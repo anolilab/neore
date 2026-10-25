@@ -133,6 +133,13 @@ export const assertComputerRoutine = (routine: { botComputer: boolean; botId: st
     }
 };
 
+/** The quiet-when-empty flag decides on a bot's run, so only a routine with a bot can have it. */
+export const assertQuietRoutine = (routine: { botId: string | undefined; quietWhenEmpty: boolean }): void => {
+    if (routine.quietWhenEmpty && !routine.botId) {
+        throw new LunoraError("INVALID_ARGUMENT", "Only a routine with a bot can be quiet when it has nothing to report.");
+    }
+};
+
 // ============================================================================
 // cRPC-exposed queries/mutations (authenticated)
 // ============================================================================
@@ -168,6 +175,7 @@ const vGetTriggersOutput = v.array(
         model: v.string(),
         name: v.string(),
         nextTriggerAt: v.union(v.number(), v.null()),
+        quietWhenEmpty: v.boolean(),
         searchMode: v.union(v.string(), v.null()),
         systemPrompt: v.union(v.string(), v.null()),
         timezone: v.union(v.string(), v.null()),
@@ -205,6 +213,7 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
             model: t.model,
             name: t.name,
             nextTriggerAt: t.nextTriggerAt ?? null,
+            quietWhenEmpty: t.quietWhenEmpty === true,
             searchMode: t.searchMode ?? null,
             systemPrompt: t.systemPrompt ?? null,
             timezone: t.timezone ?? null,
@@ -247,6 +256,8 @@ export const createTrigger = authMutation
         inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
         model: v.string().max(MAX_LENGTH.short),
         name: v.string().max(MAX_LENGTH.short),
+        // Bot routines only. Skips a run that has nothing to report (`triggers/quiet.ts`); unset means off.
+        quietWhenEmpty: v.optional(v.boolean()),
         searchMode: v.optional(v.string().max(MAX_LENGTH.short)),
         systemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
         timezone: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -295,6 +306,7 @@ export const createTrigger = authMutation
         }
 
         assertComputerRoutine({ botComputer: args.botComputer === true, botId: args.botId, type: triggerType });
+        assertQuietRoutine({ botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true });
 
         if (args.webhookSignatureScheme !== undefined && triggerType !== "webhook") {
             throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has a signature scheme.");
@@ -313,6 +325,7 @@ export const createTrigger = authMutation
             inputTemplate: args.inputTemplate,
             model: args.model,
             name: args.name,
+            quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
             searchMode: args.searchMode,
             systemPrompt: args.systemPrompt,
             timezone: args.timezone,
@@ -375,6 +388,7 @@ export const updateTrigger = authMutation
         inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
         model: v.optional(v.string().max(MAX_LENGTH.short)),
         name: v.optional(v.string().max(MAX_LENGTH.short)),
+        quietWhenEmpty: v.optional(v.boolean()),
         searchMode: v.optional(v.string().max(MAX_LENGTH.short)),
         systemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
         timezone: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -451,6 +465,9 @@ export const updateTrigger = authMutation
         }
 
         assertComputerRoutine({ botComputer: nextComputer === true, botId: nextBotId, type: trigger.type });
+        // Clearing the bot clears the flag with it (as it does the computer), so only a request to set it is refused here.
+        assertQuietRoutine({ botId: nextBotId, quietWhenEmpty: args.quietWhenEmpty === true });
+        const nextQuiet = nextBotId === undefined ? undefined : (args.quietWhenEmpty ?? trigger.quietWhenEmpty);
 
         const filters = checkedFilters(args.filters, trigger.type);
 
@@ -464,6 +481,7 @@ export const updateTrigger = authMutation
             // An empty array removes the filters; leaving the argument out leaves them as they are.
             ...(args.filters !== undefined && { filters }),
             ...((args.botId !== undefined || args.botComputer !== undefined) && { botComputer: nextComputer === true ? true : undefined }),
+            ...((args.botId !== undefined || args.quietWhenEmpty !== undefined) && { quietWhenEmpty: nextQuiet === true ? true : undefined }),
         });
 
         if (trigger.enabled === true && nextTriggerAt !== undefined) {

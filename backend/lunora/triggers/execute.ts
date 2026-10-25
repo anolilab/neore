@@ -12,6 +12,7 @@ import { internalAction } from "../_generated/server";
 import { SANDBOX_TOOLS } from "../chat/lib/tool-builder";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
+import { isQuietRunSkipped } from "./quiet";
 
 export const executeTrigger = internalAction
     .input({
@@ -37,6 +38,23 @@ export const executeTrigger = internalAction
         }
 
         const { userId } = trigger;
+
+        // 1b. A quiet routine skips a run with nothing to report, before any row, thread or charge is written.
+        // The skip is recorded in the history (collapsed to one row, as a webhook filter miss is). A failed check posts as usual.
+        const skipped = await isQuietRunSkipped(trigger, (since) =>
+            ctx.runQuery(internal.notifications.daily_brief.loadDailyBriefInputs, { since, userId }),
+        ).catch((error: unknown) => {
+            console.error(`[Triggers] Quiet check failed for ${triggerId}, posting the run:`, error);
+
+            return false;
+        });
+
+        if (skipped) {
+            await ctx.runMutation(internal.triggers.functions.recordFilteredExecution, { reason: "Nothing to report", triggerId });
+
+            return;
+        }
+
         const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
         // A bot routine runs on the bot's model, with the bot's instructions ahead of the routine's own.
         const bot = trigger.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: trigger.botId, userId }) : null;

@@ -40099,6 +40099,9 @@
                       "name": {
                         "type": "string"
                       },
+                      "quietWhenEmpty": {
+                        "type": "boolean"
+                      },
                       "searchMode": {
                         "type": "string"
                       },
@@ -40635,6 +40638,9 @@
                       },
                       "name": {
                         "type": "string"
+                      },
+                      "quietWhenEmpty": {
+                        "type": "boolean"
                       },
                       "searchMode": {
                         "type": "string"

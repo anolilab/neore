@@ -6193,6 +6193,11 @@
     {
       "from": "function:triggers_execute:default",
       "kind": "call",
+      "to": "function:notifications_daily_brief:loadDailyBriefInputs"
+    },
+    {
+      "from": "function:triggers_execute:default",
+      "kind": "call",
       "to": "function:triggers_functions:admitTriggerRun"
     },
     {
@@ -6204,6 +6209,11 @@
       "from": "function:triggers_execute:default",
       "kind": "call",
       "to": "function:triggers_functions:getTriggerInternal"
+    },
+    {
+      "from": "function:triggers_execute:default",
+      "kind": "call",
+      "to": "function:triggers_functions:recordFilteredExecution"
     },
     {
       "from": "function:triggers_execute:default",

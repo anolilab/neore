@@ -11,7 +11,16 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { assertComputerRoutine, createTrigger, getTriggerExecutions, setTriggerEnabled, testRunTrigger, updateTrigger, updateTriggerStats } from "./functions";
+import {
+    assertComputerRoutine,
+    assertQuietRoutine,
+    createTrigger,
+    getTriggerExecutions,
+    setTriggerEnabled,
+    testRunTrigger,
+    updateTrigger,
+    updateTriggerStats,
+} from "./functions";
 import { findNextCronTime } from "./schedule";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
@@ -181,6 +190,64 @@ describe("a routine's bot computer", () => {
 
         expect(cleared.botId).toBeUndefined();
         expect(cleared.botComputer).toBeUndefined();
+    });
+});
+
+describe("a routine's quiet flag", () => {
+    it("needs a bot", () => {
+        expect(() => assertQuietRoutine({ botId: undefined, quietWhenEmpty: true })).toThrow("Only a routine with a bot");
+        expect(() => assertQuietRoutine({ botId: "bot-a", quietWhenEmpty: true })).not.toThrow();
+        expect(() => assertQuietRoutine({ botId: undefined, quietWhenEmpty: false })).not.toThrow();
+    });
+
+    it("is refused on create without a bot", async () => {
+        await expect(
+            harness
+                .withIdentity({ userId: "user-a" } as never)
+                .mutation(createTrigger as never, { cronExpression: "0 9 * * 1", model: "m", name: "Daily", quietWhenEmpty: true, type: "schedule" } as never),
+        ).rejects.toThrow("Only a routine with a bot");
+    });
+
+    it("is stored only when on, and is cleared with the bot", async () => {
+        const triggerId = (await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("triggers", {
+                    botId: "bot-a",
+                    createdAt: 1,
+                    cronExpression: "0 9 * * 1",
+                    enabled: false,
+                    model: "m",
+                    name: "Daily",
+                    quietWhenEmpty: true,
+                    triggerCount: 0,
+                    type: "schedule",
+                    updatedAt: 1,
+                    userId: "user-a",
+                }),
+        )) as string;
+        const identity = harness.withIdentity({ userId: "user-a" } as never);
+
+        await expect(identity.mutation(updateTrigger as never, { botId: null, quietWhenEmpty: true, triggerId } as never)).rejects.toThrow(
+            "Only a routine with a bot",
+        );
+
+        await identity.mutation(updateTrigger as never, { quietWhenEmpty: false, triggerId } as never);
+
+        const off = await readTrigger(triggerId);
+
+        expect(off.quietWhenEmpty).toBeUndefined();
+
+        await identity.mutation(updateTrigger as never, { quietWhenEmpty: true, triggerId } as never);
+
+        const on = await readTrigger(triggerId);
+
+        expect(on.quietWhenEmpty).toBe(true);
+
+        await identity.mutation(updateTrigger as never, { botId: null, triggerId } as never);
+
+        const cleared = await readTrigger(triggerId);
+
+        expect(cleared.quietWhenEmpty).toBeUndefined();
     });
 });
 

@@ -1753,6 +1753,7 @@ export interface Doc_triggers {
     nextTriggerAt?: number;
     organizationId?: string;
     payloadTemplate?: string;
+    quietWhenEmpty?: boolean;
     searchMode?: string;
     systemPrompt?: string;
     timezone?: string;
@@ -4482,6 +4483,7 @@ export interface Insert_triggers {
     nextTriggerAt?: number;
     organizationId?: string;
     payloadTemplate?: string;
+    quietWhenEmpty?: boolean;
     searchMode?: string;
     systemPrompt?: string;
     timezone?: string;

@@ -2742,6 +2742,8 @@ export const schema = defineSchema({
         nextTriggerAt: v.optional(v.number()),
         organizationId: v.optional(v.string()),
         payloadTemplate: v.optional(v.string()),
+        // A bot routine that only posts when there is something to report (`triggers/quiet.ts`). Absent = off. Only with a botId.
+        quietWhenEmpty: v.optional(v.boolean()),
         searchMode: v.optional(v.string()),
         systemPrompt: v.optional(v.string()),
         timezone: v.optional(v.string()),

@@ -1507,6 +1507,7 @@ export const triggers = sqliteTable("triggers", {
     nextTriggerAt: real("nextTriggerAt"),
     organizationId: text("organizationId"),
     payloadTemplate: text("payloadTemplate"),
+    quietWhenEmpty: integer("quietWhenEmpty", { mode: "boolean" }),
     searchMode: text("searchMode"),
     systemPrompt: text("systemPrompt"),
     timezone: text("timezone"),

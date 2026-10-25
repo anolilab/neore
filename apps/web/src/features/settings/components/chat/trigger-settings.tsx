@@ -116,6 +116,7 @@ interface TriggerFormData {
     inputTemplate: string;
     model: string;
     name: string;
+    quietWhenEmpty: boolean;
     systemPrompt: string;
     timezone: string;
     type: TriggerType;
@@ -152,6 +153,7 @@ interface TriggerRow {
     model: string;
     name: string;
     nextTriggerAt: number | null;
+    quietWhenEmpty: boolean;
     searchMode: string | null;
     systemPrompt: string | null;
     timezone: string | null;
@@ -182,6 +184,7 @@ const EMPTY_FORM: TriggerFormData = {
     inputTemplate: "",
     model: "",
     name: "",
+    quietWhenEmpty: false,
     systemPrompt: "",
     timezone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
     type: "schedule",
@@ -349,6 +352,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
     // Generated ids: the create and edit forms can be open together, and fixed ids would make their labels ambiguous.
     const botPickerId = useId();
     const botComputerId = useId();
+    const quietId = useId();
     const schemeId = useId();
     const sourceId = useId();
     const eventId = useId();
@@ -408,6 +412,21 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                             checked={formData.botComputer}
                             id={botComputerId}
                             onCheckedChange={(checked: boolean) => onChange({ ...formData, botComputer: checked })}
+                        />
+                    </div>
+                )}
+                {formData.botId !== "" && (
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <Label htmlFor={quietId}>{t`Only post when there is something to report`}</Label>
+                            <p className="text-muted-foreground text-xs">
+                                {t`Skips a run when your workspace has had no new activity since the routine last posted. A skipped run creates no chat and sends no notification.`}
+                            </p>
+                        </div>
+                        <Switch
+                            checked={formData.quietWhenEmpty}
+                            id={quietId}
+                            onCheckedChange={(checked: boolean) => onChange({ ...formData, quietWhenEmpty: checked })}
                         />
                     </div>
                 )}
@@ -739,6 +758,7 @@ const TriggerSettings: FC = () => {
                 inputTemplate: formData.inputTemplate || undefined,
                 model: formData.model || "anthropic/claude-sonnet-4-20250514",
                 name: formData.name,
+                quietWhenEmpty: formData.botId !== "" && formData.quietWhenEmpty ? true : undefined,
                 systemPrompt: formData.systemPrompt || undefined,
                 timezone: formData.type === "schedule" ? formData.timezone : undefined,
                 type: formData.type,
@@ -775,6 +795,7 @@ const TriggerSettings: FC = () => {
                 inputTemplate: editFormData.inputTemplate || undefined,
                 model: editFormData.model || undefined,
                 name: editFormData.name,
+                quietWhenEmpty: editFormData.botId !== "" && editFormData.quietWhenEmpty,
                 systemPrompt: editFormData.systemPrompt || undefined,
                 timezone: editFormData.type === "schedule" ? editFormData.timezone : undefined,
                 triggerId: editingTriggerId,
@@ -870,6 +891,7 @@ const TriggerSettings: FC = () => {
             inputTemplate: trigger.inputTemplate ?? "",
             model: trigger.model,
             name: trigger.name,
+            quietWhenEmpty: trigger.quietWhenEmpty,
             systemPrompt: trigger.systemPrompt ?? "",
             timezone: trigger.timezone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone,
             type: trigger.type as TriggerType,
