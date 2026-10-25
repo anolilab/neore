@@ -4,7 +4,8 @@ import { HotkeysProvider, useHotkeys } from "react-hotkeys-hook";
 import { useKeyboardShortcuts as useUIKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
-import convertShortcutToHotkeysHook, { convertRecordedShortcutToHotkeysHook } from "../lib/shortcut-converter";
+import { convertRecordedShortcutToHotkeysHook } from "../lib/recorded-shortcut-converter";
+import convertShortcutToHotkeysHook from "../lib/shortcut-converter";
 import { hasThreadSearchTarget } from "../lib/thread-search-target";
 
 // Context for keyboard shortcuts
