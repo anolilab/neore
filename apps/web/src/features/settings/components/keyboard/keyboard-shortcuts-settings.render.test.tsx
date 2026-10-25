@@ -1,11 +1,13 @@
 /**
- * The keyboard settings form: the whole stored shortcut set is the form value, a chord shared by two
- * commands is refused with a field error, and a valid set still saves.
+ * The keyboard settings form and the reasoning-effort commands: a chord shared by two commands (both
+ * effort commands, or an effort command and another one) is refused with a field error, and a free chord saves.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { defaultKeyboardShortcuts, useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
 import KeyboardShortcutsSettings from "./keyboard-shortcuts-settings";
 
@@ -47,40 +49,6 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
-// Every command of the stored set, not only the ones this form edits.
-vi.mock("@/features/layout/hooks/use-ui-state", () => {
-    return {
-        useKeyboardShortcuts: () => {
-            return {
-                keyboardShortcuts: {
-                    archiveThread: "ctrl+a",
-                    audioRecord: "ctrl+shift+r",
-                    commandPalette: "ctrl+k",
-                    copyLastCodeBlock: "ctrl+shift+x",
-                    createBranch: "ctrl+shift+c",
-                    deleteThread: "ctrl+d",
-                    escape: "escape",
-                    firstItem: "home",
-                    focusSearch: "ctrl+f",
-                    help: "ctrl+/",
-                    lastItem: "end",
-                    newChat: "ctrl+n",
-                    newTemporaryChat: "ctrl+shift+n",
-                    nextItem: "arrowdown",
-                    openModelPicker: "ctrl+shift+m",
-                    pinThread: "ctrl+p",
-                    prevItem: "arrowup",
-                    search: "ctrl+k",
-                    sidebarLeft: "ctrl+b",
-                    sidebarRight: "ctrl+shift+b",
-                },
-                resetKeyboardShortcuts: vi.fn(),
-                setKeyboardShortcuts: vi.fn(),
-            };
-        },
-    };
-});
-
 const renderForm = () =>
     render(
         <QueryClientProvider client={new QueryClient()}>
@@ -90,21 +58,19 @@ const renderForm = () =>
 
 /** Records `chord` for the row labelled `label`: Record, press the keys, release them. */
 const record = (label: string, chord: Partial<Pick<KeyboardEventInit, "altKey" | "ctrlKey" | "shiftKey">> & { key: string }) => {
-    // The rows are in one order: the nth field has the nth Record button.
-    const button = screen.getAllByRole("button", { name: "Record" }).at(screen.getAllByRole("textbox").indexOf(screen.getByLabelText(label)));
-
-    if (!button) {
-        throw new TypeError(`No Record button for ${label}`);
-    }
-
-    fireEvent.click(button);
+    fireEvent.click(screen.getByRole("button", { name: `Record ${label}` }));
     fireEvent.keyDown(document, chord);
     fireEvent.keyUp(document, chord);
 };
 
+const DUPLICATE_MESSAGE = "Another action already uses this key combination. Change or clear one of them to save.";
+
 describe("KeyboardShortcutsSettings effort commands", () => {
     beforeEach(() => {
         updateUserSettings.mockClear();
+        act(() => {
+            useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts } });
+        });
     });
 
     it("refuses one chord for both effort commands", async () => {
@@ -113,9 +79,7 @@ describe("KeyboardShortcutsSettings effort commands", () => {
         record("Increase Reasoning Effort", { altKey: true, key: "e" });
 
         await waitFor(() => {
-            const message = "Increase and decrease reasoning effort need different shortcuts.";
-
-            expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toStrictEqual([message, message]);
+            expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toStrictEqual([DUPLICATE_MESSAGE, DUPLICATE_MESSAGE]);
         });
     });
 
@@ -124,14 +88,19 @@ describe("KeyboardShortcutsSettings effort commands", () => {
         record("Increase Reasoning Effort", { ctrlKey: true, key: "n" });
 
         await waitFor(() => {
-            expect(screen.getByRole("alert").textContent).toBe("Another command already uses this shortcut.");
+            expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toStrictEqual([DUPLICATE_MESSAGE, DUPLICATE_MESSAGE]);
         });
     });
 
     it("saves a free chord", async () => {
         renderForm();
         record("Increase Reasoning Effort", { altKey: true, key: "ArrowUp" });
-        fireEvent.click(screen.getByRole("button", { name: "Save Shortcuts" }));
+        const save = screen.getByRole("button", { name: "Save Shortcuts" });
+
+        await waitFor(() => {
+            expect((save as HTMLButtonElement).disabled).toBe(false);
+        });
+        fireEvent.click(save);
 
         await waitFor(() => {
             expect(updateUserSettings).toHaveBeenCalledTimes(1);
