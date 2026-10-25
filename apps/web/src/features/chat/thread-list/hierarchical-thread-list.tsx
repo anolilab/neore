@@ -6,6 +6,7 @@ import { Plural, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { KeyCombo, Keys, KeySymbol, ShortcutsProvider } from "@neore/ui/components/keyboard-shortcuts";
+import { formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -22,6 +23,7 @@ import {
     useUnpinProject,
     useUpdateProjectOrder,
 } from "@/features/projects/hooks/use-projects";
+import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError, showInfo } from "@/lib/toast";
@@ -47,16 +49,13 @@ const ProjectFormDialog = lazy(() => import("@/features/projects/components/proj
 // KeyboardHelp - Shows keyboard shortcuts overlay
 const keyboardHelpMappings = {
     "?": { label: "Question Mark", symbols: { default: "?" } },
-    a: { label: "A", symbols: { default: "A" } },
-    b: { label: "B", symbols: { default: "B" } },
-    d: { label: "D", symbols: { default: "D" } },
-    f: { label: "F", symbols: { default: "F" } },
     n: { label: "N", symbols: { default: "N" } },
-    p: { label: "P", symbols: { default: "P" } },
 };
 
 const KeyboardHelp: FC<{ onClose: () => void; show: boolean }> = ({ onClose, show }) => {
     const { t } = useLingui();
+    const { keyboardShortcuts } = useKeyboardShortcuts();
+    const focusSearchShortcut = formatShortcutForDisplay(keyboardShortcuts.focusSearch);
 
     if (!show) {
         return null;
@@ -81,26 +80,12 @@ const KeyboardHelp: FC<{ onClose: () => void; show: boolean }> = ({ onClose, sho
                             <span className="text-muted-foreground">{t`New temporary thread`}</span>
                             <KeyCombo keyNames={[Keys.Command, Keys.Shift, "n"]} />
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Delete thread`}</span>
-                            <KeyCombo keyNames={[Keys.Command, "d"]} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Pin/Unpin thread`}</span>
-                            <KeyCombo keyNames={[Keys.Command, "p"]} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Create branch`}</span>
-                            <KeyCombo keyNames={[Keys.Command, "b"]} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Archive/Unarchive thread`}</span>
-                            <KeyCombo keyNames={[Keys.Command, "a"]} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Search threads`}</span>
-                            <KeyCombo keyNames={[Keys.Command, "f"]} />
-                        </div>
+                        {focusSearchShortcut && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">{t`Focus search`}</span>
+                                <kbd className="font-mono">{focusSearchShortcut}</kbd>
+                            </div>
+                        )}
                         <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">{t`Navigate threads`}</span>
                             <KeyCombo keyNames={[Keys.ArrowUp, Keys.ArrowDown]} />

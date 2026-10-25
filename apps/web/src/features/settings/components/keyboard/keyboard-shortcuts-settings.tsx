@@ -46,6 +46,8 @@ const EDITABLE_SHORTCUT_KEYS = Object.keys(keyboardShortcutSchema.shape) as (key
 const pickEditableShortcuts = (shortcuts: Partial<KeyboardShortcuts>): KeyboardShortcutForm =>
     Object.fromEntries(EDITABLE_SHORTCUT_KEYS.map((key) => [key, shortcuts[key] ?? ""])) as KeyboardShortcutForm;
 
+const MODIFIER_KEYS = new Set(["Alt", "Control", "Meta", "Shift"]);
+
 const saveStatus = (state: { canSubmit: boolean; isSubmitting: boolean }): "invalid" | "ready" | "saving" => {
     if (state.isSubmitting) {
         return "saving";
@@ -90,6 +92,8 @@ const KeyboardShortcutsSettings: FC = () => {
     const { mutateAsync: updateUserSettings } = useMutation(crpc.auth.functions.updateUserSettings.mutationOptions());
     const [isRecording, setIsRecording] = useState<string | undefined>(undefined);
     const [pressedKeys, setPressedKeys] = useState<string[]>([]);
+    // Reset and Save are one queue: neither starts while the other is in flight, so the last click is the last write.
+    const [isResetting, setIsResetting] = useState(false);
 
     // The one save path: Save and Reset to Defaults both go through it.
     const saveShortcuts = useCallback(
@@ -117,6 +121,9 @@ const KeyboardShortcutsSettings: FC = () => {
         validators: { onChange: keyboardShortcutSchema },
     });
 
+    // A string, not `t`: a new function identity per render would tear down the recording listeners mid-press.
+    const invalidShortcutMessage = t`That key combination cannot be used as a shortcut`;
+
     // Handle keyboard recording
     useEffect(() => {
         if (!isRecording) {
@@ -132,6 +139,11 @@ const KeyboardShortcutsSettings: FC = () => {
             event.preventDefault();
             event.stopPropagation();
 
+            // A modifier on its own is not a shortcut; wait for the key it modifies.
+            if (MODIFIER_KEYS.has(event.key)) {
+                return;
+            }
+
             // Use the utility function to convert the event to a shortcut string
             const shortcut = eventToShortcut(event);
 
@@ -142,7 +154,12 @@ const KeyboardShortcutsSettings: FC = () => {
 
             // Stop recording on key up
             const handleKeyUp = () => {
-                form.setFieldValue(isRecording as keyof KeyboardShortcutForm, shortcut);
+                // Keep a combination the backend would refuse out of the form, so Save never greys out unexplained.
+                if (isValidShortcut(shortcut)) {
+                    form.setFieldValue(isRecording as keyof KeyboardShortcutForm, shortcut);
+                } else {
+                    toast.error(invalidShortcutMessage);
+                }
 
                 setIsRecording(undefined);
                 setPressedKeys([]);
@@ -156,7 +173,7 @@ const KeyboardShortcutsSettings: FC = () => {
         return () => {
             controller.abort();
         };
-    }, [isRecording, form]);
+    }, [isRecording, form, invalidShortcutMessage]);
 
     const startRecording = (field: string) => {
         setIsRecording(field);
@@ -169,14 +186,26 @@ const KeyboardShortcutsSettings: FC = () => {
     };
 
     const handleReset = useCallback(async () => {
+        if (isResetting || form.state.isSubmitting) {
+            return;
+        }
+
         const defaults = pickEditableShortcuts(defaultKeyboardShortcuts);
 
-        resetKeyboardShortcuts();
-        form.reset(defaults);
+        setIsResetting(true);
 
-        // The server keeps its own copy, so the defaults have to be saved there too.
-        await saveShortcuts(defaults, t`Keyboard shortcuts reset to defaults`).catch(() => {});
-    }, [resetKeyboardShortcuts, form, saveShortcuts, t]);
+        try {
+            // The server keeps its own copy, so it is saved first; on failure the previous bindings stay in place.
+            await saveShortcuts(defaults, t`Keyboard shortcuts reset to defaults`);
+
+            resetKeyboardShortcuts();
+            form.reset(defaults);
+        } catch {
+            // `saveShortcuts` already told the user.
+        } finally {
+            setIsResetting(false);
+        }
+    }, [isResetting, resetKeyboardShortcuts, form, saveShortcuts, t]);
 
     return (
         <div className="space-y-6">
@@ -259,12 +288,16 @@ const KeyboardShortcutsSettings: FC = () => {
 
                         <CardFooter>
                             <div className="flex gap-2">
-                                <Button onClick={handleReset} type="button" variant="outline">
-                                    {t`Reset to Defaults`}
-                                </Button>
+                                <form.Subscribe selector={(state) => state.isSubmitting}>
+                                    {(isSubmitting) => (
+                                        <Button disabled={isSubmitting || isResetting} onClick={handleReset} type="button" variant="outline">
+                                            {t`Reset to Defaults`}
+                                        </Button>
+                                    )}
+                                </form.Subscribe>
                                 <form.Subscribe selector={saveStatus}>
                                     {(status) => (
-                                        <Button disabled={status !== "ready"} type="submit">
+                                        <Button disabled={status !== "ready" || isResetting} type="submit">
                                             {status === "saving" ? t`Saving...` : t`Save Shortcuts`}
                                         </Button>
                                     )}

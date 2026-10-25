@@ -217,6 +217,11 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
                     throw new Error("Invalid keyboard shortcut");
                 }
             }
+
+            // The settings page edits a subset; merge so bindings it does not send (audio, list navigation) survive a save.
+            const stored = (settings as Record<string, unknown> | null)?.keyboardShortcuts;
+
+            toStore.keyboardShortcuts = { ...(stored && typeof stored === "object" ? stored : {}), ...(shortcuts as Record<string, unknown>) };
         }
     }
 

@@ -131,4 +131,32 @@ describe("KeyboardShortcutsSettings", () => {
         expect(updateUserSettings.mock.calls[0]![0].keyboardShortcuts.newChat).toBe(defaultKeyboardShortcuts.newChat);
         expect(useUIStateStore.getState().keyboardShortcuts).toEqual(defaultKeyboardShortcuts);
     });
+
+    it("keeps the previous bindings when the reset cannot be saved", async () => {
+        act(() => {
+            useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, newChat: "ctrl+j" } });
+        });
+        updateUserSettings.mockRejectedValueOnce(new Error("offline"));
+        renderSettings();
+
+        fireEvent.click(screen.getByRole("button", { name: "Reset to Defaults" }));
+
+        await waitFor(() => {
+            expect(updateUserSettings).toHaveBeenCalledTimes(1);
+        });
+        await waitFor(() => {
+            expect((screen.getByRole("button", { name: "Reset to Defaults" }) as HTMLButtonElement).disabled).toBe(false);
+        });
+        expect(useUIStateStore.getState().keyboardShortcuts.newChat).toBe("ctrl+j");
+    });
+
+    it("refuses to record a combination the backend would reject", () => {
+        renderSettings();
+
+        const before = (screen.getByLabelText("New Chat") as HTMLInputElement).value;
+
+        recordShortcut("New Chat", ",");
+
+        expect((screen.getByLabelText("New Chat") as HTMLInputElement).value).toBe(before);
+    });
 });

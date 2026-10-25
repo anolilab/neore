@@ -92,13 +92,14 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                             <TooltipTrigger
                                 render={
                                     <Button
+                                        aria-label={t`Search threads`}
                                         className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
                                         data-search-toggle=""
                                         onClick={toggleShowSearch}
                                         size="sm"
                                         variant="ghost"
                                     >
-                                        <Search className="h-5 w-5" />
+                                        <Search aria-hidden="true" className="h-5 w-5" />
                                     </Button>
                                 }
                             />

@@ -35,7 +35,16 @@ vi.mock("@tanstack/react-router", () => {
 vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     return {
         useAuth: () => {
-            return { hooks: { useActiveOrganization: () => {return { data: undefined }}, useListOrganizations: () => {return { data: [] }} } };
+            return {
+                hooks: {
+                    useActiveOrganization: () => {
+                        return { data: undefined };
+                    },
+                    useListOrganizations: () => {
+                        return { data: [] };
+                    },
+                },
+            };
         },
     };
 });
