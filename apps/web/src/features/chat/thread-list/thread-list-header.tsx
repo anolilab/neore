@@ -69,6 +69,7 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
     const isMessageSearch = searchType === "messages";
     const closedSearchLabel = isMessageSearch ? t`Search messages` : t`Search threads`;
     let closedSearchTooltip = closedSearchLabel;
+
     if (focusSearchShortcut) {
         closedSearchTooltip = isMessageSearch ? t`Search messages (${focusSearchShortcut})` : t`Search threads (${focusSearchShortcut})`;
     }
