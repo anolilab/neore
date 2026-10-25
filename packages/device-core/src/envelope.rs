@@ -170,6 +170,7 @@ pub fn sign_value(secret: &str, domain: Domain, value: &Value) -> Signed {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     const SECRET: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -225,15 +226,21 @@ mod tests {
         dir.join("device-nonces.json")
     }
 
-    fn run_nonce(tag: &str) -> String {
-        format!("{tag}-{}", std::process::id())
+    static NEXT_NONCE: AtomicU64 = AtomicU64::new(0);
+
+    fn fresh_nonce() -> String {
+        format!(
+            "{}-{}",
+            std::process::id(),
+            NEXT_NONCE.fetch_add(1, Ordering::Relaxed)
+        )
     }
 
     #[test]
     fn a_stored_nonce_is_still_refused_after_a_restart() {
         let path = nonce_file("reload");
-        let first = run_nonce("n1");
-        let second = run_nonce("n2");
+        let first = fresh_nonce();
+        let second = fresh_nonce();
         let mut before = NonceSet::persisted(&path, 1_000);
 
         assert!(before.insert(&first, 10_000, 1_000));
@@ -248,7 +255,7 @@ mod tests {
     #[test]
     fn an_expired_nonce_is_pruned_on_load() {
         let path = nonce_file("prune");
-        let old = run_nonce("old");
+        let old = fresh_nonce();
         let mut before = NonceSet::persisted(&path, 1_000);
 
         assert!(before.insert(&old, 5_000, 1_000));
