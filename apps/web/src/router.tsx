@@ -21,6 +21,11 @@ import { createQueryClient } from "./lib/lunora/query-client";
 import { createWsTicketMinter } from "./lib/lunora/ws-ticket";
 import { routeTree } from "./routeTree.gen";
 
+// Dev-only: the e2e suite's mocked gateway (see `lib/development-msw.ts`). Compiled out of a build.
+if (import.meta.env.DEV && globalThis.window !== undefined) {
+    void import("@/lib/development-msw").then(({ startMockedGateway }) => startMockedGateway());
+}
+
 declare module "@tanstack/react-router" {
     interface Register {
         router: ReturnType<typeof getRouter>;
