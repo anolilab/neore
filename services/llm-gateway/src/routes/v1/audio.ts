@@ -233,19 +233,43 @@ async function handleTranscription(c: Context<HonoEnv>, task: "transcribe" | "tr
     const startTime = Date.now();
 
     // formData() buffers the whole body, so refuse an oversized upload on its declared length first.
-    // The multipart envelope and the small text fields add a little to the file's own size. A missing or
-    // understated Content-Length is still caught by the check on the parsed file below.
+    // The multipart envelope and the small text fields add a little to the file's own size.
+    const maxBodyBytes = MAX_AUDIO_BYTES + MULTIPART_OVERHEAD_BYTES;
     const declaredLength = Number(c.req.header("Content-Length"));
+    const bodyTooLarge = () =>
+        c.json({ error: { message: `Request body exceeds maximum audio size of ${MAX_AUDIO_BYTES} bytes`, type: "invalid_request_error" } }, 413);
 
-    if (Number.isFinite(declaredLength) && declaredLength > MAX_AUDIO_BYTES + MULTIPART_OVERHEAD_BYTES) {
-        return c.json({ error: { message: `Request body exceeds maximum audio size of ${MAX_AUDIO_BYTES} bytes`, type: "invalid_request_error" } }, 413);
+    if (Number.isFinite(declaredLength) && declaredLength > maxBodyBytes) {
+        return bodyTooLarge();
     }
+
+    // A chunked upload declares no length, so count the bytes as they arrive and stop reading at the cap.
+    let wasOverLimit = false;
+    let received = 0;
+    const limited = c.req.raw.body?.pipeThrough(
+        new TransformStream<Uint8Array, Uint8Array>({
+            transform(chunk, controller) {
+                received += chunk.byteLength;
+
+                if (received > maxBodyBytes) {
+                    wasOverLimit = true;
+                    controller.error(new Error("Request body exceeds the audio upload cap"));
+
+                    return;
+                }
+
+                controller.enqueue(chunk);
+            },
+        }),
+    );
 
     let formData: FormData;
 
     try {
-        formData = await c.req.formData();
+        formData = await new Response(limited ?? null, { headers: { "Content-Type": c.req.header("Content-Type") ?? "" } }).formData();
     } catch {
+        if (wasOverLimit) return bodyTooLarge();
+
         return c.json({ error: { message: "Request must be multipart/form-data", type: "invalid_request_error" } }, 400);
     }
 
