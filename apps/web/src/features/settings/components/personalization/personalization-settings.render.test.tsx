@@ -14,7 +14,7 @@ const harness = vi.hoisted(() => {
     const store = {
         listeners: new Set<() => void>(),
         pendingSaves: [] as { land: () => void; resolve: () => void; value: string }[],
-        settings: { threadTitleInstructions: undefined as string | undefined },
+        settings: { threadTitleInstructions: undefined as string | undefined } as { threadTitleInstructions?: string } | undefined,
         userId: "user-1" as string | null,
     };
 
@@ -211,6 +211,13 @@ describe("PersonalizationSettings thread title instructions", () => {
         fireEvent.change(field(), { target: { value: "Short titles" } });
 
         expect(field().value).toBe("Short titles");
+    });
+
+    it("does not accept text while the settings failed to load", () => {
+        harness.store.settings = undefined;
+        render(<PersonalizationSettings />);
+
+        expect(field().disabled).toBe(true);
     });
 
     it("drops text typed for one account when another signs in, instead of saving it there", () => {
