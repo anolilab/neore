@@ -76,8 +76,20 @@ const useQueueActions = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const sendQueuedPrompt = useSendQueuedPrompt();
+    const { threadId: currentThreadId } = useChatThread();
+    const { isStreaming } = useChatIsStreaming();
+    const { error } = useChatError();
     const { mutateAsync: withdrawSteer } = useMutation(crpc.chat.steering.withdrawSteer.mutationOptions());
     const busyRef = useRef(false);
+    // What an `await` in here must re-read afterwards, not close over.
+    const latestRef = useRef({ hasError: Boolean(error), isStreaming, threadId: currentThreadId });
+    // A thread whose send was asked for while a removal held `busyRef`.
+    const sendRequestedRef = useRef<string | undefined>(undefined);
+    const sendNextPromptRef = useRef<(threadId: string) => Promise<void>>(async () => {});
+
+    useEffect(() => {
+        latestRef.current = { hasError: Boolean(error), isStreaming, threadId: currentThreadId };
+    }, [currentThreadId, error, isStreaming]);
 
     const withdraw = useCallback(
         async (threadId: string, steer: QueuedSteer): Promise<SteerWithdrawal> => {
@@ -96,6 +108,9 @@ const useQueueActions = () => {
     const sendNextPrompt = useCallback(
         async (threadId: string): Promise<void> => {
             if (busyRef.current) {
+                // Not dropped: the call that holds the flag runs it once it lets go.
+                sendRequestedRef.current = threadId;
+
                 return;
             }
 
@@ -104,6 +119,8 @@ const useQueueActions = () => {
             try {
                 const { remove, setPaused } = usePromptQueueStore.getState();
                 const next = await takeNextToSend({
+                    // A reply that started meanwhile (a message sent from the composer) owns the thread.
+                    canSend: () => latestRef.current.threadId === threadId && !latestRef.current.isStreaming,
                     peek: () => usePromptQueueStore.getState().queues[threadId]?.items[0],
                     remove: (id) => remove(threadId, id),
                     withdraw: async (steer) => await withdraw(threadId, steer),
@@ -116,10 +133,34 @@ const useQueueActions = () => {
                 }
             } finally {
                 busyRef.current = false;
+                // A send starts a reply, and the next one waits for its end.
+                sendRequestedRef.current = undefined;
             }
         },
         [sendQueuedPrompt, withdraw],
     );
+
+    useEffect(() => {
+        sendNextPromptRef.current = sendNextPrompt;
+    }, [sendNextPrompt]);
+
+    /** After a removal: runs the send that was asked for meanwhile, if the thread still allows one. */
+    const sendRequestedMeanwhile = useCallback(() => {
+        const threadId = sendRequestedRef.current;
+
+        sendRequestedRef.current = undefined;
+
+        if (!threadId) {
+            return;
+        }
+
+        const { hasError, isStreaming: streaming, threadId: shown } = latestRef.current;
+        const queue = usePromptQueueStore.getState().queues[threadId];
+
+        if (shown === threadId && !streaming && !hasError && queue && !queue.paused && queue.items.length > 0) {
+            void sendNextPromptRef.current(threadId);
+        }
+    }, []);
 
     /** Removes a chip. A steered one leaves only once its run no longer holds the message. */
     const removePrompt = useCallback(
@@ -151,9 +192,10 @@ const useQueueActions = () => {
                 showError(t`Could not cancel the message. It is still queued.`);
             } finally {
                 busyRef.current = false;
+                sendRequestedMeanwhile();
             }
         },
-        [t, withdraw],
+        [sendRequestedMeanwhile, t, withdraw],
     );
 
     return { removePrompt, sendNextPrompt };

@@ -136,40 +136,52 @@ export type SteerWithdrawal = "delivered" | "unknown" | "withdrawn";
  * it is neither lost, reordered nor sent twice. A prompt that left the queue
  * while the call was out (the reply's delivery retired it, or the user removed
  * it) is not ours to send.
+ *
+ * `canSend` is asked right before a prompt would leave the queue, after any
+ * withdrawal has answered: false (a reply started meanwhile, say a message sent
+ * from the composer) returns `blocked` with the prompt still at the head, where
+ * the next finished reply finds it. Sending it then would run two turns at once;
+ * putting it back after removing it would send it behind later prompts.
  */
 export const takeNextToSend = async <A>({
+    canSend = () => true,
     peek,
     remove,
     withdraw,
 }: {
+    canSend?: () => boolean;
     peek: () => QueuedPrompt<A> | undefined;
     remove: (id: string) => void;
     withdraw: (steer: QueuedSteer) => Promise<SteerWithdrawal>;
-}): Promise<{ kind: "failed" } | { kind: "send"; prompt: QueuedPrompt<A> } | undefined> => {
+}): Promise<{ kind: "blocked" } | { kind: "failed" } | { kind: "send"; prompt: QueuedPrompt<A> } | undefined> => {
     for (let next = peek(); next; next = peek()) {
-        if (!next.steer) {
+        let outcome: SteerWithdrawal | undefined;
+
+        if (next.steer) {
+            try {
+                outcome = await withdraw(next.steer);
+            } catch {
+                return { kind: "failed" };
+            }
+
+            if (peek()?.id !== next.id) {
+                continue;
+            }
+        }
+
+        if (outcome === "delivered") {
             remove(next.id);
 
-            return { kind: "send", prompt: next };
-        }
-
-        let outcome: SteerWithdrawal;
-
-        try {
-            outcome = await withdraw(next.steer);
-        } catch {
-            return { kind: "failed" };
-        }
-
-        if (peek()?.id !== next.id) {
             continue;
+        }
+
+        if (!canSend()) {
+            return { kind: "blocked" };
         }
 
         remove(next.id);
 
-        if (outcome !== "delivered") {
-            return { kind: "send", prompt: next };
-        }
+        return { kind: "send", prompt: next };
     }
 
     return undefined;

@@ -214,6 +214,39 @@ describe("takeNextToSend", () => {
         ).toStrictEqual({ kind: "send", prompt: { attachments: [], id: "b", text: "then this" } });
     });
 
+    it("leaves the head in place when a reply started while the withdrawal was out", async () => {
+        const prompt = { attachments: [], id: "a", steer, text: "go left" };
+        const queue = queueOf([prompt, { attachments: [], id: "b", text: "then this" }]);
+        let streaming = false;
+
+        expect(
+            await takeNextToSend({
+                ...queue,
+                canSend: () => !streaming,
+                withdraw: async () => {
+                    streaming = true;
+
+                    return "withdrawn";
+                },
+            }),
+        ).toStrictEqual({ kind: "blocked" });
+        expect(queue.items.map((entry) => entry.id)).toStrictEqual(["a", "b"]);
+    });
+
+    it("leaves a plain head in place while sending is not allowed", async () => {
+        const queue = queueOf([{ attachments: [], id: "a", text: "hi" }]);
+
+        expect(await takeNextToSend({ ...queue, canSend: () => false, withdraw: vi.fn() })).toStrictEqual({ kind: "blocked" });
+        expect(queue.items).toHaveLength(1);
+    });
+
+    it("still drops a steer the reply took while sending is blocked", async () => {
+        const queue = queueOf([{ attachments: [], id: "a", steer, text: "go left" }]);
+
+        expect(await takeNextToSend({ ...queue, canSend: () => false, withdraw: async () => "delivered" })).toBeUndefined();
+        expect(queue.items).toHaveLength(0);
+    });
+
     it("returns nothing for a queue that only held delivered steers", async () => {
         const queue = queueOf([{ attachments: [], id: "a", steer, text: "go left" }]);
 

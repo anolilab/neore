@@ -135,10 +135,10 @@ export const withdrawSteer = authMutation
  */
 export const deliverSteers = internalMutation
     .input({
-        pendingMessageId: v.string(),
+        pendingMessageId: v.string().max(MAX_LENGTH.id),
         streamId: v.id("persistentStreams"),
         threadId: v.id("threads"),
-        userId: v.string(),
+        userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.union(v.null(), v.object({ messageId: v.string(), text: v.string() })))
     .mutation(async ({ args: { pendingMessageId, streamId, threadId, userId }, ctx }) => {
