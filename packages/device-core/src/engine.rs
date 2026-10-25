@@ -67,13 +67,9 @@ pub struct DeviceState {
 impl DeviceState {
     pub fn new(data_dir: &Path, sink: Sink) -> Self {
         let settings_path = data_dir.join("device.json");
-        let mut settings = store::load(&settings_path);
-
-        // Stored roots are kept only in the canonical form the planner uses; the next save writes that list.
-        settings.roots = shareable_roots(&settings.roots)
-            .into_iter()
-            .map(|root| root.to_string_lossy().into_owned())
-            .collect();
+        // The stored roots are kept as they are: a folder that is unplugged now must survive a save. The
+        // planner and the tools canonicalise and filter them at the point of use (`shareable_roots`).
+        let settings = store::load(&settings_path);
 
         DeviceState {
             audit_path: data_dir.join("device-audit.jsonl"),
@@ -1018,6 +1014,30 @@ pub fn validate_servers(servers: &[McpServerConfig]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_disconnected_shared_folder_survives_an_unrelated_save() {
+        let dir = std::env::temp_dir().join(format!("neore-device-roots-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let missing = dir.join("drive-not-mounted").to_string_lossy().into_owned();
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                roots: vec![missing.clone()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+        let unrelated: SettingsUpdate =
+            serde_json::from_str(r#"{"allowShellNetwork":true}"#).unwrap();
+        state.settings_update(unrelated).unwrap();
+
+        assert_eq!(store::load(&dir.join("device.json")).roots, vec![missing]);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn changing_the_mcp_servers_forgets_the_cached_tool_metadata() {
