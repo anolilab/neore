@@ -189,9 +189,9 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         // A valid signature seen before is a replay: answer 200 (the sender did
         // deliver it once) and run nothing.
         const claim = { key: `${triggerId}:${normalizeSignature(presented)}`, scope: "trigger-webhook" };
-        const firstDelivery = await context.runMutation(internal.lib.claim_once.claimKey, { ...claim, ttlMs: TRIGGER_CLAIM_TTL_MS, userId: trigger.userId });
+        const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, { ...claim, ttlMs: TRIGGER_CLAIM_TTL_MS, userId: trigger.userId });
 
-        if (!firstDelivery) {
+        if (claimedAt === null) {
             return Response.json({ duplicate: true, ok: true }, { headers: { "Content-Type": "application/json" }, status: 200 });
         }
 
@@ -241,7 +241,7 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         //    this same delivery reads as a replay, and it never runs at all.
         try {
             await httpScheduler(context).runAfter(0, internal.triggers.execute.executeTrigger, {
-                claim,
+                claim: { ...claim, claimedAt },
                 invalidUtf8: strictBody === null ? true : undefined,
                 payload: body || undefined,
                 triggerId: triggerId as Id<"triggers">,

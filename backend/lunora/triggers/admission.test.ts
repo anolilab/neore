@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { internal } from "../_generated/internal";
 import schema from "../schema";
-import { claimKey, releaseKey } from "../lib/claim-once";
+import { claimKey, claimKeyFenced, releaseKey, TRIGGER_CLAIM_TTL_MS } from "../lib/claim-once";
 import { hmacSha256Hex } from "../lib/crypto";
 import { filterTextOf, MAX_WEBHOOK_BODY_BYTES } from "./filters";
 import { admitTriggerRun, createExecution } from "./functions";
@@ -75,9 +75,20 @@ const insertTrigger = async (): Promise<string> =>
             }),
     );
 
+/** The claim mutation the webhook handler calls, served by the harness's own copy. */
+const claimMutation = (reference: unknown) => {
+    if (reference === internal.lib.claim_once.releaseKey) {
+        return releaseKey;
+    }
+
+    return reference === internal.lib.claim_once.claimKeyFenced ? claimKeyFenced : claimKey;
+};
+
 const executions = async (): Promise<{ status: string }[]> => await harness.run(async (ctx: any) => await ctx.db.query("triggerExecutions").collect());
 
-type Scheduled = { claim?: { key: string; scope: string }; invalidUtf8?: boolean; payload?: string };
+type Claim = { claimedAt: number; key: string; scope: string };
+
+type Scheduled = { claim?: Claim; invalidUtf8?: boolean; payload?: string };
 
 const hmacBytesHex = async (bytes: Uint8Array): Promise<string> => {
     const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(SECRET), { hash: "SHA-256", name: "HMAC" }, false, ["sign"]);
@@ -85,19 +96,25 @@ const hmacBytesHex = async (bytes: Uint8Array): Promise<string> => {
     return [...new Uint8Array(await crypto.subtle.sign("HMAC", key, bytes))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 
-/** The webhook handler against a trigger snapshot taken BEFORE the owner saved filters; returns what it scheduled. */
-const deliver = async (triggerId: string, body: Uint8Array | string = BODY): Promise<Scheduled> => {
+/**
+ * The webhook handler against a trigger snapshot taken BEFORE the owner saved filters; returns what it scheduled.
+ * `native` signs the body alone (no timestamp), the scheme whose replay claim lapses with its TTL.
+ */
+const deliver = async (
+    triggerId: string,
+    body: Uint8Array | string = BODY,
+    { at = NOW, native = false }: { at?: number; native?: boolean } = {},
+): Promise<Scheduled> => {
     const scheduled: Scheduled[] = [];
-    const timestamp = String(Math.floor(NOW / 1000));
+    const timestamp = String(Math.floor(at / 1000));
     const signature =
         typeof body === "string"
-            ? await hmacSha256Hex(SECRET, `${timestamp}.${body}`)
-            : await hmacBytesHex(new Uint8Array([...new TextEncoder().encode(`${timestamp}.`), ...body]));
+            ? await hmacSha256Hex(SECRET, native ? body : `${timestamp}.${body}`)
+            : await hmacBytesHex(new Uint8Array(native ? body : [...new TextEncoder().encode(`${timestamp}.`), ...body]));
     const context = {
-        runMutation: async (reference: unknown, args: unknown) =>
-            await harness.run(async (ctx: any) => await ctx.runMutation(reference === internal.lib.claim_once.releaseKey ? releaseKey : claimKey, args)),
+        runMutation: async (reference: unknown, args: unknown) => await harness.run(async (ctx: any) => await ctx.runMutation(claimMutation(reference), args)),
         runQuery: async () => {
-            return { enabled: true, type: "webhook", userId: "u", webhookSecret: SECRET };
+            return { enabled: true, type: "webhook", userId: "u", webhookSecret: SECRET, webhookSignatureScheme: native ? "native" : undefined };
         },
         scheduler: {
             runAfter: async (_delay: number, reference: unknown, args: Scheduled) => {
@@ -106,22 +123,17 @@ const deliver = async (triggerId: string, body: Uint8Array | string = BODY): Pro
             },
         },
     };
-    const response = await handleTriggerWebhook(
-        context as never,
-        new Request("https://x/triggers/webhook/t", {
-            body,
-            headers: { "x-neore-timestamp": timestamp, "x-signature-256": `sha256=${signature}` },
-            method: "POST",
-        }),
-        triggerId,
-    );
+    const headers: Record<string, string> = native
+        ? { "x-hub-signature-256": `sha256=${signature}` }
+        : { "x-neore-timestamp": timestamp, "x-signature-256": `sha256=${signature}` };
+    const response = await handleTriggerWebhook(context as never, new Request("https://x/triggers/webhook/t", { body, headers, method: "POST" }), triggerId);
 
     expect(response.status).toBe(200);
 
-    return scheduled[0] as { claim?: { key: string; scope: string }; payload?: string };
+    return scheduled[0] as Scheduled;
 };
 
-const admit = async (triggerId: string, payload: string | undefined, claim?: { key: string; scope: string }) =>
+const admit = async (triggerId: string, payload: string | undefined, claim?: Claim) =>
     await harness.run(async (ctx: any) => {
         const executionId = await ctx.runMutation(createExecution, { payload, triggerId });
 
@@ -170,6 +182,24 @@ describe("admitTriggerRun filter recheck", () => {
 
         expect(redelivery).toMatchObject({ payload: first.payload });
         expect(await admit(triggerId, redelivery.payload, redelivery.claim)).toBeNull();
+    });
+
+    it("does not clear a newer claim when a run that starts after its claim lapsed is refused", async () => {
+        // A native signature has no timestamp to go stale, so once its claim lapses a redelivery of the same body takes the key again.
+        const triggerId = await insertTrigger();
+        const first = await deliver(triggerId, BODY, { native: true });
+
+        vi.setSystemTime(NOW + TRIGGER_CLAIM_TTL_MS + 1);
+        const redelivery = await deliver(triggerId, BODY, { at: NOW + TRIGGER_CLAIM_TTL_MS + 1, native: true });
+
+        expect(redelivery.claim).toBeDefined();
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { filters: MAIN_ONLY }));
+
+        // The first run starts late; the owner's filters refuse it and it gives back its own (lapsed) claim only.
+        expect(await admit(triggerId, first.payload, first.claim)).toEqual({ filtered: 'branch equals "main"' });
+
+        // The redelivery's claim still holds the key, so the sender's next retry is a replay and schedules nothing.
+        expect(await deliver(triggerId, BODY, { at: NOW + TRIGGER_CLAIM_TTL_MS + 1, native: true })).toBeUndefined();
     });
 
     it("keeps the claim of a delivery that is admitted", async () => {

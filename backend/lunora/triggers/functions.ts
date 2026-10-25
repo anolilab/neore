@@ -688,7 +688,7 @@ export const admitTriggerRun = internalMutation
     .input({
         // The webhook delivery's replay claim. A delivery refused here gives it back, as the handler does for one
         // that misses the filters, so the owner can fix them and redeliver the same signed body.
-        claim: v.optional(v.object({ key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
+        claim: v.optional(v.object({ claimedAt: v.number(), key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
         executionId: v.optional(v.id("triggerExecutions")),
         filterPayload: v.optional(v.string().max(MAX_WEBHOOK_BODY_BYTES)),
         triggerId: v.id("triggers"),
@@ -717,7 +717,7 @@ export const admitTriggerRun = internalMutation
 
                 if (claim) {
                     try {
-                        await releaseClaim(ctx, claim.scope, claim.key);
+                        await releaseClaim(ctx, claim.scope, claim.key, claim.claimedAt);
                     } catch (error) {
                         // The refusal stands; a claim left behind only makes a redelivery read as a replay until its TTL.
                         console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}:`, error);

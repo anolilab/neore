@@ -18,7 +18,8 @@ import { filterTextOf } from "./filters";
 export const executeTrigger = internalAction
     .input({
         // The webhook delivery's replay claim, given back if admission refuses the delivery. A manual run has none.
-        claim: v.optional(v.object({ key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
+        // `claimedAt` fences the release: the run may start after the claim expired and a redelivery took the key.
+        claim: v.optional(v.object({ claimedAt: v.number(), key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
         // A manual test run ("Run now") fires a disabled trigger too.
         ignoreDisabled: v.optional(v.boolean()),
         // The webhook body was not valid UTF-8, so `payload` is its lossy decode and filters see an empty body.

@@ -688,10 +688,11 @@ export interface InternalApiTypes {
         };
         claim_once: {
             claimKey: FunctionReference<"mutation", { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }, boolean>;
+            claimKeyFenced: FunctionReference<"mutation", { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }, null | number>;
             completeKey: FunctionReference<"mutation", { key: string; scope: string }, null>;
             purgeExpiredClaims: FunctionReference<"mutation", {}, number>;
             reapLapsedClaims: FunctionReference<"mutation", {}, number>;
-            releaseKey: FunctionReference<"mutation", { key: string; scope: string }, null>;
+            releaseKey: FunctionReference<"mutation", { claimedAt?: number; key: string; scope: string }, null>;
         };
         document_history: {
             getDocumentAtTime: FunctionReference<"query", { documentId: string; tableName: string; timestamp: number }, unknown | null>;
@@ -961,11 +962,11 @@ export interface InternalApiTypes {
     };
     triggers: {
         execute: {
-            default: FunctionReference<"action", { claim?: { key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
-            executeTrigger: FunctionReference<"action", { claim?: { key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
-            admitTriggerRun: FunctionReference<"mutation", { claim?: { key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }, null | string | { filtered: string }>;
+            admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }, null | string | { filtered: string }>;
             createExecution: FunctionReference<"mutation", { payload?: string; triggerId: Id<"triggers"> }, Id<"triggerExecutions">>;
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
@@ -1701,6 +1702,7 @@ export const internal: InternalApiTypes = {
         },
         claim_once: {
             claimKey: { __lunoraRef: "lib_claim_once:claimKey" },
+            claimKeyFenced: { __lunoraRef: "lib_claim_once:claimKeyFenced" },
             completeKey: { __lunoraRef: "lib_claim_once:completeKey" },
             purgeExpiredClaims: { __lunoraRef: "lib_claim_once:purgeExpiredClaims" },
             reapLapsedClaims: { __lunoraRef: "lib_claim_once:reapLapsedClaims" },

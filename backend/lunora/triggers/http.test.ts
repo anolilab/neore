@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { internal } from "../_generated/internal";
-import { claimKey, releaseKey } from "../lib/claim-once";
+import { claimKey, claimKeyFenced, releaseKey } from "../lib/claim-once";
 import { SIGNED_REQUEST_WINDOW_MS } from "../lib/crypto";
 import { recordFilteredExecution } from "./functions";
 import handleTriggerWebhook from "./http";
@@ -44,6 +44,15 @@ const hmacHex = async (payload: string | Uint8Array): Promise<string> => {
 
 const SIGNED_TRIGGER = { enabled: true, type: "webhook", webhookSecret: SECRET };
 
+/** The claim mutation the webhook handler calls, served by the harness's own copy. */
+const claimMutation = (reference: unknown) => {
+    if (reference === internal.lib.claim_once.releaseKey) {
+        return releaseKey;
+    }
+
+    return reference === internal.lib.claim_once.claimKeyFenced ? claimKeyFenced : claimKey;
+};
+
 const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
     const triggerId = await harness.run(
         async (ctx: any) =>
@@ -70,7 +79,7 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
                 return await harness.run(async (ctx: any) => await ctx.runMutation(recordFilteredExecution, args));
             }
 
-            return await harness.run(async (ctx: any) => await ctx.runMutation(reference === internal.lib.claim_once.releaseKey ? releaseKey : claimKey, args));
+            return await harness.run(async (ctx: any) => await ctx.runMutation(claimMutation(reference), args));
         },
         runQuery: async () => trigger,
         scheduler: {
