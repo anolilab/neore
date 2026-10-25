@@ -346,10 +346,8 @@ const useStream = (
     // driving a live stream ourselves.
     const isUsePersistence = streamEnded === false || !driven;
 
-    // `StreamId` is the local brand for a `persistentStreams` id — the value comes
-    // straight from `getActiveStreamForThread`. Polled, not live: a live push re-ran
-    // the whole chunk read on every chunk; a poll reads once a second and stops once
-    // the stream settles.
+    // `StreamId` is the local brand for a `persistentStreams` id, from `getActiveStreamForThread`.
+    // Polled rather than live: a live push re-reads every chunk on each write.
     const { data: persistentBody } = useQuery({
         ...crpc.chat.streaming.getStreamBody.queryOptions(
             isUsePersistence && streamId ? { streamId: streamId as unknown as Id<"persistentStreams"> } : skipToken,
