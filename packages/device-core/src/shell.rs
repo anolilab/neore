@@ -5,8 +5,11 @@
 //! only control.
 
 use std::io::Read;
+#[cfg(unix)]
+use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -23,12 +26,58 @@ pub struct ShellOutput {
 /// How long a finished command may keep its output pipes open (a background child) before we return what we have.
 const READER_GRACE: Duration = Duration::from_millis(500);
 
+/// How long a unix reader waits for output before it checks whether it was told to stop.
+const READER_POLL: Duration = Duration::from_millis(50);
+
 /// Reads a stream to the end (so the child never blocks on a full pipe) and
-/// keeps at most `cap` bytes of it.
+/// keeps at most `cap` bytes of it. On unix the read waits in short slices, so
+/// the reader sees `stop` even while a detached child still holds the pipe open.
+#[cfg(unix)]
+fn drain(
+    mut stream: impl Read + AsRawFd + Send + 'static,
+    buffer: Arc<Mutex<(Vec<u8>, bool)>>,
+    cap: usize,
+    stop: Arc<AtomicBool>,
+) -> thread::JoinHandle<()> {
+    thread::spawn(move || {
+        let mut chunk = [0u8; 8192];
+
+        while !stop.load(Ordering::Relaxed) {
+            let mut ready = libc::pollfd {
+                fd: stream.as_raw_fd(),
+                events: libc::POLLIN,
+                revents: 0,
+            };
+            // SAFETY: `ready` is one valid pollfd for the whole call.
+            let waited =
+                unsafe { libc::poll(&mut ready, 1, READER_POLL.as_millis() as libc::c_int) };
+
+            if waited < 0 {
+                if std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted {
+                    continue;
+                }
+
+                break;
+            }
+
+            if waited == 0 {
+                continue;
+            }
+
+            match stream.read(&mut chunk) {
+                Ok(0) | Err(_) => break,
+                Ok(read) => store(&buffer, &chunk[..read], cap),
+            }
+        }
+    })
+}
+
+#[cfg(not(unix))]
 fn drain(
     mut stream: impl Read + Send + 'static,
     buffer: Arc<Mutex<(Vec<u8>, bool)>>,
     cap: usize,
+    _stop: Arc<AtomicBool>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         let mut chunk = [0u8; 8192];
@@ -38,17 +87,22 @@ fn drain(
                 break;
             }
 
-            let mut guard = buffer.lock().unwrap();
-            let room = cap.saturating_sub(guard.0.len());
-
-            if read > room {
-                guard.1 = true;
-            }
-
-            let keep = read.min(room);
-            guard.0.extend_from_slice(&chunk[..keep]);
+            store(&buffer, &chunk[..read], cap);
         }
     })
+}
+
+/// Appends a chunk to the capped buffer, and records when some of it did not fit.
+fn store(buffer: &Mutex<(Vec<u8>, bool)>, chunk: &[u8], cap: usize) {
+    let mut guard = buffer.lock().unwrap();
+    let room = cap.saturating_sub(guard.0.len());
+
+    if chunk.len() > room {
+        guard.1 = true;
+    }
+
+    let keep = chunk.len().min(room);
+    guard.0.extend_from_slice(&chunk[..keep]);
 }
 
 /// The run's private temp folder (owner-only), removed when the run ends. A
@@ -317,9 +371,20 @@ pub fn run(
     let _job = Job::attach(&child);
 
     let buffer = Arc::new(Mutex::new((Vec::new(), false)));
+    let stop = Arc::new(AtomicBool::new(false));
     let readers = [
-        drain(child.stdout.take().expect("piped"), buffer.clone(), cap),
-        drain(child.stderr.take().expect("piped"), buffer.clone(), cap),
+        drain(
+            child.stdout.take().expect("piped"),
+            buffer.clone(),
+            cap,
+            stop.clone(),
+        ),
+        drain(
+            child.stderr.take().expect("piped"),
+            buffer.clone(),
+            cap,
+            stop.clone(),
+        ),
     ];
     let started = Instant::now();
     let mut timed_out = false;
@@ -356,6 +421,10 @@ pub fn run(
         }
     }
 
+    // Readers still open are held by a detached child. They see this flag within one poll slice and exit,
+    // so repeated calls do not leave threads behind.
+    stop.store(true, Ordering::Relaxed);
+
     let (bytes, truncated) = std::mem::take(&mut *buffer.lock().unwrap());
 
     Ok(ShellOutput {
@@ -369,6 +438,32 @@ pub fn run(
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_reader_returns_once_stopped_even_while_its_pipe_stays_open() {
+        let (reader, writer) = std::io::pipe().expect("pipe");
+        let buffer = Arc::new(Mutex::new((Vec::new(), false)));
+        let stop = Arc::new(AtomicBool::new(false));
+        let handle = drain(reader, buffer, 64, stop.clone());
+
+        stop.store(true, Ordering::Relaxed);
+
+        let (done, finished) = std::sync::mpsc::channel();
+
+        thread::spawn(move || {
+            let _ = handle.join();
+            let _ = done.send(());
+        });
+
+        let returned = finished.recv_timeout(Duration::from_secs(5)).is_ok();
+
+        // The writer stays open until the reader has been judged, the way a detached child would hold it.
+        drop(writer);
+        assert!(
+            returned,
+            "the reader stayed blocked on a pipe that a detached child holds open"
+        );
+    }
 
     #[test]
     fn returns_when_a_background_child_holds_stdout() {
