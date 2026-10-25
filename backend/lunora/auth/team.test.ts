@@ -60,7 +60,9 @@ const {
     addTeamMember,
     createTeam,
     deleteTeam,
+    getMyTeams,
     getTeam,
+    getTeamSettings,
     leaveTeam,
     listTeamMembers,
     removeTeamMember,
@@ -327,6 +329,19 @@ describe("updateTeamMemberRole", () => {
     });
 });
 
+describe("updateTeamMemberRole across organizations", () => {
+    it("refuses a team of another organization and leaves the member's role alone", async () => {
+        const teamId = await insertTeam(OTHER_ORG);
+
+        await insertTeamMember(teamId, MEMBER, "member");
+
+        await expect(as(OWNER).mutation(updateTeamMemberRole as never, { role: "admin", teamId, userId: MEMBER } as never)).rejects.toMatchObject({
+            code: "FORBIDDEN",
+        });
+        expect(await teamMembers(teamId)).toMatchObject([{ role: "member", userId: MEMBER }]);
+    });
+});
+
 describe("updateTeamSettings", () => {
     const settingsOf = async (teamId: string) => await seed(async (db) => await db.teamSettings.findFirst({ where: { teamId } }));
     const allowedModelsOf = async (teamId: string) => {
@@ -391,6 +406,16 @@ describe("setActiveTeam and leaveTeam", () => {
         expect(await memberCountOf(teamId)).toBe(1);
     });
 
+    it("refuses to leave a team of another organization and keeps the membership and counter", async () => {
+        const teamId = await insertTeam(OTHER_ORG);
+
+        await insertTeamMember(teamId, MEMBER);
+
+        await expect(as(MEMBER).mutation(leaveTeam as never, { teamId } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        expect(await teamMembers(teamId)).toMatchObject([{ userId: MEMBER }]);
+        expect(await memberCountOf(teamId)).toBe(0);
+    });
+
     it("answers NOT_FOUND when the caller was never on the team", async () => {
         const teamId = await insertTeam();
 
@@ -406,6 +431,36 @@ describe("reads", () => {
 
         await expect(as(OWNER).query(getTeam as never, { teamId } as never)).resolves.toBeNull();
         await expect(as(OWNER).query(listTeamMembers as never, { teamId } as never)).resolves.toStrictEqual([]);
+    });
+
+    it("hides the settings of a team of another organization, even from a member of that team", async () => {
+        const teamId = await insertTeam(OTHER_ORG);
+
+        await insertTeamMember(teamId, MEMBER, "admin");
+        await seed(async (db) => await db.insert("teamSettings", { allowedModels: ["secret"], organizationId: OTHER_ORG, teamId }));
+
+        await expect(as(OWNER).query(getTeamSettings as never, { teamId } as never)).resolves.toBeNull();
+        await expect(as(MEMBER).query(getTeamSettings as never, { teamId } as never)).resolves.toBeNull();
+    });
+
+    it("returns the settings of a team in the active organization to an admin", async () => {
+        const teamId = await insertTeam();
+
+        await seed(async (db) => await db.insert("teamSettings", { allowedModels: ["m1"], organizationId: ORG, teamId }));
+
+        await expect(as(ADMIN).query(getTeamSettings as never, { teamId } as never)).resolves.toMatchObject({ allowedModels: ["m1"], teamId });
+    });
+
+    it("lists only the caller's teams of the active organization", async () => {
+        const own = await insertTeam();
+        const foreign = await insertTeam(OTHER_ORG);
+
+        await insertTeamMember(own, MEMBER, "admin");
+        await insertTeamMember(foreign, MEMBER);
+
+        const teams = (await as(MEMBER).query(getMyTeams as never, {} as never)) as { id: string; role: string }[];
+
+        expect(teams).toMatchObject([{ id: own, role: "admin" }]);
     });
 
     it("lists the members of a team in the active organization", async () => {
