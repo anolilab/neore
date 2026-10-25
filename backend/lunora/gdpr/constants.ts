@@ -16,3 +16,10 @@ export const DELETION_SESSION_FRESH_AGE_MS = 24 * 60 * 60 * 1000;
 
 /** Owner written onto ledger rows of a deleted account (`auth/gdpr.ts`, `gdpr/steps/residual-deletion-steps.ts`). */
 export const DELETED_USER_MARKER = "deleted-user";
+
+/** Fixed and non-personal (no error text, email or user id), so it survives `minimiseGdprRecords`. */
+export const POSTHOG_FAILED_MESSAGE = "Your account data was erased, but deleting your analytics profile failed.";
+
+/** Delay before scheduled analytics-erasure retry 1, 2, 3, ...; after the last one the request stays failed. */
+export const POSTHOG_RETRY_DELAYS_MS = [60 * 60 * 1000, 6 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
+export const POSTHOG_RETRY_MAX_ATTEMPTS = POSTHOG_RETRY_DELAYS_MS.length;

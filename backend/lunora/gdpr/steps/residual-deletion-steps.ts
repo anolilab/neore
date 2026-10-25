@@ -427,9 +427,11 @@ export const purgeUserDocumentHistory = internalMutation
 /**
  * Audit-detail keys that are request metadata; anything else is dropped. `posthog` is the PostHog
  * erasure outcome (`deleted`, `no_profile`, `skipped`): a fixed status, not personal data, and the
- * only record of which of those it was once the rest of the audit is minimised.
+ * only record of which of those it was once the rest of the audit is minimised. `attempt` and
+ * `errorClass` (an error name or `http_<status>`, never a message) are the analytics-erasure
+ * retry log (`gdpr/posthog-retry.ts`).
  */
-const AUDIT_DETAIL_KEYS = new Set(["action", "posthog", "requestedAt", "requestId", "timedOutAt"]);
+const AUDIT_DETAIL_KEYS = new Set(["action", "attempt", "errorClass", "posthog", "requestedAt", "requestId", "timedOutAt"]);
 
 const minimiseDetails = (details: string): string => {
     try {

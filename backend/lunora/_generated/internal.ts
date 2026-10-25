@@ -538,6 +538,13 @@ export interface InternalApiTypes {
             logAudit: FunctionReference<"mutation", { action: string; details: string; performedBy: string; userId: string }, null>;
             updateRequestProgress: FunctionReference<"mutation", { currentStep?: string; downloadUrl?: string; errorMessage?: string; progress?: number; requestId: Id<"gdprRequests">; status?: "pending" | "processing" | "completed" | "failed" | "cancelled"; storageId?: Id<"_storage"> }, null>;
         };
+        posthog_retry: {
+            failPostHogRetry: FunctionReference<"mutation", { attempt: number; errorClass: string; requestId: Id<"gdprRequests">; userId: string }, null>;
+            recordPostHogRetrySuccess: FunctionReference<"mutation", { attempt: number; posthog: "deleted" | "no_profile" | "skipped"; requestId: Id<"gdprRequests">; userId: string }, null>;
+            retryPostHogErasure: FunctionReference<"action", { attempt: number; requestId: Id<"gdprRequests">; userId: string }, null>;
+            schedulePostHogRetry: FunctionReference<"mutation", { requestId: Id<"gdprRequests">; userId: string }, null>;
+            startPostHogRetry: FunctionReference<"mutation", { attempt: number; requestId: Id<"gdprRequests">; userId: string }, boolean>;
+        };
         request_sweeps: {
             cleanupExpiredExports: FunctionReference<"mutation", {}, null>;
             handleGdprRequestTimeouts: FunctionReference<"mutation", {}, null>;
@@ -1539,6 +1546,13 @@ export const internal: InternalApiTypes = {
             getRequestById: { __lunoraRef: "gdpr_functions:getRequestById" },
             logAudit: { __lunoraRef: "gdpr_functions:logAudit" },
             updateRequestProgress: { __lunoraRef: "gdpr_functions:updateRequestProgress" },
+        },
+        posthog_retry: {
+            failPostHogRetry: { __lunoraRef: "gdpr_posthog_retry:failPostHogRetry" },
+            recordPostHogRetrySuccess: { __lunoraRef: "gdpr_posthog_retry:recordPostHogRetrySuccess" },
+            retryPostHogErasure: { __lunoraRef: "gdpr_posthog_retry:retryPostHogErasure" },
+            schedulePostHogRetry: { __lunoraRef: "gdpr_posthog_retry:schedulePostHogRetry" },
+            startPostHogRetry: { __lunoraRef: "gdpr_posthog_retry:startPostHogRetry" },
         },
         request_sweeps: {
             cleanupExpiredExports: { __lunoraRef: "gdpr_request_sweeps:cleanupExpiredExports" },

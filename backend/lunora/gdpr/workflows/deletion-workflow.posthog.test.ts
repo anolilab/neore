@@ -13,7 +13,13 @@ interface Call {
 }
 
 /** Runs the real handler against a context whose steps record calls; the PostHog step returns `postHog`, or throws it when it is an Error. */
-const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error, minimiseFails = false, auditFails = false, statusFails = false) => {
+const runWorkflow = async (
+    postHog: "deleted" | "no_profile" | "skipped" | Error,
+    minimiseFails = false,
+    auditFails = false,
+    statusFails = false,
+    scheduleFails = false,
+) => {
     const calls: Call[] = [];
     let current = "";
     // The stored request, as `updateRequestProgress` and `minimiseGdprRecords` would leave it.
@@ -32,6 +38,10 @@ const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error
         if (typeof args.status === "string") {
             request.status = args.status;
             request.errorMessage = (args.errorMessage as string | undefined) ?? request.errorMessage;
+        }
+
+        if (scheduleFails && current === "schedule-post-hog-retry") {
+            throw new Error("scheduling failed");
         }
 
         if (auditFails && current === "log-audit-posthog-failed") {
@@ -177,6 +187,32 @@ describe("account deletion workflow, PostHog step", () => {
         expect(request.userEmail).toBe("");
         expect(request.status).toBe("failed");
         expect(request.errorMessage).toBe("Your account data was erased, but deleting your analytics profile failed.");
+    });
+
+    it("schedules the analytics retry once, after the failure audit and before the minimisation", async () => {
+        const { calls } = await runWorkflow(new Error("[GDPR/PostHog] Failed to delete person user-1: 503 Service Unavailable"));
+        const names = stepNames(calls);
+
+        expect(names.filter((name) => name === "schedule-post-hog-retry")).toHaveLength(1);
+        expect(names.indexOf("schedule-post-hog-retry")).toBeGreaterThan(names.indexOf("log-audit-posthog-failed"));
+        expect(names.indexOf("schedule-post-hog-retry")).toBeLessThan(names.indexOf("minimise-gdpr-records-posthog-failed"));
+        expect(calls.find((call) => call.name.startsWith("schedule-post-hog-retry|"))?.args).toStrictEqual({ requestId: "req-1", userId: "user-1" });
+    });
+
+    it("still minimises and reports the PostHog error when scheduling the retry fails", async () => {
+        const failure = new Error("[GDPR/PostHog] Failed to delete person user-1: 503 Service Unavailable");
+        const { calls, outcome, request } = await runWorkflow(failure, false, false, false, true);
+
+        expect(outcome).toBe(failure);
+        expect(stepNames(calls)).toContain("minimise-gdpr-records-posthog-failed");
+        expect(request.userEmail).toBe("");
+        expect(request.status).toBe("failed");
+    });
+
+    it("schedules no retry when the PostHog step succeeds", async () => {
+        const { calls } = await runWorkflow("deleted");
+
+        expect(stepNames(calls)).not.toContain("schedule-post-hog-retry");
     });
 
     it("never marks a request failed when the PostHog step succeeds", async () => {

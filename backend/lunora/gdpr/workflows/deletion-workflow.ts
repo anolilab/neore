@@ -20,8 +20,10 @@ import type { WorkflowConfig } from "@lunora/workflow";
 
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
+import { gdprLogger } from "../../lib/logger";
 import { ROOT_SHARD_KEY } from "../../lib/shard-context";
 import { onUserShard } from "../../lib/workflow-shard";
+import { POSTHOG_FAILED_MESSAGE } from "../constants";
 
 export interface DeletionParams {
     requestId: Id<"gdprRequests">;
@@ -31,9 +33,6 @@ export interface DeletionParams {
 
 /** Upper bound on batches per drained step — a guard against a row that never stops matching. */
 const MAX_DRAIN_ROUNDS = 10_000;
-
-/** Fixed and non-personal (no error text, email or user id), so it survives `minimiseGdprRecords`. */
-const POSTHOG_FAILED_MESSAGE = "Your account data was erased, but deleting your analytics profile failed.";
 
 export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void> = {
     handler: async (workflowContext): Promise<void> => {
@@ -364,7 +363,8 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             // (a fixed message; the raw error carries the provider response), then rethrow so the
             // instance errors and never reaches completion. Unlike the export workflow this does not
             // return: the data is already gone, so the operator must see a failed instance, and a
-            // re-run is safe (every step is idempotent) and ends in `completed` once PostHog works.
+            // re-run is safe (every step is idempotent) and ends in `completed` once PostHog works,
+            // as does the scheduled retry.
             try {
                 await context.run(internal.gdpr.functions.updateRequestProgress, {
                     errorMessage: POSTHOG_FAILED_MESSAGE,
@@ -389,6 +389,18 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             } catch {
                 // Best-effort: the data is already erased, and a failing audit must neither skip the
                 // minimisation below nor replace the PostHog error the instance reports.
+            }
+
+            // Only the analytics erasure is retried, from the scheduler (`gdpr/posthog-retry.ts`): the
+            // user can no longer sign in to ask again, and nothing else is left to do. The retry state
+            // is its own scheduler job, so a scheduling failure is logged, never allowed to mask `error`.
+            try {
+                await context.step.do(
+                    "schedule-post-hog-retry",
+                    async () => await context.run(internal.gdpr.posthog_retry.schedulePostHogRetry, { requestId: args.requestId, userId: args.userId }),
+                );
+            } catch (scheduleError) {
+                gdprLogger.error(`Analytics erasure retry for request ${args.requestId} could not be scheduled`, scheduleError);
             }
 
             // The failed request must not keep the email either: minimise after the failure audit,
