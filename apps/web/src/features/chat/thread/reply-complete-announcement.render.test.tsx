@@ -40,6 +40,7 @@ const region = () => screen.getByRole("status");
 
 describe("reply complete announcement", () => {
     beforeEach(() => {
+        chat.threadId = "thread-1";
         setChat(false, [reply("old")]);
     });
 
@@ -142,6 +143,22 @@ describe("reply complete announcement", () => {
         setChat(true, [reply("old")]);
         view.rerender(<ReplyCompleteAnnouncement />);
         setChat(false, [reply("old")]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+        expect(region().textContent).toBe("");
+    });
+
+    it("stays silent when a thread switch leaves isStreaming stale and the new history loads afterwards", () => {
+        setChat(true, [reply("old"), reply("new", "streaming")]);
+        const view = render(<ReplyCompleteAnnouncement />);
+
+        act(() => {
+            chat.threadId = "thread-2";
+        });
+        setChat(true, []);
+        view.rerender(<ReplyCompleteAnnouncement />);
+        setChat(true, [reply("other-1"), reply("other-2")]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+        setChat(false, [reply("other-1"), reply("other-2")]);
         view.rerender(<ReplyCompleteAnnouncement />);
         expect(region().textContent).toBe("");
     });

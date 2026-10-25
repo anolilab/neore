@@ -16,7 +16,7 @@ import type { FC } from "react";
 import { useState } from "react";
 
 import { useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
-import { findFinishedReply, latestSettledAssistantId } from "@/features/chat/voice-mode/reply-speech";
+import { findFinishedReply, latestAssistantId, latestSettledAssistantId } from "@/features/chat/voice-mode/reply-speech";
 
 interface AnnouncementState {
     announced: boolean;
@@ -31,6 +31,15 @@ interface AnnouncementState {
     threadId: string | null | undefined;
 }
 
+/**
+ * Whether a reply is on its way in THIS message list: the prompt is last, or the newest
+ * assistant row has not settled. `isStreaming` alone can still describe the previous
+ * thread for a render after a switch, and counting it would announce the new thread's
+ * history as it loads.
+ */
+const isReplyInFlight = (messages: ReadonlyArray<{ id: string; role: string; status: string; text: string }>): boolean =>
+    messages.at(-1)?.role === "user" || latestAssistantId(messages) !== latestSettledAssistantId(messages);
+
 const ReplyCompleteAnnouncement: FC = () => {
     const { t } = useLingui();
     const { isStreaming, messages } = useChatMessages();
@@ -38,17 +47,19 @@ const ReplyCompleteAnnouncement: FC = () => {
     const [state, setState] = useState<AnnouncementState>({
         announced: false,
         baselineId: latestSettledAssistantId(messages),
-        streamed: isStreaming,
+        streamed: isStreaming && isReplyInFlight(messages),
         threadId,
     });
 
     // Adjusted while rendering (React's sanctioned alternative to an effect that only sets state).
     if (state.threadId !== threadId) {
-        setState({ announced: false, baselineId: latestSettledAssistantId(messages), streamed: isStreaming, threadId });
+        setState({ announced: false, baselineId: latestSettledAssistantId(messages), streamed: false, threadId });
     } else if (isStreaming) {
         // Empty again while the next reply streams, so its completion is a change the reader hears.
-        if (!state.streamed || state.announced) {
-            setState({ ...state, announced: false, streamed: true });
+        const observed = state.streamed || isReplyInFlight(messages);
+
+        if (observed !== state.streamed || state.announced) {
+            setState({ ...state, announced: false, streamed: observed });
         }
     } else if (state.streamed) {
         const finished = findFinishedReply(messages, { baselineId: state.baselineId, isStreaming });
