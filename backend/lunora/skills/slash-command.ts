@@ -108,10 +108,10 @@ export const findSkillCommand = (typedPrompt: string | undefined, content: Messa
 };
 
 /**
- * The reasoning effort a run uses. Without an invoked skill this is the existing
- * rule (the thread's stored setting, else the message's). With one, the user's
- * explicit per-message choice still wins, and the skill's default beats only the
- * thread's stored setting. Whether the model supports reasoning at all is
+ * The reasoning effort a run uses. The user's explicit per-message choice wins
+ * (the composer sends one only when it differs from the thread's stored setting,
+ * or when it creates the thread). Without a message choice, an invoked skill's
+ * default beats only the thread's stored setting. Whether the model supports reasoning at all is
  * decided later, by `buildReasoningProviderOptions`.
  */
 export const resolveReasoningEffort = ({
@@ -122,10 +122,4 @@ export const resolveReasoningEffort = ({
     messageEffort?: number;
     skillEffort?: number;
     threadEffort?: number;
-}): number | undefined => {
-    if (skillEffort === undefined) {
-        return threadEffort ?? messageEffort;
-    }
-
-    return messageEffort ?? skillEffort;
-};
+}): number | undefined => messageEffort ?? skillEffort ?? threadEffort;
