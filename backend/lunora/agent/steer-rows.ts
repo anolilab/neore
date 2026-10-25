@@ -19,8 +19,9 @@
  *   the steer row as their prompt, after it (`agent/client/start.ts`).
  * - The reply's rows before the steer keep their place. No other row changes
  *   parent: a row after the pending row in storage order was pinned when the
- *   pending row went in. One that is NOT pinned would follow the pending row
- *   implicitly and be re-parented by the move, so the steer is refused instead.
+ *   pending row went in. A row that is the pending row's child, by following it
+ *   implicitly or by naming it as its parent, would be re-parented by the move
+ *   (its reference would point forward), so the steer is refused instead.
  *
  * So a steered reply reads prompt → reply (its order) → steer → reply (the
  * steer's order). That is two ordinary turns in storage, and regenerate, edit
@@ -29,7 +30,7 @@
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { patchRow } from "../lib/patch";
-import { getThreadRow, parentOf, rowAfter } from "./branch-rows";
+import { childrenOf, getThreadRow, parentOf } from "./branch-rows";
 import { addMessagesHandler } from "./messages";
 
 export interface SteerRowArgs {
@@ -54,9 +55,11 @@ export const insertSteerRow = async (ctx: MutationCtx, args: SteerRowArgs): Prom
         return null;
     }
 
-    const following = await rowAfter(ctx, threadId, pending);
+    // Any row that is the pending row's child now (it names it as its parent, or
+    // follows it implicitly) would change parent once the pending row moves away.
+    const children = await childrenOf(ctx, threadId, pending);
 
-    if (following && !following.parentMessageId) {
+    if (children.length > 0) {
         return null;
     }
 

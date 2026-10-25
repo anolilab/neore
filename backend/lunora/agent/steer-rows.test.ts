@@ -152,6 +152,16 @@ describe("insertSteerRow in a thread that never branched", () => {
         expect(await rowById(ids.pending!)).toMatchObject({ order: 1, stepOrder: 3 });
         expect(await rowById(ids.late!)).toMatchObject({ order: 2, stepOrder: 0 });
     });
+
+    it("refuses a move that would turn a row's explicit parent into a forward reference", async () => {
+        // A row after the pending one that names it as its parent.
+        await insertRow("child", 2, 0, { content: "another tab", role: "user" }, { parentMessageId: ids.pending });
+
+        expect(await steer(ids.pending!)).toBeNull();
+        expect(await rowById(ids.pending!)).toMatchObject({ order: 1, stepOrder: 3 });
+        expect(await rowById(ids.child!)).toMatchObject({ order: 2, parentMessageId: ids.pending, stepOrder: 0 });
+        expect(await allRows()).toHaveLength(7);
+    });
 });
 
 describe("insertSteerRow in a branched thread", () => {
