@@ -370,16 +370,22 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 requestId: args.requestId,
                 status: "failed",
             });
-            await context.step.do(
-                "log-audit-posthog-failed",
-                async () =>
-                    await context.run(internal.gdpr.functions.logAudit, {
-                        action: "deletion_failed",
-                        details: JSON.stringify({ requestId: args.requestId }),
-                        performedBy: "system",
-                        userId: args.userId,
-                    }),
-            );
+
+            try {
+                await context.step.do(
+                    "log-audit-posthog-failed",
+                    async () =>
+                        await context.run(internal.gdpr.functions.logAudit, {
+                            action: "deletion_failed",
+                            details: JSON.stringify({ requestId: args.requestId }),
+                            performedBy: "system",
+                            userId: args.userId,
+                        }),
+                );
+            } catch {
+                // Best-effort: the data is already erased, and a failing audit must neither skip the
+                // minimisation below nor replace the PostHog error the instance reports.
+            }
 
             // The failed request must not keep the email either: minimise after the failure audit,
             // as on the success path. Its own failure must not replace the PostHog error the

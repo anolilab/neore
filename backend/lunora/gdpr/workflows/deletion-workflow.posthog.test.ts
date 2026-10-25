@@ -13,7 +13,7 @@ interface Call {
 }
 
 /** Runs the real handler against a context whose steps record calls; the PostHog step returns `postHog`, or throws it when it is an Error. */
-const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error, minimiseFails = false) => {
+const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error, minimiseFails = false, auditFails = false) => {
     const calls: Call[] = [];
     let current = "";
     // The stored request, as `updateRequestProgress` and `minimiseGdprRecords` would leave it.
@@ -27,6 +27,10 @@ const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error
         if (typeof args.status === "string") {
             request.status = args.status;
             request.errorMessage = (args.errorMessage as string | undefined) ?? request.errorMessage;
+        }
+
+        if (auditFails && current === "log-audit-posthog-failed") {
+            throw new Error("audit failed");
         }
 
         // Batched steps are drained until `hasMore` is false; everything else returns null.
@@ -146,6 +150,17 @@ describe("account deletion workflow, PostHog step", () => {
         const { outcome } = await runWorkflow(failure, true);
 
         expect(outcome).toBe(failure);
+    });
+
+    it("still minimises the request and reports the PostHog error when the failure audit step fails", async () => {
+        const failure = new Error("[GDPR/PostHog] Failed to delete person user-1: 503 Service Unavailable");
+        const { calls, outcome, request } = await runWorkflow(failure, false, true);
+
+        expect(outcome).toBe(failure);
+        expect(stepNames(calls)).toContain("minimise-gdpr-records-posthog-failed");
+        expect(request.userEmail).toBe("");
+        expect(request.status).toBe("failed");
+        expect(request.errorMessage).toBe("Your account data was erased, but deleting your analytics profile failed.");
     });
 
     it("never marks a request failed when the PostHog step succeeds", async () => {
