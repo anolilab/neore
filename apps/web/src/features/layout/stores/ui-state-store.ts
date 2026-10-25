@@ -26,10 +26,6 @@ export type ModalState = {
     isOpen: boolean;
 };
 
-export type FontSettings = {
-    codeFont: "fira-code" | "mono" | "consolas" | "jetbrains" | "source-code-pro";
-};
-
 /** Accent colour, code-block and diagram themes, UI density and font family — see `features/appearance`. */
 export type AppearanceSettings = {
     accentColor: AccentId;
@@ -78,11 +74,7 @@ export type LayoutState = {
 };
 
 export type UserPreferences = {
-    animations: boolean;
-    autoSave: boolean;
-    disableExternalLinkWarning: boolean;
     hidePersonalInfo: boolean;
-    isAdvancedUser: boolean;
     lastChatId?: string;
     onboardingCompleted: boolean;
     sendBehavior: "enter" | "shiftEnter" | "button";
@@ -128,16 +120,11 @@ const defaultUIState = {
         mainFont: "inter",
         mermaidTheme: "default",
     } as AppearanceSettings,
-    fonts: { codeFont: "fira-code" as const },
     keyboardShortcuts: defaultKeyboardShortcuts,
     layout: { direction: "ltr" as const, fontSize: "medium" as const, showAvatars: true, showTimestamps: true },
     modals: {} as Record<string, ModalState>,
     preferences: {
-        animations: true,
-        autoSave: true,
-        disableExternalLinkWarning: false,
         hidePersonalInfo: false,
-        isAdvancedUser: false,
         onboardingCompleted: false,
         sendBehavior: "enter" as const,
         showTimestamps: true,
@@ -158,7 +145,6 @@ interface UIStateStore {
     clearRecentSearches: () => void;
     closeAllModals: () => void;
     closeModal: (modalName: string) => void;
-    fonts: FontSettings;
     initializeSidebarStates: (sidebarNames: string[], defaultOpenState: "all" | string[]) => Record<string, SidebarStateValue>;
     keyboardShortcuts: KeyboardShortcuts;
     layout: LayoutState;
@@ -166,7 +152,6 @@ interface UIStateStore {
     openModal: (modalName: string, data?: unknown) => void;
     preferences: UserPreferences;
     resetAppearance: () => void;
-    resetFonts: () => void;
     resetKeyboardShortcuts: () => void;
     resetLayout: () => void;
     resetSidebarStates: () => void;
@@ -175,7 +160,6 @@ interface UIStateStore {
     rightSidebarWidth: number;
     search: SearchState;
     setAppearance: (appearance: Partial<AppearanceSettings>) => void;
-    setFonts: (fonts: Partial<FontSettings>) => void;
     setKeyboardShortcuts: (shortcuts: Partial<KeyboardShortcuts>) => void;
     setLayoutState: (layout: Partial<LayoutState>) => void;
     setModalState: (modalName: string, state: Partial<ModalState>) => void;
@@ -265,9 +249,6 @@ export const useUIStateStore = create<UIStateStore>()(
                 resetAppearance: () => {
                     set({ appearance: defaultUIState.appearance });
                 },
-                resetFonts: () => {
-                    set({ fonts: defaultUIState.fonts });
-                },
                 resetKeyboardShortcuts: () => {
                     set({ keyboardShortcuts: defaultKeyboardShortcuts });
                 },
@@ -287,13 +268,6 @@ export const useUIStateStore = create<UIStateStore>()(
                     set((state) => {
                         return {
                             appearance: { ...state.appearance, ...appearance },
-                        };
-                    });
-                },
-                setFonts: (fonts: Partial<FontSettings>) => {
-                    set((state) => {
-                        return {
-                            fonts: { ...state.fonts, ...fonts },
                         };
                     });
                 },
@@ -376,7 +350,6 @@ export const useUIStateStore = create<UIStateStore>()(
             partialize: (state) => {
                 return {
                     appearance: state.appearance,
-                    fonts: state.fonts,
                     keyboardShortcuts: state.keyboardShortcuts,
                     layout: state.layout,
                     preferences: state.preferences,
