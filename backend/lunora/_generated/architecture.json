@@ -19764,19 +19764,19 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 208,
+      "line": 211,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 213,
+      "line": 216,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 238,
+      "line": 241,
       "reason": "the default export is not a registered function"
     },
     {
