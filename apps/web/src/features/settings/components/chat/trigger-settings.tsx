@@ -726,7 +726,6 @@ const TriggerSettings: FC = () => {
         }
 
         // A provider sends its event; the server compiles the filters and the scheme. A custom trigger sends its own.
-        const isProviderWebhook = formData.type === "webhook" && formData.webhookSource !== "custom";
         const isCustomWebhook = formData.type === "webhook" && formData.webhookSource === "custom";
 
         createTrigger(
@@ -743,7 +742,9 @@ const TriggerSettings: FC = () => {
                 timezone: formData.type === "schedule" ? formData.timezone : undefined,
                 type: formData.type,
                 webhookPreset:
-                    isProviderWebhook && formData.webhookSource !== "custom" ? { event: formData.webhookEvent, provider: formData.webhookSource } : undefined,
+                    formData.type === "webhook" && formData.webhookSource !== "custom"
+                        ? { event: formData.webhookEvent, provider: formData.webhookSource }
+                        : undefined,
                 webhookSignatureScheme: isCustomWebhook ? formData.webhookSignatureScheme : undefined,
             },
             {

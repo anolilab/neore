@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { assertValidFilters, evaluateFilters } from "./filters";
-import { compileWebhookPreset, presetEventsOf } from "./presets";
+import { compileWebhookPreset, PRESET_EVENTS } from "./presets";
 
 /** Whether the preset's compiled filters accept a body. */
 const matchesPreset = (provider: "github" | "gitlab", event: Parameters<typeof compileWebhookPreset>[0]["event"], body: unknown): boolean => {
@@ -28,15 +28,17 @@ describe("provider presets", () => {
     it("offers the events of each provider", () => {
         const byName = (a: string, b: string) => a.localeCompare(b);
 
-        expect(presetEventsOf("github").toSorted(byName)).toEqual(
+        expect(PRESET_EVENTS.github.toSorted(byName)).toEqual(
             ["issue_assigned", "pull_request_merged", "pull_request_opened", "pull_request_review_requested"].toSorted(byName),
         );
-        expect(presetEventsOf("gitlab").toSorted(byName)).toEqual(["merge_request_merged", "merge_request_opened"]);
+        expect(PRESET_EVENTS.gitlab.toSorted(byName)).toEqual(["merge_request_merged", "merge_request_opened"]);
     });
 
     it("compiles only to filters the backend accepts", () => {
         for (const provider of ["github", "gitlab"] as const) {
-            for (const event of presetEventsOf(provider)) {
+            const events = PRESET_EVENTS[provider];
+
+            for (const event of events) {
                 const compiled = compileWebhookPreset({ event, provider });
 
                 expect(() => assertValidFilters(compiled?.filters ?? [])).not.toThrow();

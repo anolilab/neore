@@ -458,7 +458,7 @@ describe("webhook provider presets", () => {
         ).rejects.toThrow("Only a webhook trigger has a provider preset");
     });
 
-    it("lets a hand-written trigger use the Linear and GitLab token schemes", async () => {
+    it("lets a hand-written trigger use the Linear scheme", async () => {
         const { triggerId } = (await as().mutation(createTrigger as never, { ...webhook, webhookSignatureScheme: "linear" } as never)) as {
             triggerId: string;
         };

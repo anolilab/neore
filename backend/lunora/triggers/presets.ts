@@ -81,9 +81,6 @@ export interface WebhookPreset {
     provider: WebhookProvider;
 }
 
-/** The events a provider offers, for the form. */
-export const presetEventsOf = (provider: WebhookProvider): WebhookPresetEvent[] => [...PRESET_EVENTS[provider]];
-
 /**
  * What a preset compiles to, or `undefined` when the event does not belong to
  * the provider. The caller refuses `undefined`: a preset that names a provider

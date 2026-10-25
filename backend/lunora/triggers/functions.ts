@@ -35,6 +35,9 @@ import { isTaskModelAllowed } from "../tasks/logic";
 // "event" stays in the union because existing rows carry it; removing a member is a breaking schema change.
 const triggerTypeSchema = v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event"));
 
+/** How a webhook delivery is signed; see `triggers/http.ts`. Absent on a row means "timestamped". */
+const vSignatureScheme = v.union(v.literal("timestamped"), v.literal("native"), v.literal("gitlab-token"), v.literal("linear"));
+
 /** Nothing dispatches an event trigger, so one can be neither created nor edited. Existing rows stay readable and deletable. */
 const assertTriggerTypeSupported = (type: "event" | "schedule" | "webhook"): void => {
     if (type === "event") {
@@ -268,7 +271,7 @@ export const createTrigger = authMutation
             }),
         ),
         // Webhook triggers only; unset means "timestamped". Fixed at creation, with the secret.
-        webhookSignatureScheme: v.optional(v.union(v.literal("timestamped"), v.literal("native"), v.literal("gitlab-token"), v.literal("linear"))),
+        webhookSignatureScheme: v.optional(vSignatureScheme),
     })
     .output(v.object({ triggerId: v.string(), webhookSecret: v.optional(v.string()) }))
     .mutation(async ({ args, ctx: context }) => {
