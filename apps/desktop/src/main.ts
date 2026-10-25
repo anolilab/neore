@@ -259,7 +259,7 @@ const quitWhenNoSiteWindow = (): void => {
  * A site page in its own window (a thread, or a same-origin popup): no state file, no tray, and
  * closing it really closes it.
  */
-const openSiteWindow = (url: URL): void => {
+const openSiteWindow = (url: URL): BrowserWindow => {
     const win = new BrowserWindow({
         height: DEFAULT_SIZE.height,
         minHeight: 560,
@@ -272,6 +272,36 @@ const openSiteWindow = (url: URL): void => {
 
     guardSiteWindow(win);
     win.loadURL(url.href);
+
+    return win;
+};
+
+/** The open window of each thread, by its URL. Asking again for a thread brings that window forward. */
+const threadWindows = new Map<string, BrowserWindow>();
+
+const openOrFocusThreadWindow = (url: URL): void => {
+    const open = threadWindows.get(url.href);
+
+    if (open !== undefined && !open.isDestroyed()) {
+        if (open.isMinimized()) {
+            open.restore();
+        }
+
+        open.show();
+        open.focus();
+
+        return;
+    }
+
+    const win = openSiteWindow(url);
+
+    threadWindows.set(url.href, win);
+    win.on("closed", () => {
+        // Only this window's own entry: a window opened after it may already hold the URL.
+        if (threadWindows.get(url.href) === win) {
+            threadWindows.delete(url.href);
+        }
+    });
 };
 
 /**
@@ -622,7 +652,7 @@ const registerIpc = (): void => {
             throw new Error("open-thread-window: invalid thread id");
         }
 
-        openSiteWindow(url);
+        openOrFocusThreadWindow(url);
     });
 
     ipcMain.handle(CHANNEL.takePendingCompose, (event): string | undefined => {

@@ -438,6 +438,17 @@ describe("IPC", () => {
         expect(fake().ipc.get("neore:take-pending-compose")?.(threadSender)).toBeUndefined();
         expect(fake().ipc.get("neore:take-pending-compose")?.(siteSender())).toBe("hello");
     });
+
+    it("brings an open thread's window forward instead of opening a copy", () => {
+        const openThread = fake().ipc.get("neore:open-thread-window");
+
+        openThread?.(siteSender(), "thread-2");
+        const opened = fake().windows.length;
+
+        openThread?.(siteSender(), "thread-2");
+
+        expect(fake().windows).toHaveLength(opened);
+    });
 });
 
 describe("browser sign-in", () => {
