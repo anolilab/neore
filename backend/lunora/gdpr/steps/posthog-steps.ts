@@ -1,7 +1,8 @@
 import { v } from "lunorash/server";
 
 import { internalAction } from "../../_generated/server";
-import { assertOk, FETCH_TIMEOUT_SHORT_MS, fetchWithDeadline } from "../../lib/fetch-timeout";
+import { assertOk, FETCH_TIMEOUT_SHORT_MS, fetchWithDeadline, HttpError } from "../../lib/fetch-timeout";
+import { gdprLogger } from "../../lib/logger";
 import { posthogAppHost } from "../posthog-host";
 
 /**
@@ -77,7 +78,17 @@ export const erasePostHogPerson = async (userId: string, env: PostHogErasureEnv)
         return "no_profile";
     }
 
-    await assertOk(response, `[GDPR/PostHog] Failed to delete person ${userId}`, { includeBody: true });
+    try {
+        await assertOk(response, `[GDPR/PostHog] Failed to delete person ${userId}`, { includeBody: true });
+    } catch (error) {
+        // `HttpError.message` leaves the response body out; log it here so a rejected
+        // deletion stays diagnosable, then rethrow so the workflow step still retries.
+        if (error instanceof HttpError) {
+            gdprLogger.error(error.message, error.body);
+        }
+
+        throw error;
+    }
 
     return "deleted";
 };

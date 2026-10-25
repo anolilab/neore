@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { gdprLogger } from "../../lib/logger";
 import { erasePostHogPerson } from "./posthog-steps";
 
 const CONFIGURED = { POSTHOG_HOST: "https://eu.i.posthog.com", POSTHOG_PERSONAL_API_KEY: "phx_key", POSTHOG_PROJECT_ID: "42" };
@@ -66,6 +67,17 @@ describe(erasePostHogPerson, () => {
         stubFetch(new Response("nope", { status }));
 
         await expect(erasePostHogPerson("user-1", CONFIGURED)).rejects.toThrow(`Failed to delete person user-1: ${String(status)}`);
+    });
+
+    it("logs PostHog's response body before rethrowing a rejected delete", async () => {
+        const errorSpy = vi.spyOn(gdprLogger, "error").mockImplementation(() => {});
+
+        stubFetch(new Response("rate limited by project", { status: 429 }));
+
+        await expect(erasePostHogPerson("user-1", CONFIGURED)).rejects.toThrow("Failed to delete person user-1: 429");
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("429"), "rate limited by project");
+
+        errorSpy.mockRestore();
     });
 
     it("lets a network failure propagate", async () => {
