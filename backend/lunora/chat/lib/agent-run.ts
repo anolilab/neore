@@ -20,7 +20,7 @@ import { api } from "../../_generated/api";
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
-import type { ContextHandler } from "../../agent/client/types";
+import type { ContextHandler, TakeSteer } from "../../agent/client/types";
 import type { ResearchDepth } from "../../agent/client/create-tool";
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
@@ -55,7 +55,7 @@ import { runAfterOnShard } from "../../lib/shard-scheduler";
 import { shouldNoteBriefActivity } from "../../notifications/daily-brief-logic";
 import { buildKnowledgeCitations, type KnowledgeSource } from "../../knowledge/citations";
 import type { ReplySkill } from "../../usage/activity-logic";
-import { replyUsageArgs } from "../../usage/activity-logic";
+import { repliesByOrder, replyUsageArgs } from "../../usage/activity-logic";
 import { scheduleReplyUsage } from "../../usage/schedule";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
@@ -477,6 +477,8 @@ export const afterRun = (
         savedMessages: ReadonlyArray<MessageDoc> | undefined;
         /** The skill that answered, for the usage page's per-skill breakdown; absent for the plain assistant. */
         skill?: ReplySkill;
+        /** What the user sent into the reply while it ran (`createRunSteering`); memory extraction reads it with the prompt. */
+        steeredTexts?: ReadonlyArray<string>;
         threadId: string;
         /** The user's IANA zone, so the usage heatmap files the reply under their calendar day. */
         timeZone?: string;
@@ -484,7 +486,7 @@ export const afterRun = (
         userId: string;
     },
 ): void => {
-    const { firstTokenTime, prompt, savedMessages = [], threadId, timingStart, userId } = args;
+    const { firstTokenTime, prompt, savedMessages = [], steeredTexts = [], threadId, timingStart, userId } = args;
     const lastAssistantMessage = savedMessages.findLast((m) => !m.tool);
 
     if (lastAssistantMessage) {
@@ -525,10 +527,13 @@ export const afterRun = (
     }
 
     // Usage heatmap + per-skill breakdown (`usage/activity.ts`), on the user's own shard.
-    scheduleReplyUsage(
-        ctx.scheduler as never,
-        replyUsageArgs(savedMessages, { at: Date.now(), userId, ...(args.skill && { skill: args.skill }), ...(args.timeZone && { timeZone: args.timeZone }) }),
-    );
+    // One record per reply: a steered run saved two (`repliesByOrder`).
+    for (const reply of repliesByOrder(savedMessages)) {
+        scheduleReplyUsage(
+            ctx.scheduler as never,
+            replyUsageArgs(reply, { at: Date.now(), userId, ...(args.skill && { skill: args.skill }), ...(args.timeZone && { timeZone: args.timeZone }) }),
+        );
+    }
 
     if (!args.extractMemory || !prompt) {
         return;
@@ -561,7 +566,9 @@ export const afterRun = (
         assistantResponse: assistantText.slice(0, 4000),
         threadId: threadId as Id<"threads">,
         userId,
-        userMessage: prompt,
+        // A steer can carry the very fact worth keeping ("actually, I'm vegetarian"); `steeredFrom` keeps it whole when a long prompt is cut.
+        userMessage: [prompt, ...steeredTexts].join("\n\n"),
+        ...(steeredTexts.length > 0 && { steeredFrom: prompt.length + 2 }),
         ...(toolResults.length > 0 && { toolResults: toolResults.slice(0, 10) }),
     });
 };
@@ -603,6 +610,67 @@ export const buildRunStreamArgs = (options: { model: string; reasoningEffort: nu
     };
 
     return streamTextArgs;
+};
+
+/**
+ * What a run that may pause carries in its approval snapshot: that it was mined for memory, and for
+ * which bot. The run extracts its own prompt and steers at the pause (`afterRun`), so an approval that
+ * never completes loses nothing; the continuation extracts only the messages steered into it.
+ * Nothing when the run is not mined.
+ */
+export const memoryToCarry = (run: { botId?: string; extractMemory: boolean; prompt: string }): ToolRunConfig["memory"] =>
+    run.extractMemory && run.prompt ? { ...(run.botId && { botId: run.botId }) } : undefined;
+
+/**
+ * Steering for one interactive run (`chat/steering.ts`). `takeSteer` is the
+ * agent's step-boundary hook; `steeredBefore` tells the stream pipe that a
+ * message was delivered before the step now starting, so it writes the
+ * `restart` marker (`persist-stream.ts`) once per delivery. Deliveries made
+ * before the pipe reached their step are counted: each call answers one.
+ *
+ * A failed delivery is logged and the run carries on: its steers stay queued,
+ * and the client sends them after the reply as ordinary messages.
+ */
+export const createRunSteering = (
+    ctx: Pick<ActionCtx, "runMutation">,
+    run: { streamId: string; threadId: string; userId: string },
+): { steeredBefore: () => boolean; steeredTexts: () => string[]; takeSteer: TakeSteer } => {
+    let restartsDue = 0;
+    const texts: string[] = [];
+
+    return {
+        steeredBefore: () => {
+            const due = restartsDue > 0;
+
+            if (due) {
+                restartsDue -= 1;
+            }
+
+            return due;
+        },
+        steeredTexts: () => [...texts],
+        takeSteer: async ({ pendingMessageId }) => {
+            try {
+                const delivered = await ctx.runMutation(internal.chat.steering.deliverSteers, {
+                    pendingMessageId,
+                    streamId: run.streamId as Id<"persistentStreams">,
+                    threadId: run.threadId as Id<"threads">,
+                    userId: run.userId,
+                });
+
+                if (delivered) {
+                    restartsDue += 1;
+                    texts.push(delivered.text);
+                }
+
+                return delivered;
+            } catch (error) {
+                streamLogger.warn("[AgentRun] Steer delivery failed:", error);
+
+                return null;
+            }
+        },
+    };
 };
 
 /**
@@ -747,6 +815,8 @@ export const endStoppedRun = async (
  *   row names it as its branch parent).
  * - `contextHandler`: replaces the agent's default context.
  * - `keepOpenUnlessPaused`: as for {@link finishRun}.
+ * - `steerable`: the continuation takes steered messages (`createRunSteering`).
+ *   Interactive one-assistant runs only, never a group participant.
  */
 export const resumeApprovedRun = async (
     ctx: ActionCtx,
@@ -773,6 +843,7 @@ export const resumeApprovedRun = async (
         beforeStream?: () => Promise<void>;
         contextHandler?: ContextHandler;
         keepOpenUnlessPaused?: boolean;
+        steerable?: boolean;
     } = {},
 ): Promise<{ lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
     const { answer, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
@@ -855,13 +926,50 @@ export const resumeApprovedRun = async (
 
         await options.beforeStream?.();
 
+        const steering = options.steerable === true ? createRunSteering(ctx, { streamId, threadId, userId }) : undefined;
+        const runOptions = { saveStreamDeltas: false, ...(steering && { takeSteer: steering.takeSteer }) };
         const result = approved
-            ? await agent.approveToolCall(ctx, { threadId, userId }, { approvalId }, streamTextArgs as never, { saveStreamDeltas: false })
-            : await agent.denyToolCall(ctx, { approvalId, ...(denyReason !== undefined && { reason: denyReason }), threadId }, streamTextArgs as never, {
-                  saveStreamDeltas: false,
-              });
+            ? await agent.approveToolCall(ctx, { threadId, userId }, { approvalId }, streamTextArgs as never, runOptions)
+            : await agent.denyToolCall(
+                  ctx,
+                  { approvalId, ...(denyReason !== undefined && { reason: denyReason }), threadId },
+                  streamTextArgs as never,
+                  runOptions,
+              );
+
+        // The interactive path (`steerable`) does the bookkeeping of an ordinary run (`afterRun`): usage of each reply it
+        // saved (a steered continuation saves a second one), timing and memory extraction of the messages steered into
+        // this continuation (the run that paused extracted its own prompt and steers). A group participant's reply is keyed to
+        // its speaker by the group run. The snapshot carries no skill, so a reply counts as the plain assistant's; the day
+        // is the user's own, read from their settings.
+        const timingStart = Date.now();
+        let firstTokenTime: number | undefined;
+        const recordRun = async (extractMemory: boolean): Promise<void> => {
+            if (options.steerable !== true) {
+                return;
+            }
+
+            const savedMessages = result.savedMessages ?? [];
+            const prefs = await ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
+
+            // The run that paused extracted its own prompt and steers; this one extracts the steers it took.
+            const steered = steering?.steeredTexts() ?? [];
+
+            afterRun(ctx, {
+                ...(config.memory?.botId && { botId: config.memory.botId }),
+                extractMemory: extractMemory && config.memory !== undefined && prefs.memoryEnabled,
+                firstTokenTime,
+                prompt: steered.join("\n\n"),
+                savedMessages,
+                threadId,
+                ...(prefs.timezone && { timeZone: prefs.timezone }),
+                timingStart,
+                userId,
+            });
+        };
 
         // A stop during this continuation ends it here, after its owed text is saved (`endStoppedRun`).
+        // After a steer the reply continues below the steered message; `finishStoppedReply` reads that off the stream.
         const stoppedAt = async (error: unknown) => {
             await endStoppedRun(ctx, error, {
                 agentName: options.agentName,
@@ -873,16 +981,21 @@ export const resumeApprovedRun = async (
                 streamId,
             });
 
+            // The steps that finished before the stop are a reply like any other on the usage page; nothing is mined for memory.
+            await recordRun(false);
+
             return { lastMessageId: undefined, paused: false, stopped: true };
         };
 
         let piped: PipedStream;
 
         try {
-            piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream);
+            piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream, { steeredBefore: steering?.steeredBefore });
         } catch (error) {
             return await stoppedAt(error);
         }
+
+        firstTokenTime = piped.firstTokenTime;
 
         await result.consumeStream();
 
@@ -895,7 +1008,6 @@ export const resumeApprovedRun = async (
             });
         }
 
-        // Paused again: the next approval inherits this snapshot unchanged.
         let paused: boolean;
 
         try {
@@ -913,6 +1025,8 @@ export const resumeApprovedRun = async (
         } catch (error) {
             return await stoppedAt(error);
         }
+
+        await recordRun(true);
 
         return { lastMessageId: messageIds.at(-1), paused, stopped: false };
     } finally {

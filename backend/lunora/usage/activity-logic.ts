@@ -70,9 +70,32 @@ export const skillKeyOf = (skill: ReplySkill | undefined): string => {
 export interface SavedRowLike {
     _id?: string;
     message?: { role?: string } | null;
+    order?: number;
     providerMetadata?: unknown;
     usage?: StepUsage;
 }
+
+/**
+ * A run's saved rows split into the replies they make up, one per `order`. A run
+ * usually saves one reply. A steered run (`chat/steering.ts`) carries on in the
+ * steered message's order, so it saves two, and that is how `groupReplies`
+ * (`backfill-logic.ts`) reads them back: a user row ends a reply.
+ */
+export const repliesByOrder = <R extends SavedRowLike>(rows: ReadonlyArray<R>): R[][] => {
+    const replies: R[][] = [];
+
+    for (const row of rows) {
+        const current = replies.at(-1);
+
+        if (current && current[0]?.order === row.order) {
+            current.push(row);
+        } else {
+            replies.push([row]);
+        }
+    }
+
+    return replies;
+};
 
 export interface ReplyUsage {
     costMicrodollars: number;

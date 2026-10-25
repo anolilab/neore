@@ -1,6 +1,7 @@
 import type { Id } from "../../../_generated/dataModel";
 import { internalMutation } from "../../../_generated/server";
 import { patchThread } from "../../../agent/table-writes";
+import { type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
 import { purgeExpiredToolApprovalRuns } from "../../lib/tool-approval-cleanup";
 
 const BATCH_SIZE = 100;
@@ -20,7 +21,10 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
             expiresAt: new Date(stream.expiresAt).toISOString(),
             status: stream.status,
         });
-        await ctx.db.patch(stream._id, { status: "timeout" });
+
+        const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
+
+        await ctx.db.patch(stream._id, { status: "timeout", ...(steers && { steers }) });
 
         // A run that died without reaching `failRun` (evicted, or a dropped redelivery)
         // leaves its thread `running`; nothing else resets it. A newer live stream on the

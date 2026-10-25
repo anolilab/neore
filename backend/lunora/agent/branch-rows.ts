@@ -63,7 +63,7 @@ const rowsBefore = async (context: Reader, threadId: Id<"threads">, row: Row, li
 };
 
 /** The row right after `row` in storage order; the thread's first row for `null`. */
-const rowAfter = async (context: Reader, threadId: Id<"threads">, row: Row | null): Promise<Row | null> => {
+export const rowAfter = async (context: Reader, threadId: Id<"threads">, row: Row | null): Promise<Row | null> => {
     if (!row) {
         return (await context.db.messages.findFirst({ orderBy: [...STORAGE_ORDER_ASC], where: { threadId } })) as Row | null;
     }

@@ -11,6 +11,7 @@ import { vThreadDoc } from "../../agent/validators";
 import { optionalAuthQuery } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { throwThreadLocked } from "../../lib/thread-lock";
+import { deliveredSteerIds, type SteerEntry } from "../lib/steer-queue";
 import { lockedAfterCreation, streamLockedAfterStart } from "../lib/thread-gate";
 
 /**
@@ -140,17 +141,33 @@ export const createStreamWithMessage = internalMutation
  * Returns the streamId if there's an active stream, null otherwise
  * Used by the client to show streaming placeholder reactively.
  *
- * LIVE, so it re-runs whenever `persistentStreams` is written. Its answer only
- * changes when a stream starts or ends, and the stream row is written only
- * then (`addChunk` keeps the chunk position on the chunks, not on this row) —
- * keep it that way, or every token re-runs this for every viewer.
+ * LIVE, so it re-runs whenever `persistentStreams` is written. Its answer
+ * changes when a stream starts or ends, and when a steered message is
+ * delivered (`deliveredSteerIds`). Besides those, the row is written only by
+ * steering (`chat/steering.ts`: `steerRun`, `withdrawSteer`, `deliverSteers`),
+ * a few writes per run, bounded by `MAX_STEERS_PER_RUN` and the withdrawals —
+ * each one re-runs this for every viewer. `addChunk` keeps the chunk position
+ * on the chunks, not on this row: no per-token write may land here, or every
+ * token re-runs this for every viewer.
  */
 export const getActiveStreamForThread = optionalAuthQuery
     .input({
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
-    .output(v.union(v.object({ streamId: v.id("persistentStreams") }), v.null()))
+    .output(
+        v.union(
+            v.object({
+                /**
+                 * Steering (`chat/steering.ts`): the messages the run has taken, for
+                 * the composer to retire their chips. The run's own user only.
+                 */
+                deliveredSteerIds: v.optional(v.array(v.string())),
+                streamId: v.id("persistentStreams"),
+            }),
+            v.null(),
+        ),
+    )
     .query(async ({ args: input, ctx }) => {
         const { threadId, unlockProof } = input;
 
@@ -167,11 +184,16 @@ export const getActiveStreamForThread = optionalAuthQuery
         // read every stream the thread ever had (one per turn) to find one.
         const stream = await ctx.db.persistentStreams.findFirst({
             orderBy: [{ _creationTime: "asc" }],
-            select: ["_id"],
             where: { status: { in: ["pending", "streaming"] }, threadId },
         });
 
-        return stream ? { streamId: stream._id } : null;
+        if (!stream) {
+            return null;
+        }
+
+        const delivered = stream.userId === ctx.user?.userId ? deliveredSteerIds(stream.steers as SteerEntry[] | undefined) : [];
+
+        return delivered.length > 0 ? { deliveredSteerIds: delivered, streamId: stream._id } : { streamId: stream._id };
     });
 
 /**

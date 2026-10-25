@@ -1,7 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { PromptQueueState } from "./prompt-queue";
-import { decideAutoSend, dequeuePrompt, EMPTY_PROMPT_QUEUE, enqueuePrompt, removeQueuedPrompt, restorePromptQueue, serializePromptQueue } from "./prompt-queue";
+import {
+    decideAutoSend,
+    deliveredSteerItems,
+    dequeuePrompt,
+    EMPTY_PROMPT_QUEUE,
+    enqueuePrompt,
+    removeQueuedPrompt,
+    restorePromptQueue,
+    serializePromptQueue,
+    settleQueuedSteer,
+    takeNextToSend,
+} from "./prompt-queue";
 
 const item = (id: string) => {
     return { attachments: [], id, text: `text ${id}` };
@@ -81,6 +92,20 @@ describe("prompt queue persistence", () => {
         });
     });
 
+    it("keeps a steered prompt's stream and id across a reload, so it is withdrawn before it is sent", () => {
+        const steer = { id: "steer-1", streamId: "stream-1" };
+
+        expect(restorePromptQueue(serializePromptQueue({ items: [{ attachments: [], id: "a", steer, text: "go left" }], paused: false }))).toStrictEqual({
+            items: [{ attachments: [], id: "a", steer, text: "go left" }],
+            paused: true,
+        });
+        expect(restorePromptQueue(JSON.stringify({ items: [{ id: "a", steer: { id: 1 }, text: "go left" }] }))?.items[0]).toStrictEqual({
+            attachments: [],
+            id: "a",
+            text: "go left",
+        });
+    });
+
     it("leaves out attachment-only prompts and stores nothing for an empty queue", () => {
         expect(serializePromptQueue({ items: [{ attachments: ["file"], id: "a", text: "  " }], paused: false })).toBeUndefined();
         expect(serializePromptQueue(EMPTY_PROMPT_QUEUE)).toBeUndefined();
@@ -91,5 +116,235 @@ describe("prompt queue persistence", () => {
         expect(restorePromptQueue("{not json")).toBeUndefined();
         expect(restorePromptQueue(JSON.stringify({ items: "nope" }))).toBeUndefined();
         expect(restorePromptQueue(JSON.stringify({ items: [{ id: 1, text: "x" }, null] }))).toBeUndefined();
+    });
+});
+
+describe("deliveredSteerItems", () => {
+    it("names the steered prompts this stream has taken, and nothing else", () => {
+        const items = [
+            { attachments: [], id: "plain", text: "later" },
+            { attachments: [], id: "taken", steer: { id: "s1", streamId: "stream-1" }, text: "go left" },
+            { attachments: [], id: "waiting", steer: { id: "s2", streamId: "stream-1" }, text: "go right" },
+            { attachments: [], id: "older", steer: { id: "s1", streamId: "stream-0" }, text: "stop" },
+        ];
+
+        expect(deliveredSteerItems(items, "stream-1", ["s1"])).toStrictEqual(["taken"]);
+    });
+});
+
+describe("takeNextToSend", () => {
+    const steer = { id: "s1", streamId: "stream-1" };
+
+    /** A queue the helper reads and edits, like the store does. */
+    const queueOf = <T extends { id: string }>(items: T[]) => {
+        return {
+            items,
+            peek: () => items[0],
+            plain: (head: { id: string }) => {
+                items.splice(
+                    0,
+                    items.length,
+                    ...items.map((entry) =>
+                        entry.id === head.id ? (Object.fromEntries(Object.entries(entry).filter(([key]) => key !== "steer")) as T) : entry,
+                    ),
+                );
+            },
+            remove: (id: string) => {
+                const index = items.findIndex((entry) => entry.id === id);
+
+                if (index !== -1) {
+                    items.splice(index, 1);
+                }
+            },
+        };
+    };
+
+    it("sends a plain prompt without withdrawing anything", async () => {
+        const withdraw = vi.fn();
+        const queue = queueOf([{ attachments: [], id: "a", text: "hi" }]);
+
+        expect(await takeNextToSend({ ...queue, withdraw })).toStrictEqual({ kind: "send", prompt: { attachments: [], id: "a", text: "hi" } });
+        expect(withdraw).not.toHaveBeenCalled();
+        expect(queue.items).toHaveLength(0);
+    });
+
+    it("sends a steer the reply never took, or whose stream is gone", async () => {
+        for (const outcome of ["withdrawn", "unknown"] as const) {
+            const prompt = { attachments: [], id: "a", steer, text: "go left" };
+            const queue = queueOf([prompt]);
+
+            expect(await takeNextToSend({ ...queue, withdraw: async () => outcome })).toStrictEqual({ kind: "send", prompt });
+            expect(queue.items).toHaveLength(0);
+        }
+    });
+
+    it("drops a steer the reply already took, and sends the prompt after it", async () => {
+        const queue = queueOf([
+            { attachments: [], id: "a", steer, text: "go left" },
+            { attachments: [], id: "b", text: "then this" },
+        ]);
+
+        expect(await takeNextToSend({ ...queue, withdraw: async () => "delivered" })).toStrictEqual({
+            kind: "send",
+            prompt: { attachments: [], id: "b", text: "then this" },
+        });
+        expect(queue.items).toHaveLength(0);
+    });
+
+    it("keeps a steer at the head when its withdrawal fails, so nothing is lost, reordered or sent twice", async () => {
+        const prompt = { attachments: [], id: "a", steer, text: "go left" };
+        const queue = queueOf([prompt, { attachments: [], id: "b", text: "then this" }]);
+
+        expect(
+            await takeNextToSend({
+                ...queue,
+                withdraw: async () => {
+                    throw new Error("offline");
+                },
+            }),
+        ).toStrictEqual({ kind: "failed" });
+        expect(queue.items.map((entry) => entry.id)).toStrictEqual(["a", "b"]);
+    });
+
+    it("does not send a steer that left the queue while its withdrawal was out", async () => {
+        const queue = queueOf([
+            { attachments: [], id: "a", steer, text: "go left" },
+            { attachments: [], id: "b", text: "then this" },
+        ]);
+
+        expect(
+            await takeNextToSend({
+                ...queue,
+                withdraw: async () => {
+                    queue.remove("a");
+
+                    return "withdrawn";
+                },
+            }),
+        ).toStrictEqual({ kind: "send", prompt: { attachments: [], id: "b", text: "then this" } });
+    });
+
+    it("leaves the head in place when a reply started while the withdrawal was out", async () => {
+        const prompt = { attachments: [], id: "a", steer, text: "go left" };
+        const queue = queueOf([prompt, { attachments: [], id: "b", text: "then this" }]);
+        let streaming = false;
+
+        expect(
+            await takeNextToSend({
+                ...queue,
+                canSend: () => !streaming,
+                withdraw: async () => {
+                    streaming = true;
+
+                    return "withdrawn";
+                },
+            }),
+        ).toStrictEqual({ kind: "blocked" });
+        expect(queue.items.map((entry) => entry.id)).toStrictEqual(["a", "b"]);
+    });
+
+    it("turns a withdrawn steer into a plain prompt when a reply started while the withdrawal was out", async () => {
+        const queue = queueOf([
+            { attachments: [], id: "a", steer, text: "go left" },
+            { attachments: [], id: "b", text: "then this" },
+        ]);
+        const withdraw = vi.fn(async () => "withdrawn" as const);
+
+        expect(await takeNextToSend({ ...queue, canSend: () => false, withdraw })).toStrictEqual({ kind: "blocked" });
+        expect(queue.items).toStrictEqual([
+            { attachments: [], id: "a", text: "go left" },
+            { attachments: [], id: "b", text: "then this" },
+        ]);
+        // The head is plain now, so a later pass does not ask the server about it again.
+        expect(await takeNextToSend({ ...queue, canSend: () => false, withdraw })).toStrictEqual({ kind: "blocked" });
+        expect(withdraw).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the head in place when the reply errored while the withdrawal was out", async () => {
+        const queue = queueOf([{ attachments: [], id: "a", steer, text: "go left" }]);
+        let hasError = false;
+
+        expect(
+            await takeNextToSend({
+                ...queue,
+                canSend: () => !hasError,
+                withdraw: async () => {
+                    hasError = true;
+
+                    return "withdrawn";
+                },
+            }),
+        ).toStrictEqual({ kind: "blocked" });
+        expect(queue.items.map((entry) => entry.id)).toStrictEqual(["a"]);
+    });
+
+    it("leaves a plain head in place while sending is not allowed", async () => {
+        const queue = queueOf([{ attachments: [], id: "a", text: "hi" }]);
+
+        expect(await takeNextToSend({ ...queue, canSend: () => false, withdraw: vi.fn() })).toStrictEqual({ kind: "blocked" });
+        expect(queue.items).toHaveLength(1);
+    });
+
+    it("still drops a steer the reply took while sending is blocked", async () => {
+        const queue = queueOf([{ attachments: [], id: "a", steer, text: "go left" }]);
+
+        expect(await takeNextToSend({ ...queue, canSend: () => false, withdraw: async () => "delivered" })).toBeUndefined();
+        expect(queue.items).toHaveLength(0);
+    });
+
+    it("returns nothing for a queue that only held delivered steers", async () => {
+        const queue = queueOf([{ attachments: [], id: "a", steer, text: "go left" }]);
+
+        expect(await takeNextToSend({ ...queue, withdraw: async () => "delivered" })).toBeUndefined();
+    });
+
+    it("holds at a steer whose call is still out, without withdrawing or sending behind it", async () => {
+        const withdraw = vi.fn();
+        const queue = queueOf([
+            { attachments: [], id: "a", steer: { ...steer, pending: true }, text: "go left" },
+            { attachments: [], id: "b", text: "later" },
+        ]);
+
+        expect(await takeNextToSend({ ...queue, withdraw })).toStrictEqual({ kind: "blocked" });
+        expect(withdraw).not.toHaveBeenCalled();
+        expect(queue.items).toHaveLength(2);
+    });
+});
+
+describe(settleQueuedSteer, () => {
+    const pendingQueue = (): PromptQueueState<never> => {
+        return {
+            items: [
+                { attachments: [], id: "a", steer: { id: "s1", pending: true, streamId: "stream-1" }, text: "go left" },
+                { attachments: [], id: "b", text: "later" },
+            ],
+            paused: false,
+        };
+    };
+
+    it("keeps an answered steer in its place, no longer pending", () => {
+        const settled = settleQueuedSteer(pendingQueue(), "s1", "accepted");
+
+        expect(settled.items.map((entry) => entry.id)).toStrictEqual(["a", "b"]);
+        expect(settled.items[0]?.steer).toStrictEqual({ id: "s1", streamId: "stream-1" });
+    });
+
+    it("turns a refused steer into a plain queued message in the same place", () => {
+        const settled = settleQueuedSteer(pendingQueue(), "s1", "refused");
+
+        expect(settled.items.map((entry) => entry.id)).toStrictEqual(["a", "b"]);
+        expect(settled.items[0]).toStrictEqual({ attachments: [], id: "a", text: "go left" });
+    });
+
+    it("leaves the queue alone when the steer is gone", () => {
+        const queue = pendingQueue();
+
+        expect(settleQueuedSteer(queue, "other", "refused")).toBe(queue);
+    });
+
+    it("stores a pending steer as a plain one, so a reload reconciles it by id", () => {
+        const restored = restorePromptQueue(serializePromptQueue(pendingQueue()));
+
+        expect(restored?.items[0]?.steer).toStrictEqual({ id: "s1", streamId: "stream-1" });
     });
 });
