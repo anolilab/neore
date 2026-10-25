@@ -74,7 +74,7 @@
         "@lunora/scheduler": "catalog:lunora",
         "@lunora/server": "catalog:lunora",
         "@lunora/storage": "catalog:lunora",
-        "@lunora/workflow": "catalog:",
+        "@lunora/workflow": "catalog:lunora",
         "@modelcontextprotocol/sdk": "catalog:mcp",
         "@neore/ai": "workspace:*",
         "@neore/service-sdk": "workspace:*",
