@@ -229,14 +229,18 @@ describe(pipeToPersistentChunks, () => {
             };
             const closed = { value: false };
             const source = {
-                [Symbol.asyncIterator]: () => ({
-                    next: async () => ({ done: false, value: { text: "One. ", type: "text-delta" } }),
-                    return: async () => {
-                        closed.value = true;
+                [Symbol.asyncIterator]: () => {
+                    return {
+                        next: async () => {
+                            return { done: false, value: { text: "One. ", type: "text-delta" } };
+                        },
+                        return: async () => {
+                            closed.value = true;
 
-                        return { done: true as const, value: undefined };
-                    },
-                }),
+                            return { done: true as const, value: undefined };
+                        },
+                    };
+                },
             };
 
             await expect(pipeToPersistentChunks(ctx as never, "stream-1", source, { stopPollMs: 10 })).rejects.toBe(boom);
