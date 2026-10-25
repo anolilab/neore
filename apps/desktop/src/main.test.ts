@@ -421,6 +421,12 @@ describe("IPC", () => {
         expect(mainWindow().sent).toContain("neore:compose");
     });
 
+    it("accepts a deep link whose scheme is written in capitals", () => {
+        fake().appHandlers.get("second-instance")?.({}, ["NEORE://new?text=hello"]);
+
+        expect(fake().ipc.get("neore:take-pending-compose")?.(siteSender())).toBe("hello");
+    });
+
     it("refuses a hand-off to a thread window, which is a site page but not the main window", () => {
         fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-1");
 

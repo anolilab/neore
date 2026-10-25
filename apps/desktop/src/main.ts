@@ -72,6 +72,7 @@ const TITLE_BAR_SCRIPT = `(() => {
 .min-h-svh, .min-h-screen { min-height: calc(100dvh - ${TITLE_BAR_HEIGHT}px) !important; }\`;
     document.head.append(style);
 })();`;
+// URL schemes are case-insensitive and the parser lowercases them, so the command-line filters compare case-insensitively too.
 const SCHEME_PREFIX = `${SCHEME}://`;
 
 const state: ShellState = { deviceReady: false, isQuitting: false };
@@ -761,7 +762,7 @@ const start = (): void => {
 
     // Windows and Linux pass a deep link on the command line at first launch.
     for (const argument of process.argv) {
-        if (argument.startsWith(SCHEME_PREFIX)) {
+        if (argument.toLowerCase().startsWith(SCHEME_PREFIX)) {
             pendingDeepLinks.push(argument);
         }
     }
@@ -819,7 +820,7 @@ app.on("open-file", (event, filePath) => {
 
 app.on("second-instance", (_event, argv) => {
     for (const argument of argv) {
-        if (argument.startsWith(SCHEME_PREFIX)) {
+        if (argument.toLowerCase().startsWith(SCHEME_PREFIX)) {
             handleDeepLink(argument);
         }
     }
