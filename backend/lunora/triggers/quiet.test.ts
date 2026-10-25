@@ -5,7 +5,7 @@ import { isQuietRunSkipped, quietWindowStart } from "./quiet";
 
 const EMPTY: BriefInputs = { events: [], needsYou: [], running: [], threads: [] };
 
-const ROUTINE = { createdAt: 100, lastTriggeredAt: 500, quietWhenEmpty: true };
+const ROUTINE = { createdAt: 100, lastTriggeredAt: 500, quietWhenEmpty: true, type: "schedule" };
 
 describe("quietWindowStart", () => {
     it("starts at the last run that posted", () => {
@@ -21,8 +21,8 @@ describe("isQuietRunSkipped", () => {
     it("posts every run of a routine that did not opt in, without reading the workspace", async () => {
         const loadInputs = vi.fn(async () => EMPTY);
 
-        await expect(isQuietRunSkipped({ createdAt: 100, quietWhenEmpty: undefined }, loadInputs)).resolves.toBe(false);
-        await expect(isQuietRunSkipped({ createdAt: 100, quietWhenEmpty: false }, loadInputs)).resolves.toBe(false);
+        await expect(isQuietRunSkipped({ createdAt: 100, quietWhenEmpty: undefined, type: "schedule" }, loadInputs)).resolves.toBe(false);
+        await expect(isQuietRunSkipped({ createdAt: 100, quietWhenEmpty: false, type: "schedule" }, loadInputs)).resolves.toBe(false);
         expect(loadInputs).not.toHaveBeenCalled();
     });
 
@@ -36,8 +36,15 @@ describe("isQuietRunSkipped", () => {
     it("reads from creation when the routine has never posted", async () => {
         const loadInputs = vi.fn(async () => EMPTY);
 
-        await expect(isQuietRunSkipped({ createdAt: 100, quietWhenEmpty: true }, loadInputs)).resolves.toBe(true);
+        await expect(isQuietRunSkipped({ createdAt: 100, quietWhenEmpty: true, type: "schedule" }, loadInputs)).resolves.toBe(true);
         expect(loadInputs).toHaveBeenCalledWith(100);
+    });
+
+    it("never reads the workspace for a webhook routine, even one whose row carries the flag", async () => {
+        const loadInputs = vi.fn(async () => EMPTY);
+
+        await expect(isQuietRunSkipped({ createdAt: 100, quietWhenEmpty: true, type: "webhook" }, loadInputs)).resolves.toBe(false);
+        expect(loadInputs).not.toHaveBeenCalled();
     });
 
     it.each([

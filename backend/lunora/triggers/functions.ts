@@ -133,10 +133,21 @@ export const assertComputerRoutine = (routine: { botComputer: boolean; botId: st
     }
 };
 
-/** The quiet-when-empty flag decides on a bot's run, so only a routine with a bot can have it. */
-export const assertQuietRoutine = (routine: { botId: string | undefined; quietWhenEmpty: boolean }): void => {
-    if (routine.quietWhenEmpty && !routine.botId) {
+/**
+ * The quiet-when-empty flag decides on a bot's scheduled run, so only a scheduled
+ * routine with a bot can have it. A webhook delivery is never skipped.
+ */
+export const assertQuietRoutine = (routine: { botId: string | undefined; quietWhenEmpty: boolean; type: Doc<"triggers">["type"] }): void => {
+    if (!routine.quietWhenEmpty) {
+        return;
+    }
+
+    if (!routine.botId) {
         throw new LunoraError("INVALID_ARGUMENT", "Only a routine with a bot can be quiet when it has nothing to report.");
+    }
+
+    if (routine.type !== "schedule") {
+        throw new LunoraError("INVALID_ARGUMENT", "Only a scheduled routine can be quiet when it has nothing to report.");
     }
 };
 
@@ -306,7 +317,7 @@ export const createTrigger = authMutation
         }
 
         assertComputerRoutine({ botComputer: args.botComputer === true, botId: args.botId, type: triggerType });
-        assertQuietRoutine({ botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true });
+        assertQuietRoutine({ botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true, type: triggerType });
 
         if (args.webhookSignatureScheme !== undefined && triggerType !== "webhook") {
             throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has a signature scheme.");
@@ -466,8 +477,9 @@ export const updateTrigger = authMutation
 
         assertComputerRoutine({ botComputer: nextComputer === true, botId: nextBotId, type: trigger.type });
         // Clearing the bot clears the flag with it (as it does the computer), so only a request to set it is refused here.
-        assertQuietRoutine({ botId: nextBotId, quietWhenEmpty: args.quietWhenEmpty === true });
-        const nextQuiet = nextBotId === undefined ? undefined : (args.quietWhenEmpty ?? trigger.quietWhenEmpty);
+        // The type is fixed at creation (no update path changes it), so a non-schedule row never keeps the flag.
+        assertQuietRoutine({ botId: nextBotId, quietWhenEmpty: args.quietWhenEmpty === true, type: trigger.type });
+        const nextQuiet = nextBotId === undefined || trigger.type !== "schedule" ? undefined : (args.quietWhenEmpty ?? trigger.quietWhenEmpty);
 
         const filters = checkedFilters(args.filters, trigger.type);
 

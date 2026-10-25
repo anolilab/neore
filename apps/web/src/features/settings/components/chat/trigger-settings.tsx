@@ -415,7 +415,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                         />
                     </div>
                 )}
-                {formData.botId !== "" && (
+                {formData.type === "schedule" && formData.botId !== "" && (
                     <div className="flex items-center justify-between gap-4">
                         <div>
                             <Label htmlFor={quietId}>{t`Only post when there is something to report`}</Label>
@@ -758,7 +758,7 @@ const TriggerSettings: FC = () => {
                 inputTemplate: formData.inputTemplate || undefined,
                 model: formData.model || "anthropic/claude-sonnet-4-20250514",
                 name: formData.name,
-                quietWhenEmpty: formData.botId !== "" && formData.quietWhenEmpty ? true : undefined,
+                quietWhenEmpty: formData.type === "schedule" && formData.botId !== "" && formData.quietWhenEmpty ? true : undefined,
                 systemPrompt: formData.systemPrompt || undefined,
                 timezone: formData.type === "schedule" ? formData.timezone : undefined,
                 type: formData.type,
@@ -795,7 +795,7 @@ const TriggerSettings: FC = () => {
                 inputTemplate: editFormData.inputTemplate || undefined,
                 model: editFormData.model || undefined,
                 name: editFormData.name,
-                quietWhenEmpty: editFormData.botId !== "" && editFormData.quietWhenEmpty,
+                quietWhenEmpty: editFormData.type === "schedule" && editFormData.botId !== "" && editFormData.quietWhenEmpty,
                 systemPrompt: editFormData.systemPrompt || undefined,
                 timezone: editFormData.type === "schedule" ? editFormData.timezone : undefined,
                 triggerId: editingTriggerId,

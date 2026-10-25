@@ -19,13 +19,14 @@ export const quietWindowStart = (trigger: { createdAt: number; lastTriggeredAt?:
 
 /**
  * Whether this run is skipped. `loadInputs` is called only for an opted-in
- * routine, so every other run is posted exactly as before.
+ * scheduled routine, so every other run is posted exactly as before. A webhook
+ * delivery is never skipped: the workspace signal would drop a real event.
  */
 export const isQuietRunSkipped = async (
-    trigger: { createdAt: number; lastTriggeredAt?: number; quietWhenEmpty?: boolean },
+    trigger: { createdAt: number; lastTriggeredAt?: number; quietWhenEmpty?: boolean; type: string },
     loadInputs: (since: number) => Promise<BriefInputs>,
 ): Promise<boolean> => {
-    if (trigger.quietWhenEmpty !== true) {
+    if (trigger.quietWhenEmpty !== true || trigger.type !== "schedule") {
         return false;
     }
 

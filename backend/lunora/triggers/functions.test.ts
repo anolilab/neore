@@ -195,9 +195,59 @@ describe("a routine's bot computer", () => {
 
 describe("a routine's quiet flag", () => {
     it("needs a bot", () => {
-        expect(() => assertQuietRoutine({ botId: undefined, quietWhenEmpty: true })).toThrow("Only a routine with a bot");
-        expect(() => assertQuietRoutine({ botId: "bot-a", quietWhenEmpty: true })).not.toThrow();
-        expect(() => assertQuietRoutine({ botId: undefined, quietWhenEmpty: false })).not.toThrow();
+        expect(() => assertQuietRoutine({ botId: undefined, quietWhenEmpty: true, type: "schedule" })).toThrow("Only a routine with a bot");
+        expect(() => assertQuietRoutine({ botId: undefined, quietWhenEmpty: false, type: "webhook" })).not.toThrow();
+    });
+
+    it("needs a scheduled routine: a webhook routine with the flag is refused, a schedule routine with it is accepted", () => {
+        expect(() => assertQuietRoutine({ botId: "bot-a", quietWhenEmpty: true, type: "webhook" })).toThrow("Only a scheduled routine");
+        expect(() => assertQuietRoutine({ botId: "bot-a", quietWhenEmpty: true, type: "schedule" })).not.toThrow();
+    });
+
+    it("refuses the flag on an existing webhook routine, and accepts it on a schedule", async () => {
+        const webhookId = (await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("triggers", {
+                    botId: "bot-a",
+                    createdAt: 1,
+                    enabled: false,
+                    model: "m",
+                    name: "Hook",
+                    triggerCount: 0,
+                    type: "webhook",
+                    updatedAt: 1,
+                    userId: "user-a",
+                }),
+        )) as string;
+        const scheduleId = (await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("triggers", {
+                    botId: "bot-a",
+                    createdAt: 1,
+                    cronExpression: "0 9 * * 1",
+                    enabled: false,
+                    model: "m",
+                    name: "Daily",
+                    triggerCount: 0,
+                    type: "schedule",
+                    updatedAt: 1,
+                    userId: "user-a",
+                }),
+        )) as string;
+        const identity = harness.withIdentity({ userId: "user-a" } as never);
+
+        await expect(identity.mutation(updateTrigger as never, { quietWhenEmpty: true, triggerId: webhookId } as never)).rejects.toThrow(
+            "Only a scheduled routine",
+        );
+        const hook = await readTrigger(webhookId);
+
+        expect(hook.quietWhenEmpty).toBeUndefined();
+
+        await identity.mutation(updateTrigger as never, { quietWhenEmpty: true, triggerId: scheduleId } as never);
+
+        const daily = await readTrigger(scheduleId);
+
+        expect(daily.quietWhenEmpty).toBe(true);
     });
 
     it("is refused on create without a bot", async () => {
