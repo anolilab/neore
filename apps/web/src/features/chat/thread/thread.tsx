@@ -39,6 +39,7 @@ import CopyLastCodeBlockListener from "./copy-last-code-block";
 import EditComposer from "./edit-composer";
 import MediaGalleryView from "./media-gallery-view";
 import MessageList from "./message-list";
+import SubAgentParentBreadcrumb from "./sub-agent-parent-breadcrumb";
 import TextSelectionMenu from "./text-selection-menu";
 import ThreadMinimap from "./thread-minimap";
 import type { ThreadViewportRef } from "./thread-viewport";
@@ -241,6 +242,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
             <CopyLastCodeBlockListener />
             <div className={cn("h-[calc(100%-40px)]", className)} style={{ "--thread-max-width": maxWidth } as React.CSSProperties}>
                 <ThreadViewport className="flex h-full flex-col items-center bg-inherit px-4 pt-2" ref={viewportRef}>
+                    {!isNewThread && <SubAgentParentBreadcrumb className="w-full max-w-(--thread-max-width)" threadId={threadId} />}
                     <div
                         className={clsx("assistant-message flex min-h-full w-full flex-col", {
                             "prose prose-slate dark:prose-invert max-w-(--thread-max-width)": composerMode === "text",
