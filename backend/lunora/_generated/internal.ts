@@ -730,6 +730,7 @@ export interface InternalApiTypes {
             isThreadTemporary: FunctionReference<"query", { threadId: Id<"threads"> }, boolean>;
             markMemorySupersededByCompression: FunctionReference<"mutation", { memoryId: Id<"memories">; userId: string }, void>;
             recordRetrievedMemories: FunctionReference<"mutation", { memories: Array<{ memoryId: string; score: number }>; messageId: Id<"messages">; userId: string }, null>;
+            retryMemoryVectorDelete: FunctionReference<"mutation", { attempt: number; embeddingId: string; memoryId: string; userId: string }, null>;
             saveMemory: FunctionReference<"mutation", { botId?: string; confidence?: number; importance?: number; memory: string; source?: "auto" | "manual" | "compressed" | "reflection"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }, Id<"memories">>;
             saveMemoryBatch: FunctionReference<"mutation", { memories: Array<{ botId?: string; confidence?: number; importance?: number; memory: string; source?: "auto" | "manual" | "compressed" | "reflection"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }> }, Array<Id<"memories">>>;
             updateMemoryInternal: FunctionReference<"mutation", { confidence?: number; embeddingId?: string; importance?: number; lastConfirmedAt?: number; memory?: string; memoryId: Id<"memories"> }, void>;
@@ -1727,6 +1728,7 @@ export const internal: InternalApiTypes = {
             isThreadTemporary: { __lunoraRef: "memory_functions:isThreadTemporary" },
             markMemorySupersededByCompression: { __lunoraRef: "memory_functions:markMemorySupersededByCompression" },
             recordRetrievedMemories: { __lunoraRef: "memory_functions:recordRetrievedMemories" },
+            retryMemoryVectorDelete: { __lunoraRef: "memory_functions:retryMemoryVectorDelete" },
             saveMemory: { __lunoraRef: "memory_functions:saveMemory" },
             saveMemoryBatch: { __lunoraRef: "memory_functions:saveMemoryBatch" },
             updateMemoryInternal: { __lunoraRef: "memory_functions:updateMemoryInternal" },

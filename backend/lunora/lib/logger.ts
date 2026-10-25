@@ -68,6 +68,7 @@ export const authLogger = baseLogger.scope("auth");
 export const cronsLogger = baseLogger.scope("crons");
 export const emailLogger = baseLogger.scope("email");
 export const gdprLogger = baseLogger.scope("gdpr");
+export const memoryLogger = baseLogger.scope("memory");
 export const promptsLogger = baseLogger.scope("prompts");
 export const aiLogger = baseLogger.scope("ai");
 export const scriptsLogger = baseLogger.scope("scripts");
