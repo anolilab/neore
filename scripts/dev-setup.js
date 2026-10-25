@@ -64,7 +64,8 @@ const nextLine = () => {
 const ask = async (question, defaultValue) => {
     const suffix = defaultValue ? ` (${defaultValue})` : "";
 
-    process.stdout.write(`${question}${suffix}: `);
+    rl.setPrompt(`${question}${suffix}: `);
+    rl.prompt();
 
     const answer = await nextLine();
 
