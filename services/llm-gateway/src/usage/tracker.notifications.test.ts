@@ -64,6 +64,64 @@ describe(sendNotifications, () => {
         expect(sizes).toEqual([50, 50, 20]);
     });
 
+    it("sends slices with bounded concurrency rather than one after another", async () => {
+        const many = Array.from({ length: 300 }, (_, index): NotificationEvent => {
+            return { ...notifications[0]!, ruleId: `r${index}` };
+        });
+        let inFlight = 0;
+        let peak = 0;
+        const fetchMock = vi.fn(async () => {
+            inFlight += 1;
+            peak = Math.max(peak, inFlight);
+            await new Promise((resolve) => {
+                setTimeout(resolve, 5);
+            });
+            inFlight -= 1;
+
+            return new Response("{}", { status: 200 });
+        });
+
+        vi.stubGlobal("fetch", fetchMock);
+
+        await sendNotifications(env, "user-1", many);
+
+        expect(fetchMock).toHaveBeenCalledTimes(6);
+        expect(peak).toBe(4);
+    });
+
+    it("gives up on the remaining slices at the overall deadline and logs each one", async () => {
+        const many = Array.from({ length: 300 }, (_, index): NotificationEvent => {
+            return { ...notifications[0]!, ruleId: `r${index}` };
+        });
+        const deadline = new AbortController();
+        const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+
+        vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => (ms === 25_000 ? deadline.signal : realTimeout(ms)));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(
+                async (_url: string, init: RequestInit) =>
+                    new Promise<Response>((_resolve, reject) => {
+                        init.signal!.addEventListener("abort", () => {
+                            reject(new DOMException("aborted", "AbortError"));
+                        });
+                    }),
+            ),
+        );
+
+        const delivery = sendNotifications(env, "user-1", many);
+
+        await vi.waitFor(() => {
+            expect(fetch).toHaveBeenCalledTimes(4);
+        });
+        deadline.abort();
+        await delivery;
+
+        // Four slices were in flight and aborted; the other two never start.
+        expect(fetch).toHaveBeenCalledTimes(4);
+        expect(console.error).toHaveBeenCalledTimes(6);
+    });
+
     it("logs a transport failure, once per batch, without the user or payload", async () => {
         vi.stubGlobal(
             "fetch",

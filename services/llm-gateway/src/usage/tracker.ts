@@ -283,7 +283,19 @@ const flushQuietly = async (telemetry: RequestTelemetry | undefined): Promise<vo
 /** The backend refuses a larger batch (`MAX_NOTIFICATIONS_PER_REQUEST`), so a user with many firing rules is sent in slices. */
 const NOTIFICATIONS_PER_REQUEST = 50;
 
-const postNotifications = async (lunoraUrl: string, secret: string, userId: string, notifications: NotificationEvent[]): Promise<void> => {
+/** Slices in flight at once: the backend writes each in its own transaction on the user's shard, so a few at a time is enough. */
+const NOTIFICATION_CONCURRENCY = 4;
+
+/** The whole delivery must end inside the 30 s `waitUntil` window, whatever the number of slices; later slices are abandoned, and logged, after it. */
+const NOTIFICATIONS_DEADLINE_MS = 25_000;
+
+const postNotifications = async (
+    lunoraUrl: string,
+    secret: string,
+    userId: string,
+    notifications: NotificationEvent[],
+    deadline: AbortSignal,
+): Promise<void> => {
     const body = JSON.stringify({ notifications, userId });
     const timestamp = Date.now().toString();
     const bodyHash = await sha256Hex(new TextEncoder().encode(body));
@@ -294,7 +306,7 @@ const postNotifications = async (lunoraUrl: string, secret: string, userId: stri
         body,
         headers: { "Content-Type": "application/json", "X-Signature": signature, "X-Timestamp": timestamp },
         method: "POST",
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.any([deadline, AbortSignal.timeout(10_000)]),
     });
 
     // Log before the body is released, so a cancel that throws cannot hide the status.
@@ -313,19 +325,33 @@ export const sendNotifications = async (env: AppEnv, userId: string, notificatio
 
     if (!lunoraUrl || !secret) return;
 
-    for (let offset = 0; offset < notifications.length; offset += NOTIFICATIONS_PER_REQUEST) {
-        const slice = notifications.slice(offset, offset + NOTIFICATIONS_PER_REQUEST);
+    const slices: NotificationEvent[][] = [];
 
-        try {
-            await postNotifications(lunoraUrl, secret, userId, slice);
-        } catch (error) {
-            // Best-effort, but never silent: a timeout or a dropped connection is otherwise lost. No retry, no payload.
-            console.error("[Notifications] Failed to deliver usage notifications", {
-                actions: slice.map((n) => n.action),
-                error: error instanceof Error ? `${error.name}: ${error.message}` : "unknown error",
-            });
-        }
+    for (let offset = 0; offset < notifications.length; offset += NOTIFICATIONS_PER_REQUEST) {
+        slices.push(notifications.slice(offset, offset + NOTIFICATIONS_PER_REQUEST));
     }
+
+    const deadline = AbortSignal.timeout(NOTIFICATIONS_DEADLINE_MS);
+    let next = 0;
+
+    // A small pool of workers drains the slices, so one slow slice delays only its own worker and the deadline bounds the rest.
+    const worker = async (): Promise<void> => {
+        for (let slice = slices[next++]; slice; slice = slices[next++]) {
+            try {
+                if (deadline.aborted) throw new DOMException("delivery deadline reached", "TimeoutError");
+
+                await postNotifications(lunoraUrl, secret, userId, slice, deadline);
+            } catch (error) {
+                // Best-effort, but never silent: a timeout or a dropped connection is otherwise lost. No retry, no payload.
+                console.error("[Notifications] Failed to deliver usage notifications", {
+                    actions: slice.map((n) => n.action),
+                    error: error instanceof Error ? `${error.name}: ${error.message}` : "unknown error",
+                });
+            }
+        }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(NOTIFICATION_CONCURRENCY, slices.length) }, worker));
 };
 
 const sha256Hex = async (data: ArrayBuffer | Uint8Array): Promise<string> => {
