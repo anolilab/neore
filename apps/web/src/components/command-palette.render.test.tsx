@@ -50,7 +50,11 @@ vi.mock("@/lib/lunora/crpc", () => {
                             isDone: true,
                             page: [
                                 { _id: "thread-busy", relevantMessages: busy, title: "Busy thread" },
-                                { _id: "thread-quiet", relevantMessages: [{ _id: "quiet-0", order: 1, stepOrder: 0, text: "gamma quiet match" }], title: "Quiet thread" },
+                                {
+                                    _id: "thread-quiet",
+                                    relevantMessages: [{ _id: "quiet-0", order: 1, stepOrder: 0, text: "gamma quiet match" }],
+                                    title: "Quiet thread",
+                                },
                             ],
                         };
                     }

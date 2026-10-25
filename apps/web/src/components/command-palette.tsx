@@ -92,7 +92,13 @@ interface MessageHit {
  * taking the first few would let one busy thread fill every slot; instead each thread gets a slot per round, keeping its own relevance order.
  */
 const collectMessageHits = (threads: MessageSearchThread[] = []): MessageHit[] => {
-    const queues = threads.map((thread) => (thread.relevantMessages ?? []).filter((message) => message.text?.trim()).map((message) => {return { message, thread }}));
+    const queues = threads.map((thread) =>
+        (thread.relevantMessages ?? [])
+            .filter((message) => message.text?.trim())
+            .map((message) => {
+                return { message, thread };
+            }),
+    );
     const hits: MessageHit[] = [];
 
     for (let round = 0; hits.length < MAX_MESSAGE_HITS && queues.some((queue) => round < queue.length); round += 1) {
