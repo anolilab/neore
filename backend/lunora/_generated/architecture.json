@@ -20077,25 +20077,25 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 216,
+      "line": 223,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 221,
+      "line": 228,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 226,
+      "line": 233,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 250,
+      "line": 257,
       "reason": "the default export is not a registered function"
     },
     {
