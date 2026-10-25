@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { convertRecordedShortcutToHotkeysHook } from "./recorded-shortcut-converter";
+import { convertRecordedShortcutToHotkeysHook, findEffortConflicts } from "./recorded-shortcut-converter";
 import convertShortcutToHotkeysHook from "./shortcut-converter";
 
 describe("convertRecordedShortcutToHotkeysHook", () => {
@@ -16,5 +16,38 @@ describe("convertRecordedShortcutToHotkeysHook", () => {
         expect(convertRecordedShortcutToHotkeysHook("alt+arrowup", "cmd")).toBe("alt+arrowup");
         expect(convertRecordedShortcutToHotkeysHook("", "cmd")).toBe(convertShortcutToHotkeysHook(""));
         expect(convertRecordedShortcutToHotkeysHook(undefined, "cmd")).toBe(convertShortcutToHotkeysHook(undefined));
+    });
+});
+
+describe("findEffortConflicts", () => {
+    it("finds nothing while the effort commands are unbound or on free chords", () => {
+        expect(findEffortConflicts({ newChat: "cmd+n" }, "cmd")).toStrictEqual({});
+        expect(findEffortConflicts({ decreaseEffort: "alt+arrowdown", increaseEffort: "alt+arrowup", newChat: "cmd+n" }, "cmd")).toStrictEqual({});
+        expect(findEffortConflicts({ decreaseEffort: "", increaseEffort: "", newChat: "" }, "cmd")).toStrictEqual({});
+    });
+
+    it("flags both effort commands on the same chord, however its modifiers are ordered", () => {
+        expect(findEffortConflicts({ decreaseEffort: "ctrl+shift+e", increaseEffort: "shift+ctrl+e" }, "ctrl")).toStrictEqual({
+            decreaseEffort: "effort",
+            increaseEffort: "effort",
+        });
+    });
+
+    it("flags a Control chord and its Command twin on a Mac, where one Command press would run both", () => {
+        expect(findEffortConflicts({ decreaseEffort: "ctrl+e", increaseEffort: "cmd+e" }, "cmd")).toStrictEqual({
+            decreaseEffort: "effort",
+            increaseEffort: "effort",
+        });
+        expect(findEffortConflicts({ decreaseEffort: "ctrl+e", increaseEffort: "cmd+e" }, "ctrl")).toStrictEqual({});
+    });
+
+    it("flags an effort chord another command has registered", () => {
+        expect(findEffortConflicts({ increaseEffort: "ctrl+n", newChat: "ctrl+n" }, "ctrl")).toStrictEqual({ increaseEffort: "command" });
+        expect(findEffortConflicts({ decreaseEffort: "ctrl+shift+n", newTemporaryChat: "shift+ctrl+n" }, "ctrl")).toStrictEqual({ decreaseEffort: "command" });
+    });
+
+    it("sees a recorded Control chord collide with the Command default on a Mac only", () => {
+        expect(findEffortConflicts({ increaseEffort: "ctrl+n", newChat: "cmd+n" }, "cmd")).toStrictEqual({ increaseEffort: "command" });
+        expect(findEffortConflicts({ increaseEffort: "ctrl+n", newChat: "cmd+n" }, "ctrl")).toStrictEqual({});
     });
 });

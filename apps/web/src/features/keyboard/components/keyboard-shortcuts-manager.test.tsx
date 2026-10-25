@@ -191,6 +191,21 @@ describe("KeyboardShortcutsManager", () => {
         expect(onShortcut).toHaveBeenCalledWith("decreaseEffort", expect.anything());
     });
 
+    it("leaves a chord another command already has to that command", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ increaseEffort: "alt+n", newChat: "alt+n" }}>
+                <button aria-label="page" type="button" />
+            </KeyboardShortcutsManager>,
+        );
+
+        fireEvent.keyDown(screen.getByLabelText("page"), { altKey: true, code: "KeyN", key: "n" });
+
+        expect(onShortcut).toHaveBeenCalledTimes(1);
+        expect(onShortcut).toHaveBeenCalledWith("newChat", expect.anything());
+    });
+
     it("leaves the arrow chords to the editor while the effort commands are unbound", () => {
         const onShortcut = vi.fn();
 
@@ -234,6 +249,23 @@ describe("KeyboardShortcutsManager", () => {
 
             expect(pressChord("metaKey")).toHaveBeenCalledWith("increaseEffort", expect.anything());
             expect(pressChord("ctrlKey")).toHaveBeenCalledWith("increaseEffort", expect.anything());
+        });
+
+        it("does not run both commands when a Control chord and its Command twin are bound on a Mac", () => {
+            vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+
+            const onShortcut = vi.fn();
+
+            render(
+                <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ decreaseEffort: "ctrl+arrowdown", increaseEffort: "cmd+arrowdown" }}>
+                    <textarea aria-label="composer" />
+                </KeyboardShortcutsManager>,
+            );
+
+            fireEvent.keyDown(screen.getByLabelText("composer"), { code: "ArrowDown", key: "ArrowDown", metaKey: true });
+
+            expect(onShortcut).toHaveBeenCalledTimes(1);
+            expect(onShortcut).toHaveBeenCalledWith("decreaseEffort", expect.anything());
         });
 
         it("fires on Control, not on Command, elsewhere", () => {

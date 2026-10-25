@@ -4,7 +4,7 @@ import { HotkeysProvider, useHotkeys } from "react-hotkeys-hook";
 import { useKeyboardShortcuts as useUIKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
-import { convertRecordedShortcutToHotkeysHook } from "../lib/recorded-shortcut-converter";
+import { convertRecordedShortcutToHotkeysHook, findEffortConflicts } from "../lib/recorded-shortcut-converter";
 import convertShortcutToHotkeysHook from "../lib/shortcut-converter";
 import { hasThreadSearchTarget } from "../lib/thread-search-target";
 
@@ -38,9 +38,6 @@ const isUserTypingInInput = (event: KeyboardEvent): boolean => {
 const isTextEntryKeystroke = (event: KeyboardEvent): boolean => isUserTypingInInput(event) && !event.ctrlKey && !event.metaKey && !event.altKey;
 
 const isBound = (shortcut: string | undefined): boolean => typeof shortcut === "string" && shortcut !== "";
-
-/** Bound, and on a different chord than `other`: a chord shared by two commands would run both on one press. */
-const isBoundApart = (shortcut: string | undefined, converted: string, other: string): boolean => isBound(shortcut) && converted !== other;
 
 // The effort commands are bound with modifier chords that work from the composer; a bare key stays with the field.
 const createEffortHandler =
@@ -103,6 +100,9 @@ const KeyboardShortcutsHandler: React.FC<{
         shortcuts.sidebarLeft,
         shortcuts.sidebarRight,
     ]);
+
+    // Saved bindings can reach us from elsewhere than the settings form: a chord shared by two commands would run both on one press.
+    const effortConflicts = useMemo(() => findEffortConflicts(shortcuts), [shortcuts]);
 
     // Memoize each callback individually to prevent infinite re-renders
     const handleAudioRecord = useCallback(
@@ -372,13 +372,14 @@ const KeyboardShortcutsHandler: React.FC<{
         handleDecreaseEffort,
         {
             description: "Decrease the composer's reasoning effort",
-            enabled: isBound(shortcuts.decreaseEffort),
+            // A chord another command already has stays with that command. Between the two effort commands, decrease keeps it.
+            enabled: isBound(shortcuts.decreaseEffort) && effortConflicts.decreaseEffort !== "command",
             // Like the model picker: a modifier chord must work from the composer, a bare key must not be taken from a field.
             enableOnContentEditable: true,
             enableOnFormTags: true,
             preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
         },
-        [convertedShortcuts.decreaseEffort, handleDecreaseEffort],
+        [convertedShortcuts.decreaseEffort, effortConflicts.decreaseEffort, handleDecreaseEffort],
     );
 
     useHotkeys(
@@ -386,13 +387,12 @@ const KeyboardShortcutsHandler: React.FC<{
         handleIncreaseEffort,
         {
             description: "Increase the composer's reasoning effort",
-            // Saved bindings can reach us from elsewhere than the settings form: one chord must not step both ways.
-            enabled: isBoundApart(shortcuts.increaseEffort, convertedShortcuts.increaseEffort, convertedShortcuts.decreaseEffort),
+            enabled: isBound(shortcuts.increaseEffort) && effortConflicts.increaseEffort === undefined,
             enableOnContentEditable: true,
             enableOnFormTags: true,
             preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
         },
-        [convertedShortcuts.increaseEffort, handleIncreaseEffort],
+        [convertedShortcuts.increaseEffort, effortConflicts.increaseEffort, handleIncreaseEffort],
     );
 
     useHotkeys(
