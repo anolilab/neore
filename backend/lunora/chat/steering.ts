@@ -30,6 +30,7 @@ import { LunoraError, v } from "lunorash/server";
 import { internalMutation } from "../_generated/server";
 import { insertSteerRow } from "../agent/steer-rows";
 import { authMutation, rateLimit } from "../lib/crpc";
+import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { queueSteer, type SteerEntry, takeQueuedSteers, withdrawQueuedSteer } from "./lib/steer-queue";
 import { lockedAfterCreation, threadGateOutcome, throwUnlessGranted } from "./lib/thread-gate";
@@ -93,7 +94,7 @@ export const steerRun = authMutation
             throw new LunoraError("TOO_MANY_REQUESTS", "Wait for the reply to take the messages already sent");
         }
 
-        await ctx.db.patch(stream._id, { steers });
+        await patchRow(ctx.db, stream, { steers });
 
         ctx.log.event("chat.steer_run", { queued: steers.filter((entry) => entry.status === "queued").length });
 
@@ -129,7 +130,7 @@ export const withdrawSteer = authMutation
         const { changed, entries, outcome } = withdrawQueuedSteer(stream.steers ?? [], steerId, { live: isLive(stream.status) });
 
         if (changed) {
-            await ctx.db.patch(stream._id, { steers: entries });
+            await patchRow(ctx.db, stream, { steers: entries });
         }
 
         ctx.log.event("chat.withdraw_steer", { outcome });
@@ -178,7 +179,7 @@ export const deliverSteers = internalMutation
             return null;
         }
 
-        await ctx.db.patch(stream._id, { steers: taken.deliver(row.messageId, pendingMessageId) });
+        await patchRow(ctx.db, stream, { steers: taken.deliver(row.messageId, pendingMessageId) });
 
         return { messageId: row.messageId, text: taken.text };
     });

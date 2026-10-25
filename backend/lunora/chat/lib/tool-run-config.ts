@@ -22,12 +22,11 @@ export const vToolRunConfig = v.object({
     instructions: v.optional(v.string()),
     mcpServerNames: v.array(v.string()),
     /**
-     * Set when the run that paused would have fed memory extraction: what the
-     * continuation needs to extract the exchange ONCE, when it finishes (the run
-     * that paused does not). `prompt` is cut to the extraction limit and
-     * `steeredTexts` are the messages the user sent into the reply so far.
+     * Set when the run that paused fed memory extraction (it extracted its own prompt
+     * and steers at the pause). The continuation then extracts only what it adds: the
+     * messages steered into it after the pause.
      */
-    memory: v.optional(v.object({ botId: v.optional(v.string()), prompt: v.string(), steeredTexts: v.array(v.string()) })),
+    memory: v.optional(v.object({ botId: v.optional(v.string()) })),
     model: v.string(),
     reasoningEffort: v.optional(v.number()),
     researchDepth: v.union(v.literal("speed"), v.literal("balanced"), v.literal("thorough")),
