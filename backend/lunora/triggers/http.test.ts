@@ -75,7 +75,11 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
     };
 
     const post = async (body: string | Uint8Array, headers: Record<string, string>) =>
-        await handleTriggerWebhook(context as never, new Request("https://x/triggers/webhook/t", { body: body as BodyInit, headers, method: "POST" }), triggerId);
+        await handleTriggerWebhook(
+            context as never,
+            new Request("https://x/triggers/webhook/t", { body: body as BodyInit, headers, method: "POST" }),
+            triggerId,
+        );
 
     /** Just the status code of a delivery. */
     const statusOf = async (body: string | Uint8Array, headers: Record<string, string>): Promise<number> => {
