@@ -1620,6 +1620,11 @@ msgstr "Actions"
 msgid "Actions for {title}"
 msgstr "Actions for {title}"
 
+#. placeholder {0}: prompt.name
+#: src/features/prompts/components/prompt-item.tsx:168
+msgid "Actions for prompt {0}"
+msgstr "Actions for prompt {0}"
+
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:159
 msgid "Activate Connection"
 msgstr "Activate Connection"
@@ -24228,8 +24233,12 @@ msgid "Search the marketplace"
 msgstr "Search the marketplace"
 
 #: src/features/chat/thread-list/search-bar.tsx:70
-msgid "Search thread titles"
-msgstr "Search thread titles"
+#~ msgid "Search thread titles"
+#~ msgstr "Search thread titles"
+
+#: src/features/chat/thread-list/search-bar.tsx:70
+msgid "Search thread titles and summaries"
+msgstr "Search thread titles and summaries"
 
 #: src/features/chat/thread-list/search-bar.tsx:76
 msgid "Search thread titles..."
@@ -29709,8 +29718,8 @@ msgid "Use Original Prompt"
 msgstr "Use Original Prompt"
 
 #: src/features/prompts/components/prompt-item.tsx:168
-msgid "Use prompt"
-msgstr "Use prompt"
+#~ msgid "Use prompt"
+#~ msgstr "Use prompt"
 
 #: src/features/prompts/components/prompt-list-view.tsx:200
 #: src/features/prompts/components/variable-fill-dialog.tsx:191

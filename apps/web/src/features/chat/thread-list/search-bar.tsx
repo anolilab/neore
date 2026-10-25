@@ -67,7 +67,7 @@ const SearchBar: FC<SearchBarProperties> = ({
             </div>
             <div className="relative">
                 <Input
-                    aria-label={searchType === "threads" ? t`Search thread titles` : t`Search message content`}
+                    aria-label={searchType === "threads" ? t`Search thread titles and summaries` : t`Search message content`}
                     autoFocus
                     className="border-sidebar-border bg-sidebar text-brand-black dark:text-brand-white placeholder:text-brand-black/60 placeholder:dark:text-brand-white/60 pr-8"
                     data-search-input=""

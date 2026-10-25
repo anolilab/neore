@@ -50,7 +50,7 @@ describe("SearchBar", () => {
     it("labels the input and the clear button", () => {
         render(<SearchBar {...baseProps} />);
 
-        expect(screen.getByRole("textbox", { name: "Search thread titles" })).toBeTruthy();
+        expect(screen.getByRole("textbox", { name: "Search thread titles and summaries" })).toBeTruthy();
         expect(screen.getByRole("button", { name: "Clear search" })).toBeTruthy();
     });
 

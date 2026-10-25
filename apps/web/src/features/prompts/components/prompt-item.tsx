@@ -165,7 +165,7 @@ const PromptItem = ({
                             <DropdownMenuTrigger
                                 render={
                                     <Button
-                                        aria-label={t`Use prompt`}
+                                        aria-label={t`Actions for prompt ${prompt.name}`}
                                         className="opacity-0 transition-opacity group-hover:opacity-100"
                                         size="icon-sm"
                                         variant="ghost"
