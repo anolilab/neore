@@ -23,6 +23,7 @@
         "./api": "./lunora/_generated/api.ts",
         "./auth": "./lunora/auth.ts",
         "./auth/fields": "./lunora/auth/fields.ts",
+        "./auth/shortcut": "./lunora/auth/lib/shortcut.ts",
         "./chat-upload-codes": "./lunora/lib/chat-upload-codes.ts",
         "./chat/fields": "./lunora/chat/fields.ts",
         "./chat/tags": "./lunora/chat/tags/logic.ts",

@@ -90,7 +90,8 @@ export type UserPreferences = {
     soundEffects: boolean;
 };
 
-const defaultKeyboardShortcuts: KeyboardShortcuts = {
+/** What "Reset to Defaults" restores. */
+export const defaultKeyboardShortcuts: KeyboardShortcuts = {
     archiveThread: `${platformModifier}+a`,
     audioRecord: `${platformModifier}+shift+r`,
     commandPalette: `${platformModifier}+k`,

@@ -29,12 +29,10 @@ import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
 import { normalizeModelNicknames } from "./lib/model-nicknames";
+import { isValidShortcut } from "./lib/shortcut";
 
 /** Any context an auth helper may be called from. */
 type AnyAuthContext = QueryContext | MutationContext | ActionContext;
-
-const SHORTCUT_RE =
-    /^(?:(?:ctrl|cmd|meta|alt|shift)\+)*(?:f\d{1,2}|arrowup|arrowdown|arrowleft|arrowright|space|enter|escape|tab|backspace|delete|[a-z0-9?])$/i;
 
 /**
  * Get authenticated user from context using the auth helpers.
@@ -194,13 +192,8 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
     }
 
     if (tableName === "userSettings") {
-        // Enhanced validation for shortcut format
-        // Allows: single keys, modifier combinations, function keys, special keys
-        const validPattern = SHORTCUT_RE;
-
         // `userSettings.keyboardShortcuts` is `v.any()` in the schema, so this
-        // arrives as `unknown`; narrow before indexing. `String(value)` keeps the
-        // original coercion semantics of `RegExp.test`.
+        // arrives as `unknown`; narrow before indexing. The format is `lib/shortcut.ts`.
         // The blocklist is stored as hostnames only; anything else is refused here, not silently dropped.
         if (Array.isArray(toStore.searchDomainBlocklist)) {
             const { domains, invalid } = normalizeSearchDomainBlocklist(toStore.searchDomainBlocklist as string[]);
@@ -220,7 +213,7 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
 
         if (shortcuts && typeof shortcuts === "object") {
             for (const value of Object.values(shortcuts as Record<string, unknown>)) {
-                if (!validPattern.test(String(value))) {
+                if (!isValidShortcut(value)) {
                     throw new Error("Invalid keyboard shortcut");
                 }
             }
