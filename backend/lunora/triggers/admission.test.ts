@@ -107,10 +107,11 @@ const deliver = async (
 ): Promise<Scheduled> => {
     const scheduled: Scheduled[] = [];
     const timestamp = String(Math.floor(at / 1000));
+    const prefix = native ? "" : `${timestamp}.`;
     const signature =
         typeof body === "string"
-            ? await hmacSha256Hex(SECRET, native ? body : `${timestamp}.${body}`)
-            : await hmacBytesHex(new Uint8Array(native ? body : [...new TextEncoder().encode(`${timestamp}.`), ...body]));
+            ? await hmacSha256Hex(SECRET, `${prefix}${body}`)
+            : await hmacBytesHex(new Uint8Array([...new TextEncoder().encode(prefix), ...body]));
     const context = {
         runMutation: async (reference: unknown, args: unknown) => await harness.run(async (ctx: any) => await ctx.runMutation(claimMutation(reference), args)),
         runQuery: async () => {
