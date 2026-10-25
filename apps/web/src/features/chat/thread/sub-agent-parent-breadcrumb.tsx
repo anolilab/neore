@@ -29,12 +29,14 @@ const SubAgentParentBreadcrumb: FC<SubAgentParentBreadcrumbProps> = ({ className
     const { t } = useLingui();
     const crpc = useCRPC();
 
-    // The relation and the title change rarely: one-shot reads, not subscriptions.
+    // Live reads: a one-shot read keeps a relation that arrived after the child opened hidden,
+    // and a renamed parent's old title. The parent read stays a skipToken (no subscription)
+    // until the relation names a sub-agent parent, so only sub-agent children pay for it.
     const { data: relationship } = useQuery(
-        crpc.agent.threads.getThreadRelationship.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken, { live: false }),
+        crpc.agent.threads.getThreadRelationship.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken),
     );
     const parentThreadId = relationship?.branchType === "subagent" ? relationship.parentThreadId : undefined;
-    const { data: parent } = useQuery(crpc.chat.functions.getThread.queryOptions(parentThreadId ? { threadId: parentThreadId } : skipToken, { live: false }));
+    const { data: parent } = useQuery(crpc.chat.functions.getThread.queryOptions(parentThreadId ? { threadId: parentThreadId } : skipToken));
     const title = parentThreadId ? parent?.title : undefined;
 
     if (!parentThreadId || !title) {

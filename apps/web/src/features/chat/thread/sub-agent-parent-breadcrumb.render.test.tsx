@@ -6,7 +6,7 @@
  */
 
 import { QueryClient, QueryClientProvider, skipToken } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import type { ElementType, ReactNode } from "react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +16,8 @@ type Relationship = { branchType?: string; parentThreadId: string } | null;
 const harness = vi.hoisted(() => {
     return {
         parent: null as { title?: string } | null,
+        /** Queries that opted in to live updates, as the live-query manager would see them. */
+        liveReads: new Map<string, { key: unknown[]; read: () => unknown }>(),
         parentReads: [] as string[],
         relationship: null as Relationship,
     };
@@ -36,8 +38,14 @@ vi.mock("@/lib/lunora/crpc", () => {
                 agent: {
                     threads: {
                         getThreadRelationship: {
-                            queryOptions: (args: unknown) => {
-                                return { queryFn: args === skipToken ? skipToken : async () => harness.relationship, queryKey: ["relationship", args] };
+                            queryOptions: (args: unknown, options?: { live?: boolean }) => {
+                                const queryKey = ["relationship", args];
+
+                                if (args !== skipToken && options?.live !== false) {
+                                    harness.liveReads.set(JSON.stringify(queryKey), { key: queryKey, read: () => harness.relationship });
+                                }
+
+                                return { queryFn: args === skipToken ? skipToken : async () => harness.relationship, queryKey };
                             },
                         },
                     },
@@ -45,7 +53,13 @@ vi.mock("@/lib/lunora/crpc", () => {
                 chat: {
                     functions: {
                         getThread: {
-                            queryOptions: (args: typeof skipToken | { threadId: string }) => {
+                            queryOptions: (args: typeof skipToken | { threadId: string }, options?: { live?: boolean }) => {
+                                const queryKey = ["thread", args];
+
+                                if (args !== skipToken && options?.live !== false) {
+                                    harness.liveReads.set(JSON.stringify(queryKey), { key: queryKey, read: () => harness.parent });
+                                }
+
                                 return {
                                     queryFn:
                                         args === skipToken
@@ -55,7 +69,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 
                                                   return harness.parent;
                                               },
-                                    queryKey: ["thread", args],
+                                    queryKey,
                                 };
                             },
                         },
@@ -90,7 +104,16 @@ const LONG_TITLE = "A very long parent conversation title that the header has to
 const mount = (threadId: string | undefined = "child-1") => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-    return render(createElement(QueryClientProvider, { client: queryClient }, createElement(SubAgentParentBreadcrumb, { threadId })));
+    return { queryClient, ...render(createElement(QueryClientProvider, { client: queryClient }, createElement(SubAgentParentBreadcrumb, { threadId }))) };
+};
+
+/** What the live-query manager does on a write: push the current answer into every live query's cache entry. */
+const pushLive = (queryClient: QueryClient) => {
+    act(() => {
+        for (const { key, read } of harness.liveReads.values()) {
+            queryClient.setQueryData(key, read());
+        }
+    });
 };
 
 const settle = async () => {
@@ -100,6 +123,7 @@ const settle = async () => {
 };
 
 afterEach(() => {
+    harness.liveReads.clear();
     harness.parent = null;
     harness.parentReads = [];
     harness.relationship = null;
@@ -179,5 +203,50 @@ describe("sub-agent parent breadcrumb", () => {
 
         expect(harness.parentReads).toEqual([]);
         expect(container.textContent).not.toContain("Secret parent title");
+    });
+
+    it("shows the breadcrumb when the relation arrives after the first render", async () => {
+        harness.parent = { title: "Late parent" };
+        const { container, queryClient } = mount();
+
+        await settle();
+
+        expect(container.textContent).toBe("");
+
+        harness.relationship = { branchType: "subagent", parentThreadId: "parent-1" };
+        pushLive(queryClient);
+
+        expect(await screen.findByRole("link", { name: "Late parent" })).toBeTruthy();
+    });
+
+    it("updates the title when the parent is renamed", async () => {
+        harness.relationship = { branchType: "subagent", parentThreadId: "parent-1" };
+        harness.parent = { title: "Old title" };
+        const { queryClient } = mount();
+
+        await screen.findByRole("link", { name: "Old title" });
+
+        harness.parent = { title: "New title" };
+        pushLive(queryClient);
+
+        expect(await screen.findByRole("link", { name: "New title" })).toBeTruthy();
+        expect(screen.queryByRole("link", { name: "Old title" })).toBeNull();
+    });
+
+    it("reads the new thread's relation when the child thread id changes", async () => {
+        harness.relationship = { branchType: "subagent", parentThreadId: "parent-1" };
+        harness.parent = { title: "First parent" };
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        const tree = (threadId: string) => createElement(QueryClientProvider, { client: queryClient }, createElement(SubAgentParentBreadcrumb, { threadId }));
+        const { rerender } = render(tree("child-1"));
+
+        await screen.findByRole("link", { name: "First parent" });
+
+        harness.relationship = null;
+        rerender(tree("root-2"));
+
+        await vi.waitFor(() => {
+            expect(screen.queryByRole("navigation")).toBeNull();
+        });
     });
 });
