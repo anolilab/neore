@@ -98,13 +98,18 @@ const findClaim = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string) 
         .withIndex("by_scope_key", (q) => q.eq("scope", scope).eq("key", key))
         .first();
 
-const claim = async (ctx: ClaimCtx, scope: string, key: string, { leaseMs, onLapse, ttlMs, userId }: ClaimOptions): Promise<boolean> => {
+/**
+ * Takes the claim and returns its `claimedAt`, the fence {@link releaseClaim}
+ * checks, or `null` when the key is held. A claim can only be taken again after
+ * the previous one expired, so each acquisition has a `claimedAt` of its own.
+ */
+const claimFence = async (ctx: ClaimCtx, scope: string, key: string, { leaseMs, onLapse, ttlMs, userId }: ClaimOptions): Promise<number | null> => {
     const now = Date.now();
     const existing = await findClaim(ctx, scope, key);
 
     if (existing) {
         if (existing.expiresAt > now) {
-            return false;
+            return null;
         }
 
         await ctx.db.delete(existing._id);
@@ -120,8 +125,11 @@ const claim = async (ctx: ClaimCtx, scope: string, key: string, { leaseMs, onLap
         ...(userId !== undefined && { userId }),
     });
 
-    return true;
+    return now;
 };
+
+const claim = async (ctx: ClaimCtx, scope: string, key: string, options: ClaimOptions): Promise<boolean> =>
+    (await claimFence(ctx, scope, key, options)) !== null;
 
 /** `true` while an unexpired claim for `(scope, key)` exists. Reads only, so a caller can decide before it acts. */
 export const hasClaim = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string): Promise<boolean> => {
@@ -152,11 +160,15 @@ export const completeClaim = async (ctx: ClaimCtx, scope: string, key: string): 
 /**
  * Give a claim back: the work it guarded did not start (e.g. scheduling it
  * failed), so a sender's retry of the same key must not read as a replay.
+ *
+ * With a `claimedAt` (the one {@link claimFence} returned), only that claim is
+ * deleted. Work that outlives its claim's TTL releases late, and by then a
+ * redelivery may hold the key; that claim is not ours to clear.
  */
-export const releaseClaim = async (ctx: ClaimCtx, scope: string, key: string): Promise<void> => {
+export const releaseClaim = async (ctx: ClaimCtx, scope: string, key: string, claimedAt?: number): Promise<void> => {
     const existing = await findClaim(ctx, scope, key);
 
-    if (existing) {
+    if (existing && (claimedAt === undefined || existing.claimedAt === claimedAt)) {
         await ctx.db.delete(existing._id);
     }
 };
@@ -178,6 +190,12 @@ export const claimKey = internalMutation
     .output(v.boolean())
     .mutation(async ({ args: { key, leaseMs, onLapse, scope, ttlMs, userId }, ctx }) => await claim(ctx, scope, key, { leaseMs, onLapse, ttlMs, userId }));
 
+/** {@link claimKey} that answers with the claim's `claimedAt` (for {@link releaseKey}'s `claimedAt`), or `null` when the key is held. */
+export const claimKeyFenced = internalMutation
+    .input(vClaimArgs)
+    .output(v.union(v.null(), v.number()))
+    .mutation(async ({ args: { key, leaseMs, onLapse, scope, ttlMs, userId }, ctx }) => await claimFence(ctx, scope, key, { leaseMs, onLapse, ttlMs, userId }));
+
 export const completeKey = internalMutation
     .input({ key: v.string(), scope: v.string() })
     .output(v.null())
@@ -188,10 +206,10 @@ export const completeKey = internalMutation
     });
 
 export const releaseKey = internalMutation
-    .input({ key: v.string(), scope: v.string() })
+    .input({ claimedAt: v.optional(v.number()), key: v.string(), scope: v.string() })
     .output(v.null())
-    .mutation(async ({ args: { key, scope }, ctx }) => {
-        await releaseClaim(ctx, scope, key);
+    .mutation(async ({ args: { claimedAt, key, scope }, ctx }) => {
+        await releaseClaim(ctx, scope, key, claimedAt);
 
         return null;
     });

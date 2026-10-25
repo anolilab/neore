@@ -1011,6 +1011,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "lib_action_cache:removeAll": lunora_lib_action_cache_113.removeAll as unknown as RegisteredLunoraFunction,
     "lib_action_cache:removeByArgs": lunora_lib_action_cache_113.removeByArgs as unknown as RegisteredLunoraFunction,
     "lib_claim_once:claimKey": lunora_lib_claim_once_114.claimKey as unknown as RegisteredLunoraFunction,
+    "lib_claim_once:claimKeyFenced": lunora_lib_claim_once_114.claimKeyFenced as unknown as RegisteredLunoraFunction,
     "lib_claim_once:completeKey": lunora_lib_claim_once_114.completeKey as unknown as RegisteredLunoraFunction,
     "lib_claim_once:purgeExpiredClaims": lunora_lib_claim_once_114.purgeExpiredClaims as unknown as RegisteredLunoraFunction,
     "lib_claim_once:reapLapsedClaims": lunora_lib_claim_once_114.reapLapsedClaims as unknown as RegisteredLunoraFunction,
@@ -5685,6 +5686,45 @@ __has5 = true;
 }
 return { "key": source["key"], ...(__has1 ? { "leaseMs": __val1 } : {}), ...(__has4 ? { "onLapse": __val4 } : {}), "scope": source["scope"], "ttlMs": source["ttlMs"], ...(__has5 ? { "userId": __val5 } : {}) };
 });
+installCompiledValidatorMap(lunora_lib_claim_once_114.claimKeyFenced.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["key"] !== "string") return DEFER;
+let __has1 = false;
+let __val1;
+if (source["leaseMs"] !== undefined) {
+if (typeof source["leaseMs"] !== "number" || !Number.isFinite(source["leaseMs"])) return DEFER;
+__val1 = source["leaseMs"];
+__has1 = true;
+}
+let __has4 = false;
+let __val4;
+if (source["onLapse"] !== undefined) {
+if (typeof source["onLapse"] !== "object" || source["onLapse"] === null || Array.isArray(source["onLapse"])) return DEFER;
+if (Object.getPrototypeOf(source["onLapse"]) !== Object.prototype && Object.getPrototypeOf(source["onLapse"]) !== null) return DEFER;
+let __has2 = false;
+let __val2;
+if (source["onLapse"]["args"] !== undefined) {
+if (typeof source["onLapse"]["args"] !== "string") return DEFER;
+__val2 = source["onLapse"]["args"];
+__has2 = true;
+}
+if (typeof source["onLapse"]["target"] !== "string") return DEFER;
+const __obj3 = { ...(__has2 ? { "args": __val2 } : {}), "target": source["onLapse"]["target"] };
+__val4 = __obj3;
+__has4 = true;
+}
+if (typeof source["scope"] !== "string") return DEFER;
+if (typeof source["ttlMs"] !== "number" || !Number.isFinite(source["ttlMs"])) return DEFER;
+let __has5 = false;
+let __val5;
+if (source["userId"] !== undefined) {
+if (typeof source["userId"] !== "string") return DEFER;
+__val5 = source["userId"];
+__has5 = true;
+}
+return { "key": source["key"], ...(__has1 ? { "leaseMs": __val1 } : {}), ...(__has4 ? { "onLapse": __val4 } : {}), "scope": source["scope"], "ttlMs": source["ttlMs"], ...(__has5 ? { "userId": __val5 } : {}) };
+});
 installCompiledValidatorMap(lunora_lib_claim_once_114.completeKey.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -5695,9 +5735,16 @@ return { "key": source["key"], "scope": source["scope"] };
 installCompiledValidatorMap(lunora_lib_claim_once_114.releaseKey.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["claimedAt"] !== undefined) {
+if (typeof source["claimedAt"] !== "number" || !Number.isFinite(source["claimedAt"])) return DEFER;
+__val1 = source["claimedAt"];
+__has1 = true;
+}
 if (typeof source["key"] !== "string") return DEFER;
 if (typeof source["scope"] !== "string") return DEFER;
-return { "key": source["key"], "scope": source["scope"] };
+return { ...(__has1 ? { "claimedAt": __val1 } : {}), "key": source["key"], "scope": source["scope"] };
 });
 installCompiledValidatorMap(lunora_lib_document_history_115.getDocumentAtTime.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -7444,52 +7491,6 @@ if (typeof source["skillId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "organizationId": __val1 } : {}), "skillId": source["skillId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_triggers_execute_168.default.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["ignoreDisabled"] !== undefined) {
-if (typeof source["ignoreDisabled"] !== "boolean") return DEFER;
-__val1 = source["ignoreDisabled"];
-__has1 = true;
-}
-let __has2 = false;
-let __val2;
-if (source["payload"] !== undefined) {
-if (typeof source["payload"] !== "string") return DEFER;
-__val2 = source["payload"];
-__has2 = true;
-}
-if (typeof source["triggerId"] !== "string") return DEFER;
-return { ...(__has1 ? { "ignoreDisabled": __val1 } : {}), ...(__has2 ? { "payload": __val2 } : {}), "triggerId": source["triggerId"] };
-});
-installCompiledValidatorMap(lunora_triggers_execute_168.executeTrigger.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["ignoreDisabled"] !== undefined) {
-if (typeof source["ignoreDisabled"] !== "boolean") return DEFER;
-__val1 = source["ignoreDisabled"];
-__has1 = true;
-}
-let __has2 = false;
-let __val2;
-if (source["payload"] !== undefined) {
-if (typeof source["payload"] !== "string") return DEFER;
-__val2 = source["payload"];
-__has2 = true;
-}
-if (typeof source["triggerId"] !== "string") return DEFER;
-return { ...(__has1 ? { "ignoreDisabled": __val1 } : {}), ...(__has2 ? { "payload": __val2 } : {}), "triggerId": source["triggerId"] };
-});
-installCompiledValidatorMap(lunora_triggers_functions_169.admitTriggerRun.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["triggerId"] !== "string") return DEFER;
-return { "triggerId": source["triggerId"] };
-});
 installCompiledValidatorMap(lunora_triggers_functions_169.createExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8867,10 +8868,11 @@ export interface Caller {
         };
         claim_once: {
             claimKey: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }) => Promise<boolean>;
+            claimKeyFenced: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }) => Promise<null | number>;
             completeKey: (args: { key: string; scope: string }) => Promise<null>;
             purgeExpiredClaims: (args?: {}) => Promise<number>;
             reapLapsedClaims: (args?: {}) => Promise<number>;
-            releaseKey: (args: { key: string; scope: string }) => Promise<null>;
+            releaseKey: (args: { claimedAt?: number; key: string; scope: string }) => Promise<null>;
         };
         document_history: {
             getDocumentAtTime: (args: { documentId: string; tableName: string; timestamp: number }) => Promise<unknown | null>;
@@ -9305,11 +9307,11 @@ export interface Caller {
     };
     triggers: {
         execute: {
-            default: (args: { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
-            executeTrigger: (args: { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
+            default: (args: { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
+            executeTrigger: (args: { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
         };
         functions: {
-            admitTriggerRun: (args: { triggerId: Id<"triggers"> }) => Promise<null | string>;
+            admitTriggerRun: (args: { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }) => Promise<null | string | { filtered: string }>;
             createExecution: (args: { payload?: string; triggerId: Id<"triggers"> }) => Promise<Id<"triggerExecutions">>;
             createTrigger: (args: { botComputer?: boolean; botId?: string; cronExpression?: string; description?: string; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; type: "schedule" | "webhook" | "event"; webhookSignatureScheme?: "timestamped" | "native" }) => Promise<{ triggerId: string; webhookSecret?: string }>;
             deleteTrigger: (args: { triggerId: Id<"triggers"> }) => Promise<void>;
@@ -10508,6 +10510,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         claim_once: {
             claimKey: (args) => callRegistered(context, "lib_claim_once:claimKey", args),
+            claimKeyFenced: (args) => callRegistered(context, "lib_claim_once:claimKeyFenced", args),
             completeKey: (args) => callRegistered(context, "lib_claim_once:completeKey", args),
             purgeExpiredClaims: (args) => callRegistered(context, "lib_claim_once:purgeExpiredClaims", args),
             reapLapsedClaims: (args) => callRegistered(context, "lib_claim_once:reapLapsedClaims", args),

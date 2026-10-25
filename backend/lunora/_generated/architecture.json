@@ -4521,6 +4521,16 @@
       "to": "table:idempotencyClaims"
     },
     {
+      "from": "function:lib_claim_once:claimKeyFenced",
+      "kind": "read",
+      "to": "table:idempotencyClaims"
+    },
+    {
+      "from": "function:lib_claim_once:claimKeyFenced",
+      "kind": "write",
+      "to": "table:idempotencyClaims"
+    },
+    {
       "from": "function:lib_claim_once:purgeExpiredClaims",
       "kind": "read",
       "to": "table:idempotencyClaims"
@@ -6324,6 +6334,16 @@
       "from": "function:triggers_execute:default",
       "kind": "call",
       "to": "function:triggers_functions:updateTriggerStats"
+    },
+    {
+      "from": "function:triggers_functions:admitTriggerRun",
+      "kind": "read",
+      "to": "table:triggerExecutions"
+    },
+    {
+      "from": "function:triggers_functions:admitTriggerRun",
+      "kind": "write",
+      "to": "table:triggerExecutions"
     },
     {
       "from": "function:triggers_functions:createExecution",
@@ -12186,6 +12206,12 @@
       "id": "function:lib_claim_once:claimKey",
       "kind": "function",
       "name": "lib.claim_once.claimKey"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:lib_claim_once:claimKeyFenced",
+      "kind": "function",
+      "name": "lib.claim_once.claimKeyFenced"
     },
     {
       "detail": "mutation",
@@ -19125,37 +19151,37 @@
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 110,
+      "line": 115,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 110,
+      "line": 115,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 113,
+      "line": 118,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 113,
+      "line": 118,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 160,
+      "line": 172,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 221,
+      "line": 239,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -20061,19 +20087,7 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 193,
-      "reason": "the default export is not a registered function"
-    },
-    {
-      "file": "triggers/http",
-      "kind": "call",
-      "line": 213,
-      "reason": "the default export is not a registered function"
-    },
-    {
-      "file": "triggers/http",
-      "kind": "call",
-      "line": 218,
+      "line": 192,
       "reason": "the default export is not a registered function"
     },
     {
@@ -20085,7 +20099,19 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 245,
+      "line": 228,
+      "reason": "the default export is not a registered function"
+    },
+    {
+      "file": "triggers/http",
+      "kind": "call",
+      "line": 233,
+      "reason": "the default export is not a registered function"
+    },
+    {
+      "file": "triggers/http",
+      "kind": "call",
+      "line": 257,
       "reason": "the default export is not a registered function"
     },
     {
