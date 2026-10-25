@@ -90,12 +90,13 @@ export const erasePostHogPerson = async (userId: string, env: PostHogErasureEnv)
     }
 
     try {
-        await assertOk(response, `[GDPR/PostHog] Failed to delete person ${userId}`, { includeBody: true });
+        // Neither the user id nor PostHog's reply goes into the message or the log: the message is
+        // what the workflow instance and every retry attempt record.
+        await assertOk(response, "[GDPR/PostHog] Failed to delete person");
     } catch (error) {
-        // `HttpError.message` leaves the response body out; log it here so a rejected
-        // deletion stays diagnosable, then rethrow so the workflow step still retries.
+        // Status only, then rethrow so the workflow step still retries.
         if (error instanceof HttpError) {
-            gdprLogger.error(error.message, error.body);
+            gdprLogger.error(`${error.message} (http_${String(error.status)})`);
         }
 
         throw error;

@@ -24,7 +24,7 @@
  * (the lease only keeps out a concurrent run that has not erased yet), or resends a confirmation
  * that was claimed but never marked sent.
  *
- * A watchdog scheduled when an attempt starts fails an attempt that stopped before erasing, and
+ * A watchdog armed with every scheduled attempt fails an attempt that stopped before erasing (or never started), and
  * re-queues one that stopped after, so the success path (and its confirmation) still runs. An
  * attempt of an older chain (before a workflow re-run failed again) does nothing at all.
  */
@@ -86,6 +86,12 @@ const STARTED_SCOPE = "posthog-retry-started";
 const OUTCOME_SCOPE = "posthog-retry-outcome";
 /** Who is running an attempt right now: held for `POSTHOG_RETRY_LEASE_MS`, so a second delivery stays out and a dead one can be replaced. */
 const LEASE_SCOPE = "posthog-retry-lease";
+/** One claim per failure of the workflow (`<requestId>:<failureId>`): a redelivered scheduling call finds it and starts no second chain. */
+const CHAIN_SCOPE = "posthog-retry-chain";
+/** `<attemptKey>:<n>`: the n-th time an attempt waited for a workflow re-run that holds the request. */
+const DEFER_SCOPE = "posthog-retry-deferred";
+/** How many times an attempt waits for a re-run (one lease apart) before it leaves the request to it. */
+const MAX_DEFERRALS = 12;
 /** The erasure of an attempt is done (PostHog answered): the key carries the answer, so a redelivery needs no second call. */
 const ERASED_SCOPE = "posthog-retry-erased";
 /** Past the whole retry chain (about 79 hours) plus the scheduler's redelivery window. */
@@ -111,43 +117,67 @@ const scheduleAttempt = async (context: MutationCtx, target: RetryTarget): Promi
         // The job must run on the user's shard, where the request rows live.
         userId,
     );
+    // Armed with the attempt, not when it starts: an attempt whose job never gets to start (it
+    // keeps throwing, or is dead-lettered) is then failed too, and the chain goes on.
+    await runAfterOnShard(
+        context.scheduler,
+        delayMs + POSTHOG_RETRY_WATCHDOG_MS,
+        internal.gdpr.posthog_retry.expireStalePostHogRetry,
+        { attempt, chain, requestId, userId },
+        userId,
+    );
     await record(context, "deletion_retry_scheduled", userId, { attempt, chain, requestId });
 };
 
 type PostHogOutcome = "deleted" | "no_profile";
 
-/** How many audit rows of `action` name this request. Details are parsed, never matched as text. */
-const auditCount = async (context: Pick<QueryCtx, "db">, action: string, requestId: string, userId: string): Promise<number> => {
+/** The parsed details of this request's audit rows of `action`. Details are parsed, never matched as text. */
+const auditDetails = async (context: Pick<QueryCtx, "db">, action: string, requestId: string, userId: string): Promise<{ attempt?: unknown }[]> => {
     const rows = await context.db
         .query("gdprAuditLog")
         .withIndex("by_user", (q) => q.eq("userId", userId))
         .collect();
+    const matching: { attempt?: unknown }[] = [];
 
-    return rows.filter((row) => {
+    for (const row of rows) {
         if (row.action !== action) {
-            return false;
+            continue;
         }
 
         try {
-            return (JSON.parse(row.details) as { requestId?: unknown }).requestId === requestId;
+            const details = JSON.parse(row.details) as { attempt?: unknown; requestId?: unknown };
+
+            if (details.requestId === requestId) {
+                matching.push(details);
+            }
         } catch {
-            return false;
+            // An unreadable row names no request.
         }
-    }).length;
+    }
+
+    return matching;
+};
+
+const auditCount = async (context: Pick<QueryCtx, "db">, action: string, requestId: string, userId: string): Promise<number> => {
+    const matching = await auditDetails(context, action, requestId, userId);
+
+    return matching.length;
 };
 
 /**
- * The chain a failure starts: how many times the workflow logged `deletion_failed` for this request.
- * The workflow writes that row before it calls `schedulePostHogRetry`, so the failure being handled
- * is already counted (hence the floor of 1), and a redelivery of this call reads the same number,
- * because nothing in a chain writes the row. It is also the request's CURRENT chain: an attempt of
- * a lower one belongs to a failure a later re-run has superseded.
+ * How many chains this request has started: the `deletion_retry_scheduled` rows of attempt 1, which
+ * `schedulePostHogRetry` writes itself in the same transaction as the chain, so no best-effort
+ * write of the workflow's can skip one. It is also the request's CURRENT chain: an attempt of a lower
+ * one belongs to a failure a later re-run has superseded. Nothing before a first chain counts as 0.
  */
-const chainOf = async (context: Pick<QueryCtx, "db">, requestId: string, userId: string): Promise<number> =>
-    Math.max(1, await auditCount(context, "deletion_failed", requestId, userId));
+const chainCount = async (context: Pick<QueryCtx, "db">, requestId: string, userId: string): Promise<number> => {
+    const scheduled = await auditDetails(context, "deletion_retry_scheduled", requestId, userId);
+
+    return scheduled.filter((details) => details.attempt === 1).length;
+};
 
 const isStaleChain = async (context: Pick<QueryCtx, "db">, { chain, requestId, userId }: RetryTarget): Promise<boolean> =>
-    chain < (await chainOf(context, requestId, userId));
+    chain < (await chainCount(context, requestId, userId));
 
 /** What PostHog answered for this attempt, once it did; `null` before. */
 const erasedOutcomeOf = async (context: Pick<QueryCtx, "db">, target: RetryTarget): Promise<PostHogOutcome | null> => {
@@ -175,25 +205,46 @@ const isConfirmationOwed = async (
     (await auditCount(context, "deletion_confirmation_sent", target.requestId, target.userId)) === 0;
 
 /**
- * Called by the deletion workflow when the PostHog step is exhausted: queues retry 1 of a new chain. The request
- * is also moved to `failed` HERE, in the same transaction: the workflow's own status writes are
- * best-effort, and a request they left `processing` could not be claimed by the scheduled attempt,
- * which would end without erasing anything. Only `processing` is moved, so a request completed or
- * cancelled meanwhile stays so.
+ * Called by the deletion workflow when the PostHog step is exhausted: queues retry 1 of a new chain,
+ * numbered from the chains this request already has. A call is made once per FAILURE (`failureId`),
+ * so a redelivery of it finds the failure's claim and queues nothing more. The request is also moved
+ * to `failed` HERE, in the same transaction: the workflow's own status writes are best-effort, and a
+ * request they left `processing` could not be claimed by the scheduled attempt, which would end
+ * without erasing anything. Only `processing` is moved, and only a request that is `processing` or
+ * `failed` gets a chain at all: one completed or cancelled meanwhile stays so and has nothing queued.
+ * Answers whether an attempt is queued for this failure. `userEmail` is the workflow's own copy of
+ * the address, restored on the request when an earlier chain's end had minimised it.
  */
 export const schedulePostHogRetry = internalMutation
-    .input({ requestId: v.id("gdprRequests"), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.null())
-    .mutation(async ({ args, ctx: context }) => {
-        const request = await context.db.get(args.requestId);
+    .input({
+        failureId: v.string().max(MAX_LENGTH.id),
+        requestId: v.id("gdprRequests"),
+        userEmail: v.string().max(MAX_LENGTH.short),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.boolean())
+    .mutation(async ({ args: { failureId, requestId, userEmail, userId }, ctx: context }) => {
+        const request = await context.db.get(requestId);
 
-        if (request?.userId === args.userId && request.status === "processing") {
-            await context.db.patch(args.requestId, { errorMessage: POSTHOG_FAILED_MESSAGE, status: "failed" });
+        if (request?.userId !== userId || (request.status !== "processing" && request.status !== "failed")) {
+            return false;
         }
 
-        await scheduleAttempt(context, { ...args, attempt: 1, chain: await chainOf(context, args.requestId, args.userId) });
+        if (request.status === "processing") {
+            await context.db.patch(requestId, { errorMessage: POSTHOG_FAILED_MESSAGE, status: "failed" });
+        }
 
-        return null;
+        if (await claimOnce(context, CHAIN_SCOPE, `${requestId}:${failureId}`, ATTEMPT_CLAIM_TTL_MS)) {
+            // A re-run that fails after an earlier chain ended finds the address minimised: the workflow's
+            // own copy goes back on the request for this chain's confirmation (it is minimised again at its end).
+            if (request.userEmail === "" && userEmail !== "") {
+                await context.db.patch(requestId, { userEmail });
+            }
+
+            await scheduleAttempt(context, { attempt: 1, chain: (await chainCount(context, requestId, userId)) + 1, requestId, userId });
+        }
+
+        return true;
     });
 
 /**
@@ -202,6 +253,36 @@ export const schedulePostHogRetry = internalMutation
  * (the attempt succeeded but its confirmation is still owed).
  */
 const vStartMode = v.union(v.literal("skip"), v.literal("erase"), v.literal("deleted"), v.literal("no_profile"), v.literal("confirm"));
+
+/**
+ * A workflow re-run holds the request (`processing`, and this attempt never started): the attempt
+ * waits one lease and tries again instead of being dropped, up to `MAX_DEFERRALS` times, each audited.
+ * Past that a live re-run owns the request, which it finishes or fails into a chain of its own.
+ */
+const deferAttempt = async (context: MutationCtx, target: RetryTarget): Promise<"skip"> => {
+    const { attempt, chain, requestId, userId } = target;
+
+    for (let deferral = 1; deferral <= MAX_DEFERRALS; deferral += 1) {
+        if (await claimOnce(context, DEFER_SCOPE, `${attemptKey(target)}:${String(deferral)}`, ATTEMPT_CLAIM_TTL_MS)) {
+            await runAfterOnShard(
+                context.scheduler,
+                POSTHOG_RETRY_LEASE_MS,
+                internal.gdpr.posthog_retry.retryPostHogErasure,
+                { attempt, chain, requestId, userId },
+                userId,
+            );
+            await record(context, "deletion_retry_deferred", userId, { attempt, chain, deferral, requestId });
+
+            return "skip";
+        }
+    }
+
+    if (await claimOnce(context, DEFER_SCOPE, `${attemptKey(target)}:gave_up`, ATTEMPT_CLAIM_TTL_MS)) {
+        await record(context, "deletion_retry_deferred", userId, { attempt, chain, errorClass: "gave_up", requestId });
+    }
+
+    return "skip";
+};
 
 /**
  * Claims an attempt: a request still `failed` is retried, so one that was completed meanwhile
@@ -245,7 +326,7 @@ export const startPostHogRetry = internalMutation
 
         if (request.status === "processing") {
             if (!(await hasClaim(context, STARTED_SCOPE, key))) {
-                return "skip";
+                return await deferAttempt(context, target);
             }
 
             if (!(await claimOnce(context, LEASE_SCOPE, key, POSTHOG_RETRY_LEASE_MS))) {
@@ -261,19 +342,14 @@ export const startPostHogRetry = internalMutation
             return "skip";
         }
 
-        await claimOnce(context, STARTED_SCOPE, key, ATTEMPT_CLAIM_TTL_MS);
-        await claimOnce(context, LEASE_SCOPE, key, POSTHOG_RETRY_LEASE_MS);
+        // A run of this attempt began and stopped (a re-run failed the request under it): it is not
+        // started again, the watchdog ends it. Both claims must be won for a start to count.
+        if (!(await claimOnce(context, STARTED_SCOPE, key, ATTEMPT_CLAIM_TTL_MS)) || !(await claimOnce(context, LEASE_SCOPE, key, POSTHOG_RETRY_LEASE_MS))) {
+            return "skip";
+        }
+
         await context.db.patch(request._id, { status: "processing" });
         await record(context, "deletion_retry_started", userId, { attempt, chain, requestId });
-        // Only a fresh start: a resume is the same attempt, already watched. The job and the claim
-        // commit together, so an attempt that started always has its watchdog.
-        await runAfterOnShard(
-            context.scheduler,
-            POSTHOG_RETRY_WATCHDOG_MS,
-            internal.gdpr.posthog_retry.expireStalePostHogRetry,
-            { attempt, chain, requestId, userId },
-            userId,
-        );
 
         return "erase";
     });
@@ -304,8 +380,8 @@ export const recordPostHogErased = internalMutation
 
 /**
  * An attempt failed: back to `failed` with the fixed reason, then the next attempt or the end of the
- * schedule. Only a request still `processing` is moved: one completed or cancelled meanwhile stays
- * so, and a duplicate delivery that finds it already `failed` queues no second chain. The last
+ * schedule. A request that is `processing` or `failed` is written; one completed or cancelled
+ * meanwhile stays so, and a duplicate delivery queues no second chain (the outcome is claimed once). The last
  * attempt's failure ends the chain, so it minimises the records here, in the same transaction
  * (minimisation clears the free-text reason, hence the fixed one is written after it).
  */
@@ -313,7 +389,9 @@ const failAttempt = async (context: MutationCtx, target: RetryTarget, errorClass
     const { attempt, chain, requestId, userId } = target;
     const request = await context.db.get(requestId);
 
-    if (request?.userId !== userId || request.status !== "processing") {
+    // `failed` counts too: a re-run or a sweep that failed the request under a running attempt must
+    // not leave the chain without an outcome, successor or end. Completed and cancelled stay as they are.
+    if (request?.userId !== userId || (request.status !== "processing" && request.status !== "failed")) {
         return;
     }
 
@@ -361,12 +439,12 @@ export const failPostHogRetry = internalMutation
     });
 
 /**
- * The watchdog an attempt's start schedules. An attempt that stopped before recording an outcome
+ * The watchdog an attempt's scheduling arms. An attempt that stopped before recording an outcome
  * (crash or timeout) is never redelivered, and would leave the request `processing` until the
  * 30-day sweep: this fails it like any failed attempt, so the next one is queued or the chain
  * ends. One that stopped AFTER PostHog answered is not failed (the erasure succeeded): the attempt
  * is queued again, and finishes its success path and confirmation. It does nothing for an attempt
- * of an older chain, or one that never started.
+ * of an older chain, and for one that never started while a re-run holds the request.
  */
 export const expireStalePostHogRetry = internalMutation
     .input({ attempt: v.number(), chain: v.number(), requestId: v.id("gdprRequests"), userId: v.string().max(MAX_LENGTH.id) })
@@ -387,7 +465,9 @@ export const expireStalePostHogRetry = internalMutation
             return null;
         }
 
-        if (isFinished || !(await hasClaim(context, STARTED_SCOPE, key))) {
+        // An attempt whose job never started is failed too, but only once the request is `failed`
+        // again: a `processing` one belongs to a re-run that is still working.
+        if (isFinished || (!(await hasClaim(context, STARTED_SCOPE, key)) && request?.status !== "failed")) {
             return null;
         }
 
@@ -491,34 +571,82 @@ class PostHogUnconfiguredError extends Error {
  * Best effort and after the outcome is recorded: the erasure has succeeded whether or not this
  * works, so a failure is logged (error name only) and changes neither the request nor the audit.
  * The claim is shared with the workflow's success path, so whoever sends first wins. It is made
- * before the send and given back if the send throws; a send that STOPS leaves the claim without a
- * sent row, which `isResend` (a redelivery of this attempt) treats as not sent and mails again: a
- * duplicate is acceptable, a missing confirmation is not.
+ * before the send and kept: a send that throws is given up on (settling clears the address, so no
+ * later sender has one to use), while a send that STOPS leaves the claim without a sent row, which
+ * `isResend` (a redelivery of this attempt) treats as not sent and mails again: a duplicate is
+ * acceptable, a missing confirmation is not.
  */
 const sendConfirmation = async (context: ActionCtx, target: RetryTarget, userEmail: string, isResend: boolean): Promise<void> => {
     const claim = { key: target.requestId, scope: DELETION_CONFIRMATION_EMAIL_SCOPE };
     let isSent = false;
+    let isAttempted = false;
 
     try {
         const isClaimed = await context.runMutation(internal.lib.claim_once.claimKey, { ...claim, ttlMs: DELETION_CONFIRMATION_CLAIM_TTL_MS });
 
         if (isClaimed || isResend) {
-            try {
-                await context.runAction(internal.gdpr.steps.email_steps.sendDeletionConfirmedEmailAction, { userEmail });
-                isSent = true;
-            } catch (error) {
-                if (isClaimed) {
-                    await context.runMutation(internal.lib.claim_once.releaseKey, claim);
-                }
-
-                throw error;
-            }
+            isAttempted = true;
+            await context.runAction(internal.gdpr.steps.email_steps.sendDeletionConfirmedEmailAction, { userEmail });
+            isSent = true;
         }
     } catch (error) {
         gdprLogger.error(`Deletion confirmation email for request ${target.requestId} was not sent (${errorClassOf(error)})`);
     }
 
-    await context.runMutation(internal.gdpr.posthog_retry.settleRetryConfirmation, { isSent, requestId: target.requestId, userId: target.userId });
+    // Only a send this invocation made (or tried) settles. A claim that is not ours, or an error before
+    // one, leaves the address: the sender holding the claim may still fail, and the watchdog resumes it.
+    if (isAttempted) {
+        await context.runMutation(internal.gdpr.posthog_retry.settleRetryConfirmation, { isSent, requestId: target.requestId, userId: target.userId });
+    }
+};
+
+const runAttempt = async (context: ActionCtx, args: RetryTarget, mode: "confirm" | "deleted" | "erase" | "no_profile"): Promise<void> => {
+    if (mode !== "confirm") {
+        let posthog: PostHogOutcome;
+
+        if (mode === "erase") {
+            try {
+                const outcome = await erasePostHogPerson(args.userId, process.env);
+
+                // The key or project id was removed since the workflow gave up: nothing was erased, so
+                // this must not complete the request. Failing it queues the next attempt as usual.
+                if (outcome === "skipped") {
+                    throw new PostHogUnconfiguredError("PostHog erasure is not configured");
+                }
+
+                posthog = outcome;
+                await context.runMutation(internal.gdpr.posthog_retry.recordPostHogErased, { ...args, posthog });
+            } catch (error) {
+                // Never rethrown: the scheduler would re-run a throwing job within minutes, off the 1h/6h/24h schedule.
+                await context.runMutation(internal.gdpr.posthog_retry.failPostHogRetry, { ...args, errorClass: errorClassOf(error) });
+
+                return;
+            }
+        } else {
+            // PostHog already answered for this attempt (a delivery before this one erased, then stopped).
+            posthog = mode;
+        }
+
+        // Not caught: a failure here leaves the request `processing`, and the scheduler's redelivery
+        // of this job finishes it whatever the lease says. It must never be recorded as a failed erasure.
+        const isCompleted = await context.runMutation(internal.gdpr.posthog_retry.recordPostHogRetrySuccess, { ...args, posthog });
+
+        // Not this call's outcome: a workflow re-run settled the request and owns its confirmation.
+        if (!isCompleted) {
+            return;
+        }
+    }
+
+    // After the success is recorded, so a failed address read is not a failed erasure; a throw
+    // here is redelivered as `confirm`.
+    const userEmail = await context.runQuery(internal.gdpr.posthog_retry.getRetryConfirmationEmail, {
+        requestId: args.requestId,
+        userId: args.userId,
+    });
+
+    if (userEmail !== "") {
+        await sendConfirmation(context, args, userEmail, mode === "confirm");
+    }
 };
 
 export const retryPostHogErasure = internalAction
@@ -531,51 +659,16 @@ export const retryPostHogErasure = internalAction
             return null;
         }
 
-        if (mode !== "confirm") {
-            let posthog: PostHogOutcome;
-
+        try {
+            await runAttempt(context, args, mode);
+        } catch (error) {
+            // This delivery holds the lease and is about to throw for a redelivery: hand the lease back,
+            // or that redelivery finds it held, does nothing, and the scheduler counts the job as done.
             if (mode === "erase") {
-                try {
-                    const outcome = await erasePostHogPerson(args.userId, process.env);
-
-                    // The key or project id was removed since the workflow gave up: nothing was erased, so
-                    // this must not complete the request. Failing it queues the next attempt as usual.
-                    if (outcome === "skipped") {
-                        throw new PostHogUnconfiguredError("PostHog erasure is not configured");
-                    }
-
-                    posthog = outcome;
-                    await context.runMutation(internal.gdpr.posthog_retry.recordPostHogErased, { ...args, posthog });
-                } catch (error) {
-                    // Never rethrown: the scheduler would re-run a throwing job within minutes, off the 1h/6h/24h schedule.
-                    await context.runMutation(internal.gdpr.posthog_retry.failPostHogRetry, { ...args, errorClass: errorClassOf(error) });
-
-                    return null;
-                }
-            } else {
-                // PostHog already answered for this attempt (a delivery before this one erased, then stopped).
-                posthog = mode;
+                await context.runMutation(internal.lib.claim_once.releaseKey, { key: attemptKey(args), scope: LEASE_SCOPE }).catch(() => null);
             }
 
-            // Not caught: a failure here leaves the request `processing`, and the scheduler's redelivery
-            // of this job finishes it whatever the lease says. It must never be recorded as a failed erasure.
-            const isCompleted = await context.runMutation(internal.gdpr.posthog_retry.recordPostHogRetrySuccess, { ...args, posthog });
-
-            // Not this call's outcome: a workflow re-run settled the request and owns its confirmation.
-            if (!isCompleted) {
-                return null;
-            }
-        }
-
-        // After the success is recorded, so a failed address read is not a failed erasure; a throw
-        // here is redelivered as `confirm`.
-        const userEmail = await context.runQuery(internal.gdpr.posthog_retry.getRetryConfirmationEmail, {
-            requestId: args.requestId,
-            userId: args.userId,
-        });
-
-        if (userEmail !== "") {
-            await sendConfirmation(context, args, userEmail, mode === "confirm");
+            throw error;
         }
 
         return null;

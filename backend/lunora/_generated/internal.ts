@@ -536,7 +536,7 @@ export interface InternalApiTypes {
             getExportRequest: FunctionReference<"query", { userId: string }, import("./dataModel.js").Doc_gdprRequests | null>;
             getRequestById: FunctionReference<"query", { requestId: Id<"gdprRequests"> }, import("./dataModel.js").Doc_gdprRequests | null>;
             logAudit: FunctionReference<"mutation", { action: string; details: string; performedBy: string; userId: string }, null>;
-            updateRequestProgress: FunctionReference<"mutation", { currentStep?: string; downloadUrl?: string; errorMessage?: string; fromStatus?: Array<"pending" | "processing" | "completed" | "failed" | "cancelled">; progress?: number; requestId: Id<"gdprRequests">; status?: "pending" | "processing" | "completed" | "failed" | "cancelled"; storageId?: Id<"_storage"> }, null>;
+            updateRequestProgress: FunctionReference<"mutation", { currentStep?: string; downloadUrl?: string; errorMessage?: string; fromStatus?: Array<"pending" | "processing" | "completed" | "failed" | "cancelled">; progress?: number; requestId: Id<"gdprRequests">; status?: "pending" | "processing" | "completed" | "failed" | "cancelled"; storageId?: Id<"_storage"> }, boolean>;
         };
         posthog_retry: {
             expireStalePostHogRetry: FunctionReference<"mutation", { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }, null>;
@@ -545,7 +545,7 @@ export interface InternalApiTypes {
             recordPostHogErased: FunctionReference<"mutation", { attempt: number; chain: number; posthog: "deleted" | "no_profile"; requestId: Id<"gdprRequests">; userId: string }, null>;
             recordPostHogRetrySuccess: FunctionReference<"mutation", { attempt: number; chain: number; posthog: "deleted" | "no_profile"; requestId: Id<"gdprRequests">; userId: string }, boolean>;
             retryPostHogErasure: FunctionReference<"action", { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }, null>;
-            schedulePostHogRetry: FunctionReference<"mutation", { requestId: Id<"gdprRequests">; userId: string }, null>;
+            schedulePostHogRetry: FunctionReference<"mutation", { failureId: string; requestId: Id<"gdprRequests">; userEmail: string; userId: string }, boolean>;
             settleRetryConfirmation: FunctionReference<"mutation", { isSent: boolean; requestId: Id<"gdprRequests">; userId: string }, null>;
             startPostHogRetry: FunctionReference<"mutation", { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }, "skip" | "erase" | "deleted" | "no_profile" | "confirm">;
         };

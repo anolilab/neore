@@ -103,18 +103,39 @@ describe("account deletion workflow: order", () => {
         expect(runs().find((entry) => entry.ref === "gdpr_steps_deletion_steps:deleteUserPresentations")?.args).toStrictEqual({ userId: USER });
     });
 
-    it("sends the confirmation e-mail and writes the audit entry only after completion, and minimises records last", async () => {
+    it("writes the audit entry and minimises the records after completion, and only then claims and sends the confirmation", async () => {
         await execute();
 
         const completed = completionIndex();
-        const email = indexOfStep("send-deletion-confirmed-email-action");
         const audit = indexOfStep("log-audit");
         const minimise = indexOfStep("minimise-gdpr-records");
+        const claim = indexOfStep("claim-deletion-confirmed-email");
+        const email = indexOfStep("send-deletion-confirmed-email-action");
 
-        expect(email).toBeGreaterThan(completed);
-        expect(audit).toBeGreaterThan(email);
+        expect(audit).toBeGreaterThan(completed);
         expect(minimise).toBeGreaterThan(audit);
-        expect(minimise).toBe(trace.findLastIndex((entry) => entry.kind === "step"));
+        expect(claim).toBeGreaterThan(minimise);
+        expect(email).toBeGreaterThan(claim);
+        expect(email).toBe(trace.findLastIndex((entry) => entry.kind === "step"));
+    });
+
+    it("still resolves, with the records minimised, when the confirmation cannot be sent", async () => {
+        failOn = (entry) => entry.kind === "run" && entry.ref === "gdpr_steps_email_steps:sendDeletionConfirmedEmailAction";
+
+        await expect(execute()).resolves.toBeUndefined();
+
+        expect(stepNames()).toContain("log-audit");
+        expect(stepNames()).toContain("minimise-gdpr-records");
+    });
+
+    it("does nothing for a request that already ended: the first status write is conditional and a refusal ends the run", async () => {
+        answer = (ref) => (ref === "gdpr_functions:updateRequestProgress" ? false : { cursor: null, hasMore: false });
+
+        await execute();
+
+        expect(runs()[0]?.args).toMatchObject({ fromStatus: ["pending", "processing", "failed"], status: "processing" });
+        expect(runs()).toHaveLength(1);
+        expect(stepNames()).toHaveLength(0);
     });
 
     it("reports completion exactly once, at 100 percent", async () => {

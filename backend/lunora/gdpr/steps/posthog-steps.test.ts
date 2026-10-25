@@ -87,16 +87,23 @@ describe(erasePostHogPerson, () => {
     it.each([400, 401, 403, 429, 500, 503])("throws on a %i so the workflow step retries", async (status) => {
         stubFetch(new Response("nope", { status }));
 
-        await expect(erasePostHogPerson("user-1", CONFIGURED)).rejects.toThrow(`Failed to delete person user-1: ${String(status)}`);
+        await expect(erasePostHogPerson("user-1", CONFIGURED)).rejects.toThrow(`Failed to delete person: ${String(status)}`);
     });
 
-    it("logs PostHog's response body before rethrowing a rejected delete", async () => {
+    it("logs the status, never the user id or PostHog's response body, before rethrowing a rejected delete", async () => {
         const errorSpy = vi.spyOn(gdprLogger, "error").mockImplementation(() => {});
 
         stubFetch(new Response("rate limited by project", { status: 429 }));
 
-        await expect(erasePostHogPerson("user-1", CONFIGURED)).rejects.toThrow("Failed to delete person user-1: 429");
-        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("429"), "rate limited by project");
+        const failure = await erasePostHogPerson("user-1", CONFIGURED)
+            .then(() => new Error("resolved"))
+            .catch((error: unknown) => error as Error);
+
+        expect(failure.message).toContain("429");
+        expect(failure.message).not.toContain("user-1");
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("http_429"));
+        expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("user-1");
+        expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("rate limited by project");
 
         errorSpy.mockRestore();
     });

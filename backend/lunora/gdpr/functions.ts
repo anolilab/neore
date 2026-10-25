@@ -440,7 +440,8 @@ const vRequestStatus = v.union(v.literal("pending"), v.literal("processing"), v.
 /**
  * `fromStatus`, when given, makes the write conditional: it applies only while the request is still
  * in one of those statuses, so a write that computed its outcome earlier cannot overwrite a request
- * another path (a scheduled retry) has since completed or cancelled.
+ * another path (a scheduled retry) has since completed or cancelled. It answers `false` when it did
+ * not apply, `true` otherwise.
  */
 export const updateRequestProgress = internalMutation
     .input({
@@ -453,7 +454,7 @@ export const updateRequestProgress = internalMutation
         status: v.optional(vRequestStatus),
         storageId: v.optional(v.id("_storage")),
     })
-    .output(v.null())
+    .output(v.boolean())
     .mutation(async ({ args, ctx: context }) => {
         const { fromStatus, requestId, ...updates } = args;
 
@@ -461,7 +462,7 @@ export const updateRequestProgress = internalMutation
             const current = await context.db.get(requestId);
 
             if (current === null || !fromStatus.includes(current.status)) {
-                return null;
+                return false;
             }
         }
 
@@ -498,5 +499,5 @@ export const updateRequestProgress = internalMutation
 
         await context.db.patch(requestId, withoutUndefined(patch));
 
-        return null;
+        return true;
     });

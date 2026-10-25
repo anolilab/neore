@@ -23,6 +23,7 @@ const runWorkflow = async (
     statusFails = false,
     scheduleFails: boolean | number = false,
     isEmailClaimTaken = false,
+    isScheduleRefused = false,
 ) => {
     const calls: Call[] = [];
     const stepRetries: string[] = [];
@@ -57,6 +58,11 @@ const runWorkflow = async (
         if (scheduleFailuresLeft > 0 && current === "schedule-post-hog-retry") {
             scheduleFailuresLeft -= 1;
             throw new Error("scheduling failed");
+        }
+
+        // The mutation answers `false` when it queued nothing (the request had already ended).
+        if (isScheduleRefused && current === "schedule-post-hog-retry") {
+            return false;
         }
 
         // The claim mutation answers `false` for a key the scheduled retry (or an earlier run) already holds.
@@ -242,7 +248,19 @@ describe("account deletion workflow, PostHog step", () => {
         expect(names.filter((name) => name === "schedule-post-hog-retry")).toHaveLength(1);
         expect(names.indexOf("schedule-post-hog-retry")).toBeGreaterThan(names.indexOf("log-audit-posthog-failed"));
         expect(names.indexOf("schedule-post-hog-retry")).toBeLessThan(names.indexOf("minimise-gdpr-records-posthog-failed"));
-        expect(calls.find((call) => call.name.startsWith("schedule-post-hog-retry|"))?.args).toStrictEqual({ requestId: "req-1", userId: "user-1" });
+        expect(calls.find((call) => call.name.startsWith("schedule-post-hog-retry|"))?.args).toStrictEqual({
+            failureId: expect.any(String),
+            requestId: "req-1",
+            userEmail: "a@example.com",
+            userId: "user-1",
+        });
+    });
+
+    it("minimises the address at once when the scheduling mutation queued nothing", async () => {
+        const failure = new Error("[GDPR/PostHog] Failed to delete person: 503 Service Unavailable");
+        const { request } = await runWorkflow(failure, false, false, false, false, false, true);
+
+        expect(request.userEmail).toBe("");
     });
 
     it("still minimises and reports the PostHog error when scheduling the retry fails", async () => {
