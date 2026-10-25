@@ -42,7 +42,7 @@ const CopyButton: FC<{
                     render={
                         <Button className="h-8 w-8" onClick={handleCopy} size="icon" variant="link">
                             {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                            <span className="sr-only">${t`Copy to clipboard`}</span>
+                            <span className="sr-only">{t`Copy to clipboard`}</span>
                         </Button>
                     }
                 />

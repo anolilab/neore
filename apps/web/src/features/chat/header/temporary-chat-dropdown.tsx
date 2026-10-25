@@ -234,6 +234,20 @@ const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, thre
         return t`Temporary chat mode`;
     };
 
+    // The countdown alone does not say what the button does, so name its purpose and add the status.
+    // A chat that has not started has no countdown; the button is orange when the next one is temporary, so say so.
+    const getAriaLabel = () => {
+        if (isTemporary) {
+            return t`Temporary chat settings, ${formatExpiresAt(temporaryStatus.expiresAt)}`;
+        }
+
+        if (nextChatTemporary) {
+            return t`Temporary chat mode, on for your next chat`;
+        }
+
+        return getTooltipText();
+    };
+
     const getDescriptionText = () => {
         if (isTemporary) {
             return formatExpiresAt(temporaryStatus.expiresAt);
@@ -259,11 +273,12 @@ const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, thre
                             <PopoverTrigger
                                 render={
                                     <Button
+                                        aria-label={getAriaLabel()}
                                         className={cn(className, (isTemporary || nextChatTemporary) && "text-orange-500 hover:text-orange-600")}
                                         size="icon"
                                         variant="ghost"
                                     >
-                                        <HourglassIcon className="size-4" />
+                                        <HourglassIcon aria-hidden="true" className="size-4" />
                                     </Button>
                                 }
                             />

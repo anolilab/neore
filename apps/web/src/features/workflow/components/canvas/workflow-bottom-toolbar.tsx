@@ -169,6 +169,7 @@ const WorkflowBottomToolbar = () => {
                                                     <TooltipTrigger
                                                         render={
                                                             <button
+                                                                aria-label={i18n._(config.label)}
                                                                 className={cn(buttonVariants({ size: "icon", variant: "ghost" }), "size-9 rounded-lg")}
                                                                 onClick={() => handleAddNode(type)}
                                                                 type="button"

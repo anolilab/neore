@@ -66,6 +66,14 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
         }),
     );
 
+    const isMessageSearch = searchType === "messages";
+    const closedSearchLabel = isMessageSearch ? t`Search messages` : t`Search threads`;
+    let closedSearchTooltip = closedSearchLabel;
+
+    if (focusSearchShortcut) {
+        closedSearchTooltip = isMessageSearch ? t`Search messages (${focusSearchShortcut})` : t`Search threads (${focusSearchShortcut})`;
+    }
+
     const handleNewThread = () => {
         navigate({ search: {}, to: "/chat" });
     };
@@ -96,7 +104,8 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                             <TooltipTrigger
                                 render={
                                     <Button
-                                        aria-label={t`Search threads`}
+                                        aria-expanded={showSearch}
+                                        aria-label={showSearch ? t`Close search` : closedSearchLabel}
                                         className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
                                         data-search-toggle=""
                                         onClick={toggleShowSearch}
@@ -107,7 +116,7 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                                     </Button>
                                 }
                             />
-                            <TooltipContent>{focusSearchShortcut ? t`Search threads (${focusSearchShortcut})` : t`Search threads`}</TooltipContent>
+                            <TooltipContent>{showSearch ? t`Close search` : closedSearchTooltip}</TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
                     <TooltipProvider>
@@ -115,12 +124,13 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                             <TooltipTrigger
                                 render={
                                     <Button
+                                        aria-label={t`Create project`}
                                         className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
                                         onClick={openCreateProjectDialog}
                                         size="sm"
                                         variant="ghost"
                                     >
-                                        <FolderPlus className="h-5 w-5" />
+                                        <FolderPlus aria-hidden="true" className="h-5 w-5" />
                                     </Button>
                                 }
                             />
@@ -133,12 +143,13 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                             <TooltipTrigger
                                 render={
                                     <Button
+                                        aria-label={t`Keyboard shortcuts`}
                                         className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
                                         onClick={toggleShowKeyboardHelp}
                                         size="sm"
                                         variant="ghost"
                                     >
-                                        <HelpCircle className="h-5 w-5" />
+                                        <HelpCircle aria-hidden="true" className="h-5 w-5" />
                                     </Button>
                                 }
                             />
@@ -153,11 +164,12 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                                         <DropdownMenuTrigger
                                             render={
                                                 <Button
+                                                    aria-label={t`Bulk actions`}
                                                     className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
                                                     size="sm"
                                                     variant="ghost"
                                                 >
-                                                    <MoreVertical className="h-5 w-5" />
+                                                    <MoreVertical aria-hidden="true" className="h-5 w-5" />
                                                 </Button>
                                             }
                                         />

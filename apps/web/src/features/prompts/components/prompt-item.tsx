@@ -151,20 +151,26 @@ const PromptItem = ({
                     <div className="flex items-center gap-1">
                         {onEdit && (
                             <Button
+                                aria-label={t`Edit Prompt`}
                                 className="opacity-0 transition-opacity group-hover:opacity-100"
                                 onClick={handleEdit}
                                 size="icon-sm"
                                 title={t`Edit Prompt`}
                                 variant="ghost"
                             >
-                                <Edit className="size-4" />
+                                <Edit aria-hidden="true" className="size-4" />
                             </Button>
                         )}
                         <DropdownMenu>
                             <DropdownMenuTrigger
                                 render={
-                                    <Button className="opacity-0 transition-opacity group-hover:opacity-100" size="icon-sm" variant="ghost">
-                                        <Play className="size-4" />
+                                    <Button
+                                        aria-label={t`Actions for prompt ${prompt.name}`}
+                                        className="opacity-0 transition-opacity group-hover:opacity-100"
+                                        size="icon-sm"
+                                        variant="ghost"
+                                    >
+                                        <Play aria-hidden="true" className="size-4" />
                                     </Button>
                                 }
                             />
