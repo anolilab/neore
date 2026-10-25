@@ -284,6 +284,17 @@ describe("removeTeamMember", () => {
         expect(await memberCountOf(teamId)).toBe(1);
     });
 
+    it("lets a team admin whose organization role is member remove a member", async () => {
+        const teamId = await insertTeam();
+
+        await insertTeamMember(teamId, MEMBER);
+        await insertTeamMember(teamId, TEAM_ADMIN, "admin");
+        await as(TEAM_ADMIN).mutation(removeTeamMember as never, { teamId, userId: MEMBER } as never);
+
+        expect(await teamMembers(teamId)).toMatchObject([{ userId: TEAM_ADMIN }]);
+        expect(await memberCountOf(teamId)).toBe(1);
+    });
+
     it("refuses a plain member", async () => {
         const teamId = await insertTeam();
 
@@ -312,6 +323,18 @@ describe("updateTeamMemberRole", () => {
         await as(ADMIN).mutation(updateTeamMemberRole as never, { role: "admin", teamId, userId: MEMBER } as never);
 
         expect(await teamMembers(teamId)).toMatchObject([{ role: "admin", userId: MEMBER }]);
+    });
+
+    it("lets a team admin whose organization role is member change a member's role", async () => {
+        const teamId = await insertTeam();
+
+        await insertTeamMember(teamId, MEMBER, "member");
+        await insertTeamMember(teamId, TEAM_ADMIN, "admin");
+        await as(TEAM_ADMIN).mutation(updateTeamMemberRole as never, { role: "admin", teamId, userId: MEMBER } as never);
+
+        const members = await teamMembers(teamId);
+
+        expect(members.find((member) => member.userId === MEMBER)).toMatchObject({ role: "admin" });
     });
 
     it("refuses a plain member promoting themselves", async () => {
@@ -393,6 +416,28 @@ describe("setActiveTeam and leaveTeam", () => {
         await insertTeamMember(teamId, MEMBER);
 
         await expect(as(MEMBER).mutation(setActiveTeam as never, { teamId } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+
+    it("stores the active team on the caller's session and clears it again", async () => {
+        const teamId = await insertTeam();
+
+        await insertTeamMember(teamId, MEMBER);
+        await seed(
+            async (db) => await db.insert("session", { createdAt: 1, expiresAt: Number.MAX_SAFE_INTEGER, token: "token-member", updatedAt: 1, userId: MEMBER }),
+        );
+
+        const activeTeamId = async (): Promise<string | undefined> =>
+            await seed(async (db) => {
+                const session = await db.session.findFirst({ where: { userId: MEMBER } });
+
+                return session.activeTeamId;
+            });
+
+        await as(MEMBER).mutation(setActiveTeam as never, { teamId } as never);
+        expect(await activeTeamId()).toBe(teamId);
+
+        await as(MEMBER).mutation(setActiveTeam as never, { teamId: null } as never);
+        expect(await activeTeamId()).toBeUndefined();
     });
 
     it("lets a member leave, and keeps the counter true", async () => {
