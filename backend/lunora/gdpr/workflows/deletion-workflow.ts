@@ -365,11 +365,15 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             // instance errors and never reaches completion. Unlike the export workflow this does not
             // return: the data is already gone, so the operator must see a failed instance, and a
             // re-run is safe (every step is idempotent) and ends in `completed` once PostHog works.
-            await context.run(internal.gdpr.functions.updateRequestProgress, {
-                errorMessage: POSTHOG_FAILED_MESSAGE,
-                requestId: args.requestId,
-                status: "failed",
-            });
+            try {
+                await context.run(internal.gdpr.functions.updateRequestProgress, {
+                    errorMessage: POSTHOG_FAILED_MESSAGE,
+                    requestId: args.requestId,
+                    status: "failed",
+                });
+            } catch {
+                // Best-effort, as below: a failing status write must not skip the minimisation that follows.
+            }
 
             try {
                 await context.step.do(
