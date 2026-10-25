@@ -377,6 +377,16 @@ describe("trigger webhook signing", () => {
             expect(scheduled).toHaveLength(0);
         });
 
+        it("flags a body that is not valid UTF-8 for the run, so admission evaluates the same text", async () => {
+            const { scheduled, statusOf } = await setup(SIGNED_TRIGGER);
+            const body = new Uint8Array([...new TextEncoder().encode('{"note":"'), 0xff, 0x22, 0x7d]);
+            const timestamp = String(Math.floor(NOW / 1000));
+            const signed = new Uint8Array([...new TextEncoder().encode(`${timestamp}.`), ...body]);
+
+            expect(await statusOf(body, { "x-neore-timestamp": timestamp, "x-signature-256": `sha256=${await hmacHex(signed)}` })).toBe(200);
+            expect(scheduled).toEqual([expect.objectContaining({ invalidUtf8: true })]);
+        });
+
         it("evaluates filters on a signed body that starts with a byte-order mark", async () => {
             const { scheduled, statusOf } = await setup({ ...SIGNED_TRIGGER, filters: [{ op: "equals", path: "action", value: "opened" }] });
             const body = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode('{"action":"opened"}')]);

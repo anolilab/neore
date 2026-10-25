@@ -12,6 +12,7 @@ import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { claimKey, releaseKey } from "../lib/claim-once";
 import { hmacSha256Hex } from "../lib/crypto";
+import { filterTextOf, MAX_WEBHOOK_BODY_BYTES } from "./filters";
 import { admitTriggerRun, createExecution } from "./functions";
 import handleTriggerWebhook from "./http";
 
@@ -52,6 +53,7 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 const SECRET = "whsec_test";
 const NOW = 1_800_000_000_000;
 const BODY = '{"event":"push","branch":"dev"}';
+const TOO_LONG = /filterPayload|too long|maximum|length/i;
 const MAIN_ONLY = [{ op: "equals", path: "branch", value: "main" }];
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -75,11 +77,22 @@ const insertTrigger = async (): Promise<string> =>
 
 const executions = async (): Promise<{ status: string }[]> => await harness.run(async (ctx: any) => await ctx.db.query("triggerExecutions").collect());
 
+type Scheduled = { claim?: { key: string; scope: string }; invalidUtf8?: boolean; payload?: string };
+
+const hmacBytesHex = async (bytes: Uint8Array): Promise<string> => {
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(SECRET), { hash: "SHA-256", name: "HMAC" }, false, ["sign"]);
+
+    return [...new Uint8Array(await crypto.subtle.sign("HMAC", key, bytes))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
 /** The webhook handler against a trigger snapshot taken BEFORE the owner saved filters; returns what it scheduled. */
-const deliver = async (triggerId: string): Promise<{ claim?: { key: string; scope: string }; payload?: string }> => {
-    const scheduled: { claim?: { key: string; scope: string }; payload?: string }[] = [];
+const deliver = async (triggerId: string, body: Uint8Array | string = BODY): Promise<Scheduled> => {
+    const scheduled: Scheduled[] = [];
     const timestamp = String(Math.floor(NOW / 1000));
-    const signature = await hmacSha256Hex(SECRET, `${timestamp}.${BODY}`);
+    const signature =
+        typeof body === "string"
+            ? await hmacSha256Hex(SECRET, `${timestamp}.${body}`)
+            : await hmacBytesHex(new Uint8Array([...new TextEncoder().encode(`${timestamp}.`), ...body]));
     const context = {
         runMutation: async (reference: unknown, args: unknown) =>
             await harness.run(async (ctx: any) => await ctx.runMutation(reference === internal.lib.claim_once.releaseKey ? releaseKey : claimKey, args)),
@@ -87,7 +100,7 @@ const deliver = async (triggerId: string): Promise<{ claim?: { key: string; scop
             return { enabled: true, type: "webhook", userId: "u", webhookSecret: SECRET };
         },
         scheduler: {
-            runAfter: async (_delay: number, reference: unknown, args: { claim?: { key: string; scope: string }; payload?: string }) => {
+            runAfter: async (_delay: number, reference: unknown, args: Scheduled) => {
                 expect(reference).toBe(internal.triggers.execute.executeTrigger);
                 scheduled.push(args);
             },
@@ -96,7 +109,7 @@ const deliver = async (triggerId: string): Promise<{ claim?: { key: string; scop
     const response = await handleTriggerWebhook(
         context as never,
         new Request("https://x/triggers/webhook/t", {
-            body: BODY,
+            body,
             headers: { "x-neore-timestamp": timestamp, "x-signature-256": `sha256=${signature}` },
             method: "POST",
         }),
@@ -176,6 +189,43 @@ describe("admitTriggerRun filter recheck", () => {
         expect(await admit(triggerId, payload)).toBeNull();
         expect(charged.rounds).toBe(1);
         expect(await executions()).toEqual([expect.objectContaining({ status: "running" })]);
+    });
+
+    it("refuses a body that was not valid UTF-8 once the owner adds a filter its lossy decode would pass", async () => {
+        const triggerId = await insertTrigger();
+        const bytes = new Uint8Array([...new TextEncoder().encode('{"note":"'), 0xff, 0x22, 0x7d]);
+        const delivery = await deliver(triggerId, bytes);
+
+        expect(delivery.invalidUtf8).toBe(true);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { filters: [{ op: "exists", path: "note" }] }));
+
+        // The lossy text alone would pass: the replacement character leaves valid JSON.
+        expect(await admit(triggerId, delivery.payload)).toBeNull();
+        expect(charged.rounds).toBe(1);
+
+        const executionId = await harness.run(async (ctx: any) => await ctx.runMutation(createExecution, { payload: delivery.payload, triggerId }));
+        const result = await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(admitTriggerRun, {
+                    claim: delivery.claim,
+                    executionId,
+                    filterPayload: filterTextOf(delivery.payload, delivery.invalidUtf8),
+                    triggerId,
+                }),
+        );
+
+        expect(result).toEqual({ filtered: expect.any(String) });
+        expect(charged.rounds).toBe(1);
+    });
+
+    it("rejects a filter payload longer than a webhook body can be", async () => {
+        const triggerId = await insertTrigger();
+        const run = async (filterPayload: string) =>
+            await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, { filterPayload, triggerId }));
+
+        expect(await run("x".repeat(MAX_WEBHOOK_BODY_BYTES))).toBeNull();
+        await expect(run("x".repeat(MAX_WEBHOOK_BODY_BYTES + 1))).rejects.toThrow(TOO_LONG);
     });
 
     it("does not look at filters for a run that passes no delivery payload", async () => {

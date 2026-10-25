@@ -40,7 +40,7 @@ import { hmacSha256Hex, isWithinWindow, SIGNED_REQUEST_WINDOW_MS, timingSafeEqua
 import { decryptKey } from "../lib/encryption";
 import { httpScheduler } from "../lib/http-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
-import { evaluateFilters } from "./filters";
+import { decodeStrict, evaluateFilters, MAX_WEBHOOK_BODY_BYTES } from "./filters";
 
 const DIGITS_ONLY = /^\d{1,12}$/u;
 
@@ -128,9 +128,8 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 
         // 2. Read the request body (enforce 1MB size limit to prevent DoS)
         const contentLength = request.headers.get("content-length");
-        const MAX_PAYLOAD_SIZE = 1024 * 1024; // 1MB
 
-        if (contentLength && Number.parseInt(contentLength, 10) > MAX_PAYLOAD_SIZE) {
+        if (contentLength && Number.parseInt(contentLength, 10) > MAX_WEBHOOK_BODY_BYTES) {
             return Response.json(
                 { error: "Payload too large" },
                 {
@@ -145,7 +144,7 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         // not clean UTF-8 would never match the signature it was signed with.
         const rawBody = new Uint8Array(await request.arrayBuffer());
 
-        if (rawBody.byteLength > MAX_PAYLOAD_SIZE) {
+        if (rawBody.byteLength > MAX_WEBHOOK_BODY_BYTES) {
             return Response.json(
                 { error: "Payload too large" },
                 {
@@ -208,7 +207,9 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         //    The body is decoded strictly for this: the lossy decode above turns invalid
         //    UTF-8 into U+FFFD, which could let bytes that are not JSON parse as JSON.
         //    A body that does not decode is evaluated as the empty (non-JSON) string.
-        const verdict = evaluateFilters(trigger.filters, decodeStrict(rawBody));
+        //        The run carries `invalidUtf8` so admission evaluates the same text.
+        const strictBody = decodeStrict(rawBody);
+        const verdict = evaluateFilters(trigger.filters, strictBody ?? "");
 
         if (!verdict.matched) {
             try {
@@ -241,6 +242,7 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         try {
             await httpScheduler(context).runAfter(0, internal.triggers.execute.executeTrigger, {
                 claim,
+                invalidUtf8: strictBody === null ? true : undefined,
                 payload: body || undefined,
                 triggerId: triggerId as Id<"triggers">,
             });
@@ -271,15 +273,6 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 };
 
 const MISSING_SIGNATURE = "Missing or invalid signature headers";
-
-/** UTF-8 text of `bytes`, or `""` when they are not valid UTF-8 (which no JSON parser accepts). */
-const decodeStrict = (bytes: Uint8Array): string => {
-    try {
-        return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
-    } catch {
-        return "";
-    }
-};
 
 type SignedDelivery = { presented: string; signedPayload: Uint8Array } | { error: string };
 

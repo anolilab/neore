@@ -13,6 +13,7 @@ import { SANDBOX_TOOLS } from "../chat/lib/tool-builder";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
+import { filterTextOf } from "./filters";
 
 export const executeTrigger = internalAction
     .input({
@@ -20,10 +21,12 @@ export const executeTrigger = internalAction
         claim: v.optional(v.object({ key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
         // A manual test run ("Run now") fires a disabled trigger too.
         ignoreDisabled: v.optional(v.boolean()),
+        // The webhook body was not valid UTF-8, so `payload` is its lossy decode and filters see an empty body.
+        invalidUtf8: v.optional(v.boolean()),
         payload: v.optional(v.string()), // Webhook payload or scheduled input
         triggerId: v.id("triggers"),
     })
-    .action(async ({ args: { claim, ignoreDisabled, payload, triggerId }, ctx }) => {
+    .action(async ({ args: { claim, ignoreDisabled, invalidUtf8, payload, triggerId }, ctx }) => {
         // 1. Fetch trigger config
         const trigger = await ctx.runQuery(internal.triggers.functions.getTriggerInternal, { triggerId });
 
@@ -63,7 +66,7 @@ export const executeTrigger = internalAction
             const refusal = await ctx.runMutation(internal.triggers.functions.admitTriggerRun, {
                 claim,
                 executionId,
-                filterPayload: triggerType === "webhook" && ignoreDisabled !== true ? (payload ?? "") : undefined,
+                filterPayload: triggerType === "webhook" && ignoreDisabled !== true ? filterTextOf(payload, invalidUtf8) : undefined,
                 triggerId,
             });
 
