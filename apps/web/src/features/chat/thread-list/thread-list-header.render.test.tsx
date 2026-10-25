@@ -4,6 +4,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+const searchState = vi.hoisted(() => {
+    return { showSearch: false };
+});
+
 vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
@@ -64,7 +68,7 @@ vi.mock("./stores/thread-list-ui-store", () => {
                 setSearchQuery: () => {},
                 setSearchType: () => {},
                 setSelectedCategory: () => {},
-                showSearch: false,
+                showSearch: searchState.showSearch,
                 toggleShowKeyboardHelp: () => {},
                 toggleShowSearch: () => {},
             }),
@@ -78,5 +82,17 @@ describe("ThreadListHeader", () => {
         render(<ThreadListHeader />);
 
         expect(screen.getByRole("button", { name })).toBeTruthy();
+    });
+
+    it("names the search button for closing while the search bar is open", () => {
+        searchState.showSearch = true;
+
+        try {
+            render(<ThreadListHeader />);
+
+            expect(screen.getByRole("button", { name: "Close search" })).toBeTruthy();
+        } finally {
+            searchState.showSearch = false;
+        }
     });
 });

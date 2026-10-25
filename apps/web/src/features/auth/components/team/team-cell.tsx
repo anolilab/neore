@@ -56,7 +56,7 @@ const TeamCell = ({ className, classNames, refetchTeams, team }: TeamCellPropert
                     <DropdownMenuTrigger
                         render={
                             <Button
-                                aria-label={t`Team actions`}
+                                aria-label={t`Actions for team ${team.name}`}
                                 className={cn("relative ms-auto", classNames?.button, classNames?.outlineButton)}
                                 size="icon"
                                 type="button"

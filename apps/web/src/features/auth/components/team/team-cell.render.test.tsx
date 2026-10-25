@@ -50,6 +50,6 @@ describe("TeamCell", () => {
     it("names the actions trigger", () => {
         render(<TeamCell team={{ createdAt: 0, id: "t1", memberCount: 2, name: "Core" }} />);
 
-        expect(screen.getByRole("button", { name: "Team actions" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Actions for team Core" })).toBeTruthy();
     });
 });

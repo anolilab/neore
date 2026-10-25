@@ -31,6 +31,6 @@ describe("GroupHeader", () => {
             />,
         );
 
-        expect(screen.getByRole("button", { name: "Project actions" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Actions for project Docs" })).toBeTruthy();
     });
 });

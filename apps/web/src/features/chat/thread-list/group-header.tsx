@@ -123,7 +123,7 @@ const GroupHeader: FC<GroupHeaderProperties> = ({
                                         <DropdownMenuTrigger
                                             render={
                                                 <Button
-                                                    aria-label={t`Project actions`}
+                                                    aria-label={t`Actions for project ${group.title}`}
                                                     className="text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white h-6 w-6 shrink-0 p-0"
                                                     variant="ghost"
                                                 >

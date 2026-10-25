@@ -96,7 +96,8 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                             <TooltipTrigger
                                 render={
                                     <Button
-                                        aria-label={t`Search threads`}
+                                        aria-expanded={showSearch}
+                                        aria-label={showSearch ? t`Close search` : t`Search threads`}
                                         className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
                                         data-search-toggle=""
                                         onClick={toggleShowSearch}
@@ -107,7 +108,7 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                                     </Button>
                                 }
                             />
-                            <TooltipContent>{focusSearchShortcut ? t`Search threads (${focusSearchShortcut})` : t`Search threads`}</TooltipContent>
+                            <TooltipContent>{showSearch ? t`Close search` : focusSearchShortcut ? t`Search threads (${focusSearchShortcut})` : t`Search threads`}</TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
                     <TooltipProvider>
