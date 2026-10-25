@@ -506,7 +506,7 @@ const vGetTriggerExecutionsOutput = v.array(
     }),
 );
 
-/** How many of a trigger's newest rows are searched for its filtered row. */
+/** How many of a trigger's newest rows the history query reads before hiding all but one filtered row. */
 const FILTERED_LOOKBACK = 50;
 
 export const getTriggerExecutions = authQuery
@@ -707,8 +707,8 @@ export const createExecution = internalMutation
  * nothing: no `admitTriggerRun` charge, no `triggerCount` / `lastTriggeredAt`
  * change, no notification (`updateExecution` would send one). The payload is
  * NOT stored: it is untrusted, up to 1 MB, and can be replayed at the delivery
- * limit. A trigger keeps ONE filtered row, found among its newest
- * `FILTERED_LOOKBACK` rows and moved to the front by each miss, so a sender
+ * limit. A trigger keeps ONE filtered row, found by `by_triggerId_status` however
+ * many runs followed it and moved to the front by each miss, so a sender
  * whose events miss the filters (even alternating with runs) cannot fill the
  * history or push the real runs out of the list.
  */
@@ -719,12 +719,10 @@ export const recordFilteredExecution = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { reason, triggerId }, ctx }) => {
-        const recent = await ctx.db
+        const latest = await ctx.db
             .query("triggerExecutions")
-            .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", triggerId))
-            .order("desc")
-            .take(FILTERED_LOOKBACK);
-        const latest = recent.find((entry) => entry.status === "filtered");
+            .withIndex("by_triggerId_status", (q) => q.eq("triggerId", triggerId).eq("status", "filtered"))
+            .first();
 
         if (latest) {
             await ctx.db.patch(latest._id, { completedAt: ctx.now, error: reason, startedAt: ctx.now });

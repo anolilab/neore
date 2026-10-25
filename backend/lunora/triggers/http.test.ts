@@ -419,6 +419,26 @@ describe("trigger webhook signing", () => {
             expect(rows.filter((row: any) => row.status === "completed")).toHaveLength(4);
         });
 
+        it("still reuses the filtered row after more runs than the history lookback", async () => {
+            const { history, statusOf, triggerId } = await setup(FILTERED_TRIGGER);
+
+            expect(await missOf(statusOf, 1)).toBe(202);
+
+            await harness.run(async (ctx: any) => {
+                for (let n = 1; n <= 60; n += 1) {
+                    await ctx.db.insert("triggerExecutions", { startedAt: NOW + n, status: "completed", triggerId });
+                }
+            });
+
+            vi.setSystemTime(NOW + 1000);
+            expect(await missOf(statusOf, 2)).toBe(202);
+
+            const rows = await history();
+
+            expect(rows.filter((row: any) => row.status === "filtered")).toHaveLength(1);
+            expect(rows[0]).toMatchObject({ status: "filtered" });
+        });
+
         it("gives the claim back when the filtered row cannot be written, so the sender's retry is evaluated", async () => {
             const { post, scheduler } = await setup(FILTERED_TRIGGER);
             const body = '{"action":"closed"}';

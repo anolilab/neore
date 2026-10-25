@@ -1481,6 +1481,7 @@ export const triggerExecutions = sqliteTable("triggerExecutions", {
     threadId: text("threadId"),
     triggerId: text("triggerId").references((): AnySQLiteColumn => triggers._id).notNull(),
 }, (t) => ({
+    by_triggerId_status: index("by_triggerId_status").on(t.triggerId, t.status),
     by_triggerId_startedAt: index("by_triggerId_startedAt").on(t.triggerId, t.startedAt),
 }));
 

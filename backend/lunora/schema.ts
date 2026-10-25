@@ -2699,7 +2699,10 @@ export const schema = defineSchema({
         status: v.union(v.literal("running"), v.literal("completed"), v.literal("failed"), v.literal("filtered")),
         threadId: v.optional(v.string()),
         triggerId: v.id("triggers"),
-    }).index("by_triggerId_startedAt", ["triggerId", "startedAt"]),
+    })
+        .index("by_triggerId_startedAt", ["triggerId", "startedAt"])
+        // Finds a trigger's one "filtered" row however many runs followed it (`recordFilteredExecution`).
+        .index("by_triggerId_status", ["triggerId", "status"]),
 
     triggers: defineTable({
         // Set when the routine belongs to a bot: the run uses the bot's model and instructions.
