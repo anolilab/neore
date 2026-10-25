@@ -6326,6 +6326,16 @@
       "to": "function:triggers_functions:updateTriggerStats"
     },
     {
+      "from": "function:triggers_functions:admitTriggerRun",
+      "kind": "read",
+      "to": "table:triggerExecutions"
+    },
+    {
+      "from": "function:triggers_functions:admitTriggerRun",
+      "kind": "write",
+      "to": "table:triggerExecutions"
+    },
+    {
       "from": "function:triggers_functions:createExecution",
       "kind": "write",
       "to": "table:triggerExecutions"

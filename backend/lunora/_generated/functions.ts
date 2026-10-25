@@ -7487,8 +7487,22 @@ return { ...(__has1 ? { "ignoreDisabled": __val1 } : {}), ...(__has2 ? { "payloa
 installCompiledValidatorMap(lunora_triggers_functions_169.admitTriggerRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["executionId"] !== undefined) {
+if (typeof source["executionId"] !== "string") return DEFER;
+__val1 = source["executionId"];
+__has1 = true;
+}
+let __has2 = false;
+let __val2;
+if (source["filterPayload"] !== undefined) {
+if (typeof source["filterPayload"] !== "string") return DEFER;
+__val2 = source["filterPayload"];
+__has2 = true;
+}
 if (typeof source["triggerId"] !== "string") return DEFER;
-return { "triggerId": source["triggerId"] };
+return { ...(__has1 ? { "executionId": __val1 } : {}), ...(__has2 ? { "filterPayload": __val2 } : {}), "triggerId": source["triggerId"] };
 });
 installCompiledValidatorMap(lunora_triggers_functions_169.createExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9309,7 +9323,7 @@ export interface Caller {
             executeTrigger: (args: { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
         };
         functions: {
-            admitTriggerRun: (args: { triggerId: Id<"triggers"> }) => Promise<null | string>;
+            admitTriggerRun: (args: { executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }) => Promise<null | string | { filtered: string }>;
             createExecution: (args: { payload?: string; triggerId: Id<"triggers"> }) => Promise<Id<"triggerExecutions">>;
             createTrigger: (args: { botComputer?: boolean; botId?: string; cronExpression?: string; description?: string; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; type: "schedule" | "webhook" | "event"; webhookSignatureScheme?: "timestamped" | "native" }) => Promise<{ triggerId: string; webhookSecret?: string }>;
             deleteTrigger: (args: { triggerId: Id<"triggers"> }) => Promise<void>;

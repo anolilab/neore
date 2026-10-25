@@ -55,7 +55,20 @@ export const executeTrigger = internalAction
             // failed execution, so the user sees why it did not happen. Inside the try,
             // so an admission error reaches the failure handler below instead of
             // leaving the execution running.
-            const refusal = await ctx.runMutation(internal.triggers.functions.admitTriggerRun, { triggerId });
+            // A webhook delivery (not a manual "Run now") has its filters checked again at admission,
+            // because the owner may have saved stricter ones since the webhook handler evaluated them.
+            const refusal = await ctx.runMutation(internal.triggers.functions.admitTriggerRun, {
+                executionId,
+                filterPayload: triggerType === "webhook" && ignoreDisabled !== true ? (payload ?? "") : undefined,
+                triggerId,
+            });
+
+            if (refusal !== null && typeof refusal === "object") {
+                // Recorded as filtered and not charged; the running row was replaced.
+                console.info(`[Triggers] Trigger ${trigger.name} delivery no longer matches its filters (${refusal.filtered}), skipping`);
+
+                return;
+            }
 
             if (refusal) {
                 await ctx.runMutation(internal.triggers.functions.updateExecution, {
