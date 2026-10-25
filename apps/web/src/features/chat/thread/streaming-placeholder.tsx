@@ -47,6 +47,10 @@ type StreamStatus = "pending" | "streaming" | "done" | "error" | "timeout";
 type StreamBody = { reasoning: string; speaker?: StreamSpeaker; status: StreamStatus; text: string };
 type StreamDelta = { reasoning: string; speaker?: StreamSpeaker; text: string };
 
+const STREAM_BODY_POLL_MS = 1000;
+
+const isStreamOpen = (status: StreamStatus): boolean => status === "pending" || status === "streaming";
+
 const MAX_RECONNECT_ATTEMPTS = 3;
 /** Base delay for exponential backoff (ms) */
 const RECONNECT_BASE_DELAY = 1000;
@@ -342,11 +346,17 @@ const useStream = (
     // driving a live stream ourselves.
     const isUsePersistence = streamEnded === false || !driven;
 
-    const { data: persistentBody } = useQuery(
-        // `StreamId` is the local brand for a `persistentStreams` id — the value comes
-        // straight from `getActiveStreamForThread`.
-        crpc.chat.streaming.getStreamBody.queryOptions(isUsePersistence && streamId ? { streamId: streamId as unknown as Id<"persistentStreams"> } : skipToken),
-    );
+    // `StreamId` is the local brand for a `persistentStreams` id — the value comes
+    // straight from `getActiveStreamForThread`. Polled, not live: a live push re-ran
+    // the whole chunk read on every chunk; a poll reads once a second and stops once
+    // the stream settles.
+    const { data: persistentBody } = useQuery({
+        ...crpc.chat.streaming.getStreamBody.queryOptions(
+            isUsePersistence && streamId ? { streamId: streamId as unknown as Id<"persistentStreams"> } : skipToken,
+            { live: false },
+        ),
+        refetchInterval: (query) => (query.state.data && !isStreamOpen(query.state.data.status) ? false : STREAM_BODY_POLL_MS),
+    });
     const [streamBody, setStreamBody] = useState<StreamDelta>({ reasoning: "", text: "" });
 
     // Owns the in-flight stream so it can be torn down on unmount. Deliberately NOT
