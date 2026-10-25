@@ -11,7 +11,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { assertComputerRoutine, createTrigger, setTriggerEnabled, testRunTrigger, updateTrigger, updateTriggerStats } from "./functions";
+import { assertComputerRoutine, createTrigger, getTriggerExecutions, setTriggerEnabled, testRunTrigger, updateTrigger, updateTriggerStats } from "./functions";
 import { findNextCronTime } from "./schedule";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
@@ -366,5 +366,42 @@ describe("webhook payload filters", () => {
         const { triggerId } = (await as().mutation(createTrigger as never, schedule as never)) as { triggerId: string };
 
         await expect(as().mutation(updateTrigger as never, { filters: [filter], triggerId } as never)).rejects.toThrow("Only a webhook trigger");
+    });
+});
+
+describe("getTriggerExecutions", () => {
+    const as = () => harness.withIdentity({ userId: "user-a" } as never);
+
+    const seed = async (completed: number) => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("triggerExecutions", { startedAt: completed + 1, status: "filtered", triggerId });
+
+            for (let n = 1; n <= completed; n += 1) {
+                await ctx.db.insert("triggerExecutions", { startedAt: n, status: "completed", triggerId });
+            }
+        });
+
+        return triggerId;
+    };
+
+    it("returns the full 100 rows at the top of the range, the filtered row among them", async () => {
+        const triggerId = await seed(110);
+        const rows = (await as().query(getTriggerExecutions as never, { limit: 100, triggerId } as never)) as { status: string }[];
+
+        expect(rows).toHaveLength(100);
+        expect(rows[0]?.status).toBe("filtered");
+    });
+
+    it("accepts the bounds 1 and 100 and refuses 0, 101, fractions and non-finite limits", async () => {
+        const triggerId = await seed(2);
+
+        expect(await as().query(getTriggerExecutions as never, { limit: 1, triggerId } as never)).toHaveLength(1);
+        expect(await as().query(getTriggerExecutions as never, { limit: 100, triggerId } as never)).toHaveLength(3);
+
+        for (const limit of [0, 101, -1, 1.5, NaN, Infinity]) {
+            await expect(as().query(getTriggerExecutions as never, { limit, triggerId } as never)).rejects.toThrow();
+        }
     });
 });

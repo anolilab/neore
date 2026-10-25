@@ -201,7 +201,10 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         //    writes nothing. It runs nothing, so it is not charged (`admitTriggerRun`
         //    lives in the execution) and does not count as a run. 202, not 200: the
         //    delivery was accepted and deliberately not acted on.
-        const verdict = evaluateFilters(trigger.filters, body);
+        //    The body is decoded strictly for this: the lossy decode above turns invalid
+        //    UTF-8 into U+FFFD, which could let bytes that are not JSON parse as JSON.
+        //    A body that does not decode is evaluated as the empty (non-JSON) string.
+        const verdict = evaluateFilters(trigger.filters, decodeStrict(rawBody));
 
         if (!verdict.matched) {
             try {
@@ -261,6 +264,15 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 };
 
 const MISSING_SIGNATURE = "Missing or invalid signature headers";
+
+/** UTF-8 text of `bytes`, or `""` when they are not valid UTF-8 (which no JSON parser accepts). */
+const decodeStrict = (bytes: Uint8Array): string => {
+    try {
+        return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
+    } catch {
+        return "";
+    }
+};
 
 type SignedDelivery = { presented: string; signedPayload: Uint8Array } | { error: string };
 
