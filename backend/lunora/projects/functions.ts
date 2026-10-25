@@ -1,7 +1,7 @@
 import { LunoraError, v } from "lunorash/server";
 
 import { listPinnedProjectsHandler, listProjectsHandler } from "../agent/projects";
-import { vPaginationResult, vProjectDoc as vProjectDocument } from "../agent/validators";
+import { vProjectDocFields } from "../agent/validators";
 import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
@@ -54,7 +54,17 @@ export const listProjects = authQuery
             numItems: v.number(),
         }),
     })
-    .output(v.from(vPaginationResult(vProjectDocument)))
+    // Written out, not `vPaginationResult(...)`: codegen cannot read a call, and
+    // an output it cannot read is emitted as an empty schema in the OpenAPI spec.
+    .output(
+        v.object({
+            continueCursor: v.union(v.string(), v.null()),
+            isDone: v.boolean(),
+            page: v.array(v.object({ ...vProjectDocFields })),
+            pageStatus: v.optional(v.union(v.literal("SplitRecommended"), v.literal("SplitRequired"), v.null())),
+            splitCursor: v.optional(v.union(v.string(), v.null())),
+        }),
+    )
     .query(async ({ args: { organizationId, paginationOpts }, ctx: context }) => {
         const { userId } = context.user;
 
@@ -69,7 +79,7 @@ export const listPinnedProjects = authQuery
     .input({
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
     })
-    .output(v.from(v.array(vProjectDocument)))
+    .output(v.array(v.object({ ...vProjectDocFields })))
     .query(async ({ args: { organizationId }, ctx: context }) => {
         const { userId } = context.user;
 
