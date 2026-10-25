@@ -253,16 +253,16 @@ export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string;
 
 /** Revoke the session server-side, then forget it even if the revoke fails. */
 export const signOutGrant = async (input: { fetch: Fetch; lunoraUrl: string; store: GrantStore }): Promise<void> => {
-    const grant = await input.store.get();
-
     try {
+        const grant = await input.store.get();
+
         if (grant) {
             const response = await postJson(input.fetch, `${input.lunoraUrl}/extension/auth/revoke`, { token: grant.token });
 
             await response.body?.cancel();
         }
     } catch {
-        // Offline: the session expires on its own.
+        // Offline, or the stored grant could not be read: the session expires on its own, and the local copy is cleared below.
     } finally {
         await input.store.clear();
     }
