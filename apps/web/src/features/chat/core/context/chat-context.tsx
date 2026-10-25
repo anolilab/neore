@@ -886,10 +886,12 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             const { attachedReferences } = useChatUIStore.getState();
             // The pending settings are taken out of the store before the request; a send that fails puts them back with the draft.
             let consumedSettings: PendingSettings | null = null;
+            // The thread the composer showed when the settings were taken: a late failure must not hand them to another thread.
+            const consumedFromThread = useModelStore.getState().selectedModelThreadId;
             const restoreSettings = () => {
                 const consumed = consumedSettings;
 
-                if (!consumed) {
+                if (!consumed || useModelStore.getState().selectedModelThreadId !== consumedFromThread) {
                     return;
                 }
 
