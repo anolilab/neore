@@ -4,6 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
+import { formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
 import { useNavigate } from "@tanstack/react-router";
 import { FolderPlus, HelpCircle, MoreVertical, PlusIcon, Search } from "lucide-react";
 import type { FC } from "react";
@@ -14,6 +15,7 @@ import OrganizationSwitcher from "@/features/auth/components/organization/organi
 import TeamSwitcher from "@/features/auth/components/team/team-switcher";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import CreateGroupChatButton from "@/features/chat/group/create-group-chat-button";
+import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 
 import SearchBar from "./search-bar";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
@@ -26,6 +28,8 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
     const { t } = useLingui();
     const navigate = useNavigate();
     const { hooks } = useAuth();
+    const { keyboardShortcuts } = useKeyboardShortcuts();
+    const focusSearchShortcut = formatShortcutForDisplay(keyboardShortcuts.focusSearch);
 
     const { data: organizations } = hooks.useListOrganizations();
     const { data: activeOrganization } = hooks.useActiveOrganization();
@@ -103,7 +107,7 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                                     </Button>
                                 }
                             />
-                            <TooltipContent>{t`Search threads (Ctrl+F)`}</TooltipContent>
+                            <TooltipContent>{focusSearchShortcut ? t`Search threads (${focusSearchShortcut})` : t`Search threads`}</TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
                     <TooltipProvider>

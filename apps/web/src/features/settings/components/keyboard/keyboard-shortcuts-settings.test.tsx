@@ -159,4 +159,24 @@ describe("KeyboardShortcutsSettings", () => {
 
         expect((screen.getByLabelText("New Chat") as HTMLInputElement).value).toBe(before);
     });
+
+    it("ends a recording in progress when Reset starts, so a later key cannot change the form", async () => {
+        renderSettings();
+
+        const before = (screen.getByLabelText("New Chat") as HTMLInputElement).value;
+
+        fireEvent.click(screen.getByRole("button", { name: "Record New Chat" }));
+        fireEvent.keyDown(document, { ctrlKey: true, key: "j" });
+        fireEvent.click(screen.getByRole("button", { name: "Reset to Defaults" }));
+
+        await waitFor(() => {
+            expect(updateUserSettings).toHaveBeenCalledTimes(1);
+        });
+        await waitFor(() => {
+            expect((screen.getByRole("button", { name: "Reset to Defaults" }) as HTMLButtonElement).disabled).toBe(false);
+        });
+        fireEvent.keyUp(document, { ctrlKey: true, key: "j" });
+
+        expect((screen.getByLabelText("New Chat") as HTMLInputElement).value).toBe(before);
+    });
 });

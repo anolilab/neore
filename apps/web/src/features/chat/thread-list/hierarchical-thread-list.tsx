@@ -15,6 +15,7 @@ import type { FC, ReactNode } from "react";
 import { lazy, memo, startTransition, Suspense, useCallback, useId, useMemo, useRef, useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
+import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import {
     useDeleteProject,
     useMoveThreadToProject,
@@ -23,7 +24,6 @@ import {
     useUnpinProject,
     useUpdateProjectOrder,
 } from "@/features/projects/hooks/use-projects";
-import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError, showInfo } from "@/lib/toast";
@@ -55,11 +55,12 @@ const keyboardHelpMappings = {
 const KeyboardHelp: FC<{ onClose: () => void; show: boolean }> = ({ onClose, show }) => {
     const { t } = useLingui();
     const { keyboardShortcuts } = useKeyboardShortcuts();
-    const focusSearchShortcut = formatShortcutForDisplay(keyboardShortcuts.focusSearch);
 
     if (!show) {
         return null;
     }
+
+    const focusSearchShortcut = formatShortcutForDisplay(keyboardShortcuts.focusSearch);
 
     return (
         <div className="bg-background/95 inset-0 z-50 rounded-lg border p-4 backdrop-blur-sm">

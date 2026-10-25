@@ -192,6 +192,9 @@ const KeyboardShortcutsSettings: FC = () => {
 
         const defaults = pickEditableShortcuts(defaultKeyboardShortcuts);
 
+        // Ends a recording in progress, so a later key press cannot write into the form after the reset.
+        setIsRecording(undefined);
+        setPressedKeys([]);
         setIsResetting(true);
 
         try {
@@ -251,6 +254,7 @@ const KeyboardShortcutsSettings: FC = () => {
                                                         />
                                                         <Button
                                                             aria-label={`${isRecording === key ? t`Stop` : t`Record`} ${shortcutLabels[key]}`}
+                                                            disabled={isResetting}
                                                             onClick={() => {
                                                                 if (isRecording === key) {
                                                                     stopRecording();

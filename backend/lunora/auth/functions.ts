@@ -220,8 +220,9 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
 
             // The settings page edits a subset; merge so bindings it does not send (audio, list navigation) survive a save.
             const stored = (settings as Record<string, unknown> | null)?.keyboardShortcuts;
+            const storedObject: Record<string, unknown> | undefined = stored && typeof stored === "object" ? (stored as Record<string, unknown>) : undefined;
 
-            toStore.keyboardShortcuts = { ...(stored && typeof stored === "object" ? stored : {}), ...(shortcuts as Record<string, unknown>) };
+            toStore.keyboardShortcuts = { ...storedObject, ...(shortcuts as Record<string, unknown>) };
         }
     }
 
