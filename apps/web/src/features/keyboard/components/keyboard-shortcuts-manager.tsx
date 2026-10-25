@@ -4,6 +4,7 @@ import { HotkeysProvider, useHotkeys } from "react-hotkeys-hook";
 import { useKeyboardShortcuts as useUIKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
+import { convertRecordedShortcutToHotkeysHook, effortCommandsToRegister } from "../lib/recorded-shortcut-converter";
 import convertShortcutToHotkeysHook from "../lib/shortcut-converter";
 import { hasThreadSearchTarget } from "../lib/thread-search-target";
 
@@ -33,8 +34,22 @@ const isUserTypingInInput = (event: KeyboardEvent): boolean => {
 };
 
 // A key with no ctrl/meta/alt (a bare letter, or shift alone) types a character into an
-// editable target. Such a keystroke belongs to the field, so the shortcut must not take it.
-const isTextEntryKeystroke = (event: KeyboardEvent): boolean => isUserTypingInInput(event) && !event.ctrlKey && !event.metaKey && !event.altKey;
+// editable target, or picks an option by typeahead in a select. Such a keystroke belongs to
+// the control, so the shortcut must not take it.
+const isTextEntryKeystroke = (event: KeyboardEvent): boolean =>
+    (isUserTypingInInput(event) || event.target instanceof HTMLSelectElement) && !event.ctrlKey && !event.metaKey && !event.altKey;
+
+// The effort commands are bound with modifier chords that work from the composer; a bare key stays with the field.
+const createEffortHandler =
+    (command: "decreaseEffort" | "increaseEffort", onShortcut?: (action: keyof KeyboardShortcutsConfig, event: KeyboardEvent) => void) =>
+    (event: KeyboardEvent): void => {
+        if (isTextEntryKeystroke(event)) {
+            return;
+        }
+
+        event.preventDefault();
+        onShortcut?.(command, event);
+    };
 
 // Internal component that registers hotkeys
 const KeyboardShortcutsHandler: React.FC<{
@@ -52,10 +67,12 @@ const KeyboardShortcutsHandler: React.FC<{
         return {
             audioRecord: convertShortcutToHotkeysHook(shortcuts.audioRecord),
             copyLastCodeBlock: convertShortcutToHotkeysHook(shortcuts.copyLastCodeBlock),
+            decreaseEffort: convertRecordedShortcutToHotkeysHook(shortcuts.decreaseEffort),
             escape: convertShortcutToHotkeysHook(shortcuts.escape),
             firstItem: convertShortcutToHotkeysHook(shortcuts.firstItem),
             focusSearch: convertShortcutToHotkeysHook(shortcuts.focusSearch),
             help: convertShortcutToHotkeysHook(shortcuts.help),
+            increaseEffort: convertRecordedShortcutToHotkeysHook(shortcuts.increaseEffort),
             lastItem: convertShortcutToHotkeysHook(shortcuts.lastItem),
             newChat: convertShortcutToHotkeysHook(shortcuts.newChat),
             newTemporaryChat: convertShortcutToHotkeysHook(shortcuts.newTemporaryChat),
@@ -68,10 +85,12 @@ const KeyboardShortcutsHandler: React.FC<{
     }, [
         shortcuts.audioRecord,
         shortcuts.copyLastCodeBlock,
+        shortcuts.decreaseEffort,
         shortcuts.escape,
         shortcuts.firstItem,
         shortcuts.focusSearch,
         shortcuts.help,
+        shortcuts.increaseEffort,
         shortcuts.lastItem,
         shortcuts.newChat,
         shortcuts.newTemporaryChat,
@@ -81,6 +100,9 @@ const KeyboardShortcutsHandler: React.FC<{
         shortcuts.sidebarLeft,
         shortcuts.sidebarRight,
     ]);
+
+    // Saved bindings can reach us from elsewhere than the settings form: a chord shared by two commands would run both on one press.
+    const effortRegistered = useMemo(() => effortCommandsToRegister(shortcuts), [shortcuts]);
 
     // Memoize each callback individually to prevent infinite re-renders
     const handleAudioRecord = useCallback(
@@ -139,6 +161,9 @@ const KeyboardShortcutsHandler: React.FC<{
         },
         [onShortcut],
     );
+
+    const handleDecreaseEffort = useMemo(() => createEffortHandler("decreaseEffort", onShortcut), [onShortcut]);
+    const handleIncreaseEffort = useMemo(() => createEffortHandler("increaseEffort", onShortcut), [onShortcut]);
 
     const handleLastItem = useCallback(
         (event: KeyboardEvent) => {
@@ -340,6 +365,34 @@ const KeyboardShortcutsHandler: React.FC<{
             preventDefault: true,
         },
         [convertedShortcuts.newTemporaryChat, handleNewTemporaryChat],
+    );
+
+    useHotkeys(
+        convertedShortcuts.decreaseEffort,
+        handleDecreaseEffort,
+        {
+            description: "Decrease the composer's reasoning effort",
+            // A chord another command already has stays with that command. Between the two effort commands, decrease keeps it.
+            enabled: effortRegistered.decreaseEffort,
+            // Like the model picker: a modifier chord must work from the composer, a bare key must not be taken from a field.
+            enableOnContentEditable: true,
+            enableOnFormTags: true,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.decreaseEffort, effortRegistered.decreaseEffort, handleDecreaseEffort],
+    );
+
+    useHotkeys(
+        convertedShortcuts.increaseEffort,
+        handleIncreaseEffort,
+        {
+            description: "Increase the composer's reasoning effort",
+            enabled: effortRegistered.increaseEffort,
+            enableOnContentEditable: true,
+            enableOnFormTags: true,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.increaseEffort, effortRegistered.increaseEffort, handleIncreaseEffort],
     );
 
     useHotkeys(

@@ -35,6 +35,7 @@ import ChatError from "./chat-error";
 import type { ComparisonBranch } from "./comparison-view";
 import ComparisonView from "./comparison-view";
 import Composer from "./composer";
+import ComposerEffortShortcuts from "./composer-effort-shortcuts";
 import CopyLastCodeBlockListener from "./copy-last-code-block";
 import EditComposer from "./edit-composer";
 import MediaGalleryView from "./media-gallery-view";
@@ -205,6 +206,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
         return (
             <>
                 <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
+                <ComposerEffortShortcuts />
                 <div className={cn("relative flex h-[calc(100%-40px)]", className)}>
                     {/* Columns — each scrolls independently, divided by borders */}
                     <ComparisonView branches={comparisonBranches} className="min-h-0 flex-1" />
@@ -239,6 +241,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
     return (
         <>
             <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
+            <ComposerEffortShortcuts />
             <CopyLastCodeBlockListener />
             <div className={cn("h-[calc(100%-40px)]", className)} style={{ "--thread-max-width": maxWidth } as React.CSSProperties}>
                 <ThreadViewport className="flex h-full flex-col items-center bg-inherit px-4 pt-2" ref={viewportRef}>

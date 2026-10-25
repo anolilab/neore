@@ -25,6 +25,16 @@ vi.mock("@/features/auth/hooks/use-user-settings", () => {
     };
 });
 
+vi.mock("@/hooks/use-gateway-models", () => {
+    return {
+        useGatewayModels: () => [
+            { filterCapabilities: ["reasoning"], id: "model-a" },
+            { filterCapabilities: ["text"], id: "model-b" },
+            { filterCapabilities: ["effort_control"], id: "model-c" },
+        ],
+    };
+});
+
 vi.mock("@/lib/env", () => {
     return {
         default: { VITE_LLM_GATEWAY_URL: "https://gateway.test" },
@@ -161,5 +171,81 @@ describe("useComparisonChat follow-ups to existing children", () => {
         expect(open).not.toHaveProperty("unlockProof");
 
         forgetAllUnlockProofs();
+    });
+});
+
+describe("useComparisonChat reasoning effort", () => {
+    const sentBodies = () => vi.mocked(fetch).mock.calls.map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>);
+
+    it("gives the pending effort only to the child whose model reasons, on creation", async () => {
+        useModelStore.getState().setPendingSettings({ reasoningEffort: 75 });
+
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt" }));
+
+        await act(async () => {
+            await result.current.sendComparisonMessage("hi", ["model-a", "model-b"]);
+        });
+
+        const children = createdThreads().filter((args) => args.model !== "unknown" && args.branchName === args.model);
+
+        expect(children.find((args) => args.model === "model-a")).toMatchObject({ reasoningEffort: 75 });
+        expect(children.find((args) => args.model === "model-b")?.reasoningEffort).toBeUndefined();
+        expect(sentBodies().find((body) => body.model === "model-a")).toMatchObject({ reasoningEffort: 75 });
+        expect(sentBodies().find((body) => body.model === "model-b")?.reasoningEffort).toBeUndefined();
+    });
+
+    it("gives the comparison parent the effort its reasoning children got, and none when no child reasons", async () => {
+        useModelStore.getState().setPendingSettings({ reasoningEffort: 75 });
+
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt" }));
+
+        await act(async () => {
+            await result.current.sendComparisonMessage("hi", ["model-a", "model-b"]);
+        });
+
+        expect(createdThreads().find((args) => args.multiChat === true)).toMatchObject({ reasoningEffort: 75 });
+
+        mutations.length = 0;
+        useModelStore.getState().setPendingSettings({ reasoningEffort: 75 });
+
+        const { result: secondResult } = renderHook(() => useComparisonChat({ jwtToken: "jwt" }));
+
+        await act(async () => {
+            await secondResult.current.sendComparisonMessage("hi", ["model-b", "model-b"]);
+        });
+
+        expect(createdThreads().find((args) => args.multiChat === true)?.reasoningEffort).toBeUndefined();
+    });
+
+    it("keeps the pending effort for a model that only advertises effort control", async () => {
+        useModelStore.getState().setPendingSettings({ reasoningEffort: 50 });
+
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt", parentThreadId: "parent" }));
+
+        await act(async () => {
+            await result.current.sendToExistingChildren("again", [
+                { model: "model-c", threadId: "child-c" },
+                { model: "model-b", threadId: "child-b" },
+            ]);
+        });
+
+        expect(sentBodies().find((body) => body.threadId === "child-c")).toMatchObject({ reasoningEffort: 50 });
+        expect(sentBodies().find((body) => body.threadId === "child-b")?.reasoningEffort).toBeUndefined();
+    });
+
+    it("does the same for a follow-up to existing children", async () => {
+        useModelStore.getState().setPendingSettings({ reasoningEffort: 25 });
+
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt", parentThreadId: "parent" }));
+
+        await act(async () => {
+            await result.current.sendToExistingChildren("again", [
+                { model: "model-a", threadId: "child-a" },
+                { model: "model-b", threadId: "child-b" },
+            ]);
+        });
+
+        expect(sentBodies().find((body) => body.threadId === "child-a")).toMatchObject({ reasoningEffort: 25 });
+        expect(sentBodies().find((body) => body.threadId === "child-b")?.reasoningEffort).toBeUndefined();
     });
 });

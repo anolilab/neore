@@ -17,6 +17,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { supportsReasoningEffort } from "@/features/chat/model-settings/reasoning-effort-steps";
+import { useGatewayModels } from "@/hooks/use-gateway-models";
 import env from "@/lib/env";
 import { useCRPC, useLunora } from "@/lib/lunora/crpc";
 import { withUnlockProofBody } from "@/lib/lunora/unlock-proofs";
@@ -77,6 +79,13 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
     const selectedModels = useModelStore((state) => state.selectedModelsForComparison);
     const getPendingSettings = useModelStore((state) => state.getPendingSettings);
     const { data: userSettings } = useUserSettings();
+    const gatewayModels = useGatewayModels();
+    // The pending effort skips a child whose model is known not to reason: it would be stored on the thread and ignored.
+    const effortFor = useCallback(
+        (model: string, effort: number | undefined) =>
+            gatewayModels.some((candidate) => candidate.id === model) && !supportsReasoningEffort(gatewayModels, model) ? undefined : effort,
+        [gatewayModels],
+    );
     const newChatsTemporary = userSettings?.newChatsTemporary === true;
 
     // clearComposer is only called inside an async callback, not in render output,
@@ -129,6 +138,10 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                         language: pendingSettings?.language,
                         model: models[0] ?? "unknown",
                         multiChat: true, // Flag for instant detection without querying children
+                        // The comparison view's effort shortcuts start from the parent's effort, so it carries what the children got.
+                        reasoningEffort: models.some((model) => effortFor(model, pendingSettings?.reasoningEffort) !== undefined)
+                            ? pendingSettings?.reasoningEffort
+                            : undefined,
                         ...temporaryFields,
                     });
                     setParentThread(comparisonParentId);
@@ -139,6 +152,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
 
                 // Create child threads and send messages in parallel
                 const branchPromises = models.map(async (model): Promise<ComparisonBranch> => {
+                    const reasoningEffort = effortFor(model, pendingSettings?.reasoningEffort);
                     // Create child thread for this model
                     const childThreadId = await createThreadMutation({
                         branchName: model,
@@ -146,7 +160,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                         enabledFeatures: pendingSettings?.enabledFeatures,
                         language: pendingSettings?.language,
                         model,
-                        reasoningEffort: pendingSettings?.reasoningEffort,
+                        reasoningEffort,
                         statelessMode: pendingSettings?.statelessMode,
                         ...temporaryFields,
                     });
@@ -171,7 +185,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                                 language: pendingSettings?.language,
                                 model,
                                 prompt: text,
-                                reasoningEffort: pendingSettings?.reasoningEffort,
+                                reasoningEffort,
                                 statelessMode: pendingSettings?.statelessMode,
                                 threadId: childThreadId,
                             }),
@@ -230,7 +244,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                 setIsLoading(false);
             }
         },
-        [parentThread, jwtToken, lunora, getPendingSettings, newChatsTemporary, createThreadMutation, createRelationshipMutation, navigate, t],
+        [parentThread, jwtToken, lunora, getPendingSettings, newChatsTemporary, createThreadMutation, createRelationshipMutation, navigate, t, effortFor],
     );
 
     /**
@@ -252,6 +266,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
 
                 await Promise.all(
                     children.map(async ({ model, threadId: childThreadId }) => {
+                        const reasoningEffort = effortFor(model, pendingSettings?.reasoningEffort);
                         const response = await fetch(CHAT_STREAM_URL, {
                             // Each child is its own thread: a locked one takes its own proof (`lib/lunora/unlock-proofs.ts`).
                             body: JSON.stringify(
@@ -263,7 +278,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                                         language: pendingSettings?.language,
                                         model,
                                         prompt: text,
-                                        reasoningEffort: pendingSettings?.reasoningEffort,
+                                        reasoningEffort,
                                         statelessMode: pendingSettings?.statelessMode,
                                         threadId: childThreadId,
                                     },
@@ -288,7 +303,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                 setIsLoading(false);
             }
         },
-        [jwtToken, lunora, getPendingSettings],
+        [jwtToken, lunora, getPendingSettings, effortFor],
     );
 
     // isComparisonThread is a derived const from parentThread + branches, so no extra dep needed.

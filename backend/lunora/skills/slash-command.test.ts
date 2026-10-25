@@ -74,8 +74,10 @@ describe(findSkillCommand, () => {
 });
 
 describe(resolveReasoningEffort, () => {
-    it("keeps the existing rule without a skill", () => {
-        expect(resolveReasoningEffort({ messageEffort: 1, threadEffort: 3 })).toBe(3);
+    it("uses the message's choice over the thread's stored setting, else the stored one", () => {
+        expect(resolveReasoningEffort({ messageEffort: 1, threadEffort: 3 })).toBe(1);
+        expect(resolveReasoningEffort({ messageEffort: 0, threadEffort: 3 })).toBe(0);
+        expect(resolveReasoningEffort({ threadEffort: 3 })).toBe(3);
         expect(resolveReasoningEffort({ messageEffort: 1 })).toBe(1);
         expect(resolveReasoningEffort({})).toBeUndefined();
     });

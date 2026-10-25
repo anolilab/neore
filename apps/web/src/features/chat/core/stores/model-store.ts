@@ -223,6 +223,19 @@ const createInitialState = (): ModelStoreState => {
 // ============================================================================
 // Store Creation
 // ============================================================================
+/** The pending settings without the composer's reasoning effort (`undefined` once nothing else is pending). */
+export const withoutEffort = (pending: PendingSettings | undefined): PendingSettings | undefined => {
+    if (pending?.reasoningEffort === undefined) {
+        return pending;
+    }
+
+    const rest = { ...pending };
+
+    delete rest.reasoningEffort;
+
+    return Object.keys(rest).length > 0 ? rest : undefined;
+};
+
 export const useModelStore = create<ModelStore>()(
     devtools(
         subscribeWithSelector((set, get) => {
@@ -285,7 +298,12 @@ export const useModelStore = create<ModelStore>()(
 
                             newThreadModes.set(threadId, mode);
 
+                            // A composer effort (the effort shortcuts) belongs to the thread it was set on:
+                            // switching threads must not carry it into the next send.
+                            const pendingSettings = state.selectedModelThreadId === threadId ? state.pendingSettings : withoutEffort(state.pendingSettings);
+
                             return {
+                                pendingSettings,
                                 // Reset comparison state on every thread switch.
                                 // thread.tsx will re-enable it via useEffect if the new thread
                                 // turns out to be a comparison parent (has comparison children).

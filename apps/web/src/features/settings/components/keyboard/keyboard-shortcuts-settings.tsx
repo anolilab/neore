@@ -16,9 +16,10 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import * as z from "zod";
 
+import { findEffortConflicts } from "@/features/keyboard/lib/recorded-shortcut-converter";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
-import { defaultKeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
+import { defaultKeyboardShortcuts, useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 // Same rule the backend applies on save (`@neore/backend/auth/shortcut`); "" is a cleared binding.
@@ -40,9 +41,11 @@ const keyboardShortcutSchema = z
     .strictObject({
         commandPalette: shortcutValueSchema,
         copyLastCodeBlock: shortcutValueSchema,
+        decreaseEffort: shortcutValueSchema,
         escape: shortcutValueSchema,
         focusSearch: shortcutValueSchema,
         help: shortcutValueSchema,
+        increaseEffort: shortcutValueSchema,
         newChat: shortcutValueSchema,
         newTemporaryChat: shortcutValueSchema,
         openModelPicker: shortcutValueSchema,
@@ -62,12 +65,13 @@ const keyboardShortcutSchema = z
             owners.set(identity, [...(owners.get(identity) ?? []), key]);
         }
 
-        for (const keys of owners.values()) {
-            if (keys.length > 1) {
-                for (const key of keys) {
-                    context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
-                }
-            }
+        // A recorded Control chord also answers to Command on a Mac, so the effort commands are judged by what they register.
+        // The fixed bindings (audio, list navigation) are not in the form but register at runtime, so they count too.
+        const effortConflicts = Object.keys(findEffortConflicts({ ...useUIStateStore.getState().keyboardShortcuts, ...context.value }));
+        const conflicting = new Set([...[...owners.values()].filter((keys) => keys.length > 1).flat(), ...effortConflicts]);
+
+        for (const key of conflicting) {
+            context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
         }
     });
 
@@ -91,7 +95,7 @@ const saveStatus = (state: { canSubmit: boolean; isSubmitting: boolean }): "inva
     return state.canSubmit ? "ready" : "invalid";
 };
 
-const defaultShortcut = (key: keyof KeyboardShortcutForm): string => formatShortcutForDisplay(defaultKeyboardShortcuts[key]);
+const defaultShortcut = (key: keyof KeyboardShortcutForm): string => formatShortcutForDisplay(defaultKeyboardShortcuts[key] ?? "");
 
 const KeyboardShortcutsSettings: FC = () => {
     const { t } = useLingui();
@@ -99,9 +103,11 @@ const KeyboardShortcutsSettings: FC = () => {
     const shortcutLabels: Record<keyof KeyboardShortcutForm, string> = {
         commandPalette: t`Command Palette`,
         copyLastCodeBlock: t`Copy Last Code Block`,
+        decreaseEffort: t`Decrease Reasoning Effort`,
         escape: t`Escape`,
         focusSearch: t`Focus Search`,
         help: t`Help`,
+        increaseEffort: t`Increase Reasoning Effort`,
         newChat: t`New Chat`,
         newTemporaryChat: t`New Temporary Chat`,
         openModelPicker: t`Open Model Picker`,
@@ -112,9 +118,11 @@ const KeyboardShortcutsSettings: FC = () => {
     const shortcutDescriptions: Record<keyof KeyboardShortcutForm, string> = {
         commandPalette: t`Open the command palette and global search (${defaultShortcut("commandPalette")})`,
         copyLastCodeBlock: t`Copy the last code block of the latest assistant reply (${defaultShortcut("copyLastCodeBlock")})`,
+        decreaseEffort: t`Lower the composer's reasoning effort by one step. Not bound by default.`,
         escape: t`Close dialogs and menus`,
         focusSearch: t`Open the thread search and focus it. Leave it unbound to keep the browser's find (${defaultShortcut("focusSearch")})`,
         help: t`Show help dialog (${defaultShortcut("help")})`,
+        increaseEffort: t`Raise the composer's reasoning effort by one step. Not bound by default.`,
         newChat: t`Start a new chat (${defaultShortcut("newChat")})`,
         newTemporaryChat: t`Start a new temporary chat (${defaultShortcut("newTemporaryChat")})`,
         openModelPicker: t`Open the model picker in the composer (${defaultShortcut("openModelPicker")})`,

@@ -45,10 +45,14 @@ export type KeyboardShortcuts = {
     audioRecord: string;
     commandPalette: string;
     copyLastCodeBlock: string;
+    /** Steps the composer's reasoning effort down (`composer.decreaseEffort`). Unbound until the user sets it. */
+    decreaseEffort?: string;
     escape: string;
     firstItem: string;
     focusSearch: string;
     help: string;
+    /** Steps the composer's reasoning effort up (`composer.increaseEffort`). Unbound until the user sets it. */
+    increaseEffort?: string;
     lastItem: string;
     newChat: string;
     newTemporaryChat: string;

@@ -89,9 +89,11 @@ describe("KeyboardShortcutsSettings", () => {
         expect(Object.keys(keyboardShortcuts).toSorted((a, b) => a.localeCompare(b))).toEqual([
             "commandPalette",
             "copyLastCodeBlock",
+            "decreaseEffort",
             "escape",
             "focusSearch",
             "help",
+            "increaseEffort",
             "newChat",
             "newTemporaryChat",
             "openModelPicker",

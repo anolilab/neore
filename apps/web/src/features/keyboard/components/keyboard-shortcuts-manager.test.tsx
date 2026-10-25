@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { KeyboardShortcutsManager, useKeyboardShortcuts } from "./keyboard-shortcuts-manager";
 
@@ -155,5 +155,147 @@ describe("KeyboardShortcutsManager", () => {
         fireEvent.keyDown(screen.getByLabelText("composer"), { code: "KeyM", key: "m" });
 
         expect(onShortcut).not.toHaveBeenCalled();
+    });
+
+    it("steps the composer effort from the editor on a bound modifier chord", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ decreaseEffort: "alt+arrowdown", increaseEffort: "alt+arrowup" }}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        const composer = screen.getByLabelText("composer");
+        const upNotPrevented = fireEvent.keyDown(composer, { altKey: true, code: "ArrowUp", key: "ArrowUp" });
+        const downNotPrevented = fireEvent.keyDown(composer, { altKey: true, code: "ArrowDown", key: "ArrowDown" });
+
+        expect(onShortcut).toHaveBeenCalledWith("increaseEffort", expect.anything());
+        expect(onShortcut).toHaveBeenCalledWith("decreaseEffort", expect.anything());
+        expect(upNotPrevented).toBe(false);
+        expect(downNotPrevented).toBe(false);
+    });
+
+    it("runs only the decrease command when both effort commands hold the same chord", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ decreaseEffort: "alt+arrowdown", increaseEffort: "alt+arrowdown" }}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        fireEvent.keyDown(screen.getByLabelText("composer"), { altKey: true, code: "ArrowDown", key: "ArrowDown" });
+
+        expect(onShortcut).toHaveBeenCalledTimes(1);
+        expect(onShortcut).toHaveBeenCalledWith("decreaseEffort", expect.anything());
+    });
+
+    it("leaves a chord another command already has to that command", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ increaseEffort: "alt+n", newChat: "alt+n" }}>
+                <button aria-label="page" type="button" />
+            </KeyboardShortcutsManager>,
+        );
+
+        fireEvent.keyDown(screen.getByLabelText("page"), { altKey: true, code: "KeyN", key: "n" });
+
+        expect(onShortcut).toHaveBeenCalledTimes(1);
+        expect(onShortcut).toHaveBeenCalledWith("newChat", expect.anything());
+    });
+
+    it("leaves the arrow chords to the editor while the effort commands are unbound", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        const composer = screen.getByLabelText("composer");
+
+        fireEvent.keyDown(composer, { altKey: true, code: "ArrowUp", key: "ArrowUp" });
+        fireEvent.keyDown(composer, { altKey: true, code: "ArrowDown", key: "ArrowDown" });
+
+        expect(onShortcut).not.toHaveBeenCalledWith("increaseEffort", expect.anything());
+        expect(onShortcut).not.toHaveBeenCalledWith("decreaseEffort", expect.anything());
+    });
+
+    it("leaves a bare-key effort binding to a focused select, and still takes its modifier chord", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ decreaseEffort: "alt+j", increaseEffort: "j" }}>
+                <select aria-label="language">
+                    <option>Japanese</option>
+                </select>
+            </KeyboardShortcutsManager>,
+        );
+
+        const select = screen.getByLabelText("language");
+
+        fireEvent.keyDown(select, { code: "KeyJ", key: "j" });
+
+        expect(onShortcut).not.toHaveBeenCalled();
+
+        fireEvent.keyDown(select, { altKey: true, code: "KeyJ", key: "j" });
+
+        expect(onShortcut).toHaveBeenCalledWith("decreaseEffort", expect.anything());
+    });
+
+    describe("a recorded Control chord for the effort commands", () => {
+        const pressChord = (modifier: "ctrlKey" | "metaKey") => {
+            const onShortcut = vi.fn();
+
+            const { unmount } = render(
+                <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ increaseEffort: "ctrl+arrowup" }}>
+                    <textarea aria-label="composer" />
+                </KeyboardShortcutsManager>,
+            );
+
+            fireEvent.keyDown(screen.getByLabelText("composer"), { code: "ArrowUp", key: "ArrowUp", [modifier]: true });
+            unmount();
+
+            return onShortcut;
+        };
+
+        afterEach(() => {
+            vi.restoreAllMocks();
+        });
+
+        it("fires on Command and on Control on a Mac", () => {
+            vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+
+            expect(pressChord("metaKey")).toHaveBeenCalledWith("increaseEffort", expect.anything());
+            expect(pressChord("ctrlKey")).toHaveBeenCalledWith("increaseEffort", expect.anything());
+        });
+
+        it("does not run both commands when a Control chord and its Command twin are bound on a Mac", () => {
+            vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+
+            const onShortcut = vi.fn();
+
+            render(
+                <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ decreaseEffort: "ctrl+arrowdown", increaseEffort: "cmd+arrowdown" }}>
+                    <textarea aria-label="composer" />
+                </KeyboardShortcutsManager>,
+            );
+
+            fireEvent.keyDown(screen.getByLabelText("composer"), { code: "ArrowDown", key: "ArrowDown", metaKey: true });
+
+            expect(onShortcut).toHaveBeenCalledTimes(1);
+            expect(onShortcut).toHaveBeenCalledWith("decreaseEffort", expect.anything());
+        });
+
+        it("fires on Control, not on Command, elsewhere", () => {
+            vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+            vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Windows NT 10.0)");
+
+            expect(pressChord("ctrlKey")).toHaveBeenCalledWith("increaseEffort", expect.anything());
+            expect(pressChord("metaKey")).not.toHaveBeenCalled();
+        });
     });
 });
