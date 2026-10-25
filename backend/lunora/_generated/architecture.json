@@ -17511,67 +17511,67 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 651,
+      "line": 654,
       "reason": "\"createRunSteering\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 704,
+      "line": 706,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 712,
+      "line": 714,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 724,
+      "line": 726,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 769,
+      "line": 771,
       "reason": "\"endStoppedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 867,
+      "line": 869,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 951,
+      "line": 953,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1036,
+      "line": 1038,
       "reason": "\"setThreadStatus\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1056,
+      "line": 1058,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1063,
+      "line": 1065,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1074,
+      "line": 1076,
       "reason": "\"failRun\" is not a registered function"
     },
     {
@@ -17619,7 +17619,7 @@
     {
       "file": "chat/lib/gateway-notifications",
       "kind": "call",
-      "line": 114,
+      "line": 124,
       "reason": "\"gatewayNotificationsHttpAction\" is not a registered function"
     },
     {
