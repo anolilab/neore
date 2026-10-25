@@ -128,18 +128,28 @@ export const deliveredSteerItems = <A>(items: ReadonlyArray<QueuedPrompt<A>>, st
 export type SteerWithdrawal = "delivered" | "unknown" | "withdrawn";
 
 /**
- * The next prompt to send, shifted off the queue. A steered one is withdrawn
- * from its run first: `delivered` means the reply already has it, so it is
- * dropped and the next one is tried; `withdrawn` (never taken) and `unknown`
- * (its stream is gone) send it. A withdrawal that throws hands it back as
- * `requeue`, so it is neither lost nor sent twice.
+ * The next prompt to send. A plain one leaves the queue and goes. A steered one
+ * stays in its place until its run answers `withdrawSteer`: `delivered` means
+ * the reply already has it, so it is dropped and the next one is tried;
+ * `withdrawn` (never taken) and `unknown` (its stream is gone) send it. A
+ * withdrawal that throws returns `failed` with the prompt still at the head, so
+ * it is neither lost, reordered nor sent twice. A prompt that left the queue
+ * while the call was out (the reply's delivery retired it, or the user removed
+ * it) is not ours to send.
  */
-export const takeNextToSend = async <A>(
-    shift: () => QueuedPrompt<A> | undefined,
-    withdraw: (steer: QueuedSteer) => Promise<SteerWithdrawal>,
-): Promise<{ kind: "requeue" | "send"; prompt: QueuedPrompt<A> } | undefined> => {
-    for (let next = shift(); next; next = shift()) {
+export const takeNextToSend = async <A>({
+    peek,
+    remove,
+    withdraw,
+}: {
+    peek: () => QueuedPrompt<A> | undefined;
+    remove: (id: string) => void;
+    withdraw: (steer: QueuedSteer) => Promise<SteerWithdrawal>;
+}): Promise<{ kind: "failed" } | { kind: "send"; prompt: QueuedPrompt<A> } | undefined> => {
+    for (let next = peek(); next; next = peek()) {
         if (!next.steer) {
+            remove(next.id);
+
             return { kind: "send", prompt: next };
         }
 
@@ -148,8 +158,14 @@ export const takeNextToSend = async <A>(
         try {
             outcome = await withdraw(next.steer);
         } catch {
-            return { kind: "requeue", prompt: next };
+            return { kind: "failed" };
         }
+
+        if (peek()?.id !== next.id) {
+            continue;
+        }
+
+        remove(next.id);
 
         if (outcome !== "delivered") {
             return { kind: "send", prompt: next };

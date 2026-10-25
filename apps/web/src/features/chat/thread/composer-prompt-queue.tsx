@@ -14,7 +14,10 @@
  * too, marked as such, until the reply takes them — the stream reports their
  * ids delivered and their chips go. One still here when its turn to send comes
  * is withdrawn first: `withdrawn` (the reply never took it) sends it like any
- * queued prompt, `delivered` drops it.
+ * queued prompt, `delivered` drops it. Removing its chip withdraws it too, so a
+ * cancelled steer is not written into the reply. A steer or queued message
+ * that lands after the reply ended (nothing will observe the stream end for it)
+ * is sent straight away, through the same path.
  *
  * Transition rules: `core/utils/prompt-queue.ts`. Mount exactly once per thread
  * — two mounted runners would each drain an item per stream.
@@ -32,8 +35,10 @@ import { useChatActions, useChatError, useChatIsStreaming, useChatThread } from 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import type { QueuedSteer, SteerWithdrawal } from "@/features/chat/core/utils/prompt-queue";
 import { decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/chat/core/utils/prompt-queue";
 import { useCRPC } from "@/lib/lunora/crpc";
+import { showError } from "@/lib/toast";
 
 /**
  * `sendMessage` clears the composer synchronously (before its first await) —
@@ -60,39 +65,98 @@ const useSendQueuedPrompt = () => {
 };
 
 /**
- * Sends the thread's next queued prompt, withdrawing a steered one from its run
- * first (`takeNextToSend`). One whose withdrawal failed goes back, paused.
+ * The queue's two actions that may have to ask the server first: sending the
+ * next prompt and removing a chip. A steered prompt is withdrawn from its run
+ * (`chat_steering.withdrawSteer`) before either — it may sit in the run's queue
+ * and be written into the reply otherwise — and its chip stays until that
+ * answers, so a failure loses nothing and keeps the queue's order. One call at
+ * a time: a second would act on a prompt the first is still settling.
  */
-const useSendNextPrompt = () => {
+const useQueueActions = () => {
+    const { t } = useLingui();
     const crpc = useCRPC();
     const sendQueuedPrompt = useSendQueuedPrompt();
     const { mutateAsync: withdrawSteer } = useMutation(crpc.chat.steering.withdrawSteer.mutationOptions());
+    const busyRef = useRef(false);
 
-    return useCallback(
+    const withdraw = useCallback(
+        async (threadId: string, steer: QueuedSteer): Promise<SteerWithdrawal> => {
+            const { outcome } = await withdrawSteer({
+                steerId: steer.id,
+                streamId: steer.streamId as Id<"persistentStreams">,
+                threadId: threadId as Id<"threads">,
+            });
+
+            return outcome;
+        },
+        [withdrawSteer],
+    );
+
+    /** Sends the thread's next prompt. One whose withdrawal failed stays first, and the queue pauses. */
+    const sendNextPrompt = useCallback(
         async (threadId: string): Promise<void> => {
-            const store = usePromptQueueStore.getState();
-            const next = await takeNextToSend(
-                () => store.shift(threadId),
-                async (steer) => {
-                    const { outcome } = await withdrawSteer({
-                        steerId: steer.id,
-                        streamId: steer.streamId as Id<"persistentStreams">,
-                        threadId: threadId as Id<"threads">,
-                    });
+            if (busyRef.current) {
+                return;
+            }
 
-                    return outcome;
-                },
-            );
+            busyRef.current = true;
 
-            if (next?.kind === "send") {
-                sendQueuedPrompt(next.prompt);
-            } else if (next?.kind === "requeue") {
-                store.enqueue(threadId, next.prompt);
-                store.setPaused(threadId, true);
+            try {
+                const { remove, setPaused } = usePromptQueueStore.getState();
+                const next = await takeNextToSend({
+                    peek: () => usePromptQueueStore.getState().queues[threadId]?.items[0],
+                    remove: (id) => remove(threadId, id),
+                    withdraw: async (steer) => await withdraw(threadId, steer),
+                });
+
+                if (next?.kind === "send") {
+                    sendQueuedPrompt(next.prompt);
+                } else if (next?.kind === "failed") {
+                    setPaused(threadId, true);
+                }
+            } finally {
+                busyRef.current = false;
             }
         },
-        [sendQueuedPrompt, withdrawSteer],
+        [sendQueuedPrompt, withdraw],
     );
+
+    /** Removes a chip. A steered one leaves only once its run no longer holds the message. */
+    const removePrompt = useCallback(
+        async (threadId: string, id: string): Promise<void> => {
+            const { remove } = usePromptQueueStore.getState();
+            const prompt = usePromptQueueStore.getState().queues[threadId]?.items.find((item) => item.id === id);
+
+            if (!prompt) {
+                return;
+            }
+
+            if (!prompt.steer) {
+                remove(threadId, id);
+
+                return;
+            }
+
+            if (busyRef.current) {
+                return;
+            }
+
+            busyRef.current = true;
+
+            try {
+                // `delivered` is fine too: the reply has the message, so there is nothing left to cancel.
+                await withdraw(threadId, prompt.steer);
+                remove(threadId, id);
+            } catch {
+                showError(t`Could not cancel the message. It is still queued.`);
+            } finally {
+                busyRef.current = false;
+            }
+        },
+        [t, withdraw],
+    );
+
+    return { removePrompt, sendNextPrompt };
 };
 
 const QueueChip: FC<{ onRemove: (id: string) => void; position: number; prompt: QueuedChatPrompt }> = ({ onRemove, position, prompt }) => {
@@ -145,7 +209,7 @@ const ComposerPromptQueue: FC = () => {
     const { isStreaming } = useChatIsStreaming();
     const { error } = useChatError();
     const queue = usePromptQueueStore(selectThreadQueue(threadId));
-    const sendNextPrompt = useSendNextPrompt();
+    const { removePrompt, sendNextPrompt } = useQueueActions();
     const crpc = useCRPC();
     // The same query (and key) the chat context reads, so no second subscription.
     const { data: activeStream } = useQuery(
@@ -203,13 +267,39 @@ const ComposerPromptQueue: FC = () => {
         }
     }, [error, isStreaming, sendNextPrompt, threadId]);
 
+    // A message that joins the queue once the reply has already ended (a steer the
+    // server accepted as the run finished, or one it refused for that reason) missed
+    // the streaming -> idle transition above, so nothing else would send it. What was
+    // queued before this thread mounted is not "new": coming back to an old queue
+    // never sends by surprise.
+    const seenRef = useRef<{ ids: Set<string>; threadId: string | undefined }>({ ids: new Set(), threadId: undefined });
+
+    useEffect(() => {
+        if (seenRef.current.threadId !== threadId) {
+            seenRef.current = { ids: new Set(queue.items.map((item) => item.id)), threadId };
+
+            return;
+        }
+
+        const { ids } = seenRef.current;
+        const arrived = queue.items.some((item) => !ids.has(item.id));
+
+        for (const item of queue.items) {
+            ids.add(item.id);
+        }
+
+        if (arrived && !isStreaming && !queue.paused && !error && threadId) {
+            void sendNextPrompt(threadId);
+        }
+    }, [error, isStreaming, queue.items, queue.paused, sendNextPrompt, threadId]);
+
     const handleRemove = useCallback(
         (id: string) => {
             if (threadId) {
-                usePromptQueueStore.getState().remove(threadId, id);
+                void removePrompt(threadId, id);
             }
         },
-        [threadId],
+        [removePrompt, threadId],
     );
 
     const handleSendNext = useCallback(() => {

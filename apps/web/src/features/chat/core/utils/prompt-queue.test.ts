@@ -133,53 +133,90 @@ describe("deliveredSteerItems", () => {
 
 describe("takeNextToSend", () => {
     const steer = { id: "s1", streamId: "stream-1" };
-    const shiftFrom =
-        <T>(items: T[]) =>
-        () =>
-            items.shift();
+
+    /** A queue the helper reads and edits, like the store does. */
+    const queueOf = <T extends { id: string }>(items: T[]) => {
+        return {
+            items,
+            peek: () => items[0],
+            remove: (id: string) => {
+                const index = items.findIndex((entry) => entry.id === id);
+
+                if (index !== -1) {
+                    items.splice(index, 1);
+                }
+            },
+        };
+    };
 
     it("sends a plain prompt without withdrawing anything", async () => {
         const withdraw = vi.fn();
+        const queue = queueOf([{ attachments: [], id: "a", text: "hi" }]);
 
-        expect(await takeNextToSend(shiftFrom([{ attachments: [], id: "a", text: "hi" }]), withdraw)).toStrictEqual({
-            kind: "send",
-            prompt: { attachments: [], id: "a", text: "hi" },
-        });
+        expect(await takeNextToSend({ ...queue, withdraw })).toStrictEqual({ kind: "send", prompt: { attachments: [], id: "a", text: "hi" } });
         expect(withdraw).not.toHaveBeenCalled();
+        expect(queue.items).toHaveLength(0);
     });
 
     it("sends a steer the reply never took, or whose stream is gone", async () => {
         for (const outcome of ["withdrawn", "unknown"] as const) {
             const prompt = { attachments: [], id: "a", steer, text: "go left" };
+            const queue = queueOf([prompt]);
 
-            expect(await takeNextToSend(shiftFrom([prompt]), async () => outcome)).toStrictEqual({ kind: "send", prompt });
+            expect(await takeNextToSend({ ...queue, withdraw: async () => outcome })).toStrictEqual({ kind: "send", prompt });
+            expect(queue.items).toHaveLength(0);
         }
     });
 
     it("drops a steer the reply already took, and sends the prompt after it", async () => {
-        const items = [
+        const queue = queueOf([
             { attachments: [], id: "a", steer, text: "go left" },
             { attachments: [], id: "b", text: "then this" },
-        ];
+        ]);
 
-        expect(await takeNextToSend(shiftFrom(items), async () => "delivered")).toStrictEqual({
+        expect(await takeNextToSend({ ...queue, withdraw: async () => "delivered" })).toStrictEqual({
             kind: "send",
             prompt: { attachments: [], id: "b", text: "then this" },
         });
-        expect(items).toHaveLength(0);
+        expect(queue.items).toHaveLength(0);
     });
 
-    it("hands a steer back when its withdrawal fails, so it is neither lost nor sent twice", async () => {
+    it("keeps a steer at the head when its withdrawal fails, so nothing is lost, reordered or sent twice", async () => {
         const prompt = { attachments: [], id: "a", steer, text: "go left" };
+        const queue = queueOf([prompt, { attachments: [], id: "b", text: "then this" }]);
 
         expect(
-            await takeNextToSend(shiftFrom([prompt]), async () => {
-                throw new Error("offline");
+            await takeNextToSend({
+                ...queue,
+                withdraw: async () => {
+                    throw new Error("offline");
+                },
             }),
-        ).toStrictEqual({ kind: "requeue", prompt });
+        ).toStrictEqual({ kind: "failed" });
+        expect(queue.items.map((entry) => entry.id)).toStrictEqual(["a", "b"]);
+    });
+
+    it("does not send a steer that left the queue while its withdrawal was out", async () => {
+        const queue = queueOf([
+            { attachments: [], id: "a", steer, text: "go left" },
+            { attachments: [], id: "b", text: "then this" },
+        ]);
+
+        expect(
+            await takeNextToSend({
+                ...queue,
+                withdraw: async () => {
+                    queue.remove("a");
+
+                    return "withdrawn";
+                },
+            }),
+        ).toStrictEqual({ kind: "send", prompt: { attachments: [], id: "b", text: "then this" } });
     });
 
     it("returns nothing for a queue that only held delivered steers", async () => {
-        expect(await takeNextToSend(shiftFrom([{ attachments: [], id: "a", steer, text: "go left" }]), async () => "delivered")).toBeUndefined();
+        const queue = queueOf([{ attachments: [], id: "a", steer, text: "go left" }]);
+
+        expect(await takeNextToSend({ ...queue, withdraw: async () => "delivered" })).toBeUndefined();
     });
 });
