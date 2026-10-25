@@ -188,12 +188,19 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 
         // A valid signature seen before is a replay: answer 200 (the sender did
         // deliver it once) and run nothing.
-        const claim = { key: `${triggerId}:${normalizeSignature(presented)}`, scope: "trigger-webhook" };
-        const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, { ...claim, ttlMs: TRIGGER_CLAIM_TTL_MS, userId: trigger.userId });
+        const claimKey = { key: `${triggerId}:${normalizeSignature(presented)}`, scope: "trigger-webhook" };
+        const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, {
+            ...claimKey,
+            ttlMs: TRIGGER_CLAIM_TTL_MS,
+            userId: trigger.userId,
+        });
 
         if (claimedAt === null) {
             return Response.json({ duplicate: true, ok: true }, { headers: { "Content-Type": "application/json" }, status: 200 });
         }
+
+        // Every release names the claim it took: a step that outlives the TTL must not clear a redelivery's replacement.
+        const claim = { ...claimKey, claimedAt };
 
         // 4. Payload filters, on the body only now that its signature is proven. A
         //    filtered delivery RELEASES its claim once recorded: the owner may fix the
@@ -241,7 +248,7 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         //    this same delivery reads as a replay, and it never runs at all.
         try {
             await httpScheduler(context).runAfter(0, internal.triggers.execute.executeTrigger, {
-                claim: { ...claim, claimedAt },
+                claim,
                 invalidUtf8: strictBody === null ? true : undefined,
                 payload: body || undefined,
                 triggerId: triggerId as Id<"triggers">,

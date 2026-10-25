@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { internal } from "../_generated/internal";
-import { claimKey, claimKeyFenced, releaseKey } from "../lib/claim-once";
+import { claimKey, claimKeyFenced, releaseKey, TRIGGER_CLAIM_TTL_MS } from "../lib/claim-once";
 import { SIGNED_REQUEST_WINDOW_MS } from "../lib/crypto";
 import { recordFilteredExecution } from "./functions";
 import handleTriggerWebhook from "./http";
@@ -68,7 +68,7 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
             }),
     );
     const scheduled: unknown[] = [];
-    const scheduler = { fail: false, recordFails: false };
+    const scheduler: { beforeFail?: () => Promise<void>; fail: boolean; recordFails: boolean } = { fail: false, recordFails: false };
     const context = {
         runMutation: async (reference: unknown, args: unknown) => {
             if (reference === internal.triggers.functions.recordFilteredExecution) {
@@ -85,6 +85,8 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
         scheduler: {
             runAfter: async (_delay: number, _reference: unknown, args: unknown) => {
                 if (scheduler.fail) {
+                    await scheduler.beforeFail?.();
+
                     throw new Error("scheduler unavailable");
                 }
 
@@ -503,6 +505,28 @@ describe("trigger webhook signing", () => {
             expect(await statusOf('{"action":"closed"}', await signedHeaders('{"action":"closed"}'))).toBe(202);
             expect(rateLimit.charged).toBe(1);
         });
+    });
+
+    it("does not clear the replacement claim when scheduling fails after the claim's TTL", async () => {
+        const { scheduler, statusOf } = await setup();
+        const body = '{"event":"slow"}';
+        const headers = await signedHeaders(body);
+        const claimRows = async (): Promise<{ claimedAt: number; key: string; scope: string }[]> =>
+            await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
+
+        scheduler.fail = true;
+        // The scheduler call hangs past the TTL, a redelivery takes the lapsed key, then the call fails.
+        scheduler.beforeFail = async () => {
+            const [original] = await claimRows();
+
+            vi.setSystemTime(NOW + TRIGGER_CLAIM_TTL_MS + 1);
+            await harness.run(
+                async (ctx: any) => await ctx.runMutation(claimKeyFenced, { key: original!.key, scope: original!.scope, ttlMs: TRIGGER_CLAIM_TTL_MS }),
+            );
+        };
+
+        expect(await statusOf(body, headers)).toBe(500);
+        expect(await claimRows()).toEqual([expect.objectContaining({ claimedAt: NOW + TRIGGER_CLAIM_TTL_MS + 1 })]);
     });
 
     it("gives the replay claim back when scheduling fails, so the sender's retry runs", async () => {
