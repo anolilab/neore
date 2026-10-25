@@ -5331,6 +5331,16 @@
       "to": "function:agent_projects:getProject"
     },
     {
+      "from": "function:projects_functions:listPinnedProjects",
+      "kind": "call",
+      "to": "function:agent_projects:listPinnedProjects"
+    },
+    {
+      "from": "function:projects_functions:listProjects",
+      "kind": "call",
+      "to": "function:agent_projects:listProjects"
+    },
+    {
       "from": "function:projects_functions:listThreadsByProject",
       "kind": "call",
       "to": "function:agent_projects:getProject"
@@ -10134,13 +10144,6 @@
       "id": "function:chat_streaming:getStreamBody",
       "kind": "function",
       "name": "chat.streaming.getStreamBody",
-      "module": "chat"
-    },
-    {
-      "detail": "query",
-      "id": "function:chat_streaming:streamLockedSinceStart",
-      "kind": "function",
-      "name": "chat.streaming.streamLockedSinceStart",
       "module": "chat"
     },
     {
@@ -15980,7 +15983,13 @@
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 110,
+      "line": 111,
+      "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
+    },
+    {
+      "file": "agent/client/search",
+      "kind": "call",
+      "line": 133,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
@@ -15992,43 +16001,37 @@
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 135,
+      "line": 164,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 159,
+      "line": 192,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 187,
+      "line": 195,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 190,
-      "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
-    },
-    {
-      "file": "agent/client/search",
-      "kind": "call",
-      "line": 522,
+      "line": 527,
       "reason": "\"generateAndSaveEmbeddings\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 657,
+      "line": 662,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 658,
+      "line": 663,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
@@ -17612,13 +17615,7 @@
     {
       "file": "chat/streaming/persistent/http-api",
       "kind": "call",
-      "line": 120,
-      "reason": "\"getChunksHttpAction\" is not a registered function"
-    },
-    {
-      "file": "chat/streaming/persistent/http-api",
-      "kind": "call",
-      "line": 131,
+      "line": 133,
       "reason": "\"getChunksHttpAction\" is not a registered function"
     },
     {

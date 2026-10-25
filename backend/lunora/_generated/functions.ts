@@ -719,7 +719,6 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_streaming:createStreamWithMessage": lunora_chat_streaming_63.createStreamWithMessage as unknown as RegisteredLunoraFunction,
     "chat_streaming:getActiveStreamForThread": lunora_chat_streaming_63.getActiveStreamForThread as unknown as RegisteredLunoraFunction,
     "chat_streaming:getStreamBody": lunora_chat_streaming_63.getStreamBody as unknown as RegisteredLunoraFunction,
-    "chat_streaming:streamLockedSinceStart": lunora_chat_streaming_63.streamLockedSinceStart as unknown as RegisteredLunoraFunction,
     "chat_streaming:streamRunThread": lunora_chat_streaming_63.streamRunThread as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_crons:cleanupExpiredStreams": lunora_chat_streaming_persistent_crons_64.cleanupExpiredStreams as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:addChunk": lunora_chat_streaming_persistent_library_65.addChunk as unknown as RegisteredLunoraFunction,
@@ -4066,12 +4065,6 @@ const __obj8 = { "contentType": source["streamingConfig"]["contentType"], ...(__
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "messageId": source["messageId"], "streamingConfig": __obj8, "threadId": source["threadId"], "userId": source["userId"] };
-});
-installCompiledValidatorMap(lunora_chat_streaming_63.streamLockedSinceStart.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["streamId"] !== "string") return DEFER;
-return { "streamId": source["streamId"] };
 });
 installCompiledValidatorMap(lunora_chat_streaming_63.streamRunThread.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8409,7 +8402,6 @@ export interface Caller {
             createStreamWithMessage: (args: { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }) => Promise<string>;
             getActiveStreamForThread: (args: { threadId: Id<"threads">; unlockProof?: string }) => Promise<{ streamId: Id<"persistentStreams"> } | null>;
             getStreamBody: (args: { streamId: Id<"persistentStreams">; unlockProof?: string }) => Promise<{ reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string }>;
-            streamLockedSinceStart: (args: { streamId: Id<"persistentStreams"> }) => Promise<boolean>;
             streamRunThread: (args: { streamId: Id<"persistentStreams">; userId: string }) => Promise<({ activeLeafMessageId?: string | undefined; botId?: string | undefined; createdAt?: number | undefined; groupChat?: ({ debateRounds?: number | undefined; stopRequestedAt?: number | undefined; synthesizerSkillId?: string | undefined; } & { mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: ({} & { addedAt: number; skillId: string; })[]; }) | undefined; lockedAt?: number | undefined; order?: number | undefined; tagIds?: string[] | undefined; category?: string | undefined; createdBy?: string | undefined; customSystemPrompt?: string | undefined; deleted?: boolean | undefined; deletedAt?: number | undefined; dictationLanguage?: string | undefined; enabledFeatures?: string[] | undefined; externalThreadId?: string | undefined; isPublic?: boolean | undefined; isTemporary?: boolean | undefined; language?: string | undefined; lastCompressionStartedAt?: number | undefined; messengerConnectionId?: string | undefined; mode?: "image" | "text" | "video" | undefined; model?: string | undefined; multiChat?: boolean | undefined; organizationId?: string | undefined; parentThreadIds?: string[] | undefined; pinnedAt?: number | undefined; projectId?: string | undefined; publicAccessToken?: string | undefined; reasoningEffort?: number | undefined; source?: string | undefined; statelessMode?: boolean | undefined; summary?: string | undefined; tags?: string[] | undefined; teamId?: string | undefined; title?: string | undefined; updatedAt?: number | undefined; userId?: string | undefined; } & { _creationTime: number; _id: string; status: "error" | "running" | "active" | "archived" | "abort" | "finish"; }) | null>;
             persistent: {
                 crons: {
@@ -8420,7 +8412,7 @@ export interface Caller {
                     claimStreamRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<boolean>;
                     createStream: (args: { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }) => Promise<Id<"persistentStreams">>;
                     finishStoppedReply: (args: { agentName?: string; continuation: boolean; order: number; pendingReasoning: string; pendingText: string; promptMessageId: string; streamId: Id<"persistentStreams"> }) => Promise<{ messageId?: Id<"messages">; stopped: boolean }>;
-                    getChunksAfter: (args: { afterIndex: number; streamId: Id<"persistentStreams"> }) => Promise<{ chunks: Array<{ reasoning?: string; speaker?: { name: string; skillId: string }; text: string }>; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
+                    getChunksAfter: (args: { afterIndex: number; streamId: Id<"persistentStreams"> }) => Promise<{ chunks: Array<{ reasoning?: string; speaker?: { name: string; skillId: string }; text: string }>; locked: boolean; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
                     getStreamStatus: (args: { streamId: Id<"persistentStreams"> }) => Promise<"streaming" | "pending" | "error" | "done" | "timeout">;
                     getStreamText: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
                     setStreamStatus: (args: { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }) => Promise<void>;
@@ -10033,7 +10025,6 @@ export const createCaller = (context: CallerCtx): Caller => ({
             createStreamWithMessage: (args) => callRegistered(context, "chat_streaming:createStreamWithMessage", args),
             getActiveStreamForThread: (args) => callRegistered(context, "chat_streaming:getActiveStreamForThread", args),
             getStreamBody: (args) => callRegistered(context, "chat_streaming:getStreamBody", args),
-            streamLockedSinceStart: (args) => callRegistered(context, "chat_streaming:streamLockedSinceStart", args),
             streamRunThread: (args) => callRegistered(context, "chat_streaming:streamRunThread", args),
             persistent: {
                 crons: {
