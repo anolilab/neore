@@ -24157,8 +24157,8 @@ msgid "Search messages"
 msgstr "Search messages"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:67
-msgid "Search messages (Ctrl+F)"
-msgstr "Search messages (Ctrl+F)"
+msgid "Search messages ({focusSearchShortcut})"
+msgstr "Search messages ({focusSearchShortcut})"
 
 #: ../../packages/ui/src/components/ai-elements/mic-selector.tsx:153
 msgid "Search microphones..."
@@ -24273,8 +24273,8 @@ msgid "Search threads"
 msgstr "Search threads"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:67
-msgid "Search threads (Ctrl+F)"
-msgstr "Search threads (Ctrl+F)"
+msgid "Search threads ({focusSearchShortcut})"
+msgstr "Search threads ({focusSearchShortcut})"
 
 #: src/components/command-palette.tsx:415
 msgid "Search threads, navigate, or perform actions..."
