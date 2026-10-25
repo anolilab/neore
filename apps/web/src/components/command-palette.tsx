@@ -174,14 +174,13 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
 
     // Message search is a full-text query: it waits for the palette to be open, for
     // two characters and for the typing to pause, and is never live (NEVER_LIVE).
+    // While the input and the debounced query differ, the query is skipped and no hits show.
     const trimmedSearch = searchInput.trim();
     const debouncedSearch = useDebouncedValue(trimmedSearch, MESSAGE_SEARCH_DEBOUNCE_MS);
-    const canSearchMessages = shouldQuery && trimmedSearch.length >= MESSAGE_SEARCH_MIN_CHARS && debouncedSearch.length >= MESSAGE_SEARCH_MIN_CHARS;
-    // While the input and the debounced query differ, any result belongs to an older query: show none.
-    const isMessageSearchCurrent = canSearchMessages && trimmedSearch === debouncedSearch;
+    const isMessageSearchCurrent = shouldQuery && trimmedSearch.length >= MESSAGE_SEARCH_MIN_CHARS && trimmedSearch === debouncedSearch;
     const { data: messageSearchResults } = useQuery(
         crpc.chat.functions.searchMessages.queryOptions(
-            canSearchMessages ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS, searchQuery: debouncedSearch } : skipToken,
+            isMessageSearchCurrent ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS, searchQuery: debouncedSearch } : skipToken,
         ),
     );
 
