@@ -19,7 +19,7 @@ type Entry = { args: Record<string, unknown>; kind: "run"; ref: string; shardKey
 
 let trace: Entry[];
 let failOn: ((entry: Entry) => boolean) | undefined;
-let answer: (ref: string, round: number) => unknown;
+let answer: (ref: string, round: number, args: Record<string, unknown>) => unknown;
 const rounds = new Map<string, number>();
 
 const refOf = (reference: unknown): string => (reference as { __lunoraRef: string }).__lunoraRef;
@@ -38,7 +38,7 @@ const workflowContext = () => {
 
         rounds.set(entry.ref, round);
 
-        return answer(entry.ref, round);
+        return answer(entry.ref, round, args);
     };
 
     return {
@@ -79,7 +79,7 @@ describe("account deletion workflow: order", () => {
         await execute();
 
         const authRecords = indexOfStep("delete-auth-records");
-        const postHog = indexOfStep("delete-post-hog-person");
+        const postHog = indexOfStep("erase-post-hog-person");
         const completed = completionIndex();
 
         expect(authRecords).toBeGreaterThan(-1);
@@ -103,18 +103,52 @@ describe("account deletion workflow: order", () => {
         expect(runs().find((entry) => entry.ref === "gdpr_steps_deletion_steps:deleteUserPresentations")?.args).toStrictEqual({ userId: USER });
     });
 
-    it("sends the confirmation e-mail and writes the audit entry only after completion, and minimises records last", async () => {
+    it("writes the audit entry and minimises the records after completion, and only then claims and sends the confirmation", async () => {
         await execute();
 
         const completed = completionIndex();
-        const email = indexOfStep("send-deletion-confirmed-email-action");
         const audit = indexOfStep("log-audit");
         const minimise = indexOfStep("minimise-gdpr-records");
+        const claim = indexOfStep("claim-deletion-confirmed-email");
+        const email = indexOfStep("send-deletion-confirmed-email-action");
 
-        expect(email).toBeGreaterThan(completed);
-        expect(audit).toBeGreaterThan(email);
+        expect(audit).toBeGreaterThan(completed);
         expect(minimise).toBeGreaterThan(audit);
-        expect(minimise).toBe(trace.findLastIndex((entry) => entry.kind === "step"));
+        expect(claim).toBeGreaterThan(minimise);
+        expect(email).toBeGreaterThan(claim);
+        expect(email).toBe(trace.findLastIndex((entry) => entry.kind === "step"));
+    });
+
+    it("still resolves, with the records minimised, when the confirmation cannot be sent", async () => {
+        failOn = (entry) => entry.kind === "run" && entry.ref === "gdpr_steps_email_steps:sendDeletionConfirmedEmailAction";
+
+        await expect(execute()).resolves.toBeUndefined();
+
+        expect(stepNames()).toContain("log-audit");
+        expect(stepNames()).toContain("minimise-gdpr-records");
+    });
+
+    it("does nothing for a request that already ended: the first status write is conditional and a refusal ends the run", async () => {
+        answer = (ref) => (ref === "gdpr_functions:updateRequestProgress" ? false : { cursor: null, hasMore: false });
+
+        await execute();
+
+        expect(runs()[0]?.args).toMatchObject({ fromStatus: ["pending", "processing", "failed"], status: "processing" });
+        expect(runs()).toHaveLength(1);
+        // Checkpointed, so a replay of the instance reads this answer instead of writing again.
+        expect(stepNames()).toStrictEqual(["open-deletion-request"]);
+    });
+
+    it("writes the completion audit, minimises and mails only when this run's completion applied", async () => {
+        // A scheduled retry completed the request first: this run's conditional completion write is refused.
+        answer = (ref, _round, args) =>
+            ref === "gdpr_functions:updateRequestProgress" && args["status"] === "completed" ? false : { cursor: null, hasMore: false };
+        await execute();
+
+        expect(stepNames()).not.toContain("log-audit");
+        expect(stepNames()).not.toContain("minimise-gdpr-records");
+        expect(stepNames()).not.toContain("claim-deletion-confirmed-email");
+        expect(stepNames()).not.toContain("send-deletion-confirmed-email-action");
     });
 
     it("reports completion exactly once, at 100 percent", async () => {
@@ -142,7 +176,8 @@ describe("account deletion workflow: order", () => {
     it("revokes sessions first, then runs the steps that need rows or secrets that a later step removes", async () => {
         await execute();
 
-        expect(stepNames()[0]).toBe("revoke-user-sessions");
+        // The request is opened (a checkpointed step) before anything is deleted.
+        expect(stepNames().slice(0, 2)).toStrictEqual(["open-deletion-request", "revoke-user-sessions"]);
 
         const before = (early: string, late: string) => {
             // A step that never ran is index -1, which would satisfy every "earlier than" comparison.
@@ -170,7 +205,7 @@ describe("account deletion workflow: order", () => {
         before("delete-user-workflow-data", "delete-user-projects");
         before("delete-auth-records", "delete-user-identity");
         before("delete-user-identity", "purge-user-document-history");
-        before("purge-user-document-history", "delete-post-hog-person");
+        before("purge-user-document-history", "erase-post-hog-person");
     });
 
     it("uses each durable step name once, since the names key the durable log", async () => {
@@ -262,7 +297,7 @@ describe("account deletion workflow: failure", () => {
         await expect(execute()).rejects.toThrow("deleteUserFiles failed");
 
         expect(stepNames()).not.toContain("delete-auth-records");
-        expect(stepNames()).not.toContain("delete-post-hog-person");
+        expect(stepNames()).not.toContain("erase-post-hog-person");
         expect(completionIndex()).toBe(-1);
     });
 });

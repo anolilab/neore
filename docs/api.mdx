@@ -43,7 +43,7 @@ curl -N -X POST "$NEORE_API_URL/api/v1/chat/stream" \
   -d '{"streamToken":"<streamToken from above>"}'
 ```
 
-The stream emits one JSON object per line: `{"type":"text","text":"…"}`, `{"type":"reasoning",…}`, `{"type":"speaker",…}` (group chats), and finally exactly one `{"type":"done","status":"done"}` or `{"type":"error","error":{…}}`. Pass `"stream": false` to `/chat` instead to block until the reply is complete (up to 5 minutes) and get `{ threadId, messageId, text, status }` back.
+The stream emits one JSON object per line: `{"type":"text","text":"…"}`, `{"type":"reasoning",…}`, `{"type":"speaker",…}` (group chats), `{"type":"reply.restart"}` (see below), and finally exactly one `{"type":"done","status":"done"}` or `{"type":"error","error":{…}}`. Pass `"stream": false` to `/chat` instead to block until the reply is complete (up to 5 minutes) and get `{ threadId, messageId, text, status }` back. If the same user steers the reply from the app, the stream emits `{"type":"reply.restart"}` at the cut: the `text` before it is the reply as it stood, and the `text` after it continues below the steering message. The blocking response joins both halves into one `text`; the thread's messages hold them separately.
 
 `POST /api/v1/skills/{slug}/run` runs a skill the same way. It's equivalent to typing `/<slug> <input>` in the app.
 

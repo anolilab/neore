@@ -7,7 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { claimKey, claimOnce, completeKey, purgeExpiredClaims, reapLapsedClaims, releaseKey } from "./claim-once";
+import { claimKey, claimKeyFenced, claimOnce, completeKey, purgeExpiredClaims, reapLapsedClaims, releaseKey } from "./claim-once";
 
 const NOW = 1_800_000_000_000;
 const TTL = 60_000;
@@ -117,6 +117,28 @@ describe("releaseKey", () => {
         await claim("a");
         await mutate(releaseKey, { key: "a", scope: "s" });
 
+        await expect(claim("a")).resolves.toBe(true);
+    });
+});
+
+describe("releaseKey with a fence", () => {
+    it("answers the claimedAt of the claim it took, or null while the key is held", async () => {
+        const first = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        expect(first).toBe(NOW);
+        await expect(mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL })).resolves.toBeNull();
+    });
+
+    it("deletes only the claim its claimedAt names, so a newer claim on the key survives", async () => {
+        const first = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        vi.setSystemTime(NOW + TTL + 1);
+        const second = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        await mutate(releaseKey, { claimedAt: first, key: "a", scope: "s" });
+        await expect(claim("a")).resolves.toBe(false);
+
+        await mutate(releaseKey, { claimedAt: second, key: "a", scope: "s" });
         await expect(claim("a")).resolves.toBe(true);
     });
 });

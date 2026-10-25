@@ -11,17 +11,24 @@ import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { SANDBOX_TOOLS } from "../chat/lib/tool-builder";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
+import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
+import { filterTextOf } from "./filters";
 import { isQuietRunSkipped } from "./quiet";
 
 export const executeTrigger = internalAction
     .input({
+        // The webhook delivery's replay claim, given back if admission refuses the delivery. A manual run has none.
+        // `claimedAt` fences the release: the run may start after the claim expired and a redelivery took the key.
+        claim: v.optional(v.object({ claimedAt: v.number(), key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
         // A manual test run ("Run now") fires a disabled trigger too.
         ignoreDisabled: v.optional(v.boolean()),
+        // The webhook body was not valid UTF-8, so `payload` is its lossy decode and filters see an empty body.
+        invalidUtf8: v.optional(v.boolean()),
         payload: v.optional(v.string()), // Webhook payload or scheduled input
         triggerId: v.id("triggers"),
     })
-    .action(async ({ args: { ignoreDisabled, payload, triggerId }, ctx }) => {
+    .action(async ({ args: { claim, ignoreDisabled, invalidUtf8, payload, triggerId }, ctx }) => {
         // 1. Fetch trigger config
         const trigger = await ctx.runQuery(internal.triggers.functions.getTriggerInternal, { triggerId });
 
@@ -73,7 +80,22 @@ export const executeTrigger = internalAction
             // failed execution, so the user sees why it did not happen. Inside the try,
             // so an admission error reaches the failure handler below instead of
             // leaving the execution running.
-            const refusal = await ctx.runMutation(internal.triggers.functions.admitTriggerRun, { triggerId });
+            // A webhook delivery (not a manual "Run now") has its filters checked again at admission,
+            // because the owner may have saved stricter ones since the webhook handler evaluated them.
+            const refusal = await ctx.runMutation(internal.triggers.functions.admitTriggerRun, {
+                claim,
+                executionId,
+                filterPayload: triggerType === "webhook" && ignoreDisabled !== true ? filterTextOf(payload, invalidUtf8) : undefined,
+                triggerId,
+            });
+
+            if (refusal !== null && typeof refusal === "object") {
+                // Recorded as filtered and not charged; the running row was replaced.
+                // The reason quotes the configured filter value (an address, a token), so it stays in the owner's execution history, not the log.
+                console.info(`[Triggers] Trigger ${triggerId} delivery no longer matches its filters, skipping`);
+
+                return;
+            }
 
             if (refusal) {
                 await ctx.runMutation(internal.triggers.functions.updateExecution, {

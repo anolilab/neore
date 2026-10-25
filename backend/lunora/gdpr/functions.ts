@@ -435,19 +435,37 @@ export const cancelStuckExport = authMutation.use(rateLimit("gdpr/request")).mut
     }
 });
 
+const vRequestStatus = v.union(v.literal("pending"), v.literal("processing"), v.literal("completed"), v.literal("failed"), v.literal("cancelled"));
+
+/**
+ * `fromStatus`, when given, makes the write conditional: it applies only while the request is still
+ * in one of those statuses, so a write that computed its outcome earlier cannot overwrite a request
+ * another path (a scheduled retry) has since completed or cancelled. It answers `false` when it did
+ * not apply, `true` otherwise.
+ */
 export const updateRequestProgress = internalMutation
     .input({
         currentStep: v.optional(v.string()),
         downloadUrl: v.optional(v.string()),
         errorMessage: v.optional(v.string()),
+        fromStatus: v.optional(v.array(vRequestStatus)),
         progress: v.optional(v.number()),
         requestId: v.id("gdprRequests"),
-        status: v.optional(v.union(v.literal("pending"), v.literal("processing"), v.literal("completed"), v.literal("failed"), v.literal("cancelled"))),
+        status: v.optional(vRequestStatus),
         storageId: v.optional(v.id("_storage")),
     })
-    .output(v.null())
+    .output(v.boolean())
     .mutation(async ({ args, ctx: context }) => {
-        const { requestId, ...updates } = args;
+        const { fromStatus, requestId, ...updates } = args;
+
+        if (fromStatus !== undefined) {
+            const current = await context.db.get(requestId);
+
+            if (current === null || !fromStatus.includes(current.status)) {
+                return false;
+            }
+        }
+
         const patch: Partial<Doc<"gdprRequests">> = {};
 
         if (updates.status !== undefined) {
@@ -481,5 +499,5 @@ export const updateRequestProgress = internalMutation
 
         await context.db.patch(requestId, withoutUndefined(patch));
 
-        return null;
+        return true;
     });

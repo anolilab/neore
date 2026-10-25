@@ -14,12 +14,14 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
+import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { releaseClaim } from "../lib/claim-once";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
-import { assertValidFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH } from "./filters";
+import { assertValidFilters, evaluateFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH, MAX_WEBHOOK_BODY_BYTES } from "./filters";
 import type { WebhookPreset, WebhookSignatureScheme } from "./presets";
 import { compileWebhookPreset } from "./presets";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
@@ -725,20 +727,82 @@ export const updateTriggerStats = internalMutation
         return null;
     });
 
+/** The write behind {@link recordFilteredExecution}: the trigger's ONE filtered row, created or moved to the front. */
+const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reason: string): Promise<void> => {
+    // The trigger may have been deleted after the webhook read it. Its
+    // deletion cleared the history, so a row written now would outlive it.
+    if (!(await ctx.db.get(triggerId))) {
+        return;
+    }
+
+    const latest = await ctx.db
+        .query("triggerExecutions")
+        .withIndex("by_triggerId_status", (q) => q.eq("triggerId", triggerId).eq("status", "filtered"))
+        .first();
+
+    if (latest) {
+        await patchRow(ctx.db, latest, { completedAt: ctx.now, error: reason, startedAt: ctx.now });
+
+        return;
+    }
+
+    await ctx.db.insert("triggerExecutions", { completedAt: ctx.now, error: reason, startedAt: ctx.now, status: "filtered", triggerId });
+};
+
 /**
  * Charges one run before the paid call. A trigger draws on the same daily
  * task-run quota and model allowlist as a task round (`tasks/internal.ts`), so a
  * schedule cannot run more agent turns than a task can. Returns the refusal
  * reason, or `null` when the run may go ahead.
+ *
+ * A webhook delivery passes its body as `filterPayload`: the filters the webhook
+ * handler checked may have been tightened since, so they are evaluated again here,
+ * against the trigger as it is NOW and in the same mutation as the charge. A
+ * delivery that no longer matches is recorded as filtered (replacing the running
+ * row `executionId` names), is never charged, and answers `{ filtered }`.
  */
 export const admitTriggerRun = internalMutation
-    .input({ triggerId: v.id("triggers") })
-    .output(v.union(v.null(), v.string()))
-    .mutation(async ({ args: { triggerId }, ctx }) => {
+    .input({
+        // The webhook delivery's replay claim. A delivery refused here gives it back, as the handler does for one
+        // that misses the filters, so the owner can fix them and redeliver the same signed body.
+        claim: v.optional(v.object({ claimedAt: v.number(), key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
+        executionId: v.optional(v.id("triggerExecutions")),
+        filterPayload: v.optional(v.string().max(MAX_WEBHOOK_BODY_BYTES)),
+        triggerId: v.id("triggers"),
+    })
+    .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() })))
+    .mutation(async ({ args: { claim, executionId, filterPayload, triggerId }, ctx }) => {
         const trigger = await ctx.db.get(triggerId);
 
         if (!trigger) {
             return "Trigger not found";
+        }
+
+        if (filterPayload !== undefined) {
+            const verdict = evaluateFilters(trigger.filters, filterPayload);
+
+            if (!verdict.matched) {
+                const reason = verdict.reason.slice(0, 500);
+
+                await recordFiltered(ctx, triggerId, reason);
+
+                const running = executionId ? await ctx.db.get(executionId) : null;
+
+                if (running && running.triggerId === triggerId && running.status === "running") {
+                    await ctx.db.delete(running._id);
+                }
+
+                if (claim) {
+                    try {
+                        await releaseClaim(ctx, claim.scope, claim.key, claim.claimedAt);
+                    } catch (error) {
+                        // The refusal stands; a claim left behind only makes a redelivery read as a replay until its TTL.
+                        console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}:`, error);
+                    }
+                }
+
+                return { filtered: reason };
+            }
         }
 
         const account = await loadTaskAccount(ctx, trigger.userId);
@@ -798,24 +862,7 @@ export const recordFilteredExecution = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { reason, triggerId }, ctx }) => {
-        // The trigger may have been deleted after the webhook read it. Its
-        // deletion cleared the history, so a row written now would outlive it.
-        if (!(await ctx.db.get(triggerId))) {
-            return null;
-        }
-
-        const latest = await ctx.db
-            .query("triggerExecutions")
-            .withIndex("by_triggerId_status", (q) => q.eq("triggerId", triggerId).eq("status", "filtered"))
-            .first();
-
-        if (latest) {
-            await ctx.db.patch(latest._id, { completedAt: ctx.now, error: reason, startedAt: ctx.now });
-
-            return null;
-        }
-
-        await ctx.db.insert("triggerExecutions", { completedAt: ctx.now, error: reason, startedAt: ctx.now, status: "filtered", triggerId });
+        await recordFiltered(ctx, triggerId, reason);
 
         return null;
     });

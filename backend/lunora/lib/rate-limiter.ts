@@ -202,6 +202,10 @@ export const RATE_LIMIT_CONFIGS = {
     "chat/promptImprovement:free": Ratelimit.tokenBucket(10, MINUTE, 15),
     "chat/promptImprovement:premium": Ratelimit.tokenBucket(30, MINUTE, 50),
     "chat/promptImprovement:public": Ratelimit.fixedWindow(3, HOUR),
+    // Steering a running reply (`chat/steering.ts`): a send and a withdraw per
+    // message. A run holds at most a few queued at once, so a burst is small.
+    "chat/steer:free": Ratelimit.tokenBucket(20, MINUTE, 30),
+    "chat/steer:premium": Ratelimit.tokenBucket(60, MINUTE, 90),
     "chat/stream:free": Ratelimit.tokenBucket(30, MINUTE, 50),
     "chat/stream:premium": Ratelimit.tokenBucket(100, MINUTE, 200),
     // "Translate" on a message: one short utility-model call per cache miss

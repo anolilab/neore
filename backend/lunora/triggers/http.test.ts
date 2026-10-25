@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { internal } from "../_generated/internal";
-import { claimKey, releaseKey } from "../lib/claim-once";
+import { claimKey, claimKeyFenced, releaseKey, TRIGGER_CLAIM_TTL_MS } from "../lib/claim-once";
 import { SIGNED_REQUEST_WINDOW_MS } from "../lib/crypto";
 import { recordFilteredExecution } from "./functions";
 import handleTriggerWebhook, { verifyHmacSignature } from "./http";
@@ -44,6 +44,15 @@ const hmacHex = async (payload: string | Uint8Array): Promise<string> => {
 
 const SIGNED_TRIGGER = { enabled: true, type: "webhook", webhookSecret: SECRET };
 
+/** The claim mutation the webhook handler calls, served by the harness's own copy. */
+const claimMutation = (reference: unknown) => {
+    if (reference === internal.lib.claim_once.releaseKey) {
+        return releaseKey;
+    }
+
+    return reference === internal.lib.claim_once.claimKeyFenced ? claimKeyFenced : claimKey;
+};
+
 const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
     const triggerId = await harness.run(
         async (ctx: any) =>
@@ -59,7 +68,7 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
             }),
     );
     const scheduled: unknown[] = [];
-    const scheduler = { fail: false, recordFails: false };
+    const scheduler: { beforeFail?: () => Promise<void>; fail: boolean; recordFails: boolean } = { fail: false, recordFails: false };
     const context = {
         runMutation: async (reference: unknown, args: unknown) => {
             if (reference === internal.triggers.functions.recordFilteredExecution) {
@@ -70,12 +79,14 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
                 return await harness.run(async (ctx: any) => await ctx.runMutation(recordFilteredExecution, args));
             }
 
-            return await harness.run(async (ctx: any) => await ctx.runMutation(reference === internal.lib.claim_once.releaseKey ? releaseKey : claimKey, args));
+            return await harness.run(async (ctx: any) => await ctx.runMutation(claimMutation(reference), args));
         },
         runQuery: async () => trigger,
         scheduler: {
             runAfter: async (_delay: number, _reference: unknown, args: unknown) => {
                 if (scheduler.fail) {
+                    await scheduler.beforeFail?.();
+
                     throw new Error("scheduler unavailable");
                 }
 
@@ -377,6 +388,16 @@ describe("trigger webhook signing", () => {
             expect(scheduled).toHaveLength(0);
         });
 
+        it("flags a body that is not valid UTF-8 for the run, so admission evaluates the same text", async () => {
+            const { scheduled, statusOf } = await setup(SIGNED_TRIGGER);
+            const body = new Uint8Array([...new TextEncoder().encode('{"note":"'), 0xff, 0x22, 0x7d]);
+            const timestamp = String(Math.floor(NOW / 1000));
+            const signed = new Uint8Array([...new TextEncoder().encode(`${timestamp}.`), ...body]);
+
+            expect(await statusOf(body, { "x-neore-timestamp": timestamp, "x-signature-256": `sha256=${await hmacHex(signed)}` })).toBe(200);
+            expect(scheduled).toEqual([expect.objectContaining({ invalidUtf8: true })]);
+        });
+
         it("evaluates filters on a signed body that starts with a byte-order mark", async () => {
             const { scheduled, statusOf } = await setup({ ...SIGNED_TRIGGER, filters: [{ op: "equals", path: "action", value: "opened" }] });
             const body = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode('{"action":"opened"}')]);
@@ -484,6 +505,28 @@ describe("trigger webhook signing", () => {
             expect(await statusOf('{"action":"closed"}', await signedHeaders('{"action":"closed"}'))).toBe(202);
             expect(rateLimit.charged).toBe(1);
         });
+    });
+
+    it("does not clear the replacement claim when scheduling fails after the claim's TTL", async () => {
+        const { scheduler, statusOf } = await setup();
+        const body = '{"event":"slow"}';
+        const headers = await signedHeaders(body);
+        const claimRows = async (): Promise<{ claimedAt: number; key: string; scope: string }[]> =>
+            await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
+
+        scheduler.fail = true;
+        // The scheduler call hangs past the TTL, a redelivery takes the lapsed key, then the call fails.
+        scheduler.beforeFail = async () => {
+            const [original] = await claimRows();
+
+            vi.setSystemTime(NOW + TRIGGER_CLAIM_TTL_MS + 1);
+            await harness.run(
+                async (ctx: any) => await ctx.runMutation(claimKeyFenced, { key: original!.key, scope: original!.scope, ttlMs: TRIGGER_CLAIM_TTL_MS }),
+            );
+        };
+
+        expect(await statusOf(body, headers)).toBe(500);
+        expect(await claimRows()).toEqual([expect.objectContaining({ claimedAt: NOW + TRIGGER_CLAIM_TTL_MS + 1 })]);
     });
 
     it("gives the replay claim back when scheduling fails, so the sender's retry runs", async () => {

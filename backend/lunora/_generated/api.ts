@@ -313,8 +313,12 @@ export interface ApiTypes {
                 updateSlide: FunctionReference<"mutation", { htmlContent?: string; slideId: string; title?: string; unlockProof?: string }, { success: boolean }>;
             };
         };
+        steering: {
+            steerRun: FunctionReference<"mutation", { steerId?: string; streamId: Id<"persistentStreams">; text: string; threadId: Id<"threads">; unlockProof?: string }, { steerId: string }>;
+            withdrawSteer: FunctionReference<"mutation", { steerId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads">; unlockProof?: string }, { outcome: "withdrawn" | "delivered" | "unknown" }>;
+        };
         streaming: {
-            getActiveStreamForThread: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { streamId: Id<"persistentStreams"> } | null>;
+            getActiveStreamForThread: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { deliveredSteerIds?: Array<string>; streamId: Id<"persistentStreams"> } | null>;
             getStreamBody: FunctionReference<"query", { streamId: Id<"persistentStreams">; unlockProof?: string }, { reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string }>;
         };
         tags: {
@@ -1073,6 +1077,10 @@ export const api: ApiTypes = {
                 getThreadPresentations: { __lunoraRef: "chat_slides_functions:getThreadPresentations" },
                 updateSlide: { __lunoraRef: "chat_slides_functions:updateSlide" },
             },
+        },
+        steering: {
+            steerRun: { __lunoraRef: "chat_steering:steerRun" },
+            withdrawSteer: { __lunoraRef: "chat_steering:withdrawSteer" },
         },
         streaming: {
             getActiveStreamForThread: { __lunoraRef: "chat_streaming:getActiveStreamForThread" },

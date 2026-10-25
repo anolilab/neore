@@ -64,125 +64,127 @@ import * as lunora_chat_resume_59 from "../chat/resume.js";
 import * as lunora_chat_sharing_60 from "../chat/sharing.js";
 import * as lunora_chat_slides_functions_61 from "../chat/slides/functions.js";
 import * as lunora_chat_slides_internal_62 from "../chat/slides/internal.js";
-import * as lunora_chat_streaming_63 from "../chat/streaming/index.js";
-import * as lunora_chat_streaming_persistent_crons_64 from "../chat/streaming/persistent/crons.js";
-import * as lunora_chat_streaming_persistent_library_65 from "../chat/streaming/persistent/library.js";
-import * as lunora_chat_tags_functions_66 from "../chat/tags/functions.js";
-import * as lunora_chat_tool_permissions_67 from "../chat/tool-permissions.js";
-import * as lunora_chat_tools_browser_node_68 from "../chat/tools/browser-node.js";
-import * as lunora_chat_tools_code_execution_node_69 from "../chat/tools/code-execution-node.js";
-import * as lunora_chat_tools_sandbox_node_70 from "../chat/tools/sandbox-node.js";
-import * as lunora_chat_translate_71 from "../chat/translate.js";
-import * as lunora_coding_agents_execute_72 from "../coding-agents/execute.js";
-import * as lunora_coding_agents_functions_73 from "../coding-agents/functions.js";
-import * as lunora_coding_agents_gdpr_74 from "../coding-agents/gdpr.js";
-import * as lunora_connectors_mcp_servers_75 from "../connectors/mcp-servers.js";
-import * as lunora_connectors_oauth_76 from "../connectors/oauth.js";
-import * as lunora_connectors_seed_77 from "../connectors/seed.js";
-import * as lunora_connectors_store_78 from "../connectors/store.js";
-import * as lunora_connectors_user_connectors_79 from "../connectors/user-connectors.js";
-import * as lunora_crons_80 from "../crons.js";
-import * as lunora_devices_functions_81 from "../devices/functions.js";
-import * as lunora_devices_gdpr_82 from "../devices/gdpr.js";
-import * as lunora_devices_internal_83 from "../devices/internal.js";
-import * as lunora_email_functions_84 from "../email/functions.js";
-import * as lunora_evals_execute_85 from "../evals/execute.js";
-import * as lunora_evals_functions_86 from "../evals/functions.js";
-import * as lunora_evals_gdpr_87 from "../evals/gdpr.js";
-import * as lunora_evals_internal_88 from "../evals/internal.js";
-import * as lunora_file_89 from "../file.js";
-import * as lunora_gdpr_functions_90 from "../gdpr/functions.js";
-import * as lunora_gdpr_request_sweeps_91 from "../gdpr/request-sweeps.js";
-import * as lunora_gdpr_retention_92 from "../gdpr/retention.js";
-import * as lunora_gdpr_steps_93 from "../gdpr/steps.js";
-import * as lunora_gdpr_steps_deletion_steps_94 from "../gdpr/steps/deletion-steps.js";
-import * as lunora_gdpr_steps_email_steps_95 from "../gdpr/steps/email-steps.js";
-import * as lunora_gdpr_steps_posthog_steps_96 from "../gdpr/steps/posthog-steps.js";
-import * as lunora_gdpr_steps_residual_deletion_steps_97 from "../gdpr/steps/residual-deletion-steps.js";
-import * as lunora_gdpr_workflow_actions_98 from "../gdpr/workflow-actions.js";
-import * as lunora_home_overview_99 from "../home/overview.js";
-import * as lunora_init_100 from "../init.js";
-import * as lunora_knowledge_agent_assignment_101 from "../knowledge/agent-assignment.js";
-import * as lunora_knowledge_collections_102 from "../knowledge/collections.js";
-import * as lunora_knowledge_delete_embeddings_103 from "../knowledge/delete-embeddings.js";
-import * as lunora_knowledge_documents_104 from "../knowledge/documents.js";
-import * as lunora_knowledge_functions_105 from "../knowledge/functions.js";
-import * as lunora_knowledge_housekeeping_106 from "../knowledge/housekeeping.js";
-import * as lunora_knowledge_ingest_107 from "../knowledge/ingest.js";
-import * as lunora_knowledge_retrieve_108 from "../knowledge/retrieve.js";
-import * as lunora_knowledge_summarize_109 from "../knowledge/summarize.js";
-import * as lunora_lib_account_merge_110 from "../lib/account-merge.js";
-import * as lunora_lib_action_cache_111 from "../lib/action-cache.js";
-import * as lunora_lib_claim_once_112 from "../lib/claim-once.js";
-import * as lunora_lib_document_history_113 from "../lib/document-history.js";
-import * as lunora_lib_job_once_114 from "../lib/job-once.js";
-import * as lunora_lib_rate_limiter_mutations_115 from "../lib/rate-limiter-mutations.js";
-import * as lunora_lib_shard_housekeeping_116 from "../lib/shard-housekeeping.js";
-import * as lunora_lib_shard_routes_117 from "../lib/shard-routes.js";
-import * as lunora_lib_storage_cleanup_118 from "../lib/storage-cleanup.js";
-import * as lunora_media_functions_119 from "../media/functions.js";
-import * as lunora_memory_compress_120 from "../memory/compress.js";
-import * as lunora_memory_extract_121 from "../memory/extract.js";
-import * as lunora_memory_functions_122 from "../memory/functions.js";
-import * as lunora_memory_gdpr_123 from "../memory/gdpr.js";
-import * as lunora_memory_reflection_124 from "../memory/reflection.js";
-import * as lunora_memory_retrieve_125 from "../memory/retrieve.js";
-import * as lunora_messenger_functions_126 from "../messenger/functions.js";
-import * as lunora_messenger_respond_127 from "../messenger/respond.js";
-import * as lunora_notifications_daily_brief_128 from "../notifications/daily-brief.js";
-import * as lunora_notifications_functions_129 from "../notifications/functions.js";
-import * as lunora_notifications_gdpr_130 from "../notifications/gdpr.js";
-import * as lunora_notifications_locked_redact_131 from "../notifications/locked-redact.js";
-import * as lunora_notifications_push_132 from "../notifications/push.js";
-import * as lunora_notifications_task_email_133 from "../notifications/task-email.js";
-import * as lunora_pages_agent_134 from "../pages/agent.js";
-import * as lunora_pages_comments_135 from "../pages/comments.js";
-import * as lunora_pages_functions_136 from "../pages/functions.js";
-import * as lunora_pages_gdpr_137 from "../pages/gdpr.js";
-import * as lunora_pages_presence_138 from "../pages/presence.js";
-import * as lunora_pages_sharing_139 from "../pages/sharing.js";
-import * as lunora_projects_functions_140 from "../projects/functions.js";
-import * as lunora_prompts_functions_141 from "../prompts/functions.js";
-import * as lunora_saas_notification_functions_142 from "../saas/notification-functions.js";
-import * as lunora_saas_usage_functions_143 from "../saas/usage-functions.js";
-import * as lunora_sandbox_cleanup_144 from "../sandbox/cleanup.js";
-import * as lunora_sandbox_functions_145 from "../sandbox/functions.js";
-import * as lunora_sandbox_pool_functions_146 from "../sandbox/pool-functions.js";
-import * as lunora_sandbox_pool_147 from "../sandbox/pool.js";
-import * as lunora_sandbox_pty_148 from "../sandbox/pty.js";
-import * as lunora_sandbox_workspace_sync_functions_149 from "../sandbox/workspace-sync-functions.js";
-import * as lunora_sandbox_workspace_sync_150 from "../sandbox/workspace-sync.js";
-import * as lunora_skills_agent_creation_151 from "../skills/agent-creation.js";
-import * as lunora_skills_builder_152 from "../skills/builder.js";
-import * as lunora_skills_executor_153 from "../skills/executor.js";
-import * as lunora_skills_functions_154 from "../skills/functions.js";
-import * as lunora_skills_generate_155 from "../skills/generate.js";
-import * as lunora_skills_io_156 from "../skills/io.js";
-import * as lunora_skills_jit_tool_loader_157 from "../skills/jit-tool-loader.js";
-import * as lunora_skills_marketplace_158 from "../skills/marketplace.js";
-import * as lunora_sub_agents_execute_159 from "../sub-agents/execute.js";
-import * as lunora_sub_agents_functions_160 from "../sub-agents/functions.js";
-import * as lunora_system_prompts_functions_161 from "../system-prompts/functions.js";
-import * as lunora_tasks_execute_162 from "../tasks/execute.js";
-import * as lunora_tasks_functions_163 from "../tasks/functions.js";
-import * as lunora_tasks_gdpr_164 from "../tasks/gdpr.js";
-import * as lunora_tasks_internal_165 from "../tasks/internal.js";
-import * as lunora_triggers_execute_166 from "../triggers/execute.js";
-import * as lunora_triggers_functions_167 from "../triggers/functions.js";
-import * as lunora_triggers_schedule_168 from "../triggers/schedule.js";
-import * as lunora_usage_activity_169 from "../usage/activity.js";
-import * as lunora_usage_backfill_170 from "../usage/backfill.js";
-import * as lunora_vault_fork_copy_171 from "../vault/fork-copy.js";
-import * as lunora_vault_functions_172 from "../vault/functions.js";
-import * as lunora_voice_functions_173 from "../voice/functions.js";
-import * as lunora_voice_speech_174 from "../voice/speech.js";
-import * as lunora_workflow_executor_175 from "../workflow/executor.js";
-import * as lunora_workflow_fork_176 from "../workflow/fork.js";
-import * as lunora_workflow_functions_177 from "../workflow/functions.js";
-import * as lunora_workflow_gallery_178 from "../workflow/gallery.js";
-import * as lunora_workflow_generate_179 from "../workflow/generate.js";
-import * as lunora_workflow_media_ops_180 from "../workflow/media-ops.js";
-import * as lunora_workflow_presence_181 from "../workflow/presence.js";
+import * as lunora_chat_steering_63 from "../chat/steering.js";
+import * as lunora_chat_streaming_64 from "../chat/streaming/index.js";
+import * as lunora_chat_streaming_persistent_crons_65 from "../chat/streaming/persistent/crons.js";
+import * as lunora_chat_streaming_persistent_library_66 from "../chat/streaming/persistent/library.js";
+import * as lunora_chat_tags_functions_67 from "../chat/tags/functions.js";
+import * as lunora_chat_tool_permissions_68 from "../chat/tool-permissions.js";
+import * as lunora_chat_tools_browser_node_69 from "../chat/tools/browser-node.js";
+import * as lunora_chat_tools_code_execution_node_70 from "../chat/tools/code-execution-node.js";
+import * as lunora_chat_tools_sandbox_node_71 from "../chat/tools/sandbox-node.js";
+import * as lunora_chat_translate_72 from "../chat/translate.js";
+import * as lunora_coding_agents_execute_73 from "../coding-agents/execute.js";
+import * as lunora_coding_agents_functions_74 from "../coding-agents/functions.js";
+import * as lunora_coding_agents_gdpr_75 from "../coding-agents/gdpr.js";
+import * as lunora_connectors_mcp_servers_76 from "../connectors/mcp-servers.js";
+import * as lunora_connectors_oauth_77 from "../connectors/oauth.js";
+import * as lunora_connectors_seed_78 from "../connectors/seed.js";
+import * as lunora_connectors_store_79 from "../connectors/store.js";
+import * as lunora_connectors_user_connectors_80 from "../connectors/user-connectors.js";
+import * as lunora_crons_81 from "../crons.js";
+import * as lunora_devices_functions_82 from "../devices/functions.js";
+import * as lunora_devices_gdpr_83 from "../devices/gdpr.js";
+import * as lunora_devices_internal_84 from "../devices/internal.js";
+import * as lunora_email_functions_85 from "../email/functions.js";
+import * as lunora_evals_execute_86 from "../evals/execute.js";
+import * as lunora_evals_functions_87 from "../evals/functions.js";
+import * as lunora_evals_gdpr_88 from "../evals/gdpr.js";
+import * as lunora_evals_internal_89 from "../evals/internal.js";
+import * as lunora_file_90 from "../file.js";
+import * as lunora_gdpr_functions_91 from "../gdpr/functions.js";
+import * as lunora_gdpr_posthog_retry_92 from "../gdpr/posthog-retry.js";
+import * as lunora_gdpr_request_sweeps_93 from "../gdpr/request-sweeps.js";
+import * as lunora_gdpr_retention_94 from "../gdpr/retention.js";
+import * as lunora_gdpr_steps_95 from "../gdpr/steps.js";
+import * as lunora_gdpr_steps_deletion_steps_96 from "../gdpr/steps/deletion-steps.js";
+import * as lunora_gdpr_steps_email_steps_97 from "../gdpr/steps/email-steps.js";
+import * as lunora_gdpr_steps_posthog_steps_98 from "../gdpr/steps/posthog-steps.js";
+import * as lunora_gdpr_steps_residual_deletion_steps_99 from "../gdpr/steps/residual-deletion-steps.js";
+import * as lunora_gdpr_workflow_actions_100 from "../gdpr/workflow-actions.js";
+import * as lunora_home_overview_101 from "../home/overview.js";
+import * as lunora_init_102 from "../init.js";
+import * as lunora_knowledge_agent_assignment_103 from "../knowledge/agent-assignment.js";
+import * as lunora_knowledge_collections_104 from "../knowledge/collections.js";
+import * as lunora_knowledge_delete_embeddings_105 from "../knowledge/delete-embeddings.js";
+import * as lunora_knowledge_documents_106 from "../knowledge/documents.js";
+import * as lunora_knowledge_functions_107 from "../knowledge/functions.js";
+import * as lunora_knowledge_housekeeping_108 from "../knowledge/housekeeping.js";
+import * as lunora_knowledge_ingest_109 from "../knowledge/ingest.js";
+import * as lunora_knowledge_retrieve_110 from "../knowledge/retrieve.js";
+import * as lunora_knowledge_summarize_111 from "../knowledge/summarize.js";
+import * as lunora_lib_account_merge_112 from "../lib/account-merge.js";
+import * as lunora_lib_action_cache_113 from "../lib/action-cache.js";
+import * as lunora_lib_claim_once_114 from "../lib/claim-once.js";
+import * as lunora_lib_document_history_115 from "../lib/document-history.js";
+import * as lunora_lib_job_once_116 from "../lib/job-once.js";
+import * as lunora_lib_rate_limiter_mutations_117 from "../lib/rate-limiter-mutations.js";
+import * as lunora_lib_shard_housekeeping_118 from "../lib/shard-housekeeping.js";
+import * as lunora_lib_shard_routes_119 from "../lib/shard-routes.js";
+import * as lunora_lib_storage_cleanup_120 from "../lib/storage-cleanup.js";
+import * as lunora_media_functions_121 from "../media/functions.js";
+import * as lunora_memory_compress_122 from "../memory/compress.js";
+import * as lunora_memory_extract_123 from "../memory/extract.js";
+import * as lunora_memory_functions_124 from "../memory/functions.js";
+import * as lunora_memory_gdpr_125 from "../memory/gdpr.js";
+import * as lunora_memory_reflection_126 from "../memory/reflection.js";
+import * as lunora_memory_retrieve_127 from "../memory/retrieve.js";
+import * as lunora_messenger_functions_128 from "../messenger/functions.js";
+import * as lunora_messenger_respond_129 from "../messenger/respond.js";
+import * as lunora_notifications_daily_brief_130 from "../notifications/daily-brief.js";
+import * as lunora_notifications_functions_131 from "../notifications/functions.js";
+import * as lunora_notifications_gdpr_132 from "../notifications/gdpr.js";
+import * as lunora_notifications_locked_redact_133 from "../notifications/locked-redact.js";
+import * as lunora_notifications_push_134 from "../notifications/push.js";
+import * as lunora_notifications_task_email_135 from "../notifications/task-email.js";
+import * as lunora_pages_agent_136 from "../pages/agent.js";
+import * as lunora_pages_comments_137 from "../pages/comments.js";
+import * as lunora_pages_functions_138 from "../pages/functions.js";
+import * as lunora_pages_gdpr_139 from "../pages/gdpr.js";
+import * as lunora_pages_presence_140 from "../pages/presence.js";
+import * as lunora_pages_sharing_141 from "../pages/sharing.js";
+import * as lunora_projects_functions_142 from "../projects/functions.js";
+import * as lunora_prompts_functions_143 from "../prompts/functions.js";
+import * as lunora_saas_notification_functions_144 from "../saas/notification-functions.js";
+import * as lunora_saas_usage_functions_145 from "../saas/usage-functions.js";
+import * as lunora_sandbox_cleanup_146 from "../sandbox/cleanup.js";
+import * as lunora_sandbox_functions_147 from "../sandbox/functions.js";
+import * as lunora_sandbox_pool_functions_148 from "../sandbox/pool-functions.js";
+import * as lunora_sandbox_pool_149 from "../sandbox/pool.js";
+import * as lunora_sandbox_pty_150 from "../sandbox/pty.js";
+import * as lunora_sandbox_workspace_sync_functions_151 from "../sandbox/workspace-sync-functions.js";
+import * as lunora_sandbox_workspace_sync_152 from "../sandbox/workspace-sync.js";
+import * as lunora_skills_agent_creation_153 from "../skills/agent-creation.js";
+import * as lunora_skills_builder_154 from "../skills/builder.js";
+import * as lunora_skills_executor_155 from "../skills/executor.js";
+import * as lunora_skills_functions_156 from "../skills/functions.js";
+import * as lunora_skills_generate_157 from "../skills/generate.js";
+import * as lunora_skills_io_158 from "../skills/io.js";
+import * as lunora_skills_jit_tool_loader_159 from "../skills/jit-tool-loader.js";
+import * as lunora_skills_marketplace_160 from "../skills/marketplace.js";
+import * as lunora_sub_agents_execute_161 from "../sub-agents/execute.js";
+import * as lunora_sub_agents_functions_162 from "../sub-agents/functions.js";
+import * as lunora_system_prompts_functions_163 from "../system-prompts/functions.js";
+import * as lunora_tasks_execute_164 from "../tasks/execute.js";
+import * as lunora_tasks_functions_165 from "../tasks/functions.js";
+import * as lunora_tasks_gdpr_166 from "../tasks/gdpr.js";
+import * as lunora_tasks_internal_167 from "../tasks/internal.js";
+import * as lunora_triggers_execute_168 from "../triggers/execute.js";
+import * as lunora_triggers_functions_169 from "../triggers/functions.js";
+import * as lunora_triggers_schedule_170 from "../triggers/schedule.js";
+import * as lunora_usage_activity_171 from "../usage/activity.js";
+import * as lunora_usage_backfill_172 from "../usage/backfill.js";
+import * as lunora_vault_fork_copy_173 from "../vault/fork-copy.js";
+import * as lunora_vault_functions_174 from "../vault/functions.js";
+import * as lunora_voice_functions_175 from "../voice/functions.js";
+import * as lunora_voice_speech_176 from "../voice/speech.js";
+import * as lunora_workflow_executor_177 from "../workflow/executor.js";
+import * as lunora_workflow_fork_178 from "../workflow/fork.js";
+import * as lunora_workflow_functions_179 from "../workflow/functions.js";
+import * as lunora_workflow_gallery_180 from "../workflow/gallery.js";
+import * as lunora_workflow_generate_181 from "../workflow/generate.js";
+import * as lunora_workflow_media_ops_182 from "../workflow/media-ops.js";
+import * as lunora_workflow_presence_183 from "../workflow/presence.js";
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
 import { LunoraError } from "lunorash/server";
@@ -716,668 +718,681 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_slides_internal:getResumablePresentation": lunora_chat_slides_internal_62.getResumablePresentation as unknown as RegisteredLunoraFunction,
     "chat_slides_internal:updatePresentationStatus": lunora_chat_slides_internal_62.updatePresentationStatus as unknown as RegisteredLunoraFunction,
     "chat_slides_internal:updateSlide": lunora_chat_slides_internal_62.updateSlide as unknown as RegisteredLunoraFunction,
-    "chat_streaming:createStreamWithMessage": lunora_chat_streaming_63.createStreamWithMessage as unknown as RegisteredLunoraFunction,
-    "chat_streaming:getActiveStreamForThread": lunora_chat_streaming_63.getActiveStreamForThread as unknown as RegisteredLunoraFunction,
-    "chat_streaming:getStreamBody": lunora_chat_streaming_63.getStreamBody as unknown as RegisteredLunoraFunction,
-    "chat_streaming:streamRunThread": lunora_chat_streaming_63.streamRunThread as unknown as RegisteredLunoraFunction,
-    "chat_streaming_persistent_crons:cleanupExpiredStreams": lunora_chat_streaming_persistent_crons_64.cleanupExpiredStreams as unknown as RegisteredLunoraFunction,
-    "chat_streaming_persistent_library:addChunk": lunora_chat_streaming_persistent_library_65.addChunk as unknown as RegisteredLunoraFunction,
-    "chat_streaming_persistent_library:claimStreamRun": lunora_chat_streaming_persistent_library_65.claimStreamRun as unknown as RegisteredLunoraFunction,
-    "chat_streaming_persistent_library:createStream": lunora_chat_streaming_persistent_library_65.createStream as unknown as RegisteredLunoraFunction,
-    "chat_streaming_persistent_library:finishStoppedReply": lunora_chat_streaming_persistent_library_65.finishStoppedReply as unknown as RegisteredLunoraFunction,
-    "chat_streaming_persistent_library:getChunksAfter": lunora_chat_streaming_persistent_library_65.getChunksAfter as unknown as RegisteredLunoraFunction,
-    "chat_streaming_persistent_library:getStreamStatus": lunora_chat_streaming_persistent_library_65.getStreamStatus as unknown as RegisteredLunoraFunction,
-    "chat_streaming_persistent_library:getStreamText": lunora_chat_streaming_persistent_library_65.getStreamText as unknown as RegisteredLunoraFunction,
-    "chat_streaming_persistent_library:setStreamStatus": lunora_chat_streaming_persistent_library_65.setStreamStatus as unknown as RegisteredLunoraFunction,
-    "chat_streaming_persistent_library:stopActiveForThread": lunora_chat_streaming_persistent_library_65.stopActiveForThread as unknown as RegisteredLunoraFunction,
-    "chat_tags_functions:createThreadTag": lunora_chat_tags_functions_66.createThreadTag as unknown as RegisteredLunoraFunction,
-    "chat_tags_functions:deleteThreadTag": lunora_chat_tags_functions_66.deleteThreadTag as unknown as RegisteredLunoraFunction,
-    "chat_tags_functions:reorderThreadTags": lunora_chat_tags_functions_66.reorderThreadTags as unknown as RegisteredLunoraFunction,
-    "chat_tags_functions:setThreadTagAssigned": lunora_chat_tags_functions_66.setThreadTagAssigned as unknown as RegisteredLunoraFunction,
-    "chat_tags_functions:updateThreadTag": lunora_chat_tags_functions_66.updateThreadTag as unknown as RegisteredLunoraFunction,
-    "chat_tool_permissions:getPendingToolApproval": lunora_chat_tool_permissions_67.getPendingToolApproval as unknown as RegisteredLunoraFunction,
-    "chat_tool_permissions:getToolPermissionSettings": lunora_chat_tool_permissions_67.getToolPermissionSettings as unknown as RegisteredLunoraFunction,
-    "chat_tool_permissions:getToolPermissionsQuery": lunora_chat_tool_permissions_67.getToolPermissionsQuery as unknown as RegisteredLunoraFunction,
-    "chat_tool_permissions:listMcpToolPermissions": lunora_chat_tool_permissions_67.listMcpToolPermissions as unknown as RegisteredLunoraFunction,
-    "chat_tool_permissions:recordPendingToolApprovals": lunora_chat_tool_permissions_67.recordPendingToolApprovals as unknown as RegisteredLunoraFunction,
-    "chat_tool_permissions:respondToToolApproval": lunora_chat_tool_permissions_67.respondToToolApproval as unknown as RegisteredLunoraFunction,
-    "chat_tool_permissions:setToolPermission": lunora_chat_tool_permissions_67.setToolPermission as unknown as RegisteredLunoraFunction,
-    "chat_tools_browser_node:closeBrowserSession": lunora_chat_tools_browser_node_68.closeBrowserSession as unknown as RegisteredLunoraFunction,
-    "chat_tools_browser_node:executeBrowserAction": lunora_chat_tools_browser_node_68.executeBrowserAction as unknown as RegisteredLunoraFunction,
-    "chat_tools_code_execution_node:default": lunora_chat_tools_code_execution_node_69.default as unknown as RegisteredLunoraFunction,
-    "chat_tools_code_execution_node:executeInSandbox": lunora_chat_tools_code_execution_node_69.executeInSandbox as unknown as RegisteredLunoraFunction,
-    "chat_tools_sandbox_node:executeCode": lunora_chat_tools_sandbox_node_70.executeCode as unknown as RegisteredLunoraFunction,
-    "chat_tools_sandbox_node:executeFileOperation": lunora_chat_tools_sandbox_node_70.executeFileOperation as unknown as RegisteredLunoraFunction,
-    "chat_tools_sandbox_node:executeShellCommand": lunora_chat_tools_sandbox_node_70.executeShellCommand as unknown as RegisteredLunoraFunction,
-    "chat_translate:translateMessage": lunora_chat_translate_71.translateMessage as unknown as RegisteredLunoraFunction,
-    "coding_agents_execute:createPullRequest": lunora_coding_agents_execute_72.createPullRequest as unknown as RegisteredLunoraFunction,
-    "coding_agents_execute:finishRun": lunora_coding_agents_execute_72.finishRun as unknown as RegisteredLunoraFunction,
-    "coding_agents_execute:killRunSandbox": lunora_coding_agents_execute_72.killRunSandbox as unknown as RegisteredLunoraFunction,
-    "coding_agents_execute:pollCodingAgentRun": lunora_coding_agents_execute_72.pollCodingAgentRun as unknown as RegisteredLunoraFunction,
-    "coding_agents_execute:pollPullRequest": lunora_coding_agents_execute_72.pollPullRequest as unknown as RegisteredLunoraFunction,
-    "coding_agents_execute:reapRun": lunora_coding_agents_execute_72.reapRun as unknown as RegisteredLunoraFunction,
-    "coding_agents_execute:startCodingAgentRun": lunora_coding_agents_execute_72.startCodingAgentRun as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:appendRunLog": lunora_coding_agents_functions_73.appendRunLog as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:beginPullRequest": lunora_coding_agents_functions_73.beginPullRequest as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:cancelRun": lunora_coding_agents_functions_73.cancelRun as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:claimFinish": lunora_coding_agents_functions_73.claimFinish as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:claimPoll": lunora_coding_agents_functions_73.claimPoll as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:claimRun": lunora_coding_agents_functions_73.claimRun as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:completePullRequest": lunora_coding_agents_functions_73.completePullRequest as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:completeRun": lunora_coding_agents_functions_73.completeRun as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:createRun": lunora_coding_agents_functions_73.createRun as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:expireRun": lunora_coding_agents_functions_73.expireRun as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:getLatestRunForTask": lunora_coding_agents_functions_73.getLatestRunForTask as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:getPullRequestForPoll": lunora_coding_agents_functions_73.getPullRequestForPoll as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:getRun": lunora_coding_agents_functions_73.getRun as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:getRunByToolCall": lunora_coding_agents_functions_73.getRunByToolCall as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:getRunForFollowUp": lunora_coding_agents_functions_73.getRunForFollowUp as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:getRunForPoll": lunora_coding_agents_functions_73.getRunForPoll as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:getRunForTaskRound": lunora_coding_agents_functions_73.getRunForTaskRound as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:hasProviderKey": lunora_coding_agents_functions_73.hasProviderKey as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:postRunResult": lunora_coding_agents_functions_73.postRunResult as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:recordPoll": lunora_coding_agents_functions_73.recordPoll as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:setPullRequestSandbox": lunora_coding_agents_functions_73.setPullRequestSandbox as unknown as RegisteredLunoraFunction,
-    "coding_agents_functions:setRunSandbox": lunora_coding_agents_functions_73.setRunSandbox as unknown as RegisteredLunoraFunction,
-    "coding_agents_gdpr:cancelUserCodingAgentRuns": lunora_coding_agents_gdpr_74.cancelUserCodingAgentRuns as unknown as RegisteredLunoraFunction,
-    "coding_agents_gdpr:collectCodingAgentRunsForExport": lunora_coding_agents_gdpr_74.collectCodingAgentRunsForExport as unknown as RegisteredLunoraFunction,
-    "coding_agents_gdpr:deleteUserCodingAgentRuns": lunora_coding_agents_gdpr_74.deleteUserCodingAgentRuns as unknown as RegisteredLunoraFunction,
-    "coding_agents_gdpr:stopUserCodingAgentRuns": lunora_coding_agents_gdpr_74.stopUserCodingAgentRuns as unknown as RegisteredLunoraFunction,
-    "connectors_mcp_servers:listMcpServerSignIns": lunora_connectors_mcp_servers_75.listMcpServerSignIns as unknown as RegisteredLunoraFunction,
-    "connectors_mcp_servers:signOutMcpServer": lunora_connectors_mcp_servers_75.signOutMcpServer as unknown as RegisteredLunoraFunction,
-    "connectors_mcp_servers:startMcpServerOAuth": lunora_connectors_mcp_servers_75.startMcpServerOAuth as unknown as RegisteredLunoraFunction,
-    "connectors_oauth:completeConnectorOAuth": lunora_connectors_oauth_76.completeConnectorOAuth as unknown as RegisteredLunoraFunction,
-    "connectors_oauth:startConnectorOAuth": lunora_connectors_oauth_76.startConnectorOAuth as unknown as RegisteredLunoraFunction,
-    "connectors_seed:seed": lunora_connectors_seed_77.seed as unknown as RegisteredLunoraFunction,
-    "connectors_store:clearConnectorGrant": lunora_connectors_store_78.clearConnectorGrant as unknown as RegisteredLunoraFunction,
-    "connectors_store:consumeOAuthState": lunora_connectors_store_78.consumeOAuthState as unknown as RegisteredLunoraFunction,
-    "connectors_store:createOAuthState": lunora_connectors_store_78.createOAuthState as unknown as RegisteredLunoraFunction,
-    "connectors_store:deleteMcpServerGrant": lunora_connectors_store_78.deleteMcpServerGrant as unknown as RegisteredLunoraFunction,
-    "connectors_store:getCurrentEncryptedTokens": lunora_connectors_store_78.getCurrentEncryptedTokens as unknown as RegisteredLunoraFunction,
-    "connectors_store:getDefinitionForOAuth": lunora_connectors_store_78.getDefinitionForOAuth as unknown as RegisteredLunoraFunction,
-    "connectors_store:getOwnedConnectorGrant": lunora_connectors_store_78.getOwnedConnectorGrant as unknown as RegisteredLunoraFunction,
-    "connectors_store:listConnectorGrants": lunora_connectors_store_78.listConnectorGrants as unknown as RegisteredLunoraFunction,
-    "connectors_store:listGrantsForRevocation": lunora_connectors_store_78.listGrantsForRevocation as unknown as RegisteredLunoraFunction,
-    "connectors_store:listMcpServerGrants": lunora_connectors_store_78.listMcpServerGrants as unknown as RegisteredLunoraFunction,
-    "connectors_store:markConnectorStatus": lunora_connectors_store_78.markConnectorStatus as unknown as RegisteredLunoraFunction,
-    "connectors_store:saveConnectorGrant": lunora_connectors_store_78.saveConnectorGrant as unknown as RegisteredLunoraFunction,
-    "connectors_store:saveMcpServerGrant": lunora_connectors_store_78.saveMcpServerGrant as unknown as RegisteredLunoraFunction,
-    "connectors_store:storeRefreshedTokens": lunora_connectors_store_78.storeRefreshedTokens as unknown as RegisteredLunoraFunction,
-    "connectors_user_connectors:disconnectConnector": lunora_connectors_user_connectors_79.disconnectConnector as unknown as RegisteredLunoraFunction,
-    "connectors_user_connectors:listConnectorCatalog": lunora_connectors_user_connectors_79.listConnectorCatalog as unknown as RegisteredLunoraFunction,
-    "crons:claimDueCronJobs": lunora_crons_80.claimDueCronJobs as unknown as RegisteredLunoraFunction,
-    "crons:cronTick": lunora_crons_80.cronTick as unknown as RegisteredLunoraFunction,
-    "crons:deleteExpiredTemporaryChats": lunora_crons_80.deleteExpiredTemporaryChats as unknown as RegisteredLunoraFunction,
-    "crons:deleteUnusedFiles": lunora_crons_80.deleteUnusedFiles as unknown as RegisteredLunoraFunction,
-    "crons:keepAlive": lunora_crons_80.keepAlive as unknown as RegisteredLunoraFunction,
-    "crons:purgeActionCache": lunora_crons_80.purgeActionCache as unknown as RegisteredLunoraFunction,
-    "crons:vacuumDocumentHistory": lunora_crons_80.vacuumDocumentHistory as unknown as RegisteredLunoraFunction,
-    "devices_functions:claimDeviceCall": lunora_devices_functions_81.claimDeviceCall as unknown as RegisteredLunoraFunction,
-    "devices_functions:completeDeviceCall": lunora_devices_functions_81.completeDeviceCall as unknown as RegisteredLunoraFunction,
-    "devices_functions:getDeviceCallByToolCall": lunora_devices_functions_81.getDeviceCallByToolCall as unknown as RegisteredLunoraFunction,
-    "devices_functions:heartbeatDevice": lunora_devices_functions_81.heartbeatDevice as unknown as RegisteredLunoraFunction,
-    "devices_functions:listDeviceCalls": lunora_devices_functions_81.listDeviceCalls as unknown as RegisteredLunoraFunction,
-    "devices_functions:listDevices": lunora_devices_functions_81.listDevices as unknown as RegisteredLunoraFunction,
-    "devices_functions:listPendingDeviceCalls": lunora_devices_functions_81.listPendingDeviceCalls as unknown as RegisteredLunoraFunction,
-    "devices_functions:registerDevice": lunora_devices_functions_81.registerDevice as unknown as RegisteredLunoraFunction,
-    "devices_functions:releaseDeviceCall": lunora_devices_functions_81.releaseDeviceCall as unknown as RegisteredLunoraFunction,
-    "devices_functions:renameDevice": lunora_devices_functions_81.renameDevice as unknown as RegisteredLunoraFunction,
-    "devices_functions:reportDeviceCallProgress": lunora_devices_functions_81.reportDeviceCallProgress as unknown as RegisteredLunoraFunction,
-    "devices_functions:revokeDevice": lunora_devices_functions_81.revokeDevice as unknown as RegisteredLunoraFunction,
-    "devices_functions:updateDeviceManifest": lunora_devices_functions_81.updateDeviceManifest as unknown as RegisteredLunoraFunction,
-    "devices_gdpr:collectDevicesForExport": lunora_devices_gdpr_82.collectDevicesForExport as unknown as RegisteredLunoraFunction,
-    "devices_gdpr:deleteUserDevices": lunora_devices_gdpr_82.deleteUserDevices as unknown as RegisteredLunoraFunction,
-    "devices_internal:createDeviceCall": lunora_devices_internal_83.createDeviceCall as unknown as RegisteredLunoraFunction,
-    "devices_internal:expireDeviceCall": lunora_devices_internal_83.expireDeviceCall as unknown as RegisteredLunoraFunction,
-    "devices_internal:getDeviceCallState": lunora_devices_internal_83.getDeviceCallState as unknown as RegisteredLunoraFunction,
-    "devices_internal:getDeviceToolContext": lunora_devices_internal_83.getDeviceToolContext as unknown as RegisteredLunoraFunction,
-    "devices_internal:sweepDeviceCalls": lunora_devices_internal_83.sweepDeviceCalls as unknown as RegisteredLunoraFunction,
-    "email_functions:deliverEmail": lunora_email_functions_84.deliverEmail as unknown as RegisteredLunoraFunction,
-    "email_functions:handleEmailEvent": lunora_email_functions_84.handleEmailEvent as unknown as RegisteredLunoraFunction,
-    "email_functions:insertExpectation": lunora_email_functions_84.insertExpectation as unknown as RegisteredLunoraFunction,
-    "evals_execute:runEvalCase": lunora_evals_execute_85.runEvalCase as unknown as RegisteredLunoraFunction,
-    "evals_functions:cancelRun": lunora_evals_functions_86.cancelRun as unknown as RegisteredLunoraFunction,
-    "evals_functions:compareModels": lunora_evals_functions_86.compareModels as unknown as RegisteredLunoraFunction,
-    "evals_functions:compareRuns": lunora_evals_functions_86.compareRuns as unknown as RegisteredLunoraFunction,
-    "evals_functions:createCase": lunora_evals_functions_86.createCase as unknown as RegisteredLunoraFunction,
-    "evals_functions:createDataset": lunora_evals_functions_86.createDataset as unknown as RegisteredLunoraFunction,
-    "evals_functions:deleteCase": lunora_evals_functions_86.deleteCase as unknown as RegisteredLunoraFunction,
-    "evals_functions:deleteDataset": lunora_evals_functions_86.deleteDataset as unknown as RegisteredLunoraFunction,
-    "evals_functions:deleteRun": lunora_evals_functions_86.deleteRun as unknown as RegisteredLunoraFunction,
-    "evals_functions:getDataset": lunora_evals_functions_86.getDataset as unknown as RegisteredLunoraFunction,
-    "evals_functions:getRun": lunora_evals_functions_86.getRun as unknown as RegisteredLunoraFunction,
-    "evals_functions:importCases": lunora_evals_functions_86.importCases as unknown as RegisteredLunoraFunction,
-    "evals_functions:listDatasets": lunora_evals_functions_86.listDatasets as unknown as RegisteredLunoraFunction,
-    "evals_functions:listRuns": lunora_evals_functions_86.listRuns as unknown as RegisteredLunoraFunction,
-    "evals_functions:purgeDataset": lunora_evals_functions_86.purgeDataset as unknown as RegisteredLunoraFunction,
-    "evals_functions:setCaseFrozen": lunora_evals_functions_86.setCaseFrozen as unknown as RegisteredLunoraFunction,
-    "evals_functions:startRun": lunora_evals_functions_86.startRun as unknown as RegisteredLunoraFunction,
-    "evals_functions:updateCase": lunora_evals_functions_86.updateCase as unknown as RegisteredLunoraFunction,
-    "evals_functions:updateDataset": lunora_evals_functions_86.updateDataset as unknown as RegisteredLunoraFunction,
-    "evals_gdpr:collectEvalsForExport": lunora_evals_gdpr_87.collectEvalsForExport as unknown as RegisteredLunoraFunction,
-    "evals_gdpr:deleteUserEvals": lunora_evals_gdpr_87.deleteUserEvals as unknown as RegisteredLunoraFunction,
-    "evals_internal:canRunForUser": lunora_evals_internal_88.canRunForUser as unknown as RegisteredLunoraFunction,
-    "evals_internal:claimCase": lunora_evals_internal_88.claimCase as unknown as RegisteredLunoraFunction,
-    "evals_internal:completeCase": lunora_evals_internal_88.completeCase as unknown as RegisteredLunoraFunction,
-    "evals_internal:reapCase": lunora_evals_internal_88.reapCase as unknown as RegisteredLunoraFunction,
-    "file:finalizeChatUpload": lunora_file_89.finalizeChatUpload as unknown as RegisteredLunoraFunction,
-    "file:finalizeReferenceMedia": lunora_file_89.finalizeReferenceMedia as unknown as RegisteredLunoraFunction,
-    "file:getChatFileExtraction": lunora_file_89.getChatFileExtraction as unknown as RegisteredLunoraFunction,
-    "file:getChatFileImageUrl": lunora_file_89.getChatFileImageUrl as unknown as RegisteredLunoraFunction,
-    "file:purgeStagedChatUploads": lunora_file_89.purgeStagedChatUploads as unknown as RegisteredLunoraFunction,
-    "file:sweepStagedChatUploads": lunora_file_89.sweepStagedChatUploads as unknown as RegisteredLunoraFunction,
-    "gdpr_functions:cancelStuckExport": lunora_gdpr_functions_90.cancelStuckExport as unknown as RegisteredLunoraFunction,
-    "gdpr_functions:getDataAccessSummary": lunora_gdpr_functions_90.getDataAccessSummary as unknown as RegisteredLunoraFunction,
-    "gdpr_functions:getDeletionStatus": lunora_gdpr_functions_90.getDeletionStatus as unknown as RegisteredLunoraFunction,
-    "gdpr_functions:getExportDownloadUrl": lunora_gdpr_functions_90.getExportDownloadUrl as unknown as RegisteredLunoraFunction,
-    "gdpr_functions:getExportRequest": lunora_gdpr_functions_90.getExportRequest as unknown as RegisteredLunoraFunction,
-    "gdpr_functions:getExportStatus": lunora_gdpr_functions_90.getExportStatus as unknown as RegisteredLunoraFunction,
-    "gdpr_functions:getGdprStatus": lunora_gdpr_functions_90.getGdprStatus as unknown as RegisteredLunoraFunction,
-    "gdpr_functions:getRequestById": lunora_gdpr_functions_90.getRequestById as unknown as RegisteredLunoraFunction,
-    "gdpr_functions:logAudit": lunora_gdpr_functions_90.logAudit as unknown as RegisteredLunoraFunction,
-    "gdpr_functions:requestAccountDeletion": lunora_gdpr_functions_90.requestAccountDeletion as unknown as RegisteredLunoraFunction,
-    "gdpr_functions:requestDataExport": lunora_gdpr_functions_90.requestDataExport as unknown as RegisteredLunoraFunction,
-    "gdpr_functions:updateRequestProgress": lunora_gdpr_functions_90.updateRequestProgress as unknown as RegisteredLunoraFunction,
-    "gdpr_request_sweeps:cleanupExpiredExports": lunora_gdpr_request_sweeps_91.cleanupExpiredExports as unknown as RegisteredLunoraFunction,
-    "gdpr_request_sweeps:handleGdprRequestTimeouts": lunora_gdpr_request_sweeps_91.handleGdprRequestTimeouts as unknown as RegisteredLunoraFunction,
-    "gdpr_retention:pruneRetainedActivity": lunora_gdpr_retention_92.pruneRetainedActivity as unknown as RegisteredLunoraFunction,
-    "gdpr_steps:collectActivityForExport": lunora_gdpr_steps_93.collectActivityForExport as unknown as RegisteredLunoraFunction,
-    "gdpr_steps:collectConversations": lunora_gdpr_steps_93.collectConversations as unknown as RegisteredLunoraFunction,
-    "gdpr_steps:collectFiles": lunora_gdpr_steps_93.collectFiles as unknown as RegisteredLunoraFunction,
-    "gdpr_steps:collectProfile": lunora_gdpr_steps_93.collectProfile as unknown as RegisteredLunoraFunction,
-    "gdpr_steps:collectPrompts": lunora_gdpr_steps_93.collectPrompts as unknown as RegisteredLunoraFunction,
-    "gdpr_steps:collectSettings": lunora_gdpr_steps_93.collectSettings as unknown as RegisteredLunoraFunction,
-    "gdpr_steps:collectThreadTags": lunora_gdpr_steps_93.collectThreadTags as unknown as RegisteredLunoraFunction,
-    "gdpr_steps:generateExportFile": lunora_gdpr_steps_93.generateExportFile as unknown as RegisteredLunoraFunction,
-    "gdpr_steps:sendExportReadyEmail": lunora_gdpr_steps_93.sendExportReadyEmail as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteAuthRecords": lunora_gdpr_steps_deletion_steps_94.deleteAuthRecords as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserBrowserData": lunora_gdpr_steps_deletion_steps_94.deleteUserBrowserData as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserConnectors": lunora_gdpr_steps_deletion_steps_94.deleteUserConnectors as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserDocuments": lunora_gdpr_steps_deletion_steps_94.deleteUserDocuments as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserFiles": lunora_gdpr_steps_deletion_steps_94.deleteUserFiles as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserImportJobs": lunora_gdpr_steps_deletion_steps_94.deleteUserImportJobs as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserMemories": lunora_gdpr_steps_deletion_steps_94.deleteUserMemories as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserPersistentStreams": lunora_gdpr_steps_deletion_steps_94.deleteUserPersistentStreams as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserPresentations": lunora_gdpr_steps_deletion_steps_94.deleteUserPresentations as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserProjects": lunora_gdpr_steps_deletion_steps_94.deleteUserProjects as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserPrompts": lunora_gdpr_steps_deletion_steps_94.deleteUserPrompts as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserSettings": lunora_gdpr_steps_deletion_steps_94.deleteUserSettings as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserSkills": lunora_gdpr_steps_deletion_steps_94.deleteUserSkills as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserThreadCascade": lunora_gdpr_steps_deletion_steps_94.deleteUserThreadCascade as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:deleteUserThreadMetadata": lunora_gdpr_steps_deletion_steps_94.deleteUserThreadMetadata as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_deletion_steps:revokeUserSessions": lunora_gdpr_steps_deletion_steps_94.revokeUserSessions as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_email_steps:default": lunora_gdpr_steps_email_steps_95.default as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_email_steps:sendDeletionConfirmedEmailAction": lunora_gdpr_steps_email_steps_95.sendDeletionConfirmedEmailAction as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_posthog_steps:deletePostHogPerson": lunora_gdpr_steps_posthog_steps_96.deletePostHogPerson as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:anonymiseGatewayUsageDeductions": lunora_gdpr_steps_residual_deletion_steps_97.anonymiseGatewayUsageDeductions as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:deleteUserEmbeddings": lunora_gdpr_steps_residual_deletion_steps_97.deleteUserEmbeddings as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:deleteUserIdentity": lunora_gdpr_steps_residual_deletion_steps_97.deleteUserIdentity as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:deleteUserIntegrations": lunora_gdpr_steps_residual_deletion_steps_97.deleteUserIntegrations as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:deleteUserKnowledge": lunora_gdpr_steps_residual_deletion_steps_97.deleteUserKnowledge as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:deleteUserStreamingMessages": lunora_gdpr_steps_residual_deletion_steps_97.deleteUserStreamingMessages as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:deleteUserSubAgentRuns": lunora_gdpr_steps_residual_deletion_steps_97.deleteUserSubAgentRuns as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:deleteUserUsageDaily": lunora_gdpr_steps_residual_deletion_steps_97.deleteUserUsageDaily as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:deleteUserWorkflowData": lunora_gdpr_steps_residual_deletion_steps_97.deleteUserWorkflowData as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:deregisterMessengerWebhooks": lunora_gdpr_steps_residual_deletion_steps_97.deregisterMessengerWebhooks as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:killUserSandboxes": lunora_gdpr_steps_residual_deletion_steps_97.killUserSandboxes as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:listMessengerConnectionsForDeletion": lunora_gdpr_steps_residual_deletion_steps_97.listMessengerConnectionsForDeletion as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:listSandboxIdsForDeletion": lunora_gdpr_steps_residual_deletion_steps_97.listSandboxIdsForDeletion as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:minimiseGdprRecords": lunora_gdpr_steps_residual_deletion_steps_97.minimiseGdprRecords as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:purgeUserDocumentHistory": lunora_gdpr_steps_residual_deletion_steps_97.purgeUserDocumentHistory as unknown as RegisteredLunoraFunction,
-    "gdpr_steps_residual_deletion_steps:revokeUserConnectorGrants": lunora_gdpr_steps_residual_deletion_steps_97.revokeUserConnectorGrants as unknown as RegisteredLunoraFunction,
-    "gdpr_workflow_actions:startDeletionWorkflow": lunora_gdpr_workflow_actions_98.startDeletionWorkflow as unknown as RegisteredLunoraFunction,
-    "gdpr_workflow_actions:startExportWorkflow": lunora_gdpr_workflow_actions_98.startExportWorkflow as unknown as RegisteredLunoraFunction,
-    "home_overview:getHomeOverview": lunora_home_overview_99.getHomeOverview as unknown as RegisteredLunoraFunction,
-    "init:initializeDatabase": lunora_init_100.initializeDatabase as unknown as RegisteredLunoraFunction,
-    "knowledge_agent_assignment:assignToProject": lunora_knowledge_agent_assignment_101.assignToProject as unknown as RegisteredLunoraFunction,
-    "knowledge_agent_assignment:getProjectKnowledge": lunora_knowledge_agent_assignment_101.getProjectKnowledge as unknown as RegisteredLunoraFunction,
-    "knowledge_agent_assignment:getProjectKnowledgeFileIds": lunora_knowledge_agent_assignment_101.getProjectKnowledgeFileIds as unknown as RegisteredLunoraFunction,
-    "knowledge_agent_assignment:resolveKnowledgeFiles": lunora_knowledge_agent_assignment_101.resolveKnowledgeFiles as unknown as RegisteredLunoraFunction,
-    "knowledge_agent_assignment:unassignFromProject": lunora_knowledge_agent_assignment_101.unassignFromProject as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:attachCollectionToProject": lunora_knowledge_collections_102.attachCollectionToProject as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:attachCollectionToThread": lunora_knowledge_collections_102.attachCollectionToThread as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:createCollection": lunora_knowledge_collections_102.createCollection as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:deleteCollection": lunora_knowledge_collections_102.deleteCollection as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:detachCollectionFromProject": lunora_knowledge_collections_102.detachCollectionFromProject as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:detachCollectionFromThread": lunora_knowledge_collections_102.detachCollectionFromThread as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:gatedKnowledgeFileIds": lunora_knowledge_collections_102.gatedKnowledgeFileIds as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:getCollectionOwner": lunora_knowledge_collections_102.getCollectionOwner as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:getProjectCollections": lunora_knowledge_collections_102.getProjectCollections as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:getThreadCollections": lunora_knowledge_collections_102.getThreadCollections as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:listCollectionFiles": lunora_knowledge_collections_102.listCollectionFiles as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:listCollections": lunora_knowledge_collections_102.listCollections as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:listFilesInCollection": lunora_knowledge_collections_102.listFilesInCollection as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:resolveRetrievalScope": lunora_knowledge_collections_102.resolveRetrievalScope as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:resolveSharedCollectionFiles": lunora_knowledge_collections_102.resolveSharedCollectionFiles as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:setFileCollection": lunora_knowledge_collections_102.setFileCollection as unknown as RegisteredLunoraFunction,
-    "knowledge_collections:updateCollection": lunora_knowledge_collections_102.updateCollection as unknown as RegisteredLunoraFunction,
-    "knowledge_delete_embeddings:default": lunora_knowledge_delete_embeddings_103.default as unknown as RegisteredLunoraFunction,
-    "knowledge_delete_embeddings:deleteEmbeddingsBatch": lunora_knowledge_delete_embeddings_103.deleteEmbeddingsBatch as unknown as RegisteredLunoraFunction,
-    "knowledge_documents:addDocuments": lunora_knowledge_documents_104.addDocuments as unknown as RegisteredLunoraFunction,
-    "knowledge_documents:addUrl": lunora_knowledge_documents_104.addUrl as unknown as RegisteredLunoraFunction,
-    "knowledge_documents:insertStoredDocuments": lunora_knowledge_documents_104.insertStoredDocuments as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:addFile": lunora_knowledge_functions_105.addFile as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:attachToThread": lunora_knowledge_functions_105.attachToThread as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:detachFromThread": lunora_knowledge_functions_105.detachFromThread as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:getChunksByEmbeddingIds": lunora_knowledge_functions_105.getChunksByEmbeddingIds as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:getFile": lunora_knowledge_functions_105.getFile as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:getFileChunks": lunora_knowledge_functions_105.getFileChunks as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:getIndexedFileIds": lunora_knowledge_functions_105.getIndexedFileIds as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:getThreadKnowledge": lunora_knowledge_functions_105.getThreadKnowledge as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:getThreadKnowledgeFileIds": lunora_knowledge_functions_105.getThreadKnowledgeFileIds as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:getVaultFile": lunora_knowledge_functions_105.getVaultFile as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:keywordSearchChunks": lunora_knowledge_functions_105.keywordSearchChunks as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:listFiles": lunora_knowledge_functions_105.listFiles as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:recordKnowledgeSources": lunora_knowledge_functions_105.recordKnowledgeSources as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:removeFile": lunora_knowledge_functions_105.removeFile as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:saveChunks": lunora_knowledge_functions_105.saveChunks as unknown as RegisteredLunoraFunction,
-    "knowledge_functions:updateFileStatus": lunora_knowledge_functions_105.updateFileStatus as unknown as RegisteredLunoraFunction,
-    "knowledge_housekeeping:drainDeletingFiles": lunora_knowledge_housekeeping_106.drainDeletingFiles as unknown as RegisteredLunoraFunction,
-    "knowledge_housekeeping:sweepKnowledgeFiles": lunora_knowledge_housekeeping_106.sweepKnowledgeFiles as unknown as RegisteredLunoraFunction,
-    "knowledge_ingest:default": lunora_knowledge_ingest_107.default as unknown as RegisteredLunoraFunction,
-    "knowledge_ingest:ingestFile": lunora_knowledge_ingest_107.ingestFile as unknown as RegisteredLunoraFunction,
-    "knowledge_retrieve:default": lunora_knowledge_retrieve_108.default as unknown as RegisteredLunoraFunction,
-    "knowledge_retrieve:search": lunora_knowledge_retrieve_108.search as unknown as RegisteredLunoraFunction,
-    "knowledge_retrieve:searchKnowledge": lunora_knowledge_retrieve_108.searchKnowledge as unknown as RegisteredLunoraFunction,
-    "knowledge_retrieve:searchSharedCollections": lunora_knowledge_retrieve_108.searchSharedCollections as unknown as RegisteredLunoraFunction,
-    "knowledge_summarize:resummarizeFile": lunora_knowledge_summarize_109.resummarizeFile as unknown as RegisteredLunoraFunction,
-    "knowledge_summarize:summarizeCollection": lunora_knowledge_summarize_109.summarizeCollection as unknown as RegisteredLunoraFunction,
-    "lib_account_merge:deleteShardRows": lunora_lib_account_merge_110.deleteShardRows as unknown as RegisteredLunoraFunction,
-    "lib_account_merge:importShardRows": lunora_lib_account_merge_110.importShardRows as unknown as RegisteredLunoraFunction,
-    "lib_account_merge:listShardRowIds": lunora_lib_account_merge_110.listShardRowIds as unknown as RegisteredLunoraFunction,
-    "lib_account_merge:listShardRowsPage": lunora_lib_account_merge_110.listShardRowsPage as unknown as RegisteredLunoraFunction,
-    "lib_account_merge:reassignGlobalRows": lunora_lib_account_merge_110.reassignGlobalRows as unknown as RegisteredLunoraFunction,
-    "lib_account_merge:runGuestMerge": lunora_lib_account_merge_110.runGuestMerge as unknown as RegisteredLunoraFunction,
-    "lib_action_cache:bumpGeneration": lunora_lib_action_cache_111.bumpGeneration as unknown as RegisteredLunoraFunction,
-    "lib_action_cache:get": lunora_lib_action_cache_111.get as unknown as RegisteredLunoraFunction,
-    "lib_action_cache:getGeneration": lunora_lib_action_cache_111.getGeneration as unknown as RegisteredLunoraFunction,
-    "lib_action_cache:purgeExpired": lunora_lib_action_cache_111.purgeExpired as unknown as RegisteredLunoraFunction,
-    "lib_action_cache:put": lunora_lib_action_cache_111.put as unknown as RegisteredLunoraFunction,
-    "lib_action_cache:remove": lunora_lib_action_cache_111.remove as unknown as RegisteredLunoraFunction,
-    "lib_action_cache:removeAll": lunora_lib_action_cache_111.removeAll as unknown as RegisteredLunoraFunction,
-    "lib_action_cache:removeByArgs": lunora_lib_action_cache_111.removeByArgs as unknown as RegisteredLunoraFunction,
-    "lib_claim_once:claimKey": lunora_lib_claim_once_112.claimKey as unknown as RegisteredLunoraFunction,
-    "lib_claim_once:completeKey": lunora_lib_claim_once_112.completeKey as unknown as RegisteredLunoraFunction,
-    "lib_claim_once:purgeExpiredClaims": lunora_lib_claim_once_112.purgeExpiredClaims as unknown as RegisteredLunoraFunction,
-    "lib_claim_once:reapLapsedClaims": lunora_lib_claim_once_112.reapLapsedClaims as unknown as RegisteredLunoraFunction,
-    "lib_claim_once:releaseKey": lunora_lib_claim_once_112.releaseKey as unknown as RegisteredLunoraFunction,
-    "lib_document_history:getDocumentAtTime": lunora_lib_document_history_113.getDocumentAtTime as unknown as RegisteredLunoraFunction,
-    "lib_document_history:listDocumentVersions": lunora_lib_document_history_113.listDocumentVersions as unknown as RegisteredLunoraFunction,
-    "lib_document_history:listUserActivity": lunora_lib_document_history_113.listUserActivity as unknown as RegisteredLunoraFunction,
-    "lib_document_history:recordHistory": lunora_lib_document_history_113.recordHistory as unknown as RegisteredLunoraFunction,
-    "lib_document_history:vacuumHistory": lunora_lib_document_history_113.vacuumHistory as unknown as RegisteredLunoraFunction,
-    "lib_job_once:runJobOnce": lunora_lib_job_once_114.runJobOnce as unknown as RegisteredLunoraFunction,
-    "lib_rate_limiter_mutations:applyRateLimit": lunora_lib_rate_limiter_mutations_115.applyRateLimit as unknown as RegisteredLunoraFunction,
-    "lib_rate_limiter_mutations:resetRateLimit": lunora_lib_rate_limiter_mutations_115.resetRateLimit as unknown as RegisteredLunoraFunction,
-    "lib_shard_housekeeping:dispatchDueShards": lunora_lib_shard_housekeeping_116.dispatchDueShards as unknown as RegisteredLunoraFunction,
-    "lib_shard_housekeeping:dispatchShardHousekeeping": lunora_lib_shard_housekeeping_116.dispatchShardHousekeeping as unknown as RegisteredLunoraFunction,
-    "lib_shard_housekeeping:recordShardActivity": lunora_lib_shard_housekeeping_116.recordShardActivity as unknown as RegisteredLunoraFunction,
-    "lib_shard_housekeeping:runShardHousekeeping": lunora_lib_shard_housekeeping_116.runShardHousekeeping as unknown as RegisteredLunoraFunction,
-    "lib_shard_housekeeping:runShardTick": lunora_lib_shard_housekeeping_116.runShardTick as unknown as RegisteredLunoraFunction,
-    "lib_shard_routes:getRouteOwner": lunora_lib_shard_routes_117.getRouteOwner as unknown as RegisteredLunoraFunction,
-    "lib_storage_cleanup:deleteObjects": lunora_lib_storage_cleanup_118.deleteObjects as unknown as RegisteredLunoraFunction,
-    "media_functions:listUserImages": lunora_media_functions_119.listUserImages as unknown as RegisteredLunoraFunction,
-    "memory_compress:compressThreadMemories": lunora_memory_compress_120.compressThreadMemories as unknown as RegisteredLunoraFunction,
-    "memory_compress:getThreadMemoriesForCompression": lunora_memory_compress_120.getThreadMemoriesForCompression as unknown as RegisteredLunoraFunction,
-    "memory_compress:maybeCompressThreadMemories": lunora_memory_compress_120.maybeCompressThreadMemories as unknown as RegisteredLunoraFunction,
-    "memory_compress:tryStartCompression": lunora_memory_compress_120.tryStartCompression as unknown as RegisteredLunoraFunction,
-    "memory_extract:extractMemories": lunora_memory_extract_121.extractMemories as unknown as RegisteredLunoraFunction,
-    "memory_extract:regenerateMemoryEmbedding": lunora_memory_extract_121.regenerateMemoryEmbedding as unknown as RegisteredLunoraFunction,
-    "memory_functions:clearAllUserMemories": lunora_memory_functions_122.clearAllUserMemories as unknown as RegisteredLunoraFunction,
-    "memory_functions:confirmMemories": lunora_memory_functions_122.confirmMemories as unknown as RegisteredLunoraFunction,
-    "memory_functions:deleteMemory": lunora_memory_functions_122.deleteMemory as unknown as RegisteredLunoraFunction,
-    "memory_functions:getActiveMemoriesForUser": lunora_memory_functions_122.getActiveMemoriesForUser as unknown as RegisteredLunoraFunction,
-    "memory_functions:getMemoriesByEmbeddingIds": lunora_memory_functions_122.getMemoriesByEmbeddingIds as unknown as RegisteredLunoraFunction,
-    "memory_functions:getMemoryByEmbeddingId": lunora_memory_functions_122.getMemoryByEmbeddingId as unknown as RegisteredLunoraFunction,
-    "memory_functions:getMemoryById": lunora_memory_functions_122.getMemoryById as unknown as RegisteredLunoraFunction,
-    "memory_functions:getMemoryStats": lunora_memory_functions_122.getMemoryStats as unknown as RegisteredLunoraFunction,
-    "memory_functions:getMessageMemoryUsage": lunora_memory_functions_122.getMessageMemoryUsage as unknown as RegisteredLunoraFunction,
-    "memory_functions:isMemoryEnabled": lunora_memory_functions_122.isMemoryEnabled as unknown as RegisteredLunoraFunction,
-    "memory_functions:isThreadLockedForMemory": lunora_memory_functions_122.isThreadLockedForMemory as unknown as RegisteredLunoraFunction,
-    "memory_functions:isThreadTemporary": lunora_memory_functions_122.isThreadTemporary as unknown as RegisteredLunoraFunction,
-    "memory_functions:listUserMemories": lunora_memory_functions_122.listUserMemories as unknown as RegisteredLunoraFunction,
-    "memory_functions:markMemorySupersededByCompression": lunora_memory_functions_122.markMemorySupersededByCompression as unknown as RegisteredLunoraFunction,
-    "memory_functions:recordRetrievedMemories": lunora_memory_functions_122.recordRetrievedMemories as unknown as RegisteredLunoraFunction,
-    "memory_functions:retryMemoryVectorDelete": lunora_memory_functions_122.retryMemoryVectorDelete as unknown as RegisteredLunoraFunction,
-    "memory_functions:saveMemory": lunora_memory_functions_122.saveMemory as unknown as RegisteredLunoraFunction,
-    "memory_functions:saveMemoryBatch": lunora_memory_functions_122.saveMemoryBatch as unknown as RegisteredLunoraFunction,
-    "memory_functions:setMemoryPinned": lunora_memory_functions_122.setMemoryPinned as unknown as RegisteredLunoraFunction,
-    "memory_functions:updateMemory": lunora_memory_functions_122.updateMemory as unknown as RegisteredLunoraFunction,
-    "memory_functions:updateMemoryInternal": lunora_memory_functions_122.updateMemoryInternal as unknown as RegisteredLunoraFunction,
-    "memory_gdpr:collectMemoriesForExport": lunora_memory_gdpr_123.collectMemoriesForExport as unknown as RegisteredLunoraFunction,
-    "memory_gdpr:deleteUserMemoryReflectionData": lunora_memory_gdpr_123.deleteUserMemoryReflectionData as unknown as RegisteredLunoraFunction,
-    "memory_reflection:applyReflectionOps": lunora_memory_reflection_124.applyReflectionOps as unknown as RegisteredLunoraFunction,
-    "memory_reflection:claimReflectionRun": lunora_memory_reflection_124.claimReflectionRun as unknown as RegisteredLunoraFunction,
-    "memory_reflection:dismissMemoryDigest": lunora_memory_reflection_124.dismissMemoryDigest as unknown as RegisteredLunoraFunction,
-    "memory_reflection:getLatestMemoryDigest": lunora_memory_reflection_124.getLatestMemoryDigest as unknown as RegisteredLunoraFunction,
-    "memory_reflection:loadReflectionInputs": lunora_memory_reflection_124.loadReflectionInputs as unknown as RegisteredLunoraFunction,
-    "memory_reflection:noteMemoryActivity": lunora_memory_reflection_124.noteMemoryActivity as unknown as RegisteredLunoraFunction,
-    "memory_reflection:runMemoryReflection": lunora_memory_reflection_124.runMemoryReflection as unknown as RegisteredLunoraFunction,
-    "memory_reflection:saveMemoryDigest": lunora_memory_reflection_124.saveMemoryDigest as unknown as RegisteredLunoraFunction,
-    "memory_retrieve:default": lunora_memory_retrieve_125.default as unknown as RegisteredLunoraFunction,
-    "memory_retrieve:retrieveRelevantMemories": lunora_memory_retrieve_125.retrieveRelevantMemories as unknown as RegisteredLunoraFunction,
-    "messenger_functions:aiDisclosureSent": lunora_messenger_functions_126.aiDisclosureSent as unknown as RegisteredLunoraFunction,
-    "messenger_functions:chargeReplyToolRound": lunora_messenger_functions_126.chargeReplyToolRound as unknown as RegisteredLunoraFunction,
-    "messenger_functions:claimThreadReply": lunora_messenger_functions_126.claimThreadReply as unknown as RegisteredLunoraFunction,
-    "messenger_functions:completeMessengerMessage": lunora_messenger_functions_126.completeMessengerMessage as unknown as RegisteredLunoraFunction,
-    "messenger_functions:createConnection": lunora_messenger_functions_126.createConnection as unknown as RegisteredLunoraFunction,
-    "messenger_functions:deleteConnection": lunora_messenger_functions_126.deleteConnection as unknown as RegisteredLunoraFunction,
-    "messenger_functions:findOrCreateMessengerThread": lunora_messenger_functions_126.findOrCreateMessengerThread as unknown as RegisteredLunoraFunction,
-    "messenger_functions:getConnectionById": lunora_messenger_functions_126.getConnectionById as unknown as RegisteredLunoraFunction,
-    "messenger_functions:getConnectionByPlatformChat": lunora_messenger_functions_126.getConnectionByPlatformChat as unknown as RegisteredLunoraFunction,
-    "messenger_functions:getConnectionByPlatformUser": lunora_messenger_functions_126.getConnectionByPlatformUser as unknown as RegisteredLunoraFunction,
-    "messenger_functions:getConnections": lunora_messenger_functions_126.getConnections as unknown as RegisteredLunoraFunction,
-    "messenger_functions:getOwnerRateLimitTier": lunora_messenger_functions_126.getOwnerRateLimitTier as unknown as RegisteredLunoraFunction,
-    "messenger_functions:getReplyToolSetting": lunora_messenger_functions_126.getReplyToolSetting as unknown as RegisteredLunoraFunction,
-    "messenger_functions:listReplyMedia": lunora_messenger_functions_126.listReplyMedia as unknown as RegisteredLunoraFunction,
-    "messenger_functions:markAiDisclosed": lunora_messenger_functions_126.markAiDisclosed as unknown as RegisteredLunoraFunction,
-    "messenger_functions:pairConnection": lunora_messenger_functions_126.pairConnection as unknown as RegisteredLunoraFunction,
-    "messenger_functions:regeneratePairingCode": lunora_messenger_functions_126.regeneratePairingCode as unknown as RegisteredLunoraFunction,
-    "messenger_functions:saveMessengerMessage": lunora_messenger_functions_126.saveMessengerMessage as unknown as RegisteredLunoraFunction,
-    "messenger_functions:saveMessengerNotice": lunora_messenger_functions_126.saveMessengerNotice as unknown as RegisteredLunoraFunction,
-    "messenger_functions:threadHasRecentMedia": lunora_messenger_functions_126.threadHasRecentMedia as unknown as RegisteredLunoraFunction,
-    "messenger_functions:touchConnection": lunora_messenger_functions_126.touchConnection as unknown as RegisteredLunoraFunction,
-    "messenger_functions:updateConnectionReplyTools": lunora_messenger_functions_126.updateConnectionReplyTools as unknown as RegisteredLunoraFunction,
-    "messenger_functions:updateConnectionStatus": lunora_messenger_functions_126.updateConnectionStatus as unknown as RegisteredLunoraFunction,
-    "messenger_respond:default": lunora_messenger_respond_127.default as unknown as RegisteredLunoraFunction,
-    "messenger_respond:generateAndSendResponse": lunora_messenger_respond_127.generateAndSendResponse as unknown as RegisteredLunoraFunction,
-    "messenger_respond:sendNotice": lunora_messenger_respond_127.sendNotice as unknown as RegisteredLunoraFunction,
-    "notifications_daily_brief:chargeDailyBrief": lunora_notifications_daily_brief_128.chargeDailyBrief as unknown as RegisteredLunoraFunction,
-    "notifications_daily_brief:claimDailyBrief": lunora_notifications_daily_brief_128.claimDailyBrief as unknown as RegisteredLunoraFunction,
-    "notifications_daily_brief:loadDailyBriefInputs": lunora_notifications_daily_brief_128.loadDailyBriefInputs as unknown as RegisteredLunoraFunction,
-    "notifications_daily_brief:noteDailyBriefActivity": lunora_notifications_daily_brief_128.noteDailyBriefActivity as unknown as RegisteredLunoraFunction,
-    "notifications_daily_brief:runDailyBrief": lunora_notifications_daily_brief_128.runDailyBrief as unknown as RegisteredLunoraFunction,
-    "notifications_daily_brief:setDailyBriefEnabled": lunora_notifications_daily_brief_128.setDailyBriefEnabled as unknown as RegisteredLunoraFunction,
-    "notifications_daily_brief:writeDailyBrief": lunora_notifications_daily_brief_128.writeDailyBrief as unknown as RegisteredLunoraFunction,
-    "notifications_functions:createNotification": lunora_notifications_functions_129.createNotification as unknown as RegisteredLunoraFunction,
-    "notifications_functions:createNotifications": lunora_notifications_functions_129.createNotifications as unknown as RegisteredLunoraFunction,
-    "notifications_functions:getNotificationInbox": lunora_notifications_functions_129.getNotificationInbox as unknown as RegisteredLunoraFunction,
-    "notifications_functions:markAllNotificationsRead": lunora_notifications_functions_129.markAllNotificationsRead as unknown as RegisteredLunoraFunction,
-    "notifications_functions:markNotificationRead": lunora_notifications_functions_129.markNotificationRead as unknown as RegisteredLunoraFunction,
-    "notifications_functions:pruneOldNotifications": lunora_notifications_functions_129.pruneOldNotifications as unknown as RegisteredLunoraFunction,
-    "notifications_gdpr:collectNotificationsForExport": lunora_notifications_gdpr_130.collectNotificationsForExport as unknown as RegisteredLunoraFunction,
-    "notifications_gdpr:deleteUserNotifications": lunora_notifications_gdpr_130.deleteUserNotifications as unknown as RegisteredLunoraFunction,
-    "notifications_locked_redact:redactLockedLinks": lunora_notifications_locked_redact_131.redactLockedLinks as unknown as RegisteredLunoraFunction,
-    "notifications_push:getPushConfig": lunora_notifications_push_132.getPushConfig as unknown as RegisteredLunoraFunction,
-    "notifications_push:getPushSubscriptionStatus": lunora_notifications_push_132.getPushSubscriptionStatus as unknown as RegisteredLunoraFunction,
-    "notifications_push:loadPushNotification": lunora_notifications_push_132.loadPushNotification as unknown as RegisteredLunoraFunction,
-    "notifications_push:sendPushForNotification": lunora_notifications_push_132.sendPushForNotification as unknown as RegisteredLunoraFunction,
-    "notifications_push:subscribePush": lunora_notifications_push_132.subscribePush as unknown as RegisteredLunoraFunction,
-    "notifications_push:unsubscribePush": lunora_notifications_push_132.unsubscribePush as unknown as RegisteredLunoraFunction,
-    "notifications_task_email:claimOutcomeEmail": lunora_notifications_task_email_133.claimOutcomeEmail as unknown as RegisteredLunoraFunction,
-    "notifications_task_email:dispatchOutcomeEmails": lunora_notifications_task_email_133.dispatchOutcomeEmails as unknown as RegisteredLunoraFunction,
-    "notifications_task_email:holdsOutcomeEmailClaim": lunora_notifications_task_email_133.holdsOutcomeEmailClaim as unknown as RegisteredLunoraFunction,
-    "notifications_task_email:listPendingOutcomeEmails": lunora_notifications_task_email_133.listPendingOutcomeEmails as unknown as RegisteredLunoraFunction,
-    "notifications_task_email:loadRecipientEmail": lunora_notifications_task_email_133.loadRecipientEmail as unknown as RegisteredLunoraFunction,
-    "notifications_task_email:sendPendingOutcomeEmails": lunora_notifications_task_email_133.sendPendingOutcomeEmails as unknown as RegisteredLunoraFunction,
-    "notifications_task_email:setTaskEmailEnabled": lunora_notifications_task_email_133.setTaskEmailEnabled as unknown as RegisteredLunoraFunction,
-    "notifications_task_email:settleOutcomeEmail": lunora_notifications_task_email_133.settleOutcomeEmail as unknown as RegisteredLunoraFunction,
-    "pages_agent:getPageForAgent": lunora_pages_agent_134.getPageForAgent as unknown as RegisteredLunoraFunction,
-    "pages_agent:proposePageEdit": lunora_pages_agent_134.proposePageEdit as unknown as RegisteredLunoraFunction,
-    "pages_comments:createPageComment": lunora_pages_comments_135.createPageComment as unknown as RegisteredLunoraFunction,
-    "pages_comments:deletePageComment": lunora_pages_comments_135.deletePageComment as unknown as RegisteredLunoraFunction,
-    "pages_comments:editPageComment": lunora_pages_comments_135.editPageComment as unknown as RegisteredLunoraFunction,
-    "pages_comments:listPageComments": lunora_pages_comments_135.listPageComments as unknown as RegisteredLunoraFunction,
-    "pages_comments:replyToPageComment": lunora_pages_comments_135.replyToPageComment as unknown as RegisteredLunoraFunction,
-    "pages_comments:setPageCommentStatus": lunora_pages_comments_135.setPageCommentStatus as unknown as RegisteredLunoraFunction,
-    "pages_functions:createPage": lunora_pages_functions_136.createPage as unknown as RegisteredLunoraFunction,
-    "pages_functions:createPageFromDocument": lunora_pages_functions_136.createPageFromDocument as unknown as RegisteredLunoraFunction,
-    "pages_functions:deletePage": lunora_pages_functions_136.deletePage as unknown as RegisteredLunoraFunction,
-    "pages_functions:getPage": lunora_pages_functions_136.getPage as unknown as RegisteredLunoraFunction,
-    "pages_functions:getPageVersion": lunora_pages_functions_136.getPageVersion as unknown as RegisteredLunoraFunction,
-    "pages_functions:listPageTree": lunora_pages_functions_136.listPageTree as unknown as RegisteredLunoraFunction,
-    "pages_functions:listPageVersions": lunora_pages_functions_136.listPageVersions as unknown as RegisteredLunoraFunction,
-    "pages_functions:movePage": lunora_pages_functions_136.movePage as unknown as RegisteredLunoraFunction,
-    "pages_functions:renamePage": lunora_pages_functions_136.renamePage as unknown as RegisteredLunoraFunction,
-    "pages_functions:restorePageVersion": lunora_pages_functions_136.restorePageVersion as unknown as RegisteredLunoraFunction,
-    "pages_functions:savePageContent": lunora_pages_functions_136.savePageContent as unknown as RegisteredLunoraFunction,
-    "pages_functions:searchPages": lunora_pages_functions_136.searchPages as unknown as RegisteredLunoraFunction,
-    "pages_functions:setPageFavorite": lunora_pages_functions_136.setPageFavorite as unknown as RegisteredLunoraFunction,
-    "pages_gdpr:collectPagesForExport": lunora_pages_gdpr_137.collectPagesForExport as unknown as RegisteredLunoraFunction,
-    "pages_gdpr:deleteUserPages": lunora_pages_gdpr_137.deleteUserPages as unknown as RegisteredLunoraFunction,
-    "pages_presence:heartbeatPagePresence": lunora_pages_presence_138.heartbeatPagePresence as unknown as RegisteredLunoraFunction,
-    "pages_presence:leavePagePresence": lunora_pages_presence_138.leavePagePresence as unknown as RegisteredLunoraFunction,
-    "pages_presence:listPagePresence": lunora_pages_presence_138.listPagePresence as unknown as RegisteredLunoraFunction,
-    "pages_sharing:acceptPageInvite": lunora_pages_sharing_139.acceptPageInvite as unknown as RegisteredLunoraFunction,
-    "pages_sharing:createPageInvite": lunora_pages_sharing_139.createPageInvite as unknown as RegisteredLunoraFunction,
-    "pages_sharing:getPageInviteOwner": lunora_pages_sharing_139.getPageInviteOwner as unknown as RegisteredLunoraFunction,
-    "pages_sharing:getPageSharing": lunora_pages_sharing_139.getPageSharing as unknown as RegisteredLunoraFunction,
-    "pages_sharing:getPublicPage": lunora_pages_sharing_139.getPublicPage as unknown as RegisteredLunoraFunction,
-    "pages_sharing:getPublicPageOwner": lunora_pages_sharing_139.getPublicPageOwner as unknown as RegisteredLunoraFunction,
-    "pages_sharing:readPublicPage": lunora_pages_sharing_139.readPublicPage as unknown as RegisteredLunoraFunction,
-    "pages_sharing:redeemPageInvite": lunora_pages_sharing_139.redeemPageInvite as unknown as RegisteredLunoraFunction,
-    "pages_sharing:removePageGrant": lunora_pages_sharing_139.removePageGrant as unknown as RegisteredLunoraFunction,
-    "pages_sharing:resolvePageShard": lunora_pages_sharing_139.resolvePageShard as unknown as RegisteredLunoraFunction,
-    "pages_sharing:revokePageInvite": lunora_pages_sharing_139.revokePageInvite as unknown as RegisteredLunoraFunction,
-    "pages_sharing:setPagePublic": lunora_pages_sharing_139.setPagePublic as unknown as RegisteredLunoraFunction,
-    "pages_sharing:updatePageGrant": lunora_pages_sharing_139.updatePageGrant as unknown as RegisteredLunoraFunction,
-    "projects_functions:createProject": lunora_projects_functions_140.createProject as unknown as RegisteredLunoraFunction,
-    "projects_functions:deleteProject": lunora_projects_functions_140.deleteProject as unknown as RegisteredLunoraFunction,
-    "projects_functions:getProject": lunora_projects_functions_140.getProject as unknown as RegisteredLunoraFunction,
-    "projects_functions:listPinnedProjects": lunora_projects_functions_140.listPinnedProjects as unknown as RegisteredLunoraFunction,
-    "projects_functions:listProjects": lunora_projects_functions_140.listProjects as unknown as RegisteredLunoraFunction,
-    "projects_functions:listThreadsByProject": lunora_projects_functions_140.listThreadsByProject as unknown as RegisteredLunoraFunction,
-    "projects_functions:moveThreadToProject": lunora_projects_functions_140.moveThreadToProject as unknown as RegisteredLunoraFunction,
-    "projects_functions:pinProject": lunora_projects_functions_140.pinProject as unknown as RegisteredLunoraFunction,
-    "projects_functions:unpinProject": lunora_projects_functions_140.unpinProject as unknown as RegisteredLunoraFunction,
-    "projects_functions:updateProject": lunora_projects_functions_140.updateProject as unknown as RegisteredLunoraFunction,
-    "projects_functions:updateProjectOrder": lunora_projects_functions_140.updateProjectOrder as unknown as RegisteredLunoraFunction,
-    "prompts_functions:applyThreadVariablesToPrompt": lunora_prompts_functions_141.applyThreadVariablesToPrompt as unknown as RegisteredLunoraFunction,
-    "prompts_functions:calculatePromptCount": lunora_prompts_functions_141.calculatePromptCount as unknown as RegisteredLunoraFunction,
-    "prompts_functions:calculatePrompts": lunora_prompts_functions_141.calculatePrompts as unknown as RegisteredLunoraFunction,
-    "prompts_functions:calculatePromptTags": lunora_prompts_functions_141.calculatePromptTags as unknown as RegisteredLunoraFunction,
-    "prompts_functions:createPrompt": lunora_prompts_functions_141.createPrompt as unknown as RegisteredLunoraFunction,
-    "prompts_functions:deletePrompt": lunora_prompts_functions_141.deletePrompt as unknown as RegisteredLunoraFunction,
-    "prompts_functions:deleteThreadVariable": lunora_prompts_functions_141.deleteThreadVariable as unknown as RegisteredLunoraFunction,
-    "prompts_functions:duplicatePrompt": lunora_prompts_functions_141.duplicatePrompt as unknown as RegisteredLunoraFunction,
-    "prompts_functions:getPrompt": lunora_prompts_functions_141.getPrompt as unknown as RegisteredLunoraFunction,
-    "prompts_functions:getPromptCount": lunora_prompts_functions_141.getPromptCount as unknown as RegisteredLunoraFunction,
-    "prompts_functions:getPromptCountInternal": lunora_prompts_functions_141.getPromptCountInternal as unknown as RegisteredLunoraFunction,
-    "prompts_functions:getPromptHistory": lunora_prompts_functions_141.getPromptHistory as unknown as RegisteredLunoraFunction,
-    "prompts_functions:getPrompts": lunora_prompts_functions_141.getPrompts as unknown as RegisteredLunoraFunction,
-    "prompts_functions:getPromptsByOrganizationInternal": lunora_prompts_functions_141.getPromptsByOrganizationInternal as unknown as RegisteredLunoraFunction,
-    "prompts_functions:getPromptsByUserInternal": lunora_prompts_functions_141.getPromptsByUserInternal as unknown as RegisteredLunoraFunction,
-    "prompts_functions:getPromptTags": lunora_prompts_functions_141.getPromptTags as unknown as RegisteredLunoraFunction,
-    "prompts_functions:getResolvedVariables": lunora_prompts_functions_141.getResolvedVariables as unknown as RegisteredLunoraFunction,
-    "prompts_functions:getThreadVariables": lunora_prompts_functions_141.getThreadVariables as unknown as RegisteredLunoraFunction,
-    "prompts_functions:getUserVariableDefaults": lunora_prompts_functions_141.getUserVariableDefaults as unknown as RegisteredLunoraFunction,
-    "prompts_functions:optimizePrompt": lunora_prompts_functions_141.optimizePrompt as unknown as RegisteredLunoraFunction,
-    "prompts_functions:recordPromptUsage": lunora_prompts_functions_141.recordPromptUsage as unknown as RegisteredLunoraFunction,
-    "prompts_functions:restorePromptVersion": lunora_prompts_functions_141.restorePromptVersion as unknown as RegisteredLunoraFunction,
-    "prompts_functions:searchPrompts": lunora_prompts_functions_141.searchPrompts as unknown as RegisteredLunoraFunction,
-    "prompts_functions:setOrganizationVariableDefaults": lunora_prompts_functions_141.setOrganizationVariableDefaults as unknown as RegisteredLunoraFunction,
-    "prompts_functions:setThreadVariables": lunora_prompts_functions_141.setThreadVariables as unknown as RegisteredLunoraFunction,
-    "prompts_functions:setUserVariableDefaults": lunora_prompts_functions_141.setUserVariableDefaults as unknown as RegisteredLunoraFunction,
-    "prompts_functions:togglePromptFavorite": lunora_prompts_functions_141.togglePromptFavorite as unknown as RegisteredLunoraFunction,
-    "prompts_functions:updatePrompt": lunora_prompts_functions_141.updatePrompt as unknown as RegisteredLunoraFunction,
-    "prompts_functions:updateThreadVariable": lunora_prompts_functions_141.updateThreadVariable as unknown as RegisteredLunoraFunction,
-    "saas_notification_functions:listNotifications": lunora_saas_notification_functions_142.listNotifications as unknown as RegisteredLunoraFunction,
-    "saas_notification_functions:markNotificationsRead": lunora_saas_notification_functions_142.markNotificationsRead as unknown as RegisteredLunoraFunction,
-    "saas_notification_functions:saveNotifications": lunora_saas_notification_functions_142.saveNotifications as unknown as RegisteredLunoraFunction,
-    "saas_usage_functions:createMyNotificationRule": lunora_saas_usage_functions_143.createMyNotificationRule as unknown as RegisteredLunoraFunction,
-    "saas_usage_functions:deleteMyNotificationRule": lunora_saas_usage_functions_143.deleteMyNotificationRule as unknown as RegisteredLunoraFunction,
-    "saas_usage_functions:getMyUsage": lunora_saas_usage_functions_143.getMyUsage as unknown as RegisteredLunoraFunction,
-    "saas_usage_functions:listMyNotificationRules": lunora_saas_usage_functions_143.listMyNotificationRules as unknown as RegisteredLunoraFunction,
-    "sandbox_cleanup:checkAndTerminateSandbox": lunora_sandbox_cleanup_144.checkAndTerminateSandbox as unknown as RegisteredLunoraFunction,
-    "sandbox_cleanup:default": lunora_sandbox_cleanup_144.default as unknown as RegisteredLunoraFunction,
-    "sandbox_cleanup:killSandboxById": lunora_sandbox_cleanup_144.killSandboxById as unknown as RegisteredLunoraFunction,
-    "sandbox_functions:activateBotComputer": lunora_sandbox_functions_145.activateBotComputer as unknown as RegisteredLunoraFunction,
-    "sandbox_functions:checkAndTerminateIdle": lunora_sandbox_functions_145.checkAndTerminateIdle as unknown as RegisteredLunoraFunction,
-    "sandbox_functions:claimBotComputer": lunora_sandbox_functions_145.claimBotComputer as unknown as RegisteredLunoraFunction,
-    "sandbox_functions:closeSession": lunora_sandbox_functions_145.closeSession as unknown as RegisteredLunoraFunction,
-    "sandbox_functions:createSession": lunora_sandbox_functions_145.createSession as unknown as RegisteredLunoraFunction,
-    "sandbox_functions:getActiveSession": lunora_sandbox_functions_145.getActiveSession as unknown as RegisteredLunoraFunction,
-    "sandbox_functions:logAction": lunora_sandbox_functions_145.logAction as unknown as RegisteredLunoraFunction,
-    "sandbox_functions:markBotComputerPaused": lunora_sandbox_functions_145.markBotComputerPaused as unknown as RegisteredLunoraFunction,
-    "sandbox_functions:retireBotComputers": lunora_sandbox_functions_145.retireBotComputers as unknown as RegisteredLunoraFunction,
-    "sandbox_functions:updateSession": lunora_sandbox_functions_145.updateSession as unknown as RegisteredLunoraFunction,
-    "sandbox_pool_functions:claimWarmSandbox": lunora_sandbox_pool_functions_146.claimWarmSandbox as unknown as RegisteredLunoraFunction,
-    "sandbox_pool_functions:getWarmSandboxes": lunora_sandbox_pool_functions_146.getWarmSandboxes as unknown as RegisteredLunoraFunction,
-    "sandbox_pool_functions:registerWarmSandbox": lunora_sandbox_pool_functions_146.registerWarmSandbox as unknown as RegisteredLunoraFunction,
-    "sandbox_pool:cleanupExpiredWarm": lunora_sandbox_pool_147.cleanupExpiredWarm as unknown as RegisteredLunoraFunction,
-    "sandbox_pool:createWarmSandbox": lunora_sandbox_pool_147.createWarmSandbox as unknown as RegisteredLunoraFunction,
-    "sandbox_pool:replenishPool": lunora_sandbox_pool_147.replenishPool as unknown as RegisteredLunoraFunction,
-    "sandbox_pty:default": lunora_sandbox_pty_148.default as unknown as RegisteredLunoraFunction,
-    "sandbox_workspace_sync_functions:getWorkspaceMetadata": lunora_sandbox_workspace_sync_functions_149.getWorkspaceMetadata as unknown as RegisteredLunoraFunction,
-    "sandbox_workspace_sync:restoreWorkspace": lunora_sandbox_workspace_sync_150.restoreWorkspace as unknown as RegisteredLunoraFunction,
-    "sandbox_workspace_sync:saveWorkspace": lunora_sandbox_workspace_sync_150.saveWorkspace as unknown as RegisteredLunoraFunction,
-    "skills_agent_creation:createSkillFromAgent": lunora_skills_agent_creation_151.createSkillFromAgent as unknown as RegisteredLunoraFunction,
-    "skills_builder:attachSkillTestDrive": lunora_skills_builder_152.attachSkillTestDrive as unknown as RegisteredLunoraFunction,
-    "skills_builder:refineBuilderDraft": lunora_skills_builder_152.refineBuilderDraft as unknown as RegisteredLunoraFunction,
-    "skills_builder:runBuilderTurn": lunora_skills_builder_152.runBuilderTurn as unknown as RegisteredLunoraFunction,
-    "skills_builder:searchMarketplaceForBuilder": lunora_skills_builder_152.searchMarketplaceForBuilder as unknown as RegisteredLunoraFunction,
-    "skills_executor:getEnabledSkillsForSystemPromptQuery": lunora_skills_executor_153.getEnabledSkillsForSystemPromptQuery as unknown as RegisteredLunoraFunction,
-    "skills_executor:loadSkillForInvocationQuery": lunora_skills_executor_153.loadSkillForInvocationQuery as unknown as RegisteredLunoraFunction,
-    "skills_executor:resolveSkillsForRun": lunora_skills_executor_153.resolveSkillsForRun as unknown as RegisteredLunoraFunction,
-    "skills_functions:calculateSkillCount": lunora_skills_functions_154.calculateSkillCount as unknown as RegisteredLunoraFunction,
-    "skills_functions:calculateSkills": lunora_skills_functions_154.calculateSkills as unknown as RegisteredLunoraFunction,
-    "skills_functions:createSkill": lunora_skills_functions_154.createSkill as unknown as RegisteredLunoraFunction,
-    "skills_functions:deleteSkill": lunora_skills_functions_154.deleteSkill as unknown as RegisteredLunoraFunction,
-    "skills_functions:getAvailableSkillTools": lunora_skills_functions_154.getAvailableSkillTools as unknown as RegisteredLunoraFunction,
-    "skills_functions:getEnabledSkillsMetadata": lunora_skills_functions_154.getEnabledSkillsMetadata as unknown as RegisteredLunoraFunction,
-    "skills_functions:getSkill": lunora_skills_functions_154.getSkill as unknown as RegisteredLunoraFunction,
-    "skills_functions:getSkillCount": lunora_skills_functions_154.getSkillCount as unknown as RegisteredLunoraFunction,
-    "skills_functions:getSkillCountInternal": lunora_skills_functions_154.getSkillCountInternal as unknown as RegisteredLunoraFunction,
-    "skills_functions:getSkills": lunora_skills_functions_154.getSkills as unknown as RegisteredLunoraFunction,
-    "skills_functions:getSkillsByIdsInternal": lunora_skills_functions_154.getSkillsByIdsInternal as unknown as RegisteredLunoraFunction,
-    "skills_functions:getSkillsByOrganizationInternal": lunora_skills_functions_154.getSkillsByOrganizationInternal as unknown as RegisteredLunoraFunction,
-    "skills_functions:getSkillsByUserInternal": lunora_skills_functions_154.getSkillsByUserInternal as unknown as RegisteredLunoraFunction,
-    "skills_functions:getUserSkillsStateInternal": lunora_skills_functions_154.getUserSkillsStateInternal as unknown as RegisteredLunoraFunction,
-    "skills_functions:recordSkillInvocation": lunora_skills_functions_154.recordSkillInvocation as unknown as RegisteredLunoraFunction,
-    "skills_functions:setSkillAutoRun": lunora_skills_functions_154.setSkillAutoRun as unknown as RegisteredLunoraFunction,
-    "skills_functions:setSkillEnabled": lunora_skills_functions_154.setSkillEnabled as unknown as RegisteredLunoraFunction,
-    "skills_functions:updateSkill": lunora_skills_functions_154.updateSkill as unknown as RegisteredLunoraFunction,
-    "skills_generate:generateSkillDraft": lunora_skills_generate_155.generateSkillDraft as unknown as RegisteredLunoraFunction,
-    "skills_io:exportSkill": lunora_skills_io_156.exportSkill as unknown as RegisteredLunoraFunction,
-    "skills_io:fetchSkillFromUrl": lunora_skills_io_156.fetchSkillFromUrl as unknown as RegisteredLunoraFunction,
-    "skills_io:findFreeSkillSlug": lunora_skills_io_156.findFreeSkillSlug as unknown as RegisteredLunoraFunction,
-    "skills_io:importSkill": lunora_skills_io_156.importSkill as unknown as RegisteredLunoraFunction,
-    "skills_io:listSkillFilesInternal": lunora_skills_io_156.listSkillFilesInternal as unknown as RegisteredLunoraFunction,
-    "skills_io:saveImportedSkillFiles": lunora_skills_io_156.saveImportedSkillFiles as unknown as RegisteredLunoraFunction,
-    "skills_jit_tool_loader:getSkillToolConfig": lunora_skills_jit_tool_loader_157.getSkillToolConfig as unknown as RegisteredLunoraFunction,
-    "skills_marketplace:browseSkills": lunora_skills_marketplace_158.browseSkills as unknown as RegisteredLunoraFunction,
-    "skills_marketplace:forkSkill": lunora_skills_marketplace_158.forkSkill as unknown as RegisteredLunoraFunction,
-    "skills_marketplace:getSkillDetail": lunora_skills_marketplace_158.getSkillDetail as unknown as RegisteredLunoraFunction,
-    "skills_marketplace:installSkill": lunora_skills_marketplace_158.installSkill as unknown as RegisteredLunoraFunction,
-    "skills_marketplace:rateSkill": lunora_skills_marketplace_158.rateSkill as unknown as RegisteredLunoraFunction,
-    "skills_marketplace:searchSkills": lunora_skills_marketplace_158.searchSkills as unknown as RegisteredLunoraFunction,
-    "skills_marketplace:uninstallSkill": lunora_skills_marketplace_158.uninstallSkill as unknown as RegisteredLunoraFunction,
-    "sub_agents_execute:runSubAgent": lunora_sub_agents_execute_159.runSubAgent as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:attachChildThread": lunora_sub_agents_functions_160.attachChildThread as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:cancelRun": lunora_sub_agents_functions_160.cancelRun as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:claimRun": lunora_sub_agents_functions_160.claimRun as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:completeRun": lunora_sub_agents_functions_160.completeRun as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:createRun": lunora_sub_agents_functions_160.createRun as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:getRunByToolCall": lunora_sub_agents_functions_160.getRunByToolCall as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:postResult": lunora_sub_agents_functions_160.postResult as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:reapRun": lunora_sub_agents_functions_160.reapRun as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:shouldRunStop": lunora_sub_agents_functions_160.shouldRunStop as unknown as RegisteredLunoraFunction,
-    "system_prompts_functions:createPreset": lunora_system_prompts_functions_161.createPreset as unknown as RegisteredLunoraFunction,
-    "system_prompts_functions:deletePreset": lunora_system_prompts_functions_161.deletePreset as unknown as RegisteredLunoraFunction,
-    "system_prompts_functions:listPresets": lunora_system_prompts_functions_161.listPresets as unknown as RegisteredLunoraFunction,
-    "system_prompts_functions:updatePreset": lunora_system_prompts_functions_161.updatePreset as unknown as RegisteredLunoraFunction,
-    "tasks_execute:finishCodingAgentRound": lunora_tasks_execute_162.finishCodingAgentRound as unknown as RegisteredLunoraFunction,
-    "tasks_execute:runTaskRound": lunora_tasks_execute_162.runTaskRound as unknown as RegisteredLunoraFunction,
-    "tasks_functions:cancelTask": lunora_tasks_functions_163.cancelTask as unknown as RegisteredLunoraFunction,
-    "tasks_functions:createGoal": lunora_tasks_functions_163.createGoal as unknown as RegisteredLunoraFunction,
-    "tasks_functions:createTask": lunora_tasks_functions_163.createTask as unknown as RegisteredLunoraFunction,
-    "tasks_functions:deleteGoal": lunora_tasks_functions_163.deleteGoal as unknown as RegisteredLunoraFunction,
-    "tasks_functions:deleteTask": lunora_tasks_functions_163.deleteTask as unknown as RegisteredLunoraFunction,
-    "tasks_functions:getTaskBoard": lunora_tasks_functions_163.getTaskBoard as unknown as RegisteredLunoraFunction,
-    "tasks_functions:getTaskRuns": lunora_tasks_functions_163.getTaskRuns as unknown as RegisteredLunoraFunction,
-    "tasks_functions:listTaskSkillOptions": lunora_tasks_functions_163.listTaskSkillOptions as unknown as RegisteredLunoraFunction,
-    "tasks_functions:reviewTask": lunora_tasks_functions_163.reviewTask as unknown as RegisteredLunoraFunction,
-    "tasks_functions:runTask": lunora_tasks_functions_163.runTask as unknown as RegisteredLunoraFunction,
-    "tasks_functions:updateGoal": lunora_tasks_functions_163.updateGoal as unknown as RegisteredLunoraFunction,
-    "tasks_functions:updateTask": lunora_tasks_functions_163.updateTask as unknown as RegisteredLunoraFunction,
-    "tasks_gdpr:collectTasksForExport": lunora_tasks_gdpr_164.collectTasksForExport as unknown as RegisteredLunoraFunction,
-    "tasks_gdpr:deleteUserTasks": lunora_tasks_gdpr_164.deleteUserTasks as unknown as RegisteredLunoraFunction,
-    "tasks_internal:canRunForUser": lunora_tasks_internal_165.canRunForUser as unknown as RegisteredLunoraFunction,
-    "tasks_internal:checkDueTasks": lunora_tasks_internal_165.checkDueTasks as unknown as RegisteredLunoraFunction,
-    "tasks_internal:claimRound": lunora_tasks_internal_165.claimRound as unknown as RegisteredLunoraFunction,
-    "tasks_internal:completeRound": lunora_tasks_internal_165.completeRound as unknown as RegisteredLunoraFunction,
-    "tasks_internal:getTaskForVerification": lunora_tasks_internal_165.getTaskForVerification as unknown as RegisteredLunoraFunction,
-    "tasks_internal:isRoundRunning": lunora_tasks_internal_165.isRoundRunning as unknown as RegisteredLunoraFunction,
-    "tasks_internal:resolveTaskSkill": lunora_tasks_internal_165.resolveTaskSkill as unknown as RegisteredLunoraFunction,
-    "triggers_execute:default": lunora_triggers_execute_166.default as unknown as RegisteredLunoraFunction,
-    "triggers_execute:executeTrigger": lunora_triggers_execute_166.executeTrigger as unknown as RegisteredLunoraFunction,
-    "triggers_functions:admitTriggerRun": lunora_triggers_functions_167.admitTriggerRun as unknown as RegisteredLunoraFunction,
-    "triggers_functions:createExecution": lunora_triggers_functions_167.createExecution as unknown as RegisteredLunoraFunction,
-    "triggers_functions:createTrigger": lunora_triggers_functions_167.createTrigger as unknown as RegisteredLunoraFunction,
-    "triggers_functions:deleteTrigger": lunora_triggers_functions_167.deleteTrigger as unknown as RegisteredLunoraFunction,
-    "triggers_functions:getDueScheduleTriggers": lunora_triggers_functions_167.getDueScheduleTriggers as unknown as RegisteredLunoraFunction,
-    "triggers_functions:getTriggerExecutions": lunora_triggers_functions_167.getTriggerExecutions as unknown as RegisteredLunoraFunction,
-    "triggers_functions:getTriggerInternal": lunora_triggers_functions_167.getTriggerInternal as unknown as RegisteredLunoraFunction,
-    "triggers_functions:getTriggers": lunora_triggers_functions_167.getTriggers as unknown as RegisteredLunoraFunction,
-    "triggers_functions:recordFilteredExecution": lunora_triggers_functions_167.recordFilteredExecution as unknown as RegisteredLunoraFunction,
-    "triggers_functions:setTriggerEnabled": lunora_triggers_functions_167.setTriggerEnabled as unknown as RegisteredLunoraFunction,
-    "triggers_functions:setTriggerEnabledInternal": lunora_triggers_functions_167.setTriggerEnabledInternal as unknown as RegisteredLunoraFunction,
-    "triggers_functions:testRunTrigger": lunora_triggers_functions_167.testRunTrigger as unknown as RegisteredLunoraFunction,
-    "triggers_functions:updateExecution": lunora_triggers_functions_167.updateExecution as unknown as RegisteredLunoraFunction,
-    "triggers_functions:updateTrigger": lunora_triggers_functions_167.updateTrigger as unknown as RegisteredLunoraFunction,
-    "triggers_functions:updateTriggerStats": lunora_triggers_functions_167.updateTriggerStats as unknown as RegisteredLunoraFunction,
-    "triggers_schedule:checkDueTriggers": lunora_triggers_schedule_168.checkDueTriggers as unknown as RegisteredLunoraFunction,
-    "usage_activity:getActivityHeatmap": lunora_usage_activity_169.getActivityHeatmap as unknown as RegisteredLunoraFunction,
-    "usage_activity:getSkillBreakdown": lunora_usage_activity_169.getSkillBreakdown as unknown as RegisteredLunoraFunction,
-    "usage_activity:recordReplyUsage": lunora_usage_activity_169.recordReplyUsage as unknown as RegisteredLunoraFunction,
-    "usage_backfill:getUsageBackfillStatus": lunora_usage_backfill_170.getUsageBackfillStatus as unknown as RegisteredLunoraFunction,
-    "usage_backfill:runUsageBackfillStep": lunora_usage_backfill_170.runUsageBackfillStep as unknown as RegisteredLunoraFunction,
-    "usage_backfill:startUsageBackfill": lunora_usage_backfill_170.startUsageBackfill as unknown as RegisteredLunoraFunction,
-    "usage_backfill:sweepUsageRollup": lunora_usage_backfill_170.sweepUsageRollup as unknown as RegisteredLunoraFunction,
-    "vault_fork_copy:copyVaultObjects": lunora_vault_fork_copy_171.copyVaultObjects as unknown as RegisteredLunoraFunction,
-    "vault_functions:applyFileMetadata": lunora_vault_functions_172.applyFileMetadata as unknown as RegisteredLunoraFunction,
-    "vault_functions:deleteAttachments": lunora_vault_functions_172.deleteAttachments as unknown as RegisteredLunoraFunction,
-    "vault_functions:findAttachmentByKey": lunora_vault_functions_172.findAttachmentByKey as unknown as RegisteredLunoraFunction,
-    "vault_functions:getAttachment": lunora_vault_functions_172.getAttachment as unknown as RegisteredLunoraFunction,
-    "vault_functions:getAttachmentsForChat": lunora_vault_functions_172.getAttachmentsForChat as unknown as RegisteredLunoraFunction,
-    "vault_functions:getAttachmentsForOrganization": lunora_vault_functions_172.getAttachmentsForOrganization as unknown as RegisteredLunoraFunction,
-    "vault_functions:getAttachmentsForUser": lunora_vault_functions_172.getAttachmentsForUser as unknown as RegisteredLunoraFunction,
-    "vault_functions:getDownloadUrl": lunora_vault_functions_172.getDownloadUrl as unknown as RegisteredLunoraFunction,
-    "vault_functions:getStorageUrl": lunora_vault_functions_172.getStorageUrl as unknown as RegisteredLunoraFunction,
-    "vault_functions:insertVaultFile": lunora_vault_functions_172.insertVaultFile as unknown as RegisteredLunoraFunction,
-    "vault_functions:internalSaveGenerated": lunora_vault_functions_172.internalSaveGenerated as unknown as RegisteredLunoraFunction,
-    "vault_functions:markNsfwChecking": lunora_vault_functions_172.markNsfwChecking as unknown as RegisteredLunoraFunction,
-    "vault_functions:markNsfwFailed": lunora_vault_functions_172.markNsfwFailed as unknown as RegisteredLunoraFunction,
-    "vault_functions:saveGeneratedImage": lunora_vault_functions_172.saveGeneratedImage as unknown as RegisteredLunoraFunction,
-    "vault_functions:saveNsfwResult": lunora_vault_functions_172.saveNsfwResult as unknown as RegisteredLunoraFunction,
-    "vault_functions:saveVaultFile": lunora_vault_functions_172.saveVaultFile as unknown as RegisteredLunoraFunction,
-    "vault_functions:syncMetadata": lunora_vault_functions_172.syncMetadata as unknown as RegisteredLunoraFunction,
-    "voice_functions:authorizeScribeToken": lunora_voice_functions_173.authorizeScribeToken as unknown as RegisteredLunoraFunction,
-    "voice_speech:synthesizeSpeech": lunora_voice_speech_174.synthesizeSpeech as unknown as RegisteredLunoraFunction,
-    "workflow_executor:executeWorkflow": lunora_workflow_executor_175.executeWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_fork:completeFork": lunora_workflow_fork_176.completeFork as unknown as RegisteredLunoraFunction,
-    "workflow_fork:forkWorkflow": lunora_workflow_fork_176.forkWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_fork:getAuthorVaultRows": lunora_workflow_fork_176.getAuthorVaultRows as unknown as RegisteredLunoraFunction,
-    "workflow_fork:getForkSource": lunora_workflow_fork_176.getForkSource as unknown as RegisteredLunoraFunction,
-    "workflow_functions:createExecution": lunora_workflow_functions_177.createExecution as unknown as RegisteredLunoraFunction,
-    "workflow_functions:createNodeExecution": lunora_workflow_functions_177.createNodeExecution as unknown as RegisteredLunoraFunction,
-    "workflow_functions:createWorkflow": lunora_workflow_functions_177.createWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_functions:getExecution": lunora_workflow_functions_177.getExecution as unknown as RegisteredLunoraFunction,
-    "workflow_functions:getWorkflow": lunora_workflow_functions_177.getWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_functions:listExecutions": lunora_workflow_functions_177.listExecutions as unknown as RegisteredLunoraFunction,
-    "workflow_functions:listNodeExecutions": lunora_workflow_functions_177.listNodeExecutions as unknown as RegisteredLunoraFunction,
-    "workflow_functions:listWorkflows": lunora_workflow_functions_177.listWorkflows as unknown as RegisteredLunoraFunction,
-    "workflow_functions:updateExecutionStatus": lunora_workflow_functions_177.updateExecutionStatus as unknown as RegisteredLunoraFunction,
-    "workflow_functions:updateNodeExecution": lunora_workflow_functions_177.updateNodeExecution as unknown as RegisteredLunoraFunction,
-    "workflow_functions:updateWorkflowContent": lunora_workflow_functions_177.updateWorkflowContent as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:browseGallery": lunora_workflow_gallery_178.browseGallery as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:getFeaturedWorkflows": lunora_workflow_gallery_178.getFeaturedWorkflows as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:getPublicWorkflow": lunora_workflow_gallery_178.getPublicWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:getPublicWorkflowOwner": lunora_workflow_gallery_178.getPublicWorkflowOwner as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:publishWorkflow": lunora_workflow_gallery_178.publishWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:readPublicWorkflow": lunora_workflow_gallery_178.readPublicWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:unpublishWorkflow": lunora_workflow_gallery_178.unpublishWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:updateGalleryMeta": lunora_workflow_gallery_178.updateGalleryMeta as unknown as RegisteredLunoraFunction,
-    "workflow_generate:generateWorkflowFromPrompt": lunora_workflow_generate_179.generateWorkflowFromPrompt as unknown as RegisteredLunoraFunction,
-    "workflow_media_ops:extractVideoFrame": lunora_workflow_media_ops_180.extractVideoFrame as unknown as RegisteredLunoraFunction,
-    "workflow_presence:checkNodeLock": lunora_workflow_presence_181.checkNodeLock as unknown as RegisteredLunoraFunction,
-    "workflow_presence:cleanupStalePresence": lunora_workflow_presence_181.cleanupStalePresence as unknown as RegisteredLunoraFunction,
-    "workflow_presence:disconnect": lunora_workflow_presence_181.disconnect as unknown as RegisteredLunoraFunction,
-    "workflow_presence:heartbeat": lunora_workflow_presence_181.heartbeat as unknown as RegisteredLunoraFunction,
-    "workflow_presence:listPresence": lunora_workflow_presence_181.listPresence as unknown as RegisteredLunoraFunction,
-    "workflow_presence:listVersions": lunora_workflow_presence_181.listVersions as unknown as RegisteredLunoraFunction,
-    "workflow_presence:restoreVersion": lunora_workflow_presence_181.restoreVersion as unknown as RegisteredLunoraFunction,
-    "workflow_presence:saveVersion": lunora_workflow_presence_181.saveVersion as unknown as RegisteredLunoraFunction,
+    "chat_steering:deliverSteers": lunora_chat_steering_63.deliverSteers as unknown as RegisteredLunoraFunction,
+    "chat_steering:steerRun": lunora_chat_steering_63.steerRun as unknown as RegisteredLunoraFunction,
+    "chat_steering:withdrawSteer": lunora_chat_steering_63.withdrawSteer as unknown as RegisteredLunoraFunction,
+    "chat_streaming:createStreamWithMessage": lunora_chat_streaming_64.createStreamWithMessage as unknown as RegisteredLunoraFunction,
+    "chat_streaming:getActiveStreamForThread": lunora_chat_streaming_64.getActiveStreamForThread as unknown as RegisteredLunoraFunction,
+    "chat_streaming:getStreamBody": lunora_chat_streaming_64.getStreamBody as unknown as RegisteredLunoraFunction,
+    "chat_streaming:streamRunThread": lunora_chat_streaming_64.streamRunThread as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_crons:cleanupExpiredStreams": lunora_chat_streaming_persistent_crons_65.cleanupExpiredStreams as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_library:addChunk": lunora_chat_streaming_persistent_library_66.addChunk as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_library:claimStreamRun": lunora_chat_streaming_persistent_library_66.claimStreamRun as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_library:createStream": lunora_chat_streaming_persistent_library_66.createStream as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_library:finishStoppedReply": lunora_chat_streaming_persistent_library_66.finishStoppedReply as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_library:getChunksAfter": lunora_chat_streaming_persistent_library_66.getChunksAfter as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_library:getStreamStatus": lunora_chat_streaming_persistent_library_66.getStreamStatus as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_library:getStreamText": lunora_chat_streaming_persistent_library_66.getStreamText as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_library:setStreamStatus": lunora_chat_streaming_persistent_library_66.setStreamStatus as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_library:stopActiveForThread": lunora_chat_streaming_persistent_library_66.stopActiveForThread as unknown as RegisteredLunoraFunction,
+    "chat_tags_functions:createThreadTag": lunora_chat_tags_functions_67.createThreadTag as unknown as RegisteredLunoraFunction,
+    "chat_tags_functions:deleteThreadTag": lunora_chat_tags_functions_67.deleteThreadTag as unknown as RegisteredLunoraFunction,
+    "chat_tags_functions:reorderThreadTags": lunora_chat_tags_functions_67.reorderThreadTags as unknown as RegisteredLunoraFunction,
+    "chat_tags_functions:setThreadTagAssigned": lunora_chat_tags_functions_67.setThreadTagAssigned as unknown as RegisteredLunoraFunction,
+    "chat_tags_functions:updateThreadTag": lunora_chat_tags_functions_67.updateThreadTag as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:getPendingToolApproval": lunora_chat_tool_permissions_68.getPendingToolApproval as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:getToolPermissionSettings": lunora_chat_tool_permissions_68.getToolPermissionSettings as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:getToolPermissionsQuery": lunora_chat_tool_permissions_68.getToolPermissionsQuery as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:listMcpToolPermissions": lunora_chat_tool_permissions_68.listMcpToolPermissions as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:recordPendingToolApprovals": lunora_chat_tool_permissions_68.recordPendingToolApprovals as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:respondToToolApproval": lunora_chat_tool_permissions_68.respondToToolApproval as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:setToolPermission": lunora_chat_tool_permissions_68.setToolPermission as unknown as RegisteredLunoraFunction,
+    "chat_tools_browser_node:closeBrowserSession": lunora_chat_tools_browser_node_69.closeBrowserSession as unknown as RegisteredLunoraFunction,
+    "chat_tools_browser_node:executeBrowserAction": lunora_chat_tools_browser_node_69.executeBrowserAction as unknown as RegisteredLunoraFunction,
+    "chat_tools_code_execution_node:default": lunora_chat_tools_code_execution_node_70.default as unknown as RegisteredLunoraFunction,
+    "chat_tools_code_execution_node:executeInSandbox": lunora_chat_tools_code_execution_node_70.executeInSandbox as unknown as RegisteredLunoraFunction,
+    "chat_tools_sandbox_node:executeCode": lunora_chat_tools_sandbox_node_71.executeCode as unknown as RegisteredLunoraFunction,
+    "chat_tools_sandbox_node:executeFileOperation": lunora_chat_tools_sandbox_node_71.executeFileOperation as unknown as RegisteredLunoraFunction,
+    "chat_tools_sandbox_node:executeShellCommand": lunora_chat_tools_sandbox_node_71.executeShellCommand as unknown as RegisteredLunoraFunction,
+    "chat_translate:translateMessage": lunora_chat_translate_72.translateMessage as unknown as RegisteredLunoraFunction,
+    "coding_agents_execute:createPullRequest": lunora_coding_agents_execute_73.createPullRequest as unknown as RegisteredLunoraFunction,
+    "coding_agents_execute:finishRun": lunora_coding_agents_execute_73.finishRun as unknown as RegisteredLunoraFunction,
+    "coding_agents_execute:killRunSandbox": lunora_coding_agents_execute_73.killRunSandbox as unknown as RegisteredLunoraFunction,
+    "coding_agents_execute:pollCodingAgentRun": lunora_coding_agents_execute_73.pollCodingAgentRun as unknown as RegisteredLunoraFunction,
+    "coding_agents_execute:pollPullRequest": lunora_coding_agents_execute_73.pollPullRequest as unknown as RegisteredLunoraFunction,
+    "coding_agents_execute:reapRun": lunora_coding_agents_execute_73.reapRun as unknown as RegisteredLunoraFunction,
+    "coding_agents_execute:startCodingAgentRun": lunora_coding_agents_execute_73.startCodingAgentRun as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:appendRunLog": lunora_coding_agents_functions_74.appendRunLog as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:beginPullRequest": lunora_coding_agents_functions_74.beginPullRequest as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:cancelRun": lunora_coding_agents_functions_74.cancelRun as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:claimFinish": lunora_coding_agents_functions_74.claimFinish as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:claimPoll": lunora_coding_agents_functions_74.claimPoll as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:claimRun": lunora_coding_agents_functions_74.claimRun as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:completePullRequest": lunora_coding_agents_functions_74.completePullRequest as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:completeRun": lunora_coding_agents_functions_74.completeRun as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:createRun": lunora_coding_agents_functions_74.createRun as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:expireRun": lunora_coding_agents_functions_74.expireRun as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:getLatestRunForTask": lunora_coding_agents_functions_74.getLatestRunForTask as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:getPullRequestForPoll": lunora_coding_agents_functions_74.getPullRequestForPoll as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:getRun": lunora_coding_agents_functions_74.getRun as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:getRunByToolCall": lunora_coding_agents_functions_74.getRunByToolCall as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:getRunForFollowUp": lunora_coding_agents_functions_74.getRunForFollowUp as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:getRunForPoll": lunora_coding_agents_functions_74.getRunForPoll as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:getRunForTaskRound": lunora_coding_agents_functions_74.getRunForTaskRound as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:hasProviderKey": lunora_coding_agents_functions_74.hasProviderKey as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:postRunResult": lunora_coding_agents_functions_74.postRunResult as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:recordPoll": lunora_coding_agents_functions_74.recordPoll as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:setPullRequestSandbox": lunora_coding_agents_functions_74.setPullRequestSandbox as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:setRunSandbox": lunora_coding_agents_functions_74.setRunSandbox as unknown as RegisteredLunoraFunction,
+    "coding_agents_gdpr:cancelUserCodingAgentRuns": lunora_coding_agents_gdpr_75.cancelUserCodingAgentRuns as unknown as RegisteredLunoraFunction,
+    "coding_agents_gdpr:collectCodingAgentRunsForExport": lunora_coding_agents_gdpr_75.collectCodingAgentRunsForExport as unknown as RegisteredLunoraFunction,
+    "coding_agents_gdpr:deleteUserCodingAgentRuns": lunora_coding_agents_gdpr_75.deleteUserCodingAgentRuns as unknown as RegisteredLunoraFunction,
+    "coding_agents_gdpr:stopUserCodingAgentRuns": lunora_coding_agents_gdpr_75.stopUserCodingAgentRuns as unknown as RegisteredLunoraFunction,
+    "connectors_mcp_servers:listMcpServerSignIns": lunora_connectors_mcp_servers_76.listMcpServerSignIns as unknown as RegisteredLunoraFunction,
+    "connectors_mcp_servers:signOutMcpServer": lunora_connectors_mcp_servers_76.signOutMcpServer as unknown as RegisteredLunoraFunction,
+    "connectors_mcp_servers:startMcpServerOAuth": lunora_connectors_mcp_servers_76.startMcpServerOAuth as unknown as RegisteredLunoraFunction,
+    "connectors_oauth:completeConnectorOAuth": lunora_connectors_oauth_77.completeConnectorOAuth as unknown as RegisteredLunoraFunction,
+    "connectors_oauth:startConnectorOAuth": lunora_connectors_oauth_77.startConnectorOAuth as unknown as RegisteredLunoraFunction,
+    "connectors_seed:seed": lunora_connectors_seed_78.seed as unknown as RegisteredLunoraFunction,
+    "connectors_store:clearConnectorGrant": lunora_connectors_store_79.clearConnectorGrant as unknown as RegisteredLunoraFunction,
+    "connectors_store:consumeOAuthState": lunora_connectors_store_79.consumeOAuthState as unknown as RegisteredLunoraFunction,
+    "connectors_store:createOAuthState": lunora_connectors_store_79.createOAuthState as unknown as RegisteredLunoraFunction,
+    "connectors_store:deleteMcpServerGrant": lunora_connectors_store_79.deleteMcpServerGrant as unknown as RegisteredLunoraFunction,
+    "connectors_store:getCurrentEncryptedTokens": lunora_connectors_store_79.getCurrentEncryptedTokens as unknown as RegisteredLunoraFunction,
+    "connectors_store:getDefinitionForOAuth": lunora_connectors_store_79.getDefinitionForOAuth as unknown as RegisteredLunoraFunction,
+    "connectors_store:getOwnedConnectorGrant": lunora_connectors_store_79.getOwnedConnectorGrant as unknown as RegisteredLunoraFunction,
+    "connectors_store:listConnectorGrants": lunora_connectors_store_79.listConnectorGrants as unknown as RegisteredLunoraFunction,
+    "connectors_store:listGrantsForRevocation": lunora_connectors_store_79.listGrantsForRevocation as unknown as RegisteredLunoraFunction,
+    "connectors_store:listMcpServerGrants": lunora_connectors_store_79.listMcpServerGrants as unknown as RegisteredLunoraFunction,
+    "connectors_store:markConnectorStatus": lunora_connectors_store_79.markConnectorStatus as unknown as RegisteredLunoraFunction,
+    "connectors_store:saveConnectorGrant": lunora_connectors_store_79.saveConnectorGrant as unknown as RegisteredLunoraFunction,
+    "connectors_store:saveMcpServerGrant": lunora_connectors_store_79.saveMcpServerGrant as unknown as RegisteredLunoraFunction,
+    "connectors_store:storeRefreshedTokens": lunora_connectors_store_79.storeRefreshedTokens as unknown as RegisteredLunoraFunction,
+    "connectors_user_connectors:disconnectConnector": lunora_connectors_user_connectors_80.disconnectConnector as unknown as RegisteredLunoraFunction,
+    "connectors_user_connectors:listConnectorCatalog": lunora_connectors_user_connectors_80.listConnectorCatalog as unknown as RegisteredLunoraFunction,
+    "crons:claimDueCronJobs": lunora_crons_81.claimDueCronJobs as unknown as RegisteredLunoraFunction,
+    "crons:cronTick": lunora_crons_81.cronTick as unknown as RegisteredLunoraFunction,
+    "crons:deleteExpiredTemporaryChats": lunora_crons_81.deleteExpiredTemporaryChats as unknown as RegisteredLunoraFunction,
+    "crons:deleteUnusedFiles": lunora_crons_81.deleteUnusedFiles as unknown as RegisteredLunoraFunction,
+    "crons:keepAlive": lunora_crons_81.keepAlive as unknown as RegisteredLunoraFunction,
+    "crons:purgeActionCache": lunora_crons_81.purgeActionCache as unknown as RegisteredLunoraFunction,
+    "crons:vacuumDocumentHistory": lunora_crons_81.vacuumDocumentHistory as unknown as RegisteredLunoraFunction,
+    "devices_functions:claimDeviceCall": lunora_devices_functions_82.claimDeviceCall as unknown as RegisteredLunoraFunction,
+    "devices_functions:completeDeviceCall": lunora_devices_functions_82.completeDeviceCall as unknown as RegisteredLunoraFunction,
+    "devices_functions:getDeviceCallByToolCall": lunora_devices_functions_82.getDeviceCallByToolCall as unknown as RegisteredLunoraFunction,
+    "devices_functions:heartbeatDevice": lunora_devices_functions_82.heartbeatDevice as unknown as RegisteredLunoraFunction,
+    "devices_functions:listDeviceCalls": lunora_devices_functions_82.listDeviceCalls as unknown as RegisteredLunoraFunction,
+    "devices_functions:listDevices": lunora_devices_functions_82.listDevices as unknown as RegisteredLunoraFunction,
+    "devices_functions:listPendingDeviceCalls": lunora_devices_functions_82.listPendingDeviceCalls as unknown as RegisteredLunoraFunction,
+    "devices_functions:registerDevice": lunora_devices_functions_82.registerDevice as unknown as RegisteredLunoraFunction,
+    "devices_functions:releaseDeviceCall": lunora_devices_functions_82.releaseDeviceCall as unknown as RegisteredLunoraFunction,
+    "devices_functions:renameDevice": lunora_devices_functions_82.renameDevice as unknown as RegisteredLunoraFunction,
+    "devices_functions:reportDeviceCallProgress": lunora_devices_functions_82.reportDeviceCallProgress as unknown as RegisteredLunoraFunction,
+    "devices_functions:revokeDevice": lunora_devices_functions_82.revokeDevice as unknown as RegisteredLunoraFunction,
+    "devices_functions:updateDeviceManifest": lunora_devices_functions_82.updateDeviceManifest as unknown as RegisteredLunoraFunction,
+    "devices_gdpr:collectDevicesForExport": lunora_devices_gdpr_83.collectDevicesForExport as unknown as RegisteredLunoraFunction,
+    "devices_gdpr:deleteUserDevices": lunora_devices_gdpr_83.deleteUserDevices as unknown as RegisteredLunoraFunction,
+    "devices_internal:createDeviceCall": lunora_devices_internal_84.createDeviceCall as unknown as RegisteredLunoraFunction,
+    "devices_internal:expireDeviceCall": lunora_devices_internal_84.expireDeviceCall as unknown as RegisteredLunoraFunction,
+    "devices_internal:getDeviceCallState": lunora_devices_internal_84.getDeviceCallState as unknown as RegisteredLunoraFunction,
+    "devices_internal:getDeviceToolContext": lunora_devices_internal_84.getDeviceToolContext as unknown as RegisteredLunoraFunction,
+    "devices_internal:sweepDeviceCalls": lunora_devices_internal_84.sweepDeviceCalls as unknown as RegisteredLunoraFunction,
+    "email_functions:deliverEmail": lunora_email_functions_85.deliverEmail as unknown as RegisteredLunoraFunction,
+    "email_functions:handleEmailEvent": lunora_email_functions_85.handleEmailEvent as unknown as RegisteredLunoraFunction,
+    "email_functions:insertExpectation": lunora_email_functions_85.insertExpectation as unknown as RegisteredLunoraFunction,
+    "evals_execute:runEvalCase": lunora_evals_execute_86.runEvalCase as unknown as RegisteredLunoraFunction,
+    "evals_functions:cancelRun": lunora_evals_functions_87.cancelRun as unknown as RegisteredLunoraFunction,
+    "evals_functions:compareModels": lunora_evals_functions_87.compareModels as unknown as RegisteredLunoraFunction,
+    "evals_functions:compareRuns": lunora_evals_functions_87.compareRuns as unknown as RegisteredLunoraFunction,
+    "evals_functions:createCase": lunora_evals_functions_87.createCase as unknown as RegisteredLunoraFunction,
+    "evals_functions:createDataset": lunora_evals_functions_87.createDataset as unknown as RegisteredLunoraFunction,
+    "evals_functions:deleteCase": lunora_evals_functions_87.deleteCase as unknown as RegisteredLunoraFunction,
+    "evals_functions:deleteDataset": lunora_evals_functions_87.deleteDataset as unknown as RegisteredLunoraFunction,
+    "evals_functions:deleteRun": lunora_evals_functions_87.deleteRun as unknown as RegisteredLunoraFunction,
+    "evals_functions:getDataset": lunora_evals_functions_87.getDataset as unknown as RegisteredLunoraFunction,
+    "evals_functions:getRun": lunora_evals_functions_87.getRun as unknown as RegisteredLunoraFunction,
+    "evals_functions:importCases": lunora_evals_functions_87.importCases as unknown as RegisteredLunoraFunction,
+    "evals_functions:listDatasets": lunora_evals_functions_87.listDatasets as unknown as RegisteredLunoraFunction,
+    "evals_functions:listRuns": lunora_evals_functions_87.listRuns as unknown as RegisteredLunoraFunction,
+    "evals_functions:purgeDataset": lunora_evals_functions_87.purgeDataset as unknown as RegisteredLunoraFunction,
+    "evals_functions:setCaseFrozen": lunora_evals_functions_87.setCaseFrozen as unknown as RegisteredLunoraFunction,
+    "evals_functions:startRun": lunora_evals_functions_87.startRun as unknown as RegisteredLunoraFunction,
+    "evals_functions:updateCase": lunora_evals_functions_87.updateCase as unknown as RegisteredLunoraFunction,
+    "evals_functions:updateDataset": lunora_evals_functions_87.updateDataset as unknown as RegisteredLunoraFunction,
+    "evals_gdpr:collectEvalsForExport": lunora_evals_gdpr_88.collectEvalsForExport as unknown as RegisteredLunoraFunction,
+    "evals_gdpr:deleteUserEvals": lunora_evals_gdpr_88.deleteUserEvals as unknown as RegisteredLunoraFunction,
+    "evals_internal:canRunForUser": lunora_evals_internal_89.canRunForUser as unknown as RegisteredLunoraFunction,
+    "evals_internal:claimCase": lunora_evals_internal_89.claimCase as unknown as RegisteredLunoraFunction,
+    "evals_internal:completeCase": lunora_evals_internal_89.completeCase as unknown as RegisteredLunoraFunction,
+    "evals_internal:reapCase": lunora_evals_internal_89.reapCase as unknown as RegisteredLunoraFunction,
+    "file:finalizeChatUpload": lunora_file_90.finalizeChatUpload as unknown as RegisteredLunoraFunction,
+    "file:finalizeReferenceMedia": lunora_file_90.finalizeReferenceMedia as unknown as RegisteredLunoraFunction,
+    "file:getChatFileExtraction": lunora_file_90.getChatFileExtraction as unknown as RegisteredLunoraFunction,
+    "file:getChatFileImageUrl": lunora_file_90.getChatFileImageUrl as unknown as RegisteredLunoraFunction,
+    "file:purgeStagedChatUploads": lunora_file_90.purgeStagedChatUploads as unknown as RegisteredLunoraFunction,
+    "file:sweepStagedChatUploads": lunora_file_90.sweepStagedChatUploads as unknown as RegisteredLunoraFunction,
+    "gdpr_functions:cancelStuckExport": lunora_gdpr_functions_91.cancelStuckExport as unknown as RegisteredLunoraFunction,
+    "gdpr_functions:getDataAccessSummary": lunora_gdpr_functions_91.getDataAccessSummary as unknown as RegisteredLunoraFunction,
+    "gdpr_functions:getDeletionStatus": lunora_gdpr_functions_91.getDeletionStatus as unknown as RegisteredLunoraFunction,
+    "gdpr_functions:getExportDownloadUrl": lunora_gdpr_functions_91.getExportDownloadUrl as unknown as RegisteredLunoraFunction,
+    "gdpr_functions:getExportRequest": lunora_gdpr_functions_91.getExportRequest as unknown as RegisteredLunoraFunction,
+    "gdpr_functions:getExportStatus": lunora_gdpr_functions_91.getExportStatus as unknown as RegisteredLunoraFunction,
+    "gdpr_functions:getGdprStatus": lunora_gdpr_functions_91.getGdprStatus as unknown as RegisteredLunoraFunction,
+    "gdpr_functions:getRequestById": lunora_gdpr_functions_91.getRequestById as unknown as RegisteredLunoraFunction,
+    "gdpr_functions:logAudit": lunora_gdpr_functions_91.logAudit as unknown as RegisteredLunoraFunction,
+    "gdpr_functions:requestAccountDeletion": lunora_gdpr_functions_91.requestAccountDeletion as unknown as RegisteredLunoraFunction,
+    "gdpr_functions:requestDataExport": lunora_gdpr_functions_91.requestDataExport as unknown as RegisteredLunoraFunction,
+    "gdpr_functions:updateRequestProgress": lunora_gdpr_functions_91.updateRequestProgress as unknown as RegisteredLunoraFunction,
+    "gdpr_posthog_retry:expireStalePostHogRetry": lunora_gdpr_posthog_retry_92.expireStalePostHogRetry as unknown as RegisteredLunoraFunction,
+    "gdpr_posthog_retry:failPostHogRetry": lunora_gdpr_posthog_retry_92.failPostHogRetry as unknown as RegisteredLunoraFunction,
+    "gdpr_posthog_retry:getRetryConfirmationEmail": lunora_gdpr_posthog_retry_92.getRetryConfirmationEmail as unknown as RegisteredLunoraFunction,
+    "gdpr_posthog_retry:recordPostHogErased": lunora_gdpr_posthog_retry_92.recordPostHogErased as unknown as RegisteredLunoraFunction,
+    "gdpr_posthog_retry:recordPostHogRetrySuccess": lunora_gdpr_posthog_retry_92.recordPostHogRetrySuccess as unknown as RegisteredLunoraFunction,
+    "gdpr_posthog_retry:retryPostHogErasure": lunora_gdpr_posthog_retry_92.retryPostHogErasure as unknown as RegisteredLunoraFunction,
+    "gdpr_posthog_retry:schedulePostHogRetry": lunora_gdpr_posthog_retry_92.schedulePostHogRetry as unknown as RegisteredLunoraFunction,
+    "gdpr_posthog_retry:settleRetryConfirmation": lunora_gdpr_posthog_retry_92.settleRetryConfirmation as unknown as RegisteredLunoraFunction,
+    "gdpr_posthog_retry:startPostHogRetry": lunora_gdpr_posthog_retry_92.startPostHogRetry as unknown as RegisteredLunoraFunction,
+    "gdpr_request_sweeps:cleanupExpiredExports": lunora_gdpr_request_sweeps_93.cleanupExpiredExports as unknown as RegisteredLunoraFunction,
+    "gdpr_request_sweeps:handleGdprRequestTimeouts": lunora_gdpr_request_sweeps_93.handleGdprRequestTimeouts as unknown as RegisteredLunoraFunction,
+    "gdpr_retention:pruneRetainedActivity": lunora_gdpr_retention_94.pruneRetainedActivity as unknown as RegisteredLunoraFunction,
+    "gdpr_steps:collectActivityForExport": lunora_gdpr_steps_95.collectActivityForExport as unknown as RegisteredLunoraFunction,
+    "gdpr_steps:collectConversations": lunora_gdpr_steps_95.collectConversations as unknown as RegisteredLunoraFunction,
+    "gdpr_steps:collectFiles": lunora_gdpr_steps_95.collectFiles as unknown as RegisteredLunoraFunction,
+    "gdpr_steps:collectProfile": lunora_gdpr_steps_95.collectProfile as unknown as RegisteredLunoraFunction,
+    "gdpr_steps:collectPrompts": lunora_gdpr_steps_95.collectPrompts as unknown as RegisteredLunoraFunction,
+    "gdpr_steps:collectSettings": lunora_gdpr_steps_95.collectSettings as unknown as RegisteredLunoraFunction,
+    "gdpr_steps:collectThreadTags": lunora_gdpr_steps_95.collectThreadTags as unknown as RegisteredLunoraFunction,
+    "gdpr_steps:generateExportFile": lunora_gdpr_steps_95.generateExportFile as unknown as RegisteredLunoraFunction,
+    "gdpr_steps:sendExportReadyEmail": lunora_gdpr_steps_95.sendExportReadyEmail as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteAuthRecords": lunora_gdpr_steps_deletion_steps_96.deleteAuthRecords as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserBrowserData": lunora_gdpr_steps_deletion_steps_96.deleteUserBrowserData as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserConnectors": lunora_gdpr_steps_deletion_steps_96.deleteUserConnectors as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserDocuments": lunora_gdpr_steps_deletion_steps_96.deleteUserDocuments as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserFiles": lunora_gdpr_steps_deletion_steps_96.deleteUserFiles as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserImportJobs": lunora_gdpr_steps_deletion_steps_96.deleteUserImportJobs as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserMemories": lunora_gdpr_steps_deletion_steps_96.deleteUserMemories as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserPersistentStreams": lunora_gdpr_steps_deletion_steps_96.deleteUserPersistentStreams as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserPresentations": lunora_gdpr_steps_deletion_steps_96.deleteUserPresentations as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserProjects": lunora_gdpr_steps_deletion_steps_96.deleteUserProjects as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserPrompts": lunora_gdpr_steps_deletion_steps_96.deleteUserPrompts as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserSettings": lunora_gdpr_steps_deletion_steps_96.deleteUserSettings as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserSkills": lunora_gdpr_steps_deletion_steps_96.deleteUserSkills as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserThreadCascade": lunora_gdpr_steps_deletion_steps_96.deleteUserThreadCascade as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:deleteUserThreadMetadata": lunora_gdpr_steps_deletion_steps_96.deleteUserThreadMetadata as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_deletion_steps:revokeUserSessions": lunora_gdpr_steps_deletion_steps_96.revokeUserSessions as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_email_steps:default": lunora_gdpr_steps_email_steps_97.default as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_email_steps:sendDeletionConfirmedEmailAction": lunora_gdpr_steps_email_steps_97.sendDeletionConfirmedEmailAction as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_posthog_steps:deletePostHogPerson": lunora_gdpr_steps_posthog_steps_98.deletePostHogPerson as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:anonymiseGatewayUsageDeductions": lunora_gdpr_steps_residual_deletion_steps_99.anonymiseGatewayUsageDeductions as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:deleteUserEmbeddings": lunora_gdpr_steps_residual_deletion_steps_99.deleteUserEmbeddings as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:deleteUserIdentity": lunora_gdpr_steps_residual_deletion_steps_99.deleteUserIdentity as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:deleteUserIntegrations": lunora_gdpr_steps_residual_deletion_steps_99.deleteUserIntegrations as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:deleteUserKnowledge": lunora_gdpr_steps_residual_deletion_steps_99.deleteUserKnowledge as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:deleteUserStreamingMessages": lunora_gdpr_steps_residual_deletion_steps_99.deleteUserStreamingMessages as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:deleteUserSubAgentRuns": lunora_gdpr_steps_residual_deletion_steps_99.deleteUserSubAgentRuns as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:deleteUserUsageDaily": lunora_gdpr_steps_residual_deletion_steps_99.deleteUserUsageDaily as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:deleteUserWorkflowData": lunora_gdpr_steps_residual_deletion_steps_99.deleteUserWorkflowData as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:deregisterMessengerWebhooks": lunora_gdpr_steps_residual_deletion_steps_99.deregisterMessengerWebhooks as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:killUserSandboxes": lunora_gdpr_steps_residual_deletion_steps_99.killUserSandboxes as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:listMessengerConnectionsForDeletion": lunora_gdpr_steps_residual_deletion_steps_99.listMessengerConnectionsForDeletion as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:listSandboxIdsForDeletion": lunora_gdpr_steps_residual_deletion_steps_99.listSandboxIdsForDeletion as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:minimiseGdprRecords": lunora_gdpr_steps_residual_deletion_steps_99.minimiseGdprRecords as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:purgeUserDocumentHistory": lunora_gdpr_steps_residual_deletion_steps_99.purgeUserDocumentHistory as unknown as RegisteredLunoraFunction,
+    "gdpr_steps_residual_deletion_steps:revokeUserConnectorGrants": lunora_gdpr_steps_residual_deletion_steps_99.revokeUserConnectorGrants as unknown as RegisteredLunoraFunction,
+    "gdpr_workflow_actions:startDeletionWorkflow": lunora_gdpr_workflow_actions_100.startDeletionWorkflow as unknown as RegisteredLunoraFunction,
+    "gdpr_workflow_actions:startExportWorkflow": lunora_gdpr_workflow_actions_100.startExportWorkflow as unknown as RegisteredLunoraFunction,
+    "home_overview:getHomeOverview": lunora_home_overview_101.getHomeOverview as unknown as RegisteredLunoraFunction,
+    "init:initializeDatabase": lunora_init_102.initializeDatabase as unknown as RegisteredLunoraFunction,
+    "knowledge_agent_assignment:assignToProject": lunora_knowledge_agent_assignment_103.assignToProject as unknown as RegisteredLunoraFunction,
+    "knowledge_agent_assignment:getProjectKnowledge": lunora_knowledge_agent_assignment_103.getProjectKnowledge as unknown as RegisteredLunoraFunction,
+    "knowledge_agent_assignment:getProjectKnowledgeFileIds": lunora_knowledge_agent_assignment_103.getProjectKnowledgeFileIds as unknown as RegisteredLunoraFunction,
+    "knowledge_agent_assignment:resolveKnowledgeFiles": lunora_knowledge_agent_assignment_103.resolveKnowledgeFiles as unknown as RegisteredLunoraFunction,
+    "knowledge_agent_assignment:unassignFromProject": lunora_knowledge_agent_assignment_103.unassignFromProject as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:attachCollectionToProject": lunora_knowledge_collections_104.attachCollectionToProject as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:attachCollectionToThread": lunora_knowledge_collections_104.attachCollectionToThread as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:createCollection": lunora_knowledge_collections_104.createCollection as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:deleteCollection": lunora_knowledge_collections_104.deleteCollection as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:detachCollectionFromProject": lunora_knowledge_collections_104.detachCollectionFromProject as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:detachCollectionFromThread": lunora_knowledge_collections_104.detachCollectionFromThread as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:gatedKnowledgeFileIds": lunora_knowledge_collections_104.gatedKnowledgeFileIds as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:getCollectionOwner": lunora_knowledge_collections_104.getCollectionOwner as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:getProjectCollections": lunora_knowledge_collections_104.getProjectCollections as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:getThreadCollections": lunora_knowledge_collections_104.getThreadCollections as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:listCollectionFiles": lunora_knowledge_collections_104.listCollectionFiles as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:listCollections": lunora_knowledge_collections_104.listCollections as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:listFilesInCollection": lunora_knowledge_collections_104.listFilesInCollection as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:resolveRetrievalScope": lunora_knowledge_collections_104.resolveRetrievalScope as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:resolveSharedCollectionFiles": lunora_knowledge_collections_104.resolveSharedCollectionFiles as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:setFileCollection": lunora_knowledge_collections_104.setFileCollection as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:updateCollection": lunora_knowledge_collections_104.updateCollection as unknown as RegisteredLunoraFunction,
+    "knowledge_delete_embeddings:default": lunora_knowledge_delete_embeddings_105.default as unknown as RegisteredLunoraFunction,
+    "knowledge_delete_embeddings:deleteEmbeddingsBatch": lunora_knowledge_delete_embeddings_105.deleteEmbeddingsBatch as unknown as RegisteredLunoraFunction,
+    "knowledge_documents:addDocuments": lunora_knowledge_documents_106.addDocuments as unknown as RegisteredLunoraFunction,
+    "knowledge_documents:addUrl": lunora_knowledge_documents_106.addUrl as unknown as RegisteredLunoraFunction,
+    "knowledge_documents:insertStoredDocuments": lunora_knowledge_documents_106.insertStoredDocuments as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:addFile": lunora_knowledge_functions_107.addFile as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:attachToThread": lunora_knowledge_functions_107.attachToThread as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:detachFromThread": lunora_knowledge_functions_107.detachFromThread as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:getChunksByEmbeddingIds": lunora_knowledge_functions_107.getChunksByEmbeddingIds as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:getFile": lunora_knowledge_functions_107.getFile as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:getFileChunks": lunora_knowledge_functions_107.getFileChunks as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:getIndexedFileIds": lunora_knowledge_functions_107.getIndexedFileIds as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:getThreadKnowledge": lunora_knowledge_functions_107.getThreadKnowledge as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:getThreadKnowledgeFileIds": lunora_knowledge_functions_107.getThreadKnowledgeFileIds as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:getVaultFile": lunora_knowledge_functions_107.getVaultFile as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:keywordSearchChunks": lunora_knowledge_functions_107.keywordSearchChunks as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:listFiles": lunora_knowledge_functions_107.listFiles as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:recordKnowledgeSources": lunora_knowledge_functions_107.recordKnowledgeSources as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:removeFile": lunora_knowledge_functions_107.removeFile as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:saveChunks": lunora_knowledge_functions_107.saveChunks as unknown as RegisteredLunoraFunction,
+    "knowledge_functions:updateFileStatus": lunora_knowledge_functions_107.updateFileStatus as unknown as RegisteredLunoraFunction,
+    "knowledge_housekeeping:drainDeletingFiles": lunora_knowledge_housekeeping_108.drainDeletingFiles as unknown as RegisteredLunoraFunction,
+    "knowledge_housekeeping:sweepKnowledgeFiles": lunora_knowledge_housekeeping_108.sweepKnowledgeFiles as unknown as RegisteredLunoraFunction,
+    "knowledge_ingest:default": lunora_knowledge_ingest_109.default as unknown as RegisteredLunoraFunction,
+    "knowledge_ingest:ingestFile": lunora_knowledge_ingest_109.ingestFile as unknown as RegisteredLunoraFunction,
+    "knowledge_retrieve:default": lunora_knowledge_retrieve_110.default as unknown as RegisteredLunoraFunction,
+    "knowledge_retrieve:search": lunora_knowledge_retrieve_110.search as unknown as RegisteredLunoraFunction,
+    "knowledge_retrieve:searchKnowledge": lunora_knowledge_retrieve_110.searchKnowledge as unknown as RegisteredLunoraFunction,
+    "knowledge_retrieve:searchSharedCollections": lunora_knowledge_retrieve_110.searchSharedCollections as unknown as RegisteredLunoraFunction,
+    "knowledge_summarize:resummarizeFile": lunora_knowledge_summarize_111.resummarizeFile as unknown as RegisteredLunoraFunction,
+    "knowledge_summarize:summarizeCollection": lunora_knowledge_summarize_111.summarizeCollection as unknown as RegisteredLunoraFunction,
+    "lib_account_merge:deleteShardRows": lunora_lib_account_merge_112.deleteShardRows as unknown as RegisteredLunoraFunction,
+    "lib_account_merge:importShardRows": lunora_lib_account_merge_112.importShardRows as unknown as RegisteredLunoraFunction,
+    "lib_account_merge:listShardRowIds": lunora_lib_account_merge_112.listShardRowIds as unknown as RegisteredLunoraFunction,
+    "lib_account_merge:listShardRowsPage": lunora_lib_account_merge_112.listShardRowsPage as unknown as RegisteredLunoraFunction,
+    "lib_account_merge:reassignGlobalRows": lunora_lib_account_merge_112.reassignGlobalRows as unknown as RegisteredLunoraFunction,
+    "lib_account_merge:runGuestMerge": lunora_lib_account_merge_112.runGuestMerge as unknown as RegisteredLunoraFunction,
+    "lib_action_cache:bumpGeneration": lunora_lib_action_cache_113.bumpGeneration as unknown as RegisteredLunoraFunction,
+    "lib_action_cache:get": lunora_lib_action_cache_113.get as unknown as RegisteredLunoraFunction,
+    "lib_action_cache:getGeneration": lunora_lib_action_cache_113.getGeneration as unknown as RegisteredLunoraFunction,
+    "lib_action_cache:purgeExpired": lunora_lib_action_cache_113.purgeExpired as unknown as RegisteredLunoraFunction,
+    "lib_action_cache:put": lunora_lib_action_cache_113.put as unknown as RegisteredLunoraFunction,
+    "lib_action_cache:remove": lunora_lib_action_cache_113.remove as unknown as RegisteredLunoraFunction,
+    "lib_action_cache:removeAll": lunora_lib_action_cache_113.removeAll as unknown as RegisteredLunoraFunction,
+    "lib_action_cache:removeByArgs": lunora_lib_action_cache_113.removeByArgs as unknown as RegisteredLunoraFunction,
+    "lib_claim_once:claimKey": lunora_lib_claim_once_114.claimKey as unknown as RegisteredLunoraFunction,
+    "lib_claim_once:claimKeyFenced": lunora_lib_claim_once_114.claimKeyFenced as unknown as RegisteredLunoraFunction,
+    "lib_claim_once:completeKey": lunora_lib_claim_once_114.completeKey as unknown as RegisteredLunoraFunction,
+    "lib_claim_once:purgeExpiredClaims": lunora_lib_claim_once_114.purgeExpiredClaims as unknown as RegisteredLunoraFunction,
+    "lib_claim_once:reapLapsedClaims": lunora_lib_claim_once_114.reapLapsedClaims as unknown as RegisteredLunoraFunction,
+    "lib_claim_once:releaseKey": lunora_lib_claim_once_114.releaseKey as unknown as RegisteredLunoraFunction,
+    "lib_document_history:getDocumentAtTime": lunora_lib_document_history_115.getDocumentAtTime as unknown as RegisteredLunoraFunction,
+    "lib_document_history:listDocumentVersions": lunora_lib_document_history_115.listDocumentVersions as unknown as RegisteredLunoraFunction,
+    "lib_document_history:listUserActivity": lunora_lib_document_history_115.listUserActivity as unknown as RegisteredLunoraFunction,
+    "lib_document_history:recordHistory": lunora_lib_document_history_115.recordHistory as unknown as RegisteredLunoraFunction,
+    "lib_document_history:vacuumHistory": lunora_lib_document_history_115.vacuumHistory as unknown as RegisteredLunoraFunction,
+    "lib_job_once:runJobOnce": lunora_lib_job_once_116.runJobOnce as unknown as RegisteredLunoraFunction,
+    "lib_rate_limiter_mutations:applyRateLimit": lunora_lib_rate_limiter_mutations_117.applyRateLimit as unknown as RegisteredLunoraFunction,
+    "lib_rate_limiter_mutations:resetRateLimit": lunora_lib_rate_limiter_mutations_117.resetRateLimit as unknown as RegisteredLunoraFunction,
+    "lib_shard_housekeeping:dispatchDueShards": lunora_lib_shard_housekeeping_118.dispatchDueShards as unknown as RegisteredLunoraFunction,
+    "lib_shard_housekeeping:dispatchShardHousekeeping": lunora_lib_shard_housekeeping_118.dispatchShardHousekeeping as unknown as RegisteredLunoraFunction,
+    "lib_shard_housekeeping:recordShardActivity": lunora_lib_shard_housekeeping_118.recordShardActivity as unknown as RegisteredLunoraFunction,
+    "lib_shard_housekeeping:runShardHousekeeping": lunora_lib_shard_housekeeping_118.runShardHousekeeping as unknown as RegisteredLunoraFunction,
+    "lib_shard_housekeeping:runShardTick": lunora_lib_shard_housekeeping_118.runShardTick as unknown as RegisteredLunoraFunction,
+    "lib_shard_routes:getRouteOwner": lunora_lib_shard_routes_119.getRouteOwner as unknown as RegisteredLunoraFunction,
+    "lib_storage_cleanup:deleteObjects": lunora_lib_storage_cleanup_120.deleteObjects as unknown as RegisteredLunoraFunction,
+    "media_functions:listUserImages": lunora_media_functions_121.listUserImages as unknown as RegisteredLunoraFunction,
+    "memory_compress:compressThreadMemories": lunora_memory_compress_122.compressThreadMemories as unknown as RegisteredLunoraFunction,
+    "memory_compress:getThreadMemoriesForCompression": lunora_memory_compress_122.getThreadMemoriesForCompression as unknown as RegisteredLunoraFunction,
+    "memory_compress:maybeCompressThreadMemories": lunora_memory_compress_122.maybeCompressThreadMemories as unknown as RegisteredLunoraFunction,
+    "memory_compress:tryStartCompression": lunora_memory_compress_122.tryStartCompression as unknown as RegisteredLunoraFunction,
+    "memory_extract:extractMemories": lunora_memory_extract_123.extractMemories as unknown as RegisteredLunoraFunction,
+    "memory_extract:regenerateMemoryEmbedding": lunora_memory_extract_123.regenerateMemoryEmbedding as unknown as RegisteredLunoraFunction,
+    "memory_functions:clearAllUserMemories": lunora_memory_functions_124.clearAllUserMemories as unknown as RegisteredLunoraFunction,
+    "memory_functions:confirmMemories": lunora_memory_functions_124.confirmMemories as unknown as RegisteredLunoraFunction,
+    "memory_functions:deleteMemory": lunora_memory_functions_124.deleteMemory as unknown as RegisteredLunoraFunction,
+    "memory_functions:getActiveMemoriesForUser": lunora_memory_functions_124.getActiveMemoriesForUser as unknown as RegisteredLunoraFunction,
+    "memory_functions:getMemoriesByEmbeddingIds": lunora_memory_functions_124.getMemoriesByEmbeddingIds as unknown as RegisteredLunoraFunction,
+    "memory_functions:getMemoryByEmbeddingId": lunora_memory_functions_124.getMemoryByEmbeddingId as unknown as RegisteredLunoraFunction,
+    "memory_functions:getMemoryById": lunora_memory_functions_124.getMemoryById as unknown as RegisteredLunoraFunction,
+    "memory_functions:getMemoryStats": lunora_memory_functions_124.getMemoryStats as unknown as RegisteredLunoraFunction,
+    "memory_functions:getMessageMemoryUsage": lunora_memory_functions_124.getMessageMemoryUsage as unknown as RegisteredLunoraFunction,
+    "memory_functions:isMemoryEnabled": lunora_memory_functions_124.isMemoryEnabled as unknown as RegisteredLunoraFunction,
+    "memory_functions:isThreadLockedForMemory": lunora_memory_functions_124.isThreadLockedForMemory as unknown as RegisteredLunoraFunction,
+    "memory_functions:isThreadTemporary": lunora_memory_functions_124.isThreadTemporary as unknown as RegisteredLunoraFunction,
+    "memory_functions:listUserMemories": lunora_memory_functions_124.listUserMemories as unknown as RegisteredLunoraFunction,
+    "memory_functions:markMemorySupersededByCompression": lunora_memory_functions_124.markMemorySupersededByCompression as unknown as RegisteredLunoraFunction,
+    "memory_functions:recordRetrievedMemories": lunora_memory_functions_124.recordRetrievedMemories as unknown as RegisteredLunoraFunction,
+    "memory_functions:retryMemoryVectorDelete": lunora_memory_functions_124.retryMemoryVectorDelete as unknown as RegisteredLunoraFunction,
+    "memory_functions:saveMemory": lunora_memory_functions_124.saveMemory as unknown as RegisteredLunoraFunction,
+    "memory_functions:saveMemoryBatch": lunora_memory_functions_124.saveMemoryBatch as unknown as RegisteredLunoraFunction,
+    "memory_functions:setMemoryPinned": lunora_memory_functions_124.setMemoryPinned as unknown as RegisteredLunoraFunction,
+    "memory_functions:updateMemory": lunora_memory_functions_124.updateMemory as unknown as RegisteredLunoraFunction,
+    "memory_functions:updateMemoryInternal": lunora_memory_functions_124.updateMemoryInternal as unknown as RegisteredLunoraFunction,
+    "memory_gdpr:collectMemoriesForExport": lunora_memory_gdpr_125.collectMemoriesForExport as unknown as RegisteredLunoraFunction,
+    "memory_gdpr:deleteUserMemoryReflectionData": lunora_memory_gdpr_125.deleteUserMemoryReflectionData as unknown as RegisteredLunoraFunction,
+    "memory_reflection:applyReflectionOps": lunora_memory_reflection_126.applyReflectionOps as unknown as RegisteredLunoraFunction,
+    "memory_reflection:claimReflectionRun": lunora_memory_reflection_126.claimReflectionRun as unknown as RegisteredLunoraFunction,
+    "memory_reflection:dismissMemoryDigest": lunora_memory_reflection_126.dismissMemoryDigest as unknown as RegisteredLunoraFunction,
+    "memory_reflection:getLatestMemoryDigest": lunora_memory_reflection_126.getLatestMemoryDigest as unknown as RegisteredLunoraFunction,
+    "memory_reflection:loadReflectionInputs": lunora_memory_reflection_126.loadReflectionInputs as unknown as RegisteredLunoraFunction,
+    "memory_reflection:noteMemoryActivity": lunora_memory_reflection_126.noteMemoryActivity as unknown as RegisteredLunoraFunction,
+    "memory_reflection:runMemoryReflection": lunora_memory_reflection_126.runMemoryReflection as unknown as RegisteredLunoraFunction,
+    "memory_reflection:saveMemoryDigest": lunora_memory_reflection_126.saveMemoryDigest as unknown as RegisteredLunoraFunction,
+    "memory_retrieve:default": lunora_memory_retrieve_127.default as unknown as RegisteredLunoraFunction,
+    "memory_retrieve:retrieveRelevantMemories": lunora_memory_retrieve_127.retrieveRelevantMemories as unknown as RegisteredLunoraFunction,
+    "messenger_functions:aiDisclosureSent": lunora_messenger_functions_128.aiDisclosureSent as unknown as RegisteredLunoraFunction,
+    "messenger_functions:chargeReplyToolRound": lunora_messenger_functions_128.chargeReplyToolRound as unknown as RegisteredLunoraFunction,
+    "messenger_functions:claimThreadReply": lunora_messenger_functions_128.claimThreadReply as unknown as RegisteredLunoraFunction,
+    "messenger_functions:completeMessengerMessage": lunora_messenger_functions_128.completeMessengerMessage as unknown as RegisteredLunoraFunction,
+    "messenger_functions:createConnection": lunora_messenger_functions_128.createConnection as unknown as RegisteredLunoraFunction,
+    "messenger_functions:deleteConnection": lunora_messenger_functions_128.deleteConnection as unknown as RegisteredLunoraFunction,
+    "messenger_functions:findOrCreateMessengerThread": lunora_messenger_functions_128.findOrCreateMessengerThread as unknown as RegisteredLunoraFunction,
+    "messenger_functions:getConnectionById": lunora_messenger_functions_128.getConnectionById as unknown as RegisteredLunoraFunction,
+    "messenger_functions:getConnectionByPlatformChat": lunora_messenger_functions_128.getConnectionByPlatformChat as unknown as RegisteredLunoraFunction,
+    "messenger_functions:getConnectionByPlatformUser": lunora_messenger_functions_128.getConnectionByPlatformUser as unknown as RegisteredLunoraFunction,
+    "messenger_functions:getConnections": lunora_messenger_functions_128.getConnections as unknown as RegisteredLunoraFunction,
+    "messenger_functions:getOwnerRateLimitTier": lunora_messenger_functions_128.getOwnerRateLimitTier as unknown as RegisteredLunoraFunction,
+    "messenger_functions:getReplyToolSetting": lunora_messenger_functions_128.getReplyToolSetting as unknown as RegisteredLunoraFunction,
+    "messenger_functions:listReplyMedia": lunora_messenger_functions_128.listReplyMedia as unknown as RegisteredLunoraFunction,
+    "messenger_functions:markAiDisclosed": lunora_messenger_functions_128.markAiDisclosed as unknown as RegisteredLunoraFunction,
+    "messenger_functions:pairConnection": lunora_messenger_functions_128.pairConnection as unknown as RegisteredLunoraFunction,
+    "messenger_functions:regeneratePairingCode": lunora_messenger_functions_128.regeneratePairingCode as unknown as RegisteredLunoraFunction,
+    "messenger_functions:saveMessengerMessage": lunora_messenger_functions_128.saveMessengerMessage as unknown as RegisteredLunoraFunction,
+    "messenger_functions:saveMessengerNotice": lunora_messenger_functions_128.saveMessengerNotice as unknown as RegisteredLunoraFunction,
+    "messenger_functions:threadHasRecentMedia": lunora_messenger_functions_128.threadHasRecentMedia as unknown as RegisteredLunoraFunction,
+    "messenger_functions:touchConnection": lunora_messenger_functions_128.touchConnection as unknown as RegisteredLunoraFunction,
+    "messenger_functions:updateConnectionReplyTools": lunora_messenger_functions_128.updateConnectionReplyTools as unknown as RegisteredLunoraFunction,
+    "messenger_functions:updateConnectionStatus": lunora_messenger_functions_128.updateConnectionStatus as unknown as RegisteredLunoraFunction,
+    "messenger_respond:default": lunora_messenger_respond_129.default as unknown as RegisteredLunoraFunction,
+    "messenger_respond:generateAndSendResponse": lunora_messenger_respond_129.generateAndSendResponse as unknown as RegisteredLunoraFunction,
+    "messenger_respond:sendNotice": lunora_messenger_respond_129.sendNotice as unknown as RegisteredLunoraFunction,
+    "notifications_daily_brief:chargeDailyBrief": lunora_notifications_daily_brief_130.chargeDailyBrief as unknown as RegisteredLunoraFunction,
+    "notifications_daily_brief:claimDailyBrief": lunora_notifications_daily_brief_130.claimDailyBrief as unknown as RegisteredLunoraFunction,
+    "notifications_daily_brief:loadDailyBriefInputs": lunora_notifications_daily_brief_130.loadDailyBriefInputs as unknown as RegisteredLunoraFunction,
+    "notifications_daily_brief:noteDailyBriefActivity": lunora_notifications_daily_brief_130.noteDailyBriefActivity as unknown as RegisteredLunoraFunction,
+    "notifications_daily_brief:runDailyBrief": lunora_notifications_daily_brief_130.runDailyBrief as unknown as RegisteredLunoraFunction,
+    "notifications_daily_brief:setDailyBriefEnabled": lunora_notifications_daily_brief_130.setDailyBriefEnabled as unknown as RegisteredLunoraFunction,
+    "notifications_daily_brief:writeDailyBrief": lunora_notifications_daily_brief_130.writeDailyBrief as unknown as RegisteredLunoraFunction,
+    "notifications_functions:createNotification": lunora_notifications_functions_131.createNotification as unknown as RegisteredLunoraFunction,
+    "notifications_functions:createNotifications": lunora_notifications_functions_131.createNotifications as unknown as RegisteredLunoraFunction,
+    "notifications_functions:getNotificationInbox": lunora_notifications_functions_131.getNotificationInbox as unknown as RegisteredLunoraFunction,
+    "notifications_functions:markAllNotificationsRead": lunora_notifications_functions_131.markAllNotificationsRead as unknown as RegisteredLunoraFunction,
+    "notifications_functions:markNotificationRead": lunora_notifications_functions_131.markNotificationRead as unknown as RegisteredLunoraFunction,
+    "notifications_functions:pruneOldNotifications": lunora_notifications_functions_131.pruneOldNotifications as unknown as RegisteredLunoraFunction,
+    "notifications_gdpr:collectNotificationsForExport": lunora_notifications_gdpr_132.collectNotificationsForExport as unknown as RegisteredLunoraFunction,
+    "notifications_gdpr:deleteUserNotifications": lunora_notifications_gdpr_132.deleteUserNotifications as unknown as RegisteredLunoraFunction,
+    "notifications_locked_redact:redactLockedLinks": lunora_notifications_locked_redact_133.redactLockedLinks as unknown as RegisteredLunoraFunction,
+    "notifications_push:getPushConfig": lunora_notifications_push_134.getPushConfig as unknown as RegisteredLunoraFunction,
+    "notifications_push:getPushSubscriptionStatus": lunora_notifications_push_134.getPushSubscriptionStatus as unknown as RegisteredLunoraFunction,
+    "notifications_push:loadPushNotification": lunora_notifications_push_134.loadPushNotification as unknown as RegisteredLunoraFunction,
+    "notifications_push:sendPushForNotification": lunora_notifications_push_134.sendPushForNotification as unknown as RegisteredLunoraFunction,
+    "notifications_push:subscribePush": lunora_notifications_push_134.subscribePush as unknown as RegisteredLunoraFunction,
+    "notifications_push:unsubscribePush": lunora_notifications_push_134.unsubscribePush as unknown as RegisteredLunoraFunction,
+    "notifications_task_email:claimOutcomeEmail": lunora_notifications_task_email_135.claimOutcomeEmail as unknown as RegisteredLunoraFunction,
+    "notifications_task_email:dispatchOutcomeEmails": lunora_notifications_task_email_135.dispatchOutcomeEmails as unknown as RegisteredLunoraFunction,
+    "notifications_task_email:holdsOutcomeEmailClaim": lunora_notifications_task_email_135.holdsOutcomeEmailClaim as unknown as RegisteredLunoraFunction,
+    "notifications_task_email:listPendingOutcomeEmails": lunora_notifications_task_email_135.listPendingOutcomeEmails as unknown as RegisteredLunoraFunction,
+    "notifications_task_email:loadRecipientEmail": lunora_notifications_task_email_135.loadRecipientEmail as unknown as RegisteredLunoraFunction,
+    "notifications_task_email:sendPendingOutcomeEmails": lunora_notifications_task_email_135.sendPendingOutcomeEmails as unknown as RegisteredLunoraFunction,
+    "notifications_task_email:setTaskEmailEnabled": lunora_notifications_task_email_135.setTaskEmailEnabled as unknown as RegisteredLunoraFunction,
+    "notifications_task_email:settleOutcomeEmail": lunora_notifications_task_email_135.settleOutcomeEmail as unknown as RegisteredLunoraFunction,
+    "pages_agent:getPageForAgent": lunora_pages_agent_136.getPageForAgent as unknown as RegisteredLunoraFunction,
+    "pages_agent:proposePageEdit": lunora_pages_agent_136.proposePageEdit as unknown as RegisteredLunoraFunction,
+    "pages_comments:createPageComment": lunora_pages_comments_137.createPageComment as unknown as RegisteredLunoraFunction,
+    "pages_comments:deletePageComment": lunora_pages_comments_137.deletePageComment as unknown as RegisteredLunoraFunction,
+    "pages_comments:editPageComment": lunora_pages_comments_137.editPageComment as unknown as RegisteredLunoraFunction,
+    "pages_comments:listPageComments": lunora_pages_comments_137.listPageComments as unknown as RegisteredLunoraFunction,
+    "pages_comments:replyToPageComment": lunora_pages_comments_137.replyToPageComment as unknown as RegisteredLunoraFunction,
+    "pages_comments:setPageCommentStatus": lunora_pages_comments_137.setPageCommentStatus as unknown as RegisteredLunoraFunction,
+    "pages_functions:createPage": lunora_pages_functions_138.createPage as unknown as RegisteredLunoraFunction,
+    "pages_functions:createPageFromDocument": lunora_pages_functions_138.createPageFromDocument as unknown as RegisteredLunoraFunction,
+    "pages_functions:deletePage": lunora_pages_functions_138.deletePage as unknown as RegisteredLunoraFunction,
+    "pages_functions:getPage": lunora_pages_functions_138.getPage as unknown as RegisteredLunoraFunction,
+    "pages_functions:getPageVersion": lunora_pages_functions_138.getPageVersion as unknown as RegisteredLunoraFunction,
+    "pages_functions:listPageTree": lunora_pages_functions_138.listPageTree as unknown as RegisteredLunoraFunction,
+    "pages_functions:listPageVersions": lunora_pages_functions_138.listPageVersions as unknown as RegisteredLunoraFunction,
+    "pages_functions:movePage": lunora_pages_functions_138.movePage as unknown as RegisteredLunoraFunction,
+    "pages_functions:renamePage": lunora_pages_functions_138.renamePage as unknown as RegisteredLunoraFunction,
+    "pages_functions:restorePageVersion": lunora_pages_functions_138.restorePageVersion as unknown as RegisteredLunoraFunction,
+    "pages_functions:savePageContent": lunora_pages_functions_138.savePageContent as unknown as RegisteredLunoraFunction,
+    "pages_functions:searchPages": lunora_pages_functions_138.searchPages as unknown as RegisteredLunoraFunction,
+    "pages_functions:setPageFavorite": lunora_pages_functions_138.setPageFavorite as unknown as RegisteredLunoraFunction,
+    "pages_gdpr:collectPagesForExport": lunora_pages_gdpr_139.collectPagesForExport as unknown as RegisteredLunoraFunction,
+    "pages_gdpr:deleteUserPages": lunora_pages_gdpr_139.deleteUserPages as unknown as RegisteredLunoraFunction,
+    "pages_presence:heartbeatPagePresence": lunora_pages_presence_140.heartbeatPagePresence as unknown as RegisteredLunoraFunction,
+    "pages_presence:leavePagePresence": lunora_pages_presence_140.leavePagePresence as unknown as RegisteredLunoraFunction,
+    "pages_presence:listPagePresence": lunora_pages_presence_140.listPagePresence as unknown as RegisteredLunoraFunction,
+    "pages_sharing:acceptPageInvite": lunora_pages_sharing_141.acceptPageInvite as unknown as RegisteredLunoraFunction,
+    "pages_sharing:createPageInvite": lunora_pages_sharing_141.createPageInvite as unknown as RegisteredLunoraFunction,
+    "pages_sharing:getPageInviteOwner": lunora_pages_sharing_141.getPageInviteOwner as unknown as RegisteredLunoraFunction,
+    "pages_sharing:getPageSharing": lunora_pages_sharing_141.getPageSharing as unknown as RegisteredLunoraFunction,
+    "pages_sharing:getPublicPage": lunora_pages_sharing_141.getPublicPage as unknown as RegisteredLunoraFunction,
+    "pages_sharing:getPublicPageOwner": lunora_pages_sharing_141.getPublicPageOwner as unknown as RegisteredLunoraFunction,
+    "pages_sharing:readPublicPage": lunora_pages_sharing_141.readPublicPage as unknown as RegisteredLunoraFunction,
+    "pages_sharing:redeemPageInvite": lunora_pages_sharing_141.redeemPageInvite as unknown as RegisteredLunoraFunction,
+    "pages_sharing:removePageGrant": lunora_pages_sharing_141.removePageGrant as unknown as RegisteredLunoraFunction,
+    "pages_sharing:resolvePageShard": lunora_pages_sharing_141.resolvePageShard as unknown as RegisteredLunoraFunction,
+    "pages_sharing:revokePageInvite": lunora_pages_sharing_141.revokePageInvite as unknown as RegisteredLunoraFunction,
+    "pages_sharing:setPagePublic": lunora_pages_sharing_141.setPagePublic as unknown as RegisteredLunoraFunction,
+    "pages_sharing:updatePageGrant": lunora_pages_sharing_141.updatePageGrant as unknown as RegisteredLunoraFunction,
+    "projects_functions:createProject": lunora_projects_functions_142.createProject as unknown as RegisteredLunoraFunction,
+    "projects_functions:deleteProject": lunora_projects_functions_142.deleteProject as unknown as RegisteredLunoraFunction,
+    "projects_functions:getProject": lunora_projects_functions_142.getProject as unknown as RegisteredLunoraFunction,
+    "projects_functions:listPinnedProjects": lunora_projects_functions_142.listPinnedProjects as unknown as RegisteredLunoraFunction,
+    "projects_functions:listProjects": lunora_projects_functions_142.listProjects as unknown as RegisteredLunoraFunction,
+    "projects_functions:listThreadsByProject": lunora_projects_functions_142.listThreadsByProject as unknown as RegisteredLunoraFunction,
+    "projects_functions:moveThreadToProject": lunora_projects_functions_142.moveThreadToProject as unknown as RegisteredLunoraFunction,
+    "projects_functions:pinProject": lunora_projects_functions_142.pinProject as unknown as RegisteredLunoraFunction,
+    "projects_functions:unpinProject": lunora_projects_functions_142.unpinProject as unknown as RegisteredLunoraFunction,
+    "projects_functions:updateProject": lunora_projects_functions_142.updateProject as unknown as RegisteredLunoraFunction,
+    "projects_functions:updateProjectOrder": lunora_projects_functions_142.updateProjectOrder as unknown as RegisteredLunoraFunction,
+    "prompts_functions:applyThreadVariablesToPrompt": lunora_prompts_functions_143.applyThreadVariablesToPrompt as unknown as RegisteredLunoraFunction,
+    "prompts_functions:calculatePromptCount": lunora_prompts_functions_143.calculatePromptCount as unknown as RegisteredLunoraFunction,
+    "prompts_functions:calculatePrompts": lunora_prompts_functions_143.calculatePrompts as unknown as RegisteredLunoraFunction,
+    "prompts_functions:calculatePromptTags": lunora_prompts_functions_143.calculatePromptTags as unknown as RegisteredLunoraFunction,
+    "prompts_functions:createPrompt": lunora_prompts_functions_143.createPrompt as unknown as RegisteredLunoraFunction,
+    "prompts_functions:deletePrompt": lunora_prompts_functions_143.deletePrompt as unknown as RegisteredLunoraFunction,
+    "prompts_functions:deleteThreadVariable": lunora_prompts_functions_143.deleteThreadVariable as unknown as RegisteredLunoraFunction,
+    "prompts_functions:duplicatePrompt": lunora_prompts_functions_143.duplicatePrompt as unknown as RegisteredLunoraFunction,
+    "prompts_functions:getPrompt": lunora_prompts_functions_143.getPrompt as unknown as RegisteredLunoraFunction,
+    "prompts_functions:getPromptCount": lunora_prompts_functions_143.getPromptCount as unknown as RegisteredLunoraFunction,
+    "prompts_functions:getPromptCountInternal": lunora_prompts_functions_143.getPromptCountInternal as unknown as RegisteredLunoraFunction,
+    "prompts_functions:getPromptHistory": lunora_prompts_functions_143.getPromptHistory as unknown as RegisteredLunoraFunction,
+    "prompts_functions:getPrompts": lunora_prompts_functions_143.getPrompts as unknown as RegisteredLunoraFunction,
+    "prompts_functions:getPromptsByOrganizationInternal": lunora_prompts_functions_143.getPromptsByOrganizationInternal as unknown as RegisteredLunoraFunction,
+    "prompts_functions:getPromptsByUserInternal": lunora_prompts_functions_143.getPromptsByUserInternal as unknown as RegisteredLunoraFunction,
+    "prompts_functions:getPromptTags": lunora_prompts_functions_143.getPromptTags as unknown as RegisteredLunoraFunction,
+    "prompts_functions:getResolvedVariables": lunora_prompts_functions_143.getResolvedVariables as unknown as RegisteredLunoraFunction,
+    "prompts_functions:getThreadVariables": lunora_prompts_functions_143.getThreadVariables as unknown as RegisteredLunoraFunction,
+    "prompts_functions:getUserVariableDefaults": lunora_prompts_functions_143.getUserVariableDefaults as unknown as RegisteredLunoraFunction,
+    "prompts_functions:optimizePrompt": lunora_prompts_functions_143.optimizePrompt as unknown as RegisteredLunoraFunction,
+    "prompts_functions:recordPromptUsage": lunora_prompts_functions_143.recordPromptUsage as unknown as RegisteredLunoraFunction,
+    "prompts_functions:restorePromptVersion": lunora_prompts_functions_143.restorePromptVersion as unknown as RegisteredLunoraFunction,
+    "prompts_functions:searchPrompts": lunora_prompts_functions_143.searchPrompts as unknown as RegisteredLunoraFunction,
+    "prompts_functions:setOrganizationVariableDefaults": lunora_prompts_functions_143.setOrganizationVariableDefaults as unknown as RegisteredLunoraFunction,
+    "prompts_functions:setThreadVariables": lunora_prompts_functions_143.setThreadVariables as unknown as RegisteredLunoraFunction,
+    "prompts_functions:setUserVariableDefaults": lunora_prompts_functions_143.setUserVariableDefaults as unknown as RegisteredLunoraFunction,
+    "prompts_functions:togglePromptFavorite": lunora_prompts_functions_143.togglePromptFavorite as unknown as RegisteredLunoraFunction,
+    "prompts_functions:updatePrompt": lunora_prompts_functions_143.updatePrompt as unknown as RegisteredLunoraFunction,
+    "prompts_functions:updateThreadVariable": lunora_prompts_functions_143.updateThreadVariable as unknown as RegisteredLunoraFunction,
+    "saas_notification_functions:listNotifications": lunora_saas_notification_functions_144.listNotifications as unknown as RegisteredLunoraFunction,
+    "saas_notification_functions:markNotificationsRead": lunora_saas_notification_functions_144.markNotificationsRead as unknown as RegisteredLunoraFunction,
+    "saas_notification_functions:saveNotifications": lunora_saas_notification_functions_144.saveNotifications as unknown as RegisteredLunoraFunction,
+    "saas_usage_functions:createMyNotificationRule": lunora_saas_usage_functions_145.createMyNotificationRule as unknown as RegisteredLunoraFunction,
+    "saas_usage_functions:deleteMyNotificationRule": lunora_saas_usage_functions_145.deleteMyNotificationRule as unknown as RegisteredLunoraFunction,
+    "saas_usage_functions:getMyUsage": lunora_saas_usage_functions_145.getMyUsage as unknown as RegisteredLunoraFunction,
+    "saas_usage_functions:listMyNotificationRules": lunora_saas_usage_functions_145.listMyNotificationRules as unknown as RegisteredLunoraFunction,
+    "sandbox_cleanup:checkAndTerminateSandbox": lunora_sandbox_cleanup_146.checkAndTerminateSandbox as unknown as RegisteredLunoraFunction,
+    "sandbox_cleanup:default": lunora_sandbox_cleanup_146.default as unknown as RegisteredLunoraFunction,
+    "sandbox_cleanup:killSandboxById": lunora_sandbox_cleanup_146.killSandboxById as unknown as RegisteredLunoraFunction,
+    "sandbox_functions:activateBotComputer": lunora_sandbox_functions_147.activateBotComputer as unknown as RegisteredLunoraFunction,
+    "sandbox_functions:checkAndTerminateIdle": lunora_sandbox_functions_147.checkAndTerminateIdle as unknown as RegisteredLunoraFunction,
+    "sandbox_functions:claimBotComputer": lunora_sandbox_functions_147.claimBotComputer as unknown as RegisteredLunoraFunction,
+    "sandbox_functions:closeSession": lunora_sandbox_functions_147.closeSession as unknown as RegisteredLunoraFunction,
+    "sandbox_functions:createSession": lunora_sandbox_functions_147.createSession as unknown as RegisteredLunoraFunction,
+    "sandbox_functions:getActiveSession": lunora_sandbox_functions_147.getActiveSession as unknown as RegisteredLunoraFunction,
+    "sandbox_functions:logAction": lunora_sandbox_functions_147.logAction as unknown as RegisteredLunoraFunction,
+    "sandbox_functions:markBotComputerPaused": lunora_sandbox_functions_147.markBotComputerPaused as unknown as RegisteredLunoraFunction,
+    "sandbox_functions:retireBotComputers": lunora_sandbox_functions_147.retireBotComputers as unknown as RegisteredLunoraFunction,
+    "sandbox_functions:updateSession": lunora_sandbox_functions_147.updateSession as unknown as RegisteredLunoraFunction,
+    "sandbox_pool_functions:claimWarmSandbox": lunora_sandbox_pool_functions_148.claimWarmSandbox as unknown as RegisteredLunoraFunction,
+    "sandbox_pool_functions:getWarmSandboxes": lunora_sandbox_pool_functions_148.getWarmSandboxes as unknown as RegisteredLunoraFunction,
+    "sandbox_pool_functions:registerWarmSandbox": lunora_sandbox_pool_functions_148.registerWarmSandbox as unknown as RegisteredLunoraFunction,
+    "sandbox_pool:cleanupExpiredWarm": lunora_sandbox_pool_149.cleanupExpiredWarm as unknown as RegisteredLunoraFunction,
+    "sandbox_pool:createWarmSandbox": lunora_sandbox_pool_149.createWarmSandbox as unknown as RegisteredLunoraFunction,
+    "sandbox_pool:replenishPool": lunora_sandbox_pool_149.replenishPool as unknown as RegisteredLunoraFunction,
+    "sandbox_pty:default": lunora_sandbox_pty_150.default as unknown as RegisteredLunoraFunction,
+    "sandbox_workspace_sync_functions:getWorkspaceMetadata": lunora_sandbox_workspace_sync_functions_151.getWorkspaceMetadata as unknown as RegisteredLunoraFunction,
+    "sandbox_workspace_sync:restoreWorkspace": lunora_sandbox_workspace_sync_152.restoreWorkspace as unknown as RegisteredLunoraFunction,
+    "sandbox_workspace_sync:saveWorkspace": lunora_sandbox_workspace_sync_152.saveWorkspace as unknown as RegisteredLunoraFunction,
+    "skills_agent_creation:createSkillFromAgent": lunora_skills_agent_creation_153.createSkillFromAgent as unknown as RegisteredLunoraFunction,
+    "skills_builder:attachSkillTestDrive": lunora_skills_builder_154.attachSkillTestDrive as unknown as RegisteredLunoraFunction,
+    "skills_builder:refineBuilderDraft": lunora_skills_builder_154.refineBuilderDraft as unknown as RegisteredLunoraFunction,
+    "skills_builder:runBuilderTurn": lunora_skills_builder_154.runBuilderTurn as unknown as RegisteredLunoraFunction,
+    "skills_builder:searchMarketplaceForBuilder": lunora_skills_builder_154.searchMarketplaceForBuilder as unknown as RegisteredLunoraFunction,
+    "skills_executor:getEnabledSkillsForSystemPromptQuery": lunora_skills_executor_155.getEnabledSkillsForSystemPromptQuery as unknown as RegisteredLunoraFunction,
+    "skills_executor:loadSkillForInvocationQuery": lunora_skills_executor_155.loadSkillForInvocationQuery as unknown as RegisteredLunoraFunction,
+    "skills_executor:resolveSkillsForRun": lunora_skills_executor_155.resolveSkillsForRun as unknown as RegisteredLunoraFunction,
+    "skills_functions:calculateSkillCount": lunora_skills_functions_156.calculateSkillCount as unknown as RegisteredLunoraFunction,
+    "skills_functions:calculateSkills": lunora_skills_functions_156.calculateSkills as unknown as RegisteredLunoraFunction,
+    "skills_functions:createSkill": lunora_skills_functions_156.createSkill as unknown as RegisteredLunoraFunction,
+    "skills_functions:deleteSkill": lunora_skills_functions_156.deleteSkill as unknown as RegisteredLunoraFunction,
+    "skills_functions:getAvailableSkillTools": lunora_skills_functions_156.getAvailableSkillTools as unknown as RegisteredLunoraFunction,
+    "skills_functions:getEnabledSkillsMetadata": lunora_skills_functions_156.getEnabledSkillsMetadata as unknown as RegisteredLunoraFunction,
+    "skills_functions:getSkill": lunora_skills_functions_156.getSkill as unknown as RegisteredLunoraFunction,
+    "skills_functions:getSkillCount": lunora_skills_functions_156.getSkillCount as unknown as RegisteredLunoraFunction,
+    "skills_functions:getSkillCountInternal": lunora_skills_functions_156.getSkillCountInternal as unknown as RegisteredLunoraFunction,
+    "skills_functions:getSkills": lunora_skills_functions_156.getSkills as unknown as RegisteredLunoraFunction,
+    "skills_functions:getSkillsByIdsInternal": lunora_skills_functions_156.getSkillsByIdsInternal as unknown as RegisteredLunoraFunction,
+    "skills_functions:getSkillsByOrganizationInternal": lunora_skills_functions_156.getSkillsByOrganizationInternal as unknown as RegisteredLunoraFunction,
+    "skills_functions:getSkillsByUserInternal": lunora_skills_functions_156.getSkillsByUserInternal as unknown as RegisteredLunoraFunction,
+    "skills_functions:getUserSkillsStateInternal": lunora_skills_functions_156.getUserSkillsStateInternal as unknown as RegisteredLunoraFunction,
+    "skills_functions:recordSkillInvocation": lunora_skills_functions_156.recordSkillInvocation as unknown as RegisteredLunoraFunction,
+    "skills_functions:setSkillAutoRun": lunora_skills_functions_156.setSkillAutoRun as unknown as RegisteredLunoraFunction,
+    "skills_functions:setSkillEnabled": lunora_skills_functions_156.setSkillEnabled as unknown as RegisteredLunoraFunction,
+    "skills_functions:updateSkill": lunora_skills_functions_156.updateSkill as unknown as RegisteredLunoraFunction,
+    "skills_generate:generateSkillDraft": lunora_skills_generate_157.generateSkillDraft as unknown as RegisteredLunoraFunction,
+    "skills_io:exportSkill": lunora_skills_io_158.exportSkill as unknown as RegisteredLunoraFunction,
+    "skills_io:fetchSkillFromUrl": lunora_skills_io_158.fetchSkillFromUrl as unknown as RegisteredLunoraFunction,
+    "skills_io:findFreeSkillSlug": lunora_skills_io_158.findFreeSkillSlug as unknown as RegisteredLunoraFunction,
+    "skills_io:importSkill": lunora_skills_io_158.importSkill as unknown as RegisteredLunoraFunction,
+    "skills_io:listSkillFilesInternal": lunora_skills_io_158.listSkillFilesInternal as unknown as RegisteredLunoraFunction,
+    "skills_io:saveImportedSkillFiles": lunora_skills_io_158.saveImportedSkillFiles as unknown as RegisteredLunoraFunction,
+    "skills_jit_tool_loader:getSkillToolConfig": lunora_skills_jit_tool_loader_159.getSkillToolConfig as unknown as RegisteredLunoraFunction,
+    "skills_marketplace:browseSkills": lunora_skills_marketplace_160.browseSkills as unknown as RegisteredLunoraFunction,
+    "skills_marketplace:forkSkill": lunora_skills_marketplace_160.forkSkill as unknown as RegisteredLunoraFunction,
+    "skills_marketplace:getSkillDetail": lunora_skills_marketplace_160.getSkillDetail as unknown as RegisteredLunoraFunction,
+    "skills_marketplace:installSkill": lunora_skills_marketplace_160.installSkill as unknown as RegisteredLunoraFunction,
+    "skills_marketplace:rateSkill": lunora_skills_marketplace_160.rateSkill as unknown as RegisteredLunoraFunction,
+    "skills_marketplace:searchSkills": lunora_skills_marketplace_160.searchSkills as unknown as RegisteredLunoraFunction,
+    "skills_marketplace:uninstallSkill": lunora_skills_marketplace_160.uninstallSkill as unknown as RegisteredLunoraFunction,
+    "sub_agents_execute:runSubAgent": lunora_sub_agents_execute_161.runSubAgent as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:attachChildThread": lunora_sub_agents_functions_162.attachChildThread as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:cancelRun": lunora_sub_agents_functions_162.cancelRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:claimRun": lunora_sub_agents_functions_162.claimRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:completeRun": lunora_sub_agents_functions_162.completeRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:createRun": lunora_sub_agents_functions_162.createRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:getRunByToolCall": lunora_sub_agents_functions_162.getRunByToolCall as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:postResult": lunora_sub_agents_functions_162.postResult as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:reapRun": lunora_sub_agents_functions_162.reapRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:shouldRunStop": lunora_sub_agents_functions_162.shouldRunStop as unknown as RegisteredLunoraFunction,
+    "system_prompts_functions:createPreset": lunora_system_prompts_functions_163.createPreset as unknown as RegisteredLunoraFunction,
+    "system_prompts_functions:deletePreset": lunora_system_prompts_functions_163.deletePreset as unknown as RegisteredLunoraFunction,
+    "system_prompts_functions:listPresets": lunora_system_prompts_functions_163.listPresets as unknown as RegisteredLunoraFunction,
+    "system_prompts_functions:updatePreset": lunora_system_prompts_functions_163.updatePreset as unknown as RegisteredLunoraFunction,
+    "tasks_execute:finishCodingAgentRound": lunora_tasks_execute_164.finishCodingAgentRound as unknown as RegisteredLunoraFunction,
+    "tasks_execute:runTaskRound": lunora_tasks_execute_164.runTaskRound as unknown as RegisteredLunoraFunction,
+    "tasks_functions:cancelTask": lunora_tasks_functions_165.cancelTask as unknown as RegisteredLunoraFunction,
+    "tasks_functions:createGoal": lunora_tasks_functions_165.createGoal as unknown as RegisteredLunoraFunction,
+    "tasks_functions:createTask": lunora_tasks_functions_165.createTask as unknown as RegisteredLunoraFunction,
+    "tasks_functions:deleteGoal": lunora_tasks_functions_165.deleteGoal as unknown as RegisteredLunoraFunction,
+    "tasks_functions:deleteTask": lunora_tasks_functions_165.deleteTask as unknown as RegisteredLunoraFunction,
+    "tasks_functions:getTaskBoard": lunora_tasks_functions_165.getTaskBoard as unknown as RegisteredLunoraFunction,
+    "tasks_functions:getTaskRuns": lunora_tasks_functions_165.getTaskRuns as unknown as RegisteredLunoraFunction,
+    "tasks_functions:listTaskSkillOptions": lunora_tasks_functions_165.listTaskSkillOptions as unknown as RegisteredLunoraFunction,
+    "tasks_functions:reviewTask": lunora_tasks_functions_165.reviewTask as unknown as RegisteredLunoraFunction,
+    "tasks_functions:runTask": lunora_tasks_functions_165.runTask as unknown as RegisteredLunoraFunction,
+    "tasks_functions:updateGoal": lunora_tasks_functions_165.updateGoal as unknown as RegisteredLunoraFunction,
+    "tasks_functions:updateTask": lunora_tasks_functions_165.updateTask as unknown as RegisteredLunoraFunction,
+    "tasks_gdpr:collectTasksForExport": lunora_tasks_gdpr_166.collectTasksForExport as unknown as RegisteredLunoraFunction,
+    "tasks_gdpr:deleteUserTasks": lunora_tasks_gdpr_166.deleteUserTasks as unknown as RegisteredLunoraFunction,
+    "tasks_internal:canRunForUser": lunora_tasks_internal_167.canRunForUser as unknown as RegisteredLunoraFunction,
+    "tasks_internal:checkDueTasks": lunora_tasks_internal_167.checkDueTasks as unknown as RegisteredLunoraFunction,
+    "tasks_internal:claimRound": lunora_tasks_internal_167.claimRound as unknown as RegisteredLunoraFunction,
+    "tasks_internal:completeRound": lunora_tasks_internal_167.completeRound as unknown as RegisteredLunoraFunction,
+    "tasks_internal:getTaskForVerification": lunora_tasks_internal_167.getTaskForVerification as unknown as RegisteredLunoraFunction,
+    "tasks_internal:isRoundRunning": lunora_tasks_internal_167.isRoundRunning as unknown as RegisteredLunoraFunction,
+    "tasks_internal:resolveTaskSkill": lunora_tasks_internal_167.resolveTaskSkill as unknown as RegisteredLunoraFunction,
+    "triggers_execute:default": lunora_triggers_execute_168.default as unknown as RegisteredLunoraFunction,
+    "triggers_execute:executeTrigger": lunora_triggers_execute_168.executeTrigger as unknown as RegisteredLunoraFunction,
+    "triggers_functions:admitTriggerRun": lunora_triggers_functions_169.admitTriggerRun as unknown as RegisteredLunoraFunction,
+    "triggers_functions:createExecution": lunora_triggers_functions_169.createExecution as unknown as RegisteredLunoraFunction,
+    "triggers_functions:createTrigger": lunora_triggers_functions_169.createTrigger as unknown as RegisteredLunoraFunction,
+    "triggers_functions:deleteTrigger": lunora_triggers_functions_169.deleteTrigger as unknown as RegisteredLunoraFunction,
+    "triggers_functions:getDueScheduleTriggers": lunora_triggers_functions_169.getDueScheduleTriggers as unknown as RegisteredLunoraFunction,
+    "triggers_functions:getTriggerExecutions": lunora_triggers_functions_169.getTriggerExecutions as unknown as RegisteredLunoraFunction,
+    "triggers_functions:getTriggerInternal": lunora_triggers_functions_169.getTriggerInternal as unknown as RegisteredLunoraFunction,
+    "triggers_functions:getTriggers": lunora_triggers_functions_169.getTriggers as unknown as RegisteredLunoraFunction,
+    "triggers_functions:recordFilteredExecution": lunora_triggers_functions_169.recordFilteredExecution as unknown as RegisteredLunoraFunction,
+    "triggers_functions:setTriggerEnabled": lunora_triggers_functions_169.setTriggerEnabled as unknown as RegisteredLunoraFunction,
+    "triggers_functions:setTriggerEnabledInternal": lunora_triggers_functions_169.setTriggerEnabledInternal as unknown as RegisteredLunoraFunction,
+    "triggers_functions:testRunTrigger": lunora_triggers_functions_169.testRunTrigger as unknown as RegisteredLunoraFunction,
+    "triggers_functions:updateExecution": lunora_triggers_functions_169.updateExecution as unknown as RegisteredLunoraFunction,
+    "triggers_functions:updateTrigger": lunora_triggers_functions_169.updateTrigger as unknown as RegisteredLunoraFunction,
+    "triggers_functions:updateTriggerStats": lunora_triggers_functions_169.updateTriggerStats as unknown as RegisteredLunoraFunction,
+    "triggers_schedule:checkDueTriggers": lunora_triggers_schedule_170.checkDueTriggers as unknown as RegisteredLunoraFunction,
+    "usage_activity:getActivityHeatmap": lunora_usage_activity_171.getActivityHeatmap as unknown as RegisteredLunoraFunction,
+    "usage_activity:getSkillBreakdown": lunora_usage_activity_171.getSkillBreakdown as unknown as RegisteredLunoraFunction,
+    "usage_activity:recordReplyUsage": lunora_usage_activity_171.recordReplyUsage as unknown as RegisteredLunoraFunction,
+    "usage_backfill:getUsageBackfillStatus": lunora_usage_backfill_172.getUsageBackfillStatus as unknown as RegisteredLunoraFunction,
+    "usage_backfill:runUsageBackfillStep": lunora_usage_backfill_172.runUsageBackfillStep as unknown as RegisteredLunoraFunction,
+    "usage_backfill:startUsageBackfill": lunora_usage_backfill_172.startUsageBackfill as unknown as RegisteredLunoraFunction,
+    "usage_backfill:sweepUsageRollup": lunora_usage_backfill_172.sweepUsageRollup as unknown as RegisteredLunoraFunction,
+    "vault_fork_copy:copyVaultObjects": lunora_vault_fork_copy_173.copyVaultObjects as unknown as RegisteredLunoraFunction,
+    "vault_functions:applyFileMetadata": lunora_vault_functions_174.applyFileMetadata as unknown as RegisteredLunoraFunction,
+    "vault_functions:deleteAttachments": lunora_vault_functions_174.deleteAttachments as unknown as RegisteredLunoraFunction,
+    "vault_functions:findAttachmentByKey": lunora_vault_functions_174.findAttachmentByKey as unknown as RegisteredLunoraFunction,
+    "vault_functions:getAttachment": lunora_vault_functions_174.getAttachment as unknown as RegisteredLunoraFunction,
+    "vault_functions:getAttachmentsForChat": lunora_vault_functions_174.getAttachmentsForChat as unknown as RegisteredLunoraFunction,
+    "vault_functions:getAttachmentsForOrganization": lunora_vault_functions_174.getAttachmentsForOrganization as unknown as RegisteredLunoraFunction,
+    "vault_functions:getAttachmentsForUser": lunora_vault_functions_174.getAttachmentsForUser as unknown as RegisteredLunoraFunction,
+    "vault_functions:getDownloadUrl": lunora_vault_functions_174.getDownloadUrl as unknown as RegisteredLunoraFunction,
+    "vault_functions:getStorageUrl": lunora_vault_functions_174.getStorageUrl as unknown as RegisteredLunoraFunction,
+    "vault_functions:insertVaultFile": lunora_vault_functions_174.insertVaultFile as unknown as RegisteredLunoraFunction,
+    "vault_functions:internalSaveGenerated": lunora_vault_functions_174.internalSaveGenerated as unknown as RegisteredLunoraFunction,
+    "vault_functions:markNsfwChecking": lunora_vault_functions_174.markNsfwChecking as unknown as RegisteredLunoraFunction,
+    "vault_functions:markNsfwFailed": lunora_vault_functions_174.markNsfwFailed as unknown as RegisteredLunoraFunction,
+    "vault_functions:saveGeneratedImage": lunora_vault_functions_174.saveGeneratedImage as unknown as RegisteredLunoraFunction,
+    "vault_functions:saveNsfwResult": lunora_vault_functions_174.saveNsfwResult as unknown as RegisteredLunoraFunction,
+    "vault_functions:saveVaultFile": lunora_vault_functions_174.saveVaultFile as unknown as RegisteredLunoraFunction,
+    "vault_functions:syncMetadata": lunora_vault_functions_174.syncMetadata as unknown as RegisteredLunoraFunction,
+    "voice_functions:authorizeScribeToken": lunora_voice_functions_175.authorizeScribeToken as unknown as RegisteredLunoraFunction,
+    "voice_speech:synthesizeSpeech": lunora_voice_speech_176.synthesizeSpeech as unknown as RegisteredLunoraFunction,
+    "workflow_executor:executeWorkflow": lunora_workflow_executor_177.executeWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_fork:completeFork": lunora_workflow_fork_178.completeFork as unknown as RegisteredLunoraFunction,
+    "workflow_fork:forkWorkflow": lunora_workflow_fork_178.forkWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_fork:getAuthorVaultRows": lunora_workflow_fork_178.getAuthorVaultRows as unknown as RegisteredLunoraFunction,
+    "workflow_fork:getForkSource": lunora_workflow_fork_178.getForkSource as unknown as RegisteredLunoraFunction,
+    "workflow_functions:createExecution": lunora_workflow_functions_179.createExecution as unknown as RegisteredLunoraFunction,
+    "workflow_functions:createNodeExecution": lunora_workflow_functions_179.createNodeExecution as unknown as RegisteredLunoraFunction,
+    "workflow_functions:createWorkflow": lunora_workflow_functions_179.createWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_functions:getExecution": lunora_workflow_functions_179.getExecution as unknown as RegisteredLunoraFunction,
+    "workflow_functions:getWorkflow": lunora_workflow_functions_179.getWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_functions:listExecutions": lunora_workflow_functions_179.listExecutions as unknown as RegisteredLunoraFunction,
+    "workflow_functions:listNodeExecutions": lunora_workflow_functions_179.listNodeExecutions as unknown as RegisteredLunoraFunction,
+    "workflow_functions:listWorkflows": lunora_workflow_functions_179.listWorkflows as unknown as RegisteredLunoraFunction,
+    "workflow_functions:updateExecutionStatus": lunora_workflow_functions_179.updateExecutionStatus as unknown as RegisteredLunoraFunction,
+    "workflow_functions:updateNodeExecution": lunora_workflow_functions_179.updateNodeExecution as unknown as RegisteredLunoraFunction,
+    "workflow_functions:updateWorkflowContent": lunora_workflow_functions_179.updateWorkflowContent as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:browseGallery": lunora_workflow_gallery_180.browseGallery as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:getFeaturedWorkflows": lunora_workflow_gallery_180.getFeaturedWorkflows as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:getPublicWorkflow": lunora_workflow_gallery_180.getPublicWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:getPublicWorkflowOwner": lunora_workflow_gallery_180.getPublicWorkflowOwner as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:publishWorkflow": lunora_workflow_gallery_180.publishWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:readPublicWorkflow": lunora_workflow_gallery_180.readPublicWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:unpublishWorkflow": lunora_workflow_gallery_180.unpublishWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:updateGalleryMeta": lunora_workflow_gallery_180.updateGalleryMeta as unknown as RegisteredLunoraFunction,
+    "workflow_generate:generateWorkflowFromPrompt": lunora_workflow_generate_181.generateWorkflowFromPrompt as unknown as RegisteredLunoraFunction,
+    "workflow_media_ops:extractVideoFrame": lunora_workflow_media_ops_182.extractVideoFrame as unknown as RegisteredLunoraFunction,
+    "workflow_presence:checkNodeLock": lunora_workflow_presence_183.checkNodeLock as unknown as RegisteredLunoraFunction,
+    "workflow_presence:cleanupStalePresence": lunora_workflow_presence_183.cleanupStalePresence as unknown as RegisteredLunoraFunction,
+    "workflow_presence:disconnect": lunora_workflow_presence_183.disconnect as unknown as RegisteredLunoraFunction,
+    "workflow_presence:heartbeat": lunora_workflow_presence_183.heartbeat as unknown as RegisteredLunoraFunction,
+    "workflow_presence:listPresence": lunora_workflow_presence_183.listPresence as unknown as RegisteredLunoraFunction,
+    "workflow_presence:listVersions": lunora_workflow_presence_183.listVersions as unknown as RegisteredLunoraFunction,
+    "workflow_presence:restoreVersion": lunora_workflow_presence_183.restoreVersion as unknown as RegisteredLunoraFunction,
+    "workflow_presence:saveVersion": lunora_workflow_presence_183.saveVersion as unknown as RegisteredLunoraFunction,
 };
 
 /**
@@ -4007,7 +4022,7 @@ __has2 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "htmlContent": __val1 } : {}), "presentationId": source["presentationId"], "slideNumber": source["slideNumber"], "threadId": source["threadId"], ...(__has2 ? { "title": __val2 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_chat_streaming_63.createStreamWithMessage.args, (source) => {
+installCompiledValidatorMap(lunora_chat_streaming_64.createStreamWithMessage.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["messageId"] !== "string") return DEFER;
@@ -4068,14 +4083,14 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "messageId": source["messageId"], "streamingConfig": __obj8, "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_chat_streaming_63.streamRunThread.args, (source) => {
+installCompiledValidatorMap(lunora_chat_streaming_64.streamRunThread.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["streamId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "streamId": source["streamId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_chat_streaming_persistent_library_65.addChunk.args, (source) => {
+installCompiledValidatorMap(lunora_chat_streaming_persistent_library_66.addChunk.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["final"] !== "boolean") return DEFER;
@@ -4086,28 +4101,35 @@ if (typeof source["reasoning"] !== "string") return DEFER;
 __val1 = source["reasoning"];
 __has1 = true;
 }
-let __has3 = false;
-let __val3;
+let __has2 = false;
+let __val2;
+if (source["restart"] !== undefined) {
+if (typeof source["restart"] !== "boolean") return DEFER;
+__val2 = source["restart"];
+__has2 = true;
+}
+let __has4 = false;
+let __val4;
 if (source["speaker"] !== undefined) {
 if (typeof source["speaker"] !== "object" || source["speaker"] === null || Array.isArray(source["speaker"])) return DEFER;
 if (Object.getPrototypeOf(source["speaker"]) !== Object.prototype && Object.getPrototypeOf(source["speaker"]) !== null) return DEFER;
 if (typeof source["speaker"]["name"] !== "string") return DEFER;
 if (typeof source["speaker"]["skillId"] !== "string") return DEFER;
-const __obj2 = { "name": source["speaker"]["name"], "skillId": source["speaker"]["skillId"] };
-__val3 = __obj2;
-__has3 = true;
+const __obj3 = { "name": source["speaker"]["name"], "skillId": source["speaker"]["skillId"] };
+__val4 = __obj3;
+__has4 = true;
 }
 if (typeof source["streamId"] !== "string") return DEFER;
 if (typeof source["text"] !== "string") return DEFER;
-return { "final": source["final"], ...(__has1 ? { "reasoning": __val1 } : {}), ...(__has3 ? { "speaker": __val3 } : {}), "streamId": source["streamId"], "text": source["text"] };
+return { "final": source["final"], ...(__has1 ? { "reasoning": __val1 } : {}), ...(__has2 ? { "restart": __val2 } : {}), ...(__has4 ? { "speaker": __val4 } : {}), "streamId": source["streamId"], "text": source["text"] };
 });
-installCompiledValidatorMap(lunora_chat_streaming_persistent_library_65.claimStreamRun.args, (source) => {
+installCompiledValidatorMap(lunora_chat_streaming_persistent_library_66.claimStreamRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["streamId"] !== "string") return DEFER;
 return { "streamId": source["streamId"] };
 });
-installCompiledValidatorMap(lunora_chat_streaming_persistent_library_65.createStream.args, (source) => {
+installCompiledValidatorMap(lunora_chat_streaming_persistent_library_66.createStream.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["messageId"] !== "string") return DEFER;
@@ -4175,7 +4197,7 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "messageId": source["messageId"], "streamingConfig": __obj9, "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_chat_streaming_persistent_library_65.getChunksAfter.args, (source) => {
+installCompiledValidatorMap(lunora_chat_streaming_persistent_library_66.getChunksAfter.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["afterIndex"] !== "number" || !Number.isFinite(source["afterIndex"])) return DEFER;
@@ -4189,25 +4211,25 @@ __has1 = true;
 if (typeof source["streamId"] !== "string") return DEFER;
 return { "afterIndex": source["afterIndex"], ...(__has1 ? { "checkLock": __val1 } : {}), "streamId": source["streamId"] };
 });
-installCompiledValidatorMap(lunora_chat_streaming_persistent_library_65.getStreamStatus.args, (source) => {
+installCompiledValidatorMap(lunora_chat_streaming_persistent_library_66.getStreamStatus.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["streamId"] !== "string") return DEFER;
 return { "streamId": source["streamId"] };
 });
-installCompiledValidatorMap(lunora_chat_streaming_persistent_library_65.getStreamText.args, (source) => {
+installCompiledValidatorMap(lunora_chat_streaming_persistent_library_66.getStreamText.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["streamId"] !== "string") return DEFER;
 return { "streamId": source["streamId"] };
 });
-installCompiledValidatorMap(lunora_chat_tags_functions_66.deleteThreadTag.args, (source) => {
+installCompiledValidatorMap(lunora_chat_tags_functions_67.deleteThreadTag.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["tagId"] !== "string") return DEFER;
 return { "tagId": source["tagId"] };
 });
-installCompiledValidatorMap(lunora_chat_tags_functions_66.setThreadTagAssigned.args, (source) => {
+installCompiledValidatorMap(lunora_chat_tags_functions_67.setThreadTagAssigned.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["assigned"] !== "boolean") return DEFER;
@@ -4215,7 +4237,7 @@ if (typeof source["tagId"] !== "string") return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "assigned": source["assigned"], "tagId": source["tagId"], "threadId": source["threadId"] };
 });
-installCompiledValidatorMap(lunora_chat_tool_permissions_67.getPendingToolApproval.args, (source) => {
+installCompiledValidatorMap(lunora_chat_tool_permissions_68.getPendingToolApproval.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["approvalId"] !== "string") return DEFER;
@@ -4223,19 +4245,19 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "approvalId": source["approvalId"], "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_chat_tool_permissions_67.getToolPermissionsQuery.args, (source) => {
+installCompiledValidatorMap(lunora_chat_tool_permissions_68.getToolPermissionsQuery.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_chat_tools_browser_node_68.closeBrowserSession.args, (source) => {
+installCompiledValidatorMap(lunora_chat_tools_browser_node_69.closeBrowserSession.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["sessionId"] !== "string") return DEFER;
 return { "sessionId": source["sessionId"] };
 });
-installCompiledValidatorMap(lunora_chat_tools_code_execution_node_69.default.args, (source) => {
+installCompiledValidatorMap(lunora_chat_tools_code_execution_node_70.default.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["code"] !== "string") return DEFER;
@@ -4262,7 +4284,7 @@ __has3 = true;
 }
 return { "code": source["code"], ...(__has1 ? { "threadId": __val1 } : {}), ...(__has2 ? { "timeoutMs": __val2 } : {}), ...(__has3 ? { "userId": __val3 } : {}) };
 });
-installCompiledValidatorMap(lunora_chat_tools_code_execution_node_69.executeInSandbox.args, (source) => {
+installCompiledValidatorMap(lunora_chat_tools_code_execution_node_70.executeInSandbox.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["code"] !== "string") return DEFER;
@@ -4289,7 +4311,7 @@ __has3 = true;
 }
 return { "code": source["code"], ...(__has1 ? { "threadId": __val1 } : {}), ...(__has2 ? { "timeoutMs": __val2 } : {}), ...(__has3 ? { "userId": __val3 } : {}) };
 });
-installCompiledValidatorMap(lunora_chat_tools_sandbox_node_70.executeCode.args, (source) => {
+installCompiledValidatorMap(lunora_chat_tools_sandbox_node_71.executeCode.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["code"] !== "string") return DEFER;
@@ -4304,7 +4326,7 @@ __has1 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "code": source["code"], "threadId": source["threadId"], ...(__has1 ? { "timeoutMs": __val1 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_chat_tools_sandbox_node_70.executeFileOperation.args, (source) => {
+installCompiledValidatorMap(lunora_chat_tools_sandbox_node_71.executeFileOperation.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -4348,7 +4370,7 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "content": __val1 } : {}), ...(__has2 ? { "endLine": __val2 } : {}), ...(__has3 ? { "newString": __val3 } : {}), ...(__has4 ? { "oldString": __val4 } : {}), "operation": source["operation"], "path": source["path"], ...(__has5 ? { "startLine": __val5 } : {}), "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_chat_tools_sandbox_node_70.executeShellCommand.args, (source) => {
+installCompiledValidatorMap(lunora_chat_tools_sandbox_node_71.executeShellCommand.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["command"] !== "string") return DEFER;
@@ -4370,58 +4392,58 @@ __has2 = true;
 }
 return { "command": source["command"], "threadId": source["threadId"], ...(__has1 ? { "timeoutMs": __val1 } : {}), "userId": source["userId"], ...(__has2 ? { "workingDir": __val2 } : {}) };
 });
-installCompiledValidatorMap(lunora_coding_agents_execute_72.createPullRequest.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_execute_73.createPullRequest.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_execute_72.finishRun.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_execute_73.finishRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_execute_72.killRunSandbox.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_execute_73.killRunSandbox.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["sandboxId"] !== "string") return DEFER;
 return { "sandboxId": source["sandboxId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_execute_72.pollCodingAgentRun.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_execute_73.pollCodingAgentRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["seq"] !== "number" || !Number.isFinite(source["seq"])) return DEFER;
 return { "runId": source["runId"], "seq": source["seq"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_execute_72.pollPullRequest.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_execute_73.pollPullRequest.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["seq"] !== "number" || !Number.isFinite(source["seq"])) return DEFER;
 return { "runId": source["runId"], "seq": source["seq"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_execute_72.reapRun.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_execute_73.reapRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_execute_72.startCodingAgentRun.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_execute_73.startCodingAgentRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.appendRunLog.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.appendRunLog.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["text"] !== "string") return DEFER;
 return { "runId": source["runId"], "text": source["text"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.beginPullRequest.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.beginPullRequest.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["followUp"] !== "boolean") return DEFER;
@@ -4429,32 +4451,32 @@ if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "followUp": source["followUp"], "runId": source["runId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.cancelRun.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.cancelRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.claimFinish.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.claimFinish.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.claimPoll.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.claimPoll.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["seq"] !== "number" || !Number.isFinite(source["seq"])) return DEFER;
 return { "runId": source["runId"], "seq": source["seq"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.claimRun.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.claimRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.completePullRequest.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.completePullRequest.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["log"] !== "string") return DEFER;
@@ -4468,49 +4490,49 @@ __has1 = true;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "log": source["log"], ...(__has1 ? { "prUrl": __val1 } : {}), "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.expireRun.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.expireRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.getLatestRunForTask.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.getLatestRunForTask.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { "taskId": source["taskId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.getPullRequestForPoll.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.getPullRequestForPoll.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.getRun.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.getRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.getRunForFollowUp.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.getRunForFollowUp.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.getRunForPoll.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.getRunForPoll.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.getRunForTaskRound.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.getRunForTaskRound.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.postRunResult.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.postRunResult.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["agentName"] !== "string") return DEFER;
@@ -4520,7 +4542,7 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "agentName": source["agentName"], "runId": source["runId"], "text": source["text"], "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.recordPoll.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.recordPoll.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["offset"] !== "number" || !Number.isFinite(source["offset"])) return DEFER;
@@ -4535,109 +4557,109 @@ __has1 = true;
 if (typeof source["text"] !== "string") return DEFER;
 return { "offset": source["offset"], "runId": source["runId"], ...(__has1 ? { "summary": __val1 } : {}), "text": source["text"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.setPullRequestSandbox.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.setPullRequestSandbox.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["sandboxId"] !== "string") return DEFER;
 return { "runId": source["runId"], "sandboxId": source["sandboxId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_functions_73.setRunSandbox.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_functions_74.setRunSandbox.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["sandboxId"] !== "string") return DEFER;
 return { "runId": source["runId"], "sandboxId": source["sandboxId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_gdpr_74.cancelUserCodingAgentRuns.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_gdpr_75.cancelUserCodingAgentRuns.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_gdpr_74.collectCodingAgentRunsForExport.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_gdpr_75.collectCodingAgentRunsForExport.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_gdpr_74.deleteUserCodingAgentRuns.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_gdpr_75.deleteUserCodingAgentRuns.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_coding_agents_gdpr_74.stopUserCodingAgentRuns.args, (source) => {
+installCompiledValidatorMap(lunora_coding_agents_gdpr_75.stopUserCodingAgentRuns.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_connectors_store_78.clearConnectorGrant.args, (source) => {
+installCompiledValidatorMap(lunora_connectors_store_79.clearConnectorGrant.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["connectorId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "connectorId": source["connectorId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_connectors_store_78.consumeOAuthState.args, (source) => {
+installCompiledValidatorMap(lunora_connectors_store_79.consumeOAuthState.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["stateHash"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "stateHash": source["stateHash"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_connectors_store_78.deleteMcpServerGrant.args, (source) => {
+installCompiledValidatorMap(lunora_connectors_store_79.deleteMcpServerGrant.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["serverName"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "serverName": source["serverName"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_connectors_store_78.getDefinitionForOAuth.args, (source) => {
+installCompiledValidatorMap(lunora_connectors_store_79.getDefinitionForOAuth.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["slug"] !== "string") return DEFER;
 return { "slug": source["slug"] };
 });
-installCompiledValidatorMap(lunora_connectors_store_78.getOwnedConnectorGrant.args, (source) => {
+installCompiledValidatorMap(lunora_connectors_store_79.getOwnedConnectorGrant.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["connectorId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "connectorId": source["connectorId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_connectors_store_78.listConnectorGrants.args, (source) => {
+installCompiledValidatorMap(lunora_connectors_store_79.listConnectorGrants.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_connectors_store_78.listGrantsForRevocation.args, (source) => {
+installCompiledValidatorMap(lunora_connectors_store_79.listGrantsForRevocation.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_connectors_store_78.listMcpServerGrants.args, (source) => {
+installCompiledValidatorMap(lunora_connectors_store_79.listMcpServerGrants.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_connectors_user_connectors_79.disconnectConnector.args, (source) => {
+installCompiledValidatorMap(lunora_connectors_user_connectors_80.disconnectConnector.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["connectorId"] !== "string") return DEFER;
 return { "connectorId": source["connectorId"] };
 });
-installCompiledValidatorMap(lunora_crons_80.claimDueCronJobs.args, (source) => {
+installCompiledValidatorMap(lunora_crons_81.claimDueCronJobs.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["now"] !== "number" || !Number.isFinite(source["now"])) return DEFER;
 return { "now": source["now"] };
 });
-installCompiledValidatorMap(lunora_crons_80.deleteUnusedFiles.args, (source) => {
+installCompiledValidatorMap(lunora_crons_81.deleteUnusedFiles.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -4649,57 +4671,57 @@ __has1 = true;
 }
 return { ...(__has1 ? { "cursor": __val1 } : {}) };
 });
-installCompiledValidatorMap(lunora_devices_functions_81.claimDeviceCall.args, (source) => {
+installCompiledValidatorMap(lunora_devices_functions_82.claimDeviceCall.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["callId"] !== "string") return DEFER;
 if (typeof source["deviceId"] !== "string") return DEFER;
 return { "callId": source["callId"], "deviceId": source["deviceId"] };
 });
-installCompiledValidatorMap(lunora_devices_functions_81.heartbeatDevice.args, (source) => {
+installCompiledValidatorMap(lunora_devices_functions_82.heartbeatDevice.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["deviceId"] !== "string") return DEFER;
 return { "deviceId": source["deviceId"] };
 });
-installCompiledValidatorMap(lunora_devices_functions_81.listPendingDeviceCalls.args, (source) => {
+installCompiledValidatorMap(lunora_devices_functions_82.listPendingDeviceCalls.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["deviceId"] !== "string") return DEFER;
 return { "deviceId": source["deviceId"] };
 });
-installCompiledValidatorMap(lunora_devices_functions_81.revokeDevice.args, (source) => {
+installCompiledValidatorMap(lunora_devices_functions_82.revokeDevice.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["deviceId"] !== "string") return DEFER;
 return { "deviceId": source["deviceId"] };
 });
-installCompiledValidatorMap(lunora_devices_gdpr_82.collectDevicesForExport.args, (source) => {
+installCompiledValidatorMap(lunora_devices_gdpr_83.collectDevicesForExport.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_devices_gdpr_82.deleteUserDevices.args, (source) => {
+installCompiledValidatorMap(lunora_devices_gdpr_83.deleteUserDevices.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_devices_internal_83.expireDeviceCall.args, (source) => {
+installCompiledValidatorMap(lunora_devices_internal_84.expireDeviceCall.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["callId"] !== "string") return DEFER;
 if (typeof source["reason"] !== "string") return DEFER;
 return { "callId": source["callId"], "reason": source["reason"] };
 });
-installCompiledValidatorMap(lunora_devices_internal_83.getDeviceCallState.args, (source) => {
+installCompiledValidatorMap(lunora_devices_internal_84.getDeviceCallState.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["callId"] !== "string") return DEFER;
 return { "callId": source["callId"] };
 });
-installCompiledValidatorMap(lunora_devices_internal_83.getDeviceToolContext.args, (source) => {
+installCompiledValidatorMap(lunora_devices_internal_84.getDeviceToolContext.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["now"] !== "number" || !Number.isFinite(source["now"])) return DEFER;
@@ -4707,12 +4729,12 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "now": source["now"], "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_email_functions_84.deliverEmail.args, (source) => {
+installCompiledValidatorMap(lunora_email_functions_85.deliverEmail.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 return { "message": source["message"] };
 });
-installCompiledValidatorMap(lunora_email_functions_84.handleEmailEvent.args, (source) => {
+installCompiledValidatorMap(lunora_email_functions_85.handleEmailEvent.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["event"] !== "object" || source["event"] === null || Array.isArray(source["event"])) return DEFER;
@@ -4722,132 +4744,132 @@ const __obj1 = { "type": source["event"]["type"] };
 if (typeof source["id"] !== "string") return DEFER;
 return { "event": __obj1, "id": source["id"] };
 });
-installCompiledValidatorMap(lunora_evals_execute_85.runEvalCase.args, (source) => {
+installCompiledValidatorMap(lunora_evals_execute_86.runEvalCase.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["index"] !== "number" || !Number.isFinite(source["index"])) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "index": source["index"], "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_evals_functions_86.cancelRun.args, (source) => {
+installCompiledValidatorMap(lunora_evals_functions_87.cancelRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_evals_functions_86.compareModels.args, (source) => {
+installCompiledValidatorMap(lunora_evals_functions_87.compareModels.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["datasetId"] !== "string") return DEFER;
 return { "datasetId": source["datasetId"] };
 });
-installCompiledValidatorMap(lunora_evals_functions_86.compareRuns.args, (source) => {
+installCompiledValidatorMap(lunora_evals_functions_87.compareRuns.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["baselineRunId"] !== "string") return DEFER;
 if (typeof source["candidateRunId"] !== "string") return DEFER;
 return { "baselineRunId": source["baselineRunId"], "candidateRunId": source["candidateRunId"] };
 });
-installCompiledValidatorMap(lunora_evals_functions_86.deleteCase.args, (source) => {
+installCompiledValidatorMap(lunora_evals_functions_87.deleteCase.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["caseId"] !== "string") return DEFER;
 return { "caseId": source["caseId"] };
 });
-installCompiledValidatorMap(lunora_evals_functions_86.deleteDataset.args, (source) => {
+installCompiledValidatorMap(lunora_evals_functions_87.deleteDataset.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["datasetId"] !== "string") return DEFER;
 return { "datasetId": source["datasetId"] };
 });
-installCompiledValidatorMap(lunora_evals_functions_86.deleteRun.args, (source) => {
+installCompiledValidatorMap(lunora_evals_functions_87.deleteRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_evals_functions_86.getDataset.args, (source) => {
+installCompiledValidatorMap(lunora_evals_functions_87.getDataset.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["datasetId"] !== "string") return DEFER;
 return { "datasetId": source["datasetId"] };
 });
-installCompiledValidatorMap(lunora_evals_functions_86.getRun.args, (source) => {
+installCompiledValidatorMap(lunora_evals_functions_87.getRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_evals_functions_86.listRuns.args, (source) => {
+installCompiledValidatorMap(lunora_evals_functions_87.listRuns.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["datasetId"] !== "string") return DEFER;
 return { "datasetId": source["datasetId"] };
 });
-installCompiledValidatorMap(lunora_evals_functions_86.purgeDataset.args, (source) => {
+installCompiledValidatorMap(lunora_evals_functions_87.purgeDataset.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["datasetId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "datasetId": source["datasetId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_evals_functions_86.setCaseFrozen.args, (source) => {
+installCompiledValidatorMap(lunora_evals_functions_87.setCaseFrozen.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["caseId"] !== "string") return DEFER;
 if (typeof source["frozen"] !== "boolean") return DEFER;
 return { "caseId": source["caseId"], "frozen": source["frozen"] };
 });
-installCompiledValidatorMap(lunora_evals_gdpr_87.collectEvalsForExport.args, (source) => {
+installCompiledValidatorMap(lunora_evals_gdpr_88.collectEvalsForExport.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_evals_gdpr_87.deleteUserEvals.args, (source) => {
+installCompiledValidatorMap(lunora_evals_gdpr_88.deleteUserEvals.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_evals_internal_88.canRunForUser.args, (source) => {
+installCompiledValidatorMap(lunora_evals_internal_89.canRunForUser.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_evals_internal_88.claimCase.args, (source) => {
+installCompiledValidatorMap(lunora_evals_internal_89.claimCase.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["index"] !== "number" || !Number.isFinite(source["index"])) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "index": source["index"], "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_evals_internal_88.reapCase.args, (source) => {
+installCompiledValidatorMap(lunora_evals_internal_89.reapCase.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["resultId"] !== "string") return DEFER;
 return { "resultId": source["resultId"] };
 });
-installCompiledValidatorMap(lunora_file_89.purgeStagedChatUploads.args, (source) => {
+installCompiledValidatorMap(lunora_file_90.purgeStagedChatUploads.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_functions_90.getExportRequest.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_functions_91.getExportRequest.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_functions_90.getRequestById.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_functions_91.getRequestById.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["requestId"] !== "string") return DEFER;
 return { "requestId": source["requestId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_functions_90.logAudit.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_functions_91.logAudit.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["action"] !== "string") return DEFER;
@@ -4856,49 +4878,49 @@ if (typeof source["performedBy"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "action": source["action"], "details": source["details"], "performedBy": source["performedBy"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_93.collectActivityForExport.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_95.collectActivityForExport.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_93.collectConversations.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_95.collectConversations.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_93.collectFiles.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_95.collectFiles.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_93.collectProfile.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_95.collectProfile.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_93.collectPrompts.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_95.collectPrompts.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_93.collectSettings.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_95.collectSettings.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_93.collectThreadTags.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_95.collectThreadTags.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_93.generateExportFile.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_95.generateExportFile.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -4966,219 +4988,220 @@ if (typeof source["userEmail"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "activity": __val1 } : {}), ...(__has2 ? { "bots": __val2 } : {}), ...(__has3 ? { "codingAgentRuns": __val3 } : {}), "conversations": source["conversations"], ...(__has4 ? { "devices": __val4 } : {}), ...(__has5 ? { "evals": __val5 } : {}), "files": source["files"], ...(__has6 ? { "memories": __val6 } : {}), ...(__has7 ? { "notifications": __val7 } : {}), ...(__has8 ? { "pages": __val8 } : {}), "profile": source["profile"], "prompts": source["prompts"], "requestId": source["requestId"], "settings": source["settings"], ...(__has9 ? { "tasks": __val9 } : {}), ...(__has10 ? { "threadTags": __val10 } : {}), "userEmail": source["userEmail"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_93.sendExportReadyEmail.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_95.sendExportReadyEmail.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["requestId"] !== "string") return DEFER;
 if (typeof source["userEmail"] !== "string") return DEFER;
 return { "requestId": source["requestId"], "userEmail": source["userEmail"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteAuthRecords.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteAuthRecords.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserBrowserData.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserBrowserData.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserConnectors.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserConnectors.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserDocuments.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserDocuments.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserFiles.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserFiles.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserImportJobs.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserImportJobs.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserMemories.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserMemories.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserPersistentStreams.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserPersistentStreams.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserPresentations.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserPresentations.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserProjects.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserProjects.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserPrompts.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserPrompts.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserSettings.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserSettings.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserSkills.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserSkills.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.deleteUserThreadMetadata.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.deleteUserThreadMetadata.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_94.revokeUserSessions.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_96.revokeUserSessions.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_email_steps_95.default.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_email_steps_97.default.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userEmail"] !== "string") return DEFER;
 return { "userEmail": source["userEmail"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_email_steps_95.sendDeletionConfirmedEmailAction.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_email_steps_97.sendDeletionConfirmedEmailAction.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userEmail"] !== "string") return DEFER;
 return { "userEmail": source["userEmail"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_posthog_steps_96.deletePostHogPerson.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.anonymiseGatewayUsageDeductions.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.anonymiseGatewayUsageDeductions.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.deleteUserEmbeddings.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.deleteUserEmbeddings.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "userId": source["userId"] };
-});
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.deleteUserIdentity.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.deleteUserIdentity.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userEmail"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userEmail": source["userEmail"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.deleteUserIntegrations.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.deleteUserIntegrations.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.deleteUserKnowledge.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.deleteUserKnowledge.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.deleteUserStreamingMessages.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.deleteUserStreamingMessages.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.deleteUserSubAgentRuns.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.deleteUserSubAgentRuns.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.deleteUserUsageDaily.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.deleteUserUsageDaily.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.deleteUserWorkflowData.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.deleteUserWorkflowData.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.deregisterMessengerWebhooks.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.deregisterMessengerWebhooks.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.killUserSandboxes.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.killUserSandboxes.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.listMessengerConnectionsForDeletion.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.listMessengerConnectionsForDeletion.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.listSandboxIdsForDeletion.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.listSandboxIdsForDeletion.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.minimiseGdprRecords.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.minimiseGdprRecords.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["retainEmailOf"] !== undefined) {
+if (typeof source["retainEmailOf"] !== "string") return DEFER;
+__val1 = source["retainEmailOf"];
+__has1 = true;
+}
+if (typeof source["userId"] !== "string") return DEFER;
+return { ...(__has1 ? { "retainEmailOf": __val1 } : {}), "userId": source["userId"] };
+});
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.purgeUserDocumentHistory.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.purgeUserDocumentHistory.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_99.revokeUserConnectorGrants.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_steps_residual_deletion_steps_97.revokeUserConnectorGrants.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "userId": source["userId"] };
-});
-installCompiledValidatorMap(lunora_gdpr_workflow_actions_98.startDeletionWorkflow.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_workflow_actions_100.startDeletionWorkflow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["requestId"] !== "string") return DEFER;
@@ -5186,7 +5209,7 @@ if (typeof source["userEmail"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "requestId": source["requestId"], "userEmail": source["userEmail"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_gdpr_workflow_actions_98.startExportWorkflow.args, (source) => {
+installCompiledValidatorMap(lunora_gdpr_workflow_actions_100.startExportWorkflow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["requestId"] !== "string") return DEFER;
@@ -5194,47 +5217,47 @@ if (typeof source["userEmail"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "requestId": source["requestId"], "userEmail": source["userEmail"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_agent_assignment_101.assignToProject.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_agent_assignment_103.assignToProject.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["knowledgeFileId"] !== "string") return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "knowledgeFileId": source["knowledgeFileId"], "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_agent_assignment_101.getProjectKnowledge.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_agent_assignment_103.getProjectKnowledge.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_agent_assignment_101.getProjectKnowledgeFileIds.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_agent_assignment_103.getProjectKnowledgeFileIds.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_agent_assignment_101.resolveKnowledgeFiles.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_agent_assignment_103.resolveKnowledgeFiles.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_agent_assignment_101.unassignFromProject.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_agent_assignment_103.unassignFromProject.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["knowledgeFileId"] !== "string") return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "knowledgeFileId": source["knowledgeFileId"], "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_collections_102.attachCollectionToProject.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_collections_104.attachCollectionToProject.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["collectionId"] !== "string") return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "collectionId": source["collectionId"], "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_collections_102.deleteCollection.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_collections_104.deleteCollection.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["collectionId"] !== "string") return DEFER;
@@ -5247,39 +5270,39 @@ __has1 = true;
 }
 return { "collectionId": source["collectionId"], ...(__has1 ? { "deleteFiles": __val1 } : {}) };
 });
-installCompiledValidatorMap(lunora_knowledge_collections_102.detachCollectionFromProject.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_collections_104.detachCollectionFromProject.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["collectionId"] !== "string") return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "collectionId": source["collectionId"], "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_collections_102.getCollectionOwner.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_collections_104.getCollectionOwner.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["collectionId"] !== "string") return DEFER;
 return { "collectionId": source["collectionId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_collections_102.getProjectCollections.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_collections_104.getProjectCollections.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_collections_102.listCollectionFiles.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_collections_104.listCollectionFiles.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["collectionId"] !== "string") return DEFER;
 return { "collectionId": source["collectionId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_collections_102.listFilesInCollection.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_collections_104.listFilesInCollection.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["collectionId"] !== "string") return DEFER;
 if (typeof source["requesterId"] !== "string") return DEFER;
 return { "collectionId": source["collectionId"], "requesterId": source["requesterId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_collections_102.resolveSharedCollectionFiles.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_collections_104.resolveSharedCollectionFiles.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["collectionIds"])) return DEFER;
@@ -5293,7 +5316,7 @@ if (typeof source["ownerId"] !== "string") return DEFER;
 if (typeof source["requesterId"] !== "string") return DEFER;
 return { "collectionIds": __arr1, "ownerId": source["ownerId"], "requesterId": source["requesterId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_collections_102.setFileCollection.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_collections_104.setFileCollection.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -5312,7 +5335,7 @@ __arr2[__i2] = __e2;
 }
 return { ...(__has1 ? { "collectionId": __val1 } : {}), "fileIds": __arr2 };
 });
-installCompiledValidatorMap(lunora_knowledge_delete_embeddings_103.default.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_delete_embeddings_105.default.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["embeddingIds"])) return DEFER;
@@ -5324,7 +5347,7 @@ __arr1[__i1] = __e1;
 }
 return { "embeddingIds": __arr1 };
 });
-installCompiledValidatorMap(lunora_knowledge_delete_embeddings_103.deleteEmbeddingsBatch.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_delete_embeddings_105.deleteEmbeddingsBatch.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["embeddingIds"])) return DEFER;
@@ -5336,7 +5359,7 @@ __arr1[__i1] = __e1;
 }
 return { "embeddingIds": __arr1 };
 });
-installCompiledValidatorMap(lunora_knowledge_functions_105.getChunksByEmbeddingIds.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_functions_107.getChunksByEmbeddingIds.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["embeddingIds"])) return DEFER;
@@ -5356,13 +5379,13 @@ __arr2[__i2] = __e2;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "embeddingIds": __arr1, "knowledgeFileIds": __arr2, "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_functions_105.getFile.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_functions_107.getFile.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["fileId"] !== "string") return DEFER;
 return { "fileId": source["fileId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_functions_105.getFileChunks.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_functions_107.getFileChunks.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["fileId"] !== "string") return DEFER;
@@ -5375,25 +5398,25 @@ __has1 = true;
 }
 return { "fileId": source["fileId"], ...(__has1 ? { "limit": __val1 } : {}) };
 });
-installCompiledValidatorMap(lunora_knowledge_functions_105.getIndexedFileIds.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_functions_107.getIndexedFileIds.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_functions_105.getThreadKnowledgeFileIds.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_functions_107.getThreadKnowledgeFileIds.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "threadId": source["threadId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_functions_105.getVaultFile.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_functions_107.getVaultFile.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["vaultFileId"] !== "string") return DEFER;
 return { "vaultFileId": source["vaultFileId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_functions_105.keywordSearchChunks.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_functions_107.keywordSearchChunks.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["knowledgeFileIds"])) return DEFER;
@@ -5408,13 +5431,13 @@ if (typeof source["query"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "knowledgeFileIds": __arr1, "limit": source["limit"], "query": source["query"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_functions_105.removeFile.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_functions_107.removeFile.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["fileId"] !== "string") return DEFER;
 return { "fileId": source["fileId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_functions_105.saveChunks.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_functions_107.saveChunks.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["chunks"])) return DEFER;
@@ -5461,7 +5484,7 @@ if (typeof source["fileId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "chunks": __arr1, "fileId": source["fileId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_functions_105.updateFileStatus.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_functions_107.updateFileStatus.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -5503,33 +5526,33 @@ __has5 = true;
 }
 return { ...(__has1 ? { "chunkCount": __val1 } : {}), ...(__has2 ? { "error": __val2 } : {}), "fileId": source["fileId"], ...(__has3 ? { "name": __val3 } : {}), ...(__has4 ? { "size": __val4 } : {}), "status": source["status"], ...(__has5 ? { "summary": __val5 } : {}) };
 });
-installCompiledValidatorMap(lunora_knowledge_ingest_107.default.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_ingest_109.default.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["knowledgeFileId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "knowledgeFileId": source["knowledgeFileId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_ingest_107.ingestFile.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_ingest_109.ingestFile.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["knowledgeFileId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "knowledgeFileId": source["knowledgeFileId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_summarize_109.resummarizeFile.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_summarize_111.resummarizeFile.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["knowledgeFileId"] !== "string") return DEFER;
 return { "knowledgeFileId": source["knowledgeFileId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_summarize_109.summarizeCollection.args, (source) => {
+installCompiledValidatorMap(lunora_knowledge_summarize_111.summarizeCollection.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_lib_account_merge_110.deleteShardRows.args, (source) => {
+installCompiledValidatorMap(lunora_lib_account_merge_112.deleteShardRows.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["ids"])) return DEFER;
@@ -5541,7 +5564,7 @@ __arr1[__i1] = __e1;
 }
 return { "ids": __arr1 };
 });
-installCompiledValidatorMap(lunora_lib_account_merge_110.importShardRows.args, (source) => {
+installCompiledValidatorMap(lunora_lib_account_merge_112.importShardRows.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["from"] !== "string") return DEFER;
@@ -5555,41 +5578,41 @@ if (typeof source["table"] !== "string") return DEFER;
 if (typeof source["to"] !== "string") return DEFER;
 return { "from": source["from"], "rows": __arr1, "table": source["table"], "to": source["to"] };
 });
-installCompiledValidatorMap(lunora_lib_account_merge_110.listShardRowIds.args, (source) => {
+installCompiledValidatorMap(lunora_lib_account_merge_112.listShardRowIds.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["table"] !== "string") return DEFER;
 return { "table": source["table"] };
 });
-installCompiledValidatorMap(lunora_lib_account_merge_110.reassignGlobalRows.args, (source) => {
+installCompiledValidatorMap(lunora_lib_account_merge_112.reassignGlobalRows.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["from"] !== "string") return DEFER;
 if (typeof source["to"] !== "string") return DEFER;
 return { "from": source["from"], "to": source["to"] };
 });
-installCompiledValidatorMap(lunora_lib_account_merge_110.runGuestMerge.args, (source) => {
+installCompiledValidatorMap(lunora_lib_account_merge_112.runGuestMerge.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["from"] !== "string") return DEFER;
 if (typeof source["to"] !== "string") return DEFER;
 return { "from": source["from"], "to": source["to"] };
 });
-installCompiledValidatorMap(lunora_lib_action_cache_111.bumpGeneration.args, (source) => {
+installCompiledValidatorMap(lunora_lib_action_cache_113.bumpGeneration.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["name"] !== "string") return DEFER;
 if (typeof source["scope"] !== "string") return DEFER;
 return { "name": source["name"], "scope": source["scope"] };
 });
-installCompiledValidatorMap(lunora_lib_action_cache_111.get.args, (source) => {
+installCompiledValidatorMap(lunora_lib_action_cache_113.get.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
 if (typeof source["now"] !== "number" || !Number.isFinite(source["now"])) return DEFER;
 return { "key": source["key"], "now": source["now"] };
 });
-installCompiledValidatorMap(lunora_lib_action_cache_111.getGeneration.args, (source) => {
+installCompiledValidatorMap(lunora_lib_action_cache_113.getGeneration.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["name"] !== "string") return DEFER;
@@ -5597,7 +5620,7 @@ if (typeof source["now"] !== "number" || !Number.isFinite(source["now"])) return
 if (typeof source["scope"] !== "string") return DEFER;
 return { "name": source["name"], "now": source["now"], "scope": source["scope"] };
 });
-installCompiledValidatorMap(lunora_lib_action_cache_111.put.args, (source) => {
+installCompiledValidatorMap(lunora_lib_action_cache_113.put.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
@@ -5605,26 +5628,26 @@ if (typeof source["name"] !== "string") return DEFER;
 if (typeof source["ttl"] !== "number" || !Number.isFinite(source["ttl"])) return DEFER;
 return { "key": source["key"], "name": source["name"], "ttl": source["ttl"], "value": source["value"] };
 });
-installCompiledValidatorMap(lunora_lib_action_cache_111.remove.args, (source) => {
+installCompiledValidatorMap(lunora_lib_action_cache_113.remove.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
 return { "key": source["key"] };
 });
-installCompiledValidatorMap(lunora_lib_action_cache_111.removeAll.args, (source) => {
+installCompiledValidatorMap(lunora_lib_action_cache_113.removeAll.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["name"] !== "string") return DEFER;
 return { "name": source["name"] };
 });
-installCompiledValidatorMap(lunora_lib_action_cache_111.removeByArgs.args, (source) => {
+installCompiledValidatorMap(lunora_lib_action_cache_113.removeByArgs.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["args"] !== "string") return DEFER;
 if (typeof source["name"] !== "string") return DEFER;
 return { "args": source["args"], "name": source["name"] };
 });
-installCompiledValidatorMap(lunora_lib_claim_once_112.claimKey.args, (source) => {
+installCompiledValidatorMap(lunora_lib_claim_once_114.claimKey.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
@@ -5663,21 +5686,67 @@ __has5 = true;
 }
 return { "key": source["key"], ...(__has1 ? { "leaseMs": __val1 } : {}), ...(__has4 ? { "onLapse": __val4 } : {}), "scope": source["scope"], "ttlMs": source["ttlMs"], ...(__has5 ? { "userId": __val5 } : {}) };
 });
-installCompiledValidatorMap(lunora_lib_claim_once_112.completeKey.args, (source) => {
+installCompiledValidatorMap(lunora_lib_claim_once_114.claimKeyFenced.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["key"] !== "string") return DEFER;
+let __has1 = false;
+let __val1;
+if (source["leaseMs"] !== undefined) {
+if (typeof source["leaseMs"] !== "number" || !Number.isFinite(source["leaseMs"])) return DEFER;
+__val1 = source["leaseMs"];
+__has1 = true;
+}
+let __has4 = false;
+let __val4;
+if (source["onLapse"] !== undefined) {
+if (typeof source["onLapse"] !== "object" || source["onLapse"] === null || Array.isArray(source["onLapse"])) return DEFER;
+if (Object.getPrototypeOf(source["onLapse"]) !== Object.prototype && Object.getPrototypeOf(source["onLapse"]) !== null) return DEFER;
+let __has2 = false;
+let __val2;
+if (source["onLapse"]["args"] !== undefined) {
+if (typeof source["onLapse"]["args"] !== "string") return DEFER;
+__val2 = source["onLapse"]["args"];
+__has2 = true;
+}
+if (typeof source["onLapse"]["target"] !== "string") return DEFER;
+const __obj3 = { ...(__has2 ? { "args": __val2 } : {}), "target": source["onLapse"]["target"] };
+__val4 = __obj3;
+__has4 = true;
+}
+if (typeof source["scope"] !== "string") return DEFER;
+if (typeof source["ttlMs"] !== "number" || !Number.isFinite(source["ttlMs"])) return DEFER;
+let __has5 = false;
+let __val5;
+if (source["userId"] !== undefined) {
+if (typeof source["userId"] !== "string") return DEFER;
+__val5 = source["userId"];
+__has5 = true;
+}
+return { "key": source["key"], ...(__has1 ? { "leaseMs": __val1 } : {}), ...(__has4 ? { "onLapse": __val4 } : {}), "scope": source["scope"], "ttlMs": source["ttlMs"], ...(__has5 ? { "userId": __val5 } : {}) };
+});
+installCompiledValidatorMap(lunora_lib_claim_once_114.completeKey.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
 if (typeof source["scope"] !== "string") return DEFER;
 return { "key": source["key"], "scope": source["scope"] };
 });
-installCompiledValidatorMap(lunora_lib_claim_once_112.releaseKey.args, (source) => {
+installCompiledValidatorMap(lunora_lib_claim_once_114.releaseKey.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["claimedAt"] !== undefined) {
+if (typeof source["claimedAt"] !== "number" || !Number.isFinite(source["claimedAt"])) return DEFER;
+__val1 = source["claimedAt"];
+__has1 = true;
+}
 if (typeof source["key"] !== "string") return DEFER;
 if (typeof source["scope"] !== "string") return DEFER;
-return { "key": source["key"], "scope": source["scope"] };
+return { ...(__has1 ? { "claimedAt": __val1 } : {}), "key": source["key"], "scope": source["scope"] };
 });
-installCompiledValidatorMap(lunora_lib_document_history_113.getDocumentAtTime.args, (source) => {
+installCompiledValidatorMap(lunora_lib_document_history_115.getDocumentAtTime.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["documentId"] !== "string") return DEFER;
@@ -5685,7 +5754,7 @@ if (typeof source["tableName"] !== "string") return DEFER;
 if (typeof source["timestamp"] !== "number" || !Number.isFinite(source["timestamp"])) return DEFER;
 return { "documentId": source["documentId"], "tableName": source["tableName"], "timestamp": source["timestamp"] };
 });
-installCompiledValidatorMap(lunora_lib_document_history_113.listDocumentVersions.args, (source) => {
+installCompiledValidatorMap(lunora_lib_document_history_115.listDocumentVersions.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["documentId"] !== "string") return DEFER;
@@ -5699,7 +5768,7 @@ __has1 = true;
 if (typeof source["tableName"] !== "string") return DEFER;
 return { "documentId": source["documentId"], ...(__has1 ? { "limit": __val1 } : {}), "tableName": source["tableName"] };
 });
-installCompiledValidatorMap(lunora_lib_document_history_113.listUserActivity.args, (source) => {
+installCompiledValidatorMap(lunora_lib_document_history_115.listUserActivity.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -5712,7 +5781,7 @@ __has1 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "limit": __val1 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_lib_document_history_113.recordHistory.args, (source) => {
+installCompiledValidatorMap(lunora_lib_document_history_115.recordHistory.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -5746,13 +5815,13 @@ __has4 = true;
 }
 return { ...(__has1 ? { "attribution": __val1 } : {}), "doc": source["doc"], "documentId": source["documentId"], "isDeleted": source["isDeleted"], ...(__has2 ? { "oldDoc": __val2 } : {}), ...(__has3 ? { "organizationId": __val3 } : {}), "tableName": source["tableName"], ...(__has4 ? { "userId": __val4 } : {}) };
 });
-installCompiledValidatorMap(lunora_lib_document_history_113.vacuumHistory.args, (source) => {
+installCompiledValidatorMap(lunora_lib_document_history_115.vacuumHistory.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["minTsToKeep"] !== "number" || !Number.isFinite(source["minTsToKeep"])) return DEFER;
 return { "minTsToKeep": source["minTsToKeep"] };
 });
-installCompiledValidatorMap(lunora_lib_job_once_114.runJobOnce.args, (source) => {
+installCompiledValidatorMap(lunora_lib_job_once_116.runJobOnce.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -5789,7 +5858,7 @@ __has5 = true;
 }
 return { ...(__has1 ? { "args": __val1 } : {}), "jobId": source["jobId"], ...(__has4 ? { "onLapse": __val4 } : {}), "target": source["target"], ...(__has5 ? { "userId": __val5 } : {}) };
 });
-installCompiledValidatorMap(lunora_lib_rate_limiter_mutations_115.applyRateLimit.args, (source) => {
+installCompiledValidatorMap(lunora_lib_rate_limiter_mutations_117.applyRateLimit.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -5803,20 +5872,20 @@ if (typeof source["identifier"] !== "string") return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
 return { ...(__has1 ? { "count": __val1 } : {}), "identifier": source["identifier"], "key": source["key"] };
 });
-installCompiledValidatorMap(lunora_lib_rate_limiter_mutations_115.resetRateLimit.args, (source) => {
+installCompiledValidatorMap(lunora_lib_rate_limiter_mutations_117.resetRateLimit.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["identifier"] !== "string") return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
 return { "identifier": source["identifier"], "key": source["key"] };
 });
-installCompiledValidatorMap(lunora_lib_shard_housekeeping_116.recordShardActivity.args, (source) => {
+installCompiledValidatorMap(lunora_lib_shard_housekeeping_118.recordShardActivity.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["shardKey"] !== "string") return DEFER;
 return { "shardKey": source["shardKey"] };
 });
-installCompiledValidatorMap(lunora_lib_storage_cleanup_118.deleteObjects.args, (source) => {
+installCompiledValidatorMap(lunora_lib_storage_cleanup_120.deleteObjects.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["keys"])) return DEFER;
@@ -5828,7 +5897,7 @@ __arr1[__i1] = __e1;
 }
 return { "keys": __arr1 };
 });
-installCompiledValidatorMap(lunora_memory_compress_120.compressThreadMemories.args, (source) => {
+installCompiledValidatorMap(lunora_memory_compress_122.compressThreadMemories.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -5842,7 +5911,7 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "botId": __val1 } : {}), "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_compress_120.getThreadMemoriesForCompression.args, (source) => {
+installCompiledValidatorMap(lunora_memory_compress_122.getThreadMemoriesForCompression.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -5856,7 +5925,7 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "botId": __val1 } : {}), "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_compress_120.maybeCompressThreadMemories.args, (source) => {
+installCompiledValidatorMap(lunora_memory_compress_122.maybeCompressThreadMemories.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -5870,13 +5939,13 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "botId": __val1 } : {}), "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_compress_120.tryStartCompression.args, (source) => {
+installCompiledValidatorMap(lunora_memory_compress_122.tryStartCompression.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "threadId": source["threadId"] };
 });
-installCompiledValidatorMap(lunora_memory_extract_121.extractMemories.args, (source) => {
+installCompiledValidatorMap(lunora_memory_extract_123.extractMemories.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["assistantResponse"] !== "string") return DEFER;
@@ -5889,40 +5958,47 @@ __has1 = true;
 }
 let __has2 = false;
 let __val2;
-if (source["threadId"] !== undefined) {
-if (typeof source["threadId"] !== "string") return DEFER;
-__val2 = source["threadId"];
+if (source["steeredFrom"] !== undefined) {
+if (typeof source["steeredFrom"] !== "number" || !Number.isFinite(source["steeredFrom"])) return DEFER;
+__val2 = source["steeredFrom"];
 __has2 = true;
 }
-let __has5 = false;
-let __val5;
+let __has3 = false;
+let __val3;
+if (source["threadId"] !== undefined) {
+if (typeof source["threadId"] !== "string") return DEFER;
+__val3 = source["threadId"];
+__has3 = true;
+}
+let __has6 = false;
+let __val6;
 if (source["toolResults"] !== undefined) {
 if (!Array.isArray(source["toolResults"])) return DEFER;
-const __arr3 = new Array(source["toolResults"].length);
-for (let __i3 = 0; __i3 < source["toolResults"].length; __i3++) {
-const __e3 = source["toolResults"][__i3];
-if (typeof __e3 !== "object" || __e3 === null || Array.isArray(__e3)) return DEFER;
-if (Object.getPrototypeOf(__e3) !== Object.prototype && Object.getPrototypeOf(__e3) !== null) return DEFER;
-if (typeof __e3["summary"] !== "string") return DEFER;
-if (typeof __e3["toolName"] !== "string") return DEFER;
-const __obj4 = { "summary": __e3["summary"], "toolName": __e3["toolName"] };
-__arr3[__i3] = __obj4;
+const __arr4 = new Array(source["toolResults"].length);
+for (let __i4 = 0; __i4 < source["toolResults"].length; __i4++) {
+const __e4 = source["toolResults"][__i4];
+if (typeof __e4 !== "object" || __e4 === null || Array.isArray(__e4)) return DEFER;
+if (Object.getPrototypeOf(__e4) !== Object.prototype && Object.getPrototypeOf(__e4) !== null) return DEFER;
+if (typeof __e4["summary"] !== "string") return DEFER;
+if (typeof __e4["toolName"] !== "string") return DEFER;
+const __obj5 = { "summary": __e4["summary"], "toolName": __e4["toolName"] };
+__arr4[__i4] = __obj5;
 }
-__val5 = __arr3;
-__has5 = true;
+__val6 = __arr4;
+__has6 = true;
 }
 if (typeof source["userId"] !== "string") return DEFER;
 if (typeof source["userMessage"] !== "string") return DEFER;
-return { "assistantResponse": source["assistantResponse"], ...(__has1 ? { "botId": __val1 } : {}), ...(__has2 ? { "threadId": __val2 } : {}), ...(__has5 ? { "toolResults": __val5 } : {}), "userId": source["userId"], "userMessage": source["userMessage"] };
+return { "assistantResponse": source["assistantResponse"], ...(__has1 ? { "botId": __val1 } : {}), ...(__has2 ? { "steeredFrom": __val2 } : {}), ...(__has3 ? { "threadId": __val3 } : {}), ...(__has6 ? { "toolResults": __val6 } : {}), "userId": source["userId"], "userMessage": source["userMessage"] };
 });
-installCompiledValidatorMap(lunora_memory_extract_121.regenerateMemoryEmbedding.args, (source) => {
+installCompiledValidatorMap(lunora_memory_extract_123.regenerateMemoryEmbedding.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["memoryId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "memoryId": source["memoryId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_functions_122.confirmMemories.args, (source) => {
+installCompiledValidatorMap(lunora_memory_functions_124.confirmMemories.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["memoryIds"])) return DEFER;
@@ -5935,7 +6011,7 @@ __arr1[__i1] = __e1;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "memoryIds": __arr1, "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_functions_122.getActiveMemoriesForUser.args, (source) => {
+installCompiledValidatorMap(lunora_memory_functions_124.getActiveMemoriesForUser.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -5962,7 +6038,7 @@ __has3 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "botId": __val1 } : {}), ...(__has2 ? { "includeUserWide": __val2 } : {}), ...(__has3 ? { "limit": __val3 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_functions_122.getMemoriesByEmbeddingIds.args, (source) => {
+installCompiledValidatorMap(lunora_memory_functions_124.getMemoriesByEmbeddingIds.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["embeddingIds"])) return DEFER;
@@ -5975,37 +6051,37 @@ __arr1[__i1] = __e1;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "embeddingIds": __arr1, "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_functions_122.getMemoryByEmbeddingId.args, (source) => {
+installCompiledValidatorMap(lunora_memory_functions_124.getMemoryByEmbeddingId.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["embeddingId"] !== "string") return DEFER;
 return { "embeddingId": source["embeddingId"] };
 });
-installCompiledValidatorMap(lunora_memory_functions_122.getMemoryById.args, (source) => {
+installCompiledValidatorMap(lunora_memory_functions_124.getMemoryById.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["memoryId"] !== "string") return DEFER;
 return { "memoryId": source["memoryId"] };
 });
-installCompiledValidatorMap(lunora_memory_functions_122.isMemoryEnabled.args, (source) => {
+installCompiledValidatorMap(lunora_memory_functions_124.isMemoryEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_functions_122.isThreadLockedForMemory.args, (source) => {
+installCompiledValidatorMap(lunora_memory_functions_124.isThreadLockedForMemory.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "threadId": source["threadId"] };
 });
-installCompiledValidatorMap(lunora_memory_functions_122.isThreadTemporary.args, (source) => {
+installCompiledValidatorMap(lunora_memory_functions_124.isThreadTemporary.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "threadId": source["threadId"] };
 });
-installCompiledValidatorMap(lunora_memory_functions_122.listUserMemories.args, (source) => {
+installCompiledValidatorMap(lunora_memory_functions_124.listUserMemories.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6017,14 +6093,14 @@ __has1 = true;
 }
 return { ...(__has1 ? { "includeSuperseded": __val1 } : {}) };
 });
-installCompiledValidatorMap(lunora_memory_functions_122.markMemorySupersededByCompression.args, (source) => {
+installCompiledValidatorMap(lunora_memory_functions_124.markMemorySupersededByCompression.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["memoryId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "memoryId": source["memoryId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_functions_122.recordRetrievedMemories.args, (source) => {
+installCompiledValidatorMap(lunora_memory_functions_124.recordRetrievedMemories.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["memories"])) return DEFER;
@@ -6042,7 +6118,7 @@ if (typeof source["messageId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "memories": __arr1, "messageId": source["messageId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_functions_122.updateMemoryInternal.args, (source) => {
+installCompiledValidatorMap(lunora_memory_functions_124.updateMemoryInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6083,25 +6159,25 @@ __has5 = true;
 if (typeof source["memoryId"] !== "string") return DEFER;
 return { ...(__has1 ? { "confidence": __val1 } : {}), ...(__has2 ? { "embeddingId": __val2 } : {}), ...(__has3 ? { "importance": __val3 } : {}), ...(__has4 ? { "lastConfirmedAt": __val4 } : {}), ...(__has5 ? { "memory": __val5 } : {}), "memoryId": source["memoryId"] };
 });
-installCompiledValidatorMap(lunora_memory_gdpr_123.collectMemoriesForExport.args, (source) => {
+installCompiledValidatorMap(lunora_memory_gdpr_125.collectMemoriesForExport.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_gdpr_123.deleteUserMemoryReflectionData.args, (source) => {
+installCompiledValidatorMap(lunora_memory_gdpr_125.deleteUserMemoryReflectionData.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_reflection_124.claimReflectionRun.args, (source) => {
+installCompiledValidatorMap(lunora_memory_reflection_126.claimReflectionRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_reflection_124.loadReflectionInputs.args, (source) => {
+installCompiledValidatorMap(lunora_memory_reflection_126.loadReflectionInputs.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6115,19 +6191,19 @@ if (typeof source["now"] !== "number" || !Number.isFinite(source["now"])) return
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "botId": __val1 } : {}), "now": source["now"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_reflection_124.noteMemoryActivity.args, (source) => {
+installCompiledValidatorMap(lunora_memory_reflection_126.noteMemoryActivity.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_reflection_124.runMemoryReflection.args, (source) => {
+installCompiledValidatorMap(lunora_memory_reflection_126.runMemoryReflection.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_reflection_124.saveMemoryDigest.args, (source) => {
+installCompiledValidatorMap(lunora_memory_reflection_126.saveMemoryDigest.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["learned"])) return DEFER;
@@ -6156,7 +6232,7 @@ if (typeof source["summary"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "learned": __arr1, "localDay": source["localDay"], "stats": __obj3, "summary": source["summary"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_retrieve_125.default.args, (source) => {
+installCompiledValidatorMap(lunora_memory_retrieve_127.default.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6170,7 +6246,7 @@ if (typeof source["searchText"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "botId": __val1 } : {}), "searchText": source["searchText"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_memory_retrieve_125.retrieveRelevantMemories.args, (source) => {
+installCompiledValidatorMap(lunora_memory_retrieve_127.retrieveRelevantMemories.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6184,26 +6260,26 @@ if (typeof source["searchText"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "botId": __val1 } : {}), "searchText": source["searchText"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.aiDisclosureSent.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.aiDisclosureSent.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "threadId": source["threadId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.chargeReplyToolRound.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.chargeReplyToolRound.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.claimThreadReply.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.claimThreadReply.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.findOrCreateMessengerThread.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.findOrCreateMessengerThread.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["externalThreadId"] !== "string") return DEFER;
@@ -6219,54 +6295,54 @@ __has1 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "externalThreadId": source["externalThreadId"], "messengerConnectionId": source["messengerConnectionId"], "source": source["source"], ...(__has1 ? { "title": __val1 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.getConnectionById.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.getConnectionById.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["connectionId"] !== "string") return DEFER;
 return { "connectionId": source["connectionId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.getConnectionByPlatformChat.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.getConnectionByPlatformChat.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["platform"] !== "string") return DEFER;
 if (typeof source["platformChatId"] !== "string") return DEFER;
 return { "platform": source["platform"], "platformChatId": source["platformChatId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.getConnectionByPlatformUser.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.getConnectionByPlatformUser.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["platform"] !== "string") return DEFER;
 if (typeof source["platformUserId"] !== "string") return DEFER;
 return { "platform": source["platform"], "platformUserId": source["platformUserId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.getOwnerRateLimitTier.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.getOwnerRateLimitTier.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.getReplyToolSetting.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.getReplyToolSetting.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.listReplyMedia.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.listReplyMedia.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.markAiDisclosed.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.markAiDisclosed.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.pairConnection.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.pairConnection.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["codeHash"] !== "string") return DEFER;
@@ -6289,13 +6365,13 @@ __has2 = true;
 }
 return { "codeHash": source["codeHash"], "connectionId": source["connectionId"], ...(__has1 ? { "displayName": __val1 } : {}), "platformChatId": source["platformChatId"], "platformUserId": source["platformUserId"], ...(__has2 ? { "platformUsername": __val2 } : {}) };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.regeneratePairingCode.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.regeneratePairingCode.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["connectionId"] !== "string") return DEFER;
 return { "connectionId": source["connectionId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.saveMessengerNotice.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.saveMessengerNotice.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["text"] !== "string") return DEFER;
@@ -6303,19 +6379,19 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "text": source["text"], "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.threadHasRecentMedia.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.threadHasRecentMedia.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "threadId": source["threadId"] };
 });
-installCompiledValidatorMap(lunora_messenger_functions_126.touchConnection.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_functions_128.touchConnection.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["connectionId"] !== "string") return DEFER;
 return { "connectionId": source["connectionId"] };
 });
-installCompiledValidatorMap(lunora_messenger_respond_127.sendNotice.args, (source) => {
+installCompiledValidatorMap(lunora_messenger_respond_129.sendNotice.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6359,7 +6435,7 @@ if (typeof source["text"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "inboundAt": __val1 } : {}), "platform": source["platform"], "platformChatId": source["platformChatId"], ...(__has2 ? { "platformThreadTs": __val2 } : {}), ...(__has3 ? { "replyToId": __val3 } : {}), ...(__has4 ? { "replyToken": __val4 } : {}), ...(__has5 ? { "serviceUrl": __val5 } : {}), "text": source["text"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_notifications_daily_brief_128.chargeDailyBrief.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_daily_brief_130.chargeDailyBrief.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6372,38 +6448,38 @@ __has1 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "checkOnly": __val1 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_notifications_daily_brief_128.claimDailyBrief.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_daily_brief_130.claimDailyBrief.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_notifications_daily_brief_128.loadDailyBriefInputs.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_daily_brief_130.loadDailyBriefInputs.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["since"] !== "number" || !Number.isFinite(source["since"])) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "since": source["since"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_notifications_daily_brief_128.noteDailyBriefActivity.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_daily_brief_130.noteDailyBriefActivity.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_notifications_daily_brief_128.runDailyBrief.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_daily_brief_130.runDailyBrief.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_notifications_daily_brief_128.setDailyBriefEnabled.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_daily_brief_130.setDailyBriefEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["enabled"] !== "boolean") return DEFER;
 return { "enabled": source["enabled"] };
 });
-installCompiledValidatorMap(lunora_notifications_daily_brief_128.writeDailyBrief.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_daily_brief_130.writeDailyBrief.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["localDay"] !== "string") return DEFER;
@@ -6411,246 +6487,246 @@ if (typeof source["summary"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "localDay": source["localDay"], "summary": source["summary"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_notifications_functions_129.markNotificationRead.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_functions_131.markNotificationRead.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["notificationId"] !== "string") return DEFER;
 return { "notificationId": source["notificationId"] };
 });
-installCompiledValidatorMap(lunora_notifications_gdpr_130.collectNotificationsForExport.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_gdpr_132.collectNotificationsForExport.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_notifications_gdpr_130.deleteUserNotifications.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_gdpr_132.deleteUserNotifications.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_notifications_push_132.loadPushNotification.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_push_134.loadPushNotification.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["notificationId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "notificationId": source["notificationId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_notifications_push_132.sendPushForNotification.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_push_134.sendPushForNotification.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["notificationId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "notificationId": source["notificationId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_notifications_task_email_133.claimOutcomeEmail.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_task_email_135.claimOutcomeEmail.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["id"] !== "string") return DEFER;
 return { "id": source["id"] };
 });
-installCompiledValidatorMap(lunora_notifications_task_email_133.holdsOutcomeEmailClaim.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_task_email_135.holdsOutcomeEmailClaim.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["claimedAt"] !== "number" || !Number.isFinite(source["claimedAt"])) return DEFER;
 if (typeof source["id"] !== "string") return DEFER;
 return { "claimedAt": source["claimedAt"], "id": source["id"] };
 });
-installCompiledValidatorMap(lunora_notifications_task_email_133.setTaskEmailEnabled.args, (source) => {
+installCompiledValidatorMap(lunora_notifications_task_email_135.setTaskEmailEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["enabled"] !== "boolean") return DEFER;
 return { "enabled": source["enabled"] };
 });
-installCompiledValidatorMap(lunora_pages_agent_134.getPageForAgent.args, (source) => {
+installCompiledValidatorMap(lunora_pages_agent_136.getPageForAgent.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["pageId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "pageId": source["pageId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_pages_comments_135.deletePageComment.args, (source) => {
+installCompiledValidatorMap(lunora_pages_comments_137.deletePageComment.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["commentRowId"] !== "string") return DEFER;
 return { "commentRowId": source["commentRowId"] };
 });
-installCompiledValidatorMap(lunora_pages_comments_135.listPageComments.args, (source) => {
+installCompiledValidatorMap(lunora_pages_comments_137.listPageComments.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["pageId"] !== "string") return DEFER;
 return { "pageId": source["pageId"] };
 });
-installCompiledValidatorMap(lunora_pages_functions_136.createPageFromDocument.args, (source) => {
+installCompiledValidatorMap(lunora_pages_functions_138.createPageFromDocument.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["documentId"] !== "string") return DEFER;
 return { "documentId": source["documentId"] };
 });
-installCompiledValidatorMap(lunora_pages_functions_136.deletePage.args, (source) => {
+installCompiledValidatorMap(lunora_pages_functions_138.deletePage.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["pageId"] !== "string") return DEFER;
 return { "pageId": source["pageId"] };
 });
-installCompiledValidatorMap(lunora_pages_functions_136.getPage.args, (source) => {
+installCompiledValidatorMap(lunora_pages_functions_138.getPage.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["pageId"] !== "string") return DEFER;
 return { "pageId": source["pageId"] };
 });
-installCompiledValidatorMap(lunora_pages_functions_136.getPageVersion.args, (source) => {
+installCompiledValidatorMap(lunora_pages_functions_138.getPageVersion.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["versionId"] !== "string") return DEFER;
 return { "versionId": source["versionId"] };
 });
-installCompiledValidatorMap(lunora_pages_functions_136.listPageVersions.args, (source) => {
+installCompiledValidatorMap(lunora_pages_functions_138.listPageVersions.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["pageId"] !== "string") return DEFER;
 return { "pageId": source["pageId"] };
 });
-installCompiledValidatorMap(lunora_pages_functions_136.restorePageVersion.args, (source) => {
+installCompiledValidatorMap(lunora_pages_functions_138.restorePageVersion.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["baseRevision"] !== "number" || !Number.isFinite(source["baseRevision"])) return DEFER;
 if (typeof source["versionId"] !== "string") return DEFER;
 return { "baseRevision": source["baseRevision"], "versionId": source["versionId"] };
 });
-installCompiledValidatorMap(lunora_pages_functions_136.setPageFavorite.args, (source) => {
+installCompiledValidatorMap(lunora_pages_functions_138.setPageFavorite.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["isFavorite"] !== "boolean") return DEFER;
 if (typeof source["pageId"] !== "string") return DEFER;
 return { "isFavorite": source["isFavorite"], "pageId": source["pageId"] };
 });
-installCompiledValidatorMap(lunora_pages_gdpr_137.collectPagesForExport.args, (source) => {
+installCompiledValidatorMap(lunora_pages_gdpr_139.collectPagesForExport.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_pages_gdpr_137.deleteUserPages.args, (source) => {
+installCompiledValidatorMap(lunora_pages_gdpr_139.deleteUserPages.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_pages_sharing_139.getPageInviteOwner.args, (source) => {
+installCompiledValidatorMap(lunora_pages_sharing_141.getPageInviteOwner.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["tokenHash"] !== "string") return DEFER;
 return { "tokenHash": source["tokenHash"] };
 });
-installCompiledValidatorMap(lunora_pages_sharing_139.getPageSharing.args, (source) => {
+installCompiledValidatorMap(lunora_pages_sharing_141.getPageSharing.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["pageId"] !== "string") return DEFER;
 return { "pageId": source["pageId"] };
 });
-installCompiledValidatorMap(lunora_pages_sharing_139.getPublicPageOwner.args, (source) => {
+installCompiledValidatorMap(lunora_pages_sharing_141.getPublicPageOwner.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["publicAccessToken"] !== "string") return DEFER;
 return { "publicAccessToken": source["publicAccessToken"] };
 });
-installCompiledValidatorMap(lunora_pages_sharing_139.readPublicPage.args, (source) => {
+installCompiledValidatorMap(lunora_pages_sharing_141.readPublicPage.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["publicAccessToken"] !== "string") return DEFER;
 return { "publicAccessToken": source["publicAccessToken"] };
 });
-installCompiledValidatorMap(lunora_pages_sharing_139.redeemPageInvite.args, (source) => {
+installCompiledValidatorMap(lunora_pages_sharing_141.redeemPageInvite.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["token"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "token": source["token"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_pages_sharing_139.revokePageInvite.args, (source) => {
+installCompiledValidatorMap(lunora_pages_sharing_141.revokePageInvite.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["inviteId"] !== "string") return DEFER;
 return { "inviteId": source["inviteId"] };
 });
-installCompiledValidatorMap(lunora_pages_sharing_139.setPagePublic.args, (source) => {
+installCompiledValidatorMap(lunora_pages_sharing_141.setPagePublic.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["isPublic"] !== "boolean") return DEFER;
 if (typeof source["pageId"] !== "string") return DEFER;
 return { "isPublic": source["isPublic"], "pageId": source["pageId"] };
 });
-installCompiledValidatorMap(lunora_projects_functions_140.getProject.args, (source) => {
+installCompiledValidatorMap(lunora_projects_functions_142.getProject.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_projects_functions_140.pinProject.args, (source) => {
+installCompiledValidatorMap(lunora_projects_functions_142.pinProject.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_projects_functions_140.unpinProject.args, (source) => {
+installCompiledValidatorMap(lunora_projects_functions_142.unpinProject.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.calculatePromptCount.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.calculatePromptCount.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["isPremium"] !== "boolean") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "isPremium": source["isPremium"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.deletePrompt.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.deletePrompt.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["promptId"] !== "string") return DEFER;
 return { "promptId": source["promptId"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.duplicatePrompt.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.duplicatePrompt.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["promptId"] !== "string") return DEFER;
 return { "promptId": source["promptId"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.getPrompt.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.getPrompt.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["promptId"] !== "string") return DEFER;
 return { "promptId": source["promptId"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.getPromptCountInternal.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.getPromptCountInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.getPromptHistory.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.getPromptHistory.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["promptId"] !== "string") return DEFER;
 return { "promptId": source["promptId"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.getPromptsByOrganizationInternal.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.getPromptsByOrganizationInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["maxPrompts"] !== "number" || !Number.isFinite(source["maxPrompts"])) return DEFER;
 if (typeof source["organizationId"] !== "string") return DEFER;
 return { "maxPrompts": source["maxPrompts"], "organizationId": source["organizationId"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.getPromptsByUserInternal.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.getPromptsByUserInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["maxPrompts"] !== "number" || !Number.isFinite(source["maxPrompts"])) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "maxPrompts": source["maxPrompts"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.getResolvedVariables.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.getResolvedVariables.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6662,7 +6738,7 @@ __has1 = true;
 }
 return { ...(__has1 ? { "threadId": __val1 } : {}) };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.optimizePrompt.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.optimizePrompt.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["content"] !== "string") return DEFER;
@@ -6676,26 +6752,26 @@ __has1 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "content": source["content"], ...(__has1 ? { "improvementInstructions": __val1 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.recordPromptUsage.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.recordPromptUsage.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["promptId"] !== "string") return DEFER;
 return { "promptId": source["promptId"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.restorePromptVersion.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.restorePromptVersion.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["promptId"] !== "string") return DEFER;
 if (typeof source["version"] !== "number" || !Number.isFinite(source["version"])) return DEFER;
 return { "promptId": source["promptId"], "version": source["version"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_141.togglePromptFavorite.args, (source) => {
+installCompiledValidatorMap(lunora_prompts_functions_143.togglePromptFavorite.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["promptId"] !== "string") return DEFER;
 return { "promptId": source["promptId"] };
 });
-installCompiledValidatorMap(lunora_saas_usage_functions_143.getMyUsage.args, (source) => {
+installCompiledValidatorMap(lunora_saas_usage_functions_145.getMyUsage.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6707,7 +6783,7 @@ __has1 = true;
 }
 return { ...(__has1 ? { "days": __val1 } : {}) };
 });
-installCompiledValidatorMap(lunora_sandbox_cleanup_144.checkAndTerminateSandbox.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_cleanup_146.checkAndTerminateSandbox.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6720,7 +6796,7 @@ __has1 = true;
 if (typeof source["sessionId"] !== "string") return DEFER;
 return { ...(__has1 ? { "pauseAttempt": __val1 } : {}), "sessionId": source["sessionId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_cleanup_144.default.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_cleanup_146.default.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6733,19 +6809,19 @@ __has1 = true;
 if (typeof source["sessionId"] !== "string") return DEFER;
 return { ...(__has1 ? { "pauseAttempt": __val1 } : {}), "sessionId": source["sessionId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_cleanup_144.killSandboxById.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_cleanup_146.killSandboxById.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["sandboxId"] !== "string") return DEFER;
 return { "sandboxId": source["sandboxId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_functions_145.checkAndTerminateIdle.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_functions_147.checkAndTerminateIdle.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["sessionId"] !== "string") return DEFER;
 return { "sessionId": source["sessionId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_functions_145.closeSession.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_functions_147.closeSession.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6765,7 +6841,7 @@ __has2 = true;
 }
 return { ...(__has1 ? { "errorMessage": __val1 } : {}), "sessionId": source["sessionId"], ...(__has2 ? { "status": __val2 } : {}) };
 });
-installCompiledValidatorMap(lunora_sandbox_functions_145.createSession.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_functions_147.createSession.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6793,13 +6869,13 @@ __has3 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "sandboxId": __val1 } : {}), ...(__has2 ? { "templateId": __val2 } : {}), "threadId": source["threadId"], ...(__has3 ? { "timeoutMs": __val3 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_functions_145.getActiveSession.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_functions_147.getActiveSession.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "threadId": source["threadId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_functions_145.logAction.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_functions_147.logAction.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["action"] !== "string") return DEFER;
@@ -6842,20 +6918,20 @@ __has5 = true;
 if (typeof source["success"] !== "boolean") return DEFER;
 return { "action": source["action"], ...(__has1 ? { "command": __val1 } : {}), ...(__has2 ? { "durationMs": __val2 } : {}), ...(__has3 ? { "exitCode": __val3 } : {}), "sessionId": source["sessionId"], ...(__has4 ? { "stderr": __val4 } : {}), ...(__has5 ? { "stdout": __val5 } : {}), "success": source["success"] };
 });
-installCompiledValidatorMap(lunora_sandbox_functions_145.markBotComputerPaused.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_functions_147.markBotComputerPaused.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["decidedAt"] !== "number" || !Number.isFinite(source["decidedAt"])) return DEFER;
 if (typeof source["sessionId"] !== "string") return DEFER;
 return { "decidedAt": source["decidedAt"], "sessionId": source["sessionId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_functions_145.retireBotComputers.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_functions_147.retireBotComputers.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["botId"] !== "string") return DEFER;
 return { "botId": source["botId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_functions_145.updateSession.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_functions_147.updateSession.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6896,20 +6972,20 @@ __has5 = true;
 }
 return { ...(__has1 ? { "cleanupFnId": __val1 } : {}), ...(__has2 ? { "completedAt": __val2 } : {}), ...(__has3 ? { "errorMessage": __val3 } : {}), ...(__has4 ? { "sandboxId": __val4 } : {}), "sessionId": source["sessionId"], ...(__has5 ? { "status": __val5 } : {}) };
 });
-installCompiledValidatorMap(lunora_sandbox_pool_functions_146.claimWarmSandbox.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_pool_functions_148.claimWarmSandbox.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_pool_functions_146.registerWarmSandbox.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_pool_functions_148.registerWarmSandbox.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["sandboxId"] !== "string") return DEFER;
 return { "sandboxId": source["sandboxId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_pty_148.default.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_pty_150.default.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -6938,14 +7014,14 @@ __has3 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "cols": __val1 } : {}), "command": source["command"], ...(__has2 ? { "rows": __val2 } : {}), "threadId": source["threadId"], ...(__has3 ? { "timeoutMs": __val3 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_workspace_sync_functions_149.getWorkspaceMetadata.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_workspace_sync_functions_151.getWorkspaceMetadata.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_workspace_sync_150.restoreWorkspace.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_workspace_sync_152.restoreWorkspace.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["r2Key"] !== "string") return DEFER;
@@ -6954,7 +7030,7 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "r2Key": source["r2Key"], "sandboxId": source["sandboxId"], "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_workspace_sync_150.saveWorkspace.args, (source) => {
+installCompiledValidatorMap(lunora_sandbox_workspace_sync_152.saveWorkspace.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["sandboxId"] !== "string") return DEFER;
@@ -6963,7 +7039,7 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "sandboxId": source["sandboxId"], "sessionId": source["sessionId"], "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_agent_creation_151.createSkillFromAgent.args, (source) => {
+installCompiledValidatorMap(lunora_skills_agent_creation_153.createSkillFromAgent.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has2 = false;
@@ -7013,7 +7089,7 @@ __has6 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has2 ? { "additionalTools": __val2 } : {}), ...(__has3 ? { "category": __val3 } : {}), "description": source["description"], "instructions": source["instructions"], "name": source["name"], ...(__has4 ? { "preferredModel": __val4 } : {}), "slug": source["slug"], ...(__has6 ? { "tags": __val6 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_builder_152.searchMarketplaceForBuilder.args, (source) => {
+installCompiledValidatorMap(lunora_skills_builder_154.searchMarketplaceForBuilder.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["queries"])) return DEFER;
@@ -7025,7 +7101,7 @@ __arr1[__i1] = __e1;
 }
 return { "queries": __arr1 };
 });
-installCompiledValidatorMap(lunora_skills_executor_153.getEnabledSkillsForSystemPromptQuery.args, (source) => {
+installCompiledValidatorMap(lunora_skills_executor_155.getEnabledSkillsForSystemPromptQuery.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7038,7 +7114,7 @@ __has1 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "organizationId": __val1 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_executor_153.loadSkillForInvocationQuery.args, (source) => {
+installCompiledValidatorMap(lunora_skills_executor_155.loadSkillForInvocationQuery.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7053,7 +7129,7 @@ if (typeof source["skillSlug"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "organizationId": __val1 } : {}), "rawArgs": source["rawArgs"], "skillSlug": source["skillSlug"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_executor_153.resolveSkillsForRun.args, (source) => {
+installCompiledValidatorMap(lunora_skills_executor_155.resolveSkillsForRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7087,32 +7163,32 @@ __has4 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "organizationId": __val1 } : {}), ...(__has2 ? { "rawArgs": __val2 } : {}), ...(__has3 ? { "skillSlug": __val3 } : {}), ...(__has4 ? { "threadId": __val4 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_154.calculateSkillCount.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_156.calculateSkillCount.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["isPremium"] !== "boolean") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "isPremium": source["isPremium"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_154.deleteSkill.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_156.deleteSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_154.getSkill.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_156.getSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_154.getSkillCountInternal.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_156.getSkillCountInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_154.getSkillsByIdsInternal.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_156.getSkillsByIdsInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["skillIds"])) return DEFER;
@@ -7124,60 +7200,60 @@ __arr1[__i1] = __e1;
 }
 return { "skillIds": __arr1 };
 });
-installCompiledValidatorMap(lunora_skills_functions_154.getSkillsByOrganizationInternal.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_156.getSkillsByOrganizationInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["maxSkills"] !== "number" || !Number.isFinite(source["maxSkills"])) return DEFER;
 if (typeof source["organizationId"] !== "string") return DEFER;
 return { "maxSkills": source["maxSkills"], "organizationId": source["organizationId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_154.getSkillsByUserInternal.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_156.getSkillsByUserInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["maxSkills"] !== "number" || !Number.isFinite(source["maxSkills"])) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "maxSkills": source["maxSkills"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_154.getUserSkillsStateInternal.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_156.getUserSkillsStateInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_154.setSkillAutoRun.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_156.setSkillAutoRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["autoRun"] !== "boolean") return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "autoRun": source["autoRun"], "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_154.setSkillEnabled.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_156.setSkillEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["enabled"] !== "boolean") return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "enabled": source["enabled"], "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_io_156.exportSkill.args, (source) => {
+installCompiledValidatorMap(lunora_skills_io_158.exportSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_io_156.findFreeSkillSlug.args, (source) => {
+installCompiledValidatorMap(lunora_skills_io_158.findFreeSkillSlug.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["slug"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "slug": source["slug"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_io_156.listSkillFilesInternal.args, (source) => {
+installCompiledValidatorMap(lunora_skills_io_158.listSkillFilesInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_io_156.saveImportedSkillFiles.args, (source) => {
+installCompiledValidatorMap(lunora_skills_io_158.saveImportedSkillFiles.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["files"])) return DEFER;
@@ -7205,69 +7281,69 @@ if (typeof source["skillId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "files": __arr1, "skillId": source["skillId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_jit_tool_loader_157.getSkillToolConfig.args, (source) => {
+installCompiledValidatorMap(lunora_skills_jit_tool_loader_159.getSkillToolConfig.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_marketplace_158.forkSkill.args, (source) => {
+installCompiledValidatorMap(lunora_skills_marketplace_160.forkSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_marketplace_158.getSkillDetail.args, (source) => {
+installCompiledValidatorMap(lunora_skills_marketplace_160.getSkillDetail.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_marketplace_158.installSkill.args, (source) => {
+installCompiledValidatorMap(lunora_skills_marketplace_160.installSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_marketplace_158.rateSkill.args, (source) => {
+installCompiledValidatorMap(lunora_skills_marketplace_160.rateSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["rating"] !== "number" || !Number.isFinite(source["rating"])) return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "rating": source["rating"], "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_marketplace_158.uninstallSkill.args, (source) => {
+installCompiledValidatorMap(lunora_skills_marketplace_160.uninstallSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_execute_159.runSubAgent.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_execute_161.runSubAgent.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_160.attachChildThread.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_162.attachChildThread.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["childThreadId"] !== "string") return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "childThreadId": source["childThreadId"], "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_160.cancelRun.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_162.cancelRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_160.claimRun.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_162.claimRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_160.createRun.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_162.createRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7309,50 +7385,50 @@ __has5 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "parentModel": __val1 } : {}), "parentThreadId": source["parentThreadId"], ...(__has2 ? { "skillSlug": __val2 } : {}), "task": source["task"], ...(__has4 ? { "toolAllowlist": __val4 } : {}), ...(__has5 ? { "toolCallId": __val5 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_160.postResult.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_162.postResult.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["attempt"] !== "number" || !Number.isFinite(source["attempt"])) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "attempt": source["attempt"], "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_160.reapRun.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_162.reapRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_160.shouldRunStop.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_162.shouldRunStop.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_tasks_execute_162.finishCodingAgentRound.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_execute_164.finishCodingAgentRound.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["codingRunId"] !== "string") return DEFER;
 return { "codingRunId": source["codingRunId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_163.cancelTask.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_functions_165.cancelTask.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { "taskId": source["taskId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_163.deleteGoal.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_functions_165.deleteGoal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["goalId"] !== "string") return DEFER;
 return { "goalId": source["goalId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_163.deleteTask.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_functions_165.deleteTask.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { "taskId": source["taskId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_163.getTaskRuns.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_functions_165.getTaskRuns.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7365,43 +7441,43 @@ __has1 = true;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { ...(__has1 ? { "limit": __val1 } : {}), "taskId": source["taskId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_163.runTask.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_functions_165.runTask.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { "taskId": source["taskId"] };
 });
-installCompiledValidatorMap(lunora_tasks_gdpr_164.collectTasksForExport.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_gdpr_166.collectTasksForExport.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_tasks_gdpr_164.deleteUserTasks.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_gdpr_166.deleteUserTasks.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_tasks_internal_165.canRunForUser.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_internal_167.canRunForUser.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_tasks_internal_165.getTaskForVerification.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_internal_167.getTaskForVerification.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { "taskId": source["taskId"] };
 });
-installCompiledValidatorMap(lunora_tasks_internal_165.isRoundRunning.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_internal_167.isRoundRunning.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_tasks_internal_165.resolveTaskSkill.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_internal_167.resolveTaskSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7415,53 +7491,7 @@ if (typeof source["skillId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "organizationId": __val1 } : {}), "skillId": source["skillId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_triggers_execute_166.default.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["ignoreDisabled"] !== undefined) {
-if (typeof source["ignoreDisabled"] !== "boolean") return DEFER;
-__val1 = source["ignoreDisabled"];
-__has1 = true;
-}
-let __has2 = false;
-let __val2;
-if (source["payload"] !== undefined) {
-if (typeof source["payload"] !== "string") return DEFER;
-__val2 = source["payload"];
-__has2 = true;
-}
-if (typeof source["triggerId"] !== "string") return DEFER;
-return { ...(__has1 ? { "ignoreDisabled": __val1 } : {}), ...(__has2 ? { "payload": __val2 } : {}), "triggerId": source["triggerId"] };
-});
-installCompiledValidatorMap(lunora_triggers_execute_166.executeTrigger.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["ignoreDisabled"] !== undefined) {
-if (typeof source["ignoreDisabled"] !== "boolean") return DEFER;
-__val1 = source["ignoreDisabled"];
-__has1 = true;
-}
-let __has2 = false;
-let __val2;
-if (source["payload"] !== undefined) {
-if (typeof source["payload"] !== "string") return DEFER;
-__val2 = source["payload"];
-__has2 = true;
-}
-if (typeof source["triggerId"] !== "string") return DEFER;
-return { ...(__has1 ? { "ignoreDisabled": __val1 } : {}), ...(__has2 ? { "payload": __val2 } : {}), "triggerId": source["triggerId"] };
-});
-installCompiledValidatorMap(lunora_triggers_functions_167.admitTriggerRun.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["triggerId"] !== "string") return DEFER;
-return { "triggerId": source["triggerId"] };
-});
-installCompiledValidatorMap(lunora_triggers_functions_167.createExecution.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_169.createExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7474,39 +7504,39 @@ __has1 = true;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { ...(__has1 ? { "payload": __val1 } : {}), "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_167.deleteTrigger.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_169.deleteTrigger.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_167.getDueScheduleTriggers.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_169.getDueScheduleTriggers.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["now"] !== "number" || !Number.isFinite(source["now"])) return DEFER;
 return { "now": source["now"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_167.getTriggerInternal.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_169.getTriggerInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_167.setTriggerEnabled.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_169.setTriggerEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["enabled"] !== "boolean") return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "enabled": source["enabled"], "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_167.setTriggerEnabledInternal.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_169.setTriggerEnabledInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["enabled"] !== "boolean") return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "enabled": source["enabled"], "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_167.updateExecution.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_169.updateExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7527,7 +7557,7 @@ __has2 = true;
 }
 return { ...(__has1 ? { "error": __val1 } : {}), "executionId": source["executionId"], "status": source["status"], ...(__has2 ? { "threadId": __val2 } : {}) };
 });
-installCompiledValidatorMap(lunora_triggers_functions_167.updateTriggerStats.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_169.updateTriggerStats.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7548,7 +7578,7 @@ __has2 = true;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { ...(__has1 ? { "error": __val1 } : {}), "lastTriggeredAt": source["lastTriggeredAt"], ...(__has2 ? { "nextTriggerAt": __val2 } : {}), "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_usage_activity_169.recordReplyUsage.args, (source) => {
+installCompiledValidatorMap(lunora_usage_activity_171.recordReplyUsage.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["at"] !== "number" || !Number.isFinite(source["at"])) return DEFER;
@@ -7567,14 +7597,14 @@ if (typeof source["tokens"] !== "number" || !Number.isFinite(source["tokens"])) 
 if (typeof source["userId"] !== "string") return DEFER;
 return { "at": source["at"], "costMicrodollars": source["costMicrodollars"], "date": source["date"], "replyKey": source["replyKey"], "skillKey": source["skillKey"], ...(__has1 ? { "skillName": __val1 } : {}), "tokens": source["tokens"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_usage_backfill_170.runUsageBackfillStep.args, (source) => {
+installCompiledValidatorMap(lunora_usage_backfill_172.runUsageBackfillStep.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "runId": source["runId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_vault_fork_copy_171.copyVaultObjects.args, (source) => {
+installCompiledValidatorMap(lunora_vault_fork_copy_173.copyVaultObjects.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["copies"])) return DEFER;
@@ -7590,7 +7620,7 @@ __arr1[__i1] = __obj2;
 }
 return { "copies": __arr1 };
 });
-installCompiledValidatorMap(lunora_vault_functions_172.applyFileMetadata.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_174.applyFileMetadata.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
@@ -7599,19 +7629,19 @@ if (typeof source["type"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "key": source["key"], "size": source["size"], "type": source["type"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_172.getAttachment.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_174.getAttachment.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["attachmentId"] !== "string") return DEFER;
 return { "attachmentId": source["attachmentId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_172.getDownloadUrl.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_174.getDownloadUrl.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["attachmentId"] !== "string") return DEFER;
 return { "attachmentId": source["attachmentId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_172.insertVaultFile.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_174.insertVaultFile.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
@@ -7628,7 +7658,7 @@ if (typeof source["type"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "key": source["key"], "name": source["name"], ...(__has1 ? { "organizationId": __val1 } : {}), "size": source["size"], "type": source["type"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_172.internalSaveGenerated.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_174.internalSaveGenerated.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["chatId"] !== "string") return DEFER;
@@ -7646,87 +7676,87 @@ __has1 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "chatId": source["chatId"], "fileName": source["fileName"], "fileSize": source["fileSize"], "fileType": source["fileType"], "key": source["key"], ...(__has1 ? { "url": __val1 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_172.markNsfwChecking.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_174.markNsfwChecking.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["fileId"] !== "string") return DEFER;
 return { "fileId": source["fileId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_172.markNsfwFailed.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_174.markNsfwFailed.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["fileId"] !== "string") return DEFER;
 return { "fileId": source["fileId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_172.saveNsfwResult.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_174.saveNsfwResult.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["fileId"] !== "string") return DEFER;
 if (typeof source["isNsfw"] !== "boolean") return DEFER;
 return { "fileId": source["fileId"], "isNsfw": source["isNsfw"], "scores": source["scores"] };
 });
-installCompiledValidatorMap(lunora_workflow_fork_176.getAuthorVaultRows.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_fork_178.getAuthorVaultRows.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["authorId"] !== "string") return DEFER;
 if (typeof source["sourceProjectId"] !== "string") return DEFER;
 return { "authorId": source["authorId"], "sourceProjectId": source["sourceProjectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_fork_176.getForkSource.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_fork_178.getForkSource.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["sourceProjectId"] !== "string") return DEFER;
 return { "sourceProjectId": source["sourceProjectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_functions_177.createExecution.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_functions_179.createExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_functions_177.getExecution.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_functions_179.getExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["executionId"] !== "string") return DEFER;
 return { "executionId": source["executionId"] };
 });
-installCompiledValidatorMap(lunora_workflow_functions_177.getWorkflow.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_functions_179.getWorkflow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_functions_177.listNodeExecutions.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_functions_179.listNodeExecutions.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["executionId"] !== "string") return DEFER;
 return { "executionId": source["executionId"] };
 });
-installCompiledValidatorMap(lunora_workflow_gallery_178.getPublicWorkflowOwner.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_gallery_180.getPublicWorkflowOwner.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["publicAccessToken"] !== "string") return DEFER;
 return { "publicAccessToken": source["publicAccessToken"] };
 });
-installCompiledValidatorMap(lunora_workflow_gallery_178.readPublicWorkflow.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_gallery_180.readPublicWorkflow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["publicAccessToken"] !== "string") return DEFER;
 return { "publicAccessToken": source["publicAccessToken"] };
 });
-installCompiledValidatorMap(lunora_workflow_gallery_178.unpublishWorkflow.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_gallery_180.unpublishWorkflow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_presence_181.listPresence.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_presence_183.listPresence.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_presence_181.listVersions.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_presence_183.listVersions.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -8223,7 +8253,7 @@ export interface Caller {
             failAbandonedEditReply: (args: { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }) => Promise<{ added: boolean; failed: number }>;
         };
         execute: {
-            continueAfterToolApproval: (args: { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }) => Promise<void>;
+            continueAfterToolApproval: (args: { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }) => Promise<void>;
             runStreamingAgent: (args: { isAnonymous?: boolean; messageId: string; organizationId?: string; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }) => Promise<void>;
         };
         functions: {
@@ -8394,9 +8424,14 @@ export interface Caller {
                 updateSlide: (args: { htmlContent?: string; presentationId: Id<"presentations">; slideNumber: number; threadId: Id<"threads">; title?: string; userId: string }) => Promise<{ slideId: Id<"presentationSlides"> }>;
             };
         };
+        steering: {
+            deliverSteers: (args: { pendingMessageId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads">; userId: string }) => Promise<null | { messageId: string; text: string }>;
+            steerRun: (args: { steerId?: string; streamId: Id<"persistentStreams">; text: string; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ steerId: string }>;
+            withdrawSteer: (args: { steerId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ outcome: "withdrawn" | "delivered" | "unknown" }>;
+        };
         streaming: {
             createStreamWithMessage: (args: { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }) => Promise<string>;
-            getActiveStreamForThread: (args: { threadId: Id<"threads">; unlockProof?: string }) => Promise<{ streamId: Id<"persistentStreams"> } | null>;
+            getActiveStreamForThread: (args: { threadId: Id<"threads">; unlockProof?: string }) => Promise<{ deliveredSteerIds?: Array<string>; streamId: Id<"persistentStreams"> } | null>;
             getStreamBody: (args: { streamId: Id<"persistentStreams">; unlockProof?: string }) => Promise<{ reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string }>;
             streamRunThread: (args: { streamId: Id<"persistentStreams">; userId: string }) => Promise<({ activeLeafMessageId?: string | undefined; botId?: string | undefined; createdAt?: number | undefined; groupChat?: ({ debateRounds?: number | undefined; stopRequestedAt?: number | undefined; synthesizerSkillId?: string | undefined; } & { mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: ({} & { addedAt: number; skillId: string; })[]; }) | undefined; lockedAt?: number | undefined; order?: number | undefined; tagIds?: string[] | undefined; category?: string | undefined; createdBy?: string | undefined; customSystemPrompt?: string | undefined; deleted?: boolean | undefined; deletedAt?: number | undefined; dictationLanguage?: string | undefined; enabledFeatures?: string[] | undefined; externalThreadId?: string | undefined; isPublic?: boolean | undefined; isTemporary?: boolean | undefined; language?: string | undefined; lastCompressionStartedAt?: number | undefined; messengerConnectionId?: string | undefined; mode?: "image" | "text" | "video" | undefined; model?: string | undefined; multiChat?: boolean | undefined; organizationId?: string | undefined; parentThreadIds?: string[] | undefined; pinnedAt?: number | undefined; projectId?: string | undefined; publicAccessToken?: string | undefined; reasoningEffort?: number | undefined; source?: string | undefined; statelessMode?: boolean | undefined; summary?: string | undefined; tags?: string[] | undefined; teamId?: string | undefined; title?: string | undefined; updatedAt?: number | undefined; userId?: string | undefined; } & { _creationTime: number; _id: string; status: "error" | "running" | "active" | "archived" | "abort" | "finish"; }) | null>;
             persistent: {
@@ -8404,11 +8439,11 @@ export interface Caller {
                     cleanupExpiredStreams: (args?: {}) => Promise<void>;
                 };
                 library: {
-                    addChunk: (args: { final: boolean; reasoning?: string; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string }) => Promise<void>;
+                    addChunk: (args: { final: boolean; reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string }) => Promise<void>;
                     claimStreamRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<boolean>;
                     createStream: (args: { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }) => Promise<Id<"persistentStreams">>;
                     finishStoppedReply: (args: { agentName?: string; continuation: boolean; order: number; pendingReasoning: string; pendingText: string; promptMessageId: string; streamId: Id<"persistentStreams"> }) => Promise<{ messageId?: Id<"messages">; stopped: boolean }>;
-                    getChunksAfter: (args: { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams"> }) => Promise<{ chunks: Array<{ reasoning?: string; speaker?: { name: string; skillId: string }; text: string }>; locked: boolean; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
+                    getChunksAfter: (args: { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams"> }) => Promise<{ chunks: Array<{ reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string }>; locked: boolean; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
                     getStreamStatus: (args: { streamId: Id<"persistentStreams"> }) => Promise<"streaming" | "pending" | "error" | "done" | "timeout">;
                     getStreamText: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
                     setStreamStatus: (args: { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }) => Promise<void>;
@@ -8430,7 +8465,7 @@ export interface Caller {
             getToolPermissionSettings: (args?: {}) => Promise<{ builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; overrides: Record<string, "auto" | "ask" | "off"> }>;
             getToolPermissionsQuery: (args: { userId: string }) => Promise<Record<string, "auto" | "ask" | "off">>;
             listMcpToolPermissions: (args?: {}) => Promise<{ servers: Array<{ error: string | null; name: string; tools: Array<{ defaultMode: "auto" | "ask" | "off"; description?: string; destructive: boolean; key: string; name: string; readOnly: boolean }> }> }>;
-            recordPendingToolApprovals: (args: { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }) => Promise<null>;
+            recordPendingToolApprovals: (args: { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }) => Promise<null>;
             respondToToolApproval: (args: { approvalId: string; decision: "approve" | "deny" | "always"; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
             setToolPermission: (args: { key: string; mode: "auto" | "ask" | "off" | null }) => Promise<null>;
         };
@@ -8652,7 +8687,18 @@ export interface Caller {
             logAudit: (args: { action: string; details: string; performedBy: string; userId: string }) => Promise<null>;
             requestAccountDeletion: (args?: {}) => Promise<{ requestId: import("lunorash/server").Id<"gdprRequests">; }>;
             requestDataExport: (args?: {}) => Promise<{ requestId: import("lunorash/server").Id<"gdprRequests">; }>;
-            updateRequestProgress: (args: { currentStep?: string; downloadUrl?: string; errorMessage?: string; progress?: number; requestId: Id<"gdprRequests">; status?: "pending" | "processing" | "completed" | "failed" | "cancelled"; storageId?: Id<"_storage"> }) => Promise<null>;
+            updateRequestProgress: (args: { currentStep?: string; downloadUrl?: string; errorMessage?: string; fromStatus?: Array<"pending" | "processing" | "completed" | "failed" | "cancelled">; progress?: number; requestId: Id<"gdprRequests">; status?: "pending" | "processing" | "completed" | "failed" | "cancelled"; storageId?: Id<"_storage"> }) => Promise<boolean>;
+        };
+        posthog_retry: {
+            expireStalePostHogRetry: (args: { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }) => Promise<null>;
+            failPostHogRetry: (args: { attempt: number; chain: number; errorClass: string; requestId: Id<"gdprRequests">; userId: string }) => Promise<null>;
+            getRetryConfirmationEmail: (args: { requestId: Id<"gdprRequests">; userId: string }) => Promise<string>;
+            recordPostHogErased: (args: { attempt: number; chain: number; posthog: "deleted" | "no_profile"; requestId: Id<"gdprRequests">; userId: string }) => Promise<null>;
+            recordPostHogRetrySuccess: (args: { attempt: number; chain: number; posthog: "deleted" | "no_profile"; requestId: Id<"gdprRequests">; userId: string }) => Promise<boolean>;
+            retryPostHogErasure: (args: { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }) => Promise<null>;
+            schedulePostHogRetry: (args: { failureId: string; requestId: Id<"gdprRequests">; userEmail: string; userId: string }) => Promise<boolean>;
+            settleRetryConfirmation: (args: { isSent: boolean; requestId: Id<"gdprRequests">; userId: string }) => Promise<null>;
+            startPostHogRetry: (args: { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }) => Promise<"skip" | "erase" | "deleted" | "no_profile" | "confirm">;
         };
         request_sweeps: {
             cleanupExpiredExports: (args?: {}) => Promise<null>;
@@ -8694,7 +8740,7 @@ export interface Caller {
                 sendDeletionConfirmedEmailAction: (args: { userEmail: string }) => Promise<null>;
             };
             posthog_steps: {
-                deletePostHogPerson: (args: { userId: string }) => Promise<null>;
+                deletePostHogPerson: (args: { userId: string }) => Promise<"deleted" | "no_profile" | "skipped">;
             };
             residual_deletion_steps: {
                 anonymiseGatewayUsageDeductions: (args: { userId: string }) => Promise<{ hasMore: boolean }>;
@@ -8710,7 +8756,7 @@ export interface Caller {
                 killUserSandboxes: (args: { userId: string }) => Promise<null>;
                 listMessengerConnectionsForDeletion: (args: { userId: string }) => Promise<Array<{ platform: string }>>;
                 listSandboxIdsForDeletion: (args: { userId: string }) => Promise<Array<string>>;
-                minimiseGdprRecords: (args: { userId: string }) => Promise<null>;
+                minimiseGdprRecords: (args: { retainEmailOf?: Id<"gdprRequests">; userId: string }) => Promise<null>;
                 purgeUserDocumentHistory: (args: { userId: string }) => Promise<{ hasMore: boolean }>;
                 revokeUserConnectorGrants: (args: { userId: string }) => Promise<null>;
             };
@@ -8822,10 +8868,11 @@ export interface Caller {
         };
         claim_once: {
             claimKey: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }) => Promise<boolean>;
+            claimKeyFenced: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }) => Promise<null | number>;
             completeKey: (args: { key: string; scope: string }) => Promise<null>;
             purgeExpiredClaims: (args?: {}) => Promise<number>;
             reapLapsedClaims: (args?: {}) => Promise<number>;
-            releaseKey: (args: { key: string; scope: string }) => Promise<null>;
+            releaseKey: (args: { claimedAt?: number; key: string; scope: string }) => Promise<null>;
         };
         document_history: {
             getDocumentAtTime: (args: { documentId: string; tableName: string; timestamp: number }) => Promise<unknown | null>;
@@ -8868,7 +8915,7 @@ export interface Caller {
             tryStartCompression: (args: { threadId: Id<"threads"> }) => Promise<boolean>;
         };
         extract: {
-            extractMemories: (args: { assistantResponse: string; botId?: string; threadId?: Id<"threads">; toolResults?: Array<{ summary: string; toolName: string }>; userId: string; userMessage: string }) => Promise<void>;
+            extractMemories: (args: { assistantResponse: string; botId?: string; steeredFrom?: number; threadId?: Id<"threads">; toolResults?: Array<{ summary: string; toolName: string }>; userId: string; userMessage: string }) => Promise<void>;
             regenerateMemoryEmbedding: (args: { memoryId: Id<"memories">; userId: string }) => Promise<void>;
         };
         functions: {
@@ -9260,11 +9307,11 @@ export interface Caller {
     };
     triggers: {
         execute: {
-            default: (args: { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
-            executeTrigger: (args: { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
+            default: (args: { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
+            executeTrigger: (args: { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
         };
         functions: {
-            admitTriggerRun: (args: { triggerId: Id<"triggers"> }) => Promise<null | string>;
+            admitTriggerRun: (args: { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }) => Promise<null | string | { filtered: string }>;
             createExecution: (args: { payload?: string; triggerId: Id<"triggers"> }) => Promise<Id<"triggerExecutions">>;
             createTrigger: (args: { botComputer?: boolean; botId?: string; cronExpression?: string; description?: string; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model: string; name: string; quietWhenEmpty?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; type: "schedule" | "webhook" | "event"; webhookPreset?: { event: "pull_request_opened" | "pull_request_merged" | "pull_request_review_requested" | "issue_assigned" | "merge_request_opened" | "merge_request_merged"; provider: "github" | "gitlab" }; webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token" | "linear" }) => Promise<{ triggerId: string; webhookSecret?: string }>;
             deleteTrigger: (args: { triggerId: Id<"triggers"> }) => Promise<void>;
@@ -10019,6 +10066,11 @@ export const createCaller = (context: CallerCtx): Caller => ({
                 updateSlide: (args) => callRegistered(context, "chat_slides_internal:updateSlide", args),
             },
         },
+        steering: {
+            deliverSteers: (args) => callRegistered(context, "chat_steering:deliverSteers", args),
+            steerRun: (args) => callRegistered(context, "chat_steering:steerRun", args),
+            withdrawSteer: (args) => callRegistered(context, "chat_steering:withdrawSteer", args),
+        },
         streaming: {
             createStreamWithMessage: (args) => callRegistered(context, "chat_streaming:createStreamWithMessage", args),
             getActiveStreamForThread: (args) => callRegistered(context, "chat_streaming:getActiveStreamForThread", args),
@@ -10279,6 +10331,17 @@ export const createCaller = (context: CallerCtx): Caller => ({
             requestDataExport: (args) => callRegistered(context, "gdpr_functions:requestDataExport", args),
             updateRequestProgress: (args) => callRegistered(context, "gdpr_functions:updateRequestProgress", args),
         },
+        posthog_retry: {
+            expireStalePostHogRetry: (args) => callRegistered(context, "gdpr_posthog_retry:expireStalePostHogRetry", args),
+            failPostHogRetry: (args) => callRegistered(context, "gdpr_posthog_retry:failPostHogRetry", args),
+            getRetryConfirmationEmail: (args) => callRegistered(context, "gdpr_posthog_retry:getRetryConfirmationEmail", args),
+            recordPostHogErased: (args) => callRegistered(context, "gdpr_posthog_retry:recordPostHogErased", args),
+            recordPostHogRetrySuccess: (args) => callRegistered(context, "gdpr_posthog_retry:recordPostHogRetrySuccess", args),
+            retryPostHogErasure: (args) => callRegistered(context, "gdpr_posthog_retry:retryPostHogErasure", args),
+            schedulePostHogRetry: (args) => callRegistered(context, "gdpr_posthog_retry:schedulePostHogRetry", args),
+            settleRetryConfirmation: (args) => callRegistered(context, "gdpr_posthog_retry:settleRetryConfirmation", args),
+            startPostHogRetry: (args) => callRegistered(context, "gdpr_posthog_retry:startPostHogRetry", args),
+        },
         request_sweeps: {
             cleanupExpiredExports: (args) => callRegistered(context, "gdpr_request_sweeps:cleanupExpiredExports", args),
             handleGdprRequestTimeouts: (args) => callRegistered(context, "gdpr_request_sweeps:handleGdprRequestTimeouts", args),
@@ -10447,6 +10510,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         claim_once: {
             claimKey: (args) => callRegistered(context, "lib_claim_once:claimKey", args),
+            claimKeyFenced: (args) => callRegistered(context, "lib_claim_once:claimKeyFenced", args),
             completeKey: (args) => callRegistered(context, "lib_claim_once:completeKey", args),
             purgeExpiredClaims: (args) => callRegistered(context, "lib_claim_once:purgeExpiredClaims", args),
             reapLapsedClaims: (args) => callRegistered(context, "lib_claim_once:reapLapsedClaims", args),

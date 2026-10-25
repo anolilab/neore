@@ -9,7 +9,7 @@ import { extractApiKey, isPublicApiPath, readApiKeyIdentity, resolveApiKeyIdenti
 import { decodeNativeCursor, encodeNativeCursor, MAX_PAGE_SIZE, paginateArray, parseLimit } from "./pagination";
 import { DEFAULT_API_SCOPES, hasScope, parseScopes, scopesFromStrings, scopesToStrings } from "./scopes";
 import type { StreamChunk, StreamSource } from "./stream";
-import { blockingPollDelay, collectStream, pollStream, STREAM_MAX_READS } from "./stream";
+import { blockingPollDelay, chunkToEvents, collectStream, pollStream, STREAM_MAX_READS } from "./stream";
 
 describe("scopes", () => {
     it("parses JSON text and drops unknown resources and actions", () => {
@@ -265,6 +265,23 @@ describe("stream relay", () => {
             { text: "lo", type: "text" },
             { status: "done", type: "done" },
         ]);
+    });
+
+    it("maps a steering marker chunk to a reply.restart event, before the chunk's own text", () => {
+        expect(chunkToEvents({ restart: true, text: "" })).toEqual([{ type: "reply.restart" }]);
+        expect(chunkToEvents({ reasoning: "hm", restart: true, text: "after" })).toEqual([
+            { type: "reply.restart" },
+            { text: "hm", type: "reasoning" },
+            { text: "after", type: "text" },
+        ]);
+    });
+
+    it("streams the cut of a steered reply and keeps one text when collected", async () => {
+        const chunks: StreamChunk[] = [{ text: "Before " }, { restart: true, text: "" }, { text: "after" }];
+        const events = await Array.fromAsync(pollStream(source(["done"], [chunks]), { sleep: async () => {} }));
+
+        expect(events.map((event) => event.type)).toEqual(["text", "reply.restart", "text", "done"]);
+        expect(await collectStream(source(["done"], [chunks]), { sleep: async () => {} })).toEqual({ reasoning: "", status: "done", text: "Before after" });
     });
 
     it("ends a relay at once when the thread is locked, without reading on", async () => {

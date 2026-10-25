@@ -19,8 +19,8 @@
     "dependencies": {
         "@lingui/core": "catalog:i18n",
         "@lingui/react": "catalog:i18n",
-        "@lunora/client": "catalog:",
-        "@lunora/react": "catalog:",
+        "@lunora/client": "catalog:lunora",
+        "@lunora/react": "catalog:lunora",
         "@neore/ai": "workspace:*",
         "@neore/backend": "workspace:*",
         "@neore/chat-ui": "workspace:*",

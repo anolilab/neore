@@ -13,6 +13,11 @@
  * done, because the interactive run has more to do before it may close the
  * stream.
  *
+ * Steering (`chat/steering.ts`): when `steeredBefore` says a message was
+ * delivered before the step that is starting, the text so far is flushed and a
+ * `restart` marker chunk follows. Everything before the marker is a saved
+ * message above the steered one by then, so readers show only what follows.
+ *
  * A stream `error` part is not swallowed the way `textStream` swallowed it: the
  * stream is drained, whatever text arrived is flushed, and a
  * {@link StreamFailedError} is thrown so the caller's catch writes the error
@@ -213,7 +218,7 @@ export const pipeToPersistentChunks = async (
     ctx: Partial<Pick<ActionCtx, "runQuery">> & Pick<ActionCtx, "runMutation">,
     streamId: string,
     fullStream: AsyncIterable<{ error?: unknown; text?: string; type: string }>,
-    { stopPollMs = STOP_POLL_MS }: { stopPollMs?: number } = {},
+    { steeredBefore, stopPollMs = STOP_POLL_MS }: { steeredBefore?: () => boolean; stopPollMs?: number } = {},
 ): Promise<PipedStream> => {
     let pending: StreamText = { reasoning: "", text: "" };
     let unsaved: StreamText = { reasoning: "", text: "" };
@@ -239,6 +244,27 @@ export const pipeToPersistentChunks = async (
 
         unsaved = owed;
         pending = { reasoning: "", text: "" };
+        lastFlushAt = Date.now();
+    };
+
+    // Everything written so far belongs above the steered message: flush it, then mark the cut.
+    const restartAfterSteer = async (): Promise<void> => {
+        if (pending.text || pending.reasoning) {
+            await flush();
+        }
+
+        try {
+            await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
+                final: false,
+                restart: true,
+                streamId: streamId as Id<"persistentStreams">,
+                text: "",
+            });
+        } catch (error) {
+            // A stop: the steps before the marker are saved, so nothing is owed.
+            throw asRefusedWrite(error, unsaved);
+        }
+
         lastFlushAt = Date.now();
     };
 
@@ -292,6 +318,13 @@ export const pipeToPersistentChunks = async (
                     unsaved = { reasoning: "", text: "" };
                 }
 
+                // A step starts after its `prepareStep`, where a steer is delivered,
+                // and after every part of the step before it, which `finish-step`
+                // flushed: what was written belongs above the steered message.
+                if (part.type === "start-step" && steeredBefore?.()) {
+                    await restartAfterSteer();
+                }
+
                 continue;
             }
         }
@@ -311,6 +344,12 @@ export const pipeToPersistentChunks = async (
         // Keep the partial answer visible above the error line the caller appends.
         if (pending.text || pending.reasoning) {
             await flush();
+        }
+
+        // A model call that failed before its step started never reached `start-step`: mark the cut here, so readers do not show the
+        // steps above the steered message as this reply's text.
+        while (steeredBefore?.()) {
+            await restartAfterSteer();
         }
 
         throw new StreamFailedError(streamError.error);

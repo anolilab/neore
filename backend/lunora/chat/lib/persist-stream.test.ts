@@ -31,6 +31,23 @@ async function* parts(items: (string | "finish-step")[]) {
     }
 }
 
+/** Two steps, each opened by a `start-step` part, as a steered run streams them. */
+async function* steps() {
+    yield { type: "start-step" };
+    yield { text: "Reading.", type: "text-delta" };
+    yield { type: "finish-step" };
+    yield { type: "start-step" };
+    yield { text: "The other one", type: "text-delta" };
+}
+
+/** A step that ends cleanly, then a model call that fails before its step starts. */
+async function* failing() {
+    yield { type: "start-step" };
+    yield { text: "Reading.", type: "text-delta" };
+    yield { type: "finish-step" };
+    yield { error: new Error("provider down"), type: "error" };
+}
+
 describe(pipeToPersistentChunks, () => {
     it("stops at a refused write and owes the whole text, since no step has finished", async () => {
         const { ctx, written } = ctxAccepting(1);
@@ -95,6 +112,85 @@ describe(pipeToPersistentChunks, () => {
         };
 
         await expect(pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. ", "Two", "finish-step"]))).rejects.toBe(boom);
+    });
+
+    it("marks where the reply continues below a steered message, after the step before it", async () => {
+        const chunks: { restart?: boolean; text: string }[] = [];
+        const ctx = {
+            runMutation: async (_ref: unknown, args: { restart?: boolean; text: string }) => {
+                chunks.push({ ...(args.restart && { restart: true }), text: args.text });
+            },
+        };
+        // Delivered at the boundary before the second step only.
+        const steered = [false, true];
+
+        const piped = await pipeToPersistentChunks(ctx as never, "stream-1", steps(), { steeredBefore: () => steered.shift() ?? false });
+
+        expect(chunks).toStrictEqual([{ text: "Reading." }, { restart: true, text: "" }]);
+        expect(piped.pending).toStrictEqual({ reasoning: "", text: "The other one" });
+    });
+
+    it("marks the cut before the error when the model call after a steered message fails before its step starts", async () => {
+        const chunks: { restart?: boolean; text: string }[] = [];
+        const ctx = {
+            runMutation: async (_ref: unknown, args: { restart?: boolean; text: string }) => {
+                chunks.push({ ...(args.restart && { restart: true }), text: args.text });
+            },
+        };
+        const steered = [false, true];
+
+        await expect(pipeToPersistentChunks(ctx as never, "stream-1", failing(), { steeredBefore: () => steered.shift() ?? false })).rejects.toThrow(
+            "provider down",
+        );
+        expect(chunks).toStrictEqual([{ text: "Reading." }, { restart: true, text: "" }]);
+    });
+
+    it("marks every cut still owed when the model call fails before its step starts", async () => {
+        const chunks: { restart?: boolean; text: string }[] = [];
+        const ctx = {
+            runMutation: async (_ref: unknown, args: { restart?: boolean; text: string }) => {
+                chunks.push({ ...(args.restart && { restart: true }), text: args.text });
+            },
+        };
+        // Two deliveries made while the pipe was still on the first step.
+        const steered = [false, true, true];
+
+        await expect(pipeToPersistentChunks(ctx as never, "stream-1", failing(), { steeredBefore: () => steered.shift() ?? false })).rejects.toThrow(
+            "provider down",
+        );
+        expect(chunks.filter((chunk) => chunk.restart)).toHaveLength(2);
+    });
+
+    it("owes nothing when a stop refuses the restart marker: the steps before it are saved", async () => {
+        const { ctx, written } = ctxAccepting(1);
+        const steered = [false, true];
+
+        const error = await pipeToPersistentChunks(ctx as never, "stream-1", steps(), { steeredBefore: () => steered.shift() ?? false }).catch(
+            (error_: unknown) => error_,
+        );
+
+        expect(written).toStrictEqual(["Reading."]);
+        expect(isStreamWriteRefused(error)).toBe(true);
+        expect((error as { pending: unknown }).pending).toStrictEqual({ reasoning: "", text: "" });
+    });
+
+    it("owes only the text after the restart marker when a stop comes later: the steps before it were saved", async () => {
+        // "Reading." and the marker are accepted; the flush of the continuation is the refused write.
+        const { ctx, written } = ctxAccepting(2);
+        const steered = [false, true];
+
+        async function* continued() {
+            yield* steps();
+            yield { text: " Next.", type: "text-delta" };
+        }
+
+        const error = await pipeToPersistentChunks(ctx as never, "stream-1", continued(), { steeredBefore: () => steered.shift() ?? false }).catch(
+            (error_: unknown) => error_,
+        );
+
+        expect(written).toStrictEqual(["Reading.", ""]);
+        expect(isStreamWriteRefused(error)).toBe(true);
+        expect((error as { pending: unknown }).pending).toStrictEqual({ reasoning: "", text: "The other one Next." });
     });
 
     it("rethrows any other write failure as it was", async () => {
