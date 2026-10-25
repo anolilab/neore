@@ -1039,6 +1039,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "memory_functions:listUserMemories": lunora_memory_functions_122.listUserMemories as unknown as RegisteredLunoraFunction,
     "memory_functions:markMemorySupersededByCompression": lunora_memory_functions_122.markMemorySupersededByCompression as unknown as RegisteredLunoraFunction,
     "memory_functions:recordRetrievedMemories": lunora_memory_functions_122.recordRetrievedMemories as unknown as RegisteredLunoraFunction,
+    "memory_functions:retryMemoryVectorDelete": lunora_memory_functions_122.retryMemoryVectorDelete as unknown as RegisteredLunoraFunction,
     "memory_functions:saveMemory": lunora_memory_functions_122.saveMemory as unknown as RegisteredLunoraFunction,
     "memory_functions:saveMemoryBatch": lunora_memory_functions_122.saveMemoryBatch as unknown as RegisteredLunoraFunction,
     "memory_functions:setMemoryPinned": lunora_memory_functions_122.setMemoryPinned as unknown as RegisteredLunoraFunction,
@@ -8898,6 +8899,7 @@ export interface Caller {
             listUserMemories: (args: { includeSuperseded?: boolean }) => Promise<Array<{ _creationTime: number; _id: string; confidence?: number; createdAt: number; importance?: number; lastConfirmedAt: number; memory: string; pinned: boolean; source?: string; supersededBy?: string; supersedes?: string; threadId?: string; type: "identity" | "preference" | "context" | "activity" | "experience"; updatedAt?: number; version?: number }>>;
             markMemorySupersededByCompression: (args: { memoryId: Id<"memories">; userId: string }) => Promise<void>;
             recordRetrievedMemories: (args: { memories: Array<{ memoryId: string; score: number }>; messageId: Id<"messages">; userId: string }) => Promise<null>;
+            retryMemoryVectorDelete: (args: { attempt: number; embeddingId: string; memoryId: string; userId: string }) => Promise<null>;
             saveMemory: (args: { botId?: string; confidence?: number; importance?: number; memory: string; source?: "auto" | "manual" | "compressed" | "reflection"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }) => Promise<Id<"memories">>;
             saveMemoryBatch: (args: { memories: Array<{ botId?: string; confidence?: number; importance?: number; memory: string; source?: "auto" | "manual" | "compressed" | "reflection"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }> }) => Promise<Array<Id<"memories">>>;
             setMemoryPinned: (args: { memoryId: string; pinned: boolean }) => Promise<null>;
@@ -10521,6 +10523,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             listUserMemories: (args) => callRegistered(context, "memory_functions:listUserMemories", args),
             markMemorySupersededByCompression: (args) => callRegistered(context, "memory_functions:markMemorySupersededByCompression", args),
             recordRetrievedMemories: (args) => callRegistered(context, "memory_functions:recordRetrievedMemories", args),
+            retryMemoryVectorDelete: (args) => callRegistered(context, "memory_functions:retryMemoryVectorDelete", args),
             saveMemory: (args) => callRegistered(context, "memory_functions:saveMemory", args),
             saveMemoryBatch: (args) => callRegistered(context, "memory_functions:saveMemoryBatch", args),
             setMemoryPinned: (args) => callRegistered(context, "memory_functions:setMemoryPinned", args),

@@ -28,6 +28,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    vi.mocked(scheduleObjectDeletion).mockReset();
     harness.close();
     vi.useRealTimers();
 });
@@ -93,5 +94,64 @@ describe("cleanupExpiredExports", () => {
 
         expect(done.expiresAt).toBeUndefined();
         expect(auditAfterRetry.filter((row: { action: string }) => row.action === "export_expired")).toHaveLength(1);
+    });
+
+    it("still handles healthy exports when more than a batch of rows keep failing", async () => {
+        const failing = 150;
+        const healthy = 5;
+
+        // The failing rows expired first, so they fill the front of `by_expires`.
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < failing; index += 1) {
+                await ctx.db.insert("gdprRequests", { ...exportRow, expiresAt: NOW - 3 * DAY + index, storageId: `bad/${index}.zip` });
+            }
+
+            for (let index = 0; index < healthy; index += 1) {
+                await ctx.db.insert("gdprRequests", { ...exportRow, expiresAt: NOW - DAY + index, storageId: `good/${index}.zip` });
+            }
+        });
+
+        vi.mocked(scheduleObjectDeletion).mockImplementation(async (_context, keys) => {
+            if (String(keys[0]).startsWith("bad/")) {
+                throw new Error("scheduler unavailable");
+            }
+        });
+
+        await sweep();
+        await sweep();
+
+        const rows: any[] = await harness.run(async (ctx: any) => await ctx.db.query("gdprRequests").collect());
+        const audit = await harness.run(async (ctx: any) => await ctx.db.query("gdprAuditLog").collect());
+        const stuck = rows.filter((row) => String(row.storageId).startsWith("bad/"));
+
+        expect(rows.filter((row) => row.expiresAt === undefined)).toHaveLength(healthy);
+        expect(audit.filter((row: { action: string }) => row.action === "export_expired")).toHaveLength(healthy);
+        // The failing rows are untouched: file reference and expiry both kept.
+        expect(stuck).toHaveLength(failing);
+        expect(stuck.every((row) => row.expiresAt !== undefined)).toBe(true);
+    });
+
+    it("stops at the batch size mid-page, even after a failing row on the first page", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("gdprRequests", { ...exportRow, expiresAt: NOW - 3 * DAY, storageId: "bad/0.zip" });
+
+            for (let index = 0; index < 250; index += 1) {
+                await ctx.db.insert("gdprRequests", { ...exportRow, expiresAt: NOW - DAY + index, storageId: `good/${index}.zip` });
+            }
+        });
+
+        vi.mocked(scheduleObjectDeletion).mockImplementation(async (_context, keys) => {
+            if (String(keys[0]).startsWith("bad/")) {
+                throw new Error("scheduler unavailable");
+            }
+        });
+
+        await sweep();
+
+        const rows: any[] = await harness.run(async (ctx: any) => await ctx.db.query("gdprRequests").collect());
+        const audit = await harness.run(async (ctx: any) => await ctx.db.query("gdprAuditLog").collect());
+
+        expect(rows.filter((row) => row.expiresAt === undefined)).toHaveLength(100);
+        expect(audit.filter((row: { action: string }) => row.action === "export_expired")).toHaveLength(100);
     });
 });
