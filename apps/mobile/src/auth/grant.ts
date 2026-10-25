@@ -213,8 +213,9 @@ export const exchangeGrant = async (input: {
 
 /**
  * A short-lived JWT for the stored grant, or `null` when the user is signed out:
- * no grant, or a 401 (the session is gone), which also drops the grant. Any other
- * failure throws and keeps the grant, so callers can tell it from a revoked session.
+ * no grant, a 401 (the session is gone), or a 403 (the account is refused, as a
+ * guest or a suspended account is). Either drops the grant, so the provider does not
+ * retry a session the server will not accept. Any other failure throws and keeps the grant.
  */
 export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string; store: GrantStore }): Promise<string | null> => {
     const grant = await input.store.get();
@@ -232,7 +233,7 @@ export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string;
         throw new Error("Could not reach the server. Try again.");
     }
 
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403) {
         await input.store.clear();
 
         // eslint-disable-next-line unicorn/no-null -- a signed-out result is null by contract; auth-context compares with null

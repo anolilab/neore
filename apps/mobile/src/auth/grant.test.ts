@@ -148,6 +148,14 @@ describe("grant storage", () => {
         expect(store.value).toBeNull();
     });
 
+    it("a 403 from the token route clears the grant: the account is refused, not the network", async () => {
+        const store = memoryStore({ token: "session-1", user: USER });
+        const fetch: Fetch = async () => json({ error: "access_denied" }, 403);
+
+        expect(await fetchAccessToken({ fetch, lunoraUrl: LUNORA, store })).toBeNull();
+        expect(store.value).toBeNull();
+    });
+
     it("a 500 from the token route throws and keeps the grant", async () => {
         const store = memoryStore({ token: "session-1", user: USER });
         const fetch: Fetch = async () => json({ error: "server_error" }, 500);
