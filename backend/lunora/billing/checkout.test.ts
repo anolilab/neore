@@ -235,6 +235,19 @@ describe("createCheckout", () => {
 
         expect(createCheckoutSession).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ priceId: "prod_pro_year", referenceId: OWNER }));
     });
+
+    it("sells the Team yearly product to the active organization, one seat per member", async () => {
+        session.current = sessionOf(OWNER, { id: ORG, role: "owner" });
+        subjects.set(`organization:${ORG}`, subject({ seats: 3 }));
+        env.CREEM_YEARLY_CHECKOUT = "true";
+        env.CREEM_PRODUCT_TEAM_YEARLY = "prod_team_year";
+
+        await checkout(OWNER, { interval: "year", plan: "team" });
+
+        expect(createCheckoutSession).toHaveBeenCalledExactlyOnceWith(
+            expect.objectContaining({ metadata: { purchaserId: OWNER }, priceId: "prod_team_year", quantity: 3, referenceId: ORG }),
+        );
+    });
 });
 
 describe("createCheckout input", () => {

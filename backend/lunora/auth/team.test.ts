@@ -65,6 +65,7 @@ const {
     getTeamSettings,
     leaveTeam,
     listTeamMembers,
+    listTeams,
     removeTeamMember,
     setActiveTeam,
     updateTeam,
@@ -489,12 +490,47 @@ describe("reads", () => {
         await expect(as(MEMBER).query(getTeamSettings as never, { teamId } as never)).resolves.toBeNull();
     });
 
+    it("hides the settings of a team in the active organization from a member who is not on the team", async () => {
+        const teamId = await insertTeam();
+
+        await seed(async (db) => await db.insert("teamSettings", { allowedModels: ["m1"], organizationId: ORG, teamId }));
+
+        await expect(as(MEMBER).query(getTeamSettings as never, { teamId } as never)).resolves.toBeNull();
+    });
+
+    it("returns the settings of a team in the active organization to a member of the team", async () => {
+        const teamId = await insertTeam();
+
+        await insertTeamMember(teamId, MEMBER);
+        await seed(async (db) => await db.insert("teamSettings", { allowedModels: ["m1"], organizationId: ORG, teamId }));
+
+        await expect(as(MEMBER).query(getTeamSettings as never, { teamId } as never)).resolves.toMatchObject({ allowedModels: ["m1"], teamId });
+    });
+
     it("returns the settings of a team in the active organization to an admin", async () => {
         const teamId = await insertTeam();
 
         await seed(async (db) => await db.insert("teamSettings", { allowedModels: ["m1"], organizationId: ORG, teamId }));
 
         await expect(as(ADMIN).query(getTeamSettings as never, { teamId } as never)).resolves.toMatchObject({ allowedModels: ["m1"], teamId });
+    });
+
+    it("lists only the teams of the active organization", async () => {
+        const own = await insertTeam();
+
+        await insertTeam(OTHER_ORG);
+        await insertTeamMember(own, MEMBER);
+
+        const teams = (await as(OWNER).query(listTeams as never, {} as never)) as { id: string; memberCount: number }[];
+
+        expect(teams).toMatchObject([{ id: own, memberCount: 1 }]);
+    });
+
+    it("lists no teams for a caller with no active organization", async () => {
+        sessions.set(OWNER, null);
+        await insertTeam();
+
+        await expect(as(OWNER).query(listTeams as never, {} as never)).resolves.toStrictEqual([]);
     });
 
     it("lists only the caller's teams of the active organization", async () => {
