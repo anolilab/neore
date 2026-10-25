@@ -25,7 +25,7 @@ const MAX_CUSTOM_INSTRUCTIONS_LENGTH = 3000;
 const MAX_NICKNAME_LENGTH = 50;
 const MAX_PROFESSION_LENGTH = 100;
 
-const SYNCED_FIELDS = ["nickname", "profession", "aboutMe", "customInstructions", "threadTitleInstructions"] as const;
+const SYNCED_FIELDS = ["nickname", "profession", "aboutMe", "customInstructions"] as const;
 
 type SyncedField = (typeof SYNCED_FIELDS)[number];
 
@@ -40,7 +40,9 @@ const PersonalizationSettings: FC = () => {
     const [profession, setProfession] = useState("");
     const [aboutMe, setAboutMe] = useState("");
     const [customInstructions, setCustomInstructions] = useState("");
-    const [threadTitleInstructions, setThreadTitleInstructions] = useState("");
+    // Not part of the render-time sync below: a draft (`null` = not editing) shadows the stored value, so a
+    // cache update from an earlier save can never replace text typed since.
+    const [titleInstructionsDraft, setTitleInstructionsDraft] = useState<string | null>(null);
     const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
 
     const handleOptimizedSystemPrompt = useCallback(
@@ -68,14 +70,12 @@ const PersonalizationSettings: FC = () => {
             customInstructions: userSettings.customInstructions ?? "",
             nickname: userSettings.nickname ?? "",
             profession: userSettings.profession ?? "",
-            threadTitleInstructions: userSettings.threadTitleInstructions ?? "",
         };
         const setters: Record<SyncedField, (value: string) => void> = {
             aboutMe: setAboutMe,
             customInstructions: setCustomInstructions,
             nickname: setNickname,
             profession: setProfession,
-            threadTitleInstructions: setThreadTitleInstructions,
         };
         const changed = SYNCED_FIELDS.filter((field) => server[field] !== lastSynced[field]);
 
@@ -133,11 +133,16 @@ const PersonalizationSettings: FC = () => {
         }
     }, [customInstructions, userSettings?.customInstructions, handleUpdateSetting]);
 
+    const threadTitleInstructions = titleInstructionsDraft ?? userSettings?.threadTitleInstructions ?? "";
+
     // Sent as "" to clear: `handleUpdateSetting` maps blank to `undefined`, which the wire drops, so the old text would stay.
     const handleThreadTitleInstructionsBlur = useCallback(async () => {
-        const trimmed = threadTitleInstructions.trim();
+        const draft = titleInstructionsDraft;
+        const trimmed = (draft ?? "").trim();
 
-        if (trimmed === (userSettings?.threadTitleInstructions ?? "")) {
+        if (draft === null || trimmed === (userSettings?.threadTitleInstructions ?? "")) {
+            setTitleInstructionsDraft(null);
+
             return;
         }
 
@@ -145,10 +150,12 @@ const PersonalizationSettings: FC = () => {
             await updateSettingsMutation.mutateAsync({ threadTitleInstructions: trimmed });
             trackEvent("settings_changed", { section: "personalization", setting_key: "threadTitleInstructions" });
             toast.success(t`Settings saved`);
+            // Drop the draft only if nothing was typed while the save was pending.
+            setTitleInstructionsDraft((current) => (current !== null && current.trim() === trimmed ? null : current));
         } catch {
             toast.error(t`Failed to save settings`);
         }
-    }, [threadTitleInstructions, userSettings?.threadTitleInstructions, updateSettingsMutation, t]);
+    }, [titleInstructionsDraft, userSettings?.threadTitleInstructions, updateSettingsMutation, t]);
 
     if (isLoading) {
         return (
@@ -268,7 +275,7 @@ const PersonalizationSettings: FC = () => {
                             id="thread-title-instructions"
                             maxLength={MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH}
                             onBlur={handleThreadTitleInstructionsBlur}
-                            onChange={(e) => setThreadTitleInstructions(e.target.value)}
+                            onChange={(e) => setTitleInstructionsDraft(e.target.value)}
                             placeholder={t`Enter your title instructions...`}
                             value={threadTitleInstructions}
                         />
