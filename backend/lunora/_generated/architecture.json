@@ -3796,6 +3796,16 @@
       "to": "table:gdprRequests"
     },
     {
+      "from": "function:gdpr_posthog_retry:expireStalePostHogRetry",
+      "kind": "write",
+      "to": "table:gdprAuditLog"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:expireStalePostHogRetry",
+      "kind": "write",
+      "to": "table:gdprRequests"
+    },
+    {
       "from": "function:gdpr_posthog_retry:failPostHogRetry",
       "kind": "write",
       "to": "table:gdprAuditLog"
@@ -3823,6 +3833,11 @@
     {
       "from": "function:gdpr_posthog_retry:retryPostHogErasure",
       "kind": "call",
+      "to": "function:gdpr_posthog_retry:getRetryConfirmationEmail"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:retryPostHogErasure",
+      "kind": "call",
       "to": "function:gdpr_posthog_retry:recordPostHogRetrySuccess"
     },
     {
@@ -3833,7 +3848,12 @@
     {
       "from": "function:gdpr_posthog_retry:retryPostHogErasure",
       "kind": "call",
-      "to": "function:gdpr_steps_residual_deletion_steps:minimiseGdprRecords"
+      "to": "function:gdpr_steps_email_steps:sendDeletionConfirmedEmailAction"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:schedulePostHogRetry",
+      "kind": "read",
+      "to": "table:gdprAuditLog"
     },
     {
       "from": "function:gdpr_posthog_retry:schedulePostHogRetry",
@@ -3924,36 +3944,6 @@
       "from": "function:gdpr_steps_residual_deletion_steps:listSandboxIdsForDeletion",
       "kind": "read",
       "to": "table:sandboxSessions"
-    },
-    {
-      "from": "function:gdpr_steps_residual_deletion_steps:minimiseGdprRecords",
-      "kind": "read",
-      "to": "table:gdprAuditLog"
-    },
-    {
-      "from": "function:gdpr_steps_residual_deletion_steps:minimiseGdprRecords",
-      "kind": "read",
-      "to": "table:gdprRequests"
-    },
-    {
-      "from": "function:gdpr_steps_residual_deletion_steps:minimiseGdprRecords",
-      "kind": "read",
-      "to": "table:rateLimits"
-    },
-    {
-      "from": "function:gdpr_steps_residual_deletion_steps:minimiseGdprRecords",
-      "kind": "write",
-      "to": "table:gdprAuditLog"
-    },
-    {
-      "from": "function:gdpr_steps_residual_deletion_steps:minimiseGdprRecords",
-      "kind": "write",
-      "to": "table:gdprRequests"
-    },
-    {
-      "from": "function:gdpr_steps_residual_deletion_steps:minimiseGdprRecords",
-      "kind": "write",
-      "to": "table:rateLimits"
     },
     {
       "from": "function:gdpr_steps_residual_deletion_steps:purgeUserDocumentHistory",
@@ -11259,9 +11249,23 @@
     },
     {
       "detail": "mutation",
+      "id": "function:gdpr_posthog_retry:expireStalePostHogRetry",
+      "kind": "function",
+      "name": "gdpr.posthog_retry.expireStalePostHogRetry",
+      "module": "gdpr"
+    },
+    {
+      "detail": "mutation",
       "id": "function:gdpr_posthog_retry:failPostHogRetry",
       "kind": "function",
       "name": "gdpr.posthog_retry.failPostHogRetry",
+      "module": "gdpr"
+    },
+    {
+      "detail": "query",
+      "id": "function:gdpr_posthog_retry:getRetryConfirmationEmail",
+      "kind": "function",
+      "name": "gdpr.posthog_retry.getRetryConfirmationEmail",
       "module": "gdpr"
     },
     {
@@ -18301,6 +18305,42 @@
       "reason": "\"isAccountDeletionUnderway\" is not a registered function"
     },
     {
+      "file": "gdpr/steps/residual-deletion-steps",
+      "kind": "read",
+      "line": 468,
+      "reason": "\"minimiseUserRecords\" is not a registered function"
+    },
+    {
+      "file": "gdpr/steps/residual-deletion-steps",
+      "kind": "read",
+      "line": 472,
+      "reason": "\"minimiseUserRecords\" is not a registered function"
+    },
+    {
+      "file": "gdpr/steps/residual-deletion-steps",
+      "kind": "write",
+      "line": 484,
+      "reason": "\"minimiseUserRecords\" is not a registered function"
+    },
+    {
+      "file": "gdpr/steps/residual-deletion-steps",
+      "kind": "write",
+      "line": 496,
+      "reason": "\"minimiseUserRecords\" is not a registered function"
+    },
+    {
+      "file": "gdpr/steps/residual-deletion-steps",
+      "kind": "read",
+      "line": 508,
+      "reason": "\"minimiseUserRecords\" is not a registered function"
+    },
+    {
+      "file": "gdpr/steps/residual-deletion-steps",
+      "kind": "write",
+      "line": 512,
+      "reason": "\"minimiseUserRecords\" is not a registered function"
+    },
+    {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
       "line": 66,
@@ -18591,31 +18631,31 @@
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 410,
+      "line": 418,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 430,
+      "line": 441,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 443,
+      "line": 454,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 452,
+      "line": 463,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 460,
+      "line": 471,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
@@ -18975,67 +19015,67 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 94,
+      "line": 95,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 94,
+      "line": 95,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 94,
+      "line": 95,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 94,
+      "line": 95,
       "reason": "\"hasClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 94,
+      "line": 95,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 108,
+      "line": 109,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 108,
+      "line": 109,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 111,
+      "line": 112,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 111,
+      "line": 112,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 158,
+      "line": 159,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 219,
+      "line": 220,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {

@@ -23,3 +23,6 @@ export const POSTHOG_FAILED_MESSAGE = "Your account data was erased, but deletin
 /** Delay before scheduled analytics-erasure retry 1, 2, 3, ...; after the last one the request stays failed. */
 export const POSTHOG_RETRY_DELAYS_MS = [60 * 60 * 1000, 6 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
 export const POSTHOG_RETRY_MAX_ATTEMPTS = POSTHOG_RETRY_DELAYS_MS.length;
+
+/** How long after an attempt starts the watchdog fails it if it recorded no outcome (crash or timeout mid-run). */
+export const POSTHOG_RETRY_WATCHDOG_MS = 2 * 60 * 60 * 1000;

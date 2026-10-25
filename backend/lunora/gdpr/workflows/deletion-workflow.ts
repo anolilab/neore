@@ -402,7 +402,15 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             // second job. The step also moves a still-`processing` request to `failed`, so the
             // status writes above being swallowed cannot strand the first attempt. If even that is
             // exhausted the error is logged at error level, never allowed to mask `error`.
+            // `dedupId` must differ per FAILURE, not per request: the workflow's dedup table answers
+            // a reused id with the first call's cached result without executing, so a re-run that
+            // failed again would never start its own chain. The id comes from a step of its own,
+            // which is durable, so a retried scheduling step still reuses it.
+            let isRetryQueued = false;
+
             try {
+                const failureId = await context.step.do("post-hog-retry-failure-id", async () => crypto.randomUUID());
+
                 await context.step.do(
                     "schedule-post-hog-retry",
                     SCHEDULE_RETRY_STEP_CONFIG,
@@ -410,20 +418,23 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                         await context.run(
                             internal.gdpr.posthog_retry.schedulePostHogRetry,
                             { requestId: args.requestId, userId: args.userId },
-                            { dedupId: `post-hog-retry:${args.requestId}` },
+                            { dedupId: `post-hog-retry:${args.requestId}:${String(failureId)}` },
                         ),
                 );
+                isRetryQueued = true;
             } catch (scheduleError) {
                 gdprLogger.error(`Analytics erasure retry for request ${args.requestId} could not be scheduled`, scheduleError);
             }
 
-            // The failed request must not keep the email either: minimise after the failure audit,
-            // as on the success path. Its own failure must not replace the PostHog error the
-            // instance reports; a re-run minimises again (the step is idempotent).
+            // Minimise after the failure audit, as on the success path. A queued retry still needs the
+            // address for the confirmation email, and its chain minimises it when it ends (success or
+            // exhaustion): this request keeps it until then. Without a retry nothing ever would, so
+            // the address goes now. Its own failure must not replace the PostHog error the instance
+            // reports; a re-run minimises again (the step is idempotent).
             try {
                 await context.step.do(
                     "minimise-gdpr-records-posthog-failed",
-                    async () => await context.run(steps.minimiseGdprRecords, { userId: args.userId }),
+                    async () => await context.run(steps.minimiseGdprRecords, { userId: args.userId, ...(isRetryQueued && { retainEmailOf: args.requestId }) }),
                 );
                 // Minimisation clears every request's free-text `errorMessage`. This one is a fixed,
                 // non-personal string, so put it back: the user's status must still say what failed.

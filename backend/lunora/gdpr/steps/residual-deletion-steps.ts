@@ -42,6 +42,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
+import type { MutationCtx } from "../../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../../_generated/server";
 import {
     eraseEmbeddingsForUser,
@@ -427,11 +428,11 @@ export const purgeUserDocumentHistory = internalMutation
 /**
  * Audit-detail keys that are request metadata; anything else is dropped. `posthog` is the PostHog
  * erasure outcome (`deleted`, `no_profile`, `skipped`): a fixed status, not personal data, and the
- * only record of which of those it was once the rest of the audit is minimised. `attempt` and
+ * only record of which of those it was once the rest of the audit is minimised. `attempt`, `chain` and
  * `errorClass` (an error name or `http_<status>`, never a message) are the analytics-erasure
  * retry log (`gdpr/posthog-retry.ts`).
  */
-const AUDIT_DETAIL_KEYS = new Set(["action", "attempt", "errorClass", "posthog", "requestedAt", "requestId", "timedOutAt"]);
+const AUDIT_DETAIL_KEYS = new Set(["action", "attempt", "chain", "errorClass", "posthog", "requestedAt", "requestId", "timedOutAt"]);
 
 const minimiseDetails = (details: string): string => {
     try {
@@ -454,66 +455,74 @@ const minimiseDetails = (details: string): string => {
  * the email address and free-text error messages go, the export file (if one is
  * still stored) is deleted, and audit `details` keep only the whitelisted keys.
  *
+ * `retainEmailOf` keeps the address on that one request: a deletion whose analytics erasure is still
+ * being retried needs it for the confirmation email, and the retry chain minimises it when it ends
+ * (`gdpr/posthog-retry.ts`).
+ *
  * Runs after the final `log-audit` step. Per-user volumes here are a handful of
  * rows (both writers are rate-limited), and rewriting is idempotent, so this is
  * one pass rather than rounds.
  */
+export const minimiseUserRecords = async (context: MutationCtx, userId: string, retainEmailOf?: Id<"gdprRequests">): Promise<void> => {
+    const [requests, auditRows] = await Promise.all([
+        context.db
+            .query("gdprRequests")
+            .withIndex("by_user_and_type", (q) => q.eq("userId", userId))
+            .collect(),
+        context.db
+            .query("gdprAuditLog")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect(),
+    ]);
+
+    for (const request of requests) {
+        if (request.storageId) {
+            await scheduleObjectDeletion(context, [request.storageId]);
+        }
+
+        // `null` clears an optional column; `undefined` is rejected by `patch`.
+        await context.db.patch(request._id, {
+            downloadUrl: null,
+            errorMessage: null,
+            storageId: null,
+            ...(request._id !== retainEmailOf && { userEmail: "" }),
+        });
+    }
+
+    for (const row of auditRows) {
+        const details = minimiseDetails(row.details);
+
+        if (details !== row.details) {
+            await context.db.patch(row._id, { details });
+        }
+    }
+
+    // Rate-limit windows keyed to the user. Keys are `neore:<name>:<identifier>`
+    // and the identifier is often composite (`<connection>:<sender>`), so the
+    // userId is never an index prefix: walk the `by_key` index one page at a
+    // time and keep the `includes` match. Bounded per page, not per call.
+    let cursor: string | null = null;
+    let isDone = false;
+
+    while (!isDone) {
+        const page = await context.db.query("rateLimits").withIndex("by_key").paginate({ cursor, numItems: RATE_LIMIT_PAGE });
+
+        for (const limit of page.page) {
+            if (limit.key.includes(userId)) {
+                await context.db.delete(limit._id);
+            }
+        }
+
+        cursor = page.continueCursor;
+        isDone = page.isDone;
+    }
+};
+
 export const minimiseGdprRecords = internalMutation
-    .input({ userId: v.string() })
+    .input({ retainEmailOf: v.optional(v.id("gdprRequests")), userId: v.string() })
     .output(v.null())
-    .mutation(async ({ args: { userId }, ctx: context }) => {
-        const [requests, auditRows] = await Promise.all([
-            context.db
-                .query("gdprRequests")
-                .withIndex("by_user_and_type", (q) => q.eq("userId", userId))
-                .collect(),
-            context.db
-                .query("gdprAuditLog")
-                .withIndex("by_user", (q) => q.eq("userId", userId))
-                .collect(),
-        ]);
-
-        for (const request of requests) {
-            if (request.storageId) {
-                await scheduleObjectDeletion(context, [request.storageId]);
-            }
-
-            // `null` clears an optional column; `undefined` is rejected by `patch`.
-            await context.db.patch(request._id, {
-                downloadUrl: null,
-                errorMessage: null,
-                storageId: null,
-                userEmail: "",
-            });
-        }
-
-        for (const row of auditRows) {
-            const details = minimiseDetails(row.details);
-
-            if (details !== row.details) {
-                await context.db.patch(row._id, { details });
-            }
-        }
-
-        // Rate-limit windows keyed to the user. Keys are `neore:<name>:<identifier>`
-        // and the identifier is often composite (`<connection>:<sender>`), so the
-        // userId is never an index prefix: walk the `by_key` index one page at a
-        // time and keep the `includes` match. Bounded per page, not per call.
-        let cursor: string | null = null;
-        let isDone = false;
-
-        while (!isDone) {
-            const page = await context.db.query("rateLimits").withIndex("by_key").paginate({ cursor, numItems: RATE_LIMIT_PAGE });
-
-            for (const limit of page.page) {
-                if (limit.key.includes(userId)) {
-                    await context.db.delete(limit._id);
-                }
-            }
-
-            cursor = page.continueCursor;
-            isDone = page.isDone;
-        }
+    .mutation(async ({ args: { retainEmailOf, userId }, ctx: context }) => {
+        await minimiseUserRecords(context, userId, retainEmailOf);
 
         return null;
     });

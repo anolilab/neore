@@ -539,11 +539,13 @@ export interface InternalApiTypes {
             updateRequestProgress: FunctionReference<"mutation", { currentStep?: string; downloadUrl?: string; errorMessage?: string; fromStatus?: Array<"pending" | "processing" | "completed" | "failed" | "cancelled">; progress?: number; requestId: Id<"gdprRequests">; status?: "pending" | "processing" | "completed" | "failed" | "cancelled"; storageId?: Id<"_storage"> }, null>;
         };
         posthog_retry: {
-            failPostHogRetry: FunctionReference<"mutation", { attempt: number; errorClass: string; requestId: Id<"gdprRequests">; userId: string }, null>;
-            recordPostHogRetrySuccess: FunctionReference<"mutation", { attempt: number; posthog: "deleted" | "no_profile"; requestId: Id<"gdprRequests">; userId: string }, null>;
-            retryPostHogErasure: FunctionReference<"action", { attempt: number; requestId: Id<"gdprRequests">; userId: string }, null>;
+            expireStalePostHogRetry: FunctionReference<"mutation", { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }, null>;
+            failPostHogRetry: FunctionReference<"mutation", { attempt: number; chain: number; errorClass: string; requestId: Id<"gdprRequests">; userId: string }, null>;
+            getRetryConfirmationEmail: FunctionReference<"query", { requestId: Id<"gdprRequests">; userId: string }, string>;
+            recordPostHogRetrySuccess: FunctionReference<"mutation", { attempt: number; chain: number; posthog: "deleted" | "no_profile"; requestId: Id<"gdprRequests">; userId: string }, null>;
+            retryPostHogErasure: FunctionReference<"action", { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }, null>;
             schedulePostHogRetry: FunctionReference<"mutation", { requestId: Id<"gdprRequests">; userId: string }, null>;
-            startPostHogRetry: FunctionReference<"mutation", { attempt: number; requestId: Id<"gdprRequests">; userId: string }, boolean>;
+            startPostHogRetry: FunctionReference<"mutation", { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }, boolean>;
         };
         request_sweeps: {
             cleanupExpiredExports: FunctionReference<"mutation", {}, null>;
@@ -601,7 +603,7 @@ export interface InternalApiTypes {
                 killUserSandboxes: FunctionReference<"action", { userId: string }, null>;
                 listMessengerConnectionsForDeletion: FunctionReference<"query", { userId: string }, Array<{ platform: string }>>;
                 listSandboxIdsForDeletion: FunctionReference<"query", { userId: string }, Array<string>>;
-                minimiseGdprRecords: FunctionReference<"mutation", { userId: string }, null>;
+                minimiseGdprRecords: FunctionReference<"mutation", { retainEmailOf?: Id<"gdprRequests">; userId: string }, null>;
                 purgeUserDocumentHistory: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 revokeUserConnectorGrants: FunctionReference<"action", { userId: string }, null>;
             };
@@ -1548,7 +1550,9 @@ export const internal: InternalApiTypes = {
             updateRequestProgress: { __lunoraRef: "gdpr_functions:updateRequestProgress" },
         },
         posthog_retry: {
+            expireStalePostHogRetry: { __lunoraRef: "gdpr_posthog_retry:expireStalePostHogRetry" },
             failPostHogRetry: { __lunoraRef: "gdpr_posthog_retry:failPostHogRetry" },
+            getRetryConfirmationEmail: { __lunoraRef: "gdpr_posthog_retry:getRetryConfirmationEmail" },
             recordPostHogRetrySuccess: { __lunoraRef: "gdpr_posthog_retry:recordPostHogRetrySuccess" },
             retryPostHogErasure: { __lunoraRef: "gdpr_posthog_retry:retryPostHogErasure" },
             schedulePostHogRetry: { __lunoraRef: "gdpr_posthog_retry:schedulePostHogRetry" },

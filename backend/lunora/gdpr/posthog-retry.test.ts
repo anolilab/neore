@@ -1,16 +1,17 @@
 /**
- * The scheduled analytics-erasure retry: 1h / 6h / 24h backoff capped at five attempts, every
- * attempt logged without personal data, only the PostHog erasure re-run, and the request
- * finished the way the workflow's success path finishes it.
+ * The scheduled analytics-erasure retry: 1h / 6h / 24h backoff capped at five attempts per chain,
+ * every attempt logged without personal data, only the PostHog erasure re-run, the request
+ * finished the way the workflow's success path finishes it, the confirmation email sent from the
+ * address kept for the chain, and a watchdog for an attempt that stops without an outcome.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { POSTHOG_RETRY_DELAYS_MS, POSTHOG_RETRY_MAX_ATTEMPTS } from "./constants";
+import { POSTHOG_RETRY_DELAYS_MS, POSTHOG_RETRY_MAX_ATTEMPTS, POSTHOG_RETRY_WATCHDOG_MS } from "./constants";
 import { updateRequestProgress } from "./functions";
-import { retryPostHogErasure, schedulePostHogRetry, startPostHogRetry } from "./posthog-retry";
+import { expireStalePostHogRetry, retryPostHogErasure, schedulePostHogRetry, startPostHogRetry } from "./posthog-retry";
 import { erasePostHogPerson } from "./steps/posthog-steps";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -28,15 +29,15 @@ const USER = "user-1";
 const FAILED_MESSAGE = "Your account data was erased, but deleting your analytics profile failed.";
 
 const deleteAuthRecordsSpy = vi.fn();
-const minimiseSpy = vi.fn();
-let realMinimise: (...handlerArgs: unknown[]) => unknown;
+const sendEmailSpy = vi.fn();
 
 let harness: ReturnType<typeof lunoraTest>;
 let requestId: string;
 
 const run = <T>(body: (ctx: any) => Promise<T>): Promise<T> => harness.run(body as never);
-/** Only retry jobs are ever scheduled here (the mocked reference carries no path to filter on). */
-const jobs = () => harness.scheduler.list();
+const allJobs = () => harness.scheduler.list();
+/** The attempts queued: watchdog jobs are told apart by the 2h delay no retry delay shares. */
+const jobs = () => allJobs().filter((job) => job.scheduledFor - NOW !== POSTHOG_RETRY_WATCHDOG_MS);
 const audit = async () =>
     (await run(async (ctx) => await ctx.db.query("gdprAuditLog").collect())) as { action: string; details: string; performedBy: string; userId: string }[];
 /** Sorted: rows read back in id order, not insertion order. */
@@ -51,25 +52,25 @@ const actions = async () => {
     return rows.map((row) => row.action).toSorted((a, b) => a.localeCompare(b));
 };
 const request = async () => (await run(async (ctx) => await ctx.db.get(requestId))) as { errorMessage?: string; status: string; userEmail: string };
+const setEmail = async (userEmail: string) => await run(async (ctx) => await ctx.db.patch(requestId, { userEmail }));
 const statusOf = async () => {
     const row = await request();
 
     return row.status;
 };
-const attempt = async (n: number) =>
-    await harness.action((async (ctx: any) => await ctx.runAction(retryPostHogErasure, { attempt: n, requestId, userId: USER })) as never);
+const attempt = async (n: number, chain = 1) =>
+    await harness.action((async (ctx: any) => await ctx.runAction(retryPostHogErasure, { attempt: n, chain, requestId, userId: USER })) as never);
 
 beforeAll(async () => {
     registerModule(registry, "gdpr_functions", await import("./functions"));
     registerModule(registry, "gdpr_posthog_retry", await import("./posthog-retry"));
-    const residualSteps = await import("./steps/residual-deletion-steps");
 
-    registerModule(registry, "gdpr_steps_residual_deletion_steps", residualSteps);
-    // Delegates to the real minimisation; a test makes it fail to see what the retry does then.
-    realMinimise = (residualSteps.minimiseGdprRecords as unknown as { handler: typeof realMinimise }).handler;
-    registry.set("gdpr_steps_residual_deletion_steps:minimiseGdprRecords", {
-        ...residualSteps.minimiseGdprRecords,
-        handler: (...handlerArgs: unknown[]) => minimiseSpy(...handlerArgs),
+    // The mail itself is not under test: the spy sees the address the retry sends it to.
+    const emailSteps = await import("./steps/email-steps");
+
+    registry.set("gdpr_steps_email_steps:sendDeletionConfirmedEmailAction", {
+        ...emailSteps.sendDeletionConfirmedEmailAction,
+        handler: (...handlerArgs: unknown[]) => sendEmailSpy(...handlerArgs),
     });
 
     const deletionSteps = await import("./steps/deletion-steps");
@@ -85,8 +86,8 @@ beforeEach(async () => {
     vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
     vi.mocked(erasePostHogPerson).mockReset();
     deleteAuthRecordsSpy.mockReset();
-    minimiseSpy.mockReset();
-    minimiseSpy.mockImplementation((...handlerArgs: unknown[]) => realMinimise(...handlerArgs));
+    sendEmailSpy.mockReset();
+    sendEmailSpy.mockResolvedValue(null);
     harness = lunoraTest(schema as never);
     requestId = await run(
         async (ctx) =>
@@ -111,11 +112,11 @@ describe("scheduling the first retry", () => {
         await run(async (ctx) => await ctx.runMutation(schedulePostHogRetry, { requestId, userId: USER }));
 
         expect(jobs()).toHaveLength(1);
-        expect(jobs()[0]?.args).toStrictEqual({ attempt: 1, requestId, userId: USER });
+        expect(jobs()[0]?.args).toStrictEqual({ attempt: 1, chain: 1, requestId, userId: USER });
         expect(jobs()[0]?.scheduledFor).toBe(NOW + HOUR);
 
         expect(await actions()).toStrictEqual(["deletion_retry_scheduled"]);
-        expect(await details("deletion_retry_scheduled")).toStrictEqual({ attempt: 1, requestId });
+        expect(await details("deletion_retry_scheduled")).toStrictEqual({ attempt: 1, chain: 1, requestId });
     });
 });
 
@@ -168,7 +169,7 @@ describe("a retry attempt", () => {
         expect(row.errorMessage).toBeFalsy();
         expect(await actions()).toStrictEqual(["deletion_completed", "deletion_retry_started", "deletion_retry_succeeded"]);
 
-        expect(await details("deletion_retry_succeeded")).toStrictEqual({ attempt: 1, posthog: "deleted", requestId });
+        expect(await details("deletion_retry_succeeded")).toStrictEqual({ attempt: 1, chain: 1, posthog: "deleted", requestId });
         expect(await details("deletion_completed")).toStrictEqual({ posthog: "deleted", requestId });
         expect(erasePostHogPerson).toHaveBeenCalledWith(USER, expect.anything());
         expect(jobs()).toHaveLength(0);
@@ -200,10 +201,10 @@ describe("a retry attempt", () => {
         expect(row.errorMessage).toBe(FAILED_MESSAGE);
         expect(await actions()).toStrictEqual(["deletion_retry_failed", "deletion_retry_scheduled", "deletion_retry_started"]);
 
-        expect(await details("deletion_retry_failed")).toStrictEqual({ attempt: 1, errorClass: "Error", requestId });
+        expect(await details("deletion_retry_failed")).toStrictEqual({ attempt: 1, chain: 1, errorClass: "Error", requestId });
         expect(JSON.stringify(await audit())).not.toContain("503");
         expect(jobs()).toHaveLength(1);
-        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, requestId, userId: USER });
+        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, chain: 1, requestId, userId: USER });
         expect(jobs()[0]?.scheduledFor).toBe(NOW + 6 * HOUR);
     });
 
@@ -255,54 +256,247 @@ describe("a retry attempt", () => {
     });
 });
 
-describe("minimising the failed request", () => {
-    it("every failed attempt minimises, so an address a failed workflow minimisation left behind goes", async () => {
-        await run(async (ctx) => await ctx.db.patch(requestId, { userEmail: "a@example.com" }));
+describe("the address kept for the confirmation email", () => {
+    it("stays on the request through a failed attempt while the chain is pending", async () => {
+        await setEmail("a@example.com");
         vi.mocked(erasePostHogPerson).mockRejectedValue(new Error("down"));
 
         await attempt(1);
 
         const row = await request();
 
-        expect(row.userEmail).toBe("");
+        expect(row.userEmail).toBe("a@example.com");
         expect(row.status).toBe("failed");
-        // Minimisation clears the free-text reason; the fixed one is put back.
         expect(row.errorMessage).toBe(FAILED_MESSAGE);
         expect(jobs()).toHaveLength(1);
+        expect(sendEmailSpy).not.toHaveBeenCalled();
     });
-});
 
-describe("a retry whose minimisation fails", () => {
-    it("is not completed with the address still on it: the attempt fails, and the next one minimises again", async () => {
-        await run(async (ctx) => await ctx.db.patch(requestId, { userEmail: "a@example.com" }));
+    it("is mailed once when the erasure recovers on a later attempt, and the request ends minimised", async () => {
+        await setEmail("a@example.com");
+        vi.mocked(erasePostHogPerson).mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce("deleted");
+
+        await attempt(1);
+        await attempt(2);
+
+        expect(sendEmailSpy).toHaveBeenCalledTimes(1);
+        // The handler's first argument is the ctx, whose lazy getters throw when inspected whole.
+        expect(sendEmailSpy.mock.calls[0]?.[1]).toStrictEqual({ userEmail: "a@example.com" });
+
+        const row = await request();
+
+        expect(row.status).toBe("completed");
+        expect(row.userEmail).toBe("");
+        expect(await actions()).toContain("deletion_completed");
+    });
+
+    it("is gone, unmailed, once the chain is exhausted", async () => {
+        await setEmail("a@example.com");
+        vi.mocked(erasePostHogPerson).mockRejectedValue(new Error("down"));
+
+        for (let n = 1; n <= POSTHOG_RETRY_MAX_ATTEMPTS; n += 1) {
+            await attempt(n);
+
+            const row = await request();
+
+            // Kept until the last attempt fails, gone with it.
+            expect(row.userEmail).toBe(n < POSTHOG_RETRY_MAX_ATTEMPTS ? "a@example.com" : "");
+        }
+
+        const last = await request();
+
+        expect(last.status).toBe("failed");
+        expect(last.errorMessage).toBe(FAILED_MESSAGE);
+        expect(sendEmailSpy).not.toHaveBeenCalled();
+        expect(await actions()).toContain("deletion_retry_exhausted");
+    });
+
+    it("sends nothing when the address is already gone", async () => {
         vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
-        minimiseSpy.mockRejectedValue(new Error("db busy"));
+
+        await attempt(1);
+
+        expect(sendEmailSpy).not.toHaveBeenCalled();
+        expect(await statusOf()).toBe("completed");
+    });
+
+    it("fails the attempt when the mail cannot be queued, and the next attempt mails it", async () => {
+        await setEmail("a@example.com");
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+        sendEmailSpy.mockRejectedValueOnce(new Error("queue down"));
 
         await attempt(1);
 
         const failed = await request();
 
         expect(failed.status).toBe("failed");
-        expect(failed.errorMessage).toBe(FAILED_MESSAGE);
+        expect(failed.userEmail).toBe("a@example.com");
         expect(await actions()).not.toContain("deletion_completed");
-        expect(await actions()).toContain("deletion_retry_failed");
-        expect(jobs()).toHaveLength(1);
-        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, requestId, userId: USER });
-        expect(jobs()[0]?.scheduledFor).toBe(NOW + 6 * HOUR);
 
-        minimiseSpy.mockImplementation((...handlerArgs: unknown[]) => realMinimise(...handlerArgs));
         await attempt(2);
 
+        expect(sendEmailSpy).toHaveBeenCalledTimes(2);
+        expect(await statusOf()).toBe("completed");
         const done = await request();
 
-        expect(done.status).toBe("completed");
         expect(done.userEmail).toBe("");
-        expect(erasePostHogPerson).toHaveBeenCalledTimes(2);
+    });
+
+    it("minimises the user's other records when the chain ends", async () => {
+        const otherId = await run(
+            async (ctx) =>
+                await ctx.db.insert("gdprRequests", {
+                    requestedAt: NOW - 2 * HOUR,
+                    requestType: "export",
+                    status: "completed",
+                    userEmail: "b@example.com",
+                    userId: USER,
+                }),
+        );
+
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+        await attempt(1);
+
+        const other = (await run(async (ctx) => await ctx.db.get(otherId))) as { userEmail: string };
+
+        expect(other.userEmail).toBe("");
+    });
+});
+
+describe("chains", () => {
+    it("starts chain 2 with a fresh attempt 1 at +1h when a re-run fails again after chain 1 was exhausted", async () => {
+        vi.mocked(erasePostHogPerson).mockRejectedValue(new Error("down"));
+
+        // The workflow logs `deletion_failed` before it schedules, once per failure.
+        const failedRun = async () => {
+            await run(
+                async (ctx) =>
+                    await ctx.db.insert("gdprAuditLog", {
+                        action: "deletion_failed",
+                        details: JSON.stringify({ requestId }),
+                        performedBy: "system",
+                        timestamp: NOW,
+                        userId: USER,
+                    }),
+            );
+            await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+            await run(async (ctx) => await ctx.runMutation(schedulePostHogRetry, { requestId, userId: USER }));
+        };
+
+        await failedRun();
+
+        for (let n = 1; n <= POSTHOG_RETRY_MAX_ATTEMPTS; n += 1) {
+            await attempt(n);
+        }
+
+        expect(erasePostHogPerson).toHaveBeenCalledTimes(POSTHOG_RETRY_MAX_ATTEMPTS);
+        expect(await actions()).toContain("deletion_retry_exhausted");
+        const before = jobs().length;
+
+        await failedRun();
+
+        const queued = jobs().slice(before);
+
+        expect(queued).toHaveLength(1);
+        expect(queued[0]?.args).toStrictEqual({ attempt: 1, chain: 2, requestId, userId: USER });
+        expect(queued[0]?.scheduledFor).toBe(NOW + HOUR);
+
+        // Chain 2 has its own five attempts, and chain 1's finished attempts do not stop them.
+        await attempt(1, 2);
+
+        expect(erasePostHogPerson).toHaveBeenCalledTimes(POSTHOG_RETRY_MAX_ATTEMPTS + 1);
+        expect(jobs().at(-1)?.args).toStrictEqual({ attempt: 2, chain: 2, requestId, userId: USER });
+    });
+
+    it("keeps the attempt dedupe within a chain: a redelivered scheduling call queues nothing new", async () => {
+        await run(async (ctx) => await ctx.runMutation(schedulePostHogRetry, { requestId, userId: USER }));
+        await run(async (ctx) => await ctx.runMutation(schedulePostHogRetry, { requestId, userId: USER }));
+
+        expect(jobs()).toHaveLength(1);
+    });
+});
+
+describe("the watchdog", () => {
+    const watchdog = async (n: number) =>
+        await run(async (ctx) => await ctx.runMutation(expireStalePostHogRetry, { attempt: n, chain: 1, requestId, userId: USER }));
+
+    it("is queued two hours after an attempt starts, once even when the job is resumed", async () => {
+        await run(async (ctx) => await ctx.runMutation(startPostHogRetry, { attempt: 1, chain: 1, requestId, userId: USER }));
+        await run(async (ctx) => await ctx.runMutation(startPostHogRetry, { attempt: 1, chain: 1, requestId, userId: USER }));
+
+        const watchers = allJobs().filter((job) => job.scheduledFor - NOW === POSTHOG_RETRY_WATCHDOG_MS);
+
+        expect(watchers).toHaveLength(1);
+        expect(watchers[0]?.args).toStrictEqual({ attempt: 1, chain: 1, requestId, userId: USER });
+    });
+
+    it("fails an attempt that stopped without an outcome and queues its successor", async () => {
+        await run(async (ctx) => await ctx.runMutation(startPostHogRetry, { attempt: 1, chain: 1, requestId, userId: USER }));
+        expect(await statusOf()).toBe("processing");
+
+        await watchdog(1);
+
+        const row = await request();
+
+        expect(row.status).toBe("failed");
+        expect(row.errorMessage).toBe(FAILED_MESSAGE);
+        expect(await details("deletion_retry_failed")).toStrictEqual({ attempt: 1, chain: 1, errorClass: "watchdog", requestId });
+        expect(jobs()).toHaveLength(1);
+        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, chain: 1, requestId, userId: USER });
+        expect(jobs()[0]?.scheduledFor).toBe(NOW + 6 * HOUR);
+
+        // A second firing finds the outcome and changes nothing.
+        await watchdog(1);
+
+        expect(jobs()).toHaveLength(1);
+        const names = await actions();
+
+        expect(names.filter((name) => name === "deletion_retry_failed")).toHaveLength(1);
+    });
+
+    it("ends the chain, minimised, when the last attempt is the one that stopped", async () => {
+        await setEmail("a@example.com");
+        await run(async (ctx) => await ctx.runMutation(startPostHogRetry, { attempt: POSTHOG_RETRY_MAX_ATTEMPTS, chain: 1, requestId, userId: USER }));
+
+        await watchdog(POSTHOG_RETRY_MAX_ATTEMPTS);
+
+        const row = await request();
+
+        expect(row.status).toBe("failed");
+        expect(row.userEmail).toBe("");
+        expect(row.errorMessage).toBe(FAILED_MESSAGE);
+        expect(jobs()).toHaveLength(0);
+        expect(await actions()).toContain("deletion_retry_exhausted");
+    });
+
+    it("does nothing for an attempt that recorded an outcome", async () => {
+        vi.mocked(erasePostHogPerson).mockRejectedValue(new Error("down"));
+        await attempt(1);
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+
+        await watchdog(1);
+
+        expect(await statusOf()).toBe("processing");
+        expect(jobs()).toHaveLength(1);
+    });
+
+    it("does nothing for an attempt that never started, or a request that finished", async () => {
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+        await watchdog(1);
+
+        expect(await statusOf()).toBe("processing");
+
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await run(async (ctx) => await ctx.runMutation(startPostHogRetry, { attempt: 1, chain: 1, requestId, userId: USER }));
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "completed" }));
+        await watchdog(1);
+
+        expect(await statusOf()).toBe("completed");
     });
 });
 
 describe("a redelivered attempt", () => {
-    const claim = async (n: number) => await run(async (ctx) => await ctx.runMutation(startPostHogRetry, { attempt: n, requestId, userId: USER }));
+    const claim = async (n: number) => await run(async (ctx) => await ctx.runMutation(startPostHogRetry, { attempt: n, chain: 1, requestId, userId: USER }));
 
     it("finishes a request its own interrupted attempt left processing", async () => {
         expect(await claim(1)).toBe(true);
@@ -329,7 +523,7 @@ describe("a redelivered attempt", () => {
 
         expect(erasePostHogPerson).toHaveBeenCalledTimes(1);
         expect(jobs()).toHaveLength(1);
-        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, requestId, userId: USER });
+        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, chain: 1, requestId, userId: USER });
         expect(await statusOf()).toBe("failed");
 
         const names = await actions();
@@ -357,7 +551,7 @@ describe("a redelivered attempt", () => {
 
         expect(await statusOf()).toBe("failed");
         expect(jobs()).toHaveLength(1);
-        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, requestId, userId: USER });
+        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, chain: 1, requestId, userId: USER });
     });
 
     it("leaves a processing request alone when no attempt of this number claimed it", async () => {
@@ -419,9 +613,9 @@ describe("a retry while PostHog erasure is no longer configured", () => {
         expect(row.errorMessage).toBe(FAILED_MESSAGE);
         expect(await actions()).not.toContain("deletion_completed");
         expect(await actions()).not.toContain("deletion_retry_succeeded");
-        expect(await details("deletion_retry_failed")).toStrictEqual({ attempt: 1, errorClass: "unconfigured", requestId });
+        expect(await details("deletion_retry_failed")).toStrictEqual({ attempt: 1, chain: 1, errorClass: "unconfigured", requestId });
         expect(jobs()).toHaveLength(1);
-        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, requestId, userId: USER });
+        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, chain: 1, requestId, userId: USER });
         expect(jobs()[0]?.scheduledFor).toBe(NOW + 6 * HOUR);
     });
 });
@@ -438,10 +632,10 @@ describe("attempt deduplication", () => {
         const rows = await claims();
 
         expect(rows.map((row) => `${row.scope}|${row.key}`).toSorted((a, b) => a.localeCompare(b))).toStrictEqual([
-            `posthog-retry-outcome|${requestId}:1`,
-            `posthog-retry-scheduled|${requestId}:1`,
-            `posthog-retry-scheduled|${requestId}:2`,
-            `posthog-retry-started|${requestId}:1`,
+            `posthog-retry-outcome|${requestId}:1:1`,
+            `posthog-retry-scheduled|${requestId}:1:1`,
+            `posthog-retry-scheduled|${requestId}:1:2`,
+            `posthog-retry-started|${requestId}:1:1`,
         ]);
         // Untagged, so erasing the account keeps them.
         expect(rows.every((row) => row.userId === undefined)).toBe(true);
