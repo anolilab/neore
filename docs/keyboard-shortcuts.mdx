@@ -23,7 +23,7 @@ Most commonly used shortcuts:
 
 ## All Global Shortcuts
 
-These fire anywhere in the app (except while you are typing in a text field), with two exceptions: Copy Last Code Block and Open Model Picker also work from the composer.
+These fire anywhere in the app (except while you are typing in a text field), with one exception: the composer commands (Copy Last Code Block, Open Model Picker, Increase / Decrease Reasoning Effort) also work while the cursor is in the composer, as long as they use a modifier key.
 
 ### Navigation
 
@@ -56,6 +56,14 @@ These fire anywhere in the app (except while you are typing in a text field), wi
 | `Ctrl+Shift+R` / `Cmd+Shift+R` | Start / stop audio recording |
 | `Ctrl+Shift+X` / `Cmd+Shift+X` | Copy the last code block of the latest assistant reply |
 | `Ctrl+Shift+M` / `Cmd+Shift+M` | Open the model picker in the composer |
+| Not bound by default | Increase the composer's reasoning effort by one step (`composer.increaseEffort`) |
+| Not bound by default | Decrease the composer's reasoning effort by one step (`composer.decreaseEffort`) |
+
+The effort commands move through the same five levels as the reasoning effort slider (Low, Medium-Low, Medium, Medium-High, High) and stop at the ends instead of wrapping around. The new level applies to your next message and shows as a short notice. They do nothing for a model without reasoning effort. Bind them at **Settings → App → Keyboard Shortcuts**.
+
+:::note
+These commands also fire while you type. Pick a chord with `Ctrl`, `Cmd` or `Alt`. Binding one to a chord the editor already uses (for example `Ctrl+Shift+Arrow Up`, which extends the selection) takes that chord away from text editing.
+:::
 
 ### Search and help
 
@@ -146,6 +154,8 @@ Some shortcuts can be rebound at **Settings → App → Keyboard Shortcuts**:
 | Open Model Picker | |
 | Command Palette | |
 | Focus Search | |
+| Increase reasoning effort (unbound by default) | |
+| Decrease reasoning effort (unbound by default) | |
 | Left sidebar | |
 | Right sidebar | |
 | Help | |

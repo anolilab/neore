@@ -144,4 +144,21 @@ describe("useKeyboardShortcutHandler", () => {
 
         expect(listener).toHaveBeenCalledTimes(1);
     });
+
+    it.each([
+        ["increaseEffort", "composer.increaseEffort"],
+        ["decreaseEffort", "composer.decreaseEffort"],
+    ] as const)("announces %s to the composer as %s", (action, eventName) => {
+        const listener = vi.fn();
+
+        globalThis.addEventListener(eventName, listener);
+
+        const { result } = renderHook(() => useKeyboardShortcutHandler());
+
+        result.current(action, new KeyboardEvent("keydown", { key: "ArrowUp" }));
+
+        globalThis.removeEventListener(eventName, listener);
+
+        expect(listener).toHaveBeenCalledTimes(1);
+    });
 });

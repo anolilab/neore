@@ -6536,6 +6536,9 @@
                           "createBranch": {
                             "type": "string"
                           },
+                          "decreaseEffort": {
+                            "type": "string"
+                          },
                           "deleteThread": {
                             "type": "string"
                           },
@@ -6549,6 +6552,9 @@
                             "type": "string"
                           },
                           "help": {
+                            "type": "string"
+                          },
+                          "increaseEffort": {
                             "type": "string"
                           },
                           "lastItem": {

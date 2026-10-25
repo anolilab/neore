@@ -52,10 +52,12 @@ const KeyboardShortcutsHandler: React.FC<{
         return {
             audioRecord: convertShortcutToHotkeysHook(shortcuts.audioRecord),
             copyLastCodeBlock: convertShortcutToHotkeysHook(shortcuts.copyLastCodeBlock),
+            decreaseEffort: convertShortcutToHotkeysHook(shortcuts.decreaseEffort),
             escape: convertShortcutToHotkeysHook(shortcuts.escape),
             firstItem: convertShortcutToHotkeysHook(shortcuts.firstItem),
             focusSearch: convertShortcutToHotkeysHook(shortcuts.focusSearch),
             help: convertShortcutToHotkeysHook(shortcuts.help),
+            increaseEffort: convertShortcutToHotkeysHook(shortcuts.increaseEffort),
             lastItem: convertShortcutToHotkeysHook(shortcuts.lastItem),
             newChat: convertShortcutToHotkeysHook(shortcuts.newChat),
             newTemporaryChat: convertShortcutToHotkeysHook(shortcuts.newTemporaryChat),
@@ -68,10 +70,12 @@ const KeyboardShortcutsHandler: React.FC<{
     }, [
         shortcuts.audioRecord,
         shortcuts.copyLastCodeBlock,
+        shortcuts.decreaseEffort,
         shortcuts.escape,
         shortcuts.firstItem,
         shortcuts.focusSearch,
         shortcuts.help,
+        shortcuts.increaseEffort,
         shortcuts.lastItem,
         shortcuts.newChat,
         shortcuts.newTemporaryChat,
@@ -99,6 +103,18 @@ const KeyboardShortcutsHandler: React.FC<{
 
             event.preventDefault();
             onShortcut?.("copyLastCodeBlock", event);
+        },
+        [onShortcut],
+    );
+
+    const handleDecreaseEffort = useCallback(
+        (event: KeyboardEvent) => {
+            if (isTextEntryKeystroke(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            onShortcut?.("decreaseEffort", event);
         },
         [onShortcut],
     );
@@ -136,6 +152,18 @@ const KeyboardShortcutsHandler: React.FC<{
         (event: KeyboardEvent) => {
             event.preventDefault();
             onShortcut?.("help", event);
+        },
+        [onShortcut],
+    );
+
+    const handleIncreaseEffort = useCallback(
+        (event: KeyboardEvent) => {
+            if (isTextEntryKeystroke(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            onShortcut?.("increaseEffort", event);
         },
         [onShortcut],
     );
@@ -340,6 +368,33 @@ const KeyboardShortcutsHandler: React.FC<{
             preventDefault: true,
         },
         [convertedShortcuts.newTemporaryChat, handleNewTemporaryChat],
+    );
+
+    useHotkeys(
+        convertedShortcuts.decreaseEffort,
+        handleDecreaseEffort,
+        {
+            description: "Decrease the composer's reasoning effort",
+            enabled: !!shortcuts.decreaseEffort && typeof shortcuts.decreaseEffort === "string",
+            // Like the model picker: a modifier chord must work from the composer, a bare key must not be taken from a field.
+            enableOnContentEditable: true,
+            enableOnFormTags: true,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.decreaseEffort, handleDecreaseEffort],
+    );
+
+    useHotkeys(
+        convertedShortcuts.increaseEffort,
+        handleIncreaseEffort,
+        {
+            description: "Increase the composer's reasoning effort",
+            enabled: !!shortcuts.increaseEffort && typeof shortcuts.increaseEffort === "string",
+            enableOnContentEditable: true,
+            enableOnFormTags: true,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.increaseEffort, handleIncreaseEffort],
     );
 
     useHotkeys(

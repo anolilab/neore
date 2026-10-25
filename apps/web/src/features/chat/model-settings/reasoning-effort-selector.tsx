@@ -8,6 +8,8 @@ import { Label } from "@neore/ui/components/label";
 import { Slider } from "@neore/ui/components/slider";
 import type { FC } from "react";
 
+import { EFFORT_DEFAULT, EFFORT_MAX, EFFORT_MIN, EFFORT_STEP } from "./reasoning-effort-steps";
+
 /**
  * Translatable effort labels for reasoning effort levels — resolve with `i18n._(...)`.
  */
@@ -38,7 +40,7 @@ export const ReasoningEffortSelector: FC<ReasoningEffortSelectorProps> = ({ mode
         return null;
     }
 
-    const currentMessage = EFFORT_LABEL_MESSAGES[value ?? 50];
+    const currentMessage = EFFORT_LABEL_MESSAGES[value ?? EFFORT_DEFAULT];
     const currentLabel = currentMessage ? i18n._(currentMessage) : t`Medium`;
 
     return (
@@ -48,11 +50,11 @@ export const ReasoningEffortSelector: FC<ReasoningEffortSelectorProps> = ({ mode
                 <span className="text-muted-foreground text-xs">{currentLabel}</span>
             </div>
             <Slider
-                max={100}
-                min={0}
+                max={EFFORT_MAX}
+                min={EFFORT_MIN}
                 onValueChange={(nextValue: number | ReadonlyArray<number>) => onChange(Array.isArray(nextValue) ? nextValue[0] : nextValue)}
-                step={25}
-                value={[value ?? 50]}
+                step={EFFORT_STEP}
+                value={[value ?? EFFORT_DEFAULT]}
             />
             <p className="text-muted-foreground text-xs">{t`Higher reasoning effort may produce more thoughtful responses but takes longer.`}</p>
         </div>

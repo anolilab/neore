@@ -41,6 +41,11 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                     globalThis.dispatchEvent(new CustomEvent("copyLastCodeBlock"));
                     break;
                 }
+                case "decreaseEffort": {
+                    // The composer's effort listener owns the value (`composer-effort-shortcuts.tsx`).
+                    globalThis.dispatchEvent(new CustomEvent("composer.decreaseEffort"));
+                    break;
+                }
                 case "escape": {
                     // Close modals, blur inputs, etc.
                     const activeElement = document.activeElement as HTMLElement;
@@ -78,6 +83,10 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                         navigate({ from: "/chat/$threadId" as "/chat/$threadId" | "/dashboard", to: "/help" });
                     }
 
+                    break;
+                }
+                case "increaseEffort": {
+                    globalThis.dispatchEvent(new CustomEvent("composer.increaseEffort"));
                     break;
                 }
                 case "lastItem": {

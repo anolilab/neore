@@ -1,0 +1,74 @@
+"use client";
+
+import { useLingui } from "@lingui/react/macro";
+import type { FC } from "react";
+import { useEffect, useRef } from "react";
+import { toast } from "sonner";
+
+import { useChatThread } from "@/features/chat/core/context/chat-context";
+import useCurrentModel from "@/features/chat/core/hooks/use-current-model";
+import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { EFFORT_LABEL_MESSAGES } from "@/features/chat/model-settings/reasoning-effort-selector";
+import type { EffortDirection } from "@/features/chat/model-settings/reasoning-effort-steps";
+import { stepReasoningEffort } from "@/features/chat/model-settings/reasoning-effort-steps";
+import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+
+/** The events the `increaseEffort` / `decreaseEffort` shortcuts dispatch (`use-keyboard-shortcut-handler.ts`). */
+const EFFORT_EVENTS: Record<EffortDirection, string> = {
+    decrease: "composer.decreaseEffort",
+    increase: "composer.increaseEffort",
+};
+
+/**
+ * Steps the composer's reasoning effort one stop per shortcut press, clamped at both ends. The
+ * value lands in the pending settings, which the next send carries (like every other composer
+ * setting). A model without reasoning is left alone. Renders nothing.
+ *
+ * Mounted once per thread view (`thread.tsx`), not inside `Composer`: the landing page mounts
+ * several composers, and each listener would step the value again.
+ */
+const ComposerEffortShortcuts: FC = () => {
+    const { i18n, t } = useLingui();
+    const { thread } = useChatThread();
+    const model = useCurrentModel();
+    const models = useFeatureFlaggedModels();
+    const supportsReasoning = models.find((candidate) => candidate.id === (model as string))?.filterCapabilities?.includes("reasoning") ?? false;
+    const threadEffortRef = useRef(thread?.reasoningEffort);
+
+    useEffect(() => {
+        threadEffortRef.current = thread?.reasoningEffort;
+    });
+
+    useEffect(() => {
+        const step = (direction: EffortDirection) => {
+            if (!supportsReasoning) {
+                toast.info(t`This model has no reasoning effort`);
+
+                return;
+            }
+
+            const { pendingSettings, setPendingSettings } = useModelStore.getState();
+            const next = stepReasoningEffort(pendingSettings?.reasoningEffort ?? threadEffortRef.current, direction);
+            const message = EFFORT_LABEL_MESSAGES[next];
+
+            setPendingSettings((previous) => {
+                return { ...previous, reasoningEffort: next };
+            });
+            toast.info(t`Reasoning effort: ${message ? i18n._(message) : next}`);
+        };
+        const increase = () => step("increase");
+        const decrease = () => step("decrease");
+
+        globalThis.addEventListener(EFFORT_EVENTS.increase, increase);
+        globalThis.addEventListener(EFFORT_EVENTS.decrease, decrease);
+
+        return () => {
+            globalThis.removeEventListener(EFFORT_EVENTS.increase, increase);
+            globalThis.removeEventListener(EFFORT_EVENTS.decrease, decrease);
+        };
+    }, [i18n, supportsReasoning, t]);
+
+    return null;
+};
+
+export default ComposerEffortShortcuts;

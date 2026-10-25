@@ -156,4 +156,41 @@ describe("KeyboardShortcutsManager", () => {
 
         expect(onShortcut).not.toHaveBeenCalled();
     });
+
+    it("steps the composer effort from the editor on a bound modifier chord", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ decreaseEffort: "alt+arrowdown", increaseEffort: "alt+arrowup" }}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        const composer = screen.getByLabelText("composer");
+        const upNotPrevented = fireEvent.keyDown(composer, { altKey: true, code: "ArrowUp", key: "ArrowUp" });
+        const downNotPrevented = fireEvent.keyDown(composer, { altKey: true, code: "ArrowDown", key: "ArrowDown" });
+
+        expect(onShortcut).toHaveBeenCalledWith("increaseEffort", expect.anything());
+        expect(onShortcut).toHaveBeenCalledWith("decreaseEffort", expect.anything());
+        expect(upNotPrevented).toBe(false);
+        expect(downNotPrevented).toBe(false);
+    });
+
+    it("leaves the arrow chords to the editor while the effort commands are unbound", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        const composer = screen.getByLabelText("composer");
+
+        fireEvent.keyDown(composer, { altKey: true, code: "ArrowUp", key: "ArrowUp" });
+        fireEvent.keyDown(composer, { altKey: true, code: "ArrowDown", key: "ArrowDown" });
+
+        expect(onShortcut).not.toHaveBeenCalledWith("increaseEffort", expect.anything());
+        expect(onShortcut).not.toHaveBeenCalledWith("decreaseEffort", expect.anything());
+    });
 });

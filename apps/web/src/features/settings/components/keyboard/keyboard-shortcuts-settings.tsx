@@ -40,9 +40,11 @@ const keyboardShortcutSchema = z
     .strictObject({
         commandPalette: shortcutValueSchema,
         copyLastCodeBlock: shortcutValueSchema,
+        decreaseEffort: shortcutValueSchema,
         escape: shortcutValueSchema,
         focusSearch: shortcutValueSchema,
         help: shortcutValueSchema,
+        increaseEffort: shortcutValueSchema,
         newChat: shortcutValueSchema,
         newTemporaryChat: shortcutValueSchema,
         openModelPicker: shortcutValueSchema,
@@ -91,7 +93,7 @@ const saveStatus = (state: { canSubmit: boolean; isSubmitting: boolean }): "inva
     return state.canSubmit ? "ready" : "invalid";
 };
 
-const defaultShortcut = (key: keyof KeyboardShortcutForm): string => formatShortcutForDisplay(defaultKeyboardShortcuts[key]);
+const defaultShortcut = (key: keyof KeyboardShortcutForm): string => formatShortcutForDisplay(defaultKeyboardShortcuts[key] ?? "");
 
 const KeyboardShortcutsSettings: FC = () => {
     const { t } = useLingui();
@@ -99,9 +101,11 @@ const KeyboardShortcutsSettings: FC = () => {
     const shortcutLabels: Record<keyof KeyboardShortcutForm, string> = {
         commandPalette: t`Command Palette`,
         copyLastCodeBlock: t`Copy Last Code Block`,
+        decreaseEffort: t`Decrease Reasoning Effort`,
         escape: t`Escape`,
         focusSearch: t`Focus Search`,
         help: t`Help`,
+        increaseEffort: t`Increase Reasoning Effort`,
         newChat: t`New Chat`,
         newTemporaryChat: t`New Temporary Chat`,
         openModelPicker: t`Open Model Picker`,
@@ -112,9 +116,11 @@ const KeyboardShortcutsSettings: FC = () => {
     const shortcutDescriptions: Record<keyof KeyboardShortcutForm, string> = {
         commandPalette: t`Open the command palette and global search (${defaultShortcut("commandPalette")})`,
         copyLastCodeBlock: t`Copy the last code block of the latest assistant reply (${defaultShortcut("copyLastCodeBlock")})`,
+        decreaseEffort: t`Lower the composer's reasoning effort by one step. Not bound by default.`,
         escape: t`Close dialogs and menus`,
         focusSearch: t`Open the thread search and focus it. Leave it unbound to keep the browser's find (${defaultShortcut("focusSearch")})`,
         help: t`Show help dialog (${defaultShortcut("help")})`,
+        increaseEffort: t`Raise the composer's reasoning effort by one step. Not bound by default.`,
         newChat: t`Start a new chat (${defaultShortcut("newChat")})`,
         newTemporaryChat: t`Start a new temporary chat (${defaultShortcut("newTemporaryChat")})`,
         openModelPicker: t`Open the model picker in the composer (${defaultShortcut("openModelPicker")})`,
