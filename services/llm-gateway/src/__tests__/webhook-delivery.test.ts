@@ -182,6 +182,33 @@ describe("deliverEvent", () => {
         expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
+    it("cancels the customer's response body and still records the status", async () => {
+        const response = new Response("ignored", { status: 202 });
+        const cancel = vi.spyOn(response.body as ReadableStream, "cancel");
+
+        mockFetch.mockResolvedValueOnce(response);
+
+        const database = createMockDatabase([{ events: '["completion"]', id: "wh-9", secret: "s", url: "https://hook.example.com/" }]);
+
+        await deliverEvent(database, buildEvent("completion", "user-123", {}));
+
+        expect(cancel).toHaveBeenCalledOnce();
+        expect(database._getLastUpdateArgs()[1]).toBe(202);
+    });
+
+    it("does not wait for a response body cancel that never settles", async () => {
+        const response = new Response("ignored", { status: 202 });
+
+        vi.spyOn(response.body as ReadableStream, "cancel").mockReturnValue(new Promise<void>(() => {}));
+        mockFetch.mockResolvedValueOnce(response);
+
+        const database = createMockDatabase([{ events: '["completion"]', id: "wh-10", secret: "s", url: "https://hook.example.com/" }]);
+
+        await deliverEvent(database, buildEvent("completion", "user-123", {}));
+
+        expect(database._getLastUpdateArgs()[1]).toBe(202);
+    });
+
     it("delivers to multiple webhooks subscribed to the same event", async () => {
         mockFetch.mockResolvedValue({ status: 200 });
 

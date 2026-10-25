@@ -26,6 +26,9 @@ const REALTIME_MODELS = new Set(["gpt-4o-mini-realtime-preview", "gpt-4o-realtim
 /** Upstream OpenAI Realtime WebSocket base URL */
 const OPENAI_REALTIME_URL = "wss://api.openai.com/v1/realtime";
 
+/** Deadline for the upstream handshake only; the open session is not time-limited. */
+const UPSTREAM_CONNECT_TIMEOUT_MS = 10_000;
+
 /** Concurrent session limits by tier */
 const CONCURRENT_LIMITS: Record<string, number> = {
     enterprise: 50,
@@ -188,6 +191,10 @@ realtimeRouter.get("/v1/realtime", bearerAuth, async (c) => {
     const upstreamUrl = `${OPENAI_REALTIME_URL}?model=${encodeURIComponent(model)}`;
     let upstreamResp: Response;
 
+    // The timer is cleared once the handshake answers, so it never cuts an open session.
+    const connectAbort = new AbortController();
+    const connectTimer = setTimeout(() => connectAbort.abort(), UPSTREAM_CONNECT_TIMEOUT_MS);
+
     try {
         upstreamResp = await fetch(upstreamUrl, {
             headers: {
@@ -196,6 +203,7 @@ realtimeRouter.get("/v1/realtime", bearerAuth, async (c) => {
                 "OpenAI-Beta": "realtime=v1",
                 Upgrade: "websocket",
             },
+            signal: connectAbort.signal,
         });
     } catch (error) {
         // Decrement on upstream connect failure so the slot is reclaimed.
@@ -203,6 +211,8 @@ realtimeRouter.get("/v1/realtime", bearerAuth, async (c) => {
         logger.error("[Realtime] Failed to connect to OpenAI upstream", error);
 
         return c.json({ error: "Failed to connect to upstream realtime service" }, 502);
+    } finally {
+        clearTimeout(connectTimer);
     }
 
     if (upstreamResp.status !== 101) {

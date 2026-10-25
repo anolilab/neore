@@ -21,7 +21,6 @@ import type { HonoEnv } from "../../env.js";
 import { isProductionEnv } from "../../env.js";
 import { canonicalPathAndQuery } from "../../lib/canonical-query.js";
 import { chatInputValidationMiddleware } from "../../middleware/input-validation.js";
-import { parseTierOverride, TIER_OVERRIDE_HEADER } from "../../routing/tier-override.js";
 
 const chatRouter = new OpenAPIHono<HonoEnv>();
 
@@ -115,13 +114,7 @@ const PROMPT_RPM = 15;
  * Forward a request to a Lunora backend HTTP endpoint with HMAC signing.
  * Handles auth check, rate limiting, signing, error passthrough.
  */
-const forwardToBackend = async (
-    c: Context<HonoEnv>,
-    backendPath: string,
-    rateLimitPrefix: string,
-    rateLimitRpm: number,
-    extraHeaders: Record<string, string> = {},
-): Promise<Response> => {
+const forwardToBackend = async (c: Context<HonoEnv>, backendPath: string, rateLimitPrefix: string, rateLimitRpm: number): Promise<Response> => {
     const lunoraUrl = c.env.LUNORA_URL;
     const signingSecret = c.env.SIGNING_SECRET;
     const authHeader = c.req.header("Authorization");
@@ -158,7 +151,6 @@ const forwardToBackend = async (
             Authorization: authHeader,
             "Content-Type": "application/json",
             ...sigHeaders,
-            ...extraHeaders,
         },
         method: "POST",
         signal: headersAbort.signal,
@@ -241,25 +233,7 @@ const resolvePublicGatewayOrigin = (c: Context<HonoEnv>): string | null => {
 
 /** POST /v1/chat — Start a chat (create thread + schedule agent) */
 chatRouter.post("/v1/chat", async (c) => {
-    // Shape-validate the `x-gateway-tier` header (forwarded to the backend which
-    // re-issues it on `/internal/route` where the real userTier permission
-    // check happens). We probe with `admin` here so this catches obviously-
-    // malformed alias values without saving the round-trip for legitimately
-    // disallowed tiers.
-    const tierHeaderRaw = c.req.header(TIER_OVERRIDE_HEADER);
-    const extraHeaders: Record<string, string> = {};
-
-    if (tierHeaderRaw) {
-        const probe = parseTierOverride(tierHeaderRaw, "admin");
-
-        if (probe.error) {
-            return c.json({ error: probe.error }, 400);
-        }
-
-        extraHeaders[TIER_OVERRIDE_HEADER] = tierHeaderRaw;
-    }
-
-    const response = await forwardToBackend(c, "/chat/start", "chat", CHAT_RPM, extraHeaders);
+    const response = await forwardToBackend(c, "/chat/start", "chat", CHAT_RPM);
 
     // Enrich with gateway URL so the client knows where to stream from.
     if (response.status === 200) {

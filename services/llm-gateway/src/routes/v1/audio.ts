@@ -219,6 +219,12 @@ audioRouter.get("/v1/audio/models", (c) => {
 // Shared transcription handler (used by both /transcriptions and /translations)
 // ---------------------------------------------------------------------------
 
+/** The provider's speech-to-text cap is 25 MiB; we mirror it. Oversized uploads are answered 413. */
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+
+/** Allowance for the multipart boundaries and the text fields around the file when judging Content-Length. */
+const MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
+
 async function handleTranscription(c: Context<HonoEnv>, task: "transcribe" | "translate") {
     const requestId = c.get("requestId") ?? crypto.randomUUID();
     const userId = c.get("userId");
@@ -226,11 +232,44 @@ async function handleTranscription(c: Context<HonoEnv>, task: "transcribe" | "tr
     const apiKeyId = c.get("apiKeyId");
     const startTime = Date.now();
 
+    // formData() buffers the whole body, so refuse an oversized upload on its declared length first.
+    // The multipart envelope and the small text fields add a little to the file's own size.
+    const maxBodyBytes = MAX_AUDIO_BYTES + MULTIPART_OVERHEAD_BYTES;
+    const declaredLength = Number(c.req.header("Content-Length"));
+    const bodyTooLarge = () =>
+        c.json({ error: { message: `Request body exceeds maximum audio size of ${MAX_AUDIO_BYTES} bytes`, type: "invalid_request_error" } }, 413);
+
+    if (Number.isFinite(declaredLength) && declaredLength > maxBodyBytes) {
+        return bodyTooLarge();
+    }
+
+    // A chunked upload declares no length, so count the bytes as they arrive and stop reading at the cap.
+    let wasOverLimit = false;
+    let received = 0;
+    const limited = c.req.raw.body?.pipeThrough(
+        new TransformStream<Uint8Array, Uint8Array>({
+            transform(chunk, controller) {
+                received += chunk.byteLength;
+
+                if (received > maxBodyBytes) {
+                    wasOverLimit = true;
+                    controller.error(new Error("Request body exceeds the audio upload cap"));
+
+                    return;
+                }
+
+                controller.enqueue(chunk);
+            },
+        }),
+    );
+
     let formData: FormData;
 
     try {
-        formData = await c.req.formData();
+        formData = await new Response(limited ?? null, { headers: { "Content-Type": c.req.header("Content-Type") ?? "" } }).formData();
     } catch {
+        if (wasOverLimit) return bodyTooLarge();
+
         return c.json({ error: { message: "Request must be multipart/form-data", type: "invalid_request_error" } }, 400);
     }
 
@@ -249,10 +288,7 @@ async function handleTranscription(c: Context<HonoEnv>, task: "transcribe" | "tr
     const audioFile = audioFileEntry as File;
 
     // Reject oversized uploads — the file is read fully into Worker memory
-    // before being forwarded to the provider. OpenAI's STT cap is 25 MiB; we
-    // mirror that limit. 413 (Payload Too Large) is the appropriate status.
-    const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
-
+    // before being forwarded to the provider (see MAX_AUDIO_BYTES).
     if (audioFile.size > MAX_AUDIO_BYTES) {
         return c.json(
             {
