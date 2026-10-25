@@ -12,7 +12,7 @@ export interface StreamSpeaker {
 
 /**
  * One NDJSON line relayed by the gateway's `/v1/stream`: a `persistentChunks` row
- * (`{ text, reasoning?, speaker? }`), an error object, or — for a request sent
+ * (`{ text, reasoning?, speaker?, restart? }`), an error object, or — for a request sent
  * with `resumable: true` — the resume marker
  * `{ type: "resume", lastChunkIndex }`, always the last line of a relay that
  * ran out of its per-request budget. It is not a chunk: the reader asks again
@@ -23,7 +23,8 @@ export interface StreamSpeaker {
 export type ParsedStreamLine =
     | { kind: "end" }
     | { error: unknown; kind: "error" }
-    | { kind: "chunk"; reasoning: string; speaker?: StreamSpeaker; text: string }
+    /** `restart`: the reply continues below a message the user steered into it; what came before is saved. */
+    | { kind: "chunk"; reasoning: string; restart?: true; speaker?: StreamSpeaker; text: string }
     | { kind: "resume"; lastChunkIndex: number };
 
 const readSpeaker = (value: unknown): StreamSpeaker | undefined => {
@@ -57,10 +58,11 @@ export const parseStreamLine = (line: string): ParsedStreamLine => {
         error,
         lastChunkIndex,
         reasoning,
+        restart,
         speaker: rawSpeaker,
         text,
         type,
-    } = parsed as { error?: unknown; lastChunkIndex?: unknown; reasoning?: unknown; speaker?: unknown; text?: unknown; type?: unknown };
+    } = parsed as { error?: unknown; lastChunkIndex?: unknown; reasoning?: unknown; restart?: unknown; speaker?: unknown; text?: unknown; type?: unknown };
 
     if (error) {
         return { error, kind: "error" };
@@ -79,6 +81,7 @@ export const parseStreamLine = (line: string): ParsedStreamLine => {
     return {
         kind: "chunk",
         reasoning: typeof reasoning === "string" ? reasoning : "",
+        ...(restart === true && { restart: true as const }),
         ...(speaker && { speaker }),
         text: typeof text === "string" ? text : "",
     };

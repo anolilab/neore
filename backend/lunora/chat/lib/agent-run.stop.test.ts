@@ -269,4 +269,60 @@ describe(resumeApprovedRun, () => {
             promptMessageId: "tool-result-1",
         });
     });
+    it("records the usage of each reply a steered continuation saved", async () => {
+        const runAfter = vi.fn(async () => "job");
+        const runMutation = vi.fn(async () => null);
+        const runQuery = vi.fn(async (ref: unknown) => {
+            if (ref === internal.chat.tool_permissions.getPendingToolApproval) {
+                return { approvalId: "approval-1", toolName: null };
+            }
+
+            if (ref === internal.auth.functions.getUserPreferencesQuery) {
+                return { timezone: "Pacific/Auckland" };
+            }
+
+            return ref === internal.auth.functions.getDecryptedProviderKeysQuery ? {} : null;
+        });
+        const row = (id: string, order: number, role: string) => {
+            return { _id: id, message: { content: "x", role }, order, usage: { totalTokens: 10 } };
+        };
+        const agent = {
+            approveToolCall: vi.fn(async () => {
+                return {
+                    consumeStream: async () => {},
+                    fullStream: (async function* none() {})(),
+                    order: 2,
+                    promptMessageId: "tool-result-1",
+                    savedMessages: [row("r1", 2, "assistant"), row("steer", 3, "user"), row("r2", 3, "assistant")],
+                };
+            }),
+            options: {},
+        };
+
+        vi.mocked(getAgent).mockResolvedValue(agent as never);
+        // 23:30 UTC on the 24th is already the 25th in Auckland.
+        vi.useFakeTimers({ now: Date.UTC(2026, 9, 24, 23, 30), toFake: ["Date"] });
+
+        await resumeApprovedRun(
+            { runMutation, runQuery, scheduler: { runAfter } } as never,
+            {
+                approvalId: "approval-1",
+                approved: true,
+                config: { autoMediaEnrichment: false, mcpServerNames: [], model: "gpt-4o", searchMode: "chat", toolNames: [] } as never,
+                streamId: "stream-1",
+                threadId: "thread-1",
+                userId: "owner-1",
+            },
+            { steerable: true },
+        );
+
+        vi.useRealTimers();
+
+        const recorded = runAfter.mock.calls.filter((call) => (call as unknown[])[1] === internal.usage.activity.recordReplyUsage);
+
+        expect(recorded.map((call) => (call as unknown[])[2])).toMatchObject([
+            { date: "2026-10-25", replyKey: "r1", tokens: 10 },
+            { date: "2026-10-25", replyKey: "r2", tokens: 10 },
+        ]);
+    });
 });

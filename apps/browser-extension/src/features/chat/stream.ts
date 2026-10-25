@@ -36,6 +36,8 @@ export const createLineBuffer = () => {
 
 export interface StreamDelta {
     reasoning: string;
+    /** Steering: the reply continues below a message the user sent into it; what came before is saved. */
+    restart?: true;
     /** Group chat: a new participant's reply starts with this delta. */
     speaker?: StreamSpeaker;
     text: string;
@@ -106,7 +108,7 @@ export const streamReply = async (gatewayOrigin: string, streamToken: string, on
             }
 
             chunkCount += 1;
-            onDelta({ reasoning: parsed.reasoning, speaker: parsed.speaker, text: parsed.text });
+            onDelta({ reasoning: parsed.reasoning, restart: parsed.restart, speaker: parsed.speaker, text: parsed.text });
         };
 
         try {

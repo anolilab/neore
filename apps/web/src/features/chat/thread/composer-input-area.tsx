@@ -20,7 +20,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Separator } from "@neore/ui/components/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import clsx from "clsx";
-import { ListPlusIcon, Loader2Icon, MonitorIcon, PencilIcon, PlusIcon, SendIcon, Square, UploadIcon } from "lucide-react";
+import { CornerDownRightIcon, ListPlusIcon, Loader2Icon, MonitorIcon, PencilIcon, PlusIcon, SendIcon, Square, UploadIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { lazy, Suspense, useImperativeHandle, useRef } from "react";
 
@@ -90,6 +90,12 @@ interface ComposerInputAreaProps {
     onSelectFileUpload?: () => void;
     /** Called when a vault file is selected from the @ popup */
     onSelectVaultFile?: (file: VaultFileRef) => void;
+
+    /**
+     * While streaming, a "Steer" button sends the text INTO the running reply,
+     * which takes it at its next step. Omit where steering is not offered.
+     */
+    onSteer?: () => void;
     /** Called on submit (Enter without Shift) */
     onSubmit: () => void;
     /** Placeholder text */
@@ -131,6 +137,7 @@ const ComposerInputArea = ({
     onSelectChat,
     onSelectFileUpload,
     onSelectVaultFile,
+    onSteer,
     onSubmit,
     placeholder,
     ref,
@@ -276,6 +283,28 @@ const ComposerInputArea = ({
                     survive when transcribed text makes the input non-empty. */}
                 {isStreaming ? (
                     <>
+                        {onSteer && !isEmpty && !isUploading && (
+                            <Tooltip>
+                                <TooltipTrigger
+                                    render={
+                                        <button
+                                            aria-label={t`Steer the reply`}
+                                            className={clsx(
+                                                buttonVariants({ size: "icon", variant: "outline" }),
+                                                "my-2 size-[34px]",
+                                                compact && "my-1.5 size-[30px]",
+                                            )}
+                                            disabled={disabled}
+                                            onClick={onSteer}
+                                            type="button"
+                                        >
+                                            <CornerDownRightIcon aria-hidden="true" className="size-4" />
+                                        </button>
+                                    }
+                                />
+                                <TooltipContent side="bottom">{t`Steer — the current reply reads this at its next step`}</TooltipContent>
+                            </Tooltip>
+                        )}
                         {canQueueWhileStreaming && (!isEmpty || isUploading) && (
                             <Tooltip>
                                 <TooltipTrigger

@@ -121,6 +121,8 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
         shouldCreatePendingMessage?: boolean,
     ) => Promise<void>;
     stepOrder: number;
+    /** Steering: delivers a queued message at a step boundary, after which saves follow it. */
+    takeSteer: () => Promise<{ messageId: string; text: string } | null>;
     updateModel: (model: ModelOrMetadata | undefined) => void;
     userId: string | undefined;
 }> => {
@@ -166,7 +168,9 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
     // If forceNewOrder is set, increment from the context order to create a separate message
     let order = pendingMessage?.order ?? context.order;
     let stepOrder = pendingMessage?.stepOrder ?? context.stepOrder;
-    const useForceNewOrder = args.forceNewOrder && order !== undefined;
+    // Both change once, when a steered message is delivered (`takeSteer`).
+    let useForceNewOrder = args.forceNewOrder && order !== undefined;
+    let savePromptMessageId = promptMessageId;
 
     if (useForceNewOrder) {
         // Past EVERY row, not just past the prompt's: in a branched thread a
@@ -290,7 +294,7 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
                 pendingMessageId: pendingMessageId as Id<"messages"> | undefined,
                 // When forceNewOrder is true, don't pass promptMessageId and use overrideOrder
                 // to ensure the continuation message gets a fresh order (N+1)
-                promptMessageId: (useForceNewOrder ? undefined : promptMessageId) as Id<"messages"> | undefined,
+                promptMessageId: (useForceNewOrder ? undefined : savePromptMessageId) as Id<"messages"> | undefined,
                 threadId: threadId as Id<"threads">,
                 userId,
             });
@@ -351,6 +355,25 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
             return inFlightSave;
         },
         stepOrder: stepOrder ?? 0,
+        takeSteer: async () => {
+            if (!options.takeSteer || !threadId || saveMessages === "none" || !pendingMessageId) {
+                return null;
+            }
+
+            const delivered = await options.takeSteer({ pendingMessageId });
+
+            if (delivered) {
+                // The steered message took a fresh order and the pending row moved
+                // under it (`agent/steer-rows.ts`). It is the prompt of every later
+                // step, so they land in its order, after the pending row. That holds
+                // for a tool-approval continuation too, which stops writing into
+                // its own override order here.
+                savePromptMessageId = delivered.messageId;
+                useForceNewOrder = false;
+            }
+
+            return delivered;
+        },
         updateModel: (modelValue: ModelOrMetadata | undefined) => {
             if (modelValue) {
                 activeModel = modelValue;

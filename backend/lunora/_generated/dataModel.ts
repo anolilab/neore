@@ -1123,6 +1123,7 @@ export interface Doc_persistentChunks {
     _id: Id<"persistentChunks">;
     _creationTime: number;
     reasoning?: string;
+    restart?: boolean;
     seq: number;
     speaker?: { name: string; skillId: string };
     streamId: Id<"persistentStreams">;
@@ -1136,6 +1137,7 @@ export interface Doc_persistentStreams {
     messageId: string;
     runClaimedAt?: number;
     status: string;
+    steers?: Array<{ id: string; messageId?: string; pendingMessageId?: string; status: "queued" | "delivered" | "withdrawn"; text?: string }>;
     streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean };
     threadId: string;
     userId: string;
@@ -1709,7 +1711,7 @@ export interface Doc_toolApprovalRuns {
     _id: Id<"toolApprovalRuns">;
     _creationTime: number;
     approvalId: string;
-    config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> };
+    config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> };
     createdAt: number;
     resolvedAt?: number;
     resolvedBy?: string;
@@ -3852,6 +3854,7 @@ export interface Insert_persistentChunks {
     _id?: Id<"persistentChunks">;
     _creationTime?: number;
     reasoning?: string;
+    restart?: boolean;
     seq: number;
     speaker?: { name: string; skillId: string };
     streamId: Id<"persistentStreams">;
@@ -3865,6 +3868,7 @@ export interface Insert_persistentStreams {
     messageId: string;
     runClaimedAt?: number;
     status: string;
+    steers?: Array<{ id: string; messageId?: string; pendingMessageId?: string; status: "queued" | "delivered" | "withdrawn"; text?: string }>;
     streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean };
     threadId: string;
     userId: string;
@@ -4438,7 +4442,7 @@ export interface Insert_toolApprovalRuns {
     _id?: Id<"toolApprovalRuns">;
     _creationTime?: number;
     approvalId: string;
-    config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> };
+    config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> };
     createdAt: number;
     resolvedAt?: number;
     resolvedBy?: string;

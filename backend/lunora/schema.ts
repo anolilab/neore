@@ -1673,6 +1673,10 @@ export const schema = defineSchema({
 
     persistentChunks: defineTable({
         reasoning: v.optional(v.string()),
+        // Steering (`chat/steering.ts`): the reply continues below a message the
+        // user sent into it. The text before this chunk is a saved message by
+        // now, so readers show only what follows, as for a `speaker` marker.
+        restart: v.optional(v.boolean()),
         // The chunk's position in its stream, 0-based, stamped by `addChunk`
         // as one past the stream's last chunk. Lets a poll read only the chunks
         // past its cursor (`by_streamId_seq`). Kept off `persistentStreams` so a
@@ -1699,6 +1703,23 @@ export const schema = defineSchema({
         // redelivery finds this set and does nothing.
         runClaimedAt: v.optional(v.number()),
         status: v.string(),
+        // Messages the run's user sent into it while it streams (`chat/steering.ts`).
+        // `queued` until the run takes them at a step boundary; a delivered entry
+        // keeps only its id, so the client can tell delivery from withdrawal. `withdrawn`
+        // marks an id closed before the run held it, so a late `steerRun` queues nothing.
+        steers: v.optional(
+            v.array(
+                v.object({
+                    id: v.string(),
+                    /** Set on delivery: the steered message's row, which a stopped run's owed text follows. */
+                    messageId: v.optional(v.string()),
+                    /** Set on delivery: the run's pending row, moved under that message, so a stop finds it even when that message is gone. */
+                    pendingMessageId: v.optional(v.string()),
+                    status: v.union(v.literal("queued"), v.literal("delivered"), v.literal("withdrawn")),
+                    text: v.optional(v.string()),
+                }),
+            ),
+        ),
         streamingConfig: v.object({
             contentType: v.string(),
             customSystemPrompt: v.optional(v.string()),

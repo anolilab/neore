@@ -382,7 +382,7 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
     {
         body: zStreamRequestSchema,
         description:
-            'Streams the reply as NDJSON: `{"type":"text","text":…}`, `{"type":"reasoning",…}`, `{"type":"speaker",…}`, then exactly one `{"type":"done","status":…}` or `{"type":"error","error":{…}}`. One request reads a bounded number of times; send `resumable: true` and a long reply ends with `{"type":"resume","lastChunkIndex":n}` instead — request again with that `lastChunkIndex` to continue.',
+            'Streams the reply as NDJSON: `{"type":"text","text":…}`, `{"type":"reasoning",…}`, `{"type":"speaker",…}`, `{"type":"reply.restart"}` (the user steered the reply from the app: the text after it continues below their message), then exactly one `{"type":"done","status":…}` or `{"type":"error","error":{…}}`. One request reads a bounded number of times; send `resumable: true` and a long reply ends with `{"type":"resume","lastChunkIndex":n}` instead — request again with that `lastChunkIndex` to continue.',
         handler: async (input) => {
             const signingSecret = process.env.LLM_GATEWAY_SIGNING_SECRET;
 
