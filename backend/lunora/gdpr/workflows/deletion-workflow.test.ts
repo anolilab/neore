@@ -19,7 +19,7 @@ type Entry = { args: Record<string, unknown>; kind: "run"; ref: string; shardKey
 
 let trace: Entry[];
 let failOn: ((entry: Entry) => boolean) | undefined;
-let answer: (ref: string, round: number) => unknown;
+let answer: (ref: string, round: number, args: Record<string, unknown>) => unknown;
 const rounds = new Map<string, number>();
 
 const refOf = (reference: unknown): string => (reference as { __lunoraRef: string }).__lunoraRef;
@@ -38,7 +38,7 @@ const workflowContext = () => {
 
         rounds.set(entry.ref, round);
 
-        return answer(entry.ref, round);
+        return answer(entry.ref, round, args);
     };
 
     return {
@@ -135,7 +135,20 @@ describe("account deletion workflow: order", () => {
 
         expect(runs()[0]?.args).toMatchObject({ fromStatus: ["pending", "processing", "failed"], status: "processing" });
         expect(runs()).toHaveLength(1);
-        expect(stepNames()).toHaveLength(0);
+        // Checkpointed, so a replay of the instance reads this answer instead of writing again.
+        expect(stepNames()).toStrictEqual(["open-deletion-request"]);
+    });
+
+    it("writes the completion audit, minimises and mails only when this run's completion applied", async () => {
+        // A scheduled retry completed the request first: this run's conditional completion write is refused.
+        answer = (ref, _round, args) =>
+            ref === "gdpr_functions:updateRequestProgress" && args["status"] === "completed" ? false : { cursor: null, hasMore: false };
+        await execute();
+
+        expect(stepNames()).not.toContain("log-audit");
+        expect(stepNames()).not.toContain("minimise-gdpr-records");
+        expect(stepNames()).not.toContain("claim-deletion-confirmed-email");
+        expect(stepNames()).not.toContain("send-deletion-confirmed-email-action");
     });
 
     it("reports completion exactly once, at 100 percent", async () => {
@@ -163,7 +176,8 @@ describe("account deletion workflow: order", () => {
     it("revokes sessions first, then runs the steps that need rows or secrets that a later step removes", async () => {
         await execute();
 
-        expect(stepNames()[0]).toBe("revoke-user-sessions");
+        // The request is opened (a checkpointed step) before anything is deleted.
+        expect(stepNames().slice(0, 2)).toStrictEqual(["open-deletion-request", "revoke-user-sessions"]);
 
         const before = (early: string, late: string) => {
             // A step that never ran is index -1, which would satisfy every "earlier than" comparison.

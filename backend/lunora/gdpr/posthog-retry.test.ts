@@ -788,7 +788,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
         expect(await start(2, 1)).toBe("skip");
     });
 
-    it("does not complete, or mail, a request a re-run failed while the retry's erasure was in flight", async () => {
+    it("completes and mails a request a re-run failed while the erasure was in flight, when no newer chain exists", async () => {
         await setEmail("a@example.com");
         vi.mocked(erasePostHogPerson).mockImplementation(async () => {
             await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
@@ -798,12 +798,39 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
 
         await attempt(1);
 
-        const row = await request();
+        // The erasure is done and nobody else will finish it.
+        expect(await statusOf()).toBe("completed");
+        expect(await actions()).toContain("deletion_retry_succeeded");
+        expect(sendEmailSpy).toHaveBeenCalledTimes(1);
+    });
 
-        expect(row.status).toBe("failed");
-        expect(row.userEmail).toBe("a@example.com");
-        expect(await actions()).toStrictEqual(["deletion_retry_started"]);
+    it("leaves a request alone that a re-run failed into a newer chain while the erasure was in flight", async () => {
+        await setEmail("a@example.com");
+        vi.mocked(erasePostHogPerson).mockImplementation(async () => {
+            await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+            await schedule("newer", "a@example.com");
+
+            return "deleted";
+        });
+        await schedule("older");
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        // Chain 1 is stale once chain 2 exists, so its attempt does not even start: this is chain 2's to run.
+        await attempt(1, 1);
+
+        expect(await statusOf()).toBe("failed");
+        expect(await actions()).not.toContain("deletion_retry_succeeded");
         expect(sendEmailSpy).not.toHaveBeenCalled();
+    });
+
+    it("finishes a recorded erasure on a request that was failed meanwhile, even while the lease is held", async () => {
+        await start(1);
+        await erased(1);
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+
+        await attempt(1);
+
+        expect(erasePostHogPerson).not.toHaveBeenCalled();
+        expect(await statusOf()).toBe("completed");
     });
 
     it("sends nothing when a re-run completed the request meanwhile, and the re-run's claim keeps a second mail out", async () => {
@@ -1023,9 +1050,13 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
         const names = await actions();
         const deferred = names.filter((name) => name === "deletion_retry_deferred");
 
-        // Twelve deferrals and the one record that it gave up; the queue holds the twelve re-tries.
-        expect(deferred).toHaveLength(13);
-        expect(jobs()).toHaveLength(12);
+        // Twelve deferrals, then the attempt is failed like any other: the re-run's request is untouched,
+        // the successor is queued, and a later delivery does nothing.
+        expect(deferred).toHaveLength(12);
+        expect(await details("deletion_retry_failed")).toStrictEqual({ attempt: 1, chain: 1, errorClass: "deferred", requestId });
+        expect(await statusOf()).toBe("processing");
+        expect(jobs().at(-1)?.args).toStrictEqual({ attempt: 2, chain: 1, requestId, userId: USER });
+        expect(jobs()).toHaveLength(13);
     });
 
     it("does not start an attempt twice: a started attempt whose request was failed under it is left to the watchdog", async () => {

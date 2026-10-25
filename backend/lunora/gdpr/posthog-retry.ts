@@ -257,7 +257,7 @@ const vStartMode = v.union(v.literal("skip"), v.literal("erase"), v.literal("del
 /**
  * A workflow re-run holds the request (`processing`, and this attempt never started): the attempt
  * waits one lease and tries again instead of being dropped, up to `MAX_DEFERRALS` times, each audited.
- * Past that a live re-run owns the request, which it finishes or fails into a chain of its own.
+ * Past that the attempt is failed (`failAttempt`) and the chain goes on.
  */
 const deferAttempt = async (context: MutationCtx, target: RetryTarget): Promise<"skip"> => {
     const { attempt, chain, requestId, userId } = target;
@@ -277,9 +277,10 @@ const deferAttempt = async (context: MutationCtx, target: RetryTarget): Promise<
         }
     }
 
-    if (await claimOnce(context, DEFER_SCOPE, `${attemptKey(target)}:gave_up`, ATTEMPT_CLAIM_TTL_MS)) {
-        await record(context, "deletion_retry_deferred", userId, { attempt, chain, errorClass: "gave_up", requestId });
-    }
+    // A re-run that never finishes must not hold the chain (and the kept address) forever: the attempt
+    // fails like any other, without touching the request the re-run owns, so the next one is queued or
+    // the chain ends. A later delivery finds the outcome and does nothing.
+    await failAttempt(context, target, "deferred", { isRequestKept: true });
 
     return "skip";
 };
@@ -321,7 +322,9 @@ export const startPostHogRetry = internalMutation
         const erased = await erasedOutcomeOf(context, target);
 
         if (erased !== null) {
-            return request.status === "processing" ? erased : "skip";
+            // `failed` too: a re-run that failed the request under this attempt without starting a
+            // newer chain (checked above) leaves nobody else to complete an erasure that is done.
+            return request.status === "processing" || request.status === "failed" ? erased : "skip";
         }
 
         if (request.status === "processing") {
@@ -385,7 +388,7 @@ export const recordPostHogErased = internalMutation
  * attempt's failure ends the chain, so it minimises the records here, in the same transaction
  * (minimisation clears the free-text reason, hence the fixed one is written after it).
  */
-const failAttempt = async (context: MutationCtx, target: RetryTarget, errorClass: string): Promise<void> => {
+const failAttempt = async (context: MutationCtx, target: RetryTarget, errorClass: string, { isRequestKept = false } = {}): Promise<void> => {
     const { attempt, chain, requestId, userId } = target;
     const request = await context.db.get(requestId);
 
@@ -410,7 +413,10 @@ const failAttempt = async (context: MutationCtx, target: RetryTarget, errorClass
         await minimiseUserRecords(context, userId);
     }
 
-    await context.db.patch(requestId, { errorMessage: POSTHOG_FAILED_MESSAGE, status: "failed" });
+    if (!isRequestKept) {
+        await context.db.patch(requestId, { errorMessage: POSTHOG_FAILED_MESSAGE, status: "failed" });
+    }
+
     await record(context, "deletion_retry_failed", userId, { attempt, chain, errorClass, requestId });
 
     if (!isLast) {
@@ -519,7 +525,9 @@ export const recordPostHogRetrySuccess = internalMutation
         const request = await context.db.get(requestId);
         const target = { attempt, chain, requestId, userId };
 
-        if (request?.userId !== userId || request.status !== "processing" || (await isStaleChain(context, target))) {
+        // `failed` is this attempt's to complete too: a newer chain would have made it stale, so a failed
+        // request here is one a re-run (or the sweep) failed and nobody else is going to finish.
+        if (request?.userId !== userId || (request.status !== "processing" && request.status !== "failed") || (await isStaleChain(context, target))) {
             return false;
         }
 

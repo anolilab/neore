@@ -256,11 +256,11 @@ describe("account deletion workflow, PostHog step", () => {
         });
     });
 
-    it("minimises the address at once when the scheduling mutation queued nothing", async () => {
+    it("keeps the address when the scheduling mutation queued nothing: a retry may have just completed the request and still owe the mail", async () => {
         const failure = new Error("[GDPR/PostHog] Failed to delete person: 503 Service Unavailable");
         const { request } = await runWorkflow(failure, false, false, false, false, false, true);
 
-        expect(request.userEmail).toBe("");
+        expect(request.userEmail).toBe("a@example.com");
     });
 
     it("still minimises and reports the PostHog error when scheduling the retry fails", async () => {
