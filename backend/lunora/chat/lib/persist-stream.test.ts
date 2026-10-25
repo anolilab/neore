@@ -193,15 +193,17 @@ describe(pipeToPersistentChunks, () => {
                 },
             };
             const source = {
-                [Symbol.asyncIterator]: () => {return {
-                    next: async () => {
-                        reads.count += 1;
+                [Symbol.asyncIterator]: () => {
+                    return {
+                        next: async () => {
+                            reads.count += 1;
 
-                        return reads.count === 1
-                            ? { done: false, value: { text: "One. ", type: "text-delta" } }
-                            : { done: false, value: { text: "Two. ", type: "text-delta" } };
-                    },
-                }},
+                            return reads.count === 1
+                                ? { done: false, value: { text: "One. ", type: "text-delta" } }
+                                : { done: false, value: { text: "Two. ", type: "text-delta" } };
+                        },
+                    };
+                },
             };
             const piping = pipeToPersistentChunks(ctx as never, "stream-1", source, { stopPollMs: 10 }).catch((error_: unknown) => error_);
 
@@ -215,6 +217,30 @@ describe(pipeToPersistentChunks, () => {
 
             expect(isStreamWriteRefused(error)).toBe(true);
             expect(reads.count).toBe(1);
+        });
+
+        it("closes the model stream when a chunk write fails for a reason other than a stop", async () => {
+            const boom = new Error("database down");
+            const ctx = {
+                runMutation: async () => {
+                    throw boom;
+                },
+                runQuery: async () => "streaming",
+            };
+            const closed = { value: false };
+            const source = {
+                [Symbol.asyncIterator]: () => ({
+                    next: async () => ({ done: false, value: { text: "One. ", type: "text-delta" } }),
+                    return: async () => {
+                        closed.value = true;
+
+                        return { done: true as const, value: undefined };
+                    },
+                }),
+            };
+
+            await expect(pipeToPersistentChunks(ctx as never, "stream-1", source, { stopPollMs: 10 })).rejects.toBe(boom);
+            expect(closed.value).toBe(true);
         });
 
         it("does not poll while parts keep arriving, nor after the stream ended", async () => {

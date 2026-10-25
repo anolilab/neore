@@ -130,7 +130,7 @@ export interface PipedStream {
  * Yields `source`'s parts, and throws `onStop()` once `isStopped` answers true after `pollMs` without `lastActivityAt()`
  * moving. The caller reports its last chunk write, not the last part: tool-input deltas and step markers never write one,
  * so a stop during them has to be found here. A part still pending then is abandoned: the abort the caller issues
- * next ends it, and returning the iterator now would wait on that pending read.
+ * next ends it, and returning the iterator now would wait on that pending read. Any other early exit closes the source.
  */
 async function* untilStopped<T>(
     source: AsyncIterable<T>,
@@ -143,6 +143,8 @@ async function* untilStopped<T>(
     let timer: ReturnType<typeof setTimeout> | undefined;
     let watching = true;
     let stopFound = false;
+    // True only while the consumer holds a part: leaving then (a failed write) is an early exit that must close the source.
+    let consumerHoldsPart = false;
     // The wait for the part being read, if there is one. Each wait is its own promise, so nothing long-lived holds on to a settled part.
     let wake: (() => void) | undefined;
     const tick = () => {
@@ -190,11 +192,19 @@ async function* untilStopped<T>(
                 return;
             }
 
+            consumerHoldsPart = true;
             yield step.value;
+            consumerHoldsPart = false;
         }
     } finally {
         watching = false;
         clearTimeout(timer);
+
+        // A consumer that left on its own error would have closed the source with a plain `for await`; do the same, so the
+        // model stream's reader is not left open. A stop leaves a read pending that the caller's abort ends, so it is not closed here.
+        if (consumerHoldsPart) {
+            await iterator.return?.().catch(() => undefined);
+        }
     }
 }
 
