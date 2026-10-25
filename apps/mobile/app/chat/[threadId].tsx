@@ -179,19 +179,21 @@ const ChatScreen = () => {
         }
     };
 
+    const olderHeader = olderCursor === null
+        ? undefined
+        : (
+        <Pressable accessibilityRole="button" accessibilityState={{ busy: isLoadingOlder, disabled: isLoadingOlder }} disabled={isLoadingOlder} onPress={loadOlder} style={{ padding: 12 }}>
+            <Text style={{ textAlign: "center" }}>{isLoadingOlder ? "Loading older messages..." : "Load older messages"}</Text>
+        </Pressable>
+        );
+
     return (
         <View style={{ flex: 1 }}>
             <LegendList
                 data={rows}
                 estimatedItemSize={72}
                 keyExtractor={(row) => row.id}
-                ListHeaderComponent={olderCursor === null
-                    ? undefined
-                    : (
-                    <Pressable accessibilityRole="button" accessibilityState={{ busy: isLoadingOlder, disabled: isLoadingOlder }} disabled={isLoadingOlder} onPress={loadOlder} style={{ padding: 12 }}>
-                        <Text style={{ textAlign: "center" }}>{isLoadingOlder ? "Loading older messages..." : "Load older messages"}</Text>
-                    </Pressable>
-                    )}
+                ListHeaderComponent={olderHeader}
                 renderItem={({ item }) => (
                     <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
                         <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
