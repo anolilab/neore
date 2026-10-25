@@ -33,22 +33,6 @@ const MCP_CALL_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_ROOTS: usize = 20;
 const MAX_MCP_SERVERS: usize = 20;
 const AUDIT_MAX_BYTES: u64 = 5 * 1024 * 1024;
-/// The pairing, when its secret is usable. A pairing whose keychain entry could not be read loads with an empty secret;
-/// an HMAC keyed with the empty string is public, so such a pairing must refuse every call and manifest until the
-/// keychain answers on a later load.
-fn usable_pairing(settings: &Settings) -> Result<Pairing, String> {
-    let pairing = settings
-        .pairing
-        .clone()
-        .ok_or("this computer is not paired")?;
-
-    if pairing.secret.is_empty() {
-        return Err("the pairing secret is unavailable: the keychain could not be read".into());
-    }
-
-    Ok(pairing)
-}
-
 /// How long a pairing waits for its confirmation click.
 const PAIRING_WAIT: Duration = Duration::from_secs(5 * 60);
 
@@ -899,6 +883,22 @@ fn platform() -> &'static str {
     } else {
         "linux"
     }
+}
+
+/// The pairing, when its secret is usable. A pairing whose keychain entry could not be read loads with an empty secret;
+/// an HMAC keyed with the empty string is public, so such a pairing must refuse every call and manifest until the
+/// keychain answers on a later load.
+fn usable_pairing(settings: &Settings) -> Result<Pairing, String> {
+    let pairing = settings
+        .pairing
+        .clone()
+        .ok_or("this computer is not paired")?;
+
+    if pairing.secret.is_empty() {
+        return Err("the pairing secret is unavailable: the keychain could not be read".into());
+    }
+
+    Ok(pairing)
 }
 
 fn valid_pairing(device_id: &str, secret: &str, account_label: &str) -> bool {
