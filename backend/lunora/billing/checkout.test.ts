@@ -6,7 +6,10 @@
  * subject from a map, and the session is whatever the test sets. Nothing here
  * reaches Creem.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { lunoraTest } from "@lunora/testing";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import schema from "../schema";
 
 const env = vi.hoisted(() => {
     return {
@@ -50,7 +53,7 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
 });
 
-const { createCheckout, openCustomerPortal } = await import("./checkout");
+const { createCheckout, getBillingSubject, openCustomerPortal } = await import("./checkout");
 
 interface Subject {
     baseTier: "enterprise" | "free" | "pro";
@@ -133,6 +136,14 @@ describe("createCheckout", () => {
             referenceId: OWNER,
             successUrl: "https://app.example.com/chat?settings=true&settingsTab=auth-billing",
         });
+    });
+
+    it("starts a monthly checkout when the web client sends interval month explicitly", async () => {
+        subjects.set(`user:${OWNER}`, subject());
+
+        await checkout(OWNER, { interval: "month", plan: "pro" });
+
+        expect(createCheckoutSession).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ priceId: "prod_pro", referenceId: OWNER }));
     });
 
     it("starts a Team checkout for the active organization, one seat per member", async () => {
@@ -232,6 +243,7 @@ describe("createCheckout input", () => {
     it("accepts only the two paid plans and the two intervals", () => {
         expect(plan.parse("pro")).toBe("pro");
         expect(plan.parse("team")).toBe("team");
+        expect(interval.parse("month")).toBe("month");
         expect(interval.parse("year")).toBe("year");
     });
 
@@ -303,5 +315,68 @@ describe("openCustomerPortal", () => {
         env.CREEM_API_KEY = "";
 
         await expect(portal(OWNER, { subject: "user" })).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+    });
+});
+
+describe("getBillingSubject", () => {
+    let harness: ReturnType<typeof lunoraTest>;
+
+    beforeEach(() => {
+        harness = lunoraTest(schema as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    const insertOrganization = async (ctx: any, overrides: object = {}): Promise<string> =>
+        await ctx.db.insert("organization", { createdAt: 1, name: "Team", ...overrides });
+
+    const insertMembers = async (ctx: any, organizationId: string, count: number): Promise<void> => {
+        for (let index = 0; index < count; index += 1) {
+            await ctx.db.insert("member", { createdAt: 1, organizationId, role: "member", userId: `${organizationId}-user-${String(index)}` });
+        }
+    };
+
+    const organizationSubject = async (seed: (ctx: any) => Promise<string>) =>
+        await harness.run(async (ctx: any) => await ctx.runQuery(getBillingSubject, { id: await seed(ctx), kind: "organization" }));
+
+    it("bills one seat per member of that organization, and none of another's", async () => {
+        const result = await organizationSubject(async (ctx) => {
+            const organization = await insertOrganization(ctx);
+            const other = await insertOrganization(ctx, { name: "Other" });
+
+            await insertMembers(ctx, organization, 4);
+            await insertMembers(ctx, other, 7);
+
+            return organization;
+        });
+
+        expect(result).toMatchObject({ exists: true, isAnonymous: false, seats: 4 });
+    });
+
+    it("bills at least one seat for an organization with no member rows", async () => {
+        const result = await organizationSubject(async (ctx) => await insertOrganization(ctx));
+
+        expect(result).toMatchObject({ exists: true, seats: 1 });
+    });
+
+    it("reads the plan and the purchaser off the organization row", async () => {
+        const result = await organizationSubject(
+            async (ctx) =>
+                await insertOrganization(ctx, { baseTier: "pro", creemCustomerId: "cus_1", creemPurchaserId: "buyer", creemSubscriptionId: "sub_1" }),
+        );
+
+        expect(result).toMatchObject({ baseTier: "pro", creemCustomerId: "cus_1", creemPurchaserId: "buyer", creemSubscriptionId: "sub_1" });
+    });
+
+    it("reports a user as one seat, with the user's own id as the purchaser", async () => {
+        const result = await harness.run(async (ctx: any) => {
+            const id = await ctx.db.insert("user", { createdAt: 1, email: "u@example.com", emailVerified: true, name: "U", updatedAt: 1 });
+
+            return await ctx.runQuery(getBillingSubject, { id, kind: "user" });
+        });
+
+        expect(result).toMatchObject({ baseTier: "free", creemPurchaserId: expect.any(String), exists: true, seats: 1 });
     });
 });

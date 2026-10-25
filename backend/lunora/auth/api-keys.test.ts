@@ -53,13 +53,14 @@ interface State {
 describe("createScopedApiKey", () => {
     let state: State;
     let identity: unknown;
+    const runQuery = vi.fn(async (_reference: unknown, _args: object) => state);
 
     const context = () => {
         return {
             auth: { getIdentity: async () => identity, userId: USER },
             db: {},
             log: { event: vi.fn() },
-            runQuery: vi.fn(async () => state),
+            runQuery,
         };
     };
 
@@ -71,6 +72,7 @@ describe("createScopedApiKey", () => {
     beforeEach(() => {
         state = { existingKeys: 0, isAnonymous: false };
         identity = null;
+        runQuery.mockClear();
         session.current = { activeOrganization: null, email: "u@example.com", id: USER, isAdmin: false, name: "U", userId: USER };
         createApiKey.mockReset();
         createApiKey.mockResolvedValue({ expiresAt: null, id: "key_1", key: "neore_secret", name: "CI", start: "neore_" });
@@ -155,6 +157,12 @@ describe("createScopedApiKey", () => {
         await expect(create({ name: "CI", scopes: ["threads:read"] })).rejects.toMatchObject({ code: "FORBIDDEN" });
 
         expect(createApiKey).not.toHaveBeenCalled();
+    });
+
+    it("reads the creation state of the authenticated user, not of anyone else", async () => {
+        await create({ name: "CI", scopes: ["threads:read"] });
+
+        expect(runQuery).toHaveBeenCalledExactlyOnceWith(expect.anything(), { userId: USER });
     });
 
     it("refuses a key minted by an API key", async () => {
