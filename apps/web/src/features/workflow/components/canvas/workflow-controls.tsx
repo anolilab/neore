@@ -93,6 +93,9 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
     // Use a count (primitive) so this selector never returns a new reference and
     // only triggers a re-render when the actual count changes.
     const selectedNonGroupCount = useWorkflowStore((state) => state.nodes.filter((n) => n.selected && n.type !== "group").length);
+    // Delete removes every selected node (groups included); Group only takes top-level, non-group nodes.
+    const selectedCount = useWorkflowStore((state) => state.nodes.filter((n) => n.selected).length);
+    const groupableCount = useWorkflowStore((state) => state.nodes.filter((n) => n.selected && n.type !== "group" && !n.parentId).length);
     // Align, distribute and arrange move only what layoutSelection returns (no groups, no grouped children).
     const layoutCount = useWorkflowStore((state) => layoutSelection(state.nodes).length);
     const hasMultipleSelected = selectedNonGroupCount >= 2;
@@ -437,7 +440,7 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                             <TooltipTrigger
                                 render={
                                     <Button
-                                        aria-label={t`Delete selected (${selectedNonGroupCount})`}
+                                        aria-label={t`Delete selected (${selectedCount})`}
                                         className="size-8"
                                         onClick={handleDeleteSelected}
                                         size="icon"
@@ -449,7 +452,7 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                             />
                             <TooltipContent>
                                 <p>
-                                    <Trans>Delete selected ({selectedNonGroupCount})</Trans>
+                                    <Trans>Delete selected ({selectedCount})</Trans>
                                 </p>
                             </TooltipContent>
                         </Tooltip>
@@ -457,26 +460,28 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                         {hasMultipleSelected && (
                             <>
                                 {/* Group selected */}
-                                <Tooltip>
-                                    <TooltipTrigger
-                                        render={
-                                            <Button
-                                                aria-label={t`Group (${selectedNonGroupCount})`}
-                                                className="size-8"
-                                                onClick={handleGroupSelected}
-                                                size="icon"
-                                                variant="ghost"
-                                            >
-                                                <BoxSelect aria-hidden="true" className="size-4" />
-                                            </Button>
-                                        }
-                                    />
-                                    <TooltipContent>
-                                        <p>
-                                            <Trans>Group ({selectedNonGroupCount})</Trans>
-                                        </p>
-                                    </TooltipContent>
-                                </Tooltip>
+                                {groupableCount >= 2 && (
+                                    <Tooltip>
+                                        <TooltipTrigger
+                                            render={
+                                                <Button
+                                                    aria-label={t`Group (${groupableCount})`}
+                                                    className="size-8"
+                                                    onClick={handleGroupSelected}
+                                                    size="icon"
+                                                    variant="ghost"
+                                                >
+                                                    <BoxSelect aria-hidden="true" className="size-4" />
+                                                </Button>
+                                            }
+                                        />
+                                        <TooltipContent>
+                                            <p>
+                                                <Trans>Group ({groupableCount})</Trans>
+                                            </p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                )}
 
                                 {layoutCount >= 2 && (
                                     <>

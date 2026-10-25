@@ -95,7 +95,7 @@ const VariableDefinitions = ({ onChange, variables }: VariableDefinitionsProps) 
                                     </Label>
                                 </div>
                                 <Button
-                                    aria-label={t`Remove variable`}
+                                    aria-label={t`Remove variable ${variable.name}`}
                                     onClick={() => handleRemoveVariable(index)}
                                     size="icon-sm"
                                     type="button"

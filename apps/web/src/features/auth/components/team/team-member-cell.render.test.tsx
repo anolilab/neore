@@ -49,16 +49,18 @@ const { default: TeamMemberCell } = await import("./team-member-cell");
 
 const member = { id: "m1", role: "member" as const, user: { email: "a@example.com", id: "u1", name: "Ada" }, userId: "u1" };
 
+const REMOVE_MEMBER = /^Remove member/;
+
 describe("TeamMemberCell", () => {
     it("names the owner's remove button", () => {
         render(<TeamMemberCell isOwner member={member} teamId="t1" />);
 
-        expect(screen.getByRole("button", { name: "Remove member" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Remove member Ada" })).toBeTruthy();
     });
 
     it("shows no remove button to non-owners", () => {
         render(<TeamMemberCell member={member} teamId="t1" />);
 
-        expect(screen.queryByRole("button", { name: "Remove member" })).toBeNull();
+        expect(screen.queryByRole("button", { name: REMOVE_MEMBER })).toBeNull();
     });
 });

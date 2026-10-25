@@ -152,6 +152,9 @@ vi.mock("./variable-fill-dialog", () => {
 
 const { default: PromptsSidebarTab } = await import("./prompts-sidebar-tab");
 
+const COPY_PROMPT = /^Copy Prompt \d+ to clipboard$/;
+const PROMPT_ACTIONS = /^More actions for Prompt \d+$/;
+
 describe("PromptsSidebarTab", () => {
     it("names the add button, the search box and the pagination buttons", async () => {
         render(<PromptsSidebarTab />);
@@ -160,8 +163,8 @@ describe("PromptsSidebarTab", () => {
         expect(screen.getByRole("textbox", { name: "Search prompts" })).toBeTruthy();
         expect(screen.getByRole("button", { name: "Previous page" })).toBeTruthy();
         expect(screen.getByRole("button", { name: "Next page" })).toBeTruthy();
-        expect(screen.getAllByRole("button", { name: "Copy to clipboard" }).length).toBeGreaterThan(0);
-        expect(screen.getAllByRole("button", { name: "More actions" }).length).toBeGreaterThan(0);
+        expect(screen.getAllByRole("button", { name: COPY_PROMPT }).length).toBeGreaterThan(0);
+        expect(screen.getAllByRole("button", { name: PROMPT_ACTIONS }).length).toBeGreaterThan(0);
     });
 
     it("names the clear button once there is a query", async () => {

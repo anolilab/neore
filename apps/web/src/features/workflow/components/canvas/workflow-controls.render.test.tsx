@@ -81,6 +81,8 @@ vi.mock("../version-history", () => {
 
 const { default: WorkflowControls } = await import("./workflow-controls");
 
+const GROUP_BUTTON = /^Group/;
+
 describe("WorkflowControls", () => {
     it.each([
         "Import workflow",
@@ -100,6 +102,44 @@ describe("WorkflowControls", () => {
         render(<WorkflowControls onShowShortcuts={() => {}} onToggleHistory={() => {}} showHistory={false} />);
 
         expect(screen.getByRole("button", { name })).toBeTruthy();
+    });
+
+    it("counts what Delete removes and what Group takes, not the same number for both", () => {
+        const original = state.nodes;
+
+        state.nodes = [
+            { id: "g", selected: true, type: "group" },
+            { id: "a", parentId: "g", selected: true, type: "http" },
+            { id: "b", selected: true, type: "http" },
+            { id: "c", selected: true, type: "http" },
+        ] as typeof original;
+
+        try {
+            render(<WorkflowControls onShowShortcuts={() => {}} onToggleHistory={() => {}} showHistory={false} />);
+
+            expect(screen.getByRole("button", { name: "Delete selected (4)" })).toBeTruthy();
+            expect(screen.getByRole("button", { name: "Group (2)" })).toBeTruthy();
+        } finally {
+            state.nodes = original;
+        }
+    });
+
+    it("offers no Group button when fewer than two selected nodes can be grouped", () => {
+        const original = state.nodes;
+
+        state.nodes = [
+            { id: "g", selected: true, type: "group" },
+            { id: "a", parentId: "g", selected: true, type: "http" },
+            { id: "b", selected: true, type: "http" },
+        ] as typeof original;
+
+        try {
+            render(<WorkflowControls onShowShortcuts={() => {}} onToggleHistory={() => {}} showHistory={false} />);
+
+            expect(screen.queryByRole("button", { name: GROUP_BUTTON })).toBeNull();
+        } finally {
+            state.nodes = original;
+        }
     });
 
     it("flips the history label when the panel is open", () => {

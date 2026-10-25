@@ -642,7 +642,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                                                                 <TooltipTrigger
                                                                     render={
                                                                         <Button
-                                                                            aria-label={t`Copy to clipboard`}
+                                                                            aria-label={t`Copy ${prompt.name} to clipboard`}
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 handleCopy(prompt);
@@ -664,7 +664,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                                                                 <DropdownMenuTrigger
                                                                     render={
                                                                         <Button
-                                                                            aria-label={t`More actions`}
+                                                                            aria-label={t`More actions for ${prompt.name}`}
                                                                             onClick={(e) => e.stopPropagation()}
                                                                             size="icon-xs"
                                                                             variant="ghost"
@@ -781,7 +781,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                                                                 <TooltipTrigger
                                                                     render={
                                                                         <Button
-                                                                            aria-label={t`Copy to clipboard`}
+                                                                            aria-label={t`Copy ${prompt.name} to clipboard`}
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 handleCopy(prompt);
@@ -803,7 +803,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                                                                 <DropdownMenuTrigger
                                                                     render={
                                                                         <Button
-                                                                            aria-label={t`More actions`}
+                                                                            aria-label={t`More actions for ${prompt.name}`}
                                                                             onClick={(e) => e.stopPropagation()}
                                                                             size="icon-xs"
                                                                             variant="ghost"

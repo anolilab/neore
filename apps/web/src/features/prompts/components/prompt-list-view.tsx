@@ -189,7 +189,7 @@ const PromptListView = ({ onDelete, onDeleteMany, onEdit, onOptimize, onToggleFa
                         <DropdownMenu>
                             <DropdownMenuTrigger
                                 render={
-                                    <Button aria-label={t`More actions`} size="icon-sm" variant="ghost">
+                                    <Button aria-label={t`More actions for ${prompt.name}`} size="icon-sm" variant="ghost">
                                         <MoreVertical aria-hidden="true" className="size-4" />
                                     </Button>
                                 }

@@ -234,6 +234,9 @@ const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, thre
         return t`Temporary chat mode`;
     };
 
+    // The countdown alone does not say what the button does, so name its purpose and add the status.
+    const getAriaLabel = () => (isTemporary ? t`Temporary chat settings, ${formatExpiresAt(temporaryStatus.expiresAt)}` : getTooltipText());
+
     const getDescriptionText = () => {
         if (isTemporary) {
             return formatExpiresAt(temporaryStatus.expiresAt);
@@ -259,7 +262,7 @@ const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, thre
                             <PopoverTrigger
                                 render={
                                     <Button
-                                        aria-label={getTooltipText()}
+                                        aria-label={getAriaLabel()}
                                         className={cn(className, (isTemporary || nextChatTemporary) && "text-orange-500 hover:text-orange-600")}
                                         size="icon"
                                         variant="ghost"

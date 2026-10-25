@@ -15,6 +15,10 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
+const status = vi.hoisted(() => {
+    return { current: undefined as undefined | { expiresAt: number; isTemporary: boolean; retentionHours: number } };
+});
+
 vi.mock("@tanstack/react-query", () => {
     return {
         skipToken: Symbol("skip"),
@@ -22,7 +26,7 @@ vi.mock("@tanstack/react-query", () => {
             return { mutateAsync: async () => {} };
         },
         useQuery: () => {
-            return { data: undefined };
+            return { data: status.current };
         },
     };
 });
@@ -58,6 +62,8 @@ vi.mock("@/lib/lunora/crpc", () => {
 
 const { default: TemporaryChatDropdown } = await import("./temporary-chat-dropdown");
 
+const TEMPORARY_SETTINGS = /^Temporary chat settings, 2h \d+m remaining$/;
+
 describe("TemporaryChatDropdown", () => {
     it("names the trigger for a chat that has not started", () => {
         render(<TemporaryChatDropdown />);
@@ -69,5 +75,17 @@ describe("TemporaryChatDropdown", () => {
         render(<TemporaryChatDropdown threadId="t1" />);
 
         expect(screen.getByRole("button", { name: "Enable auto-delete" })).toBeTruthy();
+    });
+
+    it("keeps the purpose in the name of a temporary chat's trigger, not just the countdown", () => {
+        status.current = { expiresAt: Date.now() + 2 * 60 * 60 * 1000 + 30 * 60 * 1000, isTemporary: true, retentionHours: 24 };
+
+        try {
+            render(<TemporaryChatDropdown threadId="t1" />);
+
+            expect(screen.getByRole("button", { name: TEMPORARY_SETTINGS })).toBeTruthy();
+        } finally {
+            status.current = undefined;
+        }
     });
 });

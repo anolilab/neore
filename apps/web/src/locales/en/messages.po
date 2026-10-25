@@ -193,7 +193,7 @@ msgid "{0, plural, one {# image} other {# images}}"
 msgstr "{0, plural, one {# image} other {# images}}"
 
 #. placeholder {0}: validationErrors.length
-#: src/features/workflow/components/canvas/workflow-controls.tsx:692
+#: src/features/workflow/components/canvas/workflow-controls.tsx:697
 msgid "{0, plural, one {# issue found} other {# issues found}}"
 msgstr "{0, plural, one {# issue found} other {# issues found}}"
 
@@ -2486,20 +2486,20 @@ msgid "Align"
 msgstr "Align"
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:50
-#: src/features/workflow/components/canvas/workflow-controls.tsx:488
+#: src/features/workflow/components/canvas/workflow-controls.tsx:493
 msgid "Align horizontally"
 msgstr "Align horizontally"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:500
+#: src/features/workflow/components/canvas/workflow-controls.tsx:505
 msgid "Align horizontally (H)"
 msgstr "Align horizontally (H)"
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:51
-#: src/features/workflow/components/canvas/workflow-controls.tsx:510
+#: src/features/workflow/components/canvas/workflow-controls.tsx:515
 msgid "Align vertically"
 msgstr "Align vertically"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:522
+#: src/features/workflow/components/canvas/workflow-controls.tsx:527
 msgid "Align vertically (V)"
 msgstr "Align vertically (V)"
 
@@ -2550,7 +2550,7 @@ msgstr "All categories"
 msgid "All Categories"
 msgstr "All Categories"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:403
+#: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "All changes saved"
 msgstr "All changes saved"
 
@@ -3234,11 +3234,11 @@ msgid "Armenian (Armenia)"
 msgstr "Armenian (Armenia)"
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:53
-#: src/features/workflow/components/canvas/workflow-controls.tsx:559
+#: src/features/workflow/components/canvas/workflow-controls.tsx:564
 msgid "Arrange selection in a grid"
 msgstr "Arrange selection in a grid"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:571
+#: src/features/workflow/components/canvas/workflow-controls.tsx:576
 msgid "Arrange selection in a grid (G)"
 msgstr "Arrange selection in a grid (G)"
 
@@ -3475,7 +3475,7 @@ msgstr "Auto-archive inactive chats"
 msgid "Auto-archive turned off"
 msgstr "Auto-archive turned off"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:279
+#: src/features/chat/header/temporary-chat-dropdown.tsx:282
 msgid "Auto-Delete Active"
 msgstr "Auto-Delete Active"
 
@@ -3489,11 +3489,11 @@ msgid "Auto-Detect Task Complexity"
 msgstr "Auto-Detect Task Complexity"
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:55
-#: src/features/workflow/components/canvas/workflow-controls.tsx:354
+#: src/features/workflow/components/canvas/workflow-controls.tsx:357
 msgid "Auto-layout"
 msgstr "Auto-layout"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:361
+#: src/features/workflow/components/canvas/workflow-controls.tsx:364
 msgid "Auto-layout (L)"
 msgstr "Auto-layout (L)"
 
@@ -6618,6 +6618,12 @@ msgstr "Copied!"
 msgid "Copy"
 msgstr "Copy"
 
+#. placeholder {0}: prompt.name
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:645
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:784
+msgid "Copy {0} to clipboard"
+msgstr "Copy {0} to clipboard"
+
 #: src/routes/admin/gateway/keys.tsx:149
 #~ msgid "Copy and store your API key now — it will not be shown again."
 #~ msgstr "Copy and store your API key now — it will not be shown again."
@@ -6707,9 +6713,7 @@ msgstr "Copy this secret now and store it with your webhook sender. It will not 
 #: src/components/copy-button.tsx:45
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:60
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:645
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:661
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:784
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:800
 msgid "Copy to clipboard"
 msgstr "Copy to clipboard"
@@ -8201,10 +8205,15 @@ msgstr "Delete selected"
 msgid "Delete Selected"
 msgstr "Delete Selected"
 
+#: src/features/workflow/components/canvas/workflow-controls.tsx:443
+#: src/features/workflow/components/canvas/workflow-controls.tsx:455
+msgid "Delete selected ({selectedCount})"
+msgstr "Delete selected ({selectedCount})"
+
 #: src/features/workflow/components/canvas/workflow-controls.tsx:440
 #: src/features/workflow/components/canvas/workflow-controls.tsx:452
-msgid "Delete selected ({selectedNonGroupCount})"
-msgstr "Delete selected ({selectedNonGroupCount})"
+#~ msgid "Delete selected ({selectedNonGroupCount})"
+#~ msgstr "Delete selected ({selectedNonGroupCount})"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:214
 msgid "Delete selected rows"
@@ -8734,7 +8743,7 @@ msgstr "Dismiss digest"
 msgid "Dismiss error"
 msgstr "Dismiss error"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:695
+#: src/features/workflow/components/canvas/workflow-controls.tsx:700
 msgid "Dismiss errors"
 msgstr "Dismiss errors"
 
@@ -8783,11 +8792,11 @@ msgid "Distilled from Krea 1 for open access"
 msgstr "Distilled from Krea 1 for open access"
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:52
-#: src/features/workflow/components/canvas/workflow-controls.tsx:535
+#: src/features/workflow/components/canvas/workflow-controls.tsx:540
 msgid "Distribute evenly"
 msgstr "Distribute evenly"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:547
+#: src/features/workflow/components/canvas/workflow-controls.tsx:552
 msgid "Distribute evenly (D)"
 msgstr "Distribute evenly (D)"
 
@@ -9085,13 +9094,13 @@ msgstr "Duplicate node"
 msgid "Duplicate selected"
 msgstr "Duplicate selected"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:418
-#: src/features/workflow/components/canvas/workflow-controls.tsx:430
+#: src/features/workflow/components/canvas/workflow-controls.tsx:421
+#: src/features/workflow/components/canvas/workflow-controls.tsx:433
 msgid "Duplicate selected ({selectedNonGroupCount})"
 msgstr "Duplicate selected ({selectedNonGroupCount})"
 
 #: src/features/admin/components/ban-user-dialog.tsx:117
-#: src/features/chat/header/temporary-chat-dropdown.tsx:286
+#: src/features/chat/header/temporary-chat-dropdown.tsx:289
 #: src/features/chat/thread/media-gallery-view.tsx:559
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:136
 msgid "Duration"
@@ -9695,7 +9704,7 @@ msgstr "Enable auto-delete"
 msgid "Enable Auto-Delete"
 msgstr "Enable Auto-Delete"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:243
+#: src/features/chat/header/temporary-chat-dropdown.tsx:246
 msgid "Enable auto-delete for this conversation."
 msgstr "Enable auto-delete for this conversation."
 
@@ -10456,7 +10465,7 @@ msgstr "Execute cleanup"
 msgid "Execute code"
 msgstr "Execute code"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:650
+#: src/features/workflow/components/canvas/workflow-controls.tsx:655
 msgid "Execute workflow"
 msgstr "Execute workflow"
 
@@ -10714,7 +10723,7 @@ msgstr "Export ready!"
 msgid "Export request submitted. You will receive an email when it's ready."
 msgstr "Export request submitted. You will receive an email when it's ready."
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:332
+#: src/features/workflow/components/canvas/workflow-controls.tsx:335
 msgid "Export workflow"
 msgstr "Export workflow"
 
@@ -10722,7 +10731,7 @@ msgstr "Export workflow"
 #~ msgid "Export workflow (JSON)"
 #~ msgstr "Export workflow (JSON)"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:345
+#: src/features/workflow/components/canvas/workflow-controls.tsx:348
 msgid "Export workflow (ZIP)"
 msgstr "Export workflow (ZIP)"
 
@@ -13574,7 +13583,7 @@ msgstr "Grok 3, Grok 3 Mini — real-time knowledge"
 msgid "Grok models from xAI with real-time web access"
 msgstr "Grok models from xAI with real-time web access"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:107
+#: src/features/workflow/components/canvas/workflow-controls.tsx:110
 #: src/features/workflow/components/nodes/group-node.tsx:57
 #: src/features/workflow/components/nodes/group-node.tsx:299
 #: src/features/workflow/components/nodes/group-node.tsx:317
@@ -13584,10 +13593,15 @@ msgstr "Grok models from xAI with real-time web access"
 msgid "Group"
 msgstr "Group"
 
+#: src/features/workflow/components/canvas/workflow-controls.tsx:468
+#: src/features/workflow/components/canvas/workflow-controls.tsx:480
+msgid "Group ({groupableCount})"
+msgstr "Group ({groupableCount})"
+
 #: src/features/workflow/components/canvas/workflow-controls.tsx:464
 #: src/features/workflow/components/canvas/workflow-controls.tsx:476
-msgid "Group ({selectedNonGroupCount})"
-msgstr "Group ({selectedNonGroupCount})"
+#~ msgid "Group ({selectedNonGroupCount})"
+#~ msgstr "Group ({selectedNonGroupCount})"
 
 #: src/features/chat/group/create-group-chat-button.tsx:168
 msgid "Group chat"
@@ -13794,8 +13808,8 @@ msgstr "Hide password"
 msgid "Hide Personal Information"
 msgstr "Hide Personal Information"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:589
-#: src/features/workflow/components/canvas/workflow-controls.tsx:600
+#: src/features/workflow/components/canvas/workflow-controls.tsx:594
+#: src/features/workflow/components/canvas/workflow-controls.tsx:605
 msgid "Hide run history"
 msgstr "Hide run history"
 
@@ -14434,7 +14448,7 @@ msgstr "Import one kind of export at a time."
 msgid "Import skill"
 msgstr "Import skill"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:311
+#: src/features/workflow/components/canvas/workflow-controls.tsx:314
 msgid "Import workflow"
 msgstr "Import workflow"
 
@@ -14442,7 +14456,7 @@ msgstr "Import workflow"
 #~ msgid "Import workflow (JSON)"
 #~ msgstr "Import workflow (JSON)"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:324
+#: src/features/workflow/components/canvas/workflow-controls.tsx:327
 msgid "Import workflow (ZIP or JSON)"
 msgstr "Import workflow (ZIP or JSON)"
 
@@ -15199,7 +15213,7 @@ msgstr "Keep files"
 msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
 msgstr "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:304
+#: src/features/chat/header/temporary-chat-dropdown.tsx:307
 msgid "Keep Permanently"
 msgstr "Keep Permanently"
 
@@ -15221,7 +15235,7 @@ msgstr "Kenya"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
 #: src/features/chat/thread-list/thread-list-header.tsx:132
-#: src/features/workflow/components/canvas/workflow-controls.tsx:371
+#: src/features/workflow/components/canvas/workflow-controls.tsx:374
 msgid "Keyboard shortcuts"
 msgstr "Keyboard shortcuts"
 
@@ -15234,7 +15248,7 @@ msgid "Keyboard Shortcuts"
 msgstr "Keyboard Shortcuts"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:142
-#: src/features/workflow/components/canvas/workflow-controls.tsx:378
+#: src/features/workflow/components/canvas/workflow-controls.tsx:381
 msgid "Keyboard shortcuts (?)"
 msgstr "Keyboard shortcuts (?)"
 
@@ -17505,8 +17519,15 @@ msgstr "More About You"
 #: src/features/prompts/components/prompt-list-view.tsx:192
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:667
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:806
-msgid "More actions"
-msgstr "More actions"
+#~ msgid "More actions"
+#~ msgstr "More actions"
+
+#. placeholder {0}: prompt.name
+#: src/features/prompts/components/prompt-list-view.tsx:192
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:667
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:806
+msgid "More actions for {0}"
+msgstr "More actions for {0}"
 
 #: src/features/chat/thread/message-item.tsx:358
 msgid "More copy options"
@@ -21326,7 +21347,7 @@ msgstr "preview"
 #: src/features/canvas/canvas-panel.tsx:748
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:790
 #: src/features/prompts/components/variable-fill-dialog.tsx:174
-#: src/features/workflow/components/canvas/workflow-controls.tsx:628
+#: src/features/workflow/components/canvas/workflow-controls.tsx:633
 #: src/features/workflow/components/nodes/image-node.tsx:76
 msgid "Preview"
 msgstr "Preview"
@@ -21347,7 +21368,7 @@ msgstr "Preview access to future Gemini capabilities"
 msgid "Preview access to Qwen's most advanced model"
 msgstr "Preview access to Qwen's most advanced model"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:634
+#: src/features/workflow/components/canvas/workflow-controls.tsx:639
 msgid "Preview execution order (dry run)"
 msgstr "Preview execution order (dry run)"
 
@@ -22879,14 +22900,19 @@ msgid "Remove key"
 msgstr "Remove key"
 
 #: src/features/auth/components/team/team-member-cell.tsx:175
-msgid "Remove member"
-msgstr "Remove member"
+#~ msgid "Remove member"
+#~ msgstr "Remove member"
 
 #: src/features/auth/components/organization/member-cell.tsx:86
 #: src/features/auth/components/organization/remove-member-dialog.tsx:66
 #: src/features/auth/components/organization/remove-member-dialog.tsx:94
 msgid "Remove Member"
 msgstr "Remove Member"
+
+#. placeholder {0}: member.user.name || member.user.email
+#: src/features/auth/components/team/team-member-cell.tsx:176
+msgid "Remove member {0}"
+msgstr "Remove member {0}"
 
 #: src/features/workflow/components/nodes/parallel-compare-node.tsx:131
 msgid "Remove model"
@@ -22948,8 +22974,13 @@ msgid "Remove User"
 msgstr "Remove User"
 
 #: src/features/prompts/components/variable-definitions.tsx:98
-msgid "Remove variable"
-msgstr "Remove variable"
+#~ msgid "Remove variable"
+#~ msgstr "Remove variable"
+
+#. placeholder {0}: variable.name
+#: src/features/prompts/components/variable-definitions.tsx:98
+msgid "Remove variable {0}"
+msgstr "Remove variable {0}"
 
 #: src/features/prompts/components/prompt-list.tsx:331
 msgid "Removed from favorites"
@@ -23170,8 +23201,8 @@ msgstr "Reset"
 msgid "Reset {0} to default"
 msgstr "Reset {0} to default"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:659
-#: src/features/workflow/components/canvas/workflow-controls.tsx:666
+#: src/features/workflow/components/canvas/workflow-controls.tsx:664
+#: src/features/workflow/components/canvas/workflow-controls.tsx:671
 msgid "Reset execution state"
 msgstr "Reset execution state"
 
@@ -23572,7 +23603,7 @@ msgstr "Rule name is required"
 #: src/features/evals/components/dataset-panel.tsx:123
 #: src/features/evals/components/dataset-panel.tsx:233
 #: src/features/tasks/components/task-card.tsx:100
-#: src/features/workflow/components/canvas/workflow-controls.tsx:644
+#: src/features/workflow/components/canvas/workflow-controls.tsx:649
 msgid "Run"
 msgstr "Run"
 
@@ -23679,7 +23710,7 @@ msgstr "Running on {device}…"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:201
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
-#: src/features/workflow/components/canvas/workflow-controls.tsx:617
+#: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
 msgid "Running..."
 msgstr "Running..."
@@ -23796,7 +23827,7 @@ msgstr "Saudi Arabia"
 #: src/features/settings/components/chat/native-providers-settings.tsx:711
 #: src/features/settings/components/personalization/memory-item.tsx:145
 #: src/features/slides/components/slide-editor-dialog.tsx:117
-#: src/features/workflow/components/canvas/workflow-controls.tsx:398
+#: src/features/workflow/components/canvas/workflow-controls.tsx:401
 msgid "Save"
 msgstr "Save"
 
@@ -23843,7 +23874,7 @@ msgstr "Save case"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:504
-#: src/features/workflow/components/canvas/workflow-controls.tsx:403
+#: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "Save changes"
 
@@ -23891,7 +23922,7 @@ msgstr "Save version"
 msgid "Save workflow"
 msgstr "Save workflow"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:398
+#: src/features/workflow/components/canvas/workflow-controls.tsx:401
 msgid "Saved"
 msgstr "Saved"
 
@@ -24910,8 +24941,8 @@ msgstr "Show password"
 msgid "Show resolved"
 msgstr "Show resolved"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:589
-#: src/features/workflow/components/canvas/workflow-controls.tsx:600
+#: src/features/workflow/components/canvas/workflow-controls.tsx:594
+#: src/features/workflow/components/canvas/workflow-controls.tsx:605
 msgid "Show run history"
 msgstr "Show run history"
 
@@ -26054,7 +26085,7 @@ msgstr "Stocks"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:245
-#: src/features/workflow/components/canvas/workflow-controls.tsx:613
+#: src/features/workflow/components/canvas/workflow-controls.tsx:618
 msgid "Stop"
 msgstr "Stop"
 
@@ -27075,7 +27106,7 @@ msgstr "Temporary"
 msgid "Temporary chat"
 msgstr "Temporary chat"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:279
+#: src/features/chat/header/temporary-chat-dropdown.tsx:282
 msgid "Temporary Chat"
 msgstr "Temporary Chat"
 
@@ -27086,6 +27117,11 @@ msgstr "Temporary chat mode"
 #: src/features/settings/components/account/account-settings.tsx:488
 msgid "Temporary Chat Retention (hours)"
 msgstr "Temporary Chat Retention (hours)"
+
+#. placeholder {0}: formatExpiresAt(temporaryStatus.expiresAt)
+#: src/features/chat/header/temporary-chat-dropdown.tsx:238
+msgid "Temporary chat settings, {0}"
+msgstr "Temporary chat settings, {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:676
 msgid "Temporary chats expire, so they can't be tagged. Convert it to a permanent chat to add tags."
@@ -31454,11 +31490,11 @@ msgstr "Your message contains inappropriate content that cannot be sent."
 msgid "Your message:"
 msgstr "Your message:"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:247
+#: src/features/chat/header/temporary-chat-dropdown.tsx:250
 msgid "Your next chat is temporary. Turn this off in Settings to keep it."
 msgstr "Your next chat is temporary. Turn this off in Settings to keep it."
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:250
+#: src/features/chat/header/temporary-chat-dropdown.tsx:253
 msgid "Your next message will start a self-destructing chat."
 msgstr "Your next message will start a self-destructing chat."
 

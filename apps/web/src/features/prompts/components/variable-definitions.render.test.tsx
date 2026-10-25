@@ -35,6 +35,7 @@ describe("VariableDefinitions", () => {
     it("names the remove button of every variable", () => {
         render(<VariableDefinitions onChange={() => {}} variables={[{ name: "topic" }, { name: "tone" }]} />);
 
-        expect(screen.getAllByRole("button", { name: "Remove variable" })).toHaveLength(2);
+        expect(screen.getByRole("button", { name: "Remove variable topic" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Remove variable tone" })).toBeTruthy();
     });
 });
