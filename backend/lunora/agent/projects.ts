@@ -74,11 +74,7 @@ export const getProject = query
         return publicProject(project);
     });
 
-/**
- * The project list read. The public query below and the owner's list wrapper
- * (`projects/functions.ts`) both call it, so the wrapper reads in its own query
- * rather than through a nested `runQuery` that repeats the auth and access checks.
- */
+/** The project list read, shared by the public query and the owner's wrapper in `projects/functions.ts`. */
 export const listProjectsHandler = async (
     ctx: QueryCtx,
     args: {
@@ -153,7 +149,6 @@ export const listProjects = query
     .output(v.from(vPaginationResult(vProjectDocument)))
     .query(async ({ args, ctx }) => await listProjectsHandler(ctx, args));
 
-/** The pinned-project read, shared like `listProjectsHandler`. */
 export const listPinnedProjectsHandler = async (ctx: QueryCtx, args: { organizationId?: string; userId?: string }) => {
     const identity = await getAuthUserIdentity(ctx);
 

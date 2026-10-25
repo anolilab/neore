@@ -58,8 +58,6 @@ export const listProjects = authQuery
     .query(async ({ args: { organizationId, paginationOpts }, ctx: context }) => {
         const { userId } = context.user;
 
-        // Read here, not through a nested `runQuery`: the agent query would repeat
-        // the auth and access checks this query has already made.
         if (organizationId) {
             return await listProjectsHandler(context, { organizationId, paginationOpts });
         }
@@ -75,7 +73,6 @@ export const listPinnedProjects = authQuery
     .query(async ({ args: { organizationId }, ctx: context }) => {
         const { userId } = context.user;
 
-        // Read here, not through a nested `runQuery` (see `listProjects`).
         if (organizationId) {
             return await listPinnedProjectsHandler(context, { organizationId });
         }

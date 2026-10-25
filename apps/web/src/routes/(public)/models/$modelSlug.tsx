@@ -21,8 +21,6 @@ const ModelDetailPageWrapper = () => {
 
 export const Route = createFileRoute("/(public)/models/$modelSlug")({
     component: ModelDetailPageWrapper,
-    // The catalog is loaded on demand, not from the entry chunk: only this page
-    // and the models index need it.
     loader: async ({ context, params }): Promise<ModelDetailLoaderData> => {
         const { getModelBySlug } = await import("@/features/marketing/data/models-data");
         const model = getModelBySlug(params.modelSlug);

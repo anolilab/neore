@@ -10,7 +10,6 @@ const TRAILING_SLASH_RE = /\/$/;
 
 export const Route = createFileRoute("/(public)/models/")({
     component: ModelsPage,
-    // The catalog is loaded on demand, not from the entry chunk (see `$modelSlug`).
     head: async ({ match }) => {
         const { ALL_MODELS, IMAGE_MODELS, TEXT_MODELS, VIDEO_MODELS } = await import("@/features/marketing/data/models-data");
         const { localizeModelDescription } = await import("@/lib/model-descriptions");
