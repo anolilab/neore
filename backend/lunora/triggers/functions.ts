@@ -515,7 +515,7 @@ const FILTERED_LOOKBACK = 50;
 
 export const getTriggerExecutions = authQuery
     .input({
-        limit: v.optional(v.number()),
+        limit: v.optional(v.number().check((value) => Number.isSafeInteger(value) && value >= 1 && value <= 100, { message: "Invalid limit" })),
         triggerId: v.id("triggers"),
     })
     .output(v.from(vGetTriggerExecutionsOutput))

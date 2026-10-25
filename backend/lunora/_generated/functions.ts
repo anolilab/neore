@@ -7485,19 +7485,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["now"] !== "number" || !Number.isFinite(source["now"])) return DEFER;
 return { "now": source["now"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_167.getTriggerExecutions.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["limit"] !== undefined) {
-if (typeof source["limit"] !== "number" || !Number.isFinite(source["limit"])) return DEFER;
-__val1 = source["limit"];
-__has1 = true;
-}
-if (typeof source["triggerId"] !== "string") return DEFER;
-return { ...(__has1 ? { "limit": __val1 } : {}), "triggerId": source["triggerId"] };
-});
 installCompiledValidatorMap(lunora_triggers_functions_167.getTriggerInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
