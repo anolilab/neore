@@ -44,6 +44,10 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 // eslint-disable-next-line import/first -- the mocks above must be hoisted before these load
 import { addMessagesHandler } from "../agent/messages";
 // eslint-disable-next-line import/first
+import { _deletePageForThreadId } from "../agent/threads";
+// eslint-disable-next-line import/first
+import { hashPasscode, mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
+// eslint-disable-next-line import/first
 import schema from "../schema";
 // eslint-disable-next-line import/first
 import { MAX_QUEUED_STEERS } from "./lib/steer-queue";
@@ -70,8 +74,8 @@ const as = (userId: string) => harness.withIdentity({ userId } as never);
 const steer = async (text: string, userId = OWNER, stream = streamId): Promise<{ steerId: string }> =>
     (await as(userId).mutation(steerRun as never, { streamId: stream, text, threadId } as never)) as { steerId: string };
 
-const withdraw = async (steerId: string, userId = OWNER): Promise<{ outcome: string }> =>
-    (await as(userId).mutation(withdrawSteer as never, { steerId, streamId, threadId } as never)) as { outcome: string };
+const withdraw = async (steerId: string, userId = OWNER, unlockProof?: string): Promise<{ outcome: string }> =>
+    (await as(userId).mutation(withdrawSteer as never, { steerId, streamId, threadId, unlockProof } as never)) as { outcome: string };
 
 const deliver = async (): Promise<{ messageId: string; text: string } | null> =>
     await harness.run(async (ctx: any) => await ctx.runMutation(deliverSteers, { pendingMessageId: pendingId, streamId, threadId, userId: OWNER }));
@@ -222,6 +226,53 @@ describe("deliverSteers and withdrawSteer", () => {
 
         expect(await withdraw(steerId, OTHER)).toStrictEqual({ outcome: "unknown" });
         expect(await steersOnStream()).toMatchObject([{ status: "queued" }]);
+    });
+
+    it("leaves a locked chat's queue alone without its proof, and withdraws with it", async () => {
+        const secret = "p".repeat(40);
+        const epoch = newPasscodeEpoch();
+        const hashed = await hashPasscode("passcode-1", 1000);
+
+        process.env.STORAGE_SIGNING_SECRET = secret;
+        const { steerId } = await steer("use the other file");
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch(threadId, { lockedAt: Date.now() });
+            await ctx.db.insert("threadPasscodes", {
+                createdAt: 1,
+                epoch,
+                failedAttempts: 0,
+                hash: hashed.hash,
+                iterations: hashed.iterations,
+                salt: hashed.salt,
+                threadId,
+                updatedAt: 1,
+                userId: OWNER,
+            });
+        });
+
+        await expect(withdraw(steerId)).rejects.toThrow("This chat is locked.");
+        expect(await steersOnStream()).toMatchObject([{ id: steerId, status: "queued" }]);
+
+        const { proof } = await mintUnlockProof({ epoch, threadId, userId: OWNER }, secret, Date.now());
+
+        expect(await withdraw(steerId, OWNER, proof)).toStrictEqual({ outcome: "withdrawn" });
+        expect(await steersOnStream()).toStrictEqual([]);
+    });
+});
+
+describe("a deleted thread", () => {
+    it("keeps no steered text, queued or not yet taken", async () => {
+        await steer("use the other file");
+        await steer("and keep it short");
+        await deliver();
+        await steer("one more");
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(_deletePageForThreadId, { threadId }));
+
+        expect(await harness.run(async (ctx: any) => await ctx.db.get(threadId))).toBeNull();
+        expect((await steersOnStream()).map((entry) => entry.status)).toStrictEqual(["delivered", "delivered"]);
+        expect((await steersOnStream()).every((entry) => entry.text === undefined)).toBe(true);
     });
 });
 

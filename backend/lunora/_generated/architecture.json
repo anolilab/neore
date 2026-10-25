@@ -16579,13 +16579,13 @@
     {
       "file": "agent/threads",
       "kind": "write",
-      "line": 288,
+      "line": 289,
       "reason": "\"markThreadArchived\" is not a registered function"
     },
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1444,
+      "line": 1448,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
@@ -17463,6 +17463,18 @@
       "kind": "call",
       "line": 230,
       "reason": "\"pipeToPersistentChunks\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/steer-cleanup",
+      "kind": "read",
+      "line": 21,
+      "reason": "\"dropQueuedSteersForThread\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/steer-cleanup",
+      "kind": "write",
+      "line": 30,
+      "reason": "\"dropQueuedSteersForThread\" is not a registered function"
     },
     {
       "file": "chat/lib/thread-helpers",

@@ -6,6 +6,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx as QueryContext } from "../_generated/server";
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
+import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
 
 /**
@@ -449,6 +450,9 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
     if (messages.isDone) {
         // Approval snapshots hold the run's system prompt; they go with the thread.
         await deleteToolApprovalRunsForThread(context, args.threadId);
+
+        // Steered messages still waiting on a run of this thread have nobody left to take them.
+        await dropQueuedSteersForThread(context, args.threadId);
 
         // One batch of links per call. While links remain this page reports "not done" and the
         // chain re-runs it, so the thread row (deleted last) and its links never outlive a partial delete.

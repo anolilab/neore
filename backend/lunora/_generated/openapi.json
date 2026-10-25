@@ -19018,6 +19018,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [

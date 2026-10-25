@@ -315,7 +315,7 @@ export interface ApiTypes {
         };
         steering: {
             steerRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams">; text: string; threadId: Id<"threads">; unlockProof?: string }, { steerId: string }>;
-            withdrawSteer: FunctionReference<"mutation", { steerId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads"> }, { outcome: "withdrawn" | "delivered" | "unknown" }>;
+            withdrawSteer: FunctionReference<"mutation", { steerId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads">; unlockProof?: string }, { outcome: "withdrawn" | "delivered" | "unknown" }>;
         };
         streaming: {
             getActiveStreamForThread: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { deliveredSteerIds?: Array<string>; streamId: Id<"persistentStreams"> } | null>;

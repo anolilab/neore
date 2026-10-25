@@ -366,7 +366,7 @@ for a schema table that is neither policed nor listed:
 | `chat_slides_functions.getThreadPresentations` | query | authQuery | threads | caller-scoped (ctx.user) | ok |
 | `chat_slides_functions.updateSlide` | mutation | authMutation + RL | — | owner helper | **fixed** (high) — owner-only + RL |
 | `chat_steering.steerRun` | mutation | authMutation + RL | persistentStreams, threads | thread write access, and stream.userId == caller (the run's own user; a collaborator cannot steer another's reply) | ok — live text streams only, group chats refused, at most 3 queued / 20 per run, text capped at `MAX_LENGTH.text` |
-| `chat_steering.withdrawSteer` | mutation | authMutation + RL | persistentStreams | stream.userId == caller and stream.threadId == args | ok — anyone else's stream answers `unknown`, like a missing one |
+| `chat_steering.withdrawSteer` | mutation | authMutation + RL | persistentStreams, threads | thread write gate (a locked chat needs its `unlockProof`), and stream.userId == caller and stream.threadId == args | ok — locked without proof answers THREAD_LOCKED; anyone else's stream answers `unknown`, like a missing one |
 | `chat_streaming.getActiveStreamForThread` | query | optionalAuthQuery | threads | thread access (owner/grant/public-redacted) | **fixed** (low) — deleted/temporary public threads no longer admitted; `deliveredSteerIds` only for the stream's own user |
 | `chat_streaming.getStreamBody` | query | optionalAuthQuery | persistentStreams | thread access (owner/grant/public-redacted) | **fixed** (medium) — was a bare publicQuery keyed by stream id; now thread access, reasoning redacted for public viewers |
 | `chat_tags_functions.createThreadTag` | mutation | authMutation + RL | threadTags | caller-scoped (ctx.user) | ok |

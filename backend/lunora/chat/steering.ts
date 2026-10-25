@@ -96,10 +96,20 @@ export const withdrawSteer = authMutation
         steerId: v.string().max(MAX_LENGTH.id),
         streamId: v.id("persistentStreams"),
         threadId: v.id("threads"),
+        /** A locked chat's passcode proof, as `steerRun` takes it. */
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ outcome: v.union(v.literal("withdrawn"), v.literal("delivered"), v.literal("unknown")) }))
-    .mutation(async ({ args: { steerId, streamId, threadId }, ctx }) => {
-        const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } });
+    .mutation(async ({ args: { steerId, streamId, threadId, unlockProof }, ctx }) => {
+        const gate = await threadGateOutcome(ctx, { level: "write", threadId, unlockProof, userId: ctx.user.userId });
+
+        // A locked chat's queue is its content: no proof, no change. Anything else the
+        // gate refuses reads like a missing stream, as it does for someone else's.
+        if (gate === "locked") {
+            throwUnlessGranted(gate);
+        }
+
+        const stream = gate === "ok" ? await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } }) : undefined;
 
         // Someone else's stream reads exactly like a missing one.
         if (!stream || stream.threadId !== threadId || stream.userId !== ctx.user.userId) {
