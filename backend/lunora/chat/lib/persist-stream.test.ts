@@ -158,7 +158,9 @@ describe(pipeToPersistentChunks, () => {
             const { ctx, polls } = ctxWithStatus({ current: "done" });
 
             await pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. ", "Two. "]), { stopPollMs: 10 });
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await new Promise((resolve) => {
+                setTimeout(resolve, 50);
+            });
 
             expect(polls).toHaveLength(0);
         });
@@ -169,7 +171,9 @@ describe(pipeToPersistentChunks, () => {
             const piped = await pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. "]), { stopPollMs: 10 });
 
             status.current = "done";
-            await new Promise((resolve) => setTimeout(resolve, 30));
+            await new Promise((resolve) => {
+                setTimeout(resolve, 30);
+            });
 
             expect(piped.pending).toStrictEqual({ reasoning: "", text: "" });
         });

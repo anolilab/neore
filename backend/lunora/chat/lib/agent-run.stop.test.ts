@@ -76,7 +76,7 @@ describe("a stop during a long tool step", () => {
         const stop = new AbortController();
         const toolEnded = { aborted: false };
         // The model wrote some text and is now inside a tool call that only ends when the run's signal aborts.
-        const fullStream = (async function* () {
+        const fullStream = (async function* quietTool() {
             yield { text: "Searching. ", type: "text-delta" };
             await new Promise<void>((resolve) => {
                 stop.signal.addEventListener("abort", () => resolve(), { once: true });

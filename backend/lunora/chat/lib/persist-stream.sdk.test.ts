@@ -6,7 +6,7 @@
 import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import { isStepCount, streamText, tool } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { isStreamWriteRefused, pipeToPersistentChunks, stopWhenStopped } from "./persist-stream";
@@ -92,6 +92,57 @@ describe("pipeToPersistentChunks against streamText", () => {
 
         expect(calls.count).toBe(1);
         expect(seen.aborted).toBe(true);
+    });
+
+    it("a tool that ignores the abort and ends later does not finish the aborted step", async () => {
+        const calls = { count: 0 };
+        const finished: number[] = [];
+        const toolDone = { value: false };
+        const stop = new AbortController();
+        const status = { current: "streaming" };
+        const result = streamText({
+            abortSignal: stop.signal,
+            model: modelOf(calls),
+            onStepFinish: (step) => {
+                finished.push(step.content.length);
+            },
+            prompt: "go",
+            stopWhen: isStepCount(5),
+            tools: {
+                slow: tool({
+                    description: "ignores its signal and ends after the stop",
+                    execute: async () => {
+                        await new Promise((resolve) => {
+                            setTimeout(resolve, 80);
+                        });
+                        toolDone.value = true;
+
+                        return "late";
+                    },
+                    inputSchema: z.object({}),
+                }),
+            },
+        });
+        const ctx = { runMutation: async () => undefined, runQuery: async () => status.current };
+
+        setTimeout(() => {
+            status.current = "done";
+        }, 20);
+
+        const error = await pipeToPersistentChunks(ctx as never, "stream-1", result.fullStream, { stopPollMs: 10 }).catch((error_: unknown) => error_);
+
+        expect(isStreamWriteRefused(error)).toBe(true);
+
+        stop.abort();
+        await result.consumeStream();
+        await vi.waitFor(() => expect(toolDone.value).toBe(true));
+        await new Promise((resolve) => {
+            setTimeout(resolve, 30);
+        });
+
+        // No step finished after the abort, so the agent saves nothing into the reply the stop already ended.
+        expect(finished).toStrictEqual([]);
+        expect(calls.count).toBe(1);
     });
 
     it("a stop that landed during a tool step keeps the next model call from starting", async () => {

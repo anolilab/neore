@@ -109,8 +109,8 @@ export const isStreamStopped = async (ctx: Partial<Pick<ActionCtx, "runQuery">>,
         .catch(() => false));
 
 /**
- * `stopWhen` for a run's `streamText`: the step cap, and a stop found after a step's tools finished, so the
- * next model call never starts. (The pipe cannot gate it: the SDK starts the next step without waiting for a reader.)
+ * The `stopWhen` for a run's `streamText`: the step cap, and a stop found after a step's tools finished, so the
+ * next model call never starts. The pipe cannot gate it, because the SDK starts the next step without waiting for a reader.
  */
 export const stopWhenStopped = (ctx: Partial<Pick<ActionCtx, "runQuery">>, streamId: string, maxSteps: number) => [
     stepCountIs(maxSteps),
@@ -136,30 +136,42 @@ async function* untilStopped<T>(source: AsyncIterable<T>, isStopped: () => Promi
     let lastPartAt = Date.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let watching = true;
-    const stopped = new Promise<typeof STOPPED>((resolve) => {
-        const tick = () => {
-            timer = setTimeout(async () => {
-                if (watching && Date.now() - lastPartAt >= pollMs && (await isStopped())) {
-                    resolve(STOPPED);
+    let stopFound = false;
+    // The wait for the part being read, if there is one. Each wait is its own promise, so nothing long-lived holds on to a settled part.
+    let wake: (() => void) | undefined;
+    const tick = () => {
+        timer = setTimeout(async () => {
+            if (watching && Date.now() - lastPartAt >= pollMs && (await isStopped())) {
+                stopFound = true;
+                wake?.();
 
-                    return;
-                }
+                return;
+            }
 
-                if (watching) {
-                    tick();
-                }
-            }, pollMs);
-        };
+            if (watching) {
+                tick();
+            }
+        }, pollMs);
+    };
 
-        tick();
-    });
+    tick();
 
     try {
         while (true) {
             const next = iterator.next();
-            const step = await Promise.race([next, stopped]);
+            const step: IteratorResult<T> | typeof STOPPED = stopFound
+                ? STOPPED
+                : await new Promise<IteratorResult<T> | typeof STOPPED>((resolve, reject) => {
+                      wake = () => {
+                          resolve(STOPPED);
+                      };
+                      next.then(resolve).catch(reject);
+                  });
+
+            wake = undefined;
 
             if (step === STOPPED) {
+                // The abandoned read may still fail once the caller aborts: nobody is left to hear it.
                 next.catch(() => undefined);
 
                 throw onStop();
@@ -181,7 +193,7 @@ async function* untilStopped<T>(source: AsyncIterable<T>, isStopped: () => Promi
 
 export const pipeToPersistentChunks = async (
     // Without `runQuery` the pipe only learns of a stop from a refused write.
-    ctx: Pick<ActionCtx, "runMutation"> & Partial<Pick<ActionCtx, "runQuery">>,
+    ctx: Partial<Pick<ActionCtx, "runQuery">> & Pick<ActionCtx, "runMutation">,
     streamId: string,
     fullStream: AsyncIterable<{ error?: unknown; text?: string; type: string }>,
     { stopPollMs = STOP_POLL_MS }: { stopPollMs?: number } = {},
@@ -219,7 +231,9 @@ export const pipeToPersistentChunks = async (
 
     // `fullStream`, not `textStream`: reasoning deltas only exist on the full
     // stream, and the client renders them live from `persistentChunks.reasoning`.
-    for await (const part of ctx.runQuery === undefined ? fullStream : untilStopped(fullStream, isStopped, refusedByStop, stopPollMs)) {
+    const parts = ctx.runQuery === undefined ? fullStream : untilStopped(fullStream, isStopped, refusedByStop, stopPollMs);
+
+    for await (const part of parts) {
         let delta: string;
 
         switch (part.type) {
