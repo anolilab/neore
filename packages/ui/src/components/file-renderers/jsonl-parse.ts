@@ -32,7 +32,7 @@ export interface JsonlParseLimits {
 }
 
 const PREVIEW_CHARS = 160;
-const BYTE_ORDER_MARK = "\uFEFF";
+const BYTE_ORDER_MARK = "\u{FEFF}";
 
 export const parseJsonLines = (text: string, limits: JsonlParseLimits): JsonlParseResult => {
     const source = text.startsWith(BYTE_ORDER_MARK) ? text.slice(BYTE_ORDER_MARK.length) : text;

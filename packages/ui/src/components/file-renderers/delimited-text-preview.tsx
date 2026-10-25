@@ -3,6 +3,8 @@
 /**
  * CSV / TSV preview — code-split, lazy-loaded. Loads the file and shows it with
  * the spreadsheet table (`CsvRenderer`), which detects the delimiter itself.
+ * Only the first 50 columns are shown, and a file over 1 MB is not read at all
+ * (the download card shows).
  *
  * NOT exported from the barrel index. Import directly:
  *
@@ -11,13 +13,13 @@
  * ```
  */
 
-import { useFetchedText } from "@ui/hooks/use-fetched-text";
-import cn from "@ui/utils/cn";
+import { Plural, useLingui } from "@lingui/react/macro";
 import type { FC } from "react";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 
 import { CsvRenderer } from "../spreadsheet/csv-renderer";
-import { TextFileLoading, TextFileUnavailable } from "./text-file-states";
+import { capDelimitedColumns } from "./delimited-columns";
+import { FetchedTextPreview } from "./fetched-text-preview";
 
 export interface DelimitedTextPreviewProps {
     className?: string;
@@ -25,22 +27,36 @@ export interface DelimitedTextPreviewProps {
     url: string;
 }
 
-const DelimitedTextPreview: FC<DelimitedTextPreviewProps> = memo(({ className, filename, url }) => {
-    const fetched = useFetchedText(url);
+/** Columns shown. Each costs a header cell and a cell per row, and a file can have hundreds of thousands. */
+const MAX_PREVIEW_COLUMNS = 50;
 
-    if (fetched.status === "error") {
-        return <TextFileUnavailable className={className} filename={filename} url={url} />;
-    }
-
-    if (fetched.status === "loading") {
-        return <TextFileLoading />;
-    }
+const DelimitedTable: FC<{ text: string }> = ({ text }) => {
+    const { t } = useLingui();
+    const { content, hiddenColumns } = useMemo(() => capDelimitedColumns(text, MAX_PREVIEW_COLUMNS), [text]);
 
     // Not `compact`: the compact table renders every row, while this one pages (50 rows) and searches.
+    // The frame already names the file, so the toolbar title is generic: it would read "CSV Data" for a .tsv.
     return (
-        <div className={cn("my-2 h-[420px] w-full max-w-2xl overflow-hidden rounded-lg border", className)}>
-            <CsvRenderer content={fetched.text} />
-        </div>
+        <>
+            <div className="h-[420px]">
+                <CsvRenderer content={content} labels={{ title: t`Table` }} />
+            </div>
+            {hiddenColumns > 0 && (
+                <p className="text-muted-foreground border-t px-3 py-2 text-xs">
+                    <Plural one="+# more column is not shown." other="+# more columns are not shown." value={hiddenColumns} />
+                </p>
+            )}
+        </>
+    );
+};
+
+const DelimitedTextPreview: FC<DelimitedTextPreviewProps> = memo(({ className, filename, url }) => {
+    const { t } = useLingui();
+
+    return (
+        <FetchedTextPreview className={className} fallbackName={t`Table`} filename={filename} url={url}>
+            {(text) => <DelimitedTable text={text} />}
+        </FetchedTextPreview>
     );
 });
 

@@ -25,7 +25,7 @@ describe(parseJsonLines, () => {
     });
 
     it("ignores a leading byte-order mark", () => {
-        const result = parseJsonLines('\uFEFF{"a":1}\n', LIMITS);
+        const result = parseJsonLines('\u{FEFF}{"a":1}\n', LIMITS);
 
         expect(result.records).toStrictEqual([{ line: 1, value: { a: 1 } }]);
     });
@@ -61,25 +61,15 @@ describe(parseJsonLines, () => {
         expect(result.truncated).toBe(false);
     });
 
-    it("does not count trailing blank lines against the record cap", () => {
-        const result = parseJsonLines('{"n":1}\n{"n":2}\n\n  \r\n\n', { maxProblems: 20, maxRecords: 2 });
+    it.each([
+        ["trailing blank lines", '{"n":1}\n{"n":2}\n\n  \r\n\n', [1, 2], false],
+        ["blank lines between records", '{"n":1}\n\n\n{"n":2}\n', [1, 4], false],
+        ["a record after the cap", '{"n":1}\n\n{"n":2}\n\n{"n":3}\n', [1, 3], true],
+    ])("with %s, reports the lines read and whether the cap cut the file short", (_name, text, lines, truncated) => {
+        const result = parseJsonLines(text, { maxProblems: 20, maxRecords: 2 });
 
-        expect(result.records).toHaveLength(2);
-        expect(result.truncated).toBe(false);
-    });
-
-    it("does not count blank lines between records against the record cap", () => {
-        const result = parseJsonLines('{"n":1}\n\n\n{"n":2}\n', { maxProblems: 20, maxRecords: 2 });
-
-        expect(result.records.map((record) => record.line)).toStrictEqual([1, 4]);
-        expect(result.truncated).toBe(false);
-    });
-
-    it("still says more was not read when a record follows the cap", () => {
-        const result = parseJsonLines('{"n":1}\n\n{"n":2}\n\n{"n":3}\n', { maxProblems: 20, maxRecords: 2 });
-
-        expect(result.records).toHaveLength(2);
-        expect(result.truncated).toBe(true);
+        expect(result.records.map((record) => record.line)).toStrictEqual(lines);
+        expect(result.truncated).toBe(truncated);
     });
 
     it("stops at the problem cap", () => {

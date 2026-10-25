@@ -14,14 +14,12 @@
  */
 
 import { Plural, useLingui } from "@lingui/react/macro";
-import { useFetchedText } from "@ui/hooks/use-fetched-text";
-import cn from "@ui/utils/cn";
 import type { FC } from "react";
 import { memo, useMemo } from "react";
 
+import { FetchedTextPreview } from "./fetched-text-preview";
 import { JsonViewer } from "./json-viewer";
 import { parseJsonLines } from "./jsonl-parse";
-import { TextFileLoading, TextFileUnavailable } from "./text-file-states";
 
 export interface JsonlViewerProps {
     className?: string;
@@ -34,31 +32,14 @@ const MAX_RECORDS = 200;
 /** Bad lines listed before the preview stops reading. */
 const MAX_PROBLEMS = 20;
 
-const JsonlViewer: FC<JsonlViewerProps> = memo(({ className, filename, url }) => {
+const JsonlRecords: FC<{ text: string }> = ({ text }) => {
     const { t } = useLingui();
-    const fetched = useFetchedText(url);
-    const parsed = useMemo(
-        () => (fetched.status === "ready" ? parseJsonLines(fetched.text, { maxProblems: MAX_PROBLEMS, maxRecords: MAX_RECORDS }) : undefined),
-        [fetched],
-    );
-
-    if (fetched.status === "error") {
-        return <TextFileUnavailable className={className} filename={filename} url={url} />;
-    }
-
-    if (!parsed) {
-        return <TextFileLoading />;
-    }
-
-    const { problems, records, truncated } = parsed;
+    const { problems, records, truncated } = useMemo(() => parseJsonLines(text, { maxProblems: MAX_PROBLEMS, maxRecords: MAX_RECORDS }), [text]);
 
     return (
-        <div className={cn("my-2 w-full max-w-2xl overflow-hidden rounded-lg border", className)}>
-            <div className="bg-muted/50 flex items-center justify-between gap-2 border-b px-3 py-1.5 text-xs">
-                <span className="truncate font-medium">{filename || t`JSON Lines`}</span>
-                <span className="text-muted-foreground shrink-0">
-                    <Plural one="# record" other="# records" value={records.length} />
-                </span>
+        <>
+            <div className="text-muted-foreground border-b px-3 py-1 text-xs">
+                <Plural one="# record" other="# records" value={records.length} />
             </div>
 
             <div className="max-h-[500px] overflow-auto">
@@ -89,7 +70,17 @@ const JsonlViewer: FC<JsonlViewerProps> = memo(({ className, filename, url }) =>
                     </p>
                 )}
             </div>
-        </div>
+        </>
+    );
+};
+
+const JsonlViewer: FC<JsonlViewerProps> = memo(({ className, filename, url }) => {
+    const { t } = useLingui();
+
+    return (
+        <FetchedTextPreview className={className} fallbackName={t`JSON Lines`} filename={filename} url={url}>
+            {(text) => <JsonlRecords text={text} />}
+        </FetchedTextPreview>
     );
 });
 

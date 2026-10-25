@@ -19,7 +19,7 @@ export const TEXT_PREVIEW_EXTENSIONS = {
 
 const getExtension = (filename?: string): string => filename?.split(".").pop()?.toLowerCase() ?? "";
 
-const hasExtension = (filename: string | undefined, extensions: readonly string[]): boolean => extensions.includes(getExtension(filename));
+const hasExtension = (filename: string | undefined, extensions: ReadonlyArray<string>): boolean => extensions.includes(getExtension(filename));
 
 /** JSON Lines / NDJSON: one JSON value per line. */
 export const isJsonl = (filename?: string): boolean => hasExtension(filename, TEXT_PREVIEW_EXTENSIONS.jsonl);

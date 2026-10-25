@@ -10,6 +10,8 @@ import { formatFileSize } from "./file-type-utilities";
 
 export interface GenericFileCardProps {
     className?: string;
+    /** Replaces the type and size line, for a card that stands in for a preview that could not be shown. */
+    description?: string;
     filename?: string;
     fileSize?: number;
     mediaType?: string;
@@ -79,7 +81,7 @@ const getIconForFile = (mediaType?: string, filename?: string): FC<{ className?:
     return extensionMap[extension] ?? File;
 };
 
-const GenericFileCard: FC<GenericFileCardProps> = memo(({ className, filename, fileSize, mediaType, url }) => {
+const GenericFileCard: FC<GenericFileCardProps> = memo(({ className, description, filename, fileSize, mediaType, url }) => {
     const { t } = useLingui();
     const Icon = useMemo(() => getIconForFile(mediaType, filename), [mediaType, filename]);
     const displayName = filename || t`Download file`;
@@ -103,9 +105,13 @@ const GenericFileCard: FC<GenericFileCardProps> = memo(({ className, filename, f
             <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{displayName}</div>
                 <div className="text-muted-foreground text-xs">
-                    {mediaType && <span>{mediaType}</span>}
-                    {mediaType && fileSize != null && " · "}
-                    {fileSize != null && <span>{formatFileSize(fileSize)}</span>}
+                    {description ?? (
+                        <>
+                            {mediaType && <span>{mediaType}</span>}
+                            {mediaType && fileSize != null && " · "}
+                            {fileSize != null && <span>{formatFileSize(fileSize)}</span>}
+                        </>
+                    )}
                 </div>
             </div>
             <Download aria-hidden="true" className="text-muted-foreground size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
