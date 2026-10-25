@@ -424,8 +424,12 @@ export const purgeUserDocumentHistory = internalMutation
         return { hasMore: full(page) };
     });
 
-/** Audit-detail keys that are request metadata; anything else is dropped. */
-const AUDIT_DETAIL_KEYS = new Set(["action", "requestedAt", "requestId", "timedOutAt"]);
+/**
+ * Audit-detail keys that are request metadata; anything else is dropped. `posthog` is the PostHog
+ * erasure outcome (`deleted`, `no_profile`, `skipped`): a fixed status, not personal data, and the
+ * only record of which of those it was once the rest of the audit is minimised.
+ */
+const AUDIT_DETAIL_KEYS = new Set(["action", "posthog", "requestedAt", "requestId", "timedOutAt"]);
 
 const minimiseDetails = (details: string): string => {
     try {

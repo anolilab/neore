@@ -185,6 +185,24 @@ describe("residual account-deletion steps", () => {
         expect(anonymised).toHaveLength(MANY);
     }, 30_000);
 
+    it("keeps the PostHog outcome in the completed deletion's audit details", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("gdprAuditLog", {
+                action: "deletion_completed",
+                details: JSON.stringify({ email: "a@example.com", posthog: "no_profile", requestId: "r1" }),
+                performedBy: A,
+                timestamp: NOW,
+                userId: A,
+            });
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(minimiseGdprRecords, { userId: A }));
+
+        const audit = (await rowsOf("gdprAuditLog")) as { details: string }[];
+
+        expect(audit.map((row) => JSON.parse(row.details))).toStrictEqual([{ posthog: "no_profile", requestId: "r1" }]);
+    });
+
     it("keeps the GDPR request and audit rows but strips them to metadata", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("gdprRequests", {
