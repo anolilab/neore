@@ -28,7 +28,7 @@ import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { CornerDownRightIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
-import type { FC } from "react";
+import type { FC, ReactNode } from "react";
 import { useCallback, useEffect, useRef } from "react";
 
 import { useChatActions, useChatError, useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
@@ -413,10 +413,10 @@ const ComposerPromptQueue: FC = () => {
     const count = queue.items.length;
     const steerCount = queue.items.filter((item) => item.steer).length;
     const willAutoSend = isStreaming && !queue.paused;
-    let statusText = willAutoSend ? t`${count} queued — sends when the current reply finishes` : t`${count} queued`;
+    let statusText: ReactNode = willAutoSend ? t`${count} queued — sends when the current reply finishes` : t`${count} queued`;
 
     if (steerCount === count && isStreaming) {
-        statusText = t`${count} steering — the reply reads it at its next step`;
+        statusText = <Plural one="# steering — the reply reads it at its next step" other="# steering — the reply reads them at its next step" value={count} />;
     }
 
     return (
