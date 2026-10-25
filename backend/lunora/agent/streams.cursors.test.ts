@@ -71,15 +71,18 @@ afterEach(() => {
     harness.close();
 });
 
-const cursorsOf = (count: number) => Array.from({ length: count }, () => ({ cursor: 0, streamId: missingStreamId }));
+const CURSOR_CAP_MESSAGE = /At most \d+ stream cursors/;
+
+const cursorsOf = (count: number) =>
+    Array.from({ length: count }, () => {
+        return { cursor: 0, streamId: missingStreamId };
+    });
 
 describe("listDeltas cursor cap", () => {
     it("refuses a cursor list over the cap", async () => {
         await expect(
-            harness
-                .withIdentity({ userId: OWNER } as never)
-                .query(listDeltas as never, { cursors: cursorsOf(MAX_CURSORS_PER_REQUEST + 1), threadId } as never),
-        ).rejects.toThrow(/At most \d+ stream cursors/);
+            harness.withIdentity({ userId: OWNER } as never).query(listDeltas as never, { cursors: cursorsOf(MAX_CURSORS_PER_REQUEST + 1), threadId } as never),
+        ).rejects.toThrow(CURSOR_CAP_MESSAGE);
     });
 
     it("accepts a list at the cap", async () => {

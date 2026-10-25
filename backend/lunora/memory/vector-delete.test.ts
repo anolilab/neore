@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { memoryLogger } from "../lib/logger";
 import schema from "../schema";
 import { deleteVectorRow } from "../agent/table-writes";
+import { getVectorIdInfo } from "../agent/vector/tables";
 import { clearAllUserMemories, deleteMemory, retryMemoryVectorDelete } from "./functions";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -42,6 +43,12 @@ vi.mock("../agent/table-writes", async (importOriginal) => {
     return { ...original, deleteVectorRow: vi.fn(original.deleteVectorRow) };
 });
 
+vi.mock("../agent/vector/tables", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../agent/vector/tables")>();
+
+    return { ...original, getVectorIdInfo: vi.fn(original.getVectorIdInfo) };
+});
+
 const OWNER = "owner-user";
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -58,7 +65,12 @@ beforeEach(async () => {
     vi.spyOn(memoryLogger, "error").mockImplementation(() => undefined);
 
     ({ embeddingId, memoryId } = await run(async (ctx) => {
-        const embedding = await ctx.db.insert("embeddings_768", { model: "m", table: "memories", userId: OWNER, vector: Array.from({ length: 768 }, () => 0.1) });
+        const embedding = await ctx.db.insert("embeddings_768", {
+            model: "m",
+            table: "memories",
+            userId: OWNER,
+            vector: Array.from({ length: 768 }, (_, index) => index / 768),
+        });
         const memory = await ctx.db.insert("memories", { embeddingId: embedding, memory: "likes tea", type: "preference", userId: OWNER });
 
         return { embeddingId: embedding as string, memoryId: memory as string };
@@ -106,12 +118,33 @@ describe("memory vector deletion", () => {
 
         expect(await run(async (ctx) => await ctx.db.get(embeddingId))).toBeNull();
 
-        const other = await run(async (ctx) => await ctx.db.insert("embeddings_768", { model: "m", table: "memories", userId: OWNER, vector: Array.from({ length: 768 }, () => 0.1) }));
+        const other = await run(
+            async (ctx) =>
+                await ctx.db.insert("embeddings_768", {
+                    model: "m",
+                    table: "memories",
+                    userId: OWNER,
+                    vector: Array.from({ length: 768 }, (_, index) => index / 768),
+                }),
+        );
 
         vi.mocked(deleteVectorRow).mockRejectedValue(new Error("still down"));
         await run(async (ctx) => await ctx.runMutation(retryMemoryVectorDelete, { attempt: 5, embeddingId: other, memoryId, userId: OWNER }));
 
         expect(memoryLogger.error).toHaveBeenCalledWith(expect.stringContaining(other as string), expect.any(Error));
+        expect(jobs()).toHaveLength(0);
+    });
+
+    it("deletes the memory and logs when its embedding id names no vector table", async () => {
+        vi.mocked(getVectorIdInfo).mockImplementationOnce(() => {
+            throw new Error("Unknown vector table id");
+        });
+
+        await asOwner().mutation(deleteMemory as never, { memoryId } as never);
+
+        expect(await run(async (ctx) => await ctx.db.get(memoryId))).toBeNull();
+        expect(memoryLogger.error).toHaveBeenCalledWith(expect.stringContaining(embeddingId), expect.any(Error));
+        expect(deleteVectorRow).not.toHaveBeenCalled();
         expect(jobs()).toHaveLength(0);
     });
 });

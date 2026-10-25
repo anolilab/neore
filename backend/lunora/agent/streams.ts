@@ -25,6 +25,7 @@ const MINUTE = 60 * SECOND;
 
 const MAX_DELTAS_PER_REQUEST = 2000;
 const MAX_DELTAS_PER_STREAM = 500;
+
 /** Streams one `listDeltas` call reads. A thread has a handful in flight; each cursor costs a `db.get`. */
 export const MAX_CURSORS_PER_REQUEST = 100;
 const TIMEOUT_INTERVAL = 10 * MINUTE;

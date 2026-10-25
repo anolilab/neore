@@ -46,6 +46,11 @@ export const cleanupExpiredExports = internalMutation
             read += page.page.length;
 
             for (const request of page.page) {
+                // The cap is per run, not per page: stop mid-page once it is reached.
+                if (handled >= EXPIRED_EXPORT_BATCH_SIZE) {
+                    break;
+                }
+
                 if (request.storageId) {
                     try {
                         await scheduleObjectDeletion(context, [request.storageId as string]);

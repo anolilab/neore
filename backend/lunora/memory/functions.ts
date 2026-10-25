@@ -12,6 +12,7 @@ import { withoutUndefined } from "../lib/patch";
 import { lastConfirmedOf, type MemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { requireOwnedThread } from "../agent/thread-read-access";
+import { getVectorIdInfo, type VectorTableId, type VectorTableName } from "../agent/vector/tables";
 import { parentKeyOf } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 
@@ -140,22 +141,33 @@ const VECTOR_DELETE_RETRY_BASE_MS = 60_000;
 type OrphanedVector = { embeddingId: string; memoryId: string; userId: string };
 
 /**
- * Delete the embedding of a memory whose row is already gone. A memory's embedding
- * is always text-embedding-004 (768-dim → `embeddings_768`) and carries no memory
- * text, only the vector plus model/table/thread/user ids.
+ * Delete the embedding of a memory whose row is already gone. The vector's table is
+ * resolved from its id (a memory's embedding is normally `embeddings_768`) and the
+ * embedding carries no memory text, only the vector plus model/table/thread/user ids.
  *
- * A failure is never swallowed: unless the vector is confirmed gone, it is logged
- * with the ids that find the orphan and retried by
- * {@link retryMemoryVectorDelete} with a growing delay. The retry is scheduled
- * from the mutation, so it exists only if the row delete committed.
+ * This covers the vector ROW in the database. The sync of that delete to the vector
+ * index runs after the transaction commits, outside this function, so a failure
+ * there is not seen here. When the row delete fails, the failure is never swallowed:
+ * it is logged with the ids that find the orphan and retried by
+ * {@link retryMemoryVectorDelete} with a growing delay. The retry is scheduled from
+ * the mutation, so it exists only if the row delete committed. An id that names no
+ * vector table is logged and skipped, so it can never block deleting the memory.
  */
 const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, attempt = 1): Promise<void> => {
-    const vectorId = context.db.asId("embeddings_768", orphan.embeddingId);
+    let vectorId: Id<VectorTableName>;
+
+    try {
+        const { tableName } = getVectorIdInfo(context, orphan.embeddingId as VectorTableId);
+
+        vectorId = context.db.asId(tableName, orphan.embeddingId);
+    } catch (error) {
+        memoryLogger.error(`Memory ${orphan.memoryId} of user ${orphan.userId} points at embedding ${orphan.embeddingId}, which is not a vector row id`, error);
+
+        return;
+    }
 
     try {
         await deleteVectorRow(context.db, vectorId);
-
-        return;
     } catch (error) {
         // Already gone (a retry of a delete that did land): nothing is orphaned.
         if ((await context.db.get(vectorId).catch(() => undefined)) === null) {
@@ -163,7 +175,10 @@ const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, 
         }
 
         if (attempt >= VECTOR_DELETE_ATTEMPTS) {
-            memoryLogger.error(`Giving up deleting the vector of memory ${orphan.memoryId}: embedding ${orphan.embeddingId} of user ${orphan.userId} is orphaned`, error);
+            memoryLogger.error(
+                `Giving up deleting the vector of memory ${orphan.memoryId}: embedding ${orphan.embeddingId} of user ${orphan.userId} is orphaned`,
+                error,
+            );
 
             return;
         }
