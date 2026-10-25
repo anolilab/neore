@@ -78,6 +78,18 @@ describe("persistent stream cost", () => {
         }
     });
 
+    it("answers a missing stream as an error, not as a lock", async () => {
+        const { harness } = await setup();
+
+        try {
+            const result = await harness.run(async (context: any) => await context.runQuery(getChunksAfter, { afterIndex: 0, streamId: "missing-stream-id" }));
+
+            expect(result).toStrictEqual({ chunks: [], locked: false, status: "error", totalChunks: 0 });
+        } finally {
+            harness.close();
+        }
+    });
+
     it("refuses a poll on a stream whose thread was locked after it started, with no chunks", async () => {
         const { harness, streamId } = await setup();
 

@@ -418,7 +418,13 @@ export const getChunksAfter = internalQuery
     .query(async ({ args: { afterIndex, checkLock = true, streamId }, ctx }) => {
         // One indexed row, not an un-hinted `db.get` (which probes every table).
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } });
-        const status = (stream?.status ?? "error") as StreamStatus;
+
+        // A missing stream is an error, not a lock: an expired one must not read as "This chat is locked."
+        if (!stream) {
+            return { chunks: [], locked: false, status: "error", totalChunks: afterIndex };
+        }
+
+        const status = stream.status as StreamStatus;
         const mustCheck = checkLock || SETTLED_STREAM_STATUSES.has(status);
         const lockedAnswer = { chunks: [], locked: true, status, totalChunks: afterIndex };
 

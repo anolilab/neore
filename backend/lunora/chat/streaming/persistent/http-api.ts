@@ -128,20 +128,25 @@ export const getChunksHttpAction = async (context: HttpActionCtx, request: Reque
         // `done` answer always carries the final chunk. This poll carries no
         // passcode proof: a thread locked after the stream was created is refused
         // at once, and nothing may read on from it.
-        // Only the first read of a long-poll checks the lock on every read; later
-        // reads are checked whenever they return chunks, so an idle wait reads no thread.
-        let isFirstRead = true;
-        const result = await readChunksWhenReady(async () => {
-            const read = await context.runQuery(internal.chat.streaming.persistent.library.getChunksAfter, {
+        // The lock is checked on the first read and whenever a read returns chunks, so an
+        // idle wait reads no thread. A poll that ends empty is checked once more.
+        const readChunks = async (checkLock: boolean) =>
+            await context.runQuery(internal.chat.streaming.persistent.library.getChunksAfter, {
                 afterIndex,
-                checkLock: isFirstRead,
+                checkLock,
                 streamId: streamId as Id<"persistentStreams">,
             });
 
-            isFirstRead = false;
+        let reads = 0;
+        let result = await readChunksWhenReady(async () => {
+            reads += 1;
 
-            return read;
+            return await readChunks(reads === 1);
         }, waitMs);
+
+        if (!result.locked && result.chunks.length === 0 && reads > 1) {
+            result = await readChunks(true);
+        }
 
         if (result.locked) {
             return Response.json({ code: THREAD_LOCKED_CODE, error: "This chat is locked." }, { status: 403 });

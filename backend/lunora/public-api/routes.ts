@@ -205,6 +205,11 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
             signal: input.signal,
         });
 
+        // A thread locked mid-reply is NOT FOUND to an API key; its partial text is dropped.
+        if (collected.status === "thread_locked") {
+            throw new PublicApiError("not_found", "Thread not found.");
+        }
+
         return { data: { messageId: body.messageId, reasoning: collected.reasoning, status: collected.status, text: collected.text, threadId: body.threadId } };
     }
 
