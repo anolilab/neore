@@ -7,15 +7,7 @@ import { DEFAULT_CONTRAST, DEFAULT_DENSITY, DEFAULT_MAIN_FONT, isContrastId, isD
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
-import type {
-    AppearanceSettings,
-    FontSettings,
-    KeyboardShortcuts,
-    LayoutState,
-    SearchState,
-    SidebarStateValue,
-    UserPreferences,
-} from "../stores/ui-state-store";
+import type { AppearanceSettings, KeyboardShortcuts, LayoutState, SearchState, SidebarStateValue, UserPreferences } from "../stores/ui-state-store";
 import { useUIStateStore } from "../stores/ui-state-store";
 
 /**
@@ -25,7 +17,7 @@ import { useUIStateStore } from "../stores/ui-state-store";
  * The doc type is wider in both directions and neither gap is harmless: it
  * carries `_id` / `_creationTime` / `userId`, which the handler derives from the
  * caller's identity and the validator now rejects, and it widens every
- * `textEnum` column to `string` — so `codeFont: "whatever"` typechecked here and
+ * `textEnum` column to `string` — so `sendBehavior: "whatever"` typechecked here and
  * failed at the boundary. Deriving it from `mutateAsync` keeps the two in step
  * by construction.
  */
@@ -43,12 +35,6 @@ type SidebarHookReturn = {
     isOpen: boolean;
     setState: (state: Partial<SidebarStateValue>) => void;
     toggle: () => void;
-};
-
-type FontSettingsHookReturn = FontSettings & {
-    resetFonts: () => void;
-    setCodeFont: (codeFont: FontSettings["codeFont"]) => void;
-    setFonts: (fonts: Partial<FontSettings>) => void;
 };
 
 type AppearanceSettingsHookReturn = AppearanceSettings & {
@@ -100,11 +86,7 @@ type LayoutStateHookReturn = LayoutState & {
 
 type UserPreferencesHookReturn = UserPreferences & {
     resetUserPreferences: () => void;
-    setAnimations: (animations: boolean) => void;
-    setAutoSave: (autoSave: boolean) => void;
-    setDisableExternalLinkWarning: (disableExternalLinkWarning: boolean) => void;
     setHidePersonalInfo: (hidePersonalInfo: boolean) => void;
-    setIsAdvancedUser: (isAdvancedUser: boolean) => void;
     setLastChatId: (lastChatId?: string) => void;
     setOnboardingCompleted: (onboardingCompleted: boolean) => void;
     setSendBehavior: (sendBehavior: UserPreferences["sendBehavior"]) => void;
@@ -136,13 +118,11 @@ export type UIStateHook = {
         closeAllModals: () => void;
         closeModal: (modalName: string) => void;
         openModal: (modalName: string, data?: unknown) => void;
-        resetFonts: () => void;
         resetKeyboardShortcuts: () => void;
         resetLayout: () => void;
         resetSidebarStates: () => void;
         resetUIState: () => void;
         resetUserPreferences: () => void;
-        setFonts: (fonts: Partial<FontSettings>) => void;
         setKeyboardShortcuts: (shortcuts: Partial<KeyboardShortcuts>) => void;
         setLayoutState: (layout: Partial<LayoutState>) => void;
         setModalState: (modalName: string, state: Partial<{ data?: unknown; isOpen: boolean }>) => void;
@@ -151,7 +131,6 @@ export type UIStateHook = {
         setUserPreferences: (preferences: Partial<UserPreferences>) => void;
         toggleSidebar: (sidebarName: string) => void;
     };
-    fonts: FontSettings;
     isLoading: boolean;
     keyboardShortcuts: KeyboardShortcuts;
     layout: LayoutState;
@@ -160,7 +139,6 @@ export type UIStateHook = {
     search: SearchState;
     sidebars: Record<string, SidebarStateValue>;
     uiState?: {
-        fonts: FontSettings;
         keyboardShortcuts: KeyboardShortcuts;
         layout: LayoutState;
         modals: Record<string, { data?: unknown; isOpen: boolean }>;
@@ -173,7 +151,6 @@ export type UIStateHook = {
 /**
  * @deprecated Use specific selectors instead:
  * - useSidebarState(name) for sidebar state
- * - useFontSettings() for font settings
  * - useSearchState() for search state
  * - useModalState() or useModalState(name) for modals
  * - useLayoutState() for layout settings
@@ -191,7 +168,6 @@ export const useUIState = (): UIStateHook => {
             "[PERFORMANCE] useUIState is deprecated and causes excessive re-renders.\n" +
                 "Use specific selectors instead:\n" +
                 "  - useSidebarState(name) for sidebar state\n" +
-                "  - useFontSettings() for font settings\n" +
                 "  - useSearchState() for search state\n" +
                 "  - useModalState() or useModalState(name) for modals\n" +
                 "  - useLayoutState() for layout settings\n" +
@@ -207,13 +183,11 @@ export const useUIState = (): UIStateHook => {
             closeAllModals: store.closeAllModals,
             closeModal: store.closeModal,
             openModal: store.openModal,
-            resetFonts: store.resetFonts,
             resetKeyboardShortcuts: store.resetKeyboardShortcuts,
             resetLayout: store.resetLayout,
             resetSidebarStates: store.resetSidebarStates,
             resetUIState: store.resetUIState,
             resetUserPreferences: store.resetUserPreferences,
-            setFonts: store.setFonts,
             setKeyboardShortcuts: store.setKeyboardShortcuts,
             setLayoutState: store.setLayoutState,
             setModalState: store.setModalState,
@@ -222,7 +196,6 @@ export const useUIState = (): UIStateHook => {
             setUserPreferences: store.setUserPreferences,
             toggleSidebar: store.toggleSidebar,
         },
-        fonts: store.fonts,
         isLoading: false, // Zustand stores are always ready
         keyboardShortcuts: store.keyboardShortcuts,
         layout: store.layout,
@@ -231,7 +204,6 @@ export const useUIState = (): UIStateHook => {
         search: store.search,
         sidebars: store.sidebars,
         uiState: {
-            fonts: store.fonts,
             keyboardShortcuts: store.keyboardShortcuts,
             layout: store.layout,
             modals: store.modals,
@@ -268,20 +240,6 @@ export function useSidebarState(sidebarName?: string): SidebarsHookReturn | Side
         toggleSidebar,
     };
 }
-
-export const useFontSettings = (): FontSettingsHookReturn => {
-    // Use granular selectors to avoid subscribing to entire store
-    const fonts = useUIStateStore((state) => state.fonts);
-    const resetFonts = useUIStateStore((state) => state.resetFonts);
-    const setFonts = useUIStateStore((state) => state.setFonts);
-
-    return {
-        ...fonts,
-        resetFonts,
-        setCodeFont: (codeFont: FontSettings["codeFont"]) => setFonts({ codeFont }),
-        setFonts,
-    };
-};
 
 /**
  * Accent colour / code-highlight / Mermaid theme. The store (localStorage) is
@@ -422,12 +380,8 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
 
         return {
             // Client-side preferences (from UI state)
-            animations: uiPreferences.animations,
-            autoSave: uiPreferences.autoSave,
             // Lunora-backed preferences (from userSettings query, fallback to UI state defaults)
-            disableExternalLinkWarning: userSettings?.disableExternalLinkWarning ?? uiPreferences.disableExternalLinkWarning,
             hidePersonalInfo: userSettings?.hidePersonalInfo ?? uiPreferences.hidePersonalInfo,
-            isAdvancedUser: userSettings?.isAdvancedUser ?? uiPreferences.isAdvancedUser,
             lastChatId: userSettings?.lastChatId ?? uiPreferences.lastChatId,
             onboardingCompleted: userSettings?.onboardingCompleted ?? uiPreferences.onboardingCompleted,
             sendBehavior: isSendBehavior(storedSendBehavior) ? storedSendBehavior : uiPreferences.sendBehavior,
@@ -454,17 +408,9 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
         ...preferences,
         resetUserPreferences,
         // Client-side preferences (only update UI state)
-        setAnimations: (animations: boolean) => setUserPreferencesAction({ animations }),
-        setAutoSave: (autoSave: boolean) => setUserPreferencesAction({ autoSave }),
         // Lunora-based preferences (update both collection and UI state)
-        setDisableExternalLinkWarning: (disableExternalLinkWarning: boolean) => {
-            updateUserSettings({ disableExternalLinkWarning });
-        },
         setHidePersonalInfo: (hidePersonalInfo: boolean) => {
             updateUserSettings({ hidePersonalInfo });
-        },
-        setIsAdvancedUser: (isAdvancedUser: boolean) => {
-            updateUserSettings({ isAdvancedUser });
         },
         setLastChatId: (lastChatId?: string) => {
             updateUserSettings({ lastChatId });
@@ -485,14 +431,6 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
             const clientSide: Partial<UserPreferences> = {};
             const serverBacked: UserSettingsUpdate = {};
 
-            if ("animations" in prefs) {
-                clientSide.animations = prefs.animations;
-            }
-
-            if ("autoSave" in prefs) {
-                clientSide.autoSave = prefs.autoSave;
-            }
-
             if ("showTimestamps" in prefs) {
                 clientSide.showTimestamps = prefs.showTimestamps;
             }
@@ -501,16 +439,8 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
                 clientSide.soundEffects = prefs.soundEffects;
             }
 
-            if ("disableExternalLinkWarning" in prefs) {
-                serverBacked.disableExternalLinkWarning = prefs.disableExternalLinkWarning;
-            }
-
             if ("hidePersonalInfo" in prefs) {
                 serverBacked.hidePersonalInfo = prefs.hidePersonalInfo;
-            }
-
-            if ("isAdvancedUser" in prefs) {
-                serverBacked.isAdvancedUser = prefs.isAdvancedUser;
             }
 
             if ("lastChatId" in prefs) {

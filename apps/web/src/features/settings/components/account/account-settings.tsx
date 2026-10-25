@@ -17,7 +17,7 @@ import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { createLanguageList } from "@/features/chat/core/utils/language-utilities";
 import { DEFAULT_SPEECH_VOICE, SPEECH_VOICES, speechVoiceLabel } from "@/features/chat/voice-mode/tts-availability";
-import { useFontSettings, useLayoutState, useUserPreferences } from "@/features/layout/hooks/use-ui-state";
+import { useLayoutState, useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import NotificationSettings from "@/features/notifications/components/notification-settings";
 import ChatLifecycleControls from "@/features/settings/components/chat/chat-lifecycle-settings";
 
@@ -36,17 +36,9 @@ const getBrowserTimezone = (): string => {
 const AccountSettings: FC = () => {
     const { i18n, t } = useLingui();
     const {
-        animations,
-        autoSave,
-        disableExternalLinkWarning,
         hidePersonalInfo,
-        isAdvancedUser,
         sendBehavior,
-        setAnimations,
-        setAutoSave,
-        setDisableExternalLinkWarning,
         setHidePersonalInfo,
-        setIsAdvancedUser,
         setSendBehavior,
         setShowTimestamps,
         setSoundEffects,
@@ -58,7 +50,6 @@ const AccountSettings: FC = () => {
     const userSettings = userSettingsQuery.data;
     const retentionHours = userSettings?.temporaryChatRetentionHours ?? 24;
     const [retentionInput, setRetentionInput] = useState(retentionHours.toString());
-    const { codeFont, setCodeFont } = useFontSettings();
     const { direction, setDirection } = useLayoutState();
     const updateUserSettings = useUpdateUserSettings();
     const { isAnonymous } = useIsAnonymous();
@@ -153,51 +144,12 @@ const AccountSettings: FC = () => {
                             }}
                         />
                     </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="disable-external-link-warning">
-                                {t`Disable External Link Warning`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm">{t`Skip the warning dialog when clicking external links.`}</p>
-                        </div>
-                        <Switch
-                            checked={disableExternalLinkWarning}
-                            id="disable-external-link-warning"
-                            onCheckedChange={(checked) => {
-                                setDisableExternalLinkWarning(checked);
-                                toast.success(checked ? t`External link warnings disabled` : t`External link warnings enabled`);
-                            }}
-                        />
-                    </div>
                 </CardContent>
             </SettingsCard>
 
             <SettingsCard description={t`Customize the appearance of the application.`} title={t`Appearance`}>
                 <CardContent className="space-y-4">
                     <AppearanceControls />
-                    <div className="space-y-2">
-                        <Label className="text-base font-medium" htmlFor="code-font">
-                            {t`Code Font`}
-                        </Label>
-                        <Select
-                            onValueChange={(value) => {
-                                setCodeFont(value as typeof codeFont);
-                                toast.success(t`Code font updated`);
-                            }}
-                            value={codeFont}
-                        >
-                            <SelectTrigger id="code-font">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="fira-code">{t`Fira Code`}</SelectItem>
-                                <SelectItem value="mono">{t`Mono`}</SelectItem>
-                                <SelectItem value="consolas">{t`Consolas`}</SelectItem>
-                                <SelectItem value="jetbrains">{t`JetBrains Mono`}</SelectItem>
-                                <SelectItem value="source-code-pro">{t`Source Code Pro`}</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
                     <div className="space-y-2">
                         <Label className="text-base font-medium" htmlFor="direction">
                             {t`Text Direction`}
@@ -542,38 +494,6 @@ const AccountSettings: FC = () => {
                 <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="animations">
-                                {t`Animations`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm">{t`Enable animations and transitions in the UI.`}</p>
-                        </div>
-                        <Switch
-                            checked={animations}
-                            id="animations"
-                            onCheckedChange={(checked) => {
-                                setAnimations(checked);
-                                toast.success(checked ? t`Animations enabled` : t`Animations disabled`);
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="auto-save">
-                                {t`Auto Save`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm">{t`Automatically save your work.`}</p>
-                        </div>
-                        <Switch
-                            checked={autoSave}
-                            id="auto-save"
-                            onCheckedChange={(checked) => {
-                                setAutoSave(checked);
-                                toast.success(checked ? t`Auto save enabled` : t`Auto save disabled`);
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
                             <Label className="text-base font-medium" htmlFor="show-timestamps">
                                 {t`Show Timestamps`}
                             </Label>
@@ -608,27 +528,6 @@ const AccountSettings: FC = () => {
             </SettingsCard>
 
             {!isAnonymous && <NotificationSettings />}
-
-            <SettingsCard description={t`Advanced options for power users.`} title={t`Advanced`}>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="advanced-user">
-                                {t`Advanced User Mode`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm">{t`Enable advanced features and options.`}</p>
-                        </div>
-                        <Switch
-                            checked={isAdvancedUser}
-                            id="advanced-user"
-                            onCheckedChange={(checked) => {
-                                setIsAdvancedUser(checked);
-                                toast.success(checked ? t`Advanced user mode enabled` : t`Advanced user mode disabled`);
-                            }}
-                        />
-                    </div>
-                </CardContent>
-            </SettingsCard>
         </div>
     );
 };
