@@ -369,6 +369,106 @@ describe("webhook payload filters", () => {
     });
 });
 
+describe("webhook provider presets", () => {
+    const as = () => harness.withIdentity({ userId: "user-a" } as never);
+    const webhook = { model: "m", name: "Hook", type: "webhook" };
+    const schedule = { cronExpression: "0 9 * * 1", model: "m", name: "Daily", type: "schedule" };
+
+    it("stores the event's filters and the provider's scheme", async () => {
+        const { triggerId } = (await as().mutation(
+            createTrigger as never,
+            {
+                ...webhook,
+                webhookPreset: { event: "pull_request_merged", provider: "github" },
+            } as never,
+        )) as { triggerId: string };
+        const row = await readTrigger(triggerId);
+
+        expect(row.webhookSignatureScheme).toBe("native");
+        expect(row.filters).toEqual([
+            { op: "equals", path: "action", value: "closed" },
+            { op: "equals", path: "pull_request.merged", value: "true" },
+        ]);
+    });
+
+    it("stores the GitLab scheme for a GitLab preset", async () => {
+        const { triggerId } = (await as().mutation(
+            createTrigger as never,
+            {
+                ...webhook,
+                webhookPreset: { event: "merge_request_opened", provider: "gitlab" },
+            } as never,
+        )) as { triggerId: string };
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.webhookSignatureScheme).toBe("gitlab-token");
+    });
+
+    it("refuses an event that belongs to another provider", async () => {
+        await expect(
+            as().mutation(createTrigger as never, { ...webhook, webhookPreset: { event: "merge_request_merged", provider: "github" } } as never),
+        ).rejects.toThrow("not one of the provider's events");
+    });
+
+    it("refuses a preset together with filters", async () => {
+        await expect(
+            as().mutation(
+                createTrigger as never,
+                {
+                    ...webhook,
+                    filters: [{ op: "exists", path: "a" }],
+                    webhookPreset: { event: "pull_request_opened", provider: "github" },
+                } as never,
+            ),
+        ).rejects.toThrow("sets its own filters");
+    });
+
+    it("refuses an explicit scheme that is not the provider's", async () => {
+        await expect(
+            as().mutation(
+                createTrigger as never,
+                {
+                    ...webhook,
+                    webhookPreset: { event: "pull_request_opened", provider: "github" },
+                    webhookSignatureScheme: "gitlab-token",
+                } as never,
+            ),
+        ).rejects.toThrow("does not match the provider");
+    });
+
+    it("accepts an explicit scheme that is the provider's", async () => {
+        const { triggerId } = (await as().mutation(
+            createTrigger as never,
+            {
+                ...webhook,
+                webhookPreset: { event: "pull_request_opened", provider: "github" },
+                webhookSignatureScheme: "native",
+            } as never,
+        )) as { triggerId: string };
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.webhookSignatureScheme).toBe("native");
+    });
+
+    it("keeps a preset to webhook triggers", async () => {
+        await expect(
+            as().mutation(createTrigger as never, { ...schedule, webhookPreset: { event: "pull_request_opened", provider: "github" } } as never),
+        ).rejects.toThrow("Only a webhook trigger has a provider preset");
+    });
+
+    it("lets a hand-written trigger use the Linear and GitLab token schemes", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { ...webhook, webhookSignatureScheme: "linear" } as never)) as {
+            triggerId: string;
+        };
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.webhookSignatureScheme).toBe("linear");
+    });
+});
+
 describe("getTriggerExecutions", () => {
     const as = () => harness.withIdentity({ userId: "user-a" } as never);
 

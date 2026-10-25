@@ -2751,8 +2751,8 @@ export const schema = defineSchema({
         userId: v.string(),
         webhookSecret: v.optional(v.string()),
         // How a webhook delivery is signed; unset = "timestamped" (`triggers/http.ts`).
-        // A trigger accepts only its own scheme's headers.
-        webhookSignatureScheme: v.optional(v.union(v.literal("timestamped"), v.literal("native"))),
+        // A trigger accepts only its own scheme's headers. Widening this union is additive.
+        webhookSignatureScheme: v.optional(v.union(v.literal("timestamped"), v.literal("native"), v.literal("gitlab-token"), v.literal("linear"))),
     })
         .shardBy("userId")
         .index("by_userId_organizationId", ["userId", "organizationId"])

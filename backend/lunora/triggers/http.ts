@@ -32,20 +32,49 @@ import type { HttpActionCtx } from "lunorash/server";
  * accepted again. Nothing outside the signed bytes (a delivery-id header, say) is
  * ever trusted: it is not covered by the signature, so a claim keyed on it would
  * let anyone replay a captured body under a fresh id.
+ *
+ * Two more senders, each with its own scheme (`triggers/presets.ts`):
+ *   linear:       Linear-Signature: <hex HMAC-SHA256(secret, "<raw body>")>, bare
+ *                 hex with no prefix. The body carries `webhookTimestamp` (ms),
+ *                 which is inside the signed bytes, so it is checked after the HMAC
+ *                 against the same window as the timestamped scheme. Nothing else
+ *                 is needed for replay; the claim keyed on the signature still applies.
+ *   gitlab-token: X-Gitlab-Token: <secret>, sent as plain text. GitLab does not sign
+ *                 the body and sends no timestamp, so this is a BEARER TOKEN with no
+ *                 replay defence of its own. The claim is keyed on the SHA-256 of the
+ *                 body instead of the token, which is the same on every delivery: a
+ *                 token keyed claim would swallow every delivery after the first.
+ *                 Identical bodies within `TRIGGER_CLAIM_TTL_MS` are answered as
+ *                 duplicates; a body replayed after that window is accepted again,
+ *                 and anyone who holds the token can forge any body anyway.
+ *
+ * A missing or empty secret is refused for every scheme (fail closed).
  */
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { TRIGGER_CLAIM_TTL_MS } from "../lib/claim-once";
-import { hmacSha256Hex, isWithinWindow, SIGNED_REQUEST_WINDOW_MS, timingSafeEqual } from "../lib/crypto";
+import { hmacSha256Hex, isWithinWindow, SIGNED_REQUEST_WINDOW_MS, sha256Hex, timingSafeEqual } from "../lib/crypto";
 import { decryptKey } from "../lib/encryption";
 import { httpScheduler } from "../lib/http-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { evaluateFilters } from "./filters";
+import type { WebhookSignatureScheme } from "./presets";
 
 const DIGITS_ONLY = /^\d{1,12}$/u;
 
 /** `X-Hub-Signature-256` is always `sha256=<64 hex>`; anything else is refused before any HMAC work. */
 const NATIVE_SIGNATURE = /^sha256=[\da-f]{64}$/iu;
+
+/** `Linear-Signature` is bare hex: 64 characters, no prefix. */
+const LINEAR_SIGNATURE = /^[\da-f]{64}$/iu;
+
+/** The headers each scheme owns. A trigger refuses a request carrying any header of a scheme it does not use. */
+const SCHEME_HEADERS: Record<WebhookSignatureScheme, ReadonlyArray<string>> = {
+    "gitlab-token": ["x-gitlab-token"],
+    linear: ["linear-signature"],
+    native: ["x-hub-signature-256"],
+    timestamped: ["x-signature-256", "x-neore-timestamp"],
+};
 
 /**
  * The trigger fields this handler reads.
@@ -157,10 +186,10 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 
         const body = new TextDecoder().decode(rawBody);
 
-        // 3. Verify the HMAC-SHA256 signature. A trigger without a secret
-        //    (legacy rows) is refused: unsigned delivery is no delivery.
+        // 3. Verify the delivery against the trigger's scheme. A trigger without a
+        //    secret (legacy rows) is refused: unsigned delivery is no delivery.
         const encryptedSecret = trigger.webhookSecret;
-        const delivery = readSignedDelivery(request.headers, rawBody, trigger.webhookSignatureScheme ?? "timestamped");
+        const delivery = readDelivery(request.headers, rawBody, trigger.webhookSignatureScheme ?? "timestamped");
 
         if (!encryptedSecret || "error" in delivery) {
             return Response.json(
@@ -169,13 +198,16 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
             );
         }
 
-        const { presented, signedPayload } = delivery;
-
         // Decrypt the stored secret (supports both encrypted v1: and legacy plaintext)
         const plaintextSecret = encryptedSecret.startsWith("v1:") ? await decryptKey(encryptedSecret, "tool-keys") : encryptedSecret;
 
-        if (!(await verifyHmacSignature(plaintextSecret, signedPayload, presented))) {
+        if (!(await verifyDelivery(delivery, plaintextSecret))) {
             return Response.json({ error: "Invalid signature" }, { headers: { "Content-Type": "application/json" }, status: 401 });
+        }
+
+        // Linear's timestamp is inside the signed bytes, so it is trusted only now.
+        if (delivery.scheme === "linear" && !linearTimestampIsFresh(rawBody)) {
+            return Response.json({ error: "Stale or future timestamp" }, { headers: { "Content-Type": "application/json" }, status: 401 });
         }
 
         // Capped per trigger only once the sender is proven. Charged before the
@@ -189,7 +221,9 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 
         // A valid signature seen before is a replay: answer 200 (the sender did
         // deliver it once) and run nothing.
-        const claim = { key: `${triggerId}:${normalizeSignature(presented)}`, scope: "trigger-webhook" };
+        // A bearer token is the same on every delivery, so its claim is keyed on the body.
+        const claimDigest = delivery.scheme === "gitlab-token" ? `body:${await sha256Hex(rawBody)}` : normalizeSignature(delivery.presented);
+        const claim = { key: `${triggerId}:${claimDigest}`, scope: "trigger-webhook" };
         const firstDelivery = await context.runMutation(internal.lib.claim_once.claimKey, { ...claim, ttlMs: TRIGGER_CLAIM_TTL_MS, userId: trigger.userId });
 
         if (!firstDelivery) {
@@ -278,28 +312,50 @@ const decodeStrict = (bytes: Uint8Array): string => {
     }
 };
 
-type SignedDelivery = { presented: string; signedPayload: Uint8Array } | { error: string };
+/**
+ * What a delivery presented, read from the headers of the trigger's scheme.
+ * `signed` schemes verify an HMAC over `signedPayload`; `gitlab-token` compares
+ * a plain secret and signs nothing.
+ */
+type Delivery = { presented: string; scheme: "gitlab-token" } | { presented: string; scheme: "linear" | "native" | "timestamped"; signedPayload: Uint8Array };
+
+/** Whether a header of a scheme OTHER than `scheme` is on the request. */
+const carriesForeignHeader = (headers: Headers, scheme: WebhookSignatureScheme): boolean =>
+    (Object.keys(SCHEME_HEADERS) as WebhookSignatureScheme[]).some((other) => other !== scheme && SCHEME_HEADERS[other].some((name) => headers.has(name)));
 
 /**
- * Read the signature the trigger's configured scheme expects, and say what was
- * signed. A request carrying the OTHER scheme's headers is refused outright, so
- * one scheme's signature is never tried as the other's. The timestamp is checked
- * here; the HMAC itself by the caller.
+ * Read what the trigger's scheme expects, and say what was signed. A request
+ * carrying another scheme's headers is refused outright, so one scheme's
+ * credential is never tried as another's. The timestamp of `timestamped` is
+ * checked here; every HMAC and token comparison is left to `verifyDelivery`.
  */
-const readSignedDelivery = (headers: Headers, body: Uint8Array, scheme: "native" | "timestamped"): SignedDelivery => {
-    const signature = headers.get("x-signature-256");
-    const timestamp = headers.get("x-neore-timestamp");
-    const native = headers.get("x-hub-signature-256");
-
-    if (scheme === "native") {
-        if (signature !== null || timestamp !== null || !native || !NATIVE_SIGNATURE.test(native)) {
-            return { error: MISSING_SIGNATURE };
-        }
-
-        return { presented: native, signedPayload: body };
+const readDelivery = (headers: Headers, body: Uint8Array, scheme: WebhookSignatureScheme): Delivery | { error: string } => {
+    if (carriesForeignHeader(headers, scheme)) {
+        return { error: MISSING_SIGNATURE };
     }
 
-    if (native !== null || !signature || !timestamp || !DIGITS_ONLY.test(timestamp)) {
+    if (scheme === "gitlab-token") {
+        const token = headers.get("x-gitlab-token");
+
+        return token ? { presented: token, scheme } : { error: MISSING_SIGNATURE };
+    }
+
+    if (scheme === "linear") {
+        const signature = headers.get("linear-signature");
+
+        return signature && LINEAR_SIGNATURE.test(signature) ? { presented: signature, scheme, signedPayload: body } : { error: MISSING_SIGNATURE };
+    }
+
+    if (scheme === "native") {
+        const native = headers.get("x-hub-signature-256");
+
+        return native && NATIVE_SIGNATURE.test(native) ? { presented: native, scheme, signedPayload: body } : { error: MISSING_SIGNATURE };
+    }
+
+    const signature = headers.get("x-signature-256");
+    const timestamp = headers.get("x-neore-timestamp");
+
+    if (!signature || !timestamp || !DIGITS_ONLY.test(timestamp)) {
         return { error: MISSING_SIGNATURE };
     }
 
@@ -313,7 +369,36 @@ const readSignedDelivery = (headers: Headers, body: Uint8Array, scheme: "native"
     signedPayload.set(prefix);
     signedPayload.set(body, prefix.byteLength);
 
-    return { presented: signature, signedPayload };
+    return { presented: signature, scheme, signedPayload };
+};
+
+/**
+ * Whether the delivery proves knowledge of `secret`. The token is compared in
+ * constant time; an HMAC is recomputed over the signed bytes. The Linear
+ * timestamp is NOT checked here: it is read from the body, so it is trusted only
+ * once this has passed.
+ */
+const verifyDelivery = async (delivery: Delivery, secret: string): Promise<boolean> => {
+    if (delivery.scheme === "gitlab-token") {
+        return timingSafeEqual(delivery.presented, secret);
+    }
+
+    return await verifyHmacSignature(secret, delivery.signedPayload, delivery.presented);
+};
+
+/** Linear's `webhookTimestamp` (ms) is a number inside the window. Called only after the HMAC has passed. */
+const linearTimestampIsFresh = (body: Uint8Array): boolean => {
+    let parsed: unknown;
+
+    try {
+        parsed = JSON.parse(decodeStrict(body));
+    } catch {
+        return false;
+    }
+
+    const timestamp = typeof parsed === "object" && parsed !== null ? (parsed as { webhookTimestamp?: unknown }).webhookTimestamp : undefined;
+
+    return typeof timestamp === "number" && isWithinWindow(timestamp, SIGNED_REQUEST_WINDOW_MS);
 };
 
 /** `sha256=<hex>` or bare hex, lower-cased — also the dedupe key. */

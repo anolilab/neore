@@ -19765,37 +19765,37 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 83,
+      "line": 112,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 193,
+      "line": 227,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 213,
+      "line": 247,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 218,
+      "line": 252,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 223,
+      "line": 257,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 245,
+      "line": 279,
       "reason": "the default export is not a registered function"
     },
     {
