@@ -56,6 +56,7 @@ import ComposerPromptQueue from "./composer-prompt-queue";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import useComposerAutocomplete from "./composer-tiptap/use-composer-autocomplete";
 import { readChatMessages } from "./read-chat-messages";
+import ReplyCompleteAnnouncement from "./reply-complete-announcement";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
 import { PromptHistorySource, usePromptHistory } from "./use-prompt-history";
 
@@ -1109,6 +1110,7 @@ const ComposerInput = ({
             {isThreadComposer && <ComposerPromptQueue />}
             {isThreadComposer && <AutoReadReplies />}
             {isThreadComposer && <CompletionSound />}
+            {isThreadComposer && <ReplyCompleteAnnouncement />}
 
             <ComposerInputArea
                 afterTextarea={
