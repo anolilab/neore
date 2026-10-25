@@ -73,7 +73,8 @@ export const executeTrigger = internalAction
 
             if (refusal !== null && typeof refusal === "object") {
                 // Recorded as filtered and not charged; the running row was replaced.
-                console.info(`[Triggers] Trigger ${trigger.name} delivery no longer matches its filters (${refusal.filtered}), skipping`);
+                // The reason quotes the configured filter value (an address, a token), so it stays in the owner's execution history, not the log.
+                console.info(`[Triggers] Trigger ${triggerId} delivery no longer matches its filters, skipping`);
 
                 return;
             }
