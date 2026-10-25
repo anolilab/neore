@@ -4,7 +4,7 @@ import { HotkeysProvider, useHotkeys } from "react-hotkeys-hook";
 import { useKeyboardShortcuts as useUIKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
-import convertShortcutToHotkeysHook from "../lib/shortcut-converter";
+import convertShortcutToHotkeysHook, { convertRecordedShortcutToHotkeysHook } from "../lib/shortcut-converter";
 import { hasThreadSearchTarget } from "../lib/thread-search-target";
 
 // Context for keyboard shortcuts
@@ -52,12 +52,12 @@ const KeyboardShortcutsHandler: React.FC<{
         return {
             audioRecord: convertShortcutToHotkeysHook(shortcuts.audioRecord),
             copyLastCodeBlock: convertShortcutToHotkeysHook(shortcuts.copyLastCodeBlock),
-            decreaseEffort: convertShortcutToHotkeysHook(shortcuts.decreaseEffort),
+            decreaseEffort: convertRecordedShortcutToHotkeysHook(shortcuts.decreaseEffort),
             escape: convertShortcutToHotkeysHook(shortcuts.escape),
             firstItem: convertShortcutToHotkeysHook(shortcuts.firstItem),
             focusSearch: convertShortcutToHotkeysHook(shortcuts.focusSearch),
             help: convertShortcutToHotkeysHook(shortcuts.help),
-            increaseEffort: convertShortcutToHotkeysHook(shortcuts.increaseEffort),
+            increaseEffort: convertRecordedShortcutToHotkeysHook(shortcuts.increaseEffort),
             lastItem: convertShortcutToHotkeysHook(shortcuts.lastItem),
             newChat: convertShortcutToHotkeysHook(shortcuts.newChat),
             newTemporaryChat: convertShortcutToHotkeysHook(shortcuts.newTemporaryChat),

@@ -10,8 +10,8 @@ import useCurrentModel from "@/features/chat/core/hooks/use-current-model";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { EFFORT_LABEL_MESSAGES } from "@/features/chat/model-settings/reasoning-effort-selector";
 import type { EffortDirection } from "@/features/chat/model-settings/reasoning-effort-steps";
-import { stepReasoningEffort } from "@/features/chat/model-settings/reasoning-effort-steps";
-import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+import { stepReasoningEffort, supportsReasoningEffort } from "@/features/chat/model-settings/reasoning-effort-steps";
+import { useGatewayModels } from "@/hooks/use-gateway-models";
 
 /** The events the `increaseEffort` / `decreaseEffort` shortcuts dispatch (`use-keyboard-shortcut-handler.ts`). */
 const EFFORT_EVENTS: Record<EffortDirection, string> = {
@@ -22,7 +22,8 @@ const EFFORT_EVENTS: Record<EffortDirection, string> = {
 /**
  * Steps the composer's reasoning effort one stop per shortcut press, clamped at both ends. The
  * value lands in the pending settings, which the next send carries (like every other composer
- * setting). A model without reasoning is left alone. Renders nothing.
+ * setting). A model without reasoning is left alone. The store drops the value when the thread
+ * changes (`loadThreadData`). Renders nothing.
  *
  * Mounted once per thread view (`thread.tsx`), not inside `Composer`: the landing page mounts
  * several composers, and each listener would step the value again.
@@ -31,8 +32,11 @@ const ComposerEffortShortcuts: FC = () => {
     const { i18n, t } = useLingui();
     const { thread } = useChatThread();
     const model = useCurrentModel();
-    const models = useFeatureFlaggedModels();
-    const supportsReasoning = models.find((candidate) => candidate.id === (model as string))?.filterCapabilities?.includes("reasoning") ?? false;
+    // The whole catalog, not the picker's filtered list: a thread keeps its model after a flag or a filter hides it.
+    const models = useGatewayModels();
+    const comparisonModels = useModelStore((state) => (state.comparisonMode ? state.selectedModelsForComparison : undefined));
+    // In a comparison the value goes to each child that reasons, so one is enough.
+    const supportsReasoning = (comparisonModels?.length ? comparisonModels : [model as string]).some((id) => supportsReasoningEffort(models, id));
     const threadEffortRef = useRef(thread?.reasoningEffort);
 
     useEffect(() => {

@@ -46,15 +46,20 @@ const { models, thread } = vi.hoisted(() => {
 });
 
 vi.mock("@/features/chat/core/context/chat-context", () => {
-    return { useChatThread: () => {return { thread: thread.current }} };
+    return {
+        useChatThread: () => {
+            return { thread: thread.current };
+        },
+    };
 });
 
 vi.mock("@/features/chat/core/hooks/use-current-model", () => {
     return { default: () => "reasoner" };
 });
 
-vi.mock("@/hooks/use-feature-flagged-models", () => {
-    return { default: () => models.current };
+// The shortcut reads the whole catalog: the picker's flag-filtered list would hide a thread's retained model.
+vi.mock("@/hooks/use-gateway-models", () => {
+    return { useGatewayModels: () => models.current };
 });
 
 const press = (name: "decreaseEffort" | "increaseEffort") => {
@@ -129,6 +134,30 @@ describe("composer effort shortcuts", () => {
 
         expect(pendingEffort()).toBeUndefined();
         expect(toast.info).toHaveBeenCalledWith("This model has no reasoning effort");
+    });
+
+    it("steps a reasoning model that the model picker no longer lists", () => {
+        // `useGatewayModels` is the catalog; the flag-filtered picker list is not consulted at all.
+        render(<ComposerEffortShortcuts />);
+
+        press("increaseEffort");
+
+        expect(pendingEffort()).toBe(75);
+    });
+
+    it("steps in a comparison when any compared model reasons", () => {
+        models.current = [
+            { filterCapabilities: [], id: "reasoner" },
+            { filterCapabilities: ["reasoning"], id: "other" },
+        ];
+        useModelStore.getState().setSelectedModelsForComparison(["reasoner", "other"]);
+        useModelStore.setState({ comparisonMode: true });
+        render(<ComposerEffortShortcuts />);
+
+        press("increaseEffort");
+
+        expect(pendingEffort()).toBe(75);
+        useModelStore.setState({ comparisonMode: false, selectedModelsForComparison: [] });
     });
 
     it("stops listening when it unmounts", () => {

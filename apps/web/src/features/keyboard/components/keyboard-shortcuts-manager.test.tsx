@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { KeyboardShortcutsManager, useKeyboardShortcuts } from "./keyboard-shortcuts-manager";
 
@@ -192,5 +192,41 @@ describe("KeyboardShortcutsManager", () => {
 
         expect(onShortcut).not.toHaveBeenCalledWith("increaseEffort", expect.anything());
         expect(onShortcut).not.toHaveBeenCalledWith("decreaseEffort", expect.anything());
+    });
+
+    describe("a recorded Control chord for the effort commands", () => {
+        const pressChord = (modifier: "ctrlKey" | "metaKey") => {
+            const onShortcut = vi.fn();
+
+            const { unmount } = render(
+                <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ increaseEffort: "ctrl+arrowup" }}>
+                    <textarea aria-label="composer" />
+                </KeyboardShortcutsManager>,
+            );
+
+            fireEvent.keyDown(screen.getByLabelText("composer"), { code: "ArrowUp", key: "ArrowUp", [modifier]: true });
+            unmount();
+
+            return onShortcut;
+        };
+
+        afterEach(() => {
+            vi.restoreAllMocks();
+        });
+
+        it("fires on Command and on Control on a Mac", () => {
+            vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+
+            expect(pressChord("metaKey")).toHaveBeenCalledWith("increaseEffort", expect.anything());
+            expect(pressChord("ctrlKey")).toHaveBeenCalledWith("increaseEffort", expect.anything());
+        });
+
+        it("fires on Control, not on Command, elsewhere", () => {
+            vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+            vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Windows NT 10.0)");
+
+            expect(pressChord("ctrlKey")).toHaveBeenCalledWith("increaseEffort", expect.anything());
+            expect(pressChord("metaKey")).not.toHaveBeenCalled();
+        });
     });
 });

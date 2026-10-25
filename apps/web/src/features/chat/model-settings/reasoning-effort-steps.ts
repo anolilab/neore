@@ -8,7 +8,10 @@ export const EFFORT_STEP = 25;
 /** What the selector shows for a chat that has no effort set. */
 export const EFFORT_DEFAULT = 50;
 
-export const EFFORT_STOPS: ReadonlyArray<number> = Array.from({ length: (EFFORT_MAX - EFFORT_MIN) / EFFORT_STEP + 1 }, (_, index) => EFFORT_MIN + index * EFFORT_STEP);
+export const EFFORT_STOPS: ReadonlyArray<number> = Array.from(
+    { length: (EFFORT_MAX - EFFORT_MIN) / EFFORT_STEP + 1 },
+    (_, index) => EFFORT_MIN + index * EFFORT_STEP,
+);
 
 export type EffortDirection = "decrease" | "increase";
 
@@ -25,3 +28,9 @@ export const stepReasoningEffort = (current: number | undefined, direction: Effo
 
     return EFFORT_STOPS.findLast((stop) => stop < value) ?? EFFORT_MIN;
 };
+
+/** The model catalog entry's capability test; the selector's own (`reasoning-effort-selector.tsx`). */
+export const supportsReasoningEffort = (
+    models: ReadonlyArray<{ filterCapabilities?: ReadonlyArray<string>; id: string }>,
+    modelId: string | undefined,
+): boolean => models.find((candidate) => candidate.id === modelId)?.filterCapabilities?.includes("reasoning") ?? false;
