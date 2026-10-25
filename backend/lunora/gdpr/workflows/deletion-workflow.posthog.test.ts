@@ -10,6 +10,7 @@ import { accountDeletionWorkflowConfig } from "./deletion-workflow";
 interface Call {
     args: Record<string, unknown>;
     name: string;
+    options?: Record<string, unknown>;
 }
 
 /** Runs the real handler against a context whose steps record calls; the PostHog step returns `postHog`, or throws it when it is an Error. */
@@ -18,17 +19,19 @@ const runWorkflow = async (
     minimiseFails = false,
     auditFails = false,
     statusFails = false,
-    scheduleFails = false,
+    scheduleFails: boolean | number = false,
 ) => {
     const calls: Call[] = [];
+    const stepRetries: string[] = [];
+    let scheduleFailuresLeft = scheduleFails === true ? Infinity : Number(scheduleFails);
     let current = "";
     // The stored request, as `updateRequestProgress` and `minimiseGdprRecords` would leave it.
     const request: { errorMessage?: string | null; status: string; userEmail: string } = { status: "processing", userEmail: "a@example.com" };
 
-    const run = async (reference: unknown, args: Record<string, unknown> = {}) => {
+    const run = async (reference: unknown, args: Record<string, unknown> = {}, options?: Record<string, unknown>) => {
         const name = `${current}|${String((reference as { name?: string }).name ?? "")}`;
 
-        calls.push({ args, name });
+        calls.push({ args, name, options });
 
         // The first `failed` write happens before minimisation, while the email is still stored.
         if (statusFails && args.status === "failed" && request.userEmail !== "") {
@@ -40,7 +43,8 @@ const runWorkflow = async (
             request.errorMessage = (args.errorMessage as string | undefined) ?? request.errorMessage;
         }
 
-        if (scheduleFails && current === "schedule-post-hog-retry") {
+        if (scheduleFailuresLeft > 0 && current === "schedule-post-hog-retry") {
+            scheduleFailuresLeft -= 1;
             throw new Error("scheduling failed");
         }
 
@@ -71,12 +75,26 @@ const runWorkflow = async (
         params: { requestId: "req-1", userEmail: "a@example.com", userId: "user-1" },
         run,
         step: {
-            do: async (name: string, callback: () => Promise<unknown>) => {
+            do: async (name: string, configOrCallback: unknown, maybeCallback?: () => Promise<unknown>) => {
+                const config = typeof configOrCallback === "function" ? undefined : (configOrCallback as { retries?: { limit: number } });
+                const callback = (maybeCallback ?? configOrCallback) as () => Promise<unknown>;
+
                 current = name;
                 calls.push({ args: {}, name: `step:${name}` });
 
                 try {
-                    return await callback();
+                    // Like the platform: a failing callback runs again, up to `retries.limit` more times.
+                    for (let tries = 0; ; tries += 1) {
+                        try {
+                            return await callback();
+                        } catch (error) {
+                            if (tries >= (config?.retries?.limit ?? 0)) {
+                                throw error;
+                            }
+
+                            stepRetries.push(name);
+                        }
+                    }
                 } finally {
                     current = "";
                 }
@@ -94,7 +112,7 @@ const runWorkflow = async (
         }
     })();
 
-    return { calls, outcome, request };
+    return { calls, outcome, request, stepRetries };
 };
 
 const stepNames = (calls: Call[]) => calls.filter((call) => call.name.startsWith("step:")).map((call) => call.name.slice("step:".length));
@@ -207,6 +225,24 @@ describe("account deletion workflow, PostHog step", () => {
         expect(stepNames(calls)).toContain("minimise-gdpr-records-posthog-failed");
         expect(request.userEmail).toBe("");
         expect(request.status).toBe("failed");
+    });
+
+    it("retries the scheduling step, so a transient scheduling failure still queues the analytics retry", async () => {
+        const failure = new Error("[GDPR/PostHog] Failed to delete person user-1: 503 Service Unavailable");
+        const { calls, outcome, stepRetries } = await runWorkflow(failure, false, false, false, 3);
+        const scheduled = calls.filter((call) => call.name.startsWith("schedule-post-hog-retry|"));
+
+        expect(outcome).toBe(failure);
+        expect(stepRetries).toStrictEqual(["schedule-post-hog-retry", "schedule-post-hog-retry", "schedule-post-hog-retry"]);
+        expect(scheduled).toHaveLength(4);
+    });
+
+    it("gives the scheduling step a retry budget and a dedup id so a retried attempt queues one job", async () => {
+        const { calls, stepRetries } = await runWorkflow(new Error("503"), false, false, false, true);
+
+        // 1 attempt + 7 retries, all spent before the failure is logged.
+        expect(stepRetries).toHaveLength(7);
+        expect(calls.find((call) => call.name.startsWith("schedule-post-hog-retry|"))?.options?.dedupId).toBe("post-hog-retry:req-1");
     });
 
     it("schedules no retry when the PostHog step succeeds", async () => {

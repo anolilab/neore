@@ -34,6 +34,9 @@ export interface DeletionParams {
 /** Upper bound on batches per drained step — a guard against a row that never stops matching. */
 const MAX_DRAIN_ROUNDS = 10_000;
 
+/** Scheduling the analytics retry is the only thing that finishes a failed erasure, so it gets a longer budget than a default step (30 s doubling, about an hour in total). */
+const SCHEDULE_RETRY_STEP_CONFIG = { retries: { backoff: "exponential", delay: "30 seconds", limit: 7 } } as const;
+
 export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void> = {
     handler: async (workflowContext): Promise<void> => {
         // Every step works on this user's rows, which live on their shard.
@@ -392,12 +395,20 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             }
 
             // Only the analytics erasure is retried, from the scheduler (`gdpr/posthog-retry.ts`): the
-            // user can no longer sign in to ask again, and nothing else is left to do. The retry state
-            // is its own scheduler job, so a scheduling failure is logged, never allowed to mask `error`.
+            // user can no longer sign in to ask again, and nothing else is left to do. The step gets
+            // a long retry budget of its own, and `dedupId` keeps a retried attempt from queueing a
+            // second job. If even that is exhausted the error is logged at error level, never allowed
+            // to mask `error`; a re-run of this instance schedules it again.
             try {
                 await context.step.do(
                     "schedule-post-hog-retry",
-                    async () => await context.run(internal.gdpr.posthog_retry.schedulePostHogRetry, { requestId: args.requestId, userId: args.userId }),
+                    SCHEDULE_RETRY_STEP_CONFIG,
+                    async () =>
+                        await context.run(
+                            internal.gdpr.posthog_retry.schedulePostHogRetry,
+                            { requestId: args.requestId, userId: args.userId },
+                            { dedupId: `post-hog-retry:${args.requestId}` },
+                        ),
                 );
             } catch (scheduleError) {
                 gdprLogger.error(`Analytics erasure retry for request ${args.requestId} could not be scheduled`, scheduleError);

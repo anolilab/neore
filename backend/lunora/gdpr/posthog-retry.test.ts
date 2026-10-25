@@ -9,7 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { POSTHOG_RETRY_DELAYS_MS, POSTHOG_RETRY_MAX_ATTEMPTS } from "./constants";
-import { retryPostHogErasure, schedulePostHogRetry } from "./posthog-retry";
+import { retryPostHogErasure, schedulePostHogRetry, startPostHogRetry } from "./posthog-retry";
 import { erasePostHogPerson } from "./steps/posthog-steps";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -48,6 +48,11 @@ const actions = async () => {
     return rows.map((row) => row.action).toSorted((a, b) => a.localeCompare(b));
 };
 const request = async () => (await run(async (ctx) => await ctx.db.get(requestId))) as { errorMessage?: string; status: string; userEmail: string };
+const statusOf = async () => {
+    const row = await request();
+
+    return row.status;
+};
 const attempt = async (n: number) =>
     await harness.action((async (ctx: any) => await ctx.runAction(retryPostHogErasure, { attempt: n, requestId, userId: USER })) as never);
 
@@ -197,5 +202,95 @@ describe("a retry attempt", () => {
         await attempt(2);
 
         expect(deleteAuthRecordsSpy).not.toHaveBeenCalled();
+    });
+});
+
+describe("minimising the failed request", () => {
+    it("every failed attempt minimises, so an address a failed workflow minimisation left behind goes", async () => {
+        await run(async (ctx) => await ctx.db.patch(requestId, { userEmail: "a@example.com" }));
+        vi.mocked(erasePostHogPerson).mockRejectedValue(new Error("down"));
+
+        await attempt(1);
+
+        const row = await request();
+
+        expect(row.userEmail).toBe("");
+        expect(row.status).toBe("failed");
+        // Minimisation clears the free-text reason; the fixed one is put back.
+        expect(row.errorMessage).toBe(FAILED_MESSAGE);
+        expect(jobs()).toHaveLength(1);
+    });
+});
+
+describe("a redelivered attempt", () => {
+    const claim = async (n: number) => await run(async (ctx) => await ctx.runMutation(startPostHogRetry, { attempt: n, requestId, userId: USER }));
+
+    it("finishes a request its own interrupted attempt left processing", async () => {
+        expect(await claim(1)).toBe(true);
+        expect(await statusOf()).toBe("processing");
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+
+        await attempt(1);
+
+        expect(erasePostHogPerson).toHaveBeenCalledTimes(1);
+        expect(await statusOf()).toBe("completed");
+        expect(await actions()).toStrictEqual(["deletion_completed", "deletion_retry_resumed", "deletion_retry_started", "deletion_retry_succeeded"]);
+    });
+
+    it("keeps the schedule going when the resumed attempt fails", async () => {
+        await claim(1);
+        vi.mocked(erasePostHogPerson).mockRejectedValue(new Error("down"));
+
+        await attempt(1);
+
+        expect(await statusOf()).toBe("failed");
+        expect(jobs()).toHaveLength(1);
+        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, requestId, userId: USER });
+    });
+
+    it("leaves a processing request alone when no attempt of this number claimed it", async () => {
+        // What a re-run workflow leaves: processing, with no retry row.
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+
+        await attempt(1);
+
+        // Attempt 1's claim does not entitle attempt 2.
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await claim(1);
+        await attempt(2);
+
+        expect(erasePostHogPerson).not.toHaveBeenCalled();
+        expect(await statusOf()).toBe("processing");
+    });
+});
+
+describe("a request that finished meanwhile", () => {
+    it("is not turned back into failed, and no further attempt is queued, when the erasure errors late", async () => {
+        vi.mocked(erasePostHogPerson).mockImplementation(async () => {
+            // A concurrent workflow re-run completes the request while this attempt is in flight.
+            await run(async (ctx) => await ctx.db.patch(requestId, { status: "completed" }));
+
+            throw new Error("down");
+        });
+
+        await attempt(1);
+
+        expect(await statusOf()).toBe("completed");
+        expect(jobs()).toHaveLength(0);
+        expect(await actions()).toStrictEqual(["deletion_retry_started"]);
+    });
+
+    it("is not completed again by a duplicate success, and a cancelled one stays cancelled", async () => {
+        vi.mocked(erasePostHogPerson).mockImplementation(async () => {
+            await run(async (ctx) => await ctx.db.patch(requestId, { status: "cancelled" }));
+
+            return "deleted";
+        });
+
+        await attempt(1);
+
+        expect(await statusOf()).toBe("cancelled");
+        expect(await actions()).toStrictEqual(["deletion_retry_started"]);
     });
 });

@@ -17,7 +17,7 @@ import { HttpError } from "../lib/fetch-timeout";
 import { gdprLogger } from "../lib/logger";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
-import { POSTHOG_FAILED_MESSAGE, POSTHOG_RETRY_DELAYS_MS, POSTHOG_RETRY_MAX_ATTEMPTS } from "./constants";
+import { EXPORT_EXPIRY_MS, POSTHOG_FAILED_MESSAGE, POSTHOG_RETRY_DELAYS_MS, POSTHOG_RETRY_MAX_ATTEMPTS } from "./constants";
 import { erasePostHogPerson } from "./steps/posthog-steps";
 
 interface RetryTarget {
@@ -65,9 +65,34 @@ export const schedulePostHogRetry = internalMutation
         return null;
     });
 
+/** Whether this attempt already wrote its `deletion_retry_started` row (the audit details survive minimisation). */
+const attemptWasClaimed = async (context: MutationCtx, { attempt, requestId, userId }: RetryTarget): Promise<boolean> => {
+    const rows = await context.db
+        .query("gdprAuditLog")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+
+    return rows.some((row) => {
+        if (row.action !== "deletion_retry_started") {
+            return false;
+        }
+
+        try {
+            const logged = JSON.parse(row.details) as { attempt?: unknown; requestId?: unknown };
+
+            return logged.attempt === attempt && logged.requestId === requestId;
+        } catch {
+            return false;
+        }
+    });
+};
+
 /**
- * Claims an attempt: only a request still `failed` is retried, so one that was completed meanwhile
- * (a re-run workflow) or cancelled is left alone, and a redelivered job finds it `processing`.
+ * Claims an attempt: a request still `failed` is retried, so one that was completed meanwhile
+ * (a re-run workflow) or cancelled is left alone. A `processing` request is taken over only when
+ * THIS attempt claimed it, i.e. the job was redelivered after the action stopped mid-run: the
+ * erasure is idempotent, so a concurrent duplicate is harmless. A request a workflow re-run holds
+ * as `processing` has no such row and is left alone.
  */
 export const startPostHogRetry = internalMutation
     .input({ attempt: v.number(), requestId: v.id("gdprRequests"), userId: v.string().max(MAX_LENGTH.id) })
@@ -75,7 +100,21 @@ export const startPostHogRetry = internalMutation
     .mutation(async ({ args: { attempt, requestId, userId }, ctx: context }) => {
         const request = await context.db.get(requestId);
 
-        if (request?.userId !== userId || request.status !== "failed") {
+        if (request?.userId !== userId) {
+            return false;
+        }
+
+        if (request.status === "processing") {
+            if (!(await attemptWasClaimed(context, { attempt, requestId, userId }))) {
+                return false;
+            }
+
+            await record(context, "deletion_retry_resumed", userId, { attempt, requestId });
+
+            return true;
+        }
+
+        if (request.status !== "failed") {
             return false;
         }
 
@@ -85,11 +124,21 @@ export const startPostHogRetry = internalMutation
         return true;
     });
 
-/** An attempt failed: back to `failed` with the fixed reason, then the next attempt or the end of the schedule. */
+/**
+ * An attempt failed: back to `failed` with the fixed reason, then the next attempt or the end of the
+ * schedule. Only a request still `processing` is moved: one completed or cancelled meanwhile stays
+ * so, and a duplicate delivery that finds it already `failed` queues no second chain.
+ */
 export const failPostHogRetry = internalMutation
     .input({ attempt: v.number(), errorClass: v.string().max(MAX_LENGTH.id), requestId: v.id("gdprRequests"), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args: { attempt, errorClass, requestId, userId }, ctx: context }) => {
+        const request = await context.db.get(requestId);
+
+        if (request?.userId !== userId || request.status !== "processing") {
+            return null;
+        }
+
         await context.db.patch(requestId, { errorMessage: POSTHOG_FAILED_MESSAGE, status: "failed" });
         await record(context, "deletion_retry_failed", userId, { attempt, errorClass, requestId });
 
@@ -105,7 +154,11 @@ export const failPostHogRetry = internalMutation
         return null;
     });
 
-/** The request is `completed` already; this records the attempt and the same `deletion_completed` outcome the workflow writes. */
+/**
+ * Completes the request the way the workflow's success path does and records the attempt plus the
+ * same `deletion_completed` outcome, in ONE transaction: a failure leaves it `processing` for the
+ * redelivered job to finish, and a request completed or cancelled meanwhile is neither changed nor recorded twice.
+ */
 export const recordPostHogRetrySuccess = internalMutation
     .input({
         attempt: v.number(),
@@ -115,6 +168,13 @@ export const recordPostHogRetrySuccess = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { attempt, posthog, requestId, userId }, ctx: context }) => {
+        const request = await context.db.get(requestId);
+
+        if (request?.userId !== userId || (request.status !== "processing" && request.status !== "failed")) {
+            return null;
+        }
+
+        await context.db.patch(requestId, { completedAt: context.now, expiresAt: context.now + EXPORT_EXPIRY_MS, progress: 100, status: "completed" });
         await record(context, "deletion_retry_succeeded", userId, { attempt, posthog, requestId });
         await record(context, "deletion_completed", userId, { posthog, requestId });
 
@@ -129,17 +189,29 @@ export const retryPostHogErasure = internalAction
             return null;
         }
 
-        try {
-            const posthog = await erasePostHogPerson(args.userId, process.env);
+        let posthog: Awaited<ReturnType<typeof erasePostHogPerson>>;
 
-            await context.runMutation(internal.gdpr.functions.updateRequestProgress, { progress: 100, requestId: args.requestId, status: "completed" });
-            await context.runMutation(internal.gdpr.posthog_retry.recordPostHogRetrySuccess, { ...args, posthog });
+        try {
+            posthog = await erasePostHogPerson(args.userId, process.env);
         } catch (error) {
+            // The failed request must not keep the email either: a minimisation that failed on the
+            // workflow's failure branch is retried by every attempt. Best-effort, and before the
+            // fail write, which restores the fixed reason that minimisation clears.
+            try {
+                await context.runMutation(internal.gdpr.steps.residual_deletion_steps.minimiseGdprRecords, { userId: args.userId });
+            } catch (minimiseError) {
+                gdprLogger.warn(`Minimising the records of request ${args.requestId} failed after a failed analytics erasure retry`, minimiseError);
+            }
+
             // Never rethrown: the scheduler would re-run a throwing job within minutes, off the 1h/6h/24h schedule.
             await context.runMutation(internal.gdpr.posthog_retry.failPostHogRetry, { ...args, errorClass: errorClassOf(error) });
 
             return null;
         }
+
+        // Not caught: a failure here leaves the request `processing`, and the scheduler's redelivery
+        // of this job resumes it (`startPostHogRetry`). It must never be recorded as a failed erasure.
+        await context.runMutation(internal.gdpr.posthog_retry.recordPostHogRetrySuccess, { ...args, posthog });
 
         // As on the workflow's success path, after the final audit write. Best-effort: the request is complete.
         try {
