@@ -348,10 +348,38 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         // marked completed (nor the confirmation mailed) while the person may remain.
         // Not "delete-post-hog-person": the old action returned null even on a failed
         // delete, and a run that cached that result would replay it instead of erasing.
-        const postHogOutcome = await context.step.do(
-            "erase-post-hog-person",
-            async () => await context.run(internal.gdpr.steps.posthog_steps.deletePostHogPerson, { userId: args.userId }),
-        );
+        let postHogOutcome: unknown;
+
+        try {
+            postHogOutcome = await context.step.do(
+                "erase-post-hog-person",
+                async () => await context.run(internal.gdpr.steps.posthog_steps.deletePostHogPerson, { userId: args.userId }),
+            );
+        } catch (error) {
+            // Retries are exhausted. Everything else is already erased, so leaving the request
+            // `processing` would hide this until the 30-day sweep: mark it failed and audit it
+            // (a fixed message; the raw error carries the provider response), then rethrow so the
+            // instance errors and never reaches completion. Unlike the export workflow this does not
+            // return: the data is already gone, so the operator must see a failed instance, and a
+            // re-run is safe (every step is idempotent) and ends in `completed` once PostHog works.
+            await context.run(internal.gdpr.functions.updateRequestProgress, {
+                errorMessage: "Your account data was erased, but deleting your analytics profile failed.",
+                requestId: args.requestId,
+                status: "failed",
+            });
+            await context.step.do(
+                "log-audit-posthog-failed",
+                async () =>
+                    await context.run(internal.gdpr.functions.logAudit, {
+                        action: "deletion_failed",
+                        details: JSON.stringify({ requestId: args.requestId }),
+                        performedBy: "system",
+                        userId: args.userId,
+                    }),
+            );
+
+            throw error;
+        }
 
         await context.run(internal.gdpr.functions.updateRequestProgress, {
             progress: 100,

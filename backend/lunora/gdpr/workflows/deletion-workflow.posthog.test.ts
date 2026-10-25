@@ -42,11 +42,11 @@ const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error
                 current = name;
                 calls.push({ args: {}, name: `step:${name}` });
 
-                const result = await callback();
-
-                current = "";
-
-                return result;
+                try {
+                    return await callback();
+                } finally {
+                    current = "";
+                }
             },
         },
     };
@@ -79,6 +79,30 @@ describe("account deletion workflow, PostHog step", () => {
         expect(stepNames(calls)).not.toContain("send-deletion-confirmed-email-action");
         expect(stepNames(calls)).not.toContain("log-audit");
         expect(stepNames(calls)).not.toContain("minimise-gdpr-records");
+    });
+
+    it("marks the request failed and audits it when the PostHog step is exhausted, with no raw error stored", async () => {
+        const failure = new Error("[GDPR/PostHog] Failed to delete person user-1: 503 Service Unavailable");
+        const { calls, outcome } = await runWorkflow(failure);
+
+        expect(outcome).toBe(failure);
+
+        const failed = calls.find((call) => call.args.status === "failed");
+
+        expect(failed?.args.requestId).toBe("req-1");
+        expect(String(failed?.args.errorMessage)).not.toContain("user-1");
+
+        const audit = calls.find((call) => call.args.action === "deletion_failed");
+
+        expect(JSON.parse(audit?.args.details as string)).toStrictEqual({ requestId: "req-1" });
+        expect(stepNames(calls)).toContain("log-audit-posthog-failed");
+    });
+
+    it("never marks a request failed when the PostHog step succeeds", async () => {
+        const { calls } = await runWorkflow("deleted");
+
+        expect(calls.some((call) => call.args.status === "failed")).toBe(false);
+        expect(calls.some((call) => call.args.action === "deletion_failed")).toBe(false);
     });
 
     it("completes after a successful PostHog deletion and records it", async () => {
