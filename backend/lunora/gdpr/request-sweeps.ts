@@ -16,51 +16,75 @@ import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 /** Expired exports handled per run; the next run (every tick slot) picks up the rest. */
 const EXPIRED_EXPORT_BATCH_SIZE = 100;
 
+/**
+ * Rows one run reads while looking for {@link EXPIRED_EXPORT_BATCH_SIZE} to handle.
+ * A row whose storage delete fails keeps its place at the front of `by_expires`, so
+ * the run reads past it; this is how many such rows it can skip before giving up
+ * until the next slot.
+ */
+const EXPIRED_EXPORT_READ_BUDGET = 1000;
+
 export const cleanupExpiredExports = internalMutation
     .input({})
     .output(v.null())
     .mutation(async ({ ctx: context }) => {
         const { now } = context;
-        // Bounded, and each handled row leaves the `by_expires` index below. The
-        // sweep used to keep `expiresAt` set, so every run re-selected every
-        // expired export and wrote another audit row for each, forever.
-        const expiredRequests = await context.db
-            .query("gdprRequests")
-            .withIndex("by_expires", (q) => q.lt("expiresAt", now))
-            .take(EXPIRED_EXPORT_BATCH_SIZE);
+        // Each handled row leaves the `by_expires` index below. The sweep used to keep
+        // `expiresAt` set, so every run re-selected every expired export and wrote
+        // another audit row for each, forever. A row that could not be handled stays
+        // in the index, so the read pages past it instead of re-taking the same front.
+        let cursor: null | string = null;
+        let handled = 0;
+        let read = 0;
 
-        for (const request of expiredRequests) {
-            if (request.storageId) {
-                try {
-                    await scheduleObjectDeletion(context, [request.storageId as string]);
-                } catch (error) {
-                    // Keep the row as it is, so the next run retries the deletion. Clearing
-                    // `storageId` here would orphan the stored file.
-                    // ponytail: a row that keeps failing stays at the front of `by_expires`
-                    // and can hold back its batch; add a retry counter if that is seen.
-                    cronsLogger.error(`Failed to delete storage for request ${request._id}:`, error);
+        while (handled < EXPIRED_EXPORT_BATCH_SIZE && read < EXPIRED_EXPORT_READ_BUDGET) {
+            const page = await context.db
+                .query("gdprRequests")
+                .withIndex("by_expires", (q) => q.lt("expiresAt", now))
+                .paginate({ cursor, numItems: EXPIRED_EXPORT_BATCH_SIZE });
 
-                    continue;
+            read += page.page.length;
+
+            for (const request of page.page) {
+                if (request.storageId) {
+                    try {
+                        await scheduleObjectDeletion(context, [request.storageId as string]);
+                    } catch (error) {
+                        // Keep the row as it is, so a later run retries the deletion. Clearing
+                        // `storageId` here would orphan the stored file, and moving `expiresAt`
+                        // would reopen the download of an expired export.
+                        cronsLogger.error(`Failed to delete storage for request ${request._id}:`, error);
+
+                        continue;
+                    }
                 }
+
+                // `undefined` removes the field: `expiresAt` is what puts a row in the
+                // index, so removing it is what makes this sweep terminal.
+                await patchRow(context.db, request, {
+                    downloadUrl: undefined,
+                    errorMessage: "Export expired and has been deleted",
+                    expiresAt: undefined,
+                    status: "completed",
+                    storageId: undefined,
+                });
+
+                await context.db.insert("gdprAuditLog", {
+                    action: "export_expired",
+                    details: JSON.stringify({ requestId: request._id }),
+                    performedBy: "system",
+                    timestamp: now,
+                    userId: request.userId,
+                });
+
+                handled += 1;
             }
 
-            // `undefined` removes the field: `expiresAt` is what puts a row in the
-            // index, so removing it is what makes this sweep terminal.
-            await patchRow(context.db, request, {
-                downloadUrl: undefined,
-                errorMessage: "Export expired and has been deleted",
-                expiresAt: undefined,
-                status: "completed",
-                storageId: undefined,
-            });
+            if (page.isDone) {
+                break;
+            }
 
-            await context.db.insert("gdprAuditLog", {
-                action: "export_expired",
-                details: JSON.stringify({ requestId: request._id }),
-                performedBy: "system",
-                timestamp: now,
-                userId: request.userId,
-            });
+            cursor = page.continueCursor;
         }
 
         return null;
