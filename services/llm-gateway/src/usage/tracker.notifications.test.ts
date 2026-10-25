@@ -301,6 +301,55 @@ describe("evaluateRules when the cooldown claim throws", () => {
     });
 });
 
+describe("evaluateRules when the cooldown claim keeps throwing", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
+
+    it("keys every firing in one hour alike and the next hour differently, so the backend dedupes the repeats", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+
+        const database = firingDatabase();
+        const prepare = database.prepare.bind(database);
+
+        vi.spyOn(database, "prepare").mockImplementation(((sql: string) => {
+            const statement = prepare(sql);
+
+            if (sql.startsWith("UPDATE notification_rules")) {
+                return {
+                    ...statement,
+                    bind: () => {
+                        return {
+                            run: async () => {
+                                throw new Error("D1 unavailable");
+                            },
+                        };
+                    },
+                };
+            }
+
+            return statement;
+        }) as never);
+
+        const firedAtAt = async (now: number) => {
+            vi.useFakeTimers({ now, toFake: ["Date"] });
+
+            const result = await evaluateRules({ USAGE_DB: database } as AppEnv, "user-1", undefined, {} as UsageLogEntry);
+
+            return result.notifications[0]?.firedAt;
+        };
+
+        const first = await firedAtAt(Date.UTC(2026, 0, 1, 10, 5, 1));
+        const sameHour = await firedAtAt(Date.UTC(2026, 0, 1, 10, 59, 58));
+        const nextHour = await firedAtAt(Date.UTC(2026, 0, 1, 11, 0, 1));
+
+        expect(first).toBe(Date.UTC(2026, 0, 1, 10));
+        expect(sameHour).toBe(first);
+        expect(nextHour).toBe(Date.UTC(2026, 0, 1, 11));
+    });
+});
+
 describe("evaluateRules concurrency", () => {
     it("lets only one of two concurrent evaluations of the same rule fire", async () => {
         const appEnv = { USAGE_DB: racingDatabase() } as AppEnv;

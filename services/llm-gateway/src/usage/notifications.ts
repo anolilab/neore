@@ -66,7 +66,9 @@ export const evaluateRules = async (
             if (currentValue >= threshold) {
                 // Claim the cooldown slot before acting: the read above is not serialised with other requests of the same
                 // user, so only the evaluation whose conditional update changes a row may fire.
-                if (!(await claimOrDeliver(database, ruleId))) {
+                const firedAt = await claimOrDeliver(database, ruleId);
+
+                if (firedAt === undefined) {
                     continue;
                 }
 
@@ -78,7 +80,7 @@ export const evaluateRules = async (
                     notifications.push({
                         action,
                         currentValue,
-                        firedAt: Date.now(),
+                        firedAt,
                         metric,
                         ruleId,
                         ruleName: rule["name"] as string,
@@ -108,16 +110,18 @@ const claimCooldown = async (database: D1Database, ruleId: string): Promise<bool
 };
 
 /**
- * Claim the cooldown slot, treating a claim that could not be made at all as won.
- * A missed usage or budget alert costs the user more than a duplicate one, which the backend's dedupe key absorbs anyway.
+ * Claim the cooldown slot and return the instant the rule fired, or undefined when another evaluation holds the slot.
+ * A claim that could not be made at all counts as won: a missed usage or budget alert costs the user more than a duplicate one.
+ * Nothing then limits repeats to one an hour, so the firing is stamped with the start of the current hour instead of the
+ * present: every unclaimed firing in that hour shares one backend dedupe key.
  */
-const claimOrDeliver = async (database: D1Database, ruleId: string): Promise<boolean> => {
+const claimOrDeliver = async (database: D1Database, ruleId: string): Promise<number | undefined> => {
     try {
-        return await claimCooldown(database, ruleId);
+        return (await claimCooldown(database, ruleId)) ? Date.now() : undefined;
     } catch (error) {
         console.error("[Notifications] Cooldown claim failed, delivering anyway:", error);
 
-        return true;
+        return Math.floor(Date.now() / COOLDOWN_MS) * COOLDOWN_MS;
     }
 };
 
