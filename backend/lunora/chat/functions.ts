@@ -2460,7 +2460,6 @@ export const searchMessages = authQuery
             const found: (ThreadDoc & {
                 relevantMessages?: MessageDoc[];
             })[] = [];
-            let hits = 0;
 
             for (const [i, threadId] of threadIds.entries()) {
                 const thread = threads[i];
@@ -2472,7 +2471,6 @@ export const searchMessages = authQuery
                     );
 
                     if (relevantMessages.length > 0) {
-                        hits += relevantMessages.length;
                         found.push({
                             ...thread,
                             relevantMessages,
@@ -2481,18 +2479,18 @@ export const searchMessages = authQuery
                 }
             }
 
-            return { filled, found, hits };
+            return { filled, found };
         };
 
         let window = SEARCH_WINDOW;
-        let { filled, found: threadsWithMessages, hits } = await collect(window);
+        let { filled, found: threadsWithMessages } = await collect(window);
 
-        // A full index window with fewer than a page of hits means rows were dropped (locked, trashed or
-        // inactive), so a larger window may reach more. `filled` stops the loop once the index has nothing
+        // Widen only while the caller's page is short of threads: a full index window whose survivors
+        // already fill the page needs no second pass. `filled` stops the loop once the index has nothing
         // more to give: a repeat would redo the fetches and the path walks for the same rows.
-        while (filled && hits < SEARCH_WINDOW && window < SEARCH_WINDOW_MAX) {
+        while (filled && threadsWithMessages.length < paginationOpts.numItems && window < SEARCH_WINDOW_MAX) {
             window *= 4;
-            ({ filled, found: threadsWithMessages, hits } = await collect(window));
+            ({ filled, found: threadsWithMessages } = await collect(window));
         }
 
         // Sort by relevance (threads with more matching messages first, then by creation time)
