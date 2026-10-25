@@ -19682,6 +19682,12 @@
       "file": "sub-agents/functions",
       "kind": "read",
       "line": 351,
+      "reason": "\"finishRun\" is not a registered function"
+    },
+    {
+      "file": "sub-agents/functions",
+      "kind": "read",
+      "line": 351,
       "reason": "\"postRunResult\" is not a registered function"
     },
     {
@@ -19693,13 +19699,13 @@
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 507,
+      "line": 508,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 521,
+      "line": 520,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {

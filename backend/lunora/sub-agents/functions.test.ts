@@ -545,6 +545,23 @@ describe("cancelling a run", () => {
             expect(grandchild).toMatchObject({ status: "cancelled" });
         });
 
+        it("takes down what a stopped parent's sub-agents delegated too", async () => {
+            await admit();
+
+            const [parentRun] = await runs();
+            const childThread = await insertThread(userId);
+
+            await harness.run(async (ctx: any) => await ctx.db.patch(parentRun._id, { childThreadId: childThread }));
+            await harness.run(async (ctx: any) => await claimQueuedRun(ctx, parentRun._id));
+            await harness.run(async (ctx: any) => await admitAndInsert(ctx, childThread));
+
+            expect(await forStop(threadId)).toBe(2);
+
+            const all = await runs();
+
+            expect(all.map((run: any) => run.status as string)).toStrictEqual(["cancelled", "cancelled"]);
+        });
+
         it("never reaches another user's runs", async () => {
             await admit();
 
