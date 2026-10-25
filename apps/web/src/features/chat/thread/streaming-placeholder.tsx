@@ -353,7 +353,9 @@ const useStream = (
             isUsePersistence && streamId ? { streamId: streamId as unknown as Id<"persistentStreams"> } : skipToken,
             { live: false },
         ),
-        refetchInterval: (query) => (query.state.data && !isStreamOpen(query.state.data.status) ? false : STREAM_BODY_POLL_MS),
+        // A failed read (locked thread, lost access, missing stream) would fail again every second.
+        refetchInterval: (query) =>
+            query.state.status === "error" || (query.state.data && !isStreamOpen(query.state.data.status)) ? false : STREAM_BODY_POLL_MS,
     });
     const [streamBody, setStreamBody] = useState<StreamDelta>({ reasoning: "", text: "" });
 
