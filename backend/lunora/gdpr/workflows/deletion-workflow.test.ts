@@ -141,6 +141,8 @@ describe("account deletion workflow: order", () => {
         before("stop-user-tasks", "delete-user-thread-cascade");
         before("stop-user-evals", "delete-user-thread-cascade");
         before("kill-user-sandboxes", "delete-user-thread-cascade");
+        // A coding agent run in flight would post its result into a thread after the cascade.
+        before("stop-user-coding-agents", "delete-user-thread-cascade");
         // The subscription is cancelled while the user still exists.
         before("cancel-user-billing", "delete-user-thread-metadata");
         // Thread-dependent rows go before the threads themselves.
@@ -175,6 +177,40 @@ describe("account deletion workflow: shards", () => {
             if (entry.ref !== "billing_gdpr:cancelBilling") {
                 expect(entry.shardKey, entry.ref).toBe(USER);
             }
+        }
+    });
+});
+
+describe("account deletion workflow: targets", () => {
+    it("aims every account-scoped call at the user being deleted, and only the e-mail calls at the address", async () => {
+        await execute();
+
+        const scoped = runs().filter((entry) => "userId" in entry.args);
+
+        // The workflow has dozens of user-scoped calls; a handful would mean the fake stopped recording them.
+        expect(scoped.length).toBeGreaterThan(30);
+
+        for (const entry of scoped) {
+            expect(entry.args["userId"], entry.ref).toBe(USER);
+        }
+
+        const emailed = runs().filter((entry) => "userEmail" in entry.args);
+
+        expect(emailed.length).toBeGreaterThan(0);
+
+        for (const entry of emailed) {
+            expect(entry.args["userEmail"], entry.ref).toBe(PARAMS.userEmail);
+        }
+
+        // Billing is keyed by the reference id, not the user id.
+        expect(runs().find((entry) => entry.ref === "billing_gdpr:cancelBilling")?.args).toStrictEqual({ referenceId: USER });
+
+        const reports = runs().filter((item) => item.ref === "gdpr_functions:updateRequestProgress");
+
+        expect(reports.length).toBeGreaterThan(10);
+
+        for (const entry of reports) {
+            expect(entry.args["requestId"]).toBe(PARAMS.requestId);
         }
     });
 });
