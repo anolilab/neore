@@ -131,7 +131,12 @@ describe("account deletion workflow: order", () => {
 
         expect(stepNames()[0]).toBe("revoke-user-sessions");
 
-        const before = (early: string, late: string) => expect(indexOfStep(early), `${early} before ${late}`).toBeLessThan(indexOfStep(late));
+        const before = (early: string, late: string) => {
+            // A step that never ran is index -1, which would satisfy every "earlier than" comparison.
+            expect(indexOfStep(early), `${early} ran`).toBeGreaterThan(-1);
+            expect(indexOfStep(late), `${late} ran`).toBeGreaterThan(-1);
+            expect(indexOfStep(early), `${early} before ${late}`).toBeLessThan(indexOfStep(late));
+        };
 
         // Needs the bot token that `delete-user-settings` removes.
         before("deregister-messenger-webhooks", "delete-user-settings");
