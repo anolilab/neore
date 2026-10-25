@@ -26,7 +26,7 @@
         "@anolilab/eslint-config": "catalog:lint",
         "@electron/fuses": "2.1.3",
         "@playwright/test": "catalog:test",
-        "electron": "44.4.5",
+        "electron": "44.9.3",
         "electron-builder": "26.15.3",
         "esbuild": "catalog:build",
         "eslint": "catalog:lint",
