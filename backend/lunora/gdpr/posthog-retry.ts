@@ -14,6 +14,7 @@ import { v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation } from "../_generated/server";
+import { claimOnce, hasClaim } from "../lib/claim-once";
 import { HttpError } from "../lib/fetch-timeout";
 import { gdprLogger } from "../lib/logger";
 import { runAfterOnShard } from "../lib/shard-scheduler";
@@ -42,36 +43,25 @@ const record = async (context: MutationCtx, action: string, userId: string, deta
     context.log.event(`gdpr.${action}`, details);
 };
 
-/** Whether the audit log holds one of `actions` for this attempt of this request (the details survive minimisation). */
-const hasAttemptRow = async (context: MutationCtx, actions: ReadonlyArray<string>, { attempt, requestId, userId }: RetryTarget): Promise<boolean> => {
-    const rows = await context.db
-        .query("gdprAuditLog")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect();
+/**
+ * Claim-once scopes (`lib/claim-once.ts`) that keep each step of an attempt at-most-once. The keys
+ * are `<requestId>:<attempt>`, non-personal, and deliberately NOT tagged with the user: erasing the
+ * account must not erase the memory that stops a redelivered attempt from running again.
+ */
+const SCHEDULED_SCOPE = "posthog-retry-scheduled";
+const STARTED_SCOPE = "posthog-retry-started";
+/** How an attempt ends: once its outcome is claimed (failed, succeeded or exhausted), that attempt never runs again. */
+const OUTCOME_SCOPE = "posthog-retry-outcome";
+/** Past the whole retry chain (about 79 hours) plus the scheduler's redelivery window. */
+const ATTEMPT_CLAIM_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
-    return rows.some((row) => {
-        if (!actions.includes(row.action)) {
-            return false;
-        }
+const attemptKey = ({ attempt, requestId }: RetryTarget): string => `${requestId}:${String(attempt)}`;
 
-        try {
-            const logged = JSON.parse(row.details) as { attempt?: unknown; requestId?: unknown };
-
-            return logged.attempt === attempt && logged.requestId === requestId;
-        } catch {
-            return false;
-        }
-    });
-};
-
-/** How an attempt ends: once one of these is written, that attempt never runs again. */
-const OUTCOME_ACTIONS = ["deletion_retry_failed", "deletion_retry_succeeded", "deletion_retry_exhausted"] as const;
-
-/** Queues one attempt, once: a redelivered caller finds its `deletion_retry_scheduled` row and queues nothing. */
+/** Queues one attempt, once: a redelivered caller finds the attempt's claim and queues nothing. */
 const scheduleAttempt = async (context: MutationCtx, target: RetryTarget): Promise<void> => {
     const { attempt, requestId, userId } = target;
 
-    if (await hasAttemptRow(context, ["deletion_retry_scheduled"], target)) {
+    if (!(await claimOnce(context, SCHEDULED_SCOPE, attemptKey(target), ATTEMPT_CLAIM_TTL_MS))) {
         return;
     }
 
@@ -129,14 +119,14 @@ export const startPostHogRetry = internalMutation
             return false;
         }
 
-        const target = { attempt, requestId, userId };
+        const key = attemptKey({ attempt, requestId, userId });
 
-        if (await hasAttemptRow(context, OUTCOME_ACTIONS, target)) {
+        if (await hasClaim(context, OUTCOME_SCOPE, key)) {
             return false;
         }
 
         if (request.status === "processing") {
-            if (!(await hasAttemptRow(context, ["deletion_retry_started"], target))) {
+            if (!(await hasClaim(context, STARTED_SCOPE, key))) {
                 return false;
             }
 
@@ -149,6 +139,7 @@ export const startPostHogRetry = internalMutation
             return false;
         }
 
+        await claimOnce(context, STARTED_SCOPE, key, ATTEMPT_CLAIM_TTL_MS);
         await context.db.patch(request._id, { status: "processing" });
         await record(context, "deletion_retry_started", userId, { attempt, requestId });
 
@@ -167,6 +158,10 @@ export const failPostHogRetry = internalMutation
         const request = await context.db.get(requestId);
 
         if (request?.userId !== userId || request.status !== "processing") {
+            return null;
+        }
+
+        if (!(await claimOnce(context, OUTCOME_SCOPE, attemptKey({ attempt, requestId, userId }), ATTEMPT_CLAIM_TTL_MS))) {
             return null;
         }
 
@@ -193,7 +188,7 @@ export const failPostHogRetry = internalMutation
 export const recordPostHogRetrySuccess = internalMutation
     .input({
         attempt: v.number(),
-        posthog: v.union(v.literal("deleted"), v.literal("no_profile"), v.literal("skipped")),
+        posthog: v.union(v.literal("deleted"), v.literal("no_profile")),
         requestId: v.id("gdprRequests"),
         userId: v.string().max(MAX_LENGTH.id),
     })
@@ -205,12 +200,21 @@ export const recordPostHogRetrySuccess = internalMutation
             return null;
         }
 
+        if (!(await claimOnce(context, OUTCOME_SCOPE, attemptKey({ attempt, requestId, userId }), ATTEMPT_CLAIM_TTL_MS))) {
+            return null;
+        }
+
         await context.db.patch(requestId, { completedAt: context.now, expiresAt: context.now + EXPORT_EXPIRY_MS, progress: 100, status: "completed" });
         await record(context, "deletion_retry_succeeded", userId, { attempt, posthog, requestId });
         await record(context, "deletion_completed", userId, { posthog, requestId });
 
         return null;
     });
+
+/** A retry that finds analytics erasure unconfigured erased nothing: it fails like any other attempt. `name` becomes the audited error class. */
+class PostHogUnconfiguredError extends Error {
+    override readonly name = "unconfigured";
+}
 
 export const retryPostHogErasure = internalAction
     .input({ attempt: v.number(), requestId: v.id("gdprRequests"), userId: v.string().max(MAX_LENGTH.id) })
@@ -224,6 +228,13 @@ export const retryPostHogErasure = internalAction
 
         try {
             posthog = await erasePostHogPerson(args.userId, process.env);
+
+            // The key or project id was removed since the workflow gave up: nothing was erased, so
+            // this must not complete the request. Failing it queues the next attempt as usual.
+            if (posthog === "skipped") {
+                throw new PostHogUnconfiguredError("PostHog erasure is not configured");
+            }
+
             // Before the request can be completed, and not swallowed: a request must never end
             // `completed` while the email an earlier failed minimisation left is still on it. A
             // failure here counts as a failed attempt, so the next one erases and minimises again.

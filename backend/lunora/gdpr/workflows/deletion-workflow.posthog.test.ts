@@ -38,7 +38,10 @@ const runWorkflow = async (
             throw new Error("status write failed");
         }
 
-        if (typeof args.status === "string") {
+        // Like the mutation: a conditional write leaves a request that moved on meanwhile alone.
+        const unchanged = Array.isArray(args.fromStatus) && !args.fromStatus.includes(request.status);
+
+        if (typeof args.status === "string" && !unchanged) {
             request.status = args.status;
             request.errorMessage = (args.errorMessage as string | undefined) ?? request.errorMessage;
         }
@@ -147,6 +150,17 @@ describe("account deletion workflow, PostHog step", () => {
 
         expect(JSON.parse(audit?.args.details as string)).toStrictEqual({ requestId: "req-1" });
         expect(stepNames(calls)).toContain("log-audit-posthog-failed");
+    });
+
+    it("writes `failed` only over a processing or failed request, never over a completed one", async () => {
+        const { calls } = await runWorkflow(new Error("[GDPR/PostHog] Failed to delete person user-1: 503 Service Unavailable"));
+        const failedWrites = calls.filter((call) => call.args.status === "failed");
+
+        expect(failedWrites).toHaveLength(2);
+
+        for (const write of failedWrites) {
+            expect(write.args.fromStatus).toStrictEqual(["processing", "failed"]);
+        }
     });
 
     it("minimises the request records after the failure audit when the PostHog step is exhausted", async () => {

@@ -9,6 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { POSTHOG_RETRY_DELAYS_MS, POSTHOG_RETRY_MAX_ATTEMPTS } from "./constants";
+import { updateRequestProgress } from "./functions";
 import { retryPostHogErasure, schedulePostHogRetry, startPostHogRetry } from "./posthog-retry";
 import { erasePostHogPerson } from "./steps/posthog-steps";
 
@@ -403,5 +404,90 @@ describe("a request that finished meanwhile", () => {
 
         expect(await statusOf()).toBe("cancelled");
         expect(await actions()).toStrictEqual(["deletion_retry_started"]);
+    });
+});
+
+describe("a retry while PostHog erasure is no longer configured", () => {
+    it("does not complete the request: it fails the attempt, audits the class `unconfigured`, and queues the next one", async () => {
+        vi.mocked(erasePostHogPerson).mockResolvedValue("skipped");
+
+        await attempt(1);
+
+        const row = await request();
+
+        expect(row.status).toBe("failed");
+        expect(row.errorMessage).toBe(FAILED_MESSAGE);
+        expect(await actions()).not.toContain("deletion_completed");
+        expect(await actions()).not.toContain("deletion_retry_succeeded");
+        expect(await details("deletion_retry_failed")).toStrictEqual({ attempt: 1, errorClass: "unconfigured", requestId });
+        expect(jobs()).toHaveLength(1);
+        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, requestId, userId: USER });
+        expect(jobs()[0]?.scheduledFor).toBe(NOW + 6 * HOUR);
+    });
+});
+
+describe("attempt deduplication", () => {
+    const claims = async () =>
+        (await run(async (ctx) => await ctx.db.query("idempotencyClaims").collect())) as { key: string; scope: string; userId?: string }[];
+
+    it("is held by claim-once rows, not by the audit log: wiping the log changes nothing", async () => {
+        vi.mocked(erasePostHogPerson).mockRejectedValue(new Error("down"));
+        await run(async (ctx) => await ctx.runMutation(schedulePostHogRetry, { requestId, userId: USER }));
+        await attempt(1);
+
+        const rows = await claims();
+
+        expect(rows.map((row) => `${row.scope}|${row.key}`).toSorted((a, b) => a.localeCompare(b))).toStrictEqual([
+            `posthog-retry-outcome|${requestId}:1`,
+            `posthog-retry-scheduled|${requestId}:1`,
+            `posthog-retry-scheduled|${requestId}:2`,
+            `posthog-retry-started|${requestId}:1`,
+        ]);
+        // Untagged, so erasing the account keeps them.
+        expect(rows.every((row) => row.userId === undefined)).toBe(true);
+
+        await run(async (ctx) => {
+            const logRows = await ctx.db.query("gdprAuditLog").collect();
+
+            for (const row of logRows) {
+                await ctx.db.delete(row._id);
+            }
+        });
+
+        await run(async (ctx) => await ctx.runMutation(schedulePostHogRetry, { requestId, userId: USER }));
+        await attempt(1);
+
+        expect(erasePostHogPerson).toHaveBeenCalledTimes(1);
+        // The queued attempt 1 and its successor, each once.
+        expect(jobs().map((job) => (job.args as { attempt: number }).attempt)).toStrictEqual([1, 2]);
+    });
+});
+
+describe("updateRequestProgress with fromStatus", () => {
+    const write = async (fromStatus?: string[]) =>
+        await run(async (ctx) => await ctx.runMutation(updateRequestProgress, { errorMessage: FAILED_MESSAGE, fromStatus, requestId, status: "failed" }));
+
+    it("does not turn a completed request back into failed", async () => {
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "completed" }));
+
+        await write(["processing", "failed"]);
+
+        expect(await statusOf()).toBe("completed");
+    });
+
+    it("moves a processing request to failed", async () => {
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+
+        await write(["processing", "failed"]);
+
+        expect(await statusOf()).toBe("failed");
+    });
+
+    it("writes unconditionally when no fromStatus is given", async () => {
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "completed" }));
+
+        await write();
+
+        expect(await statusOf()).toBe("failed");
     });
 });

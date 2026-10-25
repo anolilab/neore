@@ -3797,11 +3797,6 @@
     },
     {
       "from": "function:gdpr_posthog_retry:failPostHogRetry",
-      "kind": "read",
-      "to": "table:gdprAuditLog"
-    },
-    {
-      "from": "function:gdpr_posthog_retry:failPostHogRetry",
       "kind": "write",
       "to": "table:gdprAuditLog"
     },
@@ -3842,11 +3837,6 @@
     },
     {
       "from": "function:gdpr_posthog_retry:schedulePostHogRetry",
-      "kind": "read",
-      "to": "table:gdprAuditLog"
-    },
-    {
-      "from": "function:gdpr_posthog_retry:schedulePostHogRetry",
       "kind": "write",
       "to": "table:gdprAuditLog"
     },
@@ -3854,11 +3844,6 @@
       "from": "function:gdpr_posthog_retry:schedulePostHogRetry",
       "kind": "write",
       "to": "table:gdprRequests"
-    },
-    {
-      "from": "function:gdpr_posthog_retry:startPostHogRetry",
-      "kind": "read",
-      "to": "table:gdprAuditLog"
     },
     {
       "from": "function:gdpr_posthog_retry:startPostHogRetry",
@@ -18594,43 +18579,43 @@
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 372,
+      "line": 373,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 385,
+      "line": 387,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 408,
+      "line": 410,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 428,
+      "line": 430,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 440,
+      "line": 443,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 449,
+      "line": 452,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 457,
+      "line": 460,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {

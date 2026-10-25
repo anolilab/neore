@@ -536,11 +536,11 @@ export interface InternalApiTypes {
             getExportRequest: FunctionReference<"query", { userId: string }, import("./dataModel.js").Doc_gdprRequests | null>;
             getRequestById: FunctionReference<"query", { requestId: Id<"gdprRequests"> }, import("./dataModel.js").Doc_gdprRequests | null>;
             logAudit: FunctionReference<"mutation", { action: string; details: string; performedBy: string; userId: string }, null>;
-            updateRequestProgress: FunctionReference<"mutation", { currentStep?: string; downloadUrl?: string; errorMessage?: string; progress?: number; requestId: Id<"gdprRequests">; status?: "pending" | "processing" | "completed" | "failed" | "cancelled"; storageId?: Id<"_storage"> }, null>;
+            updateRequestProgress: FunctionReference<"mutation", { currentStep?: string; downloadUrl?: string; errorMessage?: string; fromStatus?: Array<"pending" | "processing" | "completed" | "failed" | "cancelled">; progress?: number; requestId: Id<"gdprRequests">; status?: "pending" | "processing" | "completed" | "failed" | "cancelled"; storageId?: Id<"_storage"> }, null>;
         };
         posthog_retry: {
             failPostHogRetry: FunctionReference<"mutation", { attempt: number; errorClass: string; requestId: Id<"gdprRequests">; userId: string }, null>;
-            recordPostHogRetrySuccess: FunctionReference<"mutation", { attempt: number; posthog: "deleted" | "no_profile" | "skipped"; requestId: Id<"gdprRequests">; userId: string }, null>;
+            recordPostHogRetrySuccess: FunctionReference<"mutation", { attempt: number; posthog: "deleted" | "no_profile"; requestId: Id<"gdprRequests">; userId: string }, null>;
             retryPostHogErasure: FunctionReference<"action", { attempt: number; requestId: Id<"gdprRequests">; userId: string }, null>;
             schedulePostHogRetry: FunctionReference<"mutation", { requestId: Id<"gdprRequests">; userId: string }, null>;
             startPostHogRetry: FunctionReference<"mutation", { attempt: number; requestId: Id<"gdprRequests">; userId: string }, boolean>;

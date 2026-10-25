@@ -17,6 +17,7 @@
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
  * | `video-reservation` | `<requestId>`            | 24 h                          | `auth/billing.ts`            |
+ * | `posthog-retry-scheduled` / `-started` / `-outcome` | `<requestId>:<attempt>` | 14 days | `gdpr/posthog-retry.ts` (not user-tagged: erasing the account must not reopen a finished attempt) |
  *
  * A key must be remembered at least as long as a replay of it could still pass
  * the caller's own freshness check, or a replay could arrive after its claim

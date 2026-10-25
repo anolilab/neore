@@ -3,6 +3,7 @@ import { v } from "lunorash/server";
 import { internalAction } from "../../_generated/server";
 import { assertOk, FETCH_TIMEOUT_SHORT_MS, fetchWithDeadline, HttpError } from "../../lib/fetch-timeout";
 import { gdprLogger } from "../../lib/logger";
+import { MAX_LENGTH } from "../../lib/validators";
 import { posthogAppHost } from "../posthog-host";
 
 /**
@@ -96,6 +97,6 @@ export const erasePostHogPerson = async (userId: string, env: PostHogErasureEnv)
 };
 
 export const deletePostHogPerson = internalAction
-    .input({ userId: v.string() })
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(vPostHogErasureOutcome)
     .action(async ({ args: { userId }, ctx: _context }) => await erasePostHogPerson(userId, process.env));

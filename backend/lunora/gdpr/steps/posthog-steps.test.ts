@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { gdprLogger } from "../../lib/logger";
-import { erasePostHogPerson } from "./posthog-steps";
+import { MAX_LENGTH } from "../../lib/validators";
+import { deletePostHogPerson, erasePostHogPerson } from "./posthog-steps";
 
 const CONFIGURED = { POSTHOG_HOST: "https://eu.i.posthog.com", POSTHOG_PERSONAL_API_KEY: "phx_key", POSTHOG_PROJECT_ID: "42" };
 
@@ -105,4 +106,17 @@ describe(erasePostHogPerson, () => {
             expect(fetchMock).not.toHaveBeenCalled();
         },
     );
+});
+
+describe("deletePostHogPerson input", () => {
+    // The validator is the procedure's own; `args` is the only place the bound lives.
+    const userIdValidator = (deletePostHogPerson as unknown as { args: { userId: { parse: (value: unknown) => unknown } } }).args.userId;
+
+    it("accepts an id up to the shared id bound", () => {
+        expect(() => userIdValidator.parse("x".repeat(MAX_LENGTH.id))).not.toThrow();
+    });
+
+    it("refuses an id past it", () => {
+        expect(() => userIdValidator.parse("x".repeat(MAX_LENGTH.id + 1))).toThrow();
+    });
 });
