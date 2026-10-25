@@ -10,8 +10,9 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import { Skeleton } from "@neore/ui/components/skeleton";
+import useFocusTrap from "@neore/ui/hooks/use-focus-trap";
 import { ChevronLeft, ChevronRight, Download, FileText, Pencil, Presentation, SkipBack, SkipForward, X } from "lucide-react";
-import React, { useCallback, useEffect, useEffectEvent, useState } from "react";
+import React, { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { createSlideHtml, SLIDE_HEIGHT, SLIDE_WIDTH } from "../lib/slide-html-template";
 import type { DownloadFormat } from "../types";
@@ -142,6 +143,10 @@ const FullScreenPresentationViewer = ({
     const [currentSlide, setCurrentSlide] = useState(initialSlide);
     const [isDownloading, setIsDownloading] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const dialogRef = useRef<HTMLDivElement>(null);
+
+    // Escape is closed by the document listener below, so the trap only moves, wraps and restores focus.
+    useFocusTrap(dialogRef, { active: isOpen });
 
     const totalSlides = slides.length;
 
@@ -175,6 +180,23 @@ const FullScreenPresentationViewer = ({
 
         if (isEditDialogOpen || (target instanceof HTMLElement && (target.matches("input, textarea") || target.isContentEditable))) {
             return;
+        }
+
+        // Focus now lives inside the viewer, so keys aimed at a control are that control's: an open menu keeps its
+        // arrows and Escape, Space activates a focused button instead of turning the slide, and ArrowUp/ArrowDown
+        // on a menu trigger open its menu.
+        if (target instanceof HTMLElement) {
+            if (target.closest('[role="menu"]')) {
+                return;
+            }
+
+            if ((e.key === "ArrowDown" || e.key === "ArrowUp") && target.closest('[aria-haspopup="menu"]')) {
+                return;
+            }
+
+            if (e.key === " " && target.closest('button, a[href], [role="button"]')) {
+                return;
+            }
         }
 
         const handledKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Home", "End", "Escape"];
@@ -251,7 +273,14 @@ const FullScreenPresentationViewer = ({
     const renderSlide = currentSlideData ? <SlideIframe presentationTitle={presentationTitle} slide={currentSlideData} totalSlides={totalSlides} /> : null;
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col bg-black/90 backdrop-blur-sm">
+        <div
+            aria-label={presentationTitle ?? t`Presentation`}
+            aria-modal="true"
+            className="fixed inset-0 z-50 flex flex-col bg-black/90 backdrop-blur-sm outline-none"
+            ref={dialogRef}
+            role="dialog"
+            tabIndex={-1}
+        >
             {/* Top Controls Bar */}
             <div className="flex-shrink-0 border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
                 <div className="flex items-center justify-between p-4">
