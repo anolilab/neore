@@ -90,6 +90,19 @@ describe("account deletion workflow: order", () => {
         expect(indexOfRun("gdpr_steps_posthog_steps:deletePostHogPerson")).toBeLessThan(completed);
     });
 
+    it("deletes the user's presentations before reporting the request completed", async () => {
+        await execute();
+
+        const completed = completionIndex();
+        const step = indexOfStep("delete-user-presentations");
+        const call = indexOfRun("gdpr_steps_deletion_steps:deleteUserPresentations");
+
+        expect(step).toBeGreaterThan(-1);
+        expect(call).toBeGreaterThan(step);
+        expect(call).toBeLessThan(completed);
+        expect(runs().find((entry) => entry.ref === "gdpr_steps_deletion_steps:deleteUserPresentations")?.args).toStrictEqual({ userId: USER });
+    });
+
     it("sends the confirmation e-mail and writes the audit entry only after completion, and minimises records last", async () => {
         await execute();
 

@@ -371,12 +371,14 @@ describe("getBillingSubject", () => {
     });
 
     it("reports a user as one seat, with the user's own id as the purchaser", async () => {
+        let userId = "";
         const result = await harness.run(async (ctx: any) => {
-            const id = await ctx.db.insert("user", { createdAt: 1, email: "u@example.com", emailVerified: true, name: "U", updatedAt: 1 });
+            userId = await ctx.db.insert("user", { createdAt: 1, email: "u@example.com", emailVerified: true, name: "U", updatedAt: 1 });
 
-            return await ctx.runQuery(getBillingSubject, { id, kind: "user" });
+            return await ctx.runQuery(getBillingSubject, { id: userId, kind: "user" });
         });
 
-        expect(result).toMatchObject({ baseTier: "free", creemPurchaserId: expect.any(String), exists: true, seats: 1 });
+        expect(userId).not.toBe("");
+        expect(result).toMatchObject({ baseTier: "free", creemPurchaserId: userId, exists: true, seats: 1 });
     });
 });
