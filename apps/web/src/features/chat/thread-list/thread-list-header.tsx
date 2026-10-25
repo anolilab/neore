@@ -66,6 +66,13 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
         }),
     );
 
+    const isMessageSearch = searchType === "messages";
+    const closedSearchLabel = isMessageSearch ? t`Search messages` : t`Search threads`;
+    let closedSearchTooltip = closedSearchLabel;
+    if (focusSearchShortcut) {
+        closedSearchTooltip = isMessageSearch ? t`Search messages (${focusSearchShortcut})` : t`Search threads (${focusSearchShortcut})`;
+    }
+
     const handleNewThread = () => {
         navigate({ search: {}, to: "/chat" });
     };
@@ -97,7 +104,7 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                                 render={
                                     <Button
                                         aria-expanded={showSearch}
-                                        aria-label={showSearch ? t`Close search` : t`Search threads`}
+                                        aria-label={showSearch ? t`Close search` : closedSearchLabel}
                                         className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
                                         data-search-toggle=""
                                         onClick={toggleShowSearch}
@@ -108,7 +115,7 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                                     </Button>
                                 }
                             />
-                            <TooltipContent>{showSearch ? t`Close search` : focusSearchShortcut ? t`Search threads (${focusSearchShortcut})` : t`Search threads`}</TooltipContent>
+                            <TooltipContent>{showSearch ? t`Close search` : closedSearchTooltip}</TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
                     <TooltipProvider>

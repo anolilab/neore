@@ -4367,8 +4367,8 @@ msgstr "Bulgarian"
 msgid "Bulgarian (Bulgaria)"
 msgstr "Bulgarian (Bulgaria)"
 
-#: src/features/chat/thread-list/thread-list-header.tsx:154
-#: src/features/chat/thread-list/thread-list-header.tsx:165
+#: src/features/chat/thread-list/thread-list-header.tsx:158
+#: src/features/chat/thread-list/thread-list-header.tsx:169
 msgid "Bulk actions"
 msgstr "Bulk actions"
 
@@ -5442,8 +5442,8 @@ msgstr "Close prompt improvement"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:237
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:210
-#: src/features/chat/thread-list/thread-list-header.tsx:96
-#: src/features/chat/thread-list/thread-list-header.tsx:106
+#: src/features/chat/thread-list/thread-list-header.tsx:100
+#: src/features/chat/thread-list/thread-list-header.tsx:110
 msgid "Close search"
 msgstr "Close search"
 
@@ -7253,8 +7253,8 @@ msgstr "Create Organization"
 msgid "Create PR"
 msgstr "Create PR"
 
-#: src/features/chat/thread-list/thread-list-header.tsx:114
-#: src/features/chat/thread-list/thread-list-header.tsx:124
+#: src/features/chat/thread-list/thread-list-header.tsx:118
+#: src/features/chat/thread-list/thread-list-header.tsx:128
 msgid "Create project"
 msgstr "Create project"
 
@@ -15251,7 +15251,7 @@ msgstr "Kenya"
 #~ msgstr "Key Created"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
-#: src/features/chat/thread-list/thread-list-header.tsx:133
+#: src/features/chat/thread-list/thread-list-header.tsx:137
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
 msgid "Keyboard shortcuts"
 msgstr "Keyboard shortcuts"
@@ -15264,7 +15264,7 @@ msgstr "Keyboard shortcuts"
 msgid "Keyboard Shortcuts"
 msgstr "Keyboard Shortcuts"
 
-#: src/features/chat/thread-list/thread-list-header.tsx:143
+#: src/features/chat/thread-list/thread-list-header.tsx:147
 #: src/features/workflow/components/canvas/workflow-controls.tsx:381
 msgid "Keyboard shortcuts (?)"
 msgstr "Keyboard shortcuts (?)"
@@ -18286,7 +18286,7 @@ msgstr "New this week"
 msgid "New thread"
 msgstr "New thread"
 
-#: src/features/chat/thread-list/thread-list-header.tsx:87
+#: src/features/chat/thread-list/thread-list-header.tsx:91
 msgid "New Thread"
 msgstr "New Thread"
 
@@ -24148,6 +24148,14 @@ msgstr "Search message content"
 msgid "Search message content..."
 msgstr "Search message content..."
 
+#: src/features/chat/thread-list/thread-list-header.tsx:66
+msgid "Search messages"
+msgstr "Search messages"
+
+#: src/features/chat/thread-list/thread-list-header.tsx:67
+msgid "Search messages (Ctrl+F)"
+msgstr "Search messages (Ctrl+F)"
+
 #: ../../packages/ui/src/components/ai-elements/mic-selector.tsx:153
 msgid "Search microphones..."
 msgstr "Search microphones..."
@@ -24256,11 +24264,11 @@ msgid "Search thread titles..."
 msgstr "Search thread titles..."
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:101
-#: src/features/chat/thread-list/thread-list-header.tsx:96
+#: src/features/chat/thread-list/thread-list-header.tsx:66
 msgid "Search threads"
 msgstr "Search threads"
 
-#: src/features/chat/thread-list/thread-list-header.tsx:106
+#: src/features/chat/thread-list/thread-list-header.tsx:67
 msgid "Search threads (Ctrl+F)"
 msgstr "Search threads (Ctrl+F)"
 
@@ -24476,7 +24484,7 @@ msgstr "Select model (optional)"
 msgid "Select model..."
 msgstr "Select model..."
 
-#: src/features/chat/thread-list/thread-list-header.tsx:169
+#: src/features/chat/thread-list/thread-list-header.tsx:173
 msgid "Select multiple threads"
 msgstr "Select multiple threads"
 

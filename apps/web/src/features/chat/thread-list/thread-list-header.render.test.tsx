@@ -5,7 +5,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const searchState = vi.hoisted(() => {
-    return { showSearch: false };
+    return { searchType: "threads", showSearch: false };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -63,7 +63,7 @@ vi.mock("./stores/thread-list-ui-store", () => {
                 enterSelectionMode: () => {},
                 openCreateProjectDialog: () => {},
                 searchQuery: "",
-                searchType: "threads",
+                searchType: searchState.searchType,
                 selectedCategory: undefined,
                 setSearchQuery: () => {},
                 setSearchType: () => {},
@@ -93,6 +93,19 @@ describe("ThreadListHeader", () => {
             expect(screen.getByRole("button", { name: "Close search" })).toBeTruthy();
         } finally {
             searchState.showSearch = false;
+        }
+    });
+
+    it("names the closed search button for message search when that mode is selected", () => {
+        searchState.searchType = "messages";
+
+        try {
+            render(<ThreadListHeader />);
+
+            expect(screen.getByRole("button", { name: "Search messages" })).toBeTruthy();
+            expect(screen.queryByRole("button", { name: "Search threads" })).toBeNull();
+        } finally {
+            searchState.searchType = "threads";
         }
     });
 });
