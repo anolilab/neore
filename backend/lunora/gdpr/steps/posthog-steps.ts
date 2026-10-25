@@ -1,44 +1,113 @@
 import { v } from "lunorash/server";
 
 import { internalAction } from "../../_generated/server";
-import { FETCH_TIMEOUT_SHORT_MS, fetchWithDeadline } from "../../lib/fetch-timeout";
+import { assertOk, FETCH_TIMEOUT_SHORT_MS, fetchWithDeadline, HttpError } from "../../lib/fetch-timeout";
+import { gdprLogger } from "../../lib/logger";
+import { MAX_LENGTH } from "../../lib/validators";
 import { posthogAppHost } from "../posthog-host";
 
-export const deletePostHogPerson = internalAction
-    .input({ userId: v.string() })
-    .output(v.null())
-    .action(async ({ args: { userId }, ctx: _context }) => {
-        const personalApiKey = process.env.POSTHOG_PERSONAL_API_KEY;
-        const projectId = process.env.POSTHOG_PROJECT_ID;
+/**
+ * - `deleted`: PostHog accepted the bulk delete.
+ * - `no_profile`: PostHog answered 404 for the person AND the configured project exists, so
+ *   the person has no PostHog profile and there is nothing to erase. This completes the
+ *   deletion workflow: an erasure cannot remove data that is not there.
+ * - `skipped`: PostHog deletion is not configured here; NOTHING was erased.
+ */
+export type PostHogErasureOutcome = "deleted" | "no_profile" | "skipped";
 
-        if (!personalApiKey || !projectId) {
-            // PostHog GDPR deletion not configured — skip silently
-            return null;
-        }
+const vPostHogErasureOutcome = v.union(v.literal("deleted"), v.literal("no_profile"), v.literal("skipped"));
 
-        // The private API lives on the app host, not on the ingestion host `POSTHOG_HOST` names.
-        const host = posthogAppHost(process.env.POSTHOG_HOST);
-        // Use the Persons v3 bulk-delete endpoint which accepts distinct_ids directly
-        const url = `${host}/api/projects/${projectId}/persons/bulk_delete/`;
+interface PostHogErasureEnv {
+    POSTHOG_HOST?: string;
+    POSTHOG_PERSONAL_API_KEY?: string;
+    POSTHOG_PROJECT_ID?: string;
+}
 
-        const response = await fetchWithDeadline(url, {
-            body: JSON.stringify({
-                delete_events: true,
-                distinct_ids: [userId],
-            }),
-            headers: {
-                Authorization: `Bearer ${personalApiKey}`,
-                "Content-Type": "application/json",
-            },
-            method: "POST",
-            timeoutMs: FETCH_TIMEOUT_SHORT_MS,
-        });
-
-        if (!response.ok) {
-            const body = await response.text().catch(() => "");
-
-            console.error(`[GDPR/PostHog] Failed to delete person ${userId}: ${response.status} ${response.statusText}`, body);
-        }
-
-        return null;
+/**
+ * PostHog answers 404 both for a person it does not know and for a project id that does not
+ * exist, so a 404 on the person proves nothing alone. Throws unless the configured project
+ * resolves, which keeps a wrong `POSTHOG_PROJECT_ID` from passing as "nothing to erase".
+ */
+const assertProjectExists = async (host: string, projectId: string, personalApiKey: string): Promise<void> => {
+    const response = await fetchWithDeadline(`${host}/api/projects/${projectId}/`, {
+        headers: { Authorization: `Bearer ${personalApiKey}` },
+        timeoutMs: FETCH_TIMEOUT_SHORT_MS,
     });
+
+    if (response.status === 401 || response.status === 403) {
+        await response.body?.cancel();
+        // The key can delete persons but cannot read the project: a configuration fault to fix, not an outage to wait out.
+        const message = `[GDPR/PostHog] POSTHOG_PERSONAL_API_KEY lacks the project:read scope, so project ${projectId} could not be verified and a 404 on the person is not trusted`;
+
+        gdprLogger.error(message);
+
+        throw new HttpError(message, response.status, response.statusText);
+    }
+
+    await assertOk(response, `[GDPR/PostHog] Project ${projectId} could not be verified, so a 404 on the person is not trusted`);
+    await response.body?.cancel();
+};
+
+/**
+ * Deletes the person and their events. Anything but a clean answer THROWS, so the workflow
+ * step retries and the deletion is never reported as done while data may remain. The one
+ * non-2xx that does not throw is a 404 on the person from a verified project (`no_profile`).
+ */
+export const erasePostHogPerson = async (userId: string, env: PostHogErasureEnv): Promise<PostHogErasureOutcome> => {
+    const personalApiKey = env.POSTHOG_PERSONAL_API_KEY;
+    const projectId = env.POSTHOG_PROJECT_ID;
+
+    if (!personalApiKey || !projectId) {
+        // PostHog GDPR deletion not configured — nothing to erase, and the caller must not call it erased.
+        return "skipped";
+    }
+
+    // The private API lives on the app host, not on the ingestion host `POSTHOG_HOST` names.
+    const host = posthogAppHost(env.POSTHOG_HOST);
+    // Use the Persons v3 bulk-delete endpoint which accepts distinct_ids directly
+    const url = `${host}/api/projects/${projectId}/persons/bulk_delete/`;
+
+    const response = await fetchWithDeadline(url, {
+        body: JSON.stringify({
+            delete_events: true,
+            distinct_ids: [userId],
+        }),
+        headers: {
+            Authorization: `Bearer ${personalApiKey}`,
+            "Content-Type": "application/json",
+        },
+        method: "POST",
+        timeoutMs: FETCH_TIMEOUT_SHORT_MS,
+    });
+
+    if (response.status === 404) {
+        await response.body?.cancel();
+        // Checked only on a 404 (so at most once per run): every other status already
+        // proves the project id resolves or throws below.
+        await assertProjectExists(host, projectId, personalApiKey);
+
+        return "no_profile";
+    }
+
+    try {
+        // Neither the user id nor PostHog's reply goes into the message or the log: the message is
+        // what the workflow instance and every retry attempt record.
+        await assertOk(response, "[GDPR/PostHog] Failed to delete person");
+    } catch (error) {
+        // Status only, then rethrow so the workflow step still retries.
+        if (error instanceof HttpError) {
+            gdprLogger.error(`${error.message} (http_${String(error.status)})`);
+        }
+
+        throw error;
+    }
+
+    await response.body?.cancel();
+
+    return "deleted";
+};
+
+export const deletePostHogPerson = internalAction
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(vPostHogErasureOutcome)
+    .action(async ({ args: { userId }, ctx: _context }) => await erasePostHogPerson(userId, process.env));

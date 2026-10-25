@@ -536,7 +536,18 @@ export interface InternalApiTypes {
             getExportRequest: FunctionReference<"query", { userId: string }, import("./dataModel.js").Doc_gdprRequests | null>;
             getRequestById: FunctionReference<"query", { requestId: Id<"gdprRequests"> }, import("./dataModel.js").Doc_gdprRequests | null>;
             logAudit: FunctionReference<"mutation", { action: string; details: string; performedBy: string; userId: string }, null>;
-            updateRequestProgress: FunctionReference<"mutation", { currentStep?: string; downloadUrl?: string; errorMessage?: string; progress?: number; requestId: Id<"gdprRequests">; status?: "pending" | "processing" | "completed" | "failed" | "cancelled"; storageId?: Id<"_storage"> }, null>;
+            updateRequestProgress: FunctionReference<"mutation", { currentStep?: string; downloadUrl?: string; errorMessage?: string; fromStatus?: Array<"pending" | "processing" | "completed" | "failed" | "cancelled">; progress?: number; requestId: Id<"gdprRequests">; status?: "pending" | "processing" | "completed" | "failed" | "cancelled"; storageId?: Id<"_storage"> }, boolean>;
+        };
+        posthog_retry: {
+            expireStalePostHogRetry: FunctionReference<"mutation", { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }, null>;
+            failPostHogRetry: FunctionReference<"mutation", { attempt: number; chain: number; errorClass: string; requestId: Id<"gdprRequests">; userId: string }, null>;
+            getRetryConfirmationEmail: FunctionReference<"query", { requestId: Id<"gdprRequests">; userId: string }, string>;
+            recordPostHogErased: FunctionReference<"mutation", { attempt: number; chain: number; posthog: "deleted" | "no_profile"; requestId: Id<"gdprRequests">; userId: string }, null>;
+            recordPostHogRetrySuccess: FunctionReference<"mutation", { attempt: number; chain: number; posthog: "deleted" | "no_profile"; requestId: Id<"gdprRequests">; userId: string }, boolean>;
+            retryPostHogErasure: FunctionReference<"action", { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }, null>;
+            schedulePostHogRetry: FunctionReference<"mutation", { failureId: string; requestId: Id<"gdprRequests">; userEmail: string; userId: string }, boolean>;
+            settleRetryConfirmation: FunctionReference<"mutation", { isSent: boolean; requestId: Id<"gdprRequests">; userId: string }, null>;
+            startPostHogRetry: FunctionReference<"mutation", { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }, "skip" | "erase" | "deleted" | "no_profile" | "confirm">;
         };
         request_sweeps: {
             cleanupExpiredExports: FunctionReference<"mutation", {}, null>;
@@ -578,7 +589,7 @@ export interface InternalApiTypes {
                 sendDeletionConfirmedEmailAction: FunctionReference<"action", { userEmail: string }, null>;
             };
             posthog_steps: {
-                deletePostHogPerson: FunctionReference<"action", { userId: string }, null>;
+                deletePostHogPerson: FunctionReference<"action", { userId: string }, "deleted" | "no_profile" | "skipped">;
             };
             residual_deletion_steps: {
                 anonymiseGatewayUsageDeductions: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
@@ -594,7 +605,7 @@ export interface InternalApiTypes {
                 killUserSandboxes: FunctionReference<"action", { userId: string }, null>;
                 listMessengerConnectionsForDeletion: FunctionReference<"query", { userId: string }, Array<{ platform: string }>>;
                 listSandboxIdsForDeletion: FunctionReference<"query", { userId: string }, Array<string>>;
-                minimiseGdprRecords: FunctionReference<"mutation", { userId: string }, null>;
+                minimiseGdprRecords: FunctionReference<"mutation", { retainEmailOf?: Id<"gdprRequests">; userId: string }, null>;
                 purgeUserDocumentHistory: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 revokeUserConnectorGrants: FunctionReference<"action", { userId: string }, null>;
             };
@@ -677,10 +688,11 @@ export interface InternalApiTypes {
         };
         claim_once: {
             claimKey: FunctionReference<"mutation", { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }, boolean>;
+            claimKeyFenced: FunctionReference<"mutation", { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }, null | number>;
             completeKey: FunctionReference<"mutation", { key: string; scope: string }, null>;
             purgeExpiredClaims: FunctionReference<"mutation", {}, number>;
             reapLapsedClaims: FunctionReference<"mutation", {}, number>;
-            releaseKey: FunctionReference<"mutation", { key: string; scope: string }, null>;
+            releaseKey: FunctionReference<"mutation", { claimedAt?: number; key: string; scope: string }, null>;
         };
         document_history: {
             getDocumentAtTime: FunctionReference<"query", { documentId: string; tableName: string; timestamp: number }, unknown | null>;
@@ -950,11 +962,11 @@ export interface InternalApiTypes {
     };
     triggers: {
         execute: {
-            default: FunctionReference<"action", { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
-            executeTrigger: FunctionReference<"action", { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
-            admitTriggerRun: FunctionReference<"mutation", { triggerId: Id<"triggers"> }, null | string>;
+            admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }, null | string | { filtered: string }>;
             createExecution: FunctionReference<"mutation", { payload?: string; triggerId: Id<"triggers"> }, Id<"triggerExecutions">>;
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
@@ -1540,6 +1552,17 @@ export const internal: InternalApiTypes = {
             logAudit: { __lunoraRef: "gdpr_functions:logAudit" },
             updateRequestProgress: { __lunoraRef: "gdpr_functions:updateRequestProgress" },
         },
+        posthog_retry: {
+            expireStalePostHogRetry: { __lunoraRef: "gdpr_posthog_retry:expireStalePostHogRetry" },
+            failPostHogRetry: { __lunoraRef: "gdpr_posthog_retry:failPostHogRetry" },
+            getRetryConfirmationEmail: { __lunoraRef: "gdpr_posthog_retry:getRetryConfirmationEmail" },
+            recordPostHogErased: { __lunoraRef: "gdpr_posthog_retry:recordPostHogErased" },
+            recordPostHogRetrySuccess: { __lunoraRef: "gdpr_posthog_retry:recordPostHogRetrySuccess" },
+            retryPostHogErasure: { __lunoraRef: "gdpr_posthog_retry:retryPostHogErasure" },
+            schedulePostHogRetry: { __lunoraRef: "gdpr_posthog_retry:schedulePostHogRetry" },
+            settleRetryConfirmation: { __lunoraRef: "gdpr_posthog_retry:settleRetryConfirmation" },
+            startPostHogRetry: { __lunoraRef: "gdpr_posthog_retry:startPostHogRetry" },
+        },
         request_sweeps: {
             cleanupExpiredExports: { __lunoraRef: "gdpr_request_sweeps:cleanupExpiredExports" },
             handleGdprRequestTimeouts: { __lunoraRef: "gdpr_request_sweeps:handleGdprRequestTimeouts" },
@@ -1679,6 +1702,7 @@ export const internal: InternalApiTypes = {
         },
         claim_once: {
             claimKey: { __lunoraRef: "lib_claim_once:claimKey" },
+            claimKeyFenced: { __lunoraRef: "lib_claim_once:claimKeyFenced" },
             completeKey: { __lunoraRef: "lib_claim_once:completeKey" },
             purgeExpiredClaims: { __lunoraRef: "lib_claim_once:purgeExpiredClaims" },
             reapLapsedClaims: { __lunoraRef: "lib_claim_once:reapLapsedClaims" },
