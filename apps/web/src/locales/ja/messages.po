@@ -1127,10 +1127,6 @@ msgstr "<0>Enter</0> 作成"
 msgid "<0>Esc</0> Close"
 msgstr "<0>Esc</0> 閉じる"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:934
-msgid "<0>Event</0> — React to external events via MCP or Composio (coming in Phase 2)."
-msgstr "<0>イベント</0> — MCP または Composio 経由で外部イベントに反応します（フェーズ 2 で提供予定）。"
-
 #: src/features/settings/components/chat/trigger-settings.tsx:916
 msgid "<0>Schedule</0> — Run on a cron schedule (e.g., daily at 8 AM). Uses standard 5-field cron expressions."
 msgstr "<0>スケジュール</0> — cron スケジュールで実行します（例：毎日午前 8 時）。標準的な 5 フィールドの cron 式を使用します。"
@@ -3516,8 +3512,8 @@ msgid "Autocomplete while typing"
 msgstr "入力中のオートコンプリート"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:632
-msgid "Automate agent execution on schedules, webhooks, or events"
-msgstr "スケジュール、Webhook、イベントでエージェントの実行を自動化"
+msgid "Automate agent execution on schedules or webhooks"
+msgstr "スケジュールまたはWebhookでエージェントの実行を自動化します"
 
 #: src/features/marketing/components/landing-page.tsx:282
 msgid "Automated multi-step analysis with cited sources"
@@ -7270,8 +7266,8 @@ msgid "Create your first skill to automate workflows. Import from GitHub, upload
 msgstr "最初のスキルを作成してワークフローを自動化しましょう。GitHub からインポートしたり、SKILL.md ファイルをアップロードしたり、公式カタログからインストールしたりできます。"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:896
-msgid "Create your first trigger to automate agent execution on a schedule, via webhooks, or from external events."
-msgstr "最初のトリガーを作成して、スケジュール、Webhook、外部イベントによるエージェントの実行を自動化しましょう。"
+msgid "Create your first trigger to automate agent execution on a schedule or via webhooks."
+msgstr "最初のトリガーを作成して、スケジュールまたはWebhook経由でエージェントの実行を自動化しましょう。"
 
 #: src/routes/(chat)/workflow/index.tsx:62
 msgid "Create your first workflow to automate AI tasks visually."
@@ -10254,8 +10250,8 @@ msgid "Event"
 msgstr "イベント"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:321
-msgid "Event triggers via MCP/Composio are coming in Phase 2. For now, use webhook triggers to connect external services."
-msgstr "MCP/Composio 経由のイベントトリガーはフェーズ 2 で提供予定です。現時点では、Webhook トリガーを使って外部サービスと接続してください。"
+msgid "Event triggers are not supported and never run. Delete this trigger and create a schedule or webhook trigger instead."
+msgstr "イベントトリガーはサポートされておらず、実行されません。このトリガーを削除して、代わりにスケジュールまたはWebhookのトリガーを作成してください。"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:129
 msgid "Every 6 hours"

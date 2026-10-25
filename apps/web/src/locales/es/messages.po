@@ -1127,10 +1127,6 @@ msgstr "<0>Enter</0> Crear"
 msgid "<0>Esc</0> Close"
 msgstr "<0>Esc</0> Cerrar"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:934
-msgid "<0>Event</0> — React to external events via MCP or Composio (coming in Phase 2)."
-msgstr "<0>Evento</0>: reacciona a eventos externos mediante MCP o Composio (llegará en la fase 2)."
-
 #: src/features/settings/components/chat/trigger-settings.tsx:916
 msgid "<0>Schedule</0> — Run on a cron schedule (e.g., daily at 8 AM). Uses standard 5-field cron expressions."
 msgstr "<0>Programación</0>: se ejecuta según una programación cron (p. ej., a diario a las 8 AM). Usa expresiones cron estándar de 5 campos."
@@ -3516,8 +3512,8 @@ msgid "Autocomplete while typing"
 msgstr "Autocompletar al escribir"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:632
-msgid "Automate agent execution on schedules, webhooks, or events"
-msgstr "Automatiza la ejecución de agentes con programaciones, webhooks o eventos"
+msgid "Automate agent execution on schedules or webhooks"
+msgstr "Automatiza la ejecución de agentes con programaciones o webhooks"
 
 #: src/features/marketing/components/landing-page.tsx:282
 msgid "Automated multi-step analysis with cited sources"
@@ -7270,8 +7266,8 @@ msgid "Create your first skill to automate workflows. Import from GitHub, upload
 msgstr "Crea tu primera habilidad para automatizar flujos de trabajo. Impórtala desde GitHub, sube archivos SKILL.md o instálala desde el catálogo oficial."
 
 #: src/features/settings/components/chat/trigger-settings.tsx:896
-msgid "Create your first trigger to automate agent execution on a schedule, via webhooks, or from external events."
-msgstr "Crea tu primer disparador para automatizar la ejecución de agentes según una programación, mediante webhooks o a partir de eventos externos."
+msgid "Create your first trigger to automate agent execution on a schedule or via webhooks."
+msgstr "Crea tu primer disparador para automatizar la ejecución de agentes con una programación o mediante webhooks."
 
 #: src/routes/(chat)/workflow/index.tsx:62
 msgid "Create your first workflow to automate AI tasks visually."
@@ -10254,8 +10250,8 @@ msgid "Event"
 msgstr "Evento"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:321
-msgid "Event triggers via MCP/Composio are coming in Phase 2. For now, use webhook triggers to connect external services."
-msgstr "Los disparadores por eventos mediante MCP/Composio llegarán en la fase 2. Por ahora, usa disparadores de webhook para conectar servicios externos."
+msgid "Event triggers are not supported and never run. Delete this trigger and create a schedule or webhook trigger instead."
+msgstr "Los disparadores de eventos no son compatibles y nunca se ejecutan. Elimina este disparador y crea uno de programación o de webhook en su lugar."
 
 #: src/features/settings/components/chat/trigger-settings.tsx:129
 msgid "Every 6 hours"
