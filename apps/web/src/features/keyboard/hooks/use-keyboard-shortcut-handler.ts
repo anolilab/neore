@@ -3,6 +3,8 @@ import { useCallback } from "react";
 
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
+import { focusThreadSearch } from "../lib/thread-search-target";
+
 // No-op handler for SSR - keyboard shortcuts only work on client
 const noopHandler = (_action: keyof KeyboardShortcuts, _event: KeyboardEvent): void => {};
 
@@ -59,16 +61,9 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                     items[0]?.focus();
                     break;
                 }
-                case "focusSearch":
-                case "search": {
-                    // Trigger search modal or focus search input
-                    const searchInput =
-                        document.querySelector<HTMLInputElement>("[data-search-input]") ||
-                        document.querySelector<HTMLInputElement>('[data-testid="search-input"]');
-
-                    if (searchInput) {
-                        searchInput.focus();
-                    }
+                case "focusSearch": {
+                    // Opens the thread list's search bar when it is closed, then focuses its input.
+                    focusThreadSearch();
 
                     break;
                 }

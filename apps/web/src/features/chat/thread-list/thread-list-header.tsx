@@ -93,6 +93,7 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                                 render={
                                     <Button
                                         className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
+                                        data-search-toggle=""
                                         onClick={toggleShowSearch}
                                         size="sm"
                                         variant="ghost"

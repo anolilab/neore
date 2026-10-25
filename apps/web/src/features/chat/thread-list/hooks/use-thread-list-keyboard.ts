@@ -20,7 +20,6 @@ interface UseThreadListKeyboardProps {
     onExitSelectionMode: () => void;
     selectedThreadIndex: number;
     setShowKeyboardHelp: (value: boolean | ((previous: boolean) => boolean)) => void;
-    setShowSearch: (value: boolean | ((previous: boolean) => boolean)) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
 }
 
@@ -45,7 +44,6 @@ const useThreadListKeyboard = ({
     navigate,
     onExitSelectionMode,
     setShowKeyboardHelp,
-    setShowSearch,
     updateThread,
 }: UseThreadListKeyboardProps) => {
     const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
@@ -199,16 +197,6 @@ const useThreadListKeyboard = ({
 
                     handleKeyboardEscape();
                     setShowKeyboardHelp(false);
-                }
-
-                break;
-            }
-
-            case "f":
-            case "F": {
-                if (isCtrlOrCommand) {
-                    event.preventDefault();
-                    setShowSearch((previous) => !previous);
                 }
 
                 break;

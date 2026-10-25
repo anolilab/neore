@@ -470,7 +470,6 @@ const HierarchicalThreadList: FC<
     setLoadingStates,
     setSelectedThreadIds,
     setShowKeyboardHelp,
-    setShowSearch,
     showKeyboardHelp,
     threadRelationships,
     threadSearchResults,
@@ -1099,7 +1098,6 @@ const HierarchicalThreadList: FC<
         onExitSelectionMode,
         selectedThreadIndex,
         setShowKeyboardHelp,
-        setShowSearch,
         updateThread,
     });
 

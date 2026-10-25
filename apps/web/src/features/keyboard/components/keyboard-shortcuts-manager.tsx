@@ -5,6 +5,7 @@ import { useKeyboardShortcuts as useUIKeyboardShortcuts } from "@/features/layou
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
 import convertShortcutToHotkeysHook from "../lib/shortcut-converter";
+import { hasThreadSearchTarget } from "../lib/thread-search-target";
 
 // Context for keyboard shortcuts
 interface KeyboardShortcutsContextType {
@@ -61,7 +62,6 @@ const KeyboardShortcutsHandler: React.FC<{
             nextItem: convertShortcutToHotkeysHook(shortcuts.nextItem),
             openModelPicker: convertShortcutToHotkeysHook(shortcuts.openModelPicker),
             prevItem: convertShortcutToHotkeysHook(shortcuts.prevItem),
-            search: convertShortcutToHotkeysHook(shortcuts.search),
             sidebarLeft: convertShortcutToHotkeysHook(shortcuts.sidebarLeft),
             sidebarRight: convertShortcutToHotkeysHook(shortcuts.sidebarRight),
         };
@@ -78,7 +78,6 @@ const KeyboardShortcutsHandler: React.FC<{
         shortcuts.nextItem,
         shortcuts.openModelPicker,
         shortcuts.prevItem,
-        shortcuts.search,
         shortcuts.sidebarLeft,
         shortcuts.sidebarRight,
     ]);
@@ -122,6 +121,11 @@ const KeyboardShortcutsHandler: React.FC<{
 
     const handleFocusSearch = useCallback(
         (event: KeyboardEvent) => {
+            // Without a search to focus the keystroke belongs to the browser's find.
+            if (!hasThreadSearchTarget()) {
+                return;
+            }
+
             event.preventDefault();
             onShortcut?.("focusSearch", event);
         },
@@ -184,14 +188,6 @@ const KeyboardShortcutsHandler: React.FC<{
         (event: KeyboardEvent) => {
             event.preventDefault();
             onShortcut?.("prevItem", event);
-        },
-        [onShortcut],
-    );
-
-    const handleSearch = useCallback(
-        (event: KeyboardEvent) => {
-            event.preventDefault();
-            onShortcut?.("search", event);
         },
         [onShortcut],
     );
@@ -289,7 +285,7 @@ const KeyboardShortcutsHandler: React.FC<{
             enabled: !!shortcuts.focusSearch && typeof shortcuts.focusSearch === "string",
             enableOnContentEditable: false,
             enableOnFormTags: false,
-            preventDefault: true,
+            preventDefault: hasThreadSearchTarget,
         },
         [convertedShortcuts.focusSearch, handleFocusSearch],
     );
@@ -384,19 +380,6 @@ const KeyboardShortcutsHandler: React.FC<{
             preventDefault: true,
         },
         [convertedShortcuts.prevItem, handlePreviousItem],
-    );
-
-    useHotkeys(
-        convertedShortcuts.search,
-        handleSearch,
-        {
-            description: "Open search",
-            enabled: !!shortcuts.search && typeof shortcuts.search === "string",
-            enableOnContentEditable: false,
-            enableOnFormTags: false,
-            preventDefault: true,
-        },
-        [convertedShortcuts.search, handleSearch],
     );
 
     useEffect(() => {

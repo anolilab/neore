@@ -67,7 +67,6 @@ export interface HierarchicalThreadListProperties {
     setLoadingStates: React.Dispatch<React.SetStateAction<LoadingStates>>;
     setSelectedThreadIds: SetStateFunction<Set<string>>;
     setShowKeyboardHelp: SetStateFunction<boolean>;
-    setShowSearch: SetStateFunction<boolean>;
     showKeyboardHelp: boolean;
     threadSearchResults: any;
     toggleExpanded: (threadId: string) => void;
