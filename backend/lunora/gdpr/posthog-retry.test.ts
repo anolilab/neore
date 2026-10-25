@@ -106,6 +106,43 @@ describe("scheduling the first retry", () => {
     });
 });
 
+describe("a first retry scheduled by a workflow whose status writes failed", () => {
+    it("moves a processing request to failed with the fixed reason, so the scheduled attempt can claim and erase", async () => {
+        // Both of the workflow's best-effort writes failed: the request is still processing.
+        await run(async (ctx) => await ctx.db.patch(requestId, { errorMessage: "stale", status: "processing" }));
+        await run(async (ctx) => await ctx.runMutation(schedulePostHogRetry, { requestId, userId: USER }));
+
+        expect(await statusOf()).toBe("failed");
+        const row = await request();
+
+        expect(row.errorMessage).toBe(FAILED_MESSAGE);
+        expect(jobs()).toHaveLength(1);
+
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+        await attempt(1);
+
+        expect(erasePostHogPerson).toHaveBeenCalledTimes(1);
+        expect(await statusOf()).toBe("completed");
+    });
+
+    it("does not touch a request that finished meanwhile", async () => {
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "cancelled" }));
+        await run(async (ctx) => await ctx.runMutation(schedulePostHogRetry, { requestId, userId: USER }));
+
+        expect(await statusOf()).toBe("cancelled");
+    });
+
+    it("queues attempt 1 once when the step is delivered twice", async () => {
+        await run(async (ctx) => await ctx.runMutation(schedulePostHogRetry, { requestId, userId: USER }));
+        await run(async (ctx) => await ctx.runMutation(schedulePostHogRetry, { requestId, userId: USER }));
+
+        expect(jobs()).toHaveLength(1);
+        const names = await actions();
+
+        expect(names.filter((name) => name === "deletion_retry_scheduled")).toHaveLength(1);
+    });
+});
+
 describe("a retry attempt", () => {
     it("completes the request, records the outcome like the workflow, and minimises", async () => {
         vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
@@ -235,6 +272,39 @@ describe("a redelivered attempt", () => {
         expect(erasePostHogPerson).toHaveBeenCalledTimes(1);
         expect(await statusOf()).toBe("completed");
         expect(await actions()).toStrictEqual(["deletion_completed", "deletion_retry_resumed", "deletion_retry_started", "deletion_retry_succeeded"]);
+    });
+
+    it("does not run a failed attempt again, nor queue a second successor, when its job is redelivered", async () => {
+        vi.mocked(erasePostHogPerson).mockRejectedValue(new Error("down"));
+
+        await attempt(1);
+
+        expect(erasePostHogPerson).toHaveBeenCalledTimes(1);
+        expect(jobs()).toHaveLength(1);
+
+        // The job is delivered again after the failure committed: the request is `failed` once more.
+        await attempt(1);
+
+        expect(erasePostHogPerson).toHaveBeenCalledTimes(1);
+        expect(jobs()).toHaveLength(1);
+        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, requestId, userId: USER });
+        expect(await statusOf()).toBe("failed");
+
+        const names = await actions();
+
+        expect(names.filter((name) => name === "deletion_retry_started")).toHaveLength(1);
+        expect(names.filter((name) => name === "deletion_retry_scheduled")).toHaveLength(1);
+        expect(names.filter((name) => name === "deletion_retry_failed")).toHaveLength(1);
+    });
+
+    it("does not run a succeeded attempt again even if the request is failed once more", async () => {
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+        await attempt(1);
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+
+        await attempt(1);
+
+        expect(erasePostHogPerson).toHaveBeenCalledTimes(1);
     });
 
     it("keeps the schedule going when the resumed attempt fails", async () => {

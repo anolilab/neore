@@ -397,8 +397,9 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             // Only the analytics erasure is retried, from the scheduler (`gdpr/posthog-retry.ts`): the
             // user can no longer sign in to ask again, and nothing else is left to do. The step gets
             // a long retry budget of its own, and `dedupId` keeps a retried attempt from queueing a
-            // second job. If even that is exhausted the error is logged at error level, never allowed
-            // to mask `error`.
+            // second job. The step also moves a still-`processing` request to `failed`, so the
+            // status writes above being swallowed cannot strand the first attempt. If even that is
+            // exhausted the error is logged at error level, never allowed to mask `error`.
             try {
                 await context.step.do(
                     "schedule-post-hog-retry",

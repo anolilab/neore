@@ -41,39 +41,15 @@ const record = async (context: MutationCtx, action: string, userId: string, deta
     context.log.event(`gdpr.${action}`, details);
 };
 
-const scheduleAttempt = async (context: MutationCtx, { attempt, requestId, userId }: RetryTarget): Promise<void> => {
-    const delayMs = POSTHOG_RETRY_DELAYS_MS[attempt - 1] ?? POSTHOG_RETRY_DELAYS_MS[POSTHOG_RETRY_MAX_ATTEMPTS - 1] ?? 0;
-
-    await runAfterOnShard(
-        context.scheduler,
-        delayMs,
-        internal.gdpr.posthog_retry.retryPostHogErasure,
-        { attempt, requestId, userId },
-        // The job must run on the user's shard, where the request rows live.
-        userId,
-    );
-    await record(context, "deletion_retry_scheduled", userId, { attempt, requestId });
-};
-
-/** Called by the deletion workflow when the PostHog step is exhausted: queues retry 1. */
-export const schedulePostHogRetry = internalMutation
-    .input({ requestId: v.id("gdprRequests"), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.null())
-    .mutation(async ({ args, ctx: context }) => {
-        await scheduleAttempt(context, { ...args, attempt: 1 });
-
-        return null;
-    });
-
-/** Whether this attempt already wrote its `deletion_retry_started` row (the audit details survive minimisation). */
-const attemptWasClaimed = async (context: MutationCtx, { attempt, requestId, userId }: RetryTarget): Promise<boolean> => {
+/** Whether the audit log holds one of `actions` for this attempt of this request (the details survive minimisation). */
+const hasAttemptRow = async (context: MutationCtx, actions: ReadonlyArray<string>, { attempt, requestId, userId }: RetryTarget): Promise<boolean> => {
     const rows = await context.db
         .query("gdprAuditLog")
         .withIndex("by_user", (q) => q.eq("userId", userId))
         .collect();
 
     return rows.some((row) => {
-        if (row.action !== "deletion_retry_started") {
+        if (!actions.includes(row.action)) {
             return false;
         }
 
@@ -87,10 +63,58 @@ const attemptWasClaimed = async (context: MutationCtx, { attempt, requestId, use
     });
 };
 
+/** How an attempt ends: once one of these is written, that attempt never runs again. */
+const OUTCOME_ACTIONS = ["deletion_retry_failed", "deletion_retry_succeeded", "deletion_retry_exhausted"] as const;
+
+/** Queues one attempt, once: a redelivered caller finds its `deletion_retry_scheduled` row and queues nothing. */
+const scheduleAttempt = async (context: MutationCtx, target: RetryTarget): Promise<void> => {
+    const { attempt, requestId, userId } = target;
+
+    if (await hasAttemptRow(context, ["deletion_retry_scheduled"], target)) {
+        return;
+    }
+
+    const delayMs = POSTHOG_RETRY_DELAYS_MS[attempt - 1] ?? POSTHOG_RETRY_DELAYS_MS[POSTHOG_RETRY_MAX_ATTEMPTS - 1] ?? 0;
+
+    await runAfterOnShard(
+        context.scheduler,
+        delayMs,
+        internal.gdpr.posthog_retry.retryPostHogErasure,
+        { attempt, requestId, userId },
+        // The job must run on the user's shard, where the request rows live.
+        userId,
+    );
+    await record(context, "deletion_retry_scheduled", userId, { attempt, requestId });
+};
+
+/**
+ * Called by the deletion workflow when the PostHog step is exhausted: queues retry 1. The request
+ * is also moved to `failed` HERE, in the same transaction: the workflow's own status writes are
+ * best-effort, and a request they left `processing` could not be claimed by the scheduled attempt,
+ * which would end without erasing anything. Only `processing` is moved, so a request completed or
+ * cancelled meanwhile stays so.
+ */
+export const schedulePostHogRetry = internalMutation
+    .input({ requestId: v.id("gdprRequests"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx: context }) => {
+        const request = await context.db.get(args.requestId);
+
+        if (request?.userId === args.userId && request.status === "processing") {
+            await context.db.patch(args.requestId, { errorMessage: POSTHOG_FAILED_MESSAGE, status: "failed" });
+        }
+
+        await scheduleAttempt(context, { ...args, attempt: 1 });
+
+        return null;
+    });
+
 /**
  * Claims an attempt: a request still `failed` is retried, so one that was completed meanwhile
- * (a re-run workflow) or cancelled is left alone. A `processing` request is taken over only when
- * THIS attempt claimed it, i.e. the job was redelivered after the action stopped mid-run: the
+ * (a re-run workflow) or cancelled is left alone. An attempt that already has its outcome row
+ * (failed, succeeded, exhausted) never runs again: a redelivery after that commit would otherwise
+ * call the provider a second time and fork the chain with a second successor. A `processing`
+ * request is taken over only when THIS attempt claimed it, i.e. the job was redelivered after the action stopped mid-run: the
  * erasure is idempotent, so a concurrent duplicate is harmless. A request a workflow re-run holds
  * as `processing` has no such row and is left alone.
  */
@@ -104,8 +128,14 @@ export const startPostHogRetry = internalMutation
             return false;
         }
 
+        const target = { attempt, requestId, userId };
+
+        if (await hasAttemptRow(context, OUTCOME_ACTIONS, target)) {
+            return false;
+        }
+
         if (request.status === "processing") {
-            if (!(await attemptWasClaimed(context, { attempt, requestId, userId }))) {
+            if (!(await hasAttemptRow(context, ["deletion_retry_started"], target))) {
                 return false;
             }
 
