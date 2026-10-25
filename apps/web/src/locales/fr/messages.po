@@ -1127,10 +1127,6 @@ msgstr "<0>Entrée</0> Créer"
 msgid "<0>Esc</0> Close"
 msgstr "<0>Échap</0> Fermer"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:934
-msgid "<0>Event</0> — React to external events via MCP or Composio (coming in Phase 2)."
-msgstr "<0>Événement</0> — Réagissez à des événements externes via MCP ou Composio (disponible en phase 2)."
-
 #: src/features/settings/components/chat/trigger-settings.tsx:916
 msgid "<0>Schedule</0> — Run on a cron schedule (e.g., daily at 8 AM). Uses standard 5-field cron expressions."
 msgstr "<0>Planification</0> — Exécution selon une planification cron (par ex. tous les jours à 8 h). Utilise des expressions cron standard à 5 champs."
@@ -3516,8 +3512,8 @@ msgid "Autocomplete while typing"
 msgstr "Saisie semi-automatique pendant la frappe"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:632
-msgid "Automate agent execution on schedules, webhooks, or events"
-msgstr "Automatisez l’exécution des agents selon des planifications, des webhooks ou des événements"
+msgid "Automate agent execution on schedules or webhooks"
+msgstr "Automatisez l’exécution des agents selon des planifications ou des webhooks"
 
 #: src/features/marketing/components/landing-page.tsx:282
 msgid "Automated multi-step analysis with cited sources"
@@ -7270,8 +7266,8 @@ msgid "Create your first skill to automate workflows. Import from GitHub, upload
 msgstr "Créez votre première compétence pour automatiser vos workflows. Importez depuis GitHub, téléversez des fichiers SKILL.md ou installez depuis le catalogue officiel."
 
 #: src/features/settings/components/chat/trigger-settings.tsx:896
-msgid "Create your first trigger to automate agent execution on a schedule, via webhooks, or from external events."
-msgstr "Créez votre premier déclencheur pour automatiser l’exécution des agents selon une planification, via des webhooks ou à partir d’événements externes."
+msgid "Create your first trigger to automate agent execution on a schedule or via webhooks."
+msgstr "Créez votre premier déclencheur pour automatiser l’exécution des agents selon une planification ou via des webhooks."
 
 #: src/routes/(chat)/workflow/index.tsx:62
 msgid "Create your first workflow to automate AI tasks visually."
@@ -10254,8 +10250,8 @@ msgid "Event"
 msgstr "Événement"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:321
-msgid "Event triggers via MCP/Composio are coming in Phase 2. For now, use webhook triggers to connect external services."
-msgstr "Les déclencheurs d’événements via MCP/Composio arriveront en phase 2. En attendant, utilisez des déclencheurs webhook pour connecter des services externes."
+msgid "Event triggers are not supported: nothing starts this one automatically, and it cannot be edited. Delete it and create a schedule or webhook trigger instead."
+msgstr "Les déclencheurs d'événement ne sont pas pris en charge : rien ne lance celui-ci automatiquement et il ne peut pas être modifié. Supprimez-le et créez plutôt un déclencheur planifié ou webhook."
 
 #: src/features/settings/components/chat/trigger-settings.tsx:129
 msgid "Every 6 hours"

@@ -26,10 +26,18 @@ import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
 
+// "event" stays in the union because existing rows carry it; removing a member is a breaking schema change.
 const triggerTypeSchema = v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event"));
 
 /** How a webhook delivery is signed; see `triggers/http.ts`. Absent on a row means "timestamped". */
 const vSignatureScheme = v.union(v.literal("timestamped"), v.literal("native"));
+
+/** Nothing dispatches an event trigger, so one can be neither created nor edited. Existing rows stay readable and deletable. */
+const assertTriggerTypeSupported = (type: "event" | "schedule" | "webhook"): void => {
+    if (type === "event") {
+        throw new LunoraError("BAD_REQUEST", "Event triggers are not supported yet. Use a schedule or a webhook trigger.");
+    }
+};
 
 /**
  * A schedule must be a 5-field cron that fires at most hourly. An unchecked
@@ -166,6 +174,8 @@ export const createTrigger = authMutation
         // `triggers` table declares.
         const triggerType = triggerTypeSchema.parse(args.type);
 
+        assertTriggerTypeSupported(triggerType);
+
         if (args.cronExpression !== undefined || triggerType === "schedule") {
             assertCronExpression(args.cronExpression ?? "");
         }
@@ -250,6 +260,8 @@ export const updateTrigger = authMutation
         if (!trigger || trigger.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Trigger not found");
         }
+
+        assertTriggerTypeSupported(trigger.type);
 
         const patch: {
             cronExpression?: string;

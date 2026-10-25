@@ -1,6 +1,6 @@
 ---
 title: Triggers
-description: Automate agent execution on schedules, via webhooks, or from external events
+description: Automate agent execution on schedules or via webhooks
 ---
 
 # Triggers
@@ -11,7 +11,7 @@ Triggers let you automate AI agent execution without manually starting a convers
 
 1. Open `/dashboard/settings/chat/triggers`
 2. Click **New Trigger**
-3. Choose a trigger type (Schedule, Webhook, or Event)
+3. Choose a trigger type (Schedule or Webhook)
 4. Configure the trigger settings and optionally set a system prompt
 5. Click **Create Trigger**, then enable it with the toggle
 
@@ -61,10 +61,9 @@ Receive HTTP POST requests from external services (Stripe, GitHub, Zapier, etc.)
 - The webhook body is passed to the AI as context
 - You can define a **payload template** to transform or filter the incoming data before it reaches the AI
 
-### Event (Coming Soon)
+### Event (not available)
 
-React to external events from MCP servers or Composio integrations. This trigger type is planned for a future release.
-
+Event triggers are not supported: nothing dispatches them automatically, so they cannot be created, and an existing one cannot be edited (it can still be enabled, disabled or test-run by hand). Use a schedule or a webhook trigger instead. Triggers of this type created earlier stay visible and can be deleted.
 ## Creating a Trigger
 
 1. Open `/dashboard/settings/chat/triggers`
@@ -72,7 +71,7 @@ React to external events from MCP servers or Composio integrations. This trigger
 3. Fill in the details:
    - **Name** — a descriptive name for the trigger
    - **Description** (optional) — what the trigger does
-   - **Type** — Schedule, Webhook, or Event
+   - **Type** — Schedule or Webhook
 4. Configure type-specific settings:
    - For Schedule: cron expression and timezone
    - For Webhook: the URL and secret are generated automatically

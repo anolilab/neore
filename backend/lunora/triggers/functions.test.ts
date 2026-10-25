@@ -184,6 +184,35 @@ describe("a routine's bot computer", () => {
     });
 });
 
+describe("event triggers", () => {
+    it("are refused on create, and an existing one cannot be edited", async () => {
+        const as = harness.withIdentity({ userId: "user-a" } as never);
+
+        await expect(as.mutation(createTrigger as never, { model: "m", name: "Ev", type: "event" } as never)).rejects.toThrow(
+            "Event triggers are not supported",
+        );
+
+        const triggerId = (await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("triggers", {
+                    createdAt: 1,
+                    enabled: false,
+                    model: "m",
+                    name: "Old event",
+                    triggerCount: 0,
+                    type: "event",
+                    updatedAt: 1,
+                    userId: "user-a",
+                }),
+        )) as string;
+
+        await expect(as.mutation(updateTrigger as never, { name: "Renamed", triggerId } as never)).rejects.toThrow("Event triggers are not supported");
+
+        // Still readable.
+        expect(await readTrigger(triggerId)).toMatchObject({ name: "Old event", type: "event" });
+    });
+});
+
 describe("testRunTrigger", () => {
     // The run reads the trigger when it starts, after this action returned. Enabling the
     // trigger only for the action's length meant a disabled trigger never ran.

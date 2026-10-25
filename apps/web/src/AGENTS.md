@@ -715,7 +715,7 @@ export const useFont = () => {
 };
 ```
 
-**Example**: See `hooks/use-font.ts`
+**Example**: See `features/auth/hooks/use-last-signin-method.ts`
 
 ## CONVENTIONS
 

@@ -41,26 +41,6 @@
       "to": "table:cleanupLogs"
     },
     {
-      "from": "function:agent_api_keys:destroy",
-      "kind": "read",
-      "to": "table:playgroundApiKeys"
-    },
-    {
-      "from": "function:agent_api_keys:destroy",
-      "kind": "write",
-      "to": "table:playgroundApiKeys"
-    },
-    {
-      "from": "function:agent_api_keys:issue",
-      "kind": "read",
-      "to": "table:playgroundApiKeys"
-    },
-    {
-      "from": "function:agent_api_keys:issue",
-      "kind": "write",
-      "to": "table:playgroundApiKeys"
-    },
-    {
       "from": "function:agent_auto_archive:archiveIfStillIdle",
       "kind": "read",
       "to": "table:persistentStreams"
@@ -6818,27 +6798,6 @@
       "kind": "function",
       "name": "admin.gateway_analytics.getGatewayAnalytics",
       "module": "admin"
-    },
-    {
-      "detail": "mutation",
-      "id": "function:agent_api_keys:destroy",
-      "kind": "function",
-      "name": "agent.api_keys.destroy",
-      "module": "agent"
-    },
-    {
-      "detail": "mutation",
-      "id": "function:agent_api_keys:issue",
-      "kind": "function",
-      "name": "agent.api_keys.issue",
-      "module": "agent"
-    },
-    {
-      "detail": "query",
-      "id": "function:agent_api_keys:validate",
-      "kind": "function",
-      "name": "agent.api_keys.validate",
-      "module": "agent"
     },
     {
       "detail": "mutation",
@@ -16615,25 +16574,25 @@
     {
       "file": "auth/functions",
       "kind": "read",
-      "line": 152,
+      "line": 150,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "write",
-      "line": 233,
+      "line": 232,
       "reason": "the written table is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "read",
-      "line": 253,
+      "line": 252,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "call",
-      "line": 749,
+      "line": 748,
       "reason": "\"createAuthAction\" is not a registered function"
     },
     {

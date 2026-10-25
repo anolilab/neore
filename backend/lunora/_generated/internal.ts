@@ -16,11 +16,6 @@ export interface InternalApiTypes {
         };
     };
     agent: {
-        api_keys: {
-            destroy: FunctionReference<"mutation", { apiKey?: Id<"playgroundApiKeys">; name?: string }, "missing" | "deleted" | "name mismatch" | "must provide either apiKey or name">;
-            issue: FunctionReference<"mutation", { name?: string }, Id<"playgroundApiKeys">>;
-            validate: FunctionReference<"query", { apiKey: Id<"playgroundApiKeys"> }, boolean>;
-        };
         auto_archive: {
             archiveIfStillIdle: FunctionReference<"mutation", { cutoff: number; threadId: Id<"threads"> }, boolean>;
             autoArchiveContinue: FunctionReference<"mutation", { cursor: string }, null>;
@@ -1018,11 +1013,6 @@ export const internal: InternalApiTypes = {
         },
     },
     agent: {
-        api_keys: {
-            destroy: { __lunoraRef: "agent_api_keys:destroy" },
-            issue: { __lunoraRef: "agent_api_keys:issue" },
-            validate: { __lunoraRef: "agent_api_keys:validate" },
-        },
         auto_archive: {
             archiveIfStillIdle: { __lunoraRef: "agent_auto_archive:archiveIfStillIdle" },
             autoArchiveContinue: { __lunoraRef: "agent_auto_archive:autoArchiveContinue" },
