@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import type { JSX } from "react";
 import React, { memo, useMemo } from "react";
 
@@ -15,6 +15,8 @@ interface TextShimmerProps {
 }
 
 const TextShimmer = memo(({ as: Component = "p", children, className, duration = 2, spread = 2 }: TextShimmerProps) => {
+    // An endless loop is motion the user cannot pause (WCAG 2.2.2), and the global CSS rule does not reach Motion.
+    const prefersReducedMotion = useReducedMotion();
     const MotionComponent = motion.create(Component as keyof JSX.IntrinsicElements);
 
     const dynamicSpread = useMemo(() => children.length * spread, [children, spread]);
@@ -36,11 +38,7 @@ const TextShimmer = memo(({ as: Component = "p", children, className, duration =
                     backgroundImage: `var(--bg), linear-gradient(var(--base-color), var(--base-color))`,
                 } as React.CSSProperties
             }
-            transition={{
-                duration,
-                ease: "linear",
-                repeat: Infinity,
-            }}
+            transition={prefersReducedMotion ? { duration: 0 } : { duration, ease: "linear", repeat: Infinity }}
         >
             {children}
         </MotionComponent>
