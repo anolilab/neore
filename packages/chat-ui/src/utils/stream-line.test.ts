@@ -38,6 +38,11 @@ describe(parseStreamLine, () => {
         });
     });
 
+    it("reads a steering restart marker, and nothing but `true` as one", () => {
+        expect(parseStreamLine(JSON.stringify({ restart: true, text: "" }))).toStrictEqual({ kind: "chunk", reasoning: "", restart: true, text: "" });
+        expect(parseStreamLine(JSON.stringify({ restart: "yes", text: "Hi." }))).toStrictEqual({ kind: "chunk", reasoning: "", text: "Hi." });
+    });
+
     it("ignores a speaker that is not an object", () => {
         expect(parseStreamLine(JSON.stringify({ speaker: "Writer", text: "Hi." }))).toStrictEqual({ kind: "chunk", reasoning: "", text: "Hi." });
     });

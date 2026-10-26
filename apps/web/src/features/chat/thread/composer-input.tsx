@@ -8,15 +8,17 @@
  * - Chat actions (sendMessage, cancelStream)
  * - Drag and drop support
  * - Prompt history (ArrowUp/ArrowDown recall of this thread's prompts)
- * - Queueing while a turn streams (`composer-prompt-queue.tsx`)
+ * - Queueing while a turn streams (`composer-prompt-queue.tsx`), or steering it:
+ *   sending the text INTO the running reply (`chat_steering.steerRun`)
  * - "Restore to input" requests from the message list (`core/utils/composer-restore.ts`)
  */
 
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
 import { formatNumber } from "@neore/ui/utils/locale-format";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangleIcon, EditIcon, InfoIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent, FC } from "react";
 import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -45,6 +47,7 @@ import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
+import { isThreadLockedError } from "@/lib/lunora/unlock-proofs";
 import { showError } from "@/lib/toast";
 
 import type { ChatReference } from "./chat-reference";
@@ -97,6 +100,30 @@ const errorMessage = (error: unknown, fallback: string, describe?: (error: Attac
 
     return error instanceof Error ? error.message : fallback;
 };
+
+/**
+ * The server answered with an error code, so it did not queue the steer. An error
+ * without one (a dropped connection, a timeout) leaves it unknown whether it did.
+ * A locked chat's rejection counts as unknown too: the chip stays a steer, and the
+ * queue's withdrawal hits the same lock and pauses with the text kept, where a
+ * plain send would take it out of the queue before the same lock failed it.
+ */
+const wasRefused = (error: unknown): boolean => {
+    if (typeof error !== "object" || error === null || isThreadLockedError(error)) {
+        return false;
+    }
+
+    const { code, data } = error as { code?: unknown; data?: { code?: unknown } | null };
+
+    return typeof data?.code === "string" || typeof code === "string";
+};
+
+/**
+ * How long a `steerRun` call may stay unanswered before its chip stops holding the queue. The outcome is then
+ * unknown, like a dropped connection: the withdrawal reconciles by id, and closes the id on the run, so a call
+ * that lands late queues nothing (`withdrawQueuedSteer`).
+ */
+const STEER_ANSWER_MS = 15_000;
 
 /** The translated sentence for one upload failure; outside the component for the React Compiler. */
 const uploadErrorText = (
@@ -712,6 +739,46 @@ const ComposerInput = ({
         [setText, promptHistory],
     );
 
+    // Steer: while a reply streams, send the text INTO it; the run takes it at its
+    // next step boundary (`chat/steering.ts`). Text only — attachments and
+    // reference images go through the queue. The steer shows as a chip in the
+    // queue until the reply takes it; one the reply never took (a text-only
+    // reply has no step boundary) is sent after it, like a queued message. A
+    // refused steer (a group chat, a reply that just ended) is simply queued.
+    const { mutateAsync: steerRun } = useMutation(crpc.chat.steering.steerRun.mutationOptions());
+    const canSteer = isThreadComposer && !isComparisonValid && Boolean(sseStreamState) && attachments.length === 0 && attachedReferences.length === 0;
+
+    const handleSteer = useCallback(() => {
+        const streamId = sseStreamState;
+        const steerText = text;
+
+        if (!canSteer || !threadId || !streamId || !steerText.trim() || disabled) {
+            return;
+        }
+
+        promptHistory.reset();
+        clear();
+
+        const { enqueue, settleSteer } = usePromptQueueStore.getState();
+
+        // The id is ours, so a call whose answer never came back can still be told
+        // apart from a refusal: the chip stays as a steer and the queue's withdrawal
+        // (`composer-prompt-queue.tsx`) learns whether the run took it before anything is sent.
+        const steerId = crypto.randomUUID();
+
+        // The chip exists before the call is made: the text is in the (persisted)
+        // queue the moment it leaves the draft, and a prompt queued while the call
+        // is out lands behind it. `pending` keeps the queue from acting on it.
+        enqueue(threadId, { attachments: [], steer: { id: steerId, pending: true, streamId }, text: steerText });
+
+        const unanswered = setTimeout(settleSteer, STEER_ANSWER_MS, threadId, steerId, "accepted");
+
+        void steerRun({ steerId, streamId: streamId as Id<"persistentStreams">, text: steerText, threadId: threadId as Id<"threads"> })
+            .then(() => settleSteer(threadId, steerId, "accepted"))
+            .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"))
+            .finally(() => clearTimeout(unanswered));
+    }, [canSteer, clear, disabled, promptHistory, sseStreamState, steerRun, text, threadId]);
+
     // Handle submit — fully synchronous, fire-and-forget network call.
     // Optimistic state (user message + Thinking...) is shown immediately inside
     // sendMessage before the first await. The network request runs in the background.
@@ -1187,6 +1254,7 @@ const ComposerInput = ({
                 onSelectChat={compact ? undefined : handleSelectChat}
                 onSelectFileUpload={compact ? undefined : handleSelectFileUpload}
                 onSelectVaultFile={compact ? undefined : handleSelectVaultFile}
+                onSteer={canSteer ? handleSteer : undefined}
                 onSubmit={handleSubmit}
                 placeholder={placeholder ?? t`Type your message...`}
                 ref={inputAreaRef}

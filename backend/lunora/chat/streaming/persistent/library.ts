@@ -15,6 +15,7 @@ import { internalMutation, internalQuery, type MutationCtx } from "../../../_gen
 import { patchRow } from "../../../lib/patch";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { MAX_LENGTH } from "../../../lib/validators";
+import { latestSteerMessageId, latestSteerPendingId, type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
 
@@ -86,6 +87,8 @@ export const addChunk = internalMutation
     .input({
         final: v.boolean(),
         reasoning: v.optional(v.string()),
+        /** Steering: the reply continues below a message the user sent into it (`chat/steering.ts`). */
+        restart: v.optional(v.boolean()),
         /** Group chat: this chunk starts a new participant's reply. */
         speaker: v.optional(v.object({ name: v.string(), skillId: v.string() })),
         streamId: v.id("persistentStreams"),
@@ -115,6 +118,7 @@ export const addChunk = internalMutation
 
         await ctx.db.insert("persistentChunks", {
             reasoning: args.reasoning,
+            ...(args.restart && { restart: true }),
             seq,
             ...(args.speaker && { speaker: args.speaker }),
             streamId: args.streamId,
@@ -133,7 +137,10 @@ export const addChunk = internalMutation
         }
 
         if (status !== stream.status) {
-            await ctx.db.patch(args.streamId, { status });
+            // The run is over: a steer it never took keeps no text on the row (`withoutQueuedText`).
+            const steers = args.final ? withoutQueuedText(stream.steers as SteerEntry[] | undefined) : undefined;
+
+            await ctx.db.patch(args.streamId, { status, ...(steers && { steers }) });
         }
     });
 
@@ -155,8 +162,12 @@ export const setStreamStatus = internalMutation
             return;
         }
 
+        // Any status past the live ones ends the run: a steer it never took keeps no text on the row.
+        const steers = args.status === "pending" || args.status === "streaming" ? undefined : withoutQueuedText(stream.steers as SteerEntry[] | undefined);
+
         await ctx.db.patch(args.streamId, {
             status: args.status,
+            ...(steers && { steers }),
         });
     });
 
@@ -196,7 +207,9 @@ export const stopActiveForThread = internalMutation
         const streams = named.length > 0 ? named : live;
 
         for (const stream of streams) {
-            await ctx.db.patch(stream._id, { status: "done" });
+            const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
+
+            await ctx.db.patch(stream._id, { status: "done", ...(steers && { steers }) });
         }
 
         // The thread leaves `running` only when no live reply is left to keep running.
@@ -259,10 +272,27 @@ export const finishStoppedReply = internalMutation
         const threadId = stream.threadId as Id<"threads">;
         let messageId: Id<"messages"> | undefined;
 
-        const pending = await ctx.db.messages.findFirst({
+        // A steered run carries on below its latest steered message (`chat/steering.ts`): its pending
+        // row and the text it owes belong in that message's order, with that message as their prompt.
+        const steeredId = latestSteerMessageId(stream.steers as SteerEntry[] | undefined);
+        const steerRow = steeredId ? await ctx.db.messages.findFirst({ where: { _id: steeredId as Id<"messages">, threadId } }) : null;
+        const order = steerRow?.order ?? args.order;
+
+        let pending = await ctx.db.messages.findFirst({
             orderBy: [{ stepOrder: "desc" }],
-            where: { order: args.order, status: "pending", threadId, tool: false },
+            where: { order, status: "pending", threadId, tool: false },
         });
+
+        // The delivered steer's row is gone (deleted since), but `insertSteerRow` already moved the run's pending row
+        // into that row's order, so the run's own order finds nothing. The delivery recorded that row's id: saving into
+        // it keeps the owed text, and an empty one is removed instead of left pending.
+        const movedId = steeredId && !steerRow ? latestSteerPendingId(stream.steers as SteerEntry[] | undefined) : undefined;
+
+        if (!pending && movedId) {
+            const moved = await ctx.db.messages.findFirst({ where: { _id: movedId as Id<"messages">, threadId } });
+
+            pending = moved?.status === "pending" && !moved.tool ? moved : null;
+        }
 
         if (args.pendingText.length === 0 && args.pendingReasoning.length === 0) {
             // Nothing owed: the step in flight wrote no text, so its empty placeholder goes. Left pending, the abort
@@ -275,9 +305,13 @@ export const finishStoppedReply = internalMutation
                 ...(args.pendingReasoning ? [{ text: args.pendingReasoning, type: "reasoning" as const }] : []),
                 ...(args.pendingText ? [{ text: args.pendingText, type: "text" as const }] : []),
             ];
-            const placement = args.continuation
+            let placement = args.continuation
                 ? { overrideOrder: args.order, parentMessageId: args.promptMessageId, promptMessageId: undefined }
                 : { overrideOrder: undefined, parentMessageId: undefined, promptMessageId: args.promptMessageId as Id<"messages"> };
+
+            if (steerRow) {
+                placement = { overrideOrder: undefined, parentMessageId: undefined, promptMessageId: steerRow._id };
+            }
 
             const saved = await addMessagesHandler(ctx, {
                 agentName: args.agentName,
@@ -355,12 +389,20 @@ export const getStreamText = internalQuery
             });
             // In a group turn, earlier participants' replies are already saved
             // messages; only the current speaker's text is still "streaming".
-            const lastMarker = allChunks.findLastIndex((chunk) => chunk.speaker);
+            // Likewise the text before a steered message (`restart`).
+            const lastMarker = allChunks.findLastIndex((chunk) => chunk.speaker || chunk.restart);
             const chunks = lastMarker === -1 ? allChunks : allChunks.slice(lastMarker);
 
             speaker = lastMarker === -1 ? undefined : (allChunks[lastMarker]?.speaker ?? undefined);
-            text = chunks.map((chunk) => chunk.text).join("");
-            reasoning = chunks.map((chunk) => chunk.reasoning || "").join("");
+
+            // A steer delivered whose marker is not written yet (the next step never started: a stop or a failure came
+            // first): everything written so far is above the steered message, so nothing is the current reply's.
+            const deliveries = new Set((stream.steers ?? []).flatMap((entry) => (entry.status === "delivered" && entry.messageId ? [entry.messageId] : [])));
+
+            if (deliveries.size <= allChunks.filter((chunk) => chunk.restart).length) {
+                text = chunks.map((chunk) => chunk.text).join("");
+                reasoning = chunks.map((chunk) => chunk.reasoning || "").join("");
+            }
         }
 
         return {
@@ -394,6 +436,7 @@ export const getChunksAfter = internalQuery
             chunks: v.array(
                 v.object({
                     reasoning: v.optional(v.string()),
+                    restart: v.optional(v.boolean()),
                     speaker: v.optional(v.object({ name: v.string(), skillId: v.string() })),
                     text: v.string(),
                 }),
@@ -433,8 +476,8 @@ export const getChunksAfter = internalQuery
             return lockedAnswer;
         }
 
-        const toChunk = (c: { reasoning?: string | null; speaker?: { name: string; skillId: string } | null; text: string }) => {
-            return { reasoning: c.reasoning ?? undefined, ...(c.speaker && { speaker: c.speaker }), text: c.text };
+        const toChunk = (c: { reasoning?: string | null; restart?: boolean | null; speaker?: { name: string; skillId: string } | null; text: string }) => {
+            return { reasoning: c.reasoning ?? undefined, ...(c.restart && { restart: true }), ...(c.speaker && { speaker: c.speaker }), text: c.text };
         };
 
         // Only the chunks past the cursor, in order. With nothing new this is

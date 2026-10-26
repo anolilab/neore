@@ -8,6 +8,7 @@ import {
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
+    repliesByOrder,
     replyUsageArgs,
     skillKeyOf,
     summariseReply,
@@ -149,6 +150,25 @@ describe("replyUsageArgs", () => {
     it("records nothing for a run that saved no reply row", () => {
         expect(replyUsageArgs([{ _id: "m_prompt", message: { role: "user" } }], { at, userId: "u1" })).toBeUndefined();
         expect(replyUsageArgs([{ message: { role: "assistant" } }], { at, userId: "u1" })).toBeUndefined();
+    });
+});
+
+describe("repliesByOrder", () => {
+    it("keeps a run in one reply, and splits a steered one where the backfill does", () => {
+        const plain = [
+            { _id: "p", message: { role: "user" }, order: 4 },
+            { _id: "a", message: { role: "assistant" }, order: 4 },
+            { _id: "t", message: { role: "tool" }, order: 4 },
+        ];
+        // Saved by a steered run: the reply before the steer, then the rest in the steer's order.
+        const steered = [
+            { _id: "a", message: { role: "assistant" }, order: 4 },
+            { _id: "t", message: { role: "tool" }, order: 4 },
+            { _id: "b", message: { role: "assistant" }, order: 5 },
+        ];
+
+        expect(repliesByOrder(plain).map((reply) => reply.map((saved) => saved._id))).toStrictEqual([["p", "a", "t"]]);
+        expect(repliesByOrder(steered).map((reply) => replyUsageArgs(reply, { at: 0, userId: "u1" })?.replyKey)).toStrictEqual(["a", "b"]);
     });
 });
 

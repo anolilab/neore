@@ -18910,6 +18910,190 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#chat_steering:steerRun": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_steering:steerRun` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_steering:steerRun",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "steerId": {
+                        "type": "string"
+                      },
+                      "streamId": {
+                        "description": "Id<\"persistentStreams\">",
+                        "type": "string",
+                        "x-lunora-table": "persistentStreams"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "streamId",
+                      "text",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_steering:steerRun",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "steerId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "steerId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_steering:steerRun",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_steering:withdrawSteer": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_steering:withdrawSteer` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_steering:withdrawSteer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "steerId": {
+                        "type": "string"
+                      },
+                      "streamId": {
+                        "description": "Id<\"persistentStreams\">",
+                        "type": "string",
+                        "x-lunora-table": "persistentStreams"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "steerId",
+                      "streamId",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_steering:withdrawSteer",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "outcome": {
+                      "anyOf": [
+                        {
+                          "const": "withdrawn",
+                          "type": "string"
+                        },
+                        {
+                          "const": "delivered",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unknown",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "outcome"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_steering:withdrawSteer",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#chat_streaming:getActiveStreamForThread": {
       "post": {
         "description": "Invoke the `query` `chat_streaming:getActiveStreamForThread` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -18962,6 +19146,12 @@
                   "anyOf": [
                     {
                       "properties": {
+                        "deliveredSteerIds": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
                         "streamId": {
                           "description": "Id<\"persistentStreams\">",
                           "type": "string",

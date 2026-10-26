@@ -74,4 +74,30 @@ describe(streamReply, () => {
 
         expect(gateway).toHaveBeenCalledTimes(2);
     });
+
+    it("passes a steering restart marker on with its delta", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(
+                async () =>
+                    new Response(`${[JSON.stringify({ text: "before" }), JSON.stringify({ restart: true, text: "after" })].join("\n")}\n`, { status: 200 }),
+            ),
+        );
+
+        const deltas: { restart?: true; text: string }[] = [];
+
+        await streamReply(
+            "https://gateway.example",
+            "token",
+            (delta) => {
+                deltas.push({ restart: delta.restart, text: delta.text });
+            },
+            new AbortController().signal,
+        );
+
+        expect(deltas).toStrictEqual([
+            { restart: undefined, text: "before" },
+            { restart: true, text: "after" },
+        ]);
+    });
 });

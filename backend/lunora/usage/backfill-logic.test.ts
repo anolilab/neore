@@ -33,6 +33,18 @@ describe("groupReplies", () => {
         expect(ids(groupReplies(rows))).toStrictEqual([["a", "a-tool"], ["sibling"], ["continuation"], ["alice"], ["bob"]]);
     });
 
+    it("reads a steered reply back as the two replies the live record keyed (`repliesByOrder`)", () => {
+        const rows = [
+            row(4, "user", { _id: "p4" }),
+            row(4, "assistant", { _id: "a" }),
+            row(4, "tool", { _id: "a-tool" }),
+            row(5, "user", { _id: "steer", parentMessageId: "a-tool" }),
+            row(5, "assistant", { _id: "b" }),
+        ];
+
+        expect(ids(groupReplies(rows))).toStrictEqual([["a", "a-tool"], ["b"]]);
+    });
+
     it("names the prompt's author only for replies in the prompt's order", () => {
         const groups = groupReplies([row(0, "user", { userId: "collaborator" }), row(0, "assistant"), row(1, "assistant")]);
 

@@ -790,6 +790,70 @@
       "relations": {},
       "shardMode": "global:d1"
     },
+    "bots": {
+      "commitOrdered": false,
+      "fields": {
+        "computerEnabled": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "description": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "instructions": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "model": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "name": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "browserActions": {
       "commitOrdered": false,
       "fields": {
@@ -1303,6 +1367,61 @@
       "relations": {},
       "shardMode": "global:d1"
     },
+    "chatFileThreads": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "fileId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "chatFiles"
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_fileId_threadId": {
+          "fields": [
+            "fileId",
+            "threadId"
+          ],
+          "unique": false
+        },
+        "by_threadId": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "chatFiles": {
       "commitOrdered": false,
       "fields": {
@@ -1605,6 +1724,12 @@
           "optional": true,
           "unique": false
         },
+        "runId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "status": {
           "kind": "union",
           "nullable": false,
@@ -1655,6 +1780,13 @@
         }
       },
       "indexes": {
+        "by_user_and_createdAt": {
+          "fields": [
+            "userId",
+            "createdAt"
+          ],
+          "unique": false
+        },
         "by_user_and_status": {
           "fields": [
             "userId",
@@ -6701,6 +6833,13 @@
     "memories": {
       "commitOrdered": false,
       "fields": {
+        "botId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "bots"
+        },
         "confidence": {
           "kind": "number",
           "nullable": false,
@@ -6857,6 +6996,14 @@
         }
       },
       "indexes": {
+        "by_userId_botId": {
+          "fields": [
+            "userId",
+            "botId",
+            "type"
+          ],
+          "unique": false
+        },
         "by_userId_supersededBy": {
           "fields": [
             "userId",
@@ -7844,6 +7991,13 @@
               "optional": false,
               "unique": false,
               "literal": "\"trigger\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"usage_alert\""
             }
           ]
         },
@@ -9573,6 +9727,12 @@
           "optional": true,
           "unique": false
         },
+        "restart": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "seq": {
           "kind": "number",
           "nullable": false,
@@ -9658,6 +9818,73 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "steers": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "id": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "messageId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "pendingMessageId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "status": {
+                "kind": "union",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "members": [
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"delivered\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"queued\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"withdrawn\""
+                  }
+                ]
+              },
+              "text": {
+                "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              }
+            }
+          }
         },
         "streamingConfig": {
           "kind": "object",
@@ -9779,6 +10006,13 @@
         "by_threadId": {
           "fields": [
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_threadId_status": {
+          "fields": [
+            "threadId",
+            "status"
           ],
           "unique": false
         },
@@ -10889,6 +11123,13 @@
     "sandboxSessions": {
       "commitOrdered": false,
       "fields": {
+        "botId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "bots"
+        },
         "cleanupFnId": {
           "kind": "string",
           "nullable": false,
@@ -10958,6 +11199,13 @@
         }
       },
       "indexes": {
+        "by_botId_status": {
+          "fields": [
+            "botId",
+            "status"
+          ],
+          "unique": false
+        },
         "by_status": {
           "fields": [
             "status"
@@ -12361,6 +12609,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"cancelled\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"failed\""
             },
             {
@@ -13612,6 +13867,101 @@
       "relations": {},
       "shardMode": "root"
     },
+    "threadPasscodes": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "epoch": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "failedAttempts": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "filesIndexedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "hash": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "iterations": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "lockoutUntil": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "salt": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_thread": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {
+        "thread": {
+          "field": "threadId",
+          "kind": "one",
+          "table": "threads"
+        }
+      },
+      "shardMode": "shardBy:userId"
+    },
     "threadPins": {
       "commitOrdered": false,
       "fields": {
@@ -14007,6 +14357,13 @@
           "optional": true,
           "unique": false
         },
+        "botId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "bots"
+        },
         "category": {
           "kind": "string",
           "nullable": false,
@@ -14181,6 +14538,12 @@
           "unique": false
         },
         "lastCompressionStartedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "lockedAt": {
           "kind": "number",
           "nullable": false,
           "optional": true,
@@ -14704,6 +15067,20 @@
                 "unique": false
               }
             },
+            "memory": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "botId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
             "model": {
               "kind": "string",
               "nullable": false,
@@ -14947,6 +15324,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"filtered\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"running\""
             }
           ]
@@ -14972,6 +15356,13 @@
             "startedAt"
           ],
           "unique": false
+        },
+        "by_triggerId_status": {
+          "fields": [
+            "triggerId",
+            "status"
+          ],
+          "unique": false
         }
       },
       "memory": false,
@@ -14981,6 +15372,19 @@
     "triggers": {
       "commitOrdered": false,
       "fields": {
+        "botComputer": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "botId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "bots"
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,
@@ -15028,6 +15432,82 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "filters": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "op": {
+                "kind": "union",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "members": [
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"contains\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"equals\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"exists\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"not_equals\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"not_exists\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"starts_with\""
+                  }
+                ]
+              },
+              "path": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "value": {
+                "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              }
+            }
+          }
         },
         "inputTemplate": {
           "kind": "string",
@@ -15147,6 +15627,28 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "webhookSignatureScheme": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"native\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"timestamped\""
+            }
+          ]
         }
       },
       "indexes": {
@@ -15919,6 +16421,18 @@
           "optional": true,
           "unique": false
         },
+        "composerVimMode": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "contrast": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "customInstructions": {
           "kind": "string",
           "nullable": false,
@@ -16021,6 +16535,24 @@
           "optional": true,
           "unique": false
         },
+        "modelNicknames": {
+          "kind": "record",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "key": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          },
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
         "newChatsTemporary": {
           "kind": "boolean",
           "nullable": false,
@@ -16080,6 +16612,13 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "threadTitleInstructions": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "refined": true
         },
         "timezone": {
           "kind": "string",

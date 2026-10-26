@@ -59,6 +59,13 @@ export interface LiveReply {
     reasoning: string;
     /** Group chat: the participant talking now; `text`/`reasoning` are theirs only. */
     speaker?: StreamSpeaker;
+
+    /**
+     * A steering restart reached the stream: the text before it is saved above the
+     * message the user sent into the reply, so the continuation is persisted only
+     * once a reply lands below that message, not below the prompt.
+     */
+    steered?: true;
     text: string;
 }
 
@@ -67,13 +74,15 @@ export interface LiveReply {
  * In a group chat one prompt gets a reply per participant, so only the current
  * speaker's counts — an earlier participant's saved reply does not.
  */
-export const isReplyPersisted = (messages: ChatMessage[], live: Pick<LiveReply, "promptMessageId" | "speaker">): boolean => {
+export const isReplyPersisted = (messages: ChatMessage[], live: Pick<LiveReply, "promptMessageId" | "speaker" | "steered">): boolean => {
     const promptIndex = messages.findIndex((message) => message.id === live.promptMessageId);
+    // The saved first half of a steered reply sits between the prompt and the steering message.
+    const anchorIndex = live.steered ? messages.findLastIndex((message, index) => index >= promptIndex && message.role === "user") : promptIndex;
 
     return (
         promptIndex !== -1 &&
         messages
-            .slice(promptIndex + 1)
+            .slice(anchorIndex + 1)
             .some(
                 (message) =>
                     message.role === "assistant" &&
