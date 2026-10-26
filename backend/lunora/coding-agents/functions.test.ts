@@ -190,13 +190,13 @@ describe("pull request reaper", () => {
             const runId = await retry();
 
             expect(await mutate(claimPoll, { prStartedAt: 100, runId, seq: 0 })).toBe(false);
-            const row191 = await getRun(runId);
+            const unclaimed = await getRun(runId);
 
-            expect(row191.pollSeq).toBeUndefined();
+            expect(unclaimed.pollSeq).toBeUndefined();
             expect(await mutate(claimPoll, { prStartedAt: 200, runId, seq: 0 })).toBe(true);
-            const row193 = await getRun(runId);
+            const claimed = await getRun(runId);
 
-            expect(row193.pollSeq).toBe(1);
+            expect(claimed.pollSeq).toBe(1);
         });
     });
 

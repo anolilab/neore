@@ -55,7 +55,7 @@ describe(deferWaitUntil, () => {
         const watcher = registered[0]!.then(() => {
             isDone = true;
 
-            return isDone;
+            return undefined;
         });
 
         expect(registered).toHaveLength(1);

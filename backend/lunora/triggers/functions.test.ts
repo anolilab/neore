@@ -343,9 +343,9 @@ describe("updateTrigger and the trigger's time zone", () => {
     it("moves the next run when only the zone changes", async () => {
         const triggerId = await insertSchedule(undefined);
 
-        const row346 = await readTrigger(triggerId);
+        const row = await readTrigger(triggerId);
 
-        expect(row346.nextTriggerAt).toBe(Date.parse("2026-07-01T09:00:00Z"));
+        expect(row.nextTriggerAt).toBe(Date.parse("2026-07-01T09:00:00Z"));
 
         await harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { timezone: "America/New_York", triggerId } as never);
 
@@ -362,9 +362,9 @@ describe("updateTrigger and the trigger's time zone", () => {
             .withIdentity({ userId: "user-a" } as never)
             .mutation(updateTrigger as never, { cronExpression: "0 9 * * *", timezone: "Europe/Berlin", triggerId } as never);
 
-        const row363 = await readTrigger(triggerId);
+        const row = await readTrigger(triggerId);
 
-        expect(row363.nextTriggerAt).toBe(Date.parse("2026-07-01T07:00:00Z"));
+        expect(row.nextTriggerAt).toBe(Date.parse("2026-07-01T07:00:00Z"));
     });
 
     it("keeps a due run the tick has not taken when the same zone is re-saved", async () => {
@@ -376,9 +376,9 @@ describe("updateTrigger and the trigger's time zone", () => {
             .withIdentity({ userId: "user-a" } as never)
             .mutation(updateTrigger as never, { cronExpression: "0 9 * * *", timezone: "America/New_York", triggerId } as never);
 
-        const row375 = await readTrigger(triggerId);
+        const row = await readTrigger(triggerId);
 
-        expect(row375.nextTriggerAt).toBe(due);
+        expect(row.nextTriggerAt).toBe(due);
     });
 
     it("does not treat UTC and a missing zone as a change", async () => {
@@ -388,9 +388,9 @@ describe("updateTrigger and the trigger's time zone", () => {
         await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
         await harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { timezone: "UTC", triggerId } as never);
 
-        const row385 = await readTrigger(triggerId);
+        const row = await readTrigger(triggerId);
 
-        expect(row385.nextTriggerAt).toBe(due);
+        expect(row.nextTriggerAt).toBe(due);
     });
 
     it("arms an enabled schedule in its zone", async () => {
@@ -400,9 +400,9 @@ describe("updateTrigger and the trigger's time zone", () => {
         await harness.withIdentity({ userId: "user-a" } as never).mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
 
         // 09:00 in Tokyo (UTC+9) is 00:00Z.
-        const row395 = await readTrigger(triggerId);
+        const row = await readTrigger(triggerId);
 
-        expect(row395.nextTriggerAt).toBe(Date.parse("2026-07-02T00:00:00Z"));
+        expect(row.nextTriggerAt).toBe(Date.parse("2026-07-02T00:00:00Z"));
     });
 });
 

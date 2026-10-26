@@ -29,7 +29,6 @@ export const LongTextCell = <TData extends RowData>({
     const initialValue = cell.getValue() as string;
     const [value, setValue] = React.useState(initialValue ?? "");
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
-    const containerRef = React.useRef<HTMLDivElement>(null);
 
     const [prevInitialValue, setPrevInitialValue] = React.useState(initialValue);
 
@@ -153,7 +152,6 @@ export const LongTextCell = <TData extends RowData>({
                         isSearchMatch={isSearchMatch}
                         isSelected={isSelected}
                         readOnly={readOnly}
-                        ref={containerRef}
                         rowHeight={rowHeight}
                         rowIndex={rowIndex}
                         tableMeta={tableMeta}

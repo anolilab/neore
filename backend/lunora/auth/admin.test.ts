@@ -121,9 +121,9 @@ describe("the platform-admin gate", () => {
     it("does not let a refused self-promotion change the row", async () => {
         await expect(as(memberId).mutation(grantAdminByEmail as never, { email: "member@example.com" } as never)).rejects.toMatchObject(forbidden);
 
-        const row124 = await readUser(memberId);
+        const row = await readUser(memberId);
 
-        expect(row124.role).toBeUndefined();
+        expect(row.role).toBeUndefined();
         expect(await auditActions()).toEqual([]);
     });
 
@@ -144,26 +144,26 @@ describe("role changes", () => {
     it("lets an admin promote a user and writes an audit entry", async () => {
         await expect(as(adminId).mutation(updateUserRole as never, { role: "admin", userId: memberId } as never)).resolves.toBe(true);
 
-        const row145 = await readUser(memberId);
+        const row = await readUser(memberId);
 
-        expect(row145.role).toBe("admin");
+        expect(row.role).toBe("admin");
         expect(await auditActions()).toEqual(["user.role.update"]);
     });
 
     it("lets an admin demote another admin", async () => {
         await as(adminId).mutation(updateUserRole as never, { role: "user", userId: otherAdminId } as never);
 
-        const row152 = await readUser(otherAdminId);
+        const row = await readUser(otherAdminId);
 
-        expect(row152.role).toBeNull();
+        expect(row.role).toBeNull();
     });
 
     it("refuses to demote oneself", async () => {
         await expect(as(adminId).mutation(updateUserRole as never, { role: "user", userId: adminId } as never)).rejects.toMatchObject(forbidden);
 
-        const row158 = await readUser(adminId);
+        const row = await readUser(adminId);
 
-        expect(row158.role).toBe("admin");
+        expect(row.role).toBe("admin");
     });
 
     it("grants admin by email, and reports an unknown address without failing", async () => {
@@ -171,25 +171,25 @@ describe("role changes", () => {
             success: true,
             userId: memberId,
         });
-        const row166 = await readUser(memberId);
+        const row = await readUser(memberId);
 
-        expect(row166.role).toBe("admin");
+        expect(row.role).toBe("admin");
 
         await expect(as(adminId).mutation(grantAdminByEmail as never, { email: "nobody@example.com" } as never)).resolves.toEqual({ success: false });
     });
 
     it("revokes admin by email but never from oneself", async () => {
         await expect(as(adminId).mutation(revokeAdminByEmail as never, { email: "admin@example.com" } as never)).rejects.toMatchObject(forbidden);
-        const row173 = await readUser(adminId);
+        const adminRow = await readUser(adminId);
 
-        expect(row173.role).toBe("admin");
+        expect(adminRow.role).toBe("admin");
 
         await expect(as(adminId).mutation(revokeAdminByEmail as never, { email: "other-admin@example.com" } as never)).resolves.toMatchObject({
             success: true,
         });
-        const row178 = await readUser(otherAdminId);
+        const otherAdminRow = await readUser(otherAdminId);
 
-        expect(row178.role).toBeNull();
+        expect(otherAdminRow.role).toBeNull();
     });
 });
 
@@ -207,9 +207,9 @@ describe("bans and sessions", () => {
         await expect(as(adminId).mutation(banUser as never, { userId: adminId } as never)).rejects.toMatchObject(forbidden);
         await expect(as(adminId).mutation(banUser as never, { userId: otherAdminId } as never)).rejects.toMatchObject(forbidden);
 
-        const row196 = await readUser(otherAdminId);
+        const row = await readUser(otherAdminId);
 
-        expect(row196.banned).toBeUndefined();
+        expect(row.banned).toBeUndefined();
     });
 
     it("revokes every session of another user, never the caller's own", async () => {

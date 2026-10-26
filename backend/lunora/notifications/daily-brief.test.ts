@@ -217,12 +217,10 @@ describe("a claim outside the morning window", () => {
 
         await expect(claim()).resolves.toEqual({ claimed: false, reason: "disabled" });
         expect(briefJobs()).toHaveLength(0);
-        const row220 = await state();
+        const row = await state();
 
-        expect(row220.scheduledFor).toBeUndefined();
-        const row221 = await state();
-
-        expect(row221.scheduledJobId).toBeUndefined();
+        expect(row.scheduledFor).toBeUndefined();
+        expect(row.scheduledJobId).toBeUndefined();
     });
 
     it("still clears the pending job when the user is inactive", async () => {
@@ -234,12 +232,10 @@ describe("a claim outside the morning window", () => {
 
         await expect(claim()).resolves.toEqual({ claimed: false, reason: "inactive" });
         expect(briefJobs()).toHaveLength(0);
-        const row233 = await state();
+        const row = await state();
 
-        expect(row233.scheduledFor).toBeUndefined();
-        const row234 = await state();
-
-        expect(row234.scheduledJobId).toBeUndefined();
+        expect(row.scheduledFor).toBeUndefined();
+        expect(row.scheduledJobId).toBeUndefined();
     });
 
     it("books nothing when activity already scheduled a later job", async () => {
