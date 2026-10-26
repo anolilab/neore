@@ -275,8 +275,6 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                 onClick={async () => {
                     // Push first, while the session still authenticates the server call.
                     await releasePush();
-                    // Cleared before the reload: no unmount cleanup runs on that.
-                    await setNativeBadge(0);
                     await authClient.signOut({
                         fetchOptions: {
                             onError: () => {
@@ -286,8 +284,10 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                                     variant: "error",
                                 });
                             },
-                            onSuccess: () => {
+                            onSuccess: async () => {
                                 resetAnalyticsIdentity();
+                                // Only after the session ends: a failed sign-out keeps the badge.
+                                await setNativeBadge(0);
                                 globalThis.location.reload();
                             },
                         },

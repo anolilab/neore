@@ -39,7 +39,7 @@ import getSessionToken, { getSessionAuthState } from "@/lib/auth/server-function
 import env from "@/lib/env";
 import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
-import { isNativeShell } from "@/lib/native/bridge";
+import { isNativeShell, setNativeBadge } from "@/lib/native/bridge";
 import NativeBridge from "@/lib/native/native-bridge";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
 import { forgetClientPostHog, readRequestContext, rememberClientPostHog } from "@/lib/request-context";
@@ -269,6 +269,8 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         else if (wasAuthenticated === true && !isAuthenticated) {
             console.log("[AuthRecovery] User logged out - clearing queries");
             queryClient.clear();
+            // An expired session takes the bell with it, and no sign-out handler ran to clear the dock badge.
+            void setNativeBadge(0);
         }
 
         previousAuthStateRef.current = isAuthenticated;

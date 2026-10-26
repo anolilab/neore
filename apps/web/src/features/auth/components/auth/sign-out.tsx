@@ -31,23 +31,22 @@ const SignOut = () => {
         // An error leaves too: after account deletion the server may already
         // have dropped the session, and a spinner forever helps nobody.
         // Push first, while the session still authenticates the server call.
-        // The dock badge is cleared before the page is replaced: no unmount cleanup runs on that.
-        void releasePush()
-            .then(() => setNativeBadge(0))
-            .then(() =>
-                authClient.signOut({
-                    fetchOptions: {
-                        onError: () => {
-                            // The session may still be active: keep the analytics identity.
-                            globalThis.location.replace(signInPath);
-                        },
-                        onSuccess: () => {
-                            resetAnalyticsIdentity();
-                            globalThis.location.replace(signInPath);
-                        },
+        void releasePush().then(() =>
+            authClient.signOut({
+                fetchOptions: {
+                    onError: () => {
+                        // The session may still be active: keep the analytics identity.
+                        globalThis.location.replace(signInPath);
                     },
-                }),
-            );
+                    onSuccess: async () => {
+                        resetAnalyticsIdentity();
+                        // Only after the session ends: a failed sign-out keeps the badge.
+                        await setNativeBadge(0);
+                        globalThis.location.replace(signInPath);
+                    },
+                },
+            }),
+        );
     }, [authClient, basePath, releasePush, viewPaths]);
 
     return <Loader2 className="animate-spin" />;
