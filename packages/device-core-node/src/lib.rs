@@ -183,10 +183,17 @@ impl DeviceCore {
         self.state.audit_tail()
     }
 
-    /// Stops local MCP servers idle for ten minutes. Call about once a minute.
+    /// Stops local MCP servers idle for ten minutes. Call about once a minute. Resolves when the sweep is done, and
+    /// runs on the blocking pool: a server that is mid-call holds its lock, and the main thread must not wait for it.
     #[napi]
-    pub fn reap_idle_servers(&self) {
-        self.state.reap_idle_servers();
+    pub fn reap_idle_servers<'env>(&self, env: &'env Env) -> Result<PromiseRaw<'env, bool>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            state.reap_idle_servers();
+
+            Ok(true)
+        })
     }
 
     /// Stops every local MCP server. Call on quit.

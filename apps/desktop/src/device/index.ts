@@ -200,7 +200,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         console.error("[neore-desktop] device execution unavailable", error);
     }
 
-    const reap = setInterval(() => state.core?.reapIdleServers(), REAP_INTERVAL_MS);
+    const reap = setInterval(() => {
+        state.core?.reapIdleServers();
+    }, REAP_INTERVAL_MS);
 
     reap.unref();
     app.on("will-quit", () => {

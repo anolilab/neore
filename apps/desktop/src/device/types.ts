@@ -51,7 +51,7 @@ export interface DeviceCore {
     pair: (deviceId: string, secret: string, accountLabel: string) => Promise<boolean>;
     promptAnswer: (id: number, answer: string) => void;
     promptCurrent: () => string | null;
-    reapIdleServers: () => void;
+    reapIdleServers: () => Promise<boolean>;
     settingsGet: () => string;
     settingsUpdate: (update: string) => string;
     status: () => string;

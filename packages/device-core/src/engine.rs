@@ -64,6 +64,8 @@ pub struct DeviceState {
     mcp: McpManager,
     /// Manifest tool name → the MCP tool it names.
     mcp_tools: Mutex<HashMap<String, McpToolRef>>,
+    /// Held across every read-change-save of the settings, so two writers cannot each save the other's stale copy.
+    save_lock: Mutex<()>,
     nonces: Mutex<NonceSet>,
     prompts: Prompts,
     settings: Mutex<Settings>,
@@ -83,6 +85,7 @@ impl DeviceState {
             last_manifest_at: Mutex::new(0),
             mcp: McpManager::default(),
             mcp_tools: Mutex::default(),
+            save_lock: Mutex::default(),
             nonces: Mutex::new(NonceSet::persisted(
                 &data_dir.join("device-nonces.json"),
                 now_ms(),
@@ -96,6 +99,20 @@ impl DeviceState {
 
     fn settings(&self) -> Settings {
         self.settings.lock().unwrap().clone()
+    }
+
+    /// Changes the settings under the save lock: each writer reads what the last one saved, then saves its own change.
+    fn change_settings<T>(
+        &self,
+        change: impl FnOnce(&mut Settings) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let _guard = self.save_lock.lock().unwrap();
+        let mut settings = self.settings();
+        let value = change(&mut settings)?;
+
+        self.save(settings)?;
+
+        Ok(value)
     }
 
     fn save(&self, settings: Settings) -> Result<(), String> {
@@ -206,15 +223,16 @@ impl DeviceState {
             return Ok(false);
         }
 
-        let mut settings = self.settings();
+        self.change_settings(|settings| {
+            settings.pairing = Some(Pairing {
+                account_label,
+                device_id: device_id.to_owned(),
+                secret: secret.to_owned(),
+            });
+            settings.allow_rules.clear();
 
-        settings.pairing = Some(Pairing {
-            account_label,
-            device_id: device_id.to_owned(),
-            secret: secret.to_owned(),
-        });
-        settings.allow_rules.clear();
-        self.save(settings)?;
+            Ok(())
+        })?;
 
         Ok(true)
     }
@@ -242,41 +260,40 @@ impl DeviceState {
     }
 
     pub fn settings_update(&self, update: SettingsUpdate) -> Result<SettingsView, String> {
-        let mut settings = self.settings();
+        self.change_settings(|settings| {
+            if let Some(roots) = update.roots {
+                settings.roots = validate_roots(&roots)?;
+            }
 
-        if let Some(roots) = update.roots {
-            settings.roots = validate_roots(&roots)?;
-        }
+            if let Some(servers) = update.mcp_servers {
+                validate_servers(&servers)?;
+                settings.mcp_servers = servers;
+                // The cached `readOnly` flags describe the old servers. Dropping them makes every MCP call
+                // fail closed until the next manifest, so none can skip its prompt on stale metadata.
+                self.mcp_tools.lock().unwrap().clear();
+            }
 
-        if let Some(servers) = update.mcp_servers {
-            validate_servers(&servers)?;
-            settings.mcp_servers = servers;
-            // The cached `readOnly` flags describe the old servers. Dropping them makes every MCP call
-            // fail closed until the next manifest, so none can skip its prompt on stale metadata.
-            self.mcp_tools.lock().unwrap().clear();
-        }
+            if let Some(required) = update.require_shell_sandbox {
+                settings.allow_unsandboxed_shell = !required;
+            }
 
-        if let Some(required) = update.require_shell_sandbox {
-            settings.allow_unsandboxed_shell = !required;
-        }
+            if let Some(allowed) = update.allow_shell_network {
+                settings.allow_shell_network = allowed;
+            }
 
-        if let Some(allowed) = update.allow_shell_network {
-            settings.allow_shell_network = allowed;
-        }
+            // Rules are only ever REMOVED here; one is added by answering "Always allow".
+            if let Some(rules) = update.allow_rules {
+                settings.allow_rules.retain(|rule| rules.contains(rule));
+            }
 
-        // Rules are only ever REMOVED here; one is added by answering "Always allow".
-        if let Some(rules) = update.allow_rules {
-            settings.allow_rules.retain(|rule| rules.contains(rule));
-        }
+            if update.unpair {
+                self.prompts.deny_all();
+                settings.pairing = None;
+                settings.allow_rules.clear();
+            }
 
-        if update.unpair {
-            self.prompts.deny_all();
-            settings.pairing = None;
-            settings.allow_rules.clear();
-        }
-
-        self.save(settings)?;
-        self.reap_idle_servers();
+            Ok(())
+        })?;
         self.emit(Event::Changed);
 
         Ok(self.settings_view())
@@ -357,12 +374,13 @@ impl DeviceState {
                 };
 
                 if answer == Answer::Always && offer_always {
-                    let mut next = self.settings();
+                    let _ = self.change_settings(|next| {
+                        if !next.allow_rules.contains(&call.tool) {
+                            next.allow_rules.push(call.tool.clone());
+                        }
 
-                    if !next.allow_rules.contains(&call.tool) {
-                        next.allow_rules.push(call.tool.clone());
-                        let _ = self.save(next);
-                    }
+                        Ok(())
+                    });
                 }
 
                 let remaining = call.expires_at.saturating_sub(now_ms());
@@ -472,7 +490,11 @@ impl DeviceState {
             }
         }
 
-        *self.mcp_tools.lock().unwrap() = mcp_tools;
+        // A server change that landed during the listing makes this snapshot stale: leave the cache empty (calls
+        // then fail closed) rather than write read-only flags that belong to the servers it replaced.
+        if self.settings().mcp_servers == settings.mcp_servers {
+            *self.mcp_tools.lock().unwrap() = mcp_tools;
+        }
 
         let issued_at = {
             let mut last = self.last_manifest_at.lock().unwrap();

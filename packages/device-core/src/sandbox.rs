@@ -395,7 +395,8 @@ pub fn policy_for_call(
 /// platform states only what its mechanism enforces (see the module docs).
 #[cfg(target_os = "macos")]
 const SANDBOX_LIMITS: &str = "it can change files only in the shared folders, cannot see the rest of \
-     your home folder, cannot run open, osascript or launchctl, and cannot send Apple events. Other \
+     your home folder, cannot run open, osascript or launchctl from their standard locations, and cannot send Apple \
+     events. Other \
      programs can still run, it can READ files outside the shared folders, and local services \
      (Mach IPC) are not restricted.";
 
@@ -599,7 +600,7 @@ mod tests {
         assert!(describe(&available, Some(&policy())).contains("NOT isolated"));
         #[cfg(target_os = "macos")]
         assert!(describe(&available, Some(&policy()))
-            .contains("cannot run open, osascript or launchctl"));
+            .contains("cannot run open, osascript or launchctl from their standard locations"));
         #[cfg(target_os = "macos")]
         assert!(describe(&available, Some(&policy())).contains("Network access is blocked"));
         #[cfg(target_os = "macos")]
