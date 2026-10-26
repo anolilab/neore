@@ -15,8 +15,9 @@
  *    their "Trigger: ..." run threads), or two quiet routines would wake each
  *    other forever.
  *
- * The window starts at `lastTriggeredAt`, which EVERY finished run sets, failed
- * ones and a manual "Run now" included. A skipped run does not move it.
+ * The window starts at `lastTriggeredAt`, which a run sets once it has reached the
+ * agent and either completed or failed, a manual "Run now" included. A skipped run
+ * and a run refused at admission (daily limit, disallowed model) do not move it.
  *
  * The check runs before the run writes anything, so a skipped run creates no
  * thread, sends no notification and is not charged.
@@ -69,7 +70,7 @@ export const quietBriefInputs = (snapshot: QuietSnapshot, since: number): BriefI
     };
 };
 
-/** Where the window starts: the last finished run, or the routine's creation before any run. */
+/** Where the window starts: the last run that reached the agent (completed or failed), or the routine's creation before any. */
 export const quietWindowStart = (trigger: { createdAt: number; lastTriggeredAt?: number }): number => trigger.lastTriggeredAt ?? trigger.createdAt;
 
 /**
