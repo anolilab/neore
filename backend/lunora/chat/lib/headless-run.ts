@@ -197,6 +197,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
             threadId = created.threadId;
             thread = created.thread!;
 
+            // As soon as the thread exists, so a failed bot patch below cannot leave it unrecorded.
+            await options.onThread?.(threadId);
+
             // Before the run: a tool call reads `thread.botId` to find the bot's computer.
             if (options.botId) {
                 await ctx.runMutation(internal.agent.threads.updateThread, {
@@ -204,8 +207,6 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
                     threadId: threadId as Id<"threads">,
                 });
             }
-
-            await options.onThread?.(threadId);
         } else {
             threadId = existingThreadId;
             ({ thread } = await agent.continueThread(ctx, { threadId, userId }));
