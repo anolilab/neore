@@ -249,6 +249,11 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         const wasAuthenticated = previousAuthStateRef.current;
         const wasAnonymous = previousIsAnonymousRef.current;
 
+        // A reload after the session ended starts signed out, so no transition shows it: clear the badge here too.
+        if (wasAuthenticated === null && !isAuthenticated) {
+            void setNativeBadge(0);
+        }
+
         // User just logged in (was not authenticated, now is)
         if (wasAuthenticated === false && isAuthenticated) {
             console.log("[AuthRecovery] User logged in - refetching all active queries");
@@ -269,7 +274,7 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         else if (wasAuthenticated === true && !isAuthenticated) {
             console.log("[AuthRecovery] User logged out - clearing queries");
             queryClient.clear();
-            // An expired session takes the bell with it, and no sign-out handler ran to clear the dock badge.
+            // An expired session skips both sign-out handlers, so the dock badge is cleared here.
             void setNativeBadge(0);
         }
 
