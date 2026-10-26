@@ -694,6 +694,7 @@ export interface InternalApiTypes {
             purgeExpiredClaims: FunctionReference<"mutation", {}, number>;
             reapLapsedClaims: FunctionReference<"mutation", {}, number>;
             releaseKey: FunctionReference<"mutation", { claimedAt?: number; key: string; scope: string }, null>;
+            retryReleaseKey: FunctionReference<"mutation", { attempt: number; claimedAt?: number; key: string; scope: string }, null>;
         };
         document_history: {
             getDocumentAtTime: FunctionReference<"query", { documentId: string; tableName: string; timestamp: number }, unknown | null>;
@@ -1709,6 +1710,7 @@ export const internal: InternalApiTypes = {
             purgeExpiredClaims: { __lunoraRef: "lib_claim_once:purgeExpiredClaims" },
             reapLapsedClaims: { __lunoraRef: "lib_claim_once:reapLapsedClaims" },
             releaseKey: { __lunoraRef: "lib_claim_once:releaseKey" },
+            retryReleaseKey: { __lunoraRef: "lib_claim_once:retryReleaseKey" },
         },
         document_history: {
             getDocumentAtTime: { __lunoraRef: "lib_document_history:getDocumentAtTime" },
