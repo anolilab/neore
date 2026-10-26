@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
 import { resetAnalyticsIdentity, trackEvent } from "@/lib/analytics";
+import { setNativeBadge } from "@/lib/native/bridge";
 
 const SignOut = () => {
     const signingOut = useRef(false);
@@ -30,20 +31,23 @@ const SignOut = () => {
         // An error leaves too: after account deletion the server may already
         // have dropped the session, and a spinner forever helps nobody.
         // Push first, while the session still authenticates the server call.
-        void releasePush().then(() =>
-            authClient.signOut({
-                fetchOptions: {
-                    onError: () => {
-                        // The session may still be active: keep the analytics identity.
-                        globalThis.location.replace(signInPath);
+        // The dock badge is cleared before the page is replaced: no unmount cleanup runs on that.
+        void releasePush()
+            .then(() => setNativeBadge(0))
+            .then(() =>
+                authClient.signOut({
+                    fetchOptions: {
+                        onError: () => {
+                            // The session may still be active: keep the analytics identity.
+                            globalThis.location.replace(signInPath);
+                        },
+                        onSuccess: () => {
+                            resetAnalyticsIdentity();
+                            globalThis.location.replace(signInPath);
+                        },
                     },
-                    onSuccess: () => {
-                        resetAnalyticsIdentity();
-                        globalThis.location.replace(signInPath);
-                    },
-                },
-            }),
-        );
+                }),
+            );
     }, [authClient, basePath, releasePush, viewPaths]);
 
     return <Loader2 className="animate-spin" />;

@@ -38,17 +38,14 @@ const NotificationBell: FC<{ className?: string }> = ({ className }) => {
     const [announcement, setAnnouncement] = useState("");
     const seen = useRef<Set<string> | undefined>(undefined);
 
+    // Publish only after the first snapshot: before it, `unreadCount` is a placeholder zero that would
+    // overwrite a real count. Sign-out clears the badge explicitly. Not on unmount: closing a thread
+    // window unmounts a bell too, and that must not zero the main window's count.
     useEffect(() => {
-        void setNativeBadge(unreadCount);
-    }, [unreadCount]);
-
-    // Clear the dock badge when the bell unmounts (sign-out), so it cannot outlive the account.
-    useEffect(
-        () => () => {
-            void setNativeBadge(0);
-        },
-        [],
-    );
+        if (loaded) {
+            void setNativeBadge(unreadCount);
+        }
+    }, [loaded, unreadCount]);
 
     useEffect(() => {
         if (!loaded) {

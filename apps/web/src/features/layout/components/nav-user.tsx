@@ -32,6 +32,7 @@ import updateLocale, { isSupportedLocale } from "@/functions/update-locale";
 import { resetAnalyticsIdentity } from "@/lib/analytics";
 import type { AuthClient } from "@/lib/auth/client";
 import { DEFAULT_LOCALE, deLocalizeUrl, dynamicActivate, locales as appLocales, shouldIgnorePath } from "@/lib/intl/client";
+import { setNativeBadge } from "@/lib/native/bridge";
 
 const LOCALE_DISPLAY_NAMES: Record<string, string> = {
     de: "Deutsch",
@@ -274,6 +275,8 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                 onClick={async () => {
                     // Push first, while the session still authenticates the server call.
                     await releasePush();
+                    // Cleared before the reload: no unmount cleanup runs on that.
+                    await setNativeBadge(0);
                     await authClient.signOut({
                         fetchOptions: {
                             onError: () => {
