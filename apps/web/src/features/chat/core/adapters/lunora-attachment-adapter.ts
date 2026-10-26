@@ -91,6 +91,20 @@ const EXTENSION_TYPES: ReadonlyArray<readonly [extension: string, type: string]>
     [".docx", DOCX_TYPE],
 ];
 
+const BINARY_DOCUMENT_TYPES = new Set([
+    "application/pdf",
+    "application/msword",
+    "application/vnd.ms-excel",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/zip",
+    DOCX_TYPE,
+]);
+
+/** A browser type whose bytes are binary, which a file extension must not turn into text. */
+const isKnownBinaryType = (type: string): boolean => /^(?:image|video|audio)\//u.test(type) || BINARY_DOCUMENT_TYPES.has(type);
+
 /**
  * The type an attachment is uploaded — and checked — as: by extension where
  * {@link EXTENSION_TYPES} knows it, otherwise the browser's own type. Anything
@@ -98,6 +112,11 @@ const EXTENSION_TYPES: ReadonlyArray<readonly [extension: string, type: string]>
  * readable error.
  */
 export const attachmentContentType = (file: Pick<File, "name" | "type">): string => {
+    // A declared binary type is kept whatever the name says, so a renamed PDF is not read as text.
+    if (isKnownBinaryType(file.type)) {
+        return file.type;
+    }
+
     const name = file.name.toLowerCase();
 
     return EXTENSION_TYPES.find(([extension]) => name.endsWith(extension))?.[1] || file.type || "application/octet-stream";

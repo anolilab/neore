@@ -212,6 +212,9 @@ describe(attachmentContentType, () => {
         [{ name: "a.txt", type: "application/octet-stream" }, "text/plain"],
         [{ name: "a.docx", type: "application/octet-stream" }, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
         [{ name: "photo.png", type: "image/png" }, "image/png"],
+        [{ name: "report.csv", type: "application/pdf" }, "application/pdf"],
+        [{ name: "flow.mmd", type: "image/png" }, "image/png"],
+        [{ name: "data.jsonl", type: "video/mp4" }, "video/mp4"],
         [{ name: "noextension", type: "" }, "application/octet-stream"],
     ])("%o is uploaded as %s", (file, expected) => {
         expect(attachmentContentType(file)).toBe(expected);
