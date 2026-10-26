@@ -682,16 +682,20 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn a_sandboxed_command_cannot_connect_without_network() {
-        if !sandbox_or_skip()
-            || !Path::new("/bin/bash").exists() && !Path::new("/usr/bin/bash").exists()
-        {
+        if !sandbox_or_skip() {
             return;
         }
+        let Some(bash) = ["/bin/bash", "/usr/bin/bash"]
+            .into_iter()
+            .find(|path| Path::new(path).exists())
+        else {
+            return;
+        };
 
         let (shared, _outside) = folders("connect");
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let line = format!(
-            "bash -c 'exec 3<>/dev/tcp/127.0.0.1/{}' && echo connected || echo refused",
+            "{bash} -c 'exec 3<>/dev/tcp/127.0.0.1/{}' && echo connected || echo refused",
             listener.local_addr().unwrap().port()
         );
         let outcome = |network: bool| {
