@@ -289,13 +289,14 @@ impl Drop for Job {
 }
 
 fn kill_tree(child: &mut Child) {
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     {
-        let _ = Command::new("kill")
-            .args(["-KILL", &format!("-{}", child.id())])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
+        // A negative pid signals the process group `process_group(0)` made for the run. Signalled directly: an
+        // external `kill` can fail on Linux and leave a background child running, and nothing would notice.
+        // SAFETY: plain syscall with no memory arguments. The result is not checked: ESRCH means the group already ended.
+        unsafe {
+            libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL);
+        }
     }
 
     #[cfg(windows)]
