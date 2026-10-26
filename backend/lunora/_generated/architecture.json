@@ -4556,6 +4556,11 @@
       "to": "table:idempotencyClaims"
     },
     {
+      "from": "function:lib_claim_once:retryReleaseKey",
+      "kind": "schedule",
+      "to": "function:lib_claim_once:retryReleaseKey"
+    },
+    {
       "from": "function:lib_document_history:recordHistory",
       "kind": "write",
       "to": "table:documentHistory"
@@ -6354,6 +6359,11 @@
       "from": "function:triggers_execute:default",
       "kind": "call",
       "to": "function:triggers_quiet_inputs:loadQuietSnapshot"
+    },
+    {
+      "from": "function:triggers_execute:default",
+      "kind": "schedule",
+      "to": "function:lib_claim_once:retryReleaseKey"
     },
     {
       "from": "function:triggers_functions:admitTriggerRun",
@@ -12269,6 +12279,12 @@
       "name": "lib.claim_once.releaseKey"
     },
     {
+      "detail": "mutation",
+      "id": "function:lib_claim_once:retryReleaseKey",
+      "kind": "function",
+      "name": "lib.claim_once.retryReleaseKey"
+    },
+    {
       "detail": "query",
       "id": "function:lib_document_history:getDocumentAtTime",
       "kind": "function",
@@ -17695,25 +17711,25 @@
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 128,
+      "line": 134,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 196,
+      "line": 202,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 211,
+      "line": 219,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "schedule",
-      "line": 217,
+      "line": 225,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
@@ -19231,7 +19247,7 @@
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 293,
+      "line": 330,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -20149,7 +20165,7 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 435,
+      "line": 438,
       "reason": "the default export is not a registered function"
     },
     {

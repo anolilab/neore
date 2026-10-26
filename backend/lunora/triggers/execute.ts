@@ -13,8 +13,14 @@ import { SANDBOX_TOOLS } from "../chat/lib/tool-builder";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
+import { releaseRetryDelayMs } from "../lib/claim-once";
 import { filterTextOf } from "./filters";
 import { isQuietRunSkipped, TRIGGER_THREAD_TAG } from "./quiet";
+
+const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds.";
+
+const RELEASE_LOST_NOTE =
+    "Giving this delivery back failed and no retry could be scheduled; a redelivery is refused as a duplicate until it is released by hand.";
 
 export const executeTrigger = internalAction
     .input({
@@ -33,16 +39,26 @@ export const executeTrigger = internalAction
         triggerId: v.id("triggers"),
     })
     .action(async ({ args: { claim, ignoreDisabled, invalidUtf8, manual, payload, releaseUnlessRun, triggerId }, ctx }) => {
-        /** Gives a permanent claim back; the admission refusals do their own, inside their transaction. */
-        const giveBack = async (): Promise<void> => {
+        /**
+         * Gives a permanent claim back (admission refusals do their own, inside their transaction). A release
+         * that fails is NOT dropped: the claim lasts years, so a lost release would refuse every redelivery of
+         * work that never ran. It is rescheduled with backoff (`retryReleaseKey`); if even that cannot be
+         * scheduled, the error escapes and fails the job. Returns a note for the execution log when a retry was needed.
+         */
+        const giveBack = async (): Promise<string | undefined> => {
             if (!claim || !releaseUnlessRun) {
-                return;
+                return undefined;
             }
 
             try {
                 await ctx.runMutation(internal.lib.claim_once.releaseKey, claim);
+
+                return undefined;
             } catch (error) {
-                console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}:`, error);
+                console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}; retrying:`, error);
+                await ctx.scheduler.runAfter(releaseRetryDelayMs(1), internal.lib.claim_once.retryReleaseKey, { ...claim, attempt: 1 });
+
+                return RELEASE_DEFERRED_NOTE;
             }
         };
 
@@ -69,7 +85,19 @@ export const executeTrigger = internalAction
 
         if (trigger.enabled !== true && ignoreDisabled !== true) {
             console.warn(`[Triggers] Trigger ${triggerId} is disabled, skipping`);
-            await giveBack();
+
+            const note = await giveBack();
+
+            // Nothing else records this delivery, so a release that needed a retry goes in the history.
+            if (note) {
+                const executionId = await ctx.runMutation(internal.triggers.functions.createExecution, { payload, triggerId });
+
+                await ctx.runMutation(internal.triggers.functions.updateExecution, {
+                    error: `Skipped: the trigger is disabled. ${note}`,
+                    executionId,
+                    status: "failed",
+                });
+            }
 
             return;
         }
@@ -195,13 +223,15 @@ export const executeTrigger = internalAction
             // A bot with its computer off gets no computer here: the sandbox lookup would fall back to a throwaway one.
             const useComputer = bot?.computerEnabled === true && trigger.botComputer === true && trigger.type === "schedule";
 
-            started = true;
             runStartedAt = windowStart;
 
             const { text: responseText, threadId } = await runHeadlessAgent(ctx, {
                 botId: bot ? trigger.botId : undefined,
                 memory: true,
                 model,
+                onGenerationStart: () => {
+                    started = true;
+                },
                 onThread: () => {
                     threadCreated = true;
                 },
@@ -234,14 +264,24 @@ export const executeTrigger = internalAction
 
             console.error(`[Triggers] Trigger ${trigger.name} failed:`, error);
 
-            // Admission or the setup before the agent threw: the delivery never ran.
+            // Admission or the setup before the model was asked threw: the delivery never ran.
+            let note: string | undefined;
+            let releaseError: unknown;
+
             if (!started) {
-                await giveBack();
+                try {
+                    note = await giveBack();
+                } catch (error_) {
+                    // The release failed AND no retry could be scheduled. The execution is still closed and shown to the
+                    // owner below; the error is then rethrown so the job fails loudly instead of leaving the claim silently.
+                    releaseError = error_;
+                    note = RELEASE_LOST_NOTE;
+                }
             }
 
             // Update execution as failed
             await ctx.runMutation(internal.triggers.functions.updateExecution, {
-                error: errorMessage.slice(0, 2000),
+                error: [errorMessage, note].filter(Boolean).join(" ").slice(0, 2000),
                 executionId,
                 status: "failed",
             });
@@ -252,6 +292,10 @@ export const executeTrigger = internalAction
                 ...(threadCreated && { lastTriggeredAt: runStartedAt }),
                 triggerId,
             });
+
+            if (releaseError !== undefined) {
+                throw releaseError;
+            }
         }
     });
 

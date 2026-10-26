@@ -55,7 +55,7 @@ import type { HttpActionCtx } from "lunorash/server";
  */
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
-import { TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
+import { releaseRetryDelayMs, TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import { hmacSha256Hex, isWithinWindow, SIGNED_REQUEST_WINDOW_MS, secretsMatch, sha256Hex, timingSafeEqual } from "../lib/crypto";
 import { decryptKey } from "../lib/encryption";
 import { httpScheduler } from "../lib/http-scheduler";
@@ -429,10 +429,24 @@ const takeReplayGuard = async (
     // Every release names the claim it took: a step that outlives the TTL must not clear a redelivery's replacement.
     const claim = { ...claimKey, claimedAt };
 
+    const permanent = scheme.requiresDeliveryId === true;
+
     return {
-        args: scheme.requiresDeliveryId ? { claim, releaseUnlessRun: true } : { claim },
+        args: permanent ? { claim, releaseUnlessRun: true } : { claim },
         giveBack: async () => {
-            await context.runMutation(internal.lib.claim_once.releaseKey, claim);
+            try {
+                await context.runMutation(internal.lib.claim_once.releaseKey, claim);
+            } catch (error) {
+                if (!permanent) {
+                    throw error;
+                }
+
+                // A permanent claim must not be left behind: schedule the release again (it is idempotent), and still fail
+                // this request so the sender retries rather than being told 2xx for work that did not run.
+                await httpScheduler(context).runAfter(releaseRetryDelayMs(1), internal.lib.claim_once.retryReleaseKey, { ...claim, attempt: 1 });
+
+                throw error;
+            }
         },
     };
 };

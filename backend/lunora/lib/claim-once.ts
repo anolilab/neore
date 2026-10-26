@@ -259,6 +259,43 @@ export const completeKey = internalMutation
         return null;
     });
 
+/** Attempts of {@link retryReleaseKey} before it gives up loudly. */
+export const RELEASE_RETRY_MAX_ATTEMPTS = 6;
+
+/** Delay before retry `attempt` (1-based) of a failed release: 5 s, then tripling. */
+export const releaseRetryDelayMs = (attempt: number): number => 5000 * 3 ** (attempt - 1);
+
+/**
+ * A release that failed, tried again later. For a claim that outlasts any retry window
+ * ({@link TRIGGER_DELIVERY_CLAIM_TTL_MS}) a lost release means the sender can never redeliver the work, so
+ * the failure is rescheduled with backoff instead of logged. Idempotent: releasing a gone claim, or one
+ * a newer holder replaced (`claimedAt`), deletes nothing. After {@link RELEASE_RETRY_MAX_ATTEMPTS} it throws,
+ * so the job fails visibly.
+ */
+export const retryReleaseKey = internalMutation
+    .input({ attempt: v.number(), claimedAt: v.optional(v.number()), key: v.string().max(1024), scope: v.string().max(200) })
+    .output(v.null())
+    .mutation(async ({ args: { attempt, claimedAt, key, scope }, ctx }) => {
+        try {
+            await releaseClaim(ctx, scope, key, claimedAt);
+        } catch (error) {
+            console.error(`[claim-once] Release of ${scope} claim failed (attempt ${String(attempt)} of ${String(RELEASE_RETRY_MAX_ATTEMPTS)}):`, error);
+
+            if (attempt >= RELEASE_RETRY_MAX_ATTEMPTS) {
+                throw error;
+            }
+
+            await ctx.scheduler.runAfter(releaseRetryDelayMs(attempt + 1), internal.lib.claim_once.retryReleaseKey, {
+                attempt: attempt + 1,
+                claimedAt,
+                key,
+                scope,
+            });
+        }
+
+        return null;
+    });
+
 export const releaseKey = internalMutation
     .input({ claimedAt: v.optional(v.number()), key: v.string(), scope: v.string() })
     .output(v.null())

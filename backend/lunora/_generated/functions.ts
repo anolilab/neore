@@ -1018,6 +1018,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "lib_claim_once:purgeExpiredClaims": lunora_lib_claim_once_114.purgeExpiredClaims as unknown as RegisteredLunoraFunction,
     "lib_claim_once:reapLapsedClaims": lunora_lib_claim_once_114.reapLapsedClaims as unknown as RegisteredLunoraFunction,
     "lib_claim_once:releaseKey": lunora_lib_claim_once_114.releaseKey as unknown as RegisteredLunoraFunction,
+    "lib_claim_once:retryReleaseKey": lunora_lib_claim_once_114.retryReleaseKey as unknown as RegisteredLunoraFunction,
     "lib_document_history:getDocumentAtTime": lunora_lib_document_history_115.getDocumentAtTime as unknown as RegisteredLunoraFunction,
     "lib_document_history:listDocumentVersions": lunora_lib_document_history_115.listDocumentVersions as unknown as RegisteredLunoraFunction,
     "lib_document_history:listUserActivity": lunora_lib_document_history_115.listUserActivity as unknown as RegisteredLunoraFunction,
@@ -5758,6 +5759,23 @@ if (typeof source["key"] !== "string") return DEFER;
 if (typeof source["scope"] !== "string") return DEFER;
 return { ...(__has1 ? { "claimedAt": __val1 } : {}), "key": source["key"], "scope": source["scope"] };
 });
+installCompiledValidatorMap(lunora_lib_claim_once_114.retryReleaseKey.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["attempt"] !== "number" || !Number.isFinite(source["attempt"])) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["claimedAt"] !== undefined) {
+if (typeof source["claimedAt"] !== "number" || !Number.isFinite(source["claimedAt"])) return DEFER;
+__val1 = source["claimedAt"];
+__has1 = true;
+}
+if (typeof source["key"] !== "string") return DEFER;
+if (source["key"].length > 1024) return DEFER;
+if (typeof source["scope"] !== "string") return DEFER;
+if (source["scope"].length > 200) return DEFER;
+return { "attempt": source["attempt"], ...(__has1 ? { "claimedAt": __val1 } : {}), "key": source["key"], "scope": source["scope"] };
+});
 installCompiledValidatorMap(lunora_lib_document_history_115.getDocumentAtTime.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8899,6 +8917,7 @@ export interface Caller {
             purgeExpiredClaims: (args?: {}) => Promise<number>;
             reapLapsedClaims: (args?: {}) => Promise<number>;
             releaseKey: (args: { claimedAt?: number; key: string; scope: string }) => Promise<null>;
+            retryReleaseKey: (args: { attempt: number; claimedAt?: number; key: string; scope: string }) => Promise<null>;
         };
         document_history: {
             getDocumentAtTime: (args: { documentId: string; tableName: string; timestamp: number }) => Promise<unknown | null>;
@@ -10545,6 +10564,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             purgeExpiredClaims: (args) => callRegistered(context, "lib_claim_once:purgeExpiredClaims", args),
             reapLapsedClaims: (args) => callRegistered(context, "lib_claim_once:reapLapsedClaims", args),
             releaseKey: (args) => callRegistered(context, "lib_claim_once:releaseKey", args),
+            retryReleaseKey: (args) => callRegistered(context, "lib_claim_once:retryReleaseKey", args),
         },
         document_history: {
             getDocumentAtTime: (args) => callRegistered(context, "lib_document_history:getDocumentAtTime", args),

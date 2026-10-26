@@ -767,11 +767,24 @@ const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reaso
     await ctx.db.insert("triggerExecutions", { completedAt: ctx.now, error: reason, startedAt: ctx.now, status: "filtered", triggerId });
 };
 
-/** Gives a delivery's replay claim back. The refusal stands if this fails; a claim left behind only makes a redelivery read as a replay until its TTL. */
-const giveBackClaim = async (ctx: MutationCtx, claim: { claimedAt: number; key: string; scope: string }, triggerId: Id<"triggers">): Promise<void> => {
+/**
+ * Gives a delivery's replay claim back. A short-lived claim left behind only makes a redelivery read as a replay
+ * until its TTL, so a failure is logged and the refusal stands. A `permanent` one lasts for years: a failed
+ * release throws, undoing this admission, so `executeTrigger` retries the release durably instead of losing it.
+ */
+const giveBackClaim = async (
+    ctx: MutationCtx,
+    claim: { claimedAt: number; key: string; scope: string },
+    triggerId: Id<"triggers">,
+    permanent: boolean,
+): Promise<void> => {
     try {
         await releaseClaim(ctx, claim.scope, claim.key, claim.claimedAt);
     } catch (error) {
+        if (permanent) {
+            throw error;
+        }
+
         console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}:`, error);
     }
 };
@@ -803,7 +816,7 @@ export const admitTriggerRun = internalMutation
     .mutation(async ({ args: { claim, executionId, filterPayload, releaseUnlessRun, triggerId }, ctx }) => {
         const refused = async (reason: string): Promise<string> => {
             if (claim && releaseUnlessRun) {
-                await giveBackClaim(ctx, claim, triggerId);
+                await giveBackClaim(ctx, claim, triggerId, true);
             }
 
             return reason;
@@ -829,7 +842,7 @@ export const admitTriggerRun = internalMutation
                 }
 
                 if (claim) {
-                    await giveBackClaim(ctx, claim, triggerId);
+                    await giveBackClaim(ctx, claim, triggerId, releaseUnlessRun === true);
                 }
 
                 return { filtered: reason };
