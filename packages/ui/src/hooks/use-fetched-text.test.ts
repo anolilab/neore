@@ -91,6 +91,13 @@ describe(dataUrlResponse, () => {
         expect(() => dataUrlResponse(`data:text/plain;base64,${"A".repeat(MAX_FETCHED_TEXT_BYTES * 2)}`)).toThrow();
     });
 
+    it("decodes percent-encoded text whose escaped form is longer than the limit", async () => {
+        const text = "é".repeat(170_000);
+        const response = dataUrlResponse(`data:text/plain,${encodeURIComponent(text)}`);
+
+        await expect(readTextWithin(response, MAX_FETCHED_TEXT_BYTES)).resolves.toBe(text);
+    });
+
     it("decodes a percent-encoded data URL, UTF-8 included", async () => {
         const response = dataUrlResponse(`data:text/plain,${encodeURIComponent("a€b\nc,d")}`);
 

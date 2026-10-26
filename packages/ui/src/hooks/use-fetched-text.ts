@@ -102,8 +102,10 @@ export const dataUrlResponse = (url: string): Response => {
     const isBase64 = BASE64_PARAM_RE.test(header);
     const mediaType = (header.split(";", 1)[0] ?? "").trim();
 
-    // Refuse on the encoded length before anything is decoded: base64 yields at most 3 bytes per 4 characters.
-    const encodedLimit = isBase64 ? Math.ceil((MAX_FETCHED_TEXT_BYTES * 4) / 3) + 4 : MAX_FETCHED_TEXT_BYTES;
+    // Refuse on the encoded length before anything is decoded. Base64 is 4 characters per 3 bytes. A percent escape
+    // is 3 characters per byte, so a payload decodes to at least a third of its length: only longer than three times
+    // the limit is certainly too large.
+    const encodedLimit = isBase64 ? Math.ceil((MAX_FETCHED_TEXT_BYTES * 4) / 3) + 4 : MAX_FETCHED_TEXT_BYTES * 3;
 
     if (payload.length > encodedLimit) {
         throw tooLarge(MAX_FETCHED_TEXT_BYTES);
