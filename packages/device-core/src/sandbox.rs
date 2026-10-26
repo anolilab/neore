@@ -12,8 +12,9 @@
 //!   `AF_NETLINK` (and refuses `io_uring_setup`, whose `IORING_OP_SOCKET` would
 //!   sidestep it). If the filter cannot be installed the spawn fails. Only
 //!   little-endian x86_64 and aarch64 have the filter: elsewhere a command
-//!   without network keeps its Landlock confinement ([`Policy::network_gap`]),
-//!   and the prompt says its network is not blocked.
+//!   without network is refused unless the user allowed unsandboxed shells, and
+//!   then keeps its Landlock confinement ([`Policy::network_gap`]) with a prompt
+//!   that says its network is not blocked.
 //! - **macOS:** `sandbox-exec` with a generated SBPL profile. Every path reaches
 //!   the profile as a `-D` parameter, never spliced into its text.
 //! - **Windows:** no sandbox. Commands run in a kill-on-close Job Object
@@ -589,6 +590,11 @@ fn plan_call(
     home: Option<&Path>,
 ) -> Result<Option<Policy>, String> {
     match support {
+        Support::Available(_) if network_gap.is_some() && !allow_unsandboxed => Err(format!(
+            "shell commands must run sandboxed, and {}. To run them anyway, turn off \
+             \"Require sandbox for shell commands\" in this computer's device settings.",
+            network_gap.unwrap_or_default()
+        )),
         Support::Available(_) => Ok(Some(Policy {
             network: allow_network,
             network_gap,
@@ -825,8 +831,9 @@ mod tests {
         assert!(note.contains("Network access is NOT blocked"));
         assert!(note.contains("no filter for riscv64"));
         assert!(plan_call(&available, false, false, gap, &roots, None)
-            .unwrap()
-            .is_some());
+            .unwrap_err()
+            .contains("no filter for riscv64"));
+        assert!(plan_call(&available, false, true, None, &roots, None).is_ok());
         assert_eq!(
             plan_call(&available, false, false, None, &roots, None)
                 .unwrap()
