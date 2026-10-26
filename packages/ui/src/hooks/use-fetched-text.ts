@@ -79,6 +79,8 @@ export const readTextWithin = async (response: Response, maxBytes: number): Prom
     return text + decoder.decode();
 };
 
+// The scheme is case-insensitive, as URL validation treats it.
+const DATA_SCHEME_RE = /^data:/iu;
 const DATA_URL_RE = /^data:([^,]*),(.*)$/isu;
 const MEDIA_TYPE_RE = /^[\w.+-]+\/[\w.+-]+$/u;
 const BASE64_PARAM_RE = /;\s*base64$/iu;
@@ -126,7 +128,7 @@ export const loadResource = async <T>(
 
     try {
         // `redirect: "error"`: the destination was checked for the URL given, so a redirect to another host is refused, not followed.
-        const response = url.startsWith("data:") ? dataUrlResponse(url) : await fetch(url, { redirect: "error", signal });
+        const response = DATA_SCHEME_RE.test(url) ? dataUrlResponse(url) : await fetch(url, { redirect: "error", signal });
 
         if (!response.ok) {
             return { status: "error" };

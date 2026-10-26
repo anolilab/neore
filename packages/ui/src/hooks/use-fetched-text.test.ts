@@ -139,6 +139,13 @@ describe(loadResource, () => {
         expect(fetchSpy).toHaveBeenCalledWith(`${BACKEND}/files/a.csv`, expect.objectContaining({ redirect: "error" }));
     });
 
+    it("decodes an uppercase DATA: URL locally, without fetch", async () => {
+        const fetchSpy = vi.fn();
+
+        await expect(run("DATA:text/plain,hello", fetchSpy)).resolves.toStrictEqual({ status: "ready", value: "hello" });
+        expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
     it("does not fetch a foreign origin, a loopback service or another scheme", async () => {
         const fetchSpy = vi.fn();
 
