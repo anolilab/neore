@@ -1,8 +1,7 @@
 /**
- * The LOCAL device window's page. The only
- * place a device call or a pairing is approved, and where shared folders, local
- * MCP servers and allow rules are managed. Bundled as a classic script
- * (`device.js`); it reaches the main process only through `window.neoreDevice`.
+ * The LOCAL device window's page. It is the only place a device call or a pairing is approved,
+ * and where shared folders, local MCP servers and allow rules are managed. Bundled as a classic
+ * script (`device.js`); it reaches the main process only through `window.neoreDevice`.
  *
  * Everything in a prompt came from a model or the network, so it is rendered
  * with textContent only — never as HTML.
