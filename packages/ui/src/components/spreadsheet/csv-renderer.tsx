@@ -57,10 +57,10 @@ interface CsvRendererProps {
     content: string;
     /** The field delimiter. Detected from the content when omitted. */
     delimiter?: string;
-    /** Read numbers and booleans as such (sorting, the labels). Off to show each field exactly as the file has it. */
-    typed?: boolean;
     /** Override labels for i18n */
     labels?: CsvRendererLabels;
+    /** Read numbers and booleans as such (sorting, the labels). Off to show each field exactly as the file has it. */
+    typed?: boolean;
 }
 
 const parseCSV = (content: string, delimiter: string | undefined, typed: boolean): { data: Record<string, unknown>[]; headers: string[] } => {
