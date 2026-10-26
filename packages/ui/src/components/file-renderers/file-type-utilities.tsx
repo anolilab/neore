@@ -55,11 +55,12 @@ export const getFileRendererType = (mediaType?: string, filename?: string): File
         return "docx";
     }
 
-    if (isTextLikeType(mediaType)) {
-        if (isJsonl(filename)) {
-            return "jsonl";
-        }
+    // Older uploads of a JSON Lines file carry application/json, which the chat allowlist accepts.
+    if (isJsonl(filename) && (isTextLikeType(mediaType) || mediaType === "application/json")) {
+        return "jsonl";
+    }
 
+    if (isTextLikeType(mediaType)) {
         if (isMermaid(filename)) {
             return "mermaid";
         }

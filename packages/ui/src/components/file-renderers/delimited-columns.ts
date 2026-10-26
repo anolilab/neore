@@ -27,14 +27,19 @@ export const delimiterForFilename = (filename?: string): string | undefined => (
  * hundreds of thousands of records within the byte limit, and parsing them all is what freezes a page.
  */
 export const exceedsRowLimit = (content: string, maxRows: number): boolean => {
-    // A file has one more line than it has newlines.
+    // A file has one more line than it has line breaks. LF, CRLF and a lone CR each end a line, and CRLF counts once.
     let rows = 1;
 
-    for (let index = content.indexOf("\n"); index !== -1; index = content.indexOf("\n", index + 1)) {
-        rows += 1;
+    for (let index = 0; index < content.length; index += 1) {
+        const code = content.codePointAt(index) ?? 0;
+        const isLineBreak = code === 10 || (code === 13 && content.codePointAt(index + 1) !== 10);
 
-        if (rows > maxRows) {
-            return true;
+        if (isLineBreak) {
+            rows += 1;
+
+            if (rows > maxRows) {
+                return true;
+            }
         }
     }
 

@@ -215,6 +215,8 @@ describe(attachmentContentType, () => {
         [{ name: "report.csv", type: "application/pdf" }, "application/pdf"],
         [{ name: "flow.mmd", type: "image/png" }, "image/png"],
         [{ name: "data.jsonl", type: "video/mp4" }, "video/mp4"],
+        [{ name: "data.csv", type: "application/vnd.ms-excel" }, "text/plain"],
+        [{ name: "data.tsv", type: "application/vnd.ms-excel" }, "text/plain"],
         [{ name: "noextension", type: "" }, "application/octet-stream"],
     ])("%o is uploaded as %s", (file, expected) => {
         expect(attachmentContentType(file)).toBe(expected);

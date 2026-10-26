@@ -92,8 +92,8 @@ const EXTENSION_TYPES: ReadonlyArray<readonly [extension: string, type: string]>
 ];
 
 const BINARY_DOCUMENT_TYPES = new Set([
-    "application/pdf",
     "application/msword",
+    "application/pdf",
     "application/vnd.ms-excel",
     "application/vnd.ms-powerpoint",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -103,7 +103,10 @@ const BINARY_DOCUMENT_TYPES = new Set([
 ]);
 
 /** A browser type whose bytes are binary, which a file extension must not turn into text. */
-const isKnownBinaryType = (type: string): boolean => /^(?:image|video|audio)\//u.test(type) || BINARY_DOCUMENT_TYPES.has(type);
+const BINARY_MEDIA_RE = /^(?:image|video|audio)\//u;
+const DELIMITED_NAME_RE = /\.(?:csv|tsv)$/iu;
+
+const isKnownBinaryType = (type: string): boolean => BINARY_MEDIA_RE.test(type) || BINARY_DOCUMENT_TYPES.has(type);
 
 /**
  * The type an attachment is uploaded — and checked — as: by extension where
@@ -112,6 +115,11 @@ const isKnownBinaryType = (type: string): boolean => /^(?:image|video|audio)\//u
  * readable error.
  */
 export const attachmentContentType = (file: Pick<File, "name" | "type">): string => {
+    // Windows reports a .csv or .tsv as Excel. A real spreadsheet fails the server's NUL-byte check, so the name decides here.
+    if (file.type === "application/vnd.ms-excel" && DELIMITED_NAME_RE.test(file.name)) {
+        return "text/plain";
+    }
+
     // A declared binary type is kept whatever the name says, so a renamed PDF is not read as text.
     if (isKnownBinaryType(file.type)) {
         return file.type;

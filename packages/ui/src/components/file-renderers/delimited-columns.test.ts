@@ -107,3 +107,15 @@ describe(exceedsRowLimit, () => {
         expect(exceedsRowLimit("a\n".repeat(100_000), 20_000)).toBe(true);
     });
 });
+
+describe("line breaks a row limit counts", () => {
+    it("counts a lone CR as a line break, so a CR-only table of too many rows is refused", () => {
+        expect(exceedsRowLimit("a\r".repeat(20_001), 20_000)).toBe(true);
+    });
+
+    it("counts a CRLF pair once, the same as LF", () => {
+        expect(exceedsRowLimit("a\r\nb\r\n", 3)).toBe(exceedsRowLimit("a\nb\n", 3));
+        expect(exceedsRowLimit("a\r\nb\r\n", 2)).toBe(true);
+        expect(exceedsRowLimit("a\r\nb\r\n", 3)).toBe(false);
+    });
+});

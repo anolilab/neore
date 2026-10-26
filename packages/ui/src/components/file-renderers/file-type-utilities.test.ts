@@ -45,6 +45,10 @@ describe(getFileRendererType, () => {
         expect(getFileRendererType(mediaType, "data.csv")).not.toBe("table");
     });
 
+    it("routes an older JSON Lines upload, which carries application/json, to the viewer", () => {
+        expect(getFileRendererType("application/json", "rows.jsonl")).toBe("jsonl");
+    });
+
     it("lets an image type win over a misleading name", () => {
         expect(getFileRendererType("image/png", "scan.pdf")).toBe("image");
     });
