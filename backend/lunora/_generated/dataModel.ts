@@ -1763,7 +1763,7 @@ export interface Doc_triggers {
     updatedAt: number;
     userId: string;
     webhookSecret?: string;
-    webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token" | "linear";
+    webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token";
 }
 
 export interface Doc_twoFactor {
@@ -4494,7 +4494,7 @@ export interface Insert_triggers {
     updatedAt: number;
     userId: string;
     webhookSecret?: string;
-    webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token" | "linear";
+    webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token";
 }
 
 export interface Insert_twoFactor {

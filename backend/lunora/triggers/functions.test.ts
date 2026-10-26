@@ -12,6 +12,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { assertComputerRoutine, createTrigger, getTriggerExecutions, setTriggerEnabled, testRunTrigger, updateTrigger, updateTriggerStats } from "./functions";
+import { compileWebhookPreset } from "./presets";
 import { findNextCronTime } from "./schedule";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
@@ -314,13 +315,23 @@ describe("updateTrigger on a new schedule", () => {
     });
 });
 
+const asOwner = () => harness.withIdentity({ userId: "user-a" } as never);
+const webhook = { model: "m", name: "Hook", type: "webhook" };
+const dailySchedule = { cronExpression: "0 9 * * 1", model: "m", name: "Daily", type: "schedule" };
+
+/** Create a webhook trigger as the owner and read the stored row back. */
+const createWebhook = async (args: Record<string, unknown> = {}): Promise<{ row: any; triggerId: string }> => {
+    const { triggerId } = (await asOwner().mutation(createTrigger as never, { ...webhook, ...args } as never)) as { triggerId: string };
+
+    return { row: await readTrigger(triggerId), triggerId };
+};
+
 describe("webhook payload filters", () => {
-    const as = () => harness.withIdentity({ userId: "user-a" } as never);
-    const webhook = { model: "m", name: "Hook", type: "webhook" };
+    const as = asOwner;
     const filter = { op: "equals", path: "action", value: "opened" };
 
     it("stores a valid set on create, replaces it on update and clears it with an empty set", async () => {
-        const { triggerId } = (await as().mutation(createTrigger as never, { ...webhook, filters: [filter] } as never)) as { triggerId: string };
+        const { triggerId } = await createWebhook({ filters: [filter] });
 
         const storedFilters = async () => {
             const row = await readTrigger(triggerId);
@@ -359,113 +370,83 @@ describe("webhook payload filters", () => {
     });
 
     it("keeps filters to webhook triggers", async () => {
-        const schedule = { cronExpression: "0 9 * * 1", model: "m", name: "Daily", type: "schedule" };
+        await expect(as().mutation(createTrigger as never, { ...dailySchedule, filters: [filter] } as never)).rejects.toThrow("Only a webhook trigger");
 
-        await expect(as().mutation(createTrigger as never, { ...schedule, filters: [filter] } as never)).rejects.toThrow("Only a webhook trigger");
-
-        const { triggerId } = (await as().mutation(createTrigger as never, schedule as never)) as { triggerId: string };
+        const { triggerId } = (await as().mutation(createTrigger as never, dailySchedule as never)) as { triggerId: string };
 
         await expect(as().mutation(updateTrigger as never, { filters: [filter], triggerId } as never)).rejects.toThrow("Only a webhook trigger");
     });
 });
 
+/** What the argument validator names when it refuses. */
+const PRESET_ARGUMENT = /webhookPreset/u;
+const SCHEME_ARGUMENT = /webhookSignatureScheme/u;
+
 describe("webhook provider presets", () => {
-    const as = () => harness.withIdentity({ userId: "user-a" } as never);
-    const webhook = { model: "m", name: "Hook", type: "webhook" };
-    const schedule = { cronExpression: "0 9 * * 1", model: "m", name: "Daily", type: "schedule" };
+    const preset = { event: "pull_request_opened", provider: "github" } as const;
 
     it("stores the event's filters and the provider's scheme", async () => {
-        const { triggerId } = (await as().mutation(
-            createTrigger as never,
-            {
-                ...webhook,
-                webhookPreset: { event: "pull_request_merged", provider: "github" },
-            } as never,
-        )) as { triggerId: string };
-        const row = await readTrigger(triggerId);
+        const merged = { event: "pull_request_merged", provider: "github" } as const;
+        const { row } = await createWebhook({ webhookPreset: merged });
 
-        expect(row.webhookSignatureScheme).toBe("native");
-        expect(row.filters).toEqual([
-            { op: "equals", path: "action", value: "closed" },
-            { op: "equals", path: "pull_request.merged", value: "true" },
-        ]);
+        expect(row.webhookSignatureScheme).toBe(compileWebhookPreset(merged).scheme);
+        expect(row.filters).toEqual(compileWebhookPreset(merged).filters);
     });
 
     it("stores the GitLab scheme for a GitLab preset", async () => {
-        const { triggerId } = (await as().mutation(
-            createTrigger as never,
-            {
-                ...webhook,
-                webhookPreset: { event: "merge_request_opened", provider: "gitlab" },
-            } as never,
-        )) as { triggerId: string };
-
-        const row = await readTrigger(triggerId);
+        const opened = { event: "merge_request_opened", provider: "gitlab" } as const;
+        const { row } = await createWebhook({ webhookPreset: opened });
 
         expect(row.webhookSignatureScheme).toBe("gitlab-token");
+        expect(row.filters).toEqual(compileWebhookPreset(opened).filters);
     });
 
-    it("refuses an event that belongs to another provider", async () => {
+    it("stores 'timestamped' for a hand-written webhook with no scheme, and the scheme it names otherwise", async () => {
+        const unnamed = await createWebhook();
+        const named = await createWebhook({ webhookSignatureScheme: "gitlab-token" });
+
+        expect(unnamed.row.webhookSignatureScheme).toBe("timestamped");
+        expect(named.row.webhookSignatureScheme).toBe("gitlab-token");
+    });
+
+    it("does not accept an event that belongs to another provider", async () => {
         await expect(
-            as().mutation(createTrigger as never, { ...webhook, webhookPreset: { event: "merge_request_merged", provider: "github" } } as never),
-        ).rejects.toThrow("not one of the provider's events");
+            asOwner().mutation(createTrigger as never, { ...webhook, webhookPreset: { event: "merge_request_merged", provider: "github" } } as never),
+        ).rejects.toThrow(PRESET_ARGUMENT);
+
+        // The same call with the provider's own event is accepted, so the refusal is the pairing.
+        await expect(createWebhook({ webhookPreset: { event: "pull_request_merged", provider: "github" } })).resolves.toBeDefined();
     });
 
     it("refuses a preset together with filters", async () => {
         await expect(
-            as().mutation(
-                createTrigger as never,
-                {
-                    ...webhook,
-                    filters: [{ op: "exists", path: "a" }],
-                    webhookPreset: { event: "pull_request_opened", provider: "github" },
-                } as never,
-            ),
+            asOwner().mutation(createTrigger as never, { ...webhook, filters: [{ op: "exists", path: "a" }], webhookPreset: preset } as never),
         ).rejects.toThrow("sets its own filters");
     });
 
     it("refuses an explicit scheme that is not the provider's", async () => {
         await expect(
-            as().mutation(
-                createTrigger as never,
-                {
-                    ...webhook,
-                    webhookPreset: { event: "pull_request_opened", provider: "github" },
-                    webhookSignatureScheme: "gitlab-token",
-                } as never,
-            ),
+            asOwner().mutation(createTrigger as never, { ...webhook, webhookPreset: preset, webhookSignatureScheme: "gitlab-token" } as never),
         ).rejects.toThrow("does not match the provider");
     });
 
     it("accepts an explicit scheme that is the provider's", async () => {
-        const { triggerId } = (await as().mutation(
-            createTrigger as never,
-            {
-                ...webhook,
-                webhookPreset: { event: "pull_request_opened", provider: "github" },
-                webhookSignatureScheme: "native",
-            } as never,
-        )) as { triggerId: string };
-
-        const row = await readTrigger(triggerId);
+        const { row } = await createWebhook({ webhookPreset: preset, webhookSignatureScheme: "native" });
 
         expect(row.webhookSignatureScheme).toBe("native");
     });
 
-    it("keeps a preset to webhook triggers", async () => {
-        await expect(
-            as().mutation(createTrigger as never, { ...schedule, webhookPreset: { event: "pull_request_opened", provider: "github" } } as never),
-        ).rejects.toThrow("Only a webhook trigger has a provider preset");
+    it("keeps a preset and a scheme to webhook triggers", async () => {
+        await expect(asOwner().mutation(createTrigger as never, { ...dailySchedule, webhookPreset: preset } as never)).rejects.toThrow(
+            "Only a webhook trigger has a provider preset",
+        );
+        await expect(asOwner().mutation(createTrigger as never, { ...dailySchedule, webhookSignatureScheme: "native" } as never)).rejects.toThrow(
+            "Only a webhook trigger has a signature scheme",
+        );
     });
 
-    it("lets a hand-written trigger use the Linear scheme", async () => {
-        const { triggerId } = (await as().mutation(createTrigger as never, { ...webhook, webhookSignatureScheme: "linear" } as never)) as {
-            triggerId: string;
-        };
-
-        const row = await readTrigger(triggerId);
-
-        expect(row.webhookSignatureScheme).toBe("linear");
+    it("does not accept the Linear scheme", async () => {
+        await expect(asOwner().mutation(createTrigger as never, { ...webhook, webhookSignatureScheme: "linear" } as never)).rejects.toThrow(SCHEME_ARGUMENT);
     });
 });
 

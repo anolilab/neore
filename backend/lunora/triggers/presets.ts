@@ -6,7 +6,7 @@
  * provider signs with (`http.ts`). Nothing about a preset is stored: the trigger
  * keeps the filters and the scheme, exactly as a hand-written trigger does.
  *
- * Pure and import-free (type-only), so the web form reads the same tables through
+ * Pure and free of runtime imports, so the web form reads the same table through
  * `@neore/backend/triggers/presets`.
  *
  * Each filter is checked against the provider's documented payload shape. Where
@@ -14,87 +14,119 @@
  * event is left out rather than approximated.
  */
 import type { PayloadFilter } from "./filters";
+import type { WebhookSignatureScheme } from "./validators";
+
+export type { WebhookSignatureScheme } from "./validators";
 
 /**
- * How a webhook delivery is signed. `timestamped` and `native` are ours and
- * GitHub's; `gitlab-token` is GitLab's plain secret header; `linear` is Linear's
- * bare-hex HMAC with a signed `webhookTimestamp` in the body. Absent on a row
- * means "timestamped".
- */
-export type WebhookSignatureScheme = "gitlab-token" | "linear" | "native" | "timestamped";
-
-export const WEBHOOK_PROVIDERS = ["github", "gitlab"] as const;
-
-export type WebhookProvider = (typeof WEBHOOK_PROVIDERS)[number];
-
-/** The events each provider offers, in the order the form lists them. */
-export const PRESET_EVENTS = {
-    github: ["pull_request_opened", "pull_request_merged", "pull_request_review_requested", "issue_assigned"],
-    gitlab: ["merge_request_opened", "merge_request_merged"],
-} as const satisfies Record<WebhookProvider, ReadonlyArray<string>>;
-
-export type WebhookPresetEvent = (typeof PRESET_EVENTS)[WebhookProvider][number];
-
-/** The scheme each provider signs with. */
-export const PROVIDER_SCHEME: Record<WebhookProvider, WebhookSignatureScheme> = {
-    github: "native",
-    gitlab: "gitlab-token",
-};
-
-/**
- * The filters that select each event.
+ * The providers, their signature scheme and their events, in the order the form
+ * lists them. Adding a provider here is all the table needs; `createTrigger`'s
+ * `webhookPreset` validator must follow (a compile-time check there says so).
  *
  * GitHub sends the event name in `X-GitHub-Event`, which a payload filter cannot
- * read, so each event is identified by the body shape only. `pull_request` and
- * `issues` payloads never share a top-level key (`pull_request` vs `issue`), and
- * the `action` values used here are unique to the event named.
+ * read, so each of its events is identified by the body shape only. `pull_request`
+ * and `issues` payloads never share a top-level key (`pull_request` vs `issue`),
+ * and the `action` values used here are unique to the event named.
  */
-const PRESET_FILTERS: Record<WebhookPresetEvent, ReadonlyArray<PayloadFilter>> = {
-    issue_assigned: [
-        { op: "equals", path: "action", value: "assigned" },
-        { op: "exists", path: "issue" },
-    ],
-    merge_request_merged: [
-        { op: "equals", path: "object_kind", value: "merge_request" },
-        { op: "equals", path: "object_attributes.action", value: "merge" },
-    ],
-    merge_request_opened: [
-        { op: "equals", path: "object_kind", value: "merge_request" },
-        { op: "equals", path: "object_attributes.action", value: "open" },
-    ],
-    pull_request_merged: [
-        { op: "equals", path: "action", value: "closed" },
-        { op: "equals", path: "pull_request.merged", value: "true" },
-    ],
-    pull_request_opened: [
-        { op: "equals", path: "action", value: "opened" },
-        { op: "exists", path: "pull_request" },
-    ],
-    pull_request_review_requested: [
-        { op: "equals", path: "action", value: "review_requested" },
-        { op: "exists", path: "pull_request" },
-    ],
+export const WEBHOOK_PRESETS = {
+    github: {
+        events: [
+            {
+                filters: [
+                    { op: "equals", path: "action", value: "opened" },
+                    { op: "exists", path: "pull_request" },
+                ],
+                id: "pull_request_opened",
+            },
+            {
+                filters: [
+                    { op: "equals", path: "action", value: "closed" },
+                    { op: "equals", path: "pull_request.merged", value: "true" },
+                ],
+                id: "pull_request_merged",
+            },
+            {
+                filters: [
+                    { op: "equals", path: "action", value: "review_requested" },
+                    { op: "exists", path: "pull_request" },
+                ],
+                id: "pull_request_review_requested",
+            },
+            {
+                filters: [
+                    { op: "equals", path: "action", value: "assigned" },
+                    { op: "exists", path: "issue" },
+                ],
+                id: "issue_assigned",
+            },
+        ],
+        scheme: "native",
+    },
+    gitlab: {
+        events: [
+            {
+                filters: [
+                    { op: "equals", path: "object_kind", value: "merge_request" },
+                    { op: "equals", path: "object_attributes.action", value: "open" },
+                ],
+                id: "merge_request_opened",
+            },
+            {
+                filters: [
+                    { op: "equals", path: "object_kind", value: "merge_request" },
+                    { op: "equals", path: "object_attributes.action", value: "merge" },
+                ],
+                id: "merge_request_merged",
+            },
+        ],
+        scheme: "gitlab-token",
+    },
+} as const satisfies Record<string, { events: ReadonlyArray<{ filters: ReadonlyArray<PayloadFilter>; id: string }>; scheme: WebhookSignatureScheme }>;
+
+export type WebhookProvider = keyof typeof WEBHOOK_PRESETS;
+
+export const WEBHOOK_PROVIDERS = Object.keys(WEBHOOK_PRESETS) as WebhookProvider[];
+
+type EventOf<P extends WebhookProvider> = (typeof WEBHOOK_PRESETS)[P]["events"][number]["id"];
+
+/** A provider and one of ITS events: a mismatched pair is not a value of this type. */
+export type WebhookPreset = { [P in WebhookProvider]: { event: EventOf<P>; provider: P } }[WebhookProvider];
+
+export type WebhookPresetEvent = WebhookPreset["event"];
+
+const presetsOf = <P extends WebhookProvider>(provider: P): ReadonlyArray<{ event: EventOf<P>; provider: P }> =>
+    WEBHOOK_PRESETS[provider].events.map((event) => {
+        return { event: event.id, provider };
+    });
+
+/** Every preset, in the order the form lists them. A provider missing from the left side fails to compile. */
+const PRESETS_BY_PROVIDER: { [P in WebhookProvider]: ReadonlyArray<{ event: EventOf<P>; provider: P }> } = {
+    github: presetsOf("github"),
+    gitlab: presetsOf("gitlab"),
 };
 
-export interface WebhookPreset {
-    event: WebhookPresetEvent;
-    provider: WebhookProvider;
-}
+export const WEBHOOK_PRESET_LIST: ReadonlyArray<WebhookPreset> = WEBHOOK_PROVIDERS.flatMap(
+    (provider): ReadonlyArray<WebhookPreset> => PRESETS_BY_PROVIDER[provider],
+);
 
 /**
- * What a preset compiles to, or `undefined` when the event does not belong to
- * the provider. The caller refuses `undefined`: a preset that names a provider
- * and an event of another provider is a mistake, not a default.
+ * What a preset compiles to: the filters that select its event and the provider's
+ * signature scheme. An event that is not the provider's cannot be built as a
+ * `WebhookPreset`, and `createTrigger` validates the same pairs, so the throw is
+ * unreachable; it is there because an empty filter set would accept every delivery.
  */
-export const compileWebhookPreset = (preset: WebhookPreset): { filters: PayloadFilter[]; scheme: WebhookSignatureScheme } | undefined => {
-    if (!(PRESET_EVENTS[preset.provider] as ReadonlyArray<string>).includes(preset.event)) {
-        return undefined;
+export const compileWebhookPreset = (preset: WebhookPreset): { filters: PayloadFilter[]; scheme: WebhookSignatureScheme } => {
+    const { events, scheme } = WEBHOOK_PRESETS[preset.provider];
+    const found = events.find((event) => event.id === preset.event);
+
+    if (!found) {
+        throw new Error(`No ${preset.provider} preset for ${preset.event}`);
     }
 
     return {
-        filters: PRESET_FILTERS[preset.event].map((filter) => {
+        filters: found.filters.map((filter) => {
             return { ...filter };
         }),
-        scheme: PROVIDER_SCHEME[preset.provider],
+        scheme,
     };
 };

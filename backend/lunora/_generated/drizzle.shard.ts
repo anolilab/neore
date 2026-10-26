@@ -1517,7 +1517,7 @@ export const triggers = sqliteTable("triggers", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
     webhookSecret: text("webhookSecret"),
-    webhookSignatureScheme: text("webhookSignatureScheme", { mode: "json" }).$type<"timestamped" | "native" | "gitlab-token" | "linear">(),
+    webhookSignatureScheme: text("webhookSignatureScheme", { mode: "json" }).$type<"timestamped" | "native" | "gitlab-token">(),
 }, (t) => ({
     by_enabled_nextTriggerAt: index("by_enabled_nextTriggerAt").on(t.enabled, t.nextTriggerAt),
     by_type_enabled: index("by_type_enabled").on(t.type, t.enabled),

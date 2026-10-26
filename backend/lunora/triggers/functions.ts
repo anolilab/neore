@@ -22,7 +22,7 @@ import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
 import { assertValidFilters, evaluateFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH, MAX_WEBHOOK_BODY_BYTES } from "./filters";
-import type { WebhookPreset, WebhookSignatureScheme } from "./presets";
+import type { WebhookPreset } from "./presets";
 import { compileWebhookPreset } from "./presets";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
@@ -31,12 +31,39 @@ import { notifyQuietly } from "../notifications/notify";
 import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
+import type { WebhookSignatureScheme } from "./validators";
+import { vWebhookSignatureScheme } from "./validators";
 
 // "event" stays in the union because existing rows carry it; removing a member is a breaking schema change.
 const triggerTypeSchema = v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event"));
 
-/** How a webhook delivery is signed; see `triggers/http.ts`. Absent on a row means "timestamped". */
-const vSignatureScheme = v.union(v.literal("timestamped"), v.literal("native"), v.literal("gitlab-token"), v.literal("linear"));
+/**
+ * A provider and one of its events: one object per provider, so a mismatched pair cannot be sent.
+ * Written out because codegen reads the literals, not a table; the check below fails to compile when
+ * this and `WEBHOOK_PRESETS` (`presets.ts`) drift apart.
+ */
+const vWebhookPreset = v.union(
+    v.object({
+        event: v.union(
+            v.literal("pull_request_opened"),
+            v.literal("pull_request_merged"),
+            v.literal("pull_request_review_requested"),
+            v.literal("issue_assigned"),
+        ),
+        provider: v.literal("github"),
+    }),
+    v.object({
+        event: v.union(v.literal("merge_request_opened"), v.literal("merge_request_merged")),
+        provider: v.literal("gitlab"),
+    }),
+);
+
+type Equal<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+const presetValidatorMatchesTable: Equal<Infer<typeof vWebhookPreset>, WebhookPreset> = true;
+
+// eslint-disable-next-line sonarjs/void-use -- type-level assertion; `void` only marks the binding as used.
+void presetValidatorMatchesTable;
 
 /** Nothing dispatches an event trigger, so one can be neither created nor edited. Existing rows stay readable and deletable. */
 const assertTriggerTypeSupported = (type: "event" | "schedule" | "webhook"): void => {
@@ -87,37 +114,43 @@ const checkedFilters = (filters: PayloadFilter[] | undefined, type: Doc<"trigger
 };
 
 /**
- * The filters and signature scheme a new trigger is stored with. A provider preset
- * supplies both, so it may not come with `filters`, and an explicit scheme must be
- * the provider's: a mismatch would verify the sender with the wrong credential.
+ * The filters and signature scheme a new trigger is stored with, after every check
+ * that belongs to the webhook-only arguments. A provider preset supplies both, so it
+ * may not come with `filters`, and an explicit scheme must be the provider's: a
+ * mismatch would verify the sender with the wrong credential. A webhook without a
+ * preset is "timestamped" unless it names a scheme; other types store neither.
  */
 const webhookSetup = (
     args: { filters?: PayloadFilter[]; webhookPreset?: WebhookPreset; webhookSignatureScheme?: WebhookSignatureScheme },
     type: Doc<"triggers">["type"],
-): { filters: PayloadFilter[] | undefined; scheme: WebhookSignatureScheme | undefined } => {
-    if (!args.webhookPreset) {
-        return { filters: checkedFilters(args.filters, type), scheme: args.webhookSignatureScheme };
-    }
-
+): { filters: PayloadFilter[] | undefined; webhookSignatureScheme: WebhookSignatureScheme | undefined } => {
     if (type !== "webhook") {
-        throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has a provider preset.");
+        if (args.webhookSignatureScheme !== undefined) {
+            throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has a signature scheme.");
+        }
+
+        if (args.webhookPreset) {
+            throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has a provider preset.");
+        }
+
+        return { filters: checkedFilters(args.filters, type), webhookSignatureScheme: undefined };
     }
 
-    const compiled = compileWebhookPreset(args.webhookPreset);
-
-    if (!compiled) {
-        throw new LunoraError("INVALID_ARGUMENT", "That event is not one of the provider's events.");
+    if (!args.webhookPreset) {
+        return { filters: checkedFilters(args.filters, type), webhookSignatureScheme: args.webhookSignatureScheme ?? "timestamped" };
     }
 
     if (args.filters && args.filters.length > 0) {
         throw new LunoraError("INVALID_ARGUMENT", "A provider preset sets its own filters. Leave the filters out.");
     }
 
+    const compiled = compileWebhookPreset(args.webhookPreset);
+
     if (args.webhookSignatureScheme !== undefined && args.webhookSignatureScheme !== compiled.scheme) {
         throw new LunoraError("INVALID_ARGUMENT", "The signature scheme does not match the provider.");
     }
 
-    return { filters: compiled.filters, scheme: compiled.scheme };
+    return { filters: compiled.filters, webhookSignatureScheme: compiled.scheme };
 };
 
 /**
@@ -179,7 +212,7 @@ const vGetTriggersOutput = v.array(
         triggerCount: v.number(),
         type: v.string(),
         updatedAt: v.number(),
-        webhookSignatureScheme: v.union(v.literal("timestamped"), v.literal("native"), v.literal("gitlab-token"), v.literal("linear"), v.null()),
+        webhookSignatureScheme: v.union(vWebhookSignatureScheme, v.null()),
     }),
 );
 
@@ -257,21 +290,9 @@ export const createTrigger = authMutation
         timezone: v.optional(v.string().max(MAX_LENGTH.short)),
         type: v.from(triggerTypeSchema),
         // Webhook triggers only. Compiles to the event's filters and the provider's scheme; takes no `filters`.
-        webhookPreset: v.optional(
-            v.object({
-                event: v.union(
-                    v.literal("pull_request_opened"),
-                    v.literal("pull_request_merged"),
-                    v.literal("pull_request_review_requested"),
-                    v.literal("issue_assigned"),
-                    v.literal("merge_request_opened"),
-                    v.literal("merge_request_merged"),
-                ),
-                provider: v.union(v.literal("github"), v.literal("gitlab")),
-            }),
-        ),
+        webhookPreset: v.optional(vWebhookPreset),
         // Webhook triggers only; unset means "timestamped". Fixed at creation, with the secret.
-        webhookSignatureScheme: v.optional(vSignatureScheme),
+        webhookSignatureScheme: v.optional(vWebhookSignatureScheme),
     })
     .output(v.object({ triggerId: v.string(), webhookSecret: v.optional(v.string()) }))
     .mutation(async ({ args, ctx: context }) => {
@@ -301,11 +322,7 @@ export const createTrigger = authMutation
 
         assertComputerRoutine({ botComputer: args.botComputer === true, botId: args.botId, type: triggerType });
 
-        if (args.webhookSignatureScheme !== undefined && triggerType !== "webhook") {
-            throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has a signature scheme.");
-        }
-
-        const { filters, scheme } = webhookSetup(args, triggerType);
+        const { filters, webhookSignatureScheme } = webhookSetup(args, triggerType);
 
         const inserted = await context.db.insert("triggers", {
             botComputer: args.botComputer === true ? true : undefined,
@@ -326,7 +343,7 @@ export const createTrigger = authMutation
             updatedAt: now,
             userId,
             webhookSecret,
-            webhookSignatureScheme: triggerType === "webhook" ? (scheme ?? "timestamped") : undefined,
+            webhookSignatureScheme,
         });
 
         // A webhook names only the trigger; this is how it finds the shard.
