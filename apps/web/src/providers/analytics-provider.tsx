@@ -17,6 +17,8 @@ import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
 export const syncConsentToPostHog = ({ preferences }: { preferences: Record<string, boolean> }): void => {
     if (preferences.measurement) {
         posthog.opt_in_capturing();
+        // A launch that happened before consent is reported now; its stored flag keeps it from repeating.
+        reportFirstNativeLaunch();
     } else {
         posthog.opt_out_capturing();
     }
