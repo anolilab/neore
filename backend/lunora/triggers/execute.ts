@@ -15,7 +15,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { releaseRetryDelayMs } from "../lib/claim-once";
 import { filterTextOf } from "./filters";
-import { isQuietRunSkipped, TRIGGER_THREAD_TAG } from "./quiet";
+import { canBeQuiet, isQuietRunSkipped, TRIGGER_THREAD_TAG } from "./quiet";
 
 const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds.";
 
@@ -286,10 +286,13 @@ export const executeTrigger = internalAction
                 status: "failed",
             });
 
-            // Update trigger stats with error
+            // Update trigger stats with error. Only a quiet routine reads `lastTriggeredAt` as its window, so only it keeps
+            // the old value when the run posted nothing; any other routine still shows when it last ran.
+            const windowRoutine = trigger.quietWhenEmpty === true && canBeQuiet({ botId: bot ? botId : undefined, type: triggerType });
+
             await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
                 error: errorMessage.slice(0, 500),
-                ...(threadCreated && { lastTriggeredAt: runStartedAt }),
+                ...((threadCreated || !windowRoutine) && { lastTriggeredAt: threadCreated ? runStartedAt : Date.now() }),
                 triggerId,
             });
 

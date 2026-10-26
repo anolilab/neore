@@ -317,5 +317,22 @@ describe("the window a run leaves for the next one", () => {
             expect(stats.error).toEqual(expect.any(String));
             expect(await nextCheckPosts()).toBe(true);
         });
+
+        it("still stamps the last run of a routine that is not quiet when it fails before a thread exists", async () => {
+            const now = 20_000;
+
+            vi.useFakeTimers({ toFake: ["Date"] });
+            vi.setSystemTime(now);
+            state.trigger = { ...state.trigger, quietWhenEmpty: undefined };
+            state.beforeThread = () => {
+                throw new Error("model gateway down");
+            };
+
+            await run();
+
+            const stats = state.mutations.find((entry) => entry.name === "updateTriggerStats")?.args as Record<string, unknown>;
+
+            expect(stats.lastTriggeredAt).toBe(now);
+        });
     });
 });

@@ -162,7 +162,7 @@ const CRON_PRESETS: { expression: string; label: MessageDescriptor }[] = [
 const EXECUTION_STATUS_LABELS: Partial<Record<string, MessageDescriptor>> = {
     completed: msg`Completed`,
     failed: msg`Failed`,
-    filtered: msg`Filtered`,
+    filtered: msg`Skipped`,
     pending: msg`Pending`,
     running: msg`Running`,
 };
