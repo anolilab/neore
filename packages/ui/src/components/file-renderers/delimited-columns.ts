@@ -20,6 +20,25 @@ export interface CappedColumns {
  */
 export const delimiterForFilename = (filename?: string): string | undefined => (filename?.toLowerCase().endsWith(".tsv") ? "\t" : undefined);
 
+/**
+ * Whether `content` has more than `maxRows` lines, counted without splitting it. A file of short rows can hold
+ * hundreds of thousands of records within the byte limit, and parsing them all is what freezes a page.
+ */
+export const exceedsRowLimit = (content: string, maxRows: number): boolean => {
+    // A file has one more line than it has newlines.
+    let rows = 1;
+
+    for (let index = content.indexOf("\n"); index !== -1; index = content.indexOf("\n", index + 1)) {
+        rows += 1;
+
+        if (rows > maxRows) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 export const capDelimitedColumns = (content: string, maxColumns: number, delimiter?: string): CappedColumns => {
     // Blank lines are skipped, as `CsvRenderer` skips them: its header is the first row with content.
     const parsed = Papa.parse<string[]>(content, { delimiter, skipEmptyLines: true });

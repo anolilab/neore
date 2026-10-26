@@ -19,8 +19,9 @@ import type { FC } from "react";
 import { memo, useMemo } from "react";
 
 import { CsvRenderer } from "../spreadsheet/csv-renderer";
-import { capDelimitedColumns, delimiterForFilename } from "./delimited-columns";
+import { capDelimitedColumns, delimiterForFilename, exceedsRowLimit } from "./delimited-columns";
 import { FetchedTextPreview } from "./fetched-text-preview";
+import GenericFileCard from "./generic-file-card";
 
 export interface DelimitedTextPreviewProps {
     className?: string;
@@ -30,6 +31,9 @@ export interface DelimitedTextPreviewProps {
 
 /** Columns shown. Each costs a header cell and a cell per row, and a file can have hundreds of thousands. */
 const MAX_PREVIEW_COLUMNS = 50;
+
+/** Rows parsed at all. A file over this shows the download card rather than being parsed, however small its rows. */
+const MAX_PREVIEW_ROWS = 20_000;
 
 const DelimitedTable: FC<{ filename?: string; text: string }> = ({ filename, text }) => {
     const { t } = useLingui();
@@ -58,7 +62,13 @@ const DelimitedTextPreview: FC<DelimitedTextPreviewProps> = memo(({ className, f
 
     return (
         <FetchedTextPreview className={className} fallbackName={t`Table`} filename={filename} url={url}>
-            {(text) => <DelimitedTable filename={filename} text={text} />}
+            {(text) =>
+                exceedsRowLimit(text, MAX_PREVIEW_ROWS) ? (
+                    <GenericFileCard className={className} description={t`Too many rows to preview · Click to download`} filename={filename} url={url} />
+                ) : (
+                    <DelimitedTable filename={filename} text={text} />
+                )
+            }
         </FetchedTextPreview>
     );
 });

@@ -1,7 +1,7 @@
 import Papa from "papaparse";
 import { describe, expect, it } from "vitest";
 
-import { capDelimitedColumns, delimiterForFilename } from "./delimited-columns";
+import { capDelimitedColumns, delimiterForFilename, exceedsRowLimit } from "./delimited-columns";
 
 const wideRow = (columns: number, delimiter = ","): string => Array.from({ length: columns }, (_, index) => `c${index}`).join(delimiter);
 
@@ -88,5 +88,16 @@ describe("a tab-separated table with commas in its fields", () => {
         expect(delimiterForFilename("data.TSV")).toBe("\t");
         expect(delimiterForFilename("data.csv")).toBeUndefined();
         expect(delimiterForFilename()).toBeUndefined();
+    });
+});
+
+describe(exceedsRowLimit, () => {
+    it("is false for a file within the row limit, true one row past it", () => {
+        expect(exceedsRowLimit("a\nb\nc", 3)).toBe(false);
+        expect(exceedsRowLimit("a\nb\nc\nd", 3)).toBe(true);
+    });
+
+    it("refuses a file of very many short rows without splitting it", () => {
+        expect(exceedsRowLimit("a\n".repeat(100_000), 20_000)).toBe(true);
     });
 });
