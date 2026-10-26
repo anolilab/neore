@@ -102,6 +102,8 @@ describe("npx skills add commands", () => {
         ["a query", "npx skills add https://github.com/acme/skills?ref=x --skill pdf"],
         ["a query on the skill", "npx skills add acme/skills --skill pdf?x=1"],
         ["a fragment", "npx skills add acme/skills#main --skill pdf"],
+        ["dot segments as the source", "npx skills add ../.. --skill pdf"],
+        ["a dot segment as the repository", "npx skills add acme/.. --skill pdf"],
         ["a path in the skill", "npx skills add acme/skills --skill ../pdf"],
         ["an uppercase skill", "npx skills add acme/skills --skill PDF"],
         ["a command chain", "npx skills add acme/skills --skill pdf; rm -rf /"],

@@ -132,7 +132,7 @@ const fromCommand = (command: string): SkillSourceResult => {
     const match = COMMAND_SOURCE.exec(source);
     const [, owner, repo] = match ?? [];
 
-    if (!owner || !repo || !GITHUB_NAME.test(owner) || !GITHUB_NAME.test(repo)) {
+    if (!owner || !repo || !GITHUB_NAME.test(owner) || !GITHUB_NAME.test(repo) || /^\.+$/.test(owner) || /^\.+$/.test(repo)) {
         return fail(COMMAND_HINT);
     }
 
