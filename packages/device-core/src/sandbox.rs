@@ -5,15 +5,21 @@
 //!
 //! - **Linux:** Landlock, applied in the child between `fork` and `exec` together
 //!   with `PR_SET_NO_NEW_PRIVS`. The ruleset is built in the parent; the child
-//!   only makes two syscalls. Best effort across ABIs (5.13+), but a kernel
-//!   without Landlock is reported as unavailable, never silently skipped.
+//!   only makes a few syscalls. Best effort across ABIs (5.13+), but a kernel
+//!   without Landlock is reported as unavailable, never silently skipped. With
+//!   the network off, a seccomp-bpf filter is installed right after it: it
+//!   makes `socket(2)` fail with `EPERM` for `AF_INET` and `AF_INET6` (and
+//!   refuses `io_uring_setup`, whose `IORING_OP_SOCKET` would sidestep it).
+//!   `AF_UNIX` and the rest stay open. If the filter cannot be installed the
+//!   spawn fails, so the command never runs unconfined.
 //! - **macOS:** `sandbox-exec` with a generated SBPL profile. Every path reaches
 //!   the profile as a `-D` parameter, never spliced into its text.
 //! - **Windows:** no sandbox. Commands run in a kill-on-close Job Object
 //!   (`shell.rs`) and are reported as unsandboxed.
 //!
-//! Network access is blocked on macOS unless the user allows it
-//! ([`Policy::network`]); Linux and Windows do not restrict it. The user's
+//! Network access is blocked on macOS and Linux unless the user allows it
+//! ([`Policy::network`]); on Linux that means no new IPv4/IPv6 sockets. Windows
+//! does not restrict it. The user's
 //! "Require sandbox for shell commands" setting (default on) refuses `shell_run`
 //! where [`support`] says unavailable.
 
@@ -40,7 +46,7 @@ pub struct Policy {
     /// Linux everything not listed is hidden anyway).
     pub home: Option<PathBuf>,
     /// Whether the command may reach the network. macOS denies it when false;
-    /// Linux does not enforce either value yet.
+    /// Linux refuses new IPv4/IPv6 sockets (seccomp). Windows does not enforce it.
     pub network: bool,
 }
 
@@ -259,6 +265,147 @@ mod linux {
 
     use super::{landlock_rules, Guard, Policy};
 
+    // The classic BPF opcodes the filter uses (`linux/bpf_common.h`).
+    const BPF_LD_W_ABS: u16 = 0x20;
+    const BPF_JMP_JEQ_K: u16 = 0x15;
+    #[cfg(target_arch = "x86_64")]
+    const BPF_JMP_JGE_K: u16 = 0x35;
+    const BPF_RET_K: u16 = 0x06;
+
+    // `struct seccomp_data` offsets: `nr`, `arch`, then `args[0]`. Argument 0
+    // is read as its low 32-bit word, which sits first only on little endian.
+    #[cfg(target_endian = "big")]
+    compile_error!("the seccomp network filter reads argument 0 as a little-endian word");
+
+    const OFFSET_NR: u32 = 0;
+    const OFFSET_ARCH: u32 = 4;
+    const OFFSET_ARG0: u32 = 16;
+
+    #[cfg(target_arch = "x86_64")]
+    const AUDIT_ARCH: u32 = 0xC000_003E;
+    #[cfg(target_arch = "aarch64")]
+    const AUDIT_ARCH: u32 = 0xC000_00B7;
+
+    /// x32 syscalls report the x86_64 arch with this bit set in the number.
+    #[cfg(target_arch = "x86_64")]
+    const X32_SYSCALL_BIT: u32 = 0x4000_0000;
+
+    /// Where a filter instruction goes next.
+    #[derive(Clone, Copy)]
+    enum To {
+        Next,
+        Allow,
+        Deny,
+        Kill,
+    }
+
+    fn statement(code: u16, k: u32) -> (u16, u32, To, To) {
+        (code, k, To::Next, To::Next)
+    }
+
+    fn branch(code: u16, k: u32, yes: To, no: To) -> (u16, u32, To, To) {
+        (code, k, yes, no)
+    }
+
+    /// The seccomp-bpf program for a command that may not use the network:
+    /// `socket(AF_INET | AF_INET6, ..)` and `io_uring_setup` fail with `EPERM`,
+    /// every other syscall is allowed, and a process of another architecture
+    /// (32-bit compat, x32) is killed. Fails when this architecture has no
+    /// filter, so an unsupported machine never runs a command unconfined.
+    pub fn network_filter() -> Result<Vec<libc::sock_filter>, String> {
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        {
+            Err("the network sandbox supports only x86_64 and aarch64 Linux".to_owned())
+        }
+
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+        {
+            let mut program = vec![
+                statement(BPF_LD_W_ABS, OFFSET_ARCH),
+                branch(BPF_JMP_JEQ_K, AUDIT_ARCH, To::Next, To::Kill),
+                statement(BPF_LD_W_ABS, OFFSET_NR),
+            ];
+
+            #[cfg(target_arch = "x86_64")]
+            program.push(branch(BPF_JMP_JGE_K, X32_SYSCALL_BIT, To::Kill, To::Next));
+
+            program.extend([
+                branch(
+                    BPF_JMP_JEQ_K,
+                    libc::SYS_io_uring_setup as u32,
+                    To::Deny,
+                    To::Next,
+                ),
+                branch(BPF_JMP_JEQ_K, libc::SYS_socket as u32, To::Next, To::Allow),
+                statement(BPF_LD_W_ABS, OFFSET_ARG0),
+                branch(BPF_JMP_JEQ_K, libc::AF_INET as u32, To::Deny, To::Next),
+                branch(BPF_JMP_JEQ_K, libc::AF_INET6 as u32, To::Deny, To::Allow),
+            ]);
+
+            let allow = program.len();
+            let target = |from: usize, to: To| -> u8 {
+                let index = match to {
+                    To::Next => from + 1,
+                    To::Allow => allow,
+                    To::Deny => allow + 1,
+                    To::Kill => allow + 2,
+                };
+
+                u8::try_from(index - from - 1).expect("filter jumps stay short")
+            };
+            let mut filter: Vec<libc::sock_filter> = program
+                .iter()
+                .enumerate()
+                .map(|(from, &(code, k, yes, no))| libc::sock_filter {
+                    code,
+                    jt: target(from, yes),
+                    jf: target(from, no),
+                    k,
+                })
+                .collect();
+            let ret = |k: u32| libc::sock_filter {
+                code: BPF_RET_K,
+                jt: 0,
+                jf: 0,
+                k,
+            };
+
+            filter.push(ret(libc::SECCOMP_RET_ALLOW));
+            filter.push(ret(libc::SECCOMP_RET_ERRNO | libc::EPERM as u32));
+            filter.push(ret(libc::SECCOMP_RET_KILL_PROCESS));
+
+            Ok(filter)
+        }
+    }
+
+    /// Installs `filter` on the calling thread. Only `prctl`: safe between
+    /// `fork` and `exec`.
+    ///
+    /// # Safety
+    /// The caller must be the process that is about to `exec` (or a test child),
+    /// since the filter cannot be removed.
+    pub unsafe fn install_filter(filter: &[libc::sock_filter]) -> std::io::Result<()> {
+        let program = libc::sock_fprog {
+            len: filter.len() as libc::c_ushort,
+            filter: filter.as_ptr().cast_mut(),
+        };
+
+        if libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+
+        if libc::prctl(
+            libc::PR_SET_SECCOMP,
+            libc::SECCOMP_MODE_FILTER as libc::c_ulong,
+            std::ptr::addr_of!(program),
+        ) != 0
+        {
+            return Err(std::io::Error::last_os_error());
+        }
+
+        Ok(())
+    }
+
     /// The kernel's Landlock ABI version, 0 when it has none.
     pub fn abi() -> i64 {
         const LANDLOCK_CREATE_RULESET_VERSION: libc::c_uint = 1;
@@ -308,14 +455,20 @@ mod linux {
             .ok_or_else(|| "this kernel does not support Landlock".to_owned())
     }
 
-    /// Confines `command`'s child with Landlock. Fails closed: if the child
-    /// cannot restrict itself, it never execs and the spawn errors.
+    /// Confines `command`'s child with Landlock and, when the policy has no
+    /// network, a seccomp filter on new IPv4/IPv6 sockets. Fails closed: if the
+    /// child cannot restrict itself, it never execs and the spawn errors.
     pub fn confine(command: &mut Command, policy: &Policy) -> Result<Guard, String> {
         let ruleset = ruleset(policy)?;
         let fd = ruleset.as_raw_fd();
+        let filter = if policy.network {
+            None
+        } else {
+            Some(network_filter()?)
+        };
 
-        // SAFETY: only async-signal-safe syscalls between fork and exec; `fd`
-        // stays open in the parent (the guard) until the spawn has returned.
+        // SAFETY: only async-signal-safe syscalls between fork and exec (the
+        // filter is built here, in the parent); `fd` stays open in the parent (the guard) until the spawn has returned.
         unsafe {
             command.pre_exec(move || {
                 if libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0 {
@@ -326,7 +479,10 @@ mod linux {
                     return Err(std::io::Error::last_os_error());
                 }
 
-                Ok(())
+                match &filter {
+                    Some(filter) => install_filter(filter),
+                    None => Ok(()),
+                }
             });
         }
 
@@ -338,6 +494,9 @@ mod linux {
 
 #[cfg(target_os = "linux")]
 pub use linux::confine;
+
+#[cfg(all(target_os = "linux", test))]
+pub use linux::{install_filter, network_filter};
 
 /// Whether `shell_run` can be sandboxed on this computer right now.
 pub fn support() -> Support {
@@ -400,7 +559,13 @@ const SANDBOX_LIMITS: &str = "it can change files only in the shared folders, ca
      programs can still run, it can READ files outside the shared folders, and local services \
      (Mach IPC) are not restricted.";
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "linux")]
+const SANDBOX_LIMITS: &str =
+    "it can change files only in the shared folders and reads only system \
+     and toolchain folders besides them. Local IPC (D-Bus, SSH and GPG agents, other sockets) is \
+     NOT isolated.";
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 const SANDBOX_LIMITS: &str =
     "it can change files only in the shared folders and reads only system \
      and toolchain folders besides them. Local IPC (D-Bus, SSH and GPG agents, other sockets) and \
@@ -417,7 +582,16 @@ fn network_sentence(policy: &Policy) -> &'static str {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "linux")]
+fn network_sentence(policy: &Policy) -> &'static str {
+    if policy.network {
+        " Network access is allowed by this computer's device settings."
+    } else {
+        " New IPv4 and IPv6 connections are blocked (Unix sockets are not). Turn on \"Allow network for shell commands\" in this computer's device settings to allow them."
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 fn network_sentence(_policy: &Policy) -> &'static str {
     ""
 }
@@ -603,7 +777,12 @@ mod tests {
             .contains("cannot run open, osascript or launchctl from their standard locations"));
         #[cfg(target_os = "macos")]
         assert!(describe(&available, Some(&policy())).contains("Network access is blocked"));
-        #[cfg(target_os = "macos")]
+        #[cfg(target_os = "linux")]
+        assert!(describe(&available, Some(&policy()))
+            .contains("New IPv4 and IPv6 connections are blocked (Unix sockets are not)"));
+        #[cfg(target_os = "linux")]
+        assert!(!describe(&available, Some(&policy())).contains("network access are NOT"));
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
         assert!(describe(
             &available,
             Some(&Policy {
@@ -613,5 +792,95 @@ mod tests {
         )
         .contains("Network access is allowed"));
         assert!(describe(&missing, None).starts_with("NOT sandboxed (no Landlock)"));
+    }
+
+    /// What a forked child sees from `socket(2)` after `filter` (if any) is
+    /// installed: bit 0 AF_INET failed with EPERM, bit 1 AF_INET6 failed with
+    /// EPERM, bit 2 AF_UNIX succeeded, bit 3 AF_INET succeeded. The child
+    /// allocates nothing and only `_exit`s, so forking the test process is safe.
+    #[cfg(target_os = "linux")]
+    fn probe_sockets(filter: Option<&[libc::sock_filter]>) -> i32 {
+        // SAFETY: the child makes only raw syscalls and exits without unwinding.
+        unsafe {
+            let pid = libc::fork();
+
+            assert!(pid >= 0, "fork failed");
+
+            if pid == 0 {
+                if let Some(filter) = filter {
+                    if install_filter(filter).is_err() {
+                        libc::_exit(100);
+                    }
+                }
+
+                let denied = |domain: libc::c_int| {
+                    let fd = libc::socket(domain, libc::SOCK_STREAM, 0);
+
+                    if fd >= 0 {
+                        libc::close(fd);
+                        return false;
+                    }
+
+                    *libc::__errno_location() == libc::EPERM
+                };
+                let opens = |domain: libc::c_int| {
+                    let fd = libc::socket(domain, libc::SOCK_STREAM, 0);
+
+                    if fd >= 0 {
+                        libc::close(fd);
+                    }
+
+                    fd >= 0
+                };
+                let bits = i32::from(denied(libc::AF_INET))
+                    | i32::from(denied(libc::AF_INET6)) << 1
+                    | i32::from(opens(libc::AF_UNIX)) << 2
+                    | i32::from(opens(libc::AF_INET)) << 3;
+
+                libc::_exit(bits);
+            }
+
+            let mut status = 0;
+
+            assert_eq!(libc::waitpid(pid, &mut status, 0), pid);
+            assert!(libc::WIFEXITED(status), "child ended abnormally: {status}");
+
+            libc::WEXITSTATUS(status)
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_network_filter_refuses_ip_sockets_and_keeps_unix_sockets() {
+        let filter = network_filter().unwrap();
+
+        assert_eq!(probe_sockets(Some(&filter)), 0b0111);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn without_the_filter_ip_sockets_open() {
+        let bits = probe_sockets(None);
+
+        assert_eq!(bits & 0b1011, 0b1000, "control run: {bits:#06b}");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_network_filter_ends_in_its_three_verdicts_and_jumps_stay_inside() {
+        let filter = network_filter().unwrap();
+        let len = filter.len();
+
+        assert_eq!(filter[len - 3].k, libc::SECCOMP_RET_ALLOW);
+        assert_eq!(
+            filter[len - 2].k,
+            libc::SECCOMP_RET_ERRNO | libc::EPERM as u32
+        );
+        assert_eq!(filter[len - 1].k, libc::SECCOMP_RET_KILL_PROCESS);
+
+        for (index, instruction) in filter[..len - 3].iter().enumerate() {
+            assert!(index + 1 + usize::from(instruction.jt) < len);
+            assert!(index + 1 + usize::from(instruction.jf) < len);
+        }
     }
 }

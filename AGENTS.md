@@ -568,8 +568,10 @@ written here is what is not.
   never do either. `shell_run` runs in an OS sandbox (`packages/device-core/src/sandbox.rs`:
   Landlock / `sandbox-exec`; Windows has none) that writes only the shared
   folders + a per-run `$TMPDIR` and hides the rest of `$HOME`. Network is blocked
-  on macOS unless the user turns on "Allow network for shell commands" (default
-  off); Linux and Windows do not restrict it. MCP servers are NOT sandboxed. Where there is no sandbox the call
+  on macOS and Linux unless the user turns on "Allow network for shell commands" (default
+  off); on Linux that is a seccomp filter making `socket(AF_INET | AF_INET6)`
+  (and `io_uring_setup`) fail with `EPERM`, so `AF_UNIX` still works; Windows does not
+  restrict it. MCP servers are NOT sandboxed. Where there is no sandbox the call
   is REFUSED unless the user turned off "Require sandbox for shell commands"
   (stored inverted, `allowUnsandboxedShell`, so absent = required). Allow
   rules, shared folders, that setting and local MCP servers live only in Rust. **The pairing secret crosses the page exactly once**

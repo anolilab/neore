@@ -630,6 +630,79 @@ mod tests {
         let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
+    /// The seccomp network filter reaches the real child, and only when the
+    /// policy has no network. The count is relative, since a container or
+    /// service manager may already filter the test process itself.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_sandboxed_command_gets_the_network_filter_only_without_network() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        let (shared, _outside) = folders("seccomp");
+        let filters = |network: bool| {
+            let policy = Policy {
+                network,
+                ..Policy::for_roots(std::slice::from_ref(&shared), None)
+            };
+            let result = run(
+                "grep '^Seccomp_filters:' /proc/self/status",
+                &shared,
+                Duration::from_secs(10),
+                4096,
+                Some(&policy),
+            )
+            .unwrap();
+
+            result
+                .output
+                .trim()
+                .trim_start_matches("Seccomp_filters:")
+                .trim()
+                .parse::<u32>()
+                .unwrap_or_else(|_| panic!("unexpected output: {}", result.output))
+        };
+
+        assert_eq!(filters(false), filters(true) + 1);
+
+        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
+    }
+
+    /// A shell that opens a TCP connection to a local listener: refused with
+    /// no network, accepted with it. Skipped without bash (`/dev/tcp`).
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_sandboxed_command_cannot_connect_without_network() {
+        if !sandbox_or_skip()
+            || !Path::new("/bin/bash").exists() && !Path::new("/usr/bin/bash").exists()
+        {
+            return;
+        }
+
+        let (shared, _outside) = folders("connect");
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let line = format!(
+            "bash -c 'exec 3<>/dev/tcp/127.0.0.1/{}' && echo connected || echo refused",
+            listener.local_addr().unwrap().port()
+        );
+        let outcome = |network: bool| {
+            let policy = Policy {
+                network,
+                ..Policy::for_roots(std::slice::from_ref(&shared), None)
+            };
+
+            run(&line, &shared, Duration::from_secs(10), 4096, Some(&policy))
+                .unwrap()
+                .output
+        };
+
+        assert!(outcome(false).contains("refused"));
+        assert!(outcome(true).contains("connected"));
+
+        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
+    }
+
     /// A sandboxed command inherits only the allowlisted environment, so a
     /// variable that points at an IPC socket never reaches it.
     #[cfg(any(target_os = "linux", target_os = "macos"))]
