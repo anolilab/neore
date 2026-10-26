@@ -26,6 +26,7 @@ import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, use
 import ReferenceStrip from "@/features/chat/components/reference-picker/reference-strip";
 import type { AttachmentAdapter } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import {
+    ATTACHMENT_ACCEPT,
     attachmentTextChars,
     AttachmentTooLargeError,
     AttachmentUploadError,
@@ -1144,7 +1145,7 @@ const ComposerInput = ({
             onDrop={handleDrop}
         >
             {/* Hidden file input (attachment button) */}
-            <input accept={attachmentAdapter.accept} className="hidden" multiple onChange={handleFileInputChange} ref={fileInputRef} type="file" />
+            <input accept={ATTACHMENT_ACCEPT} className="hidden" multiple onChange={handleFileInputChange} ref={fileInputRef} type="file" />
             {/* Hidden file input (@ mention trigger - dynamic accept) */}
             <input className="hidden" multiple onChange={handleFileInputChange} ref={mentionFileInputRef} type="file" />
 

@@ -242,14 +242,14 @@ const getFileLabel = (isVideo: boolean | undefined, isAudio: boolean | undefined
     return "Document";
 };
 
+/** Accept common file types - images, text, documents, PDFs, video, audio, DOCX. The composer's file picker uses the same list. */
+export const ATTACHMENT_ACCEPT = `image/*,text/*,video/*,audio/*,application/pdf,application/json,application/xml,${DOCX_TYPE},.md,${TEXT_PREVIEW_SUFFIXES.join(",")},.txt,.docx,.mp4,.mp3,.wav,.webm,.ogg,.m4a,.mov`;
+
 /**
  * A closure rather than a class: two of the three adapter members never touched
  * the instance, so `this` was buying nothing.
  */
 export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentAdapter => {
-    // Accept common file types - images, text, documents, PDFs, video, audio, DOCX
-    const accept = `image/*,text/*,video/*,audio/*,application/pdf,application/json,application/xml,${DOCX_TYPE},.md,${TEXT_PREVIEW_SUFFIXES.join(",")},.txt,.docx,.mp4,.mp3,.wav,.webm,.ogg,.m4a,.mov`;
-
     const add = async (state: ProgressState): Promise<PendingAttachment> => {
         const contentType = attachmentContentType(state.file);
         const isImage = contentType.startsWith("image/");
@@ -321,5 +321,5 @@ export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentA
 
     const remove = async (_attachment: Attachment): Promise<void> => {};
 
-    return { accept, add, remove, send, upload };
+    return { accept: ATTACHMENT_ACCEPT, add, remove, send, upload };
 };

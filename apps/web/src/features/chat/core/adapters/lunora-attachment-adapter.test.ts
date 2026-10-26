@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UploadFailedError } from "@/lib/upload/upload-error";
 
 import {
+    ATTACHMENT_ACCEPT,
     attachmentContentType,
     attachmentSizeLimit,
     attachmentTextChars,
@@ -149,7 +150,9 @@ describe(createLunoraAttachmentAdapter, () => {
     });
 
     it("offers the text-preview suffixes in the accept list the composer's file picker uses", () => {
-        const accept = createLunoraAttachmentAdapter(client().lunora).accept.split(",");
+        const accept = ATTACHMENT_ACCEPT.split(",");
+
+        expect(createLunoraAttachmentAdapter(client().lunora).accept).toBe(ATTACHMENT_ACCEPT);
 
         for (const suffix of [".jsonl", ".ndjson", ".mermaid", ".mmd", ".csv", ".tsv"]) {
             expect(accept).toContain(suffix);
