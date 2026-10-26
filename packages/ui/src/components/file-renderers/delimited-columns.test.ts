@@ -71,7 +71,7 @@ describe(capDelimitedColumns, () => {
 });
 
 describe("a tab-separated table with commas in its fields", () => {
-    const tsv = "name\tcity\textra\n\"Doe, Jane\"\tOslo, Norway\tx\nSmith, Bob\tRome, Italy\ty\n";
+    const tsv = 'name\tcity\textra\n"Doe, Jane"\tOslo, Norway\tx\nSmith, Bob\tRome, Italy\ty\n';
 
     it("keeps the right fields when the tab delimiter is given", () => {
         const result = capDelimitedColumns(tsv, 2, "\t");

@@ -23,7 +23,7 @@ const DOLLAR_PAIR_RE = /\$[^$\n]*\$/u;
 
 // A backtick fence of any length (three or more) opening a mermaid block on its own line, which may sit in a list or quote.
 // `toMermaidFence` lengthens the fence past any backtick run in the source.
-const MERMAID_FENCE_RE = /^[^\n`]*`{3,}mermaid/mu;
+const MERMAID_FENCE_RE = /^[ \t>*+-]*`{3,}mermaid/mu;
 
 export const needsHeavyStreamdownPlugins = (text: string): boolean =>
     MERMAID_FENCE_RE.test(text) || text.includes("$$") || DOLLAR_PAIR_RE.test(text) || text.includes(String.raw`\(`) || text.includes(String.raw`\[`);
