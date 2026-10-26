@@ -1,8 +1,10 @@
 import { useAsRef } from "@ui/hooks/use-as-ref";
+import { isFetchableUrl, useFetchableOrigins } from "@ui/hooks/use-fetchable-origins";
 import { useEffect, useState } from "react";
 
 /**
- * Loads a URL for a preview. A deadline and the unmount both abort the
+ * Loads a URL for a preview. Only the page's own origin, `data:`/`blob:` and the
+ * origins given to the fetchable-origins provider are fetched. A deadline and the unmount both abort the
  * request, so a stalled URL cannot hold a preview forever. Each result is kept
  * with the URL it answers, so a changed URL reads as loading until its own
  * request settles.
@@ -103,7 +105,17 @@ export const dataUrlResponse = (url: string): Response => {
     return new Response(body, MEDIA_TYPE_RE.test(mediaType) ? { headers: { "content-type": mediaType } } : undefined);
 };
 
-const load = async <T>(url: string, read: (response: Response) => Promise<T>, signal: AbortSignal): Promise<FetchedResource<T>> => {
+export const loadResource = async <T>(
+    url: string,
+    read: (response: Response) => Promise<T>,
+    signal: AbortSignal,
+    allowedOrigins: ReadonlyArray<string>,
+): Promise<FetchedResource<T>> => {
+    // A refused destination is the error state (the download card), with no request made.
+    if (!isFetchableUrl(url, allowedOrigins)) {
+        return { status: "error" };
+    }
+
     try {
         const response = url.startsWith("data:") ? dataUrlResponse(url) : await fetch(url, { signal });
 
@@ -123,6 +135,7 @@ const load = async <T>(url: string, read: (response: Response) => Promise<T>, si
  */
 export const useFetchedResource = <T>(url: string, read: (response: Response) => Promise<T>): FetchedResource<T> => {
     const readRef = useAsRef(read);
+    const originsRef = useAsRef(useFetchableOrigins());
     const [result, setResult] = useState<{ state: FetchedResource<T>; url: string }>();
 
     useEffect(() => {
@@ -133,7 +146,7 @@ export const useFetchedResource = <T>(url: string, read: (response: Response) =>
         let cancelled = false;
 
         const run = async (): Promise<void> => {
-            const state = await load(url, readRef.current, controller.signal);
+            const state = await loadResource(url, readRef.current, controller.signal, originsRef.current);
 
             if (!cancelled) {
                 setResult({ state, url });
@@ -147,7 +160,7 @@ export const useFetchedResource = <T>(url: string, read: (response: Response) =>
             clearTimeout(deadline);
             controller.abort();
         };
-    }, [readRef, url]);
+    }, [originsRef, readRef, url]);
 
     return result?.url === url ? result.state : LOADING;
 };

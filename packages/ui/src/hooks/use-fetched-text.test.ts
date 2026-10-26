@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { dataUrlResponse, MAX_FETCHED_TEXT_BYTES, readTextWithin } from "./use-fetched-text";
+import { dataUrlResponse, loadResource, MAX_FETCHED_TEXT_BYTES, readTextWithin } from "./use-fetched-text";
 
 const encoder = new TextEncoder();
 
@@ -99,11 +99,57 @@ describe(dataUrlResponse, () => {
 
         await expect(readTextWithin(base64, 25)).rejects.toThrow(LARGER_THAN_25);
         await expect(readTextWithin(percent, 25)).rejects.toThrow(LARGER_THAN_25);
-        await expect(readTextWithin(dataUrlResponse(`data:text/plain,${"x".repeat(25)}`), 25)).resolves.toHaveLength(25);
+
+        const atLimit = dataUrlResponse(`data:text/plain,${"x".repeat(25)}`);
+
+        await expect(readTextWithin(atLimit, 25)).resolves.toHaveLength(25);
     });
 
     it("throws on a malformed payload so the preview shows its error state", () => {
         expect(() => dataUrlResponse("data:text/plain")).toThrow(Error);
         expect(() => dataUrlResponse("data:text/plain;base64,@@@")).toThrow(Error);
+    });
+});
+
+describe(loadResource, () => {
+    const APP = "https://app.example";
+    const BACKEND = "https://api.example";
+    const readText = async (response: Response): Promise<string> => await response.text();
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    const run = async (url: string, fetchSpy: ReturnType<typeof vi.fn>) => {
+        vi.stubGlobal("location", { origin: APP });
+        vi.stubGlobal("fetch", fetchSpy);
+
+        return await loadResource(url, readText, new AbortController().signal, [BACKEND]);
+    };
+
+    it("does not fetch a foreign origin, a loopback service or another scheme", async () => {
+        const fetchSpy = vi.fn();
+
+        for (const url of ["https://evil.example/a.csv", "http://localhost:11434/api/tags", "ftp://api.example/a.csv", "https://api.example.evil.test/a"]) {
+            await expect(run(url, fetchSpy)).resolves.toStrictEqual({ status: "error" });
+        }
+
+        expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("fetches the backend origin and the page's own origin", async () => {
+        const fetchSpy = vi.fn(async () => new Response("ok"));
+
+        await expect(run(`${BACKEND}/files/a.csv?sig=1`, fetchSpy)).resolves.toStrictEqual({ status: "ready", value: "ok" });
+        await expect(run(`${APP}/a.csv`, fetchSpy)).resolves.toStrictEqual({ status: "ready", value: "ok" });
+        await expect(run("/a.csv", fetchSpy)).resolves.toStrictEqual({ status: "ready", value: "ok" });
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+    });
+
+    it("reads a data: URL without fetching", async () => {
+        const fetchSpy = vi.fn();
+
+        await expect(run("data:text/plain,hello", fetchSpy)).resolves.toStrictEqual({ status: "ready", value: "hello" });
+        expect(fetchSpy).not.toHaveBeenCalled();
     });
 });
