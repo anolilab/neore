@@ -46,6 +46,18 @@ describe(capDelimitedColumns, () => {
         expect(Papa.parse(result.content).data[0] as string[]).toHaveLength(50);
     });
 
+    it("caps a later row that is wider than a narrow header", () => {
+        const result = capDelimitedColumns(`a,b\n${wideRow(60)}\n1,2\n`, 50);
+
+        expect(result.hiddenColumns).toBe(10);
+
+        const rows = Papa.parse<string[]>(result.content).data;
+
+        expect(rows).toHaveLength(3);
+        expect(rows.every((row) => row.length <= 50)).toBe(true);
+        expect(rows[1]?.at(-1)).toBe("c49");
+    });
+
     it("bounds a table with 200,000 columns to the cap", () => {
         const result = capDelimitedColumns(`${wideRow(200_000)}\n${wideRow(200_000)}\n`, 50);
 

@@ -4,7 +4,8 @@ import Papa from "papaparse";
  * Keeps a delimited table to its first `maxColumns` columns, so a file with
  * hundreds of thousands of them cannot freeze the page (each column costs a
  * header cell and one cell per row). A table already within the cap is
- * returned untouched.
+ * returned untouched. Every row is measured, not only the first: a later row
+ * can be wider than the header.
  */
 export interface CappedColumns {
     content: string;
@@ -15,7 +16,7 @@ export interface CappedColumns {
 export const capDelimitedColumns = (content: string, maxColumns: number): CappedColumns => {
     // Blank lines are skipped, as `CsvRenderer` skips them: its header is the first row with content.
     const parsed = Papa.parse<string[]>(content, { skipEmptyLines: true });
-    const width = parsed.data[0]?.length ?? 0;
+    const width = parsed.data.reduce((widest, row) => Math.max(widest, row.length), 0);
 
     if (width <= maxColumns) {
         return { content, hiddenColumns: 0 };
