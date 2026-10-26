@@ -11,15 +11,12 @@ import { formatFileSize } from "@ui/components/file-renderers/file-type-utilitie
 import { Popover, PopoverAnchor, PopoverContent } from "@ui/components/popover";
 import { Skeleton } from "@ui/components/skeleton";
 import { useBadgeOverflow } from "@ui/hooks/use-badge-overflow";
-import { getCellKey, getLineCount } from "@ui/lib/data-grid";
+import { getCellKey, getLineCount, overlapAnchor } from "@ui/lib/data-grid";
 import type { DataGridCellProps, FileCellData } from "@ui/types/data-grid";
 import cn from "@ui/utils/cn";
 import { File, FileArchive, FileAudio, FileImage, FileSpreadsheet, FileText, FileVideo, Presentation, Upload, X } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
-
-/** Pulls the popover up over the cell so the editor opens on top of it. */
-const overlapAnchor = ({ anchor }: { anchor: { height: number } }) => -anchor.height;
 
 const getFileIcon = (type: string): React.ComponentType<React.SVGProps<SVGSVGElement>> => {
     if (type.startsWith("image/")) {

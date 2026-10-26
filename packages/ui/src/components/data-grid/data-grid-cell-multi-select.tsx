@@ -7,14 +7,11 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import DataGridCellWrapper from "@ui/components/data-grid/data-grid-cell-wrapper";
 import { Popover, PopoverAnchor, PopoverContent } from "@ui/components/popover";
 import { useBadgeOverflow } from "@ui/hooks/use-badge-overflow";
-import { getCellKey, getLineCount } from "@ui/lib/data-grid";
+import { getCellKey, getLineCount, overlapAnchor } from "@ui/lib/data-grid";
 import type { DataGridCellProps } from "@ui/types/data-grid";
 import cn from "@ui/utils/cn";
 import { Check, X } from "lucide-react";
 import * as React from "react";
-
-/** Pulls the popover up over the cell so the editor opens on top of it. */
-const overlapAnchor = ({ anchor }: { anchor: { height: number } }) => -anchor.height;
 
 export const MultiSelectCell = <TData extends RowData>({
     cell,

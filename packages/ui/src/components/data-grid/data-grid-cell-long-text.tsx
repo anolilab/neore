@@ -6,11 +6,9 @@ import DataGridCellWrapper from "@ui/components/data-grid/data-grid-cell-wrapper
 import { Popover, PopoverAnchor, PopoverContent } from "@ui/components/popover";
 import { Textarea } from "@ui/components/textarea";
 import useDebouncedCallback from "@ui/hooks/use-debounced-callback";
+import { overlapAnchor } from "@ui/lib/data-grid";
 import type { DataGridCellProps } from "@ui/types/data-grid";
 import * as React from "react";
-
-/** Pulls the popover up over the cell so the editor opens on top of it. */
-const overlapAnchor = ({ anchor }: { anchor: { height: number } }) => -anchor.height;
 
 export const LongTextCell = <TData extends RowData>({
     cell,
