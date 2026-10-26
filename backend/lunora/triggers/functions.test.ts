@@ -265,6 +265,46 @@ describe("a routine's quiet flag", () => {
         expect(daily.quietWhenEmpty).toBe(true);
     });
 
+    it("clears a flag a webhook routine still stores when the update sends false", async () => {
+        const triggerId = await insertTrigger({
+            botComputer: true,
+            botId: "bot-a",
+            cronExpression: undefined,
+            name: "Hook",
+            quietWhenEmpty: true,
+            type: "webhook",
+        });
+        const identity = harness.withIdentity({ userId: "user-a" } as never);
+
+        await identity.mutation(updateTrigger as never, { botComputer: false, name: "Hook 2", quietWhenEmpty: false, triggerId } as never);
+
+        const hook = await readTrigger(triggerId);
+
+        expect(hook.name).toBe("Hook 2");
+        expect(hook.quietWhenEmpty).toBeUndefined();
+        expect(hook.botComputer).toBeUndefined();
+    });
+
+    it("lets a webhook routine that still stores the flag be renamed without mentioning it, and drops the flag", async () => {
+        const triggerId = await insertTrigger({ botId: "bot-a", cronExpression: undefined, name: "Hook", quietWhenEmpty: true, type: "webhook" });
+        const identity = harness.withIdentity({ userId: "user-a" } as never);
+
+        await identity.mutation(updateTrigger as never, { name: "Renamed", triggerId } as never);
+
+        const hook = await readTrigger(triggerId);
+
+        expect(hook.name).toBe("Renamed");
+        expect(hook.quietWhenEmpty).toBeUndefined();
+    });
+
+    it("still refuses a request to turn the flag on for a webhook routine that stores it", async () => {
+        const triggerId = await insertTrigger({ botId: "bot-a", cronExpression: undefined, name: "Hook", quietWhenEmpty: true, type: "webhook" });
+
+        await expect(
+            harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { quietWhenEmpty: true, triggerId } as never),
+        ).rejects.toThrow("Only a scheduled routine");
+    });
+
     it("is refused on create without a bot", async () => {
         await expect(
             harness

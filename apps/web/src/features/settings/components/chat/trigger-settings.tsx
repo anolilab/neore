@@ -533,10 +533,13 @@ const TriggerSettings: FC = () => {
     const handleUpdate = useCallback(() => {
         if (!editingTriggerId || !editFormData.name.trim()) return;
 
+        // A stored row may carry a flag its type cannot have (the switches are hidden there): send it as off, which the backend accepts and clears.
+        const { botComputer, quietWhenEmpty } = withBotOptions(editFormData);
+
         updateTrigger(
             {
                 // `null` clears the bot; the form always carries the row's current botId, so this is never "leave unchanged".
-                botComputer: editFormData.botComputer,
+                botComputer,
                 botId: editFormData.botId || null,
                 cronExpression: editFormData.type === "schedule" ? editFormData.cronExpression : undefined,
                 description: editFormData.description || undefined,
@@ -545,7 +548,7 @@ const TriggerSettings: FC = () => {
                 inputTemplate: editFormData.inputTemplate || undefined,
                 model: editFormData.model || undefined,
                 name: editFormData.name,
-                quietWhenEmpty: editFormData.quietWhenEmpty,
+                quietWhenEmpty,
                 systemPrompt: editFormData.systemPrompt || undefined,
                 timezone: editFormData.type === "schedule" ? editFormData.timezone : undefined,
                 triggerId: editingTriggerId,

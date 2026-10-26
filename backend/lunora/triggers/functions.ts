@@ -476,9 +476,13 @@ export const updateTrigger = authMutation
         const nextBotId = args.botId === undefined ? trigger.botId : (args.botId ?? undefined);
         // A different bot starts without the computer permission the previous bot had: the owner grants it again.
         const botChanged = args.botId !== undefined && args.botId !== trigger.botId;
-        const keptComputer = botChanged ? undefined : trigger.botComputer;
+        // A routine that cannot have the flags (a webhook, or no bot) drops ones it still stores from before the rule, so an update that does not ask for them is never refused over them.
+        // Only a request for `true` is refused (`assertBotRoutineOptions`); `false` always clears.
+        const cannotHaveFlags = !canBeQuiet({ botId: nextBotId, type: trigger.type });
+        const keptComputer = botChanged || cannotHaveFlags ? undefined : trigger.botComputer;
+        const keptQuiet = cannotHaveFlags ? undefined : trigger.quietWhenEmpty;
         const nextComputer = botCleared ? undefined : (args.botComputer ?? keptComputer);
-        const nextQuiet = botCleared ? undefined : (args.quietWhenEmpty ?? trigger.quietWhenEmpty);
+        const nextQuiet = botCleared ? undefined : (args.quietWhenEmpty ?? keptQuiet);
 
         // An unchanged bot is not re-checked, so a routine whose bot was deleted stays editable.
         if (args.botId && args.botId !== trigger.botId && !(await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }))) {
@@ -498,8 +502,10 @@ export const updateTrigger = authMutation
             ...(args.botId !== undefined && { botId: nextBotId }),
             // An empty array removes the filters; leaving the argument out leaves them as they are.
             ...(args.filters !== undefined && { filters }),
-            ...((args.botId !== undefined || args.botComputer !== undefined) && { botComputer: nextComputer === true ? true : undefined }),
-            ...((args.botId !== undefined || args.quietWhenEmpty !== undefined) && { quietWhenEmpty: nextQuiet === true ? true : undefined }),
+            ...((args.botId !== undefined || args.botComputer !== undefined || cannotHaveFlags) && { botComputer: nextComputer === true ? true : undefined }),
+            ...((args.botId !== undefined || args.quietWhenEmpty !== undefined || cannotHaveFlags) && {
+                quietWhenEmpty: nextQuiet === true ? true : undefined,
+            }),
         });
 
         if (trigger.enabled === true && nextTriggerAt !== undefined) {
