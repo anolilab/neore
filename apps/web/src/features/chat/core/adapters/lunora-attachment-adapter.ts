@@ -3,6 +3,7 @@ import { CHAT_UPLOAD_CONTENT_MISMATCH, CHAT_UPLOAD_EXPIRED, CHAT_UPLOAD_TOO_LARG
 import { chatAttachmentLimit } from "@neore/backend/document-limits";
 
 import type { LunoraReactClient as LunoraClient } from "@/lib/lunora/crpc";
+import { downscaleOversizedImage } from "@/lib/upload/image-downscale";
 import { UploadFailedError } from "@/lib/upload/upload-error";
 import { uploadFile } from "@/lib/upload/upload-file";
 
@@ -246,29 +247,31 @@ export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentA
         "image/*,text/*,video/*,audio/*,application/pdf,application/json,application/xml,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.md,.csv,.txt,.docx,.mp4,.mp3,.wav,.webm,.ogg,.m4a,.mov";
 
     const add = async (state: ProgressState): Promise<PendingAttachment> => {
-        const contentType = attachmentContentType(state.file);
+        // Before the size check: a 12 MB photo is shrunk to fit the provider, not refused for its weight.
+        const file = await downscaleOversizedImage(state.file);
+        const contentType = attachmentContentType(file);
         const isImage = contentType.startsWith("image/");
         const isVideo = contentType.startsWith("video/");
         const isAudio = contentType.startsWith("audio/");
-        const isText = isTextAttachment(contentType, state.file.name);
+        const isText = isTextAttachment(contentType, file.name);
         const isPdf = contentType === "application/pdf";
         const isDocx = contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
         if (!isImage && !isText && !isPdf && !isVideo && !isAudio && !isDocx) {
-            throw new AttachmentUploadError(state.file.name, "unsupported");
+            throw new AttachmentUploadError(file.name, "unsupported");
         }
 
-        const limit = attachmentSizeLimit(state.file);
+        const limit = attachmentSizeLimit(file);
 
-        if (state.file.size > limit.maxBytes) {
-            throw new AttachmentTooLargeError(state.file.name, limit);
+        if (file.size > limit.maxBytes) {
+            throw new AttachmentTooLargeError(file.name, limit);
         }
 
         return {
             contentType,
-            file: state.file,
+            file,
             id: crypto.randomUUID(),
-            name: state.file.name,
+            name: file.name,
             status: { reason: "composer-send", type: "requires-action" },
             type: isImage ? "image" : "document",
         };
