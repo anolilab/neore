@@ -28,10 +28,37 @@ export const MAX_FETCHED_TEXT_BYTES = 1_000_000;
 const tooLarge = (maxBytes: number): Error => new Error(`The file is larger than ${String(maxBytes)} bytes`);
 
 /**
+ * A decoder for a text body, chosen from its first two bytes: a UTF-16 byte-order
+ * mark (FF FE little-endian, FE FF big-endian) selects that encoding, anything
+ * else is UTF-8. Both decoders strip a leading byte-order mark of their own.
+ */
+const decoderFor = (head: Uint8Array): TextDecoder => {
+    if (head[0] === 0xff && head[1] === 0xfe) {
+        return new TextDecoder("utf-16le");
+    }
+
+    if (head[0] === 0xfe && head[1] === 0xff) {
+        return new TextDecoder("utf-16be");
+    }
+
+    return new TextDecoder();
+};
+
+const concatBytes = (a: Uint8Array, b: Uint8Array): Uint8Array => {
+    const joined = new Uint8Array(a.byteLength + b.byteLength);
+
+    joined.set(a);
+    joined.set(b, a.byteLength);
+
+    return joined;
+};
+
+/**
  * Reads a response as text, refusing one over `maxBytes`. `Content-Length` is a
  * quick refusal, but it can be absent or describe the compressed size, so the
  * budget is enforced on the bytes actually read, and the body is cancelled as
- * soon as it is spent.
+ * soon as it is spent. A UTF-16 byte-order mark at the start selects that
+ * encoding for the whole body; otherwise it is UTF-8.
  */
 export const readTextWithin = async (response: Response, maxBytes: number): Promise<string> => {
     const declared = Number(response.headers.get("content-length"));
@@ -43,18 +70,19 @@ export const readTextWithin = async (response: Response, maxBytes: number): Prom
     }
 
     if (!response.body) {
-        const text = await response.text();
+        const bytes = new Uint8Array(await response.arrayBuffer());
 
-        // Without a stream the bytes cannot be counted; characters never outnumber them.
-        if (text.length > maxBytes) {
+        if (bytes.byteLength > maxBytes) {
             throw tooLarge(maxBytes);
         }
 
-        return text;
+        return decoderFor(bytes).decode(bytes);
     }
 
     const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+    let decoder: TextDecoder | undefined;
+    // The bytes held back until two have arrived, since the first chunk can be a single byte.
+    let head: Uint8Array = new Uint8Array(0);
     let text = "";
     let received = 0;
 
@@ -73,7 +101,21 @@ export const readTextWithin = async (response: Response, maxBytes: number): Prom
             throw tooLarge(maxBytes);
         }
 
-        text += decoder.decode(value, { stream: true });
+        if (decoder) {
+            text += decoder.decode(value, { stream: true });
+        } else {
+            head = concatBytes(head, value);
+
+            if (head.byteLength >= 2) {
+                decoder = decoderFor(head);
+                text += decoder.decode(head, { stream: true });
+            }
+        }
+    }
+
+    // A body of fewer than two bytes never chose an encoding: it is UTF-8.
+    if (!decoder) {
+        return new TextDecoder().decode(head);
     }
 
     return text + decoder.decode();

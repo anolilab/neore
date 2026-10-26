@@ -7,6 +7,22 @@ const encoder = new TextEncoder();
 const LARGER_THAN_100 = /larger than 100 bytes/u;
 const LARGER_THAN_25 = /larger than 25 bytes/u;
 const LARGER_THAN_3 = /larger than 3 bytes/u;
+const LARGER_THAN_7 = /larger than 7 bytes/u;
+
+/** `text` (BMP characters only, where a code point is a code unit) as UTF-16 in the given byte order, after `mark`. */
+const utf16 = (text: string, order: "be" | "le", mark: number[]): Uint8Array<ArrayBuffer> => {
+    const bytes = [...mark];
+
+    for (let index = 0; index < text.length; index += 1) {
+        const unit = text.codePointAt(index) ?? 0;
+        const high = unit >> 8;
+        const low = unit & 0xff;
+
+        bytes.push(...(order === "le" ? [low, high] : [high, low]));
+    }
+
+    return new Uint8Array(bytes);
+};
 
 /** A body that arrives in the given chunks, with no Content-Length, like a chunked response. */
 const streamed = (chunks: Uint8Array[], headers?: HeadersInit): Response =>
@@ -69,6 +85,56 @@ describe(readTextWithin, () => {
         await expect(readTextWithin(response, 100)).resolves.toBe("a€b");
     });
 
+    it("decodes a UTF-16LE body from its byte-order mark, without the mark", async () => {
+        const response = streamed([utf16("a,é\n€,2\n", "le", [0xff, 0xfe])]);
+
+        await expect(readTextWithin(response, 100)).resolves.toBe("a,é\n€,2\n");
+    });
+
+    it("decodes a UTF-16BE body from its byte-order mark, without the mark", async () => {
+        const response = streamed([utf16("a,é\n€,2\n", "be", [0xfe, 0xff])]);
+
+        await expect(readTextWithin(response, 100)).resolves.toBe("a,é\n€,2\n");
+    });
+
+    it("decides the encoding even when the first chunk is one byte, and across a split code unit", async () => {
+        const bytes = utf16("a€b", "le", [0xff, 0xfe]);
+
+        // Chunks of 1, 2, 1 and 4 bytes: the mark is split, and so is the "a" code unit.
+        const response = streamed([bytes.slice(0, 1), bytes.slice(1, 3), bytes.slice(3, 4), bytes.slice(4)]);
+
+        await expect(readTextWithin(response, 100)).resolves.toBe("a€b");
+    });
+
+    it("decodes a UTF-16 body that has no stream", async () => {
+        const response = new Response(utf16("a€b", "le", [0xff, 0xfe]));
+
+        Object.defineProperty(response, "body", { value: null });
+
+        await expect(readTextWithin(response, 100)).resolves.toBe("a€b");
+    });
+
+    it("decodes a UTF-8 body with a byte-order mark, without the mark", async () => {
+        const body = new Uint8Array([0xef, 0xbb, 0xbf, ...encoder.encode("a€b")]);
+        const response = streamed([body]);
+
+        await expect(readTextWithin(response, 100)).resolves.toBe("a€b");
+    });
+
+    it("reads a one-byte body as UTF-8", async () => {
+        const response = streamed([new Uint8Array([0x61])]);
+
+        await expect(readTextWithin(response, 100)).resolves.toBe("a");
+    });
+
+    it("counts the bytes of a UTF-16 body against the budget", async () => {
+        // 2 bytes of mark + 2 per character: 8 bytes for "abc", over a budget of 7, though "abc" is 3 characters.
+        const body = utf16("abc", "le", [0xff, 0xfe]);
+
+        await expect(readTextWithin(streamed([body]), 7)).rejects.toThrow(LARGER_THAN_7);
+        await expect(readTextWithin(streamed([body]), 8)).resolves.toBe("abc");
+    });
+
     it("reads an empty body", async () => {
         await expect(readTextWithin(new Response(""), 10)).resolves.toBe("");
     });
@@ -85,6 +151,14 @@ describe(dataUrlResponse, () => {
 
         expect(response.headers.get("content-type")).toBe("text/csv");
         await expect(readTextWithin(response, 100)).resolves.toBe("a,b\n1,2\n");
+    });
+
+    it("decodes a base64 data URL that carries UTF-16LE text, from its byte-order mark", async () => {
+        const bytes = utf16("a,€\n1,2\n", "le", [0xff, 0xfe]);
+        const binary = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
+        const response = dataUrlResponse(`data:text/csv;base64,${btoa(binary)}`);
+
+        await expect(readTextWithin(response, 100)).resolves.toBe("a,€\n1,2\n");
     });
 
     it("refuses an oversized base64 payload before decoding it", () => {
