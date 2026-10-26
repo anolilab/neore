@@ -597,7 +597,7 @@ mod linux {
         // (the guard) until the spawn has returned.
         unsafe {
             command.pre_exec(move || {
-                // First: the Landlock rules need not cover /proc.
+                // Before Landlock: its rules need not allow /proc.
                 close_inherited_sockets()?;
 
                 if libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0 {
