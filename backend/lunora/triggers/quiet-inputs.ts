@@ -16,6 +16,7 @@ import { internalQuery } from "../_generated/server";
 import { loadHomeOverview } from "../home/overview";
 import type { QuietSnapshot } from "./quiet";
 import { QUIET_IGNORED_EVENT_TYPES, TRIGGER_THREAD_TAG } from "./quiet";
+import { MAX_LENGTH } from "../lib/validators";
 
 /** Notifications read, as the brief reads them. */
 const QUIET_EVENTS_READ = 50;
@@ -37,7 +38,7 @@ const notSet = (field: "deleted" | "isTemporary") => {
 const vItem = v.object({ at: v.number(), kind: v.string(), title: v.string() });
 
 export const loadQuietSnapshot = internalQuery
-    .input({ since: v.number(), userId: v.string() })
+    .input({ since: v.number(), userId: v.string().max(MAX_LENGTH.id) })
     .output(
         v.object({
             events: v.array(v.object({ createdAt: v.number(), type: v.string() })),

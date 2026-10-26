@@ -7614,13 +7614,6 @@ __has3 = true;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { ...(__has1 ? { "error": __val1 } : {}), ...(__has2 ? { "lastTriggeredAt": __val2 } : {}), ...(__has3 ? { "nextTriggerAt": __val3 } : {}), "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_quiet_inputs_170.loadQuietSnapshot.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["since"] !== "number" || !Number.isFinite(source["since"])) return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "since": source["since"], "userId": source["userId"] };
-});
 installCompiledValidatorMap(lunora_usage_activity_172.recordReplyUsage.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
