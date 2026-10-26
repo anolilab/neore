@@ -89,11 +89,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [config.appUrl, config.lunoraUrl]);
 
     const signOut = useCallback(async () => {
-        await signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
-        signOutCount.current += 1;
-        client.setAuthToken(null);
-        setUser(null);
-        setStatus("signed-out");
+        try {
+            await signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
+        } catch (error) {
+            // The stored grant could not be cleared. The user is still signed out in memory below.
+            // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
+            console.warn("Could not clear the stored sign-in.", error);
+        } finally {
+            signOutCount.current += 1;
+            client.setAuthToken(null);
+            setUser(null);
+            setStatus("signed-out");
+        }
     }, [client, config.lunoraUrl]);
 
     const value = useMemo(() => {

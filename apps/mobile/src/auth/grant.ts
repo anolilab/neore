@@ -87,6 +87,15 @@ export const buildAuthorizeUrl = (input: { appUrl: string; challenge: string; re
         state: input.state,
     })}`;
 
+/** A stray `%` makes decodeURIComponent throw URIError; sign-in reports it as its own error instead. */
+const decodeComponent = (raw: string): string => {
+    try {
+        return decodeURIComponent(raw.replaceAll("+", " "));
+    } catch {
+        throw new SignInError("Sign-in returned an unreadable address. Try again.");
+    }
+};
+
 const parseQuery = (query: string): Record<string, string> => {
     const params: Record<string, string> = {};
 
@@ -99,7 +108,7 @@ const parseQuery = (query: string): Record<string, string> => {
         const rawKey = eq === -1 ? pair : pair.slice(0, eq);
         const rawValue = eq === -1 ? "" : pair.slice(eq + 1);
 
-        params[decodeURIComponent(rawKey.replaceAll("+", " "))] = decodeURIComponent(rawValue.replaceAll("+", " "));
+        params[decodeComponent(rawKey)] = decodeComponent(rawValue);
     }
 
     return params;
@@ -182,6 +191,25 @@ const postJson = async (fetch: Fetch, url: string, body: unknown): Promise<Respo
     }
 };
 
+/** The exchange body as a `StoredGrant`, or a `SignInError`: nothing unchecked reaches the store. */
+const readGrant = async (response: Response): Promise<StoredGrant> => {
+    let body: unknown;
+
+    try {
+        body = await response.json();
+    } catch {
+        throw new SignInError("Sign-in failed. Try again.");
+    }
+
+    const { token, user } = (typeof body === "object" && body !== null ? body : {}) as { token?: unknown; user?: unknown };
+
+    if (typeof token !== "string" || token === "" || typeof user !== "object" || user === null || typeof (user as { id?: unknown }).id !== "string") {
+        throw new SignInError("Sign-in failed. Try again.");
+    }
+
+    return { token, user: user as GrantUser };
+};
+
 /**
  * Trade the code for the session token and keep ONLY that token and the user.
  * On any failure nothing is stored and the reason comes back as `SignInError`.
@@ -204,11 +232,11 @@ export const exchangeGrant = async (input: {
         throw new SignInError(await readError(response));
     }
 
-    const { token, user } = (await response.json()) as StoredGrant;
+    const grant = await readGrant(response);
 
-    await input.store.set({ token, user });
+    await input.store.set(grant);
 
-    return user;
+    return grant.user;
 };
 
 /**

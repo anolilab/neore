@@ -2,7 +2,7 @@ import { LegendList } from "@legendapp/list/react-native";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Pressable, Text, TextInput, View } from "react-native";
 
 import { useAuth } from "@/auth/auth-state";
@@ -70,6 +70,10 @@ const ChatScreen = () => {
     const [draft, setDraft] = useState("");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // The send in flight, if any: leaving the screen cuts its stream instead of letting it run on.
+    const sendAbort = useRef<AbortController | null>(null);
+
+    useEffect(() => () => sendAbort.current?.abort(), []);
 
     // The newest pages load when a chat opens; "Load older messages" fetches the rest one page at a time.
     const loadMessages = useCallback(async (id: string) => {
@@ -127,6 +131,9 @@ const ChatScreen = () => {
             return;
         }
 
+        const controller = new AbortController();
+
+        sendAbort.current = controller;
         setSending(true);
         setError(null);
         // Announced when a reply starts and when it finishes. The deltas stay silent: an announcement on each would flood the reader.
@@ -164,6 +171,7 @@ const ChatScreen = () => {
                 fetch,
                 gatewayUrl: config.gatewayUrl,
                 onDelta: ({ text }) => setRows((current) => appendToRow(current, assistantId, text)),
+                signal: controller.signal,
                 streamToken: started.streamToken,
             });
 

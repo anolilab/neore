@@ -7,6 +7,7 @@
 import { parseStreamLine } from "@neore/chat-ui/utils/stream-line";
 
 import type { Fetch } from "../auth/grant";
+import { CHAT_START_TIMEOUT_MS } from "./chat-api";
 
 export interface StreamDelta {
     reasoning: string;
@@ -147,6 +148,41 @@ const readAttempt = async (
 };
 /* eslint-enable no-await-in-loop */
 
+/**
+ * The POST, bounded until headers arrive: a gateway that never answers would
+ * otherwise leave the reply pending forever. `undefined` means the deadline fired.
+ * The caller's own abort still rejects, and the body is read under the idle timeout.
+ */
+const postStream = async (input: { fetch: Fetch; gatewayUrl: string; signal?: AbortSignal }, body: unknown): Promise<Response | undefined> => {
+    const controller = new AbortController();
+    const forwardAbort = () => controller.abort();
+    const timer = setTimeout(forwardAbort, CHAT_START_TIMEOUT_MS);
+
+    if (input.signal?.aborted) {
+        forwardAbort();
+    }
+
+    input.signal?.addEventListener("abort", forwardAbort, { once: true });
+
+    try {
+        return await input.fetch(`${input.gatewayUrl}/v1/stream`, {
+            body: JSON.stringify(body),
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+            signal: controller.signal,
+        });
+    } catch (error) {
+        if (controller.signal.aborted && !input.signal?.aborted) {
+            return undefined;
+        }
+
+        throw error;
+    } finally {
+        // The abort listener stays: the caller's abort must still cut the body read. The signal belongs to one send.
+        clearTimeout(timer);
+    }
+};
+
 /* eslint-disable no-await-in-loop -- each POST resumes from the index the previous one counted */
 
 /**
@@ -169,12 +205,11 @@ export const relayReply = async (input: {
         const resumeFrom = counted > 0 ? { lastChunkIndex: counted } : {};
         const body = { endMarker: true, resumable: true, streamToken: input.streamToken, ...resumeFrom };
 
-        const response = await input.fetch(`${input.gatewayUrl}/v1/stream`, {
-            body: JSON.stringify(body),
-            headers: { "Content-Type": "application/json" },
-            method: "POST",
-            signal: input.signal,
-        });
+        const response = await postStream(input, body);
+
+        if (response === undefined) {
+            return "failed";
+        }
 
         if (response.status === 205) {
             await response.body?.cancel();

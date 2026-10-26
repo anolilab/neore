@@ -75,6 +75,11 @@ describe("parseAuthorizeResponse", () => {
         expect(() => parseAuthorizeResponse(`${REDIRECT}?state=s1`, input)).toThrow("did not return a code");
     });
 
+    it("reports a malformed escape as a sign-in error, not a URIError", () => {
+        expect(() => parseAuthorizeResponse(`${REDIRECT}?code=100%&state=s1`, input)).toThrow(SignInError);
+        expect(() => parseAuthorizeResponse(`${REDIRECT}?code=100%&state=s1`, input)).toThrow("unreadable");
+    });
+
     it("treats a missing URL as a cancelled sign-in", () => {
         expect(() => parseAuthorizeResponse(undefined, input)).toThrow("cancelled");
     });
@@ -116,6 +121,23 @@ describe("grant storage", () => {
         const fetch: Fetch = async () => json({ message: "Code expired." }, 400);
 
         await expect(exchangeGrant({ code: "c", fetch, lunoraUrl: LUNORA, redirectUri: REDIRECT, store, verifier: "v" })).rejects.toThrow("Code expired.");
+        expect(store.value).toBeNull();
+    });
+
+    it.each([
+        ["no token", { user: USER }],
+        ["an empty token", { token: "", user: USER }],
+        ["a non-string token", { token: 7, user: USER }],
+        ["no user", { token: "session-1" }],
+        ["a user without an id", { token: "session-1", user: { name: "A" } }],
+        ["a null body", null],
+    ])("a 200 with %s stores nothing", async (_name, body) => {
+        const store = memoryStore();
+        const fetch: Fetch = async () => json(body);
+
+        await expect(exchangeGrant({ code: "c", fetch, lunoraUrl: LUNORA, redirectUri: REDIRECT, store, verifier: "v" })).rejects.toThrow(
+            "Sign-in failed. Try again.",
+        );
         expect(store.value).toBeNull();
     });
 
@@ -185,6 +207,20 @@ describe("grant storage", () => {
 
         await signOutGrant({ fetch, lunoraUrl: LUNORA, store });
         expect(store.value).toBeNull();
+    });
+});
+
+describe("signOutGrant", () => {
+    it("lets a store that cannot be cleared reject, so the provider can still sign out in memory", async () => {
+        const store: GrantStore = {
+            clear: async () => {
+                throw new Error("keychain locked");
+            },
+            get: async () => null,
+            set: async () => {},
+        };
+
+        await expect(signOutGrant({ fetch: async () => json({}), lunoraUrl: LUNORA, store })).rejects.toThrow("keychain locked");
     });
 });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Fetch } from "../auth/grant";
+import { CHAT_START_TIMEOUT_MS } from "./chat-api";
 import { relayReply, splitLines } from "./stream";
 
 const encoder = new TextEncoder();
@@ -19,6 +20,12 @@ const streamResponse = (parts: string[], status = 200): Response => {
 
     return new Response(body, { status });
 };
+
+/** A fetch that never answers; it rejects only when its signal aborts. */
+const hangingFetch: Fetch = (_url, init) =>
+    new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+    });
 
 const scripted = (responses: Response[]): { bodies: unknown[]; fetch: Fetch } => {
     const bodies: unknown[] = [];
@@ -119,6 +126,28 @@ describe("relayReply", () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+
+    it("a POST that never answers fails the reply once the deadline passes", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const outcome = relayReply({ fetch: hangingFetch, gatewayUrl: "https://gw", onDelta: () => {}, streamToken: "tok" });
+
+            await vi.advanceTimersByTimeAsync(CHAT_START_TIMEOUT_MS);
+            expect(await outcome).toBe("failed");
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("the caller's abort cuts a pending POST and rejects instead of reporting a failed reply", async () => {
+        const controller = new AbortController();
+        const outcome = relayReply({ fetch: hangingFetch, gatewayUrl: "https://gw", onDelta: () => {}, signal: controller.signal, streamToken: "tok" });
+        const rejected = expect(outcome).rejects.toThrow("aborted");
+
+        controller.abort();
+        await rejected;
     });
 
     it("a stream that closes without the end line or a resume marker fails the reply", async () => {
