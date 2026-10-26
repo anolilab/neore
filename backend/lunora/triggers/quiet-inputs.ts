@@ -3,12 +3,13 @@
  *
  * Not `loadDailyBriefInputs`: that one drops every timestamp, and a quiet
  * routine must tell an open request from last week from a new one. It reads the
- * same sources (`loadHomeOverview` and the user's notifications) and leaves the
- * windowing and the exclusions to the pure `quietBriefInputs`.
+ * same sources (`loadHomeOverview` and the user's notifications), except for
+ * chats: `loadHomeOverview` keeps only the six most recently updated, so a
+ * handful of routine runs updating threads after a user's chat would push that
+ * chat out of view. Chats are read here by their own windowed query instead.
  */
 import { v } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
 import { loadHomeOverview } from "../home/overview";
 import type { QuietSnapshot } from "./quiet";
@@ -16,6 +17,14 @@ import { QUIET_IGNORED_EVENT_TYPES, TRIGGER_THREAD_TAG } from "./quiet";
 
 /** Notifications read, as the brief reads them. */
 const QUIET_EVENTS_READ = 50;
+
+/** Chats read: the decision needs one, and the rest only fill the brief's list of titles. */
+const QUIET_THREADS_READ = 20;
+
+/** A column an old row may leave unset, or set to false. */
+const notSet = (field: "deleted" | "isTemporary") => {
+    return { OR: [{ [field]: { isNull: true } }, { [field]: false }] };
+};
 
 const vItem = v.object({ at: v.number(), kind: v.string(), title: v.string() });
 
@@ -30,7 +39,7 @@ export const loadQuietSnapshot = internalQuery
         }),
     )
     .query(async ({ args: { since, userId }, ctx }): Promise<QuietSnapshot> => {
-        const [overview, recent] = await Promise.all([
+        const [overview, recent, chats] = await Promise.all([
             loadHomeOverview(ctx, userId),
             // The ignored types are left out of the read itself, so a busy routine's notifications cannot fill the limit and hide a real one.
             ctx.db.notifications.findMany({
@@ -44,11 +53,25 @@ export const loadQuietSnapshot = internalQuery
                     userId,
                 },
             }),
+            // Every exclusion is in the query, so routine and temporary threads cannot use up the limit and hide a chat.
+            // A routine's run thread is told by its tag (`tags` is a JSON array, so the quoted label matches whole entries).
+            // A locked or untitled chat never counts. A row with no `updatedAt` is dated by its creation, as the home view does.
+            ctx.db.threads.findMany({
+                limit: QUIET_THREADS_READ,
+                orderBy: [{ updatedAt: "desc" }, { _creationTime: "desc" }],
+                where: {
+                    AND: [
+                        notSet("deleted"),
+                        notSet("isTemporary"),
+                        { OR: [{ tags: { isNull: true } }, { NOT: { tags: { contains: JSON.stringify(TRIGGER_THREAD_TAG) } } }] },
+                        { OR: [{ updatedAt: { gt: since } }, { AND: [{ updatedAt: { isNull: true } }, { _creationTime: { gt: since } }] }] },
+                    ],
+                    lockedAt: { isNull: true },
+                    title: { isNull: false },
+                    userId,
+                },
+            }),
         ]);
-
-        // The overview's thread view carries no tags; a routine's own run thread is told by its tag.
-        const recentRows = await Promise.all(overview.recentThreads.map(async (thread) => await ctx.db.get(thread._id as Id<"threads">)));
-        const routineThreadIds = new Set(recentRows.flatMap((row) => (row?.tags?.includes(TRIGGER_THREAD_TAG) ? [row._id as string] : [])));
 
         return {
             events: recent.page.map((row) => {
@@ -74,10 +97,8 @@ export const loadQuietSnapshot = internalQuery
                     return { at: run.createdAt, kind: "sub_agent", title: run.task };
                 }),
             ],
-            threads: overview.recentThreads
-                .filter((thread) => !routineThreadIds.has(thread._id))
-                .map((thread) => {
-                    return { updatedAt: thread.updatedAt, ...(thread.title && { title: thread.title }) };
-                }),
+            threads: chats.page.map((thread) => {
+                return { updatedAt: thread.updatedAt ?? thread._creationTime, ...(thread.title && { title: thread.title }) };
+            }),
         };
     });

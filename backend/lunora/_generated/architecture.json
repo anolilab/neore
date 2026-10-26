@@ -17680,19 +17680,19 @@
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 190,
+      "line": 193,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 203,
+      "line": 209,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "schedule",
-      "line": 209,
+      "line": 215,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
