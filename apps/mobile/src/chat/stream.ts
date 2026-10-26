@@ -30,6 +30,40 @@ export const splitLines = (buffer: string): { lines: string[]; rest: string } =>
 };
 
 /* eslint-disable no-await-in-loop -- a stream is read in order: each read and each line depends on the one before */
+
+/** A relay that sends nothing for this long is treated as dead: the reply fails rather than waiting forever. */
+const IDLE_TIMEOUT_MS = 60_000;
+
+const readWithIdleTimeout = async (reader: ReadableStreamDefaultReader<Uint8Array>): Promise<ReadableStreamReadResult<Uint8Array>> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        return await Promise.race([
+            reader.read(),
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(reject, IDLE_TIMEOUT_MS, new Error("the reply went silent"));
+            }),
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+};
+
+/** The next read, or `undefined` when the relay went silent or the stream errored: the reply has failed by then. */
+const readOrNull = async (reader: ReadableStreamDefaultReader<Uint8Array>): Promise<ReadableStreamReadResult<Uint8Array> | undefined> => {
+    try {
+        return await readWithIdleTimeout(reader);
+    } catch {
+        try {
+            await reader.cancel();
+        } catch {
+            // The stream already errored: nothing is left to cancel.
+        }
+
+        return undefined;
+    }
+};
+
 /** One POST's worth of lines. Returns what ended it. */
 const readAttempt = async (
     stream: ReadableStream<Uint8Array>,
@@ -72,7 +106,13 @@ const readAttempt = async (
     };
 
     while (true) {
-        const { done, value } = await reader.read();
+        const read = await readOrNull(reader);
+
+        if (read === undefined) {
+            return "failed";
+        }
+
+        const { done, value } = read;
 
         if (done) {
             break;

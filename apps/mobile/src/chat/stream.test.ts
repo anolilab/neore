@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Fetch } from "../auth/grant";
 import { relayReply, splitLines } from "./stream";
@@ -103,6 +103,22 @@ describe("relayReply", () => {
         expect(deltas).toEqual(["a", "b", "c"]);
         expect(bodies[0]).toEqual({ endMarker: true, resumable: true, streamToken: "tok" });
         expect(bodies[1]).toEqual({ endMarker: true, lastChunkIndex: 2, resumable: true, streamToken: "tok" });
+    });
+
+    it("a relay that goes silent fails the reply after a minute, instead of waiting forever", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const silent = new ReadableStream<Uint8Array>({ start() {} });
+            const { fetch } = scripted([new Response(silent, { status: 200 })]);
+
+            const outcome = relayReply({ fetch, gatewayUrl: "https://gw", onDelta: () => {}, streamToken: "tok" });
+
+            await vi.advanceTimersByTimeAsync(60_000);
+            expect(await outcome).toBe("failed");
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("a stream that closes without the end line or a resume marker fails the reply", async () => {
