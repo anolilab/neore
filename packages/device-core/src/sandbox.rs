@@ -441,9 +441,20 @@ mod linux {
             return Err(std::io::Error::last_os_error());
         }
 
+        let result = close_sockets_listed_by(dir);
+
+        libc::close(dir);
+
+        result
+    }
+
+    /// Reads the descriptor listing `dir` and closes sockets as it goes, so the
+    /// cost follows the number of open descriptors, not the highest number. The
+    /// listing is read by position, so closing an entry already seen does not
+    /// skip another; `dir` stays open until the caller closes it.
+    unsafe fn close_sockets_listed_by(dir: libc::c_int) -> std::io::Result<()> {
         // u64 elements keep the buffer aligned for `dirent64`.
         let mut entries = [0u64; 512];
-        let mut highest: libc::c_int = 2;
 
         loop {
             let read = libc::syscall(
@@ -454,15 +465,11 @@ mod linux {
             );
 
             if read < 0 {
-                let error = std::io::Error::last_os_error();
-
-                libc::close(dir);
-
-                return Err(error);
+                return Err(std::io::Error::last_os_error());
             }
 
             if read == 0 {
-                break;
+                return Ok(());
             }
 
             let base = entries.as_ptr().cast::<u8>();
@@ -489,42 +496,40 @@ mod linux {
                     index += 1;
                 }
 
-                if numeric {
-                    highest = highest.max(fd);
+                if numeric && fd > 2 && fd != dir {
+                    close_if_inheritable_socket(fd)?;
                 }
 
                 offset += usize::from((*entry).d_reclen);
             }
         }
+    }
 
-        libc::close(dir);
+    unsafe fn close_if_inheritable_socket(fd: libc::c_int) -> std::io::Result<()> {
+        let mut stat: libc::stat = std::mem::zeroed();
 
-        for fd in 3..=highest {
-            let mut stat: libc::stat = std::mem::zeroed();
+        if libc::fstat(fd, &mut stat) != 0 {
+            let error = std::io::Error::last_os_error();
 
-            if libc::fstat(fd, &mut stat) != 0 {
-                let error = std::io::Error::last_os_error();
+            return if error.raw_os_error() == Some(libc::EBADF) {
+                Ok(())
+            } else {
+                Err(error)
+            };
+        }
 
-                if error.raw_os_error() == Some(libc::EBADF) {
-                    continue;
-                }
+        if stat.st_mode & libc::S_IFMT != libc::S_IFSOCK {
+            return Ok(());
+        }
 
-                return Err(error);
-            }
+        let flags = libc::fcntl(fd, libc::F_GETFD);
 
-            if stat.st_mode & libc::S_IFMT != libc::S_IFSOCK {
-                continue;
-            }
+        if flags < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
 
-            let flags = libc::fcntl(fd, libc::F_GETFD);
-
-            if flags < 0 {
-                return Err(std::io::Error::last_os_error());
-            }
-
-            if flags & libc::FD_CLOEXEC == 0 && libc::close(fd) != 0 {
-                return Err(std::io::Error::last_os_error());
-            }
+        if flags & libc::FD_CLOEXEC == 0 && libc::close(fd) != 0 {
+            return Err(std::io::Error::last_os_error());
         }
 
         Ok(())
@@ -627,16 +632,28 @@ pub use linux::confine;
 #[cfg(all(target_os = "linux", test))]
 pub use linux::{install_filter, network_filter};
 
+/// The Linux verdict from its two prerequisites: Landlock, and the procfs
+/// directory the child's socket sweep lists (without it every spawn would fail).
+#[cfg(any(target_os = "linux", test))]
+fn linux_support(abi: i64, procfs: bool) -> Support {
+    if abi == 0 {
+        Support::Unavailable(
+            "this Linux kernel has no Landlock (needs 5.13+ with Landlock enabled)".into(),
+        )
+    } else if !procfs {
+        Support::Unavailable(
+            "the sandbox needs /proc/self/fd, and procfs is not available here".into(),
+        )
+    } else {
+        Support::Available(format!("Landlock ABI {abi}"))
+    }
+}
+
 /// Whether `shell_run` can be sandboxed on this computer right now.
 pub fn support() -> Support {
     #[cfg(target_os = "linux")]
     {
-        match linux::abi() {
-            0 => Support::Unavailable(
-                "this Linux kernel has no Landlock (needs 5.13+ with Landlock enabled)".into(),
-            ),
-            abi => Support::Available(format!("Landlock ABI {abi}")),
-        }
+        linux_support(linux::abi(), std::fs::read_dir("/proc/self/fd").is_ok())
     }
 
     #[cfg(target_os = "macos")]
@@ -791,6 +808,20 @@ pub fn describe(support: &Support, policy: Option<&Policy>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn linux_without_procfs_is_unavailable() {
+        match linux_support(5, false) {
+            Support::Unavailable(reason) => assert!(reason.contains("/proc/self/fd")),
+            other => panic!("expected Unavailable, got {other:?}"),
+        }
+
+        assert_eq!(
+            linux_support(5, true),
+            Support::Available("Landlock ABI 5".into())
+        );
+        assert!(matches!(linux_support(0, true), Support::Unavailable(_)));
+    }
 
     fn policy() -> Policy {
         Policy {
