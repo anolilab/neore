@@ -25,10 +25,12 @@ export const executeTrigger = internalAction
         ignoreDisabled: v.optional(v.boolean()),
         // The webhook body was not valid UTF-8, so `payload` is its lossy decode and filters see an empty body.
         invalidUtf8: v.optional(v.boolean()),
+        // A manual run ("Run now"): the user is waiting for a chat, so a quiet routine is not skipped.
+        manual: v.optional(v.boolean()),
         payload: v.optional(v.string()), // Webhook payload or scheduled input
         triggerId: v.id("triggers"),
     })
-    .action(async ({ args: { claim, ignoreDisabled, invalidUtf8, payload, triggerId }, ctx }) => {
+    .action(async ({ args: { claim, ignoreDisabled, invalidUtf8, manual, payload, triggerId }, ctx }) => {
         // 1. Fetch trigger config
         const trigger = await ctx.runQuery(internal.triggers.functions.getTriggerInternal, { triggerId });
 
@@ -46,10 +48,16 @@ export const executeTrigger = internalAction
 
         const { userId } = trigger;
 
+        // A bot routine runs on the bot's model, with the bot's instructions ahead of the routine's own.
+        const bot = trigger.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: trigger.botId, userId }) : null;
+
         // 1b. A quiet routine skips a run with nothing to report, before any row, thread or charge is written.
         // The skip is recorded in the history (collapsed to one row, as a webhook filter miss is). A failed check posts as usual.
-        const skipped = await isQuietRunSkipped(trigger, (since) =>
-            ctx.runQuery(internal.notifications.daily_brief.loadDailyBriefInputs, { since, userId }),
+        // The bot must still exist: a routine whose bot was deleted keeps its flag but runs as a plain one.
+        const skipped = await isQuietRunSkipped(
+            { ...trigger, botId: bot ? trigger.botId : undefined },
+            (since) => ctx.runQuery(internal.triggers.quiet_inputs.loadQuietSnapshot, { since, userId }),
+            { manual: manual === true },
         ).catch((error: unknown) => {
             console.error(`[Triggers] Quiet check failed for ${triggerId}, posting the run:`, error);
 
@@ -63,8 +71,6 @@ export const executeTrigger = internalAction
         }
 
         const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
-        // A bot routine runs on the bot's model, with the bot's instructions ahead of the routine's own.
-        const bot = trigger.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: trigger.botId, userId }) : null;
         const model = bot?.model || trigger.model || DEFAULT_CHAT_MODEL;
         const systemPrompt = [bot?.instructions, trigger.systemPrompt].filter(Boolean).join("\n\n") || undefined;
         const triggerType = trigger.type;

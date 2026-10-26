@@ -6313,11 +6313,6 @@
     {
       "from": "function:triggers_execute:default",
       "kind": "call",
-      "to": "function:notifications_daily_brief:loadDailyBriefInputs"
-    },
-    {
-      "from": "function:triggers_execute:default",
-      "kind": "call",
       "to": "function:triggers_functions:admitTriggerRun"
     },
     {
@@ -6344,6 +6339,11 @@
       "from": "function:triggers_execute:default",
       "kind": "call",
       "to": "function:triggers_functions:updateTriggerStats"
+    },
+    {
+      "from": "function:triggers_execute:default",
+      "kind": "call",
+      "to": "function:triggers_quiet_inputs:loadQuietSnapshot"
     },
     {
       "from": "function:triggers_functions:admitTriggerRun",
@@ -14435,6 +14435,13 @@
       "id": "function:triggers_functions:updateTriggerStats",
       "kind": "function",
       "name": "triggers.functions.updateTriggerStats",
+      "module": "triggers"
+    },
+    {
+      "detail": "query",
+      "id": "function:triggers_quiet_inputs:loadQuietSnapshot",
+      "kind": "function",
+      "name": "triggers.quiet_inputs.loadQuietSnapshot",
       "module": "triggers"
     },
     {

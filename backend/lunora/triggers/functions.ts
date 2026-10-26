@@ -24,6 +24,7 @@ import type { PayloadFilter } from "./filters";
 import { assertValidFilters, evaluateFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH, MAX_WEBHOOK_BODY_BYTES } from "./filters";
 import type { WebhookPreset, WebhookSignatureScheme } from "./presets";
 import { compileWebhookPreset } from "./presets";
+import { canBeQuiet } from "./quiet";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
 import { noteShardDue } from "../lib/shard-housekeeping";
@@ -118,38 +119,24 @@ const webhookSetup = (
 };
 
 /**
- * A routine may use its bot's computer only when it has a bot and runs on a
- * schedule. A webhook payload is untrusted input, so it never drives a shell.
+ * The options only a scheduled bot routine can have, checked on the state the
+ * routine ends up in: its computer, and posting only when there is something to
+ * report. A webhook payload is untrusted input, so it never drives a shell and
+ * is never skipped. Both flags share one eligibility rule (`canBeQuiet`).
  */
-export const assertComputerRoutine = (routine: { botComputer: boolean; botId: string | undefined; type: Doc<"triggers">["type"] }): void => {
-    if (!routine.botComputer) {
-        return;
-    }
-
-    if (!routine.botId) {
-        throw new LunoraError("INVALID_ARGUMENT", "Only a routine with a bot can use the bot's computer.");
-    }
-
-    if (routine.type !== "schedule") {
-        throw new LunoraError("INVALID_ARGUMENT", "Only a scheduled routine can use the bot's computer.");
-    }
-};
-
-/**
- * The quiet-when-empty flag decides on a bot's scheduled run, so only a scheduled
- * routine with a bot can have it. A webhook delivery is never skipped.
- */
-export const assertQuietRoutine = (routine: { botId: string | undefined; quietWhenEmpty: boolean; type: Doc<"triggers">["type"] }): void => {
-    if (!routine.quietWhenEmpty) {
-        return;
-    }
-
-    if (!routine.botId) {
-        throw new LunoraError("INVALID_ARGUMENT", "Only a routine with a bot can be quiet when it has nothing to report.");
-    }
-
-    if (routine.type !== "schedule") {
-        throw new LunoraError("INVALID_ARGUMENT", "Only a scheduled routine can be quiet when it has nothing to report.");
+export const assertBotRoutineOptions = (routine: {
+    botComputer: boolean;
+    botId: string | undefined;
+    quietWhenEmpty: boolean;
+    type: Doc<"triggers">["type"];
+}): void => {
+    for (const [requested, ability] of [
+        [routine.botComputer, "use the bot's computer"],
+        [routine.quietWhenEmpty, "be quiet when it has nothing to report"],
+    ] as const) {
+        if (requested && !canBeQuiet(routine)) {
+            throw new LunoraError("INVALID_ARGUMENT", routine.botId ? `Only a scheduled routine can ${ability}.` : `Only a routine with a bot can ${ability}.`);
+        }
     }
 };
 
@@ -318,8 +305,7 @@ export const createTrigger = authMutation
             throw new LunoraError("NOT_FOUND", "Bot not found");
         }
 
-        assertComputerRoutine({ botComputer: args.botComputer === true, botId: args.botId, type: triggerType });
-        assertQuietRoutine({ botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true, type: triggerType });
+        assertBotRoutineOptions({ botComputer: args.botComputer === true, botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true, type: triggerType });
 
         if (args.webhookSignatureScheme !== undefined && triggerType !== "webhook") {
             throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has a signature scheme.");
@@ -465,23 +451,21 @@ export const updateTrigger = authMutation
 
         if (args.inputTemplate !== undefined) patch.inputTemplate = args.inputTemplate;
 
-        // Clearing the bot clears its computer flag too: a routine without a bot has no computer.
+        // Clearing the bot clears its computer and quiet flags too: a routine without a bot has neither.
+        const botCleared = args.botId === null;
         const nextBotId = args.botId === undefined ? trigger.botId : (args.botId ?? undefined);
         // A different bot starts without the computer permission the previous bot had: the owner grants it again.
         const botChanged = args.botId !== undefined && args.botId !== trigger.botId;
         const keptComputer = botChanged ? undefined : trigger.botComputer;
-        const nextComputer = nextBotId === undefined ? undefined : (args.botComputer ?? keptComputer);
+        const nextComputer = botCleared ? undefined : (args.botComputer ?? keptComputer);
+        const nextQuiet = botCleared ? undefined : (args.quietWhenEmpty ?? trigger.quietWhenEmpty);
 
         // An unchanged bot is not re-checked, so a routine whose bot was deleted stays editable.
         if (args.botId && args.botId !== trigger.botId && !(await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }))) {
             throw new LunoraError("NOT_FOUND", "Bot not found");
         }
 
-        assertComputerRoutine({ botComputer: nextComputer === true, botId: nextBotId, type: trigger.type });
-        // Clearing the bot clears the flag with it (as it does the computer), so only a request to set it is refused here.
-        // The type is fixed at creation (no update path changes it), so a non-schedule row never keeps the flag.
-        assertQuietRoutine({ botId: nextBotId, quietWhenEmpty: args.quietWhenEmpty === true, type: trigger.type });
-        const nextQuiet = nextBotId === undefined || trigger.type !== "schedule" ? undefined : (args.quietWhenEmpty ?? trigger.quietWhenEmpty);
+        assertBotRoutineOptions({ botComputer: nextComputer === true, botId: nextBotId, quietWhenEmpty: nextQuiet === true, type: trigger.type });
 
         const filters = checkedFilters(args.filters, trigger.type);
 
@@ -609,7 +593,7 @@ export const getTriggerExecutions = authQuery
             .query("triggerExecutions")
             .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", args.triggerId as Id<"triggers">))
             .order("desc")
-            // One row over the limit: a trigger keeps one filtered row, so the extra one only covers a racing duplicate.
+            // One row over the limit: a trigger keeps one filtered (skipped) row, so the extra one only covers a racing duplicate.
             .take((args.limit ?? 20) + 1);
 
         // At most one filtered row is shown (the newest), so misses never push real runs out of the list.
@@ -662,8 +646,10 @@ export const testRunTrigger = authAction
         const payload = trigger.type === "schedule" ? args.testPayload : args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
 
         // The run reads the trigger only when it starts, after this action has returned, so it is told to run a disabled one.
+        // `manual`: a quiet routine posts a run the user asked for, whatever the workspace holds.
         await context.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
             ignoreDisabled: true,
+            manual: true,
             payload,
             triggerId: args.triggerId as Id<"triggers">,
         });
@@ -727,9 +713,9 @@ export const updateTriggerStats = internalMutation
         return null;
     });
 
-/** The write behind {@link recordFilteredExecution}: the trigger's ONE filtered row, created or moved to the front. */
+/** The write behind {@link recordFilteredExecution}: the trigger's ONE filtered (skipped) row, created or moved to the front. */
 const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reason: string): Promise<void> => {
-    // The trigger may have been deleted after the webhook read it. Its
+    // The trigger may have been deleted after the run read it. Its
     // deletion cleared the history, so a row written now would outlive it.
     if (!(await ctx.db.get(triggerId))) {
         return;
@@ -846,14 +832,16 @@ export const createExecution = internalMutation
     });
 
 /**
- * Record a verified delivery that failed the trigger's payload filters. It ran
- * nothing: no `admitTriggerRun` charge, no `triggerCount` / `lastTriggeredAt`
- * change, no notification (`updateExecution` would send one). The payload is
- * NOT stored: it is untrusted, up to 1 MB, and can be replayed at the delivery
- * limit. A trigger keeps ONE filtered row, found by `by_triggerId_status` however
- * many runs followed it and moved to the front by each miss, so a sender
- * whose events miss the filters (even alternating with runs) cannot fill the
- * history or push the real runs out of the list.
+ * Record a run that was skipped: a verified delivery that failed the trigger's
+ * payload filters, or a quiet routine's scheduled run with nothing to report
+ * (`quiet.ts`). It ran nothing: no `admitTriggerRun` charge, no `triggerCount` /
+ * `lastTriggeredAt` change, no notification (`updateExecution` would send one).
+ * The payload is NOT stored: it is untrusted, up to 1 MB, and can be replayed at
+ * the delivery limit. A trigger keeps ONE filtered row, found by
+ * `by_triggerId_status` however many runs followed it and moved to the front by
+ * each skip, so a sender whose events miss the filters (even alternating with
+ * runs) cannot fill the history or push the real runs out of the list. The
+ * status is "filtered" for both causes; `error` holds the reason.
  */
 export const recordFilteredExecution = internalMutation
     .input({

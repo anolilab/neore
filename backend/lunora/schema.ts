@@ -2716,7 +2716,8 @@ export const schema = defineSchema({
         error: v.optional(v.string()),
         payload: v.optional(v.string()),
         startedAt: v.number(),
-        // "filtered": a verified delivery whose payload failed the trigger's filters; it ran nothing.
+        // "filtered": a run that was skipped and ran nothing: a verified delivery whose payload failed the
+        // trigger's filters, or a quiet routine's scheduled run with nothing to report. `error` holds the reason.
         status: v.union(v.literal("running"), v.literal("completed"), v.literal("failed"), v.literal("filtered")),
         threadId: v.optional(v.string()),
         triggerId: v.id("triggers"),

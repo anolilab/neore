@@ -962,8 +962,8 @@ export interface InternalApiTypes {
     };
     triggers: {
         execute: {
-            default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
-            executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
             admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }, null | string | { filtered: string }>;
@@ -974,6 +974,9 @@ export interface InternalApiTypes {
             setTriggerEnabledInternal: FunctionReference<"mutation", { enabled: boolean; triggerId: Id<"triggers"> }, null>;
             updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string }, null>;
             updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
+        };
+        quiet_inputs: {
+            loadQuietSnapshot: FunctionReference<"query", { since: number; userId: string }, { events: Array<{ createdAt: number; type: string }>; needsYou: Array<{ at: number; kind: string; title: string }>; running: Array<{ at: number; kind: string; title: string }>; threads: Array<{ title?: string; updatedAt: number }> }>;
         };
         schedule: {
             checkDueTriggers: FunctionReference<"mutation", {}, null>;
@@ -1988,6 +1991,9 @@ export const internal: InternalApiTypes = {
             setTriggerEnabledInternal: { __lunoraRef: "triggers_functions:setTriggerEnabledInternal" },
             updateExecution: { __lunoraRef: "triggers_functions:updateExecution" },
             updateTriggerStats: { __lunoraRef: "triggers_functions:updateTriggerStats" },
+        },
+        quiet_inputs: {
+            loadQuietSnapshot: { __lunoraRef: "triggers_quiet_inputs:loadQuietSnapshot" },
         },
         schedule: {
             checkDueTriggers: { __lunoraRef: "triggers_schedule:checkDueTriggers" },
