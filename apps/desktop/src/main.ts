@@ -1,7 +1,6 @@
 /**
- * Electron main process. Port of `apps/native/src-tauri/src/{lib.rs,desktop.rs,sign_in.rs}`:
- * the main window on the site, the tray, the Quick Composer, system-browser
- * sign-in, deep links, notifications and the updater.
+ * Electron main process: the main window on the site, the tray, the Quick Composer,
+ * system-browser sign-in, deep links, notifications and the updater.
  *
  * Every IPC handler checks its sender's URL. The site's channels accept only
  * the site's origin; the Quick Composer's accept only its own local page.
@@ -246,7 +245,7 @@ const guardSiteWindow = (win: BrowserWindow): void => {
 
 /**
  * Without a tray nothing hides, so the last site window to close ends the app. The Quick Composer is
- * hidden rather than closed, so it does not count: `window-all-closed` never fires while it exists.
+ * hidden rather than closed, so it does not count, and the quit is decided here rather than by `window-all-closed`.
  */
 const quitWhenNoSiteWindow = (): void => {
     if (state.isQuitting || canHideOnClose()) {
@@ -755,7 +754,7 @@ const checkForUpdates = async (): Promise<void> => {
     }
 };
 
-/** Registers the scheme at runtime where no installer does: a dev run, on Linux and Windows (Tauri does the same). */
+/** Registers the scheme at runtime where no installer does: a dev run, on Linux and Windows. */
 const registerSchemeInDev = (): void => {
     if (app.isPackaged || (process.platform !== "linux" && process.platform !== "win32")) {
         return;
@@ -870,12 +869,5 @@ app.on("activate", () => {
         createMainWindow();
     } else {
         focusMain();
-    }
-});
-
-app.on("window-all-closed", () => {
-    // Closing hides the window, so this only fires when nothing can hide: quit.
-    if (process.platform !== "darwin" && state.tray === undefined) {
-        app.quit();
     }
 });
