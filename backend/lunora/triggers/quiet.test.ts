@@ -119,10 +119,10 @@ describe("quietBriefInputs", () => {
         expect(inputs.threads).toEqual(["Planning"]);
     });
 
-    it("drops a routine's own run thread", () => {
-        const inputs = quietBriefInputs({ ...EMPTY, threads: [{ title: "Trigger: Daily digest", updatedAt: 700 }] }, SINCE);
+    it("counts a chat a user titled like a run thread: the title says nothing about who wrote it", () => {
+        const inputs = quietBriefInputs({ ...EMPTY, threads: [{ title: "Trigger: x", updatedAt: 700 }] }, SINCE);
 
-        expect(inputs.threads).toEqual([]);
+        expect(inputs.threads).toEqual(["Trigger: x"]);
     });
 });
 
@@ -183,13 +183,13 @@ describe("isQuietRunSkipped", () => {
         await expect(isQuietRunSkipped(ROUTINE, loadSnapshot, SCHEDULED)).resolves.toBe(false);
     });
 
-    it("skips when everything in the workspace is older than the window or another routine's output", async () => {
+    it("skips when everything in the workspace is older than the window or another routine's notification", async () => {
         const loadSnapshot = vi.fn(async () => {
             return {
                 events: [{ createdAt: 600, type: "trigger" }],
                 needsYou: [{ at: 400, kind: "waiting_in_chat", title: "Old approval" }],
                 running: [{ at: 400, kind: "task", title: "Old task" }],
-                threads: [{ title: "Trigger: Other routine", updatedAt: 600 }],
+                threads: [{ title: "Old chat", updatedAt: 400 }],
             };
         });
 

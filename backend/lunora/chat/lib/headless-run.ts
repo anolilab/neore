@@ -185,9 +185,15 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
             threadId = created.threadId;
             thread = created.thread!;
 
-            // Before the run: a tool call reads `thread.botId` to find the bot's computer.
-            if (options.botId) {
-                await ctx.runMutation(internal.agent.threads.updateThread, { patch: { botId: options.botId }, threadId: threadId as Id<"threads"> });
+            // Before the run: a tool call reads `thread.botId` to find the bot's computer, and the tags tell a
+            // reader (a quiet routine's workspace check) what this thread is while it is still running or if it fails.
+            const createdTags = "tags" in options.thread ? options.thread.tags : undefined;
+
+            if (options.botId || createdTags) {
+                await ctx.runMutation(internal.agent.threads.updateThread, {
+                    patch: { ...(options.botId && { botId: options.botId }), ...(createdTags && { tags: createdTags }) },
+                    threadId: threadId as Id<"threads">,
+                });
             }
 
             await options.onThread?.(threadId);

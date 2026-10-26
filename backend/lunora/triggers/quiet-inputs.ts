@@ -8,10 +8,11 @@
  */
 import { v } from "lunorash/server";
 
+import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
 import { loadHomeOverview } from "../home/overview";
 import type { QuietSnapshot } from "./quiet";
-import { QUIET_IGNORED_EVENT_TYPES } from "./quiet";
+import { QUIET_IGNORED_EVENT_TYPES, TRIGGER_THREAD_TAG } from "./quiet";
 
 /** Notifications read, as the brief reads them. */
 const QUIET_EVENTS_READ = 50;
@@ -45,6 +46,10 @@ export const loadQuietSnapshot = internalQuery
             }),
         ]);
 
+        // The overview's thread view carries no tags; a routine's own run thread is told by its tag.
+        const recentRows = await Promise.all(overview.recentThreads.map(async (thread) => await ctx.db.get(thread._id as Id<"threads">)));
+        const routineThreadIds = new Set(recentRows.flatMap((row) => (row?.tags?.includes(TRIGGER_THREAD_TAG) ? [row._id as string] : [])));
+
         return {
             events: recent.page.map((row) => {
                 return { createdAt: row.createdAt, type: row.type };
@@ -69,8 +74,10 @@ export const loadQuietSnapshot = internalQuery
                     return { at: run.createdAt, kind: "sub_agent", title: run.task };
                 }),
             ],
-            threads: overview.recentThreads.map((thread) => {
-                return { updatedAt: thread.updatedAt, ...(thread.title && { title: thread.title }) };
-            }),
+            threads: overview.recentThreads
+                .filter((thread) => !routineThreadIds.has(thread._id))
+                .map((thread) => {
+                    return { updatedAt: thread.updatedAt, ...(thread.title && { title: thread.title }) };
+                }),
         };
     });

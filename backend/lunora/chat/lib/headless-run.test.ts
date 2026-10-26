@@ -139,6 +139,27 @@ describe("runHeadlessAgent personalization", () => {
     });
 });
 
+describe("runHeadlessAgent thread tags", () => {
+    it("tags a new thread when it is created, before the run can fail", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await runHeadlessAgent(ctx as never, {
+            memory: false,
+            model: "test-model",
+            personalization: "none",
+            prompt: "Do the thing",
+            thread: { tags: ["trigger"], title: "Trigger: x" },
+            tools: "none",
+            userId: "owner",
+        });
+
+        const patches = ctx.runMutation.mock.calls.map(([, args]) => (args as { patch?: { tags?: string[] } }).patch);
+
+        // The first patch is the creation-time one; the last repeats the tags with the final status.
+        expect(patches[0]).toEqual({ tags: ["trigger"] });
+    });
+});
+
 describe("runHeadlessAgent tool allowlist", () => {
     beforeEach(() => {
         seen.buildOptions = [];

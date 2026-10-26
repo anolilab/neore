@@ -14,7 +14,7 @@ import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { filterTextOf } from "./filters";
-import { isQuietRunSkipped } from "./quiet";
+import { isQuietRunSkipped, TRIGGER_THREAD_TAG } from "./quiet";
 
 export const executeTrigger = internalAction
     .input({
@@ -155,7 +155,7 @@ export const executeTrigger = internalAction
                 personalization: "full",
                 prompt: inputMessage,
                 system: systemPrompt,
-                thread: { title: `Trigger: ${trigger.name}` },
+                thread: { tags: [TRIGGER_THREAD_TAG], title: `Trigger: ${trigger.name}` },
                 toolAllowlist: useComputer ? SANDBOX_TOOLS : undefined,
                 tools: useComputer ? "headless" : "none",
                 userId,

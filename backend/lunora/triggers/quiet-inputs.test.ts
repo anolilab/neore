@@ -69,4 +69,15 @@ describe("loadQuietSnapshot", () => {
         expect(snapshot.needsYou).toEqual([{ at: NOW - 4000, kind: "task_review", title: "Review me" }]);
         expect(snapshot.running).toEqual([{ at: NOW - 3000, kind: "task", title: "Sync" }]);
     });
+
+    it("leaves out a routine's run thread by its tag and keeps a chat only titled like one", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("threads", { status: "active", tags: ["trigger"], title: "Trigger: Digest", updatedAt: NOW - 1000, userId: USER });
+            await ctx.db.insert("threads", { status: "active", title: "Trigger: x", updatedAt: NOW - 2000, userId: USER });
+        });
+
+        const { threads } = await snapshotSince(NOW - 60_000);
+
+        expect(threads).toEqual([{ title: "Trigger: x", updatedAt: NOW - 2000 }]);
+    });
 });

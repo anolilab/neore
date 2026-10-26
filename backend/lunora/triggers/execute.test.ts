@@ -144,6 +144,12 @@ describe("a quiet routine's run", () => {
         expect(names()).not.toContain("recordFilteredExecution");
     });
 
+    it("creates the run's thread with the routine tag, which is how a later check tells it from a chat", async () => {
+        await run();
+
+        expect(state.runs[0]?.thread).toEqual({ tags: ["trigger"], title: "Trigger: Digest" });
+    });
+
     it("posts the run when the check itself fails", async () => {
         state.trigger = { ...state.trigger, quietWhenEmpty: true };
         state.snapshotError = true;

@@ -12,8 +12,9 @@
  *    work included, so one approval left open for a week does not make every run
  *    post;
  *  - other routines' own output does not count (their "trigger" notifications and
- *    their "Trigger: ..." run threads), or two quiet routines would wake each
- *    other forever.
+ *    their run threads, which carry {@link TRIGGER_THREAD_TAG}), or two quiet
+ *    routines would wake each other forever. A thread is a run's by that tag, set
+ *    when the run creates it, never by its title: a user can rename any chat.
  *
  * The window starts at `lastTriggeredAt`, which a run sets once it has reached the
  * agent and either completed or failed, a manual "Run now" included. A skipped run
@@ -31,8 +32,12 @@ type TriggerType = Doc<"triggers">["type"];
 /** A notification of this type is not workspace activity here: routines would wake each other, and the brief is not news. */
 export const QUIET_IGNORED_EVENT_TYPES = ["daily_brief", "trigger"] as const;
 
-/** Prefix of the title `executeTrigger` gives a routine's run thread. */
-export const TRIGGER_THREAD_TITLE_PREFIX = "Trigger: ";
+/**
+ * The system label (`threads.tags`) of a routine's run thread. Set at creation by
+ * `executeTrigger`; a user cannot write `tags`, so it, unlike the title, cannot be
+ * given to an ordinary chat.
+ */
+export const TRIGGER_THREAD_TAG = "trigger";
 
 /**
  * The one rule for which routines may be quiet: a scheduled routine that runs as
@@ -48,11 +53,11 @@ export interface QuietSnapshot {
     /** Open requests for the user. `at` is when the request arose or last changed. */
     needsYou: { at: number; kind: string; title: string }[];
     running: { at: number; kind: string; title: string }[];
-    /** A locked chat has no title here, so it never counts. */
+    /** A locked chat has no title here, so it never counts. A routine's own run threads are not listed. */
     threads: { title?: string; updatedAt: number }[];
 }
 
-/** The snapshot as the brief's inputs: only what is newer than `since`, and not the routines' own output. */
+/** The snapshot as the brief's inputs: only what is newer than `since`. The reader leaves out the routines' own threads. */
 export const quietBriefInputs = (snapshot: QuietSnapshot, since: number): BriefInputs => {
     const ignored: ReadonlyArray<string> = QUIET_IGNORED_EVENT_TYPES;
 
@@ -64,9 +69,7 @@ export const quietBriefInputs = (snapshot: QuietSnapshot, since: number): BriefI
             }),
         needsYou: snapshot.needsYou.filter((item) => item.at > since),
         running: snapshot.running.filter((item) => item.at > since),
-        threads: snapshot.threads.flatMap((thread) =>
-            thread.updatedAt > since && thread.title && !thread.title.startsWith(TRIGGER_THREAD_TITLE_PREFIX) ? [thread.title] : [],
-        ),
+        threads: snapshot.threads.flatMap((thread) => (thread.updatedAt > since && thread.title ? [thread.title] : [])),
     };
 };
 
