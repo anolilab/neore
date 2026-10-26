@@ -128,10 +128,21 @@ pub fn load(path: &Path) -> Settings {
 
 pub fn save(path: &Path, settings: &Settings) -> Result<(), String> {
     let previous = read_file(path).and_then(|stored| stored.pairing);
+
+    save_over(path, previous.as_ref(), settings)
+}
+
+/// Writes the settings over the pairing they replace. The engine passes the pairing it holds in memory, so a save
+/// does not reread the file.
+pub fn save_over(
+    path: &Path,
+    previous: Option<&Pairing>,
+    settings: &Settings,
+) -> Result<(), String> {
     let current = settings.pairing.as_ref();
 
     // Re-pairing the same device overwrites its keychain entry; keep the old one to restore on failure.
-    let overwritten = match (&previous, current) {
+    let overwritten = match (previous, current) {
         (Some(old), Some(new)) if old.device_id == new.device_id => keychain_get(&old.device_id)
             .ok()
             .map(|secret| (old.device_id.clone(), secret)),
