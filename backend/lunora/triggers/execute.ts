@@ -63,20 +63,25 @@ export const executeTrigger = internalAction
         };
 
         // The quiet window this run took (see `windowStart`), and the `lastTriggeredAt` it replaced.
-        let reservedWindow: { expected: number | undefined; windowStart: number } | undefined;
+        let reservedWindow: { expected: number | undefined } | undefined;
 
-        /** Gives the quiet window back: a run that posted nothing leaves its activity for the next one. */
+        /**
+         * Gives the quiet window back: a run that posted nothing leaves its activity for the next one. A release that
+         * fails is not dropped, or the window stays moved past activity nobody reported: it is scheduled again, which is safe
+         * because the release is idempotent and only ever moves the window back.
+         */
         const releaseWindow = async (): Promise<void> => {
             if (!reservedWindow) {
                 return;
             }
 
-            const window = reservedWindow;
+            const window = { ...reservedWindow, triggerId };
 
             reservedWindow = undefined;
 
-            await ctx.runMutation(internal.triggers.functions.releaseQuietWindow, { ...window, triggerId }).catch((error: unknown) => {
-                console.error(`[Triggers] Could not give back the quiet window of trigger ${triggerId}:`, error);
+            await ctx.runMutation(internal.triggers.functions.releaseQuietWindow, window).catch(async (error: unknown) => {
+                console.error(`[Triggers] Could not give back the quiet window of trigger ${triggerId}; retrying:`, error);
+                await ctx.scheduler.runAfter(releaseRetryDelayMs(1), internal.triggers.functions.releaseQuietWindow, window);
             });
         };
 
@@ -85,8 +90,11 @@ export const executeTrigger = internalAction
             try {
                 return await work();
             } catch (error) {
-                await releaseWindow();
-                await giveBack();
+                try {
+                    await releaseWindow();
+                } finally {
+                    await giveBack();
+                }
 
                 throw error;
             }
@@ -178,7 +186,7 @@ export const executeTrigger = internalAction
                 return;
             }
 
-            reservedWindow = { expected, windowStart };
+            reservedWindow = { expected };
         }
 
         // 2. Create execution log entry
@@ -291,8 +299,9 @@ export const executeTrigger = internalAction
             });
 
             // 6. Update trigger stats
+            // A run that took the window already moved it to this start, and must not move it again past a give-back.
             await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
-                lastTriggeredAt: runStartedAt,
+                lastTriggeredAt: takesWindow ? undefined : runStartedAt,
                 triggerId,
             });
 
@@ -319,7 +328,11 @@ export const executeTrigger = internalAction
             }
 
             if (!threadCreated) {
-                await releaseWindow();
+                try {
+                    await releaseWindow();
+                } catch (error_) {
+                    releaseError ??= error_;
+                }
             }
 
             // Update execution as failed
@@ -335,7 +348,7 @@ export const executeTrigger = internalAction
 
             await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
                 error: errorMessage.slice(0, 500),
-                ...((threadCreated || !windowRoutine) && { lastTriggeredAt: threadCreated ? runStartedAt : Date.now() }),
+                ...(!takesWindow && (threadCreated || !windowRoutine) && { lastTriggeredAt: threadCreated ? runStartedAt : Date.now() }),
                 triggerId,
             });
 

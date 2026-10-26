@@ -35,7 +35,9 @@
  * Runs of one routine can overlap (the next slot starts while the agent still
  * works), and both would otherwise read the same unmoved window and post the same
  * activity twice. The run that loses the swap is recorded as skipped. A run that
- * then posts nothing gives the window back, so the "do not move it" rule above holds.
+ * then posts nothing gives the window back, so the "do not move it" rule above holds: the give-back moves the window
+ * to the value the run replaced even when a later run has moved it on since, so that run's activity is read again
+ * rather than missed. A failed give-back is scheduled again. A run that took the window never stamps it a second time.
  */
 import type { Doc } from "../_generated/dataModel";
 import type { BriefInputs } from "../notifications/daily-brief-logic";

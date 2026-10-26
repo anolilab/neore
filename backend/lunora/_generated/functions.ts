@@ -7592,8 +7592,7 @@ __val1 = source["expected"];
 __has1 = true;
 }
 if (typeof source["triggerId"] !== "string") return DEFER;
-if (typeof source["windowStart"] !== "number" || !Number.isFinite(source["windowStart"])) return DEFER;
-return { ...(__has1 ? { "expected": __val1 } : {}), "triggerId": source["triggerId"], "windowStart": source["windowStart"] };
+return { ...(__has1 ? { "expected": __val1 } : {}), "triggerId": source["triggerId"] };
 });
 installCompiledValidatorMap(lunora_triggers_functions_171.reserveQuietWindow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9414,7 +9413,7 @@ export interface Caller {
             getTriggerInternal: (args: { triggerId: Id<"triggers"> }) => Promise<import("./dataModel.js").Doc_triggers | null>;
             getTriggers: (args?: {}) => Promise<({} & { _creationTime: number; _id: string; botComputer: boolean; botId: string | null; createdAt: number; cronExpression: string | null; cronInZone: boolean; description: string | null; enabled: boolean; filters: ({} & { op: "contains" | "equals" | "not_equals" | "starts_with" | "exists" | "not_exists"; path: string; value: string | null; })[]; inputTemplate: string | null; lastError: string | null; lastTriggeredAt: number | null; model: string; name: string; nextTriggerAt: number | null; quietWhenEmpty: boolean; searchMode: string | null; systemPrompt: string | null; timezone: string | null; triggerCount: number; type: string; updatedAt: number; webhookSignatureScheme: "native" | "timestamped" | "gitlab-token" | null; })[]>;
             recordFilteredExecution: (args: { reason: string; triggerId: Id<"triggers"> }) => Promise<null>;
-            releaseQuietWindow: (args: { expected?: number; triggerId: Id<"triggers">; windowStart: number }) => Promise<null>;
+            releaseQuietWindow: (args: { expected?: number; triggerId: Id<"triggers"> }) => Promise<null>;
             reserveQuietWindow: (args: { expected?: number; triggerId: Id<"triggers">; windowStart: number }) => Promise<boolean>;
             setTriggerEnabled: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
             setTriggerEnabledInternal: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<null>;

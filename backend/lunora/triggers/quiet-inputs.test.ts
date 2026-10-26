@@ -143,6 +143,40 @@ describe("loadQuietSnapshot", () => {
             expect(threads).toEqual([{ title: "Trigger: Digest", updatedAt: NOW - 1000 }]);
         });
 
+        it("counts a reply with more later turns than rows read", async () => {
+            const answers = Array.from({ length: 12 }, (_, index) => {
+                return { at: NOW - 900 + index, order: index + 2, role: "assistant" };
+            });
+
+            await insertRunThread([{ at: NOW - 3000, order: 0, role: "user" }, { at: NOW - 1000, order: 1, role: "user" }, ...answers]);
+
+            const { threads } = await snapshotSince(NOW - 60_000);
+
+            expect(threads).toEqual([{ title: "Trigger: Digest", updatedAt: NOW - 1000 }]);
+        });
+
+        it("finds a reply in an older run thread behind more newer run threads than the limit", async () => {
+            await insertRunThread([
+                { at: NOW - 3000, order: 0, role: "user" },
+                { at: NOW - 2000, order: 1, role: "user" },
+            ]);
+            await harness.run(async (ctx: any) => {
+                for (let index = 0; index < 25; index += 1) {
+                    await ctx.db.insert("threads", {
+                        status: "active",
+                        tags: ["trigger"],
+                        title: `Trigger: Other ${String(index)}`,
+                        updatedAt: NOW - 400 + index,
+                        userId: USER,
+                    });
+                }
+            });
+
+            const { threads } = await snapshotSince(NOW - 60_000);
+
+            expect(threads).toEqual([{ title: "Trigger: Digest", updatedAt: NOW - 2000 }]);
+        });
+
         it("does not count a reply from before the window start, nor the routine's answer to it", async () => {
             await insertRunThread([
                 { at: NOW - 120_000, order: 0, role: "user" },

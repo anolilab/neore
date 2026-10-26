@@ -182,7 +182,7 @@ describe("the quiet window reservation", () => {
         expect(await reserve({ triggerId, windowStart: 200 })).toBe(true);
         expect(await reserve({ triggerId, windowStart: 210 })).toBe(false);
 
-        await release({ triggerId, windowStart: 200 });
+        await release({ triggerId });
 
         const stored = await readTrigger(triggerId);
 
@@ -190,14 +190,25 @@ describe("the quiet window reservation", () => {
         expect(await reserve({ triggerId, windowStart: 220 })).toBe(true);
     });
 
-    it("gives back only the window the run itself took", async () => {
+    it("moves the window back for a run that fails after a later run took the window on", async () => {
         const triggerId = await insertTrigger({ lastTriggeredAt: 100 });
 
         await reserve({ expected: 100, triggerId, windowStart: 200 });
-        await record({ lastTriggeredAt: 300, triggerId });
-        await release({ expected: 100, triggerId, windowStart: 200 });
+        await reserve({ expected: 200, triggerId, windowStart: 300 });
+        await release({ expected: 100, triggerId });
 
-        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 300 });
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 100 });
+    });
+
+    it("never moves the window forward, so a repeated or late give-back is harmless", async () => {
+        const triggerId = await insertTrigger({ lastTriggeredAt: 100 });
+
+        await reserve({ expected: 100, triggerId, windowStart: 200 });
+        await release({ expected: 100, triggerId });
+        await release({ expected: 150, triggerId });
+        await release({ expected: 100, triggerId });
+
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 100 });
     });
 });
 

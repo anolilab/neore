@@ -21,7 +21,9 @@ const state = vi.hoisted(() => {
         mutations: [] as { args: unknown; name: string }[],
         onRun: undefined as (() => void) | undefined,
         queries: [] as string[],
+        releaseFails: false,
         runs: [] as Record<string, unknown>[],
+        scheduled: [] as { args: unknown; delay: number; name: string }[],
         snapshot: null as unknown as QuietSnapshot,
         snapshotError: false,
         trigger: null as Record<string, unknown> | null,
@@ -40,6 +42,14 @@ vi.mock("../chat/lib/headless-run", () => {
         },
     };
 });
+
+const moveWindowBack = (expected: number | undefined): void => {
+    const current = state.trigger?.lastTriggeredAt as number | undefined;
+
+    if (current !== undefined && (expected === undefined || expected < current)) {
+        state.trigger = { ...state.trigger, lastTriggeredAt: expected };
+    }
+};
 
 const NAME_SUFFIX = (path: string): string => path.slice(path.lastIndexOf(":") + 1);
 
@@ -68,11 +78,13 @@ const ctx = () =>
             }
 
             if (name === "releaseQuietWindow") {
-                const { expected, windowStart } = args as { expected?: number; windowStart: number };
+                const { expected } = args as { expected?: number };
 
-                if (state.trigger?.lastTriggeredAt === windowStart) {
-                    state.trigger = { ...state.trigger, lastTriggeredAt: expected };
+                if (state.releaseFails) {
+                    throw new Error("release unavailable");
                 }
+
+                moveWindowBack(expected);
 
                 return null;
             }
@@ -106,6 +118,11 @@ const ctx = () =>
 
             throw new Error(`unexpected query ${path}`);
         },
+        scheduler: {
+            runAfter: async (delay: number, path: string, args: unknown) => {
+                state.scheduled.push({ args, delay, name: NAME_SUFFIX(path) });
+            },
+        },
     }) as never;
 
 const run = async (extra: Record<string, unknown> = {}) =>
@@ -128,7 +145,9 @@ beforeEach(() => {
     state.mutations = [];
     state.onRun = undefined;
     state.queries = [];
+    state.releaseFails = false;
     state.runs = [];
+    state.scheduled = [];
     state.trigger = {
         _id: "trigger-1",
         botId: "bot-a",
@@ -277,6 +296,18 @@ describe("a quiet routine's run", () => {
         expect(state.runs).toHaveLength(1);
     });
 
+    it("schedules the give-back again when it fails, so the window is not left past activity nobody posted", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        state.trigger = { ...state.trigger, quietWhenEmpty: true };
+        state.snapshot = { ...EMPTY, threads: [{ title: "Planning", updatedAt: 600 }] };
+        state.admissionRefusal = "Daily limit reached";
+        state.releaseFails = true;
+
+        await run();
+
+        expect(state.scheduled).toStrictEqual([{ args: { expected: 500, triggerId: "trigger-1" }, delay: expect.any(Number), name: "releaseQuietWindow" }]);
+    });
+
     it("does not take the window for a manual run or a routine that is not quiet", async () => {
         state.trigger = { ...state.trigger, quietWhenEmpty: true };
 
@@ -315,14 +346,12 @@ describe("the window a run leaves for the next one", () => {
 
         await run();
 
-        const stats = state.mutations.find((entry) => entry.name === "updateTriggerStats")?.args as { lastTriggeredAt: number };
-
-        expect(stats.lastTriggeredAt).toBe(START);
+        expect(state.trigger?.lastTriggeredAt).toBe(START);
+        expect((state.mutations.find((entry) => entry.name === "updateTriggerStats")?.args as { lastTriggeredAt?: number }).lastTriggeredAt).toBeUndefined();
 
         // A chat touched halfway through the first run: after its start, before its end.
         state.mutations = [];
         state.runs = [];
-        state.trigger = { ...state.trigger, lastTriggeredAt: stats.lastTriggeredAt };
         state.snapshot = { ...EMPTY, threads: [{ title: "Mid-run chat", updatedAt: START + DURATION / 2 }] };
 
         await run();

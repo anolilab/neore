@@ -6421,6 +6421,11 @@
       "to": "function:lib_claim_once:retryReleaseKey"
     },
     {
+      "from": "function:triggers_execute:default",
+      "kind": "schedule",
+      "to": "function:triggers_functions:releaseQuietWindow"
+    },
+    {
       "from": "function:triggers_functions:admitTriggerRun",
       "kind": "read",
       "to": "table:triggerExecutions"

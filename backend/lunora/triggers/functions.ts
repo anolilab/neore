@@ -794,14 +794,19 @@ export const reserveQuietWindow = internalMutation
         return true;
     });
 
-/** Gives {@link reserveQuietWindow} back, only while the window is still the one that run took (a later run may have moved it). */
+/**
+ * Gives {@link reserveQuietWindow} back: moves the window to `expected` unless it is already earlier. A later run may
+ * have moved it on in the meantime, and the activity this run did not post must still be in the next window; the
+ * activity that run reported is then read twice, which is harmless where a missed one is not. Idempotent, so a retry
+ * after a failed release is safe.
+ */
 export const releaseQuietWindow = internalMutation
-    .input({ expected: v.optional(v.number()), triggerId: v.id("triggers"), windowStart: v.number() })
+    .input({ expected: v.optional(v.number()), triggerId: v.id("triggers") })
     .output(v.null())
-    .mutation(async ({ args: { expected, triggerId, windowStart }, ctx }) => {
+    .mutation(async ({ args: { expected, triggerId }, ctx }) => {
         const trigger = await ctx.db.get(triggerId);
 
-        if (trigger?.lastTriggeredAt === windowStart) {
+        if (trigger?.lastTriggeredAt !== undefined && (expected === undefined || expected < trigger.lastTriggeredAt)) {
             await patchRow(ctx.db, trigger, { lastTriggeredAt: expected });
         }
 

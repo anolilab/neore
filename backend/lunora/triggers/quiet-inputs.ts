@@ -32,7 +32,7 @@ const QUIET_TASKS_READ = 20;
 /** The `type` of the event a task updated inside the window becomes. */
 const TASK_EVENT_TYPE = "task";
 
-/** Turns read per run thread when looking for a reply: the newest ones decide whether anything is newer than the window. */
+/** Rows read per page when looking for a reply in a run thread. */
 const QUIET_REPLY_ROWS_READ = 10;
 
 /** A column an old row may leave unset, or set to false. */
@@ -43,21 +43,68 @@ const notSet = (field: "deleted" | "isTemporary") => {
 /**
  * When the user last wrote in a routine's run thread after `since`, or undefined. The run's own prompt is a user
  * message too, at the thread's first `order`, so only a message past it is a reply; the routine's own answers are
- * assistant rows and never count.
+ * assistant rows and never count. Read newest first, a page at a time, so assistant rows after a reply cannot hide it.
  */
 const newestUserReplyAt = async (ctx: QueryCtx, threadId: Id<"threads">, since: number): Promise<number | undefined> => {
-    const { page } = await ctx.db.messages.findMany({
-        limit: QUIET_REPLY_ROWS_READ,
-        orderBy: [{ order: "desc" }, { stepOrder: "desc" }, { _creationTime: "desc" }],
-        where: { order: { gt: 0 }, stepOrder: 0, threadId, tool: false },
-    });
-    const times = page.flatMap((row) => {
-        const at = row.createdAt ?? row._creationTime;
+    let cursor: string | undefined;
 
-        return (row.message as { role?: string } | undefined)?.role === "user" && at > since ? [at] : [];
-    });
+    do {
+        const result = await ctx.db.messages.findMany({
+            cursor,
+            limit: QUIET_REPLY_ROWS_READ,
+            orderBy: [{ order: "desc" }, { stepOrder: "desc" }, { _creationTime: "desc" }],
+            where: { _creationTime: { gt: since }, order: { gt: 0 }, stepOrder: 0, threadId, tool: false },
+        });
+        const times = result.page.flatMap((row) => {
+            const at = row.createdAt ?? row._creationTime;
 
-    return times.length > 0 ? Math.max(...times) : undefined;
+            return (row.message as { role?: string } | undefined)?.role === "user" && at > since ? [at] : [];
+        });
+
+        if (times.length > 0) {
+            return Math.max(...times);
+        }
+
+        cursor = result.isDone ? undefined : (result.continueCursor ?? undefined);
+    } while (cursor !== undefined);
+
+    return undefined;
+};
+
+/**
+ * The titled run threads of a routine updated inside the window that hold a user's reply, newest first. The threads
+ * are paged, not capped: other routines' run threads that were updated later must not push out one with a reply.
+ */
+const repliedRunThreads = async (ctx: QueryCtx, userId: string, since: number): Promise<{ title: string; updatedAt: number }[]> => {
+    const replied: { title: string; updatedAt: number }[] = [];
+    let cursor: string | undefined;
+
+    do {
+        const result = await ctx.db.threads.findMany({
+            cursor,
+            limit: QUIET_THREADS_READ,
+            orderBy: [{ updatedAt: "desc" }, { _creationTime: "desc" }],
+            where: {
+                AND: [notSet("deleted"), notSet("isTemporary"), { tags: { contains: JSON.stringify(TRIGGER_THREAD_TAG) } }, { updatedAt: { gt: since } }],
+                lockedAt: { isNull: true },
+                title: { isNull: false, ne: "" },
+                userId,
+            },
+        });
+        const replies = await Promise.all(result.page.map(async (thread) => await newestUserReplyAt(ctx, thread._id, since)));
+
+        result.page.forEach((thread, index) => {
+            const updatedAt = replies[index];
+
+            if (updatedAt !== undefined && thread.title) {
+                replied.push({ title: thread.title, updatedAt });
+            }
+        });
+
+        cursor = result.isDone || replied.length >= QUIET_THREADS_READ ? undefined : (result.continueCursor ?? undefined);
+    } while (cursor !== undefined);
+
+    return replied;
 };
 
 const vItem = v.object({ at: v.number(), kind: v.string(), title: v.string() });
@@ -73,7 +120,7 @@ export const loadQuietSnapshot = internalQuery
         }),
     )
     .query(async ({ args: { since, userId }, ctx }): Promise<QuietSnapshot> => {
-        const [overview, recent, chats, runThreads, tasks] = await Promise.all([
+        const [overview, recent, chats, repliedThreads, tasks] = await Promise.all([
             loadHomeOverview(ctx, userId),
             // The ignored types are left out of the read itself, so a busy routine's notifications cannot fill the limit and hide a real one.
             ctx.db.notifications.findMany({
@@ -106,17 +153,8 @@ export const loadQuietSnapshot = internalQuery
                     userId,
                 },
             }),
-            // A routine's run threads updated in the window: only a user's reply in one can count (see below).
-            ctx.db.threads.findMany({
-                limit: QUIET_THREADS_READ,
-                orderBy: [{ updatedAt: "desc" }, { _creationTime: "desc" }],
-                where: {
-                    AND: [notSet("deleted"), notSet("isTemporary"), { tags: { contains: JSON.stringify(TRIGGER_THREAD_TAG) } }, { updatedAt: { gt: since } }],
-                    lockedAt: { isNull: true },
-                    title: { isNull: false, ne: "" },
-                    userId,
-                },
-            }),
+            // A routine's run threads updated in the window: only a user's reply in one can count.
+            repliedRunThreads(ctx, userId, since),
             // Any status: a task that finished (or failed) since the window start is activity, and is in neither overview section.
             // Tasks are deleted outright (no `deleted` column), and `userId` is the owner check the overview uses. `updatedAt` is required.
             ctx.db.tasks.findMany({
@@ -125,13 +163,6 @@ export const loadQuietSnapshot = internalQuery
                 where: { updatedAt: { gt: since }, userId },
             }),
         ]);
-
-        const replies = await Promise.all(runThreads.page.map(async (thread) => await newestUserReplyAt(ctx, thread._id, since)));
-        const repliedThreads = runThreads.page.flatMap((thread, index) => {
-            const updatedAt = replies[index];
-
-            return updatedAt !== undefined && thread.title ? [{ title: thread.title, updatedAt }] : [];
-        });
 
         return {
             events: [
