@@ -590,16 +590,17 @@ fn plan_call(
     home: Option<&Path>,
 ) -> Result<Option<Policy>, String> {
     match support {
-        Support::Available(_) if network_gap.is_some() && !allow_unsandboxed => Err(format!(
-            "shell commands must run sandboxed, and {}. To run them anyway, turn off \
-             \"Require sandbox for shell commands\" in this computer's device settings.",
-            network_gap.unwrap_or_default()
-        )),
-        Support::Available(_) => Ok(Some(Policy {
-            network: allow_network,
-            network_gap,
-            ..Policy::for_roots(roots, home)
-        })),
+        Support::Available(_) => match network_gap {
+            Some(reason) if !allow_unsandboxed => Err(format!(
+                "shell commands must run sandboxed, and {reason}. To run them anyway, turn off \
+                 \"Require sandbox for shell commands\" in this computer's device settings."
+            )),
+            network_gap => Ok(Some(Policy {
+                network: allow_network,
+                network_gap,
+                ..Policy::for_roots(roots, home)
+            })),
+        },
         Support::Unavailable(_) if allow_unsandboxed => Ok(None),
         Support::Unavailable(reason) => Err(format!(
             "shell commands must run sandboxed, and {reason}. To run them without a sandbox, \
