@@ -11,7 +11,7 @@ import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
-import { notifyNative } from "@/lib/native/bridge";
+import { notifyNative, setNativeBadge } from "@/lib/native/bridge";
 
 import useNotificationInbox from "../hooks/use-notification-inbox";
 import { findNewArrivals } from "../lib/new-arrivals";
@@ -37,6 +37,18 @@ const NotificationBell: FC<{ className?: string }> = ({ className }) => {
     const [open, setOpen] = useState(false);
     const [announcement, setAnnouncement] = useState("");
     const seen = useRef<Set<string> | undefined>(undefined);
+
+    useEffect(() => {
+        void setNativeBadge(unreadCount);
+    }, [unreadCount]);
+
+    // Clear the dock badge when the bell unmounts (sign-out), so it cannot outlive the account.
+    useEffect(
+        () => () => {
+            void setNativeBadge(0);
+        },
+        [],
+    );
 
     useEffect(() => {
         if (!loaded) {

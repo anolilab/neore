@@ -17,6 +17,7 @@ import {
     openNativeDeviceSettings,
     openThreadWindow,
     pairNativeDevice,
+    setNativeBadge,
     shouldNotifyReplyFinished,
     startNativeBrowserSignIn,
     supportsThreadWindows,
@@ -35,6 +36,7 @@ type Native = {
     onFiles?: ReturnType<typeof vi.fn>;
     onSignIn?: ReturnType<typeof vi.fn>;
     openThreadWindow?: ReturnType<typeof vi.fn>;
+    setBadge?: ReturnType<typeof vi.fn>;
     startBrowserSignIn?: ReturnType<typeof vi.fn>;
     takePendingCompose: ReturnType<typeof vi.fn>;
     takePendingFiles?: ReturnType<typeof vi.fn>;
@@ -435,5 +437,33 @@ describe("dock files", () => {
         installNative({ takePendingFiles: vi.fn(async () => []) });
 
         expect(await takePendingFiles()).toEqual([]);
+    });
+});
+
+describe("dock badge", () => {
+    it("sets the count through the shell, and does nothing outside it", async () => {
+        await expect(setNativeBadge(3)).resolves.toBeUndefined();
+
+        const native = installNative({ setBadge: vi.fn(async () => undefined) });
+
+        await setNativeBadge(7);
+
+        expect(native.setBadge).toHaveBeenCalledWith(7);
+    });
+
+    it("does nothing on a shell too old to have the badge", async () => {
+        installNative();
+
+        await expect(setNativeBadge(2)).resolves.toBeUndefined();
+    });
+
+    it("swallows a refused badge", async () => {
+        installNative({
+            setBadge: vi.fn(async () => {
+                throw new Error("untrusted sender");
+            }),
+        });
+
+        await expect(setNativeBadge(1)).resolves.toBeUndefined();
     });
 });
