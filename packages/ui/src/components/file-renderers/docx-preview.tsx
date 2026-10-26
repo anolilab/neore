@@ -19,6 +19,8 @@ import { Download, FileText } from "lucide-react";
 import type { FC } from "react";
 import { memo, useEffect, useState } from "react";
 
+import GenericFileCard from "./generic-file-card";
+
 export interface DocxPreviewProps {
     className?: string;
     filename?: string;
@@ -26,6 +28,7 @@ export interface DocxPreviewProps {
 }
 
 const DOCX_FETCH_TIMEOUT_MS = 30_000;
+const DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 const DocxPreview: FC<DocxPreviewProps> = memo(({ className, filename, url }) => {
     const { t } = useLingui();
@@ -92,26 +95,13 @@ const DocxPreview: FC<DocxPreviewProps> = memo(({ className, filename, url }) =>
 
     if (error) {
         return (
-            <a
-                className={cn(
-                    "group my-2 flex w-full max-w-sm items-center gap-3 rounded-lg border p-3 transition-colors",
-                    "hover:bg-accent hover:border-accent-foreground/20",
-                    className,
-                )}
-                download={filename}
-                href={url}
-                rel="noopener noreferrer"
-                target="_blank"
-            >
-                <div className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-md">
-                    <FileText aria-hidden="true" className="text-muted-foreground size-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{filename || t`Document`}</div>
-                    <div className="text-muted-foreground text-xs">{t`Could not preview · Click to download`}</div>
-                </div>
-                <Download aria-hidden="true" className="text-muted-foreground size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-            </a>
+            <GenericFileCard
+                className={className}
+                description={t`Could not preview · Click to download`}
+                filename={filename}
+                mediaType={DOCX_MEDIA_TYPE}
+                url={url}
+            />
         );
     }
 

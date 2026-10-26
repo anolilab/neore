@@ -4,12 +4,14 @@ import { useLingui } from "@lingui/react/macro";
 import cn from "@ui/utils/cn";
 import { Download, File, FileArchive, FileAudio, FileCode, FileImage, FileSpreadsheet, FileText, FileVideo } from "lucide-react";
 import type { FC } from "react";
-import { memo, useMemo } from "react";
+import { memo, useId, useMemo } from "react";
 
 import { formatFileSize } from "./file-type-utilities";
 
 export interface GenericFileCardProps {
     className?: string;
+    /** Replaces the type and size line, for a card that stands in for a preview that could not be shown. */
+    description?: string;
     filename?: string;
     fileSize?: number;
     mediaType?: string;
@@ -79,13 +81,15 @@ const getIconForFile = (mediaType?: string, filename?: string): FC<{ className?:
     return extensionMap[extension] ?? File;
 };
 
-const GenericFileCard: FC<GenericFileCardProps> = memo(({ className, filename, fileSize, mediaType, url }) => {
+const GenericFileCard: FC<GenericFileCardProps> = memo(({ className, description, filename, fileSize, mediaType, url }) => {
     const { t } = useLingui();
     const Icon = useMemo(() => getIconForFile(mediaType, filename), [mediaType, filename]);
     const displayName = filename || t`Download file`;
+    const descriptionId = useId();
 
     return (
         <a
+            aria-describedby={description ? descriptionId : undefined}
             aria-label={t`Download ${displayName}`}
             className={cn(
                 "group my-2 flex w-full max-w-sm items-center gap-3 rounded-lg border p-3 transition-colors",
@@ -102,10 +106,14 @@ const GenericFileCard: FC<GenericFileCardProps> = memo(({ className, filename, f
             </div>
             <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{displayName}</div>
-                <div className="text-muted-foreground text-xs">
-                    {mediaType && <span>{mediaType}</span>}
-                    {mediaType && fileSize != null && " · "}
-                    {fileSize != null && <span>{formatFileSize(fileSize)}</span>}
+                <div className="text-muted-foreground text-xs" id={descriptionId}>
+                    {description ?? (
+                        <>
+                            {mediaType && <span>{mediaType}</span>}
+                            {mediaType && fileSize != null && " · "}
+                            {fileSize != null && <span>{formatFileSize(fileSize)}</span>}
+                        </>
+                    )}
                 </div>
             </div>
             <Download aria-hidden="true" className="text-muted-foreground size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />

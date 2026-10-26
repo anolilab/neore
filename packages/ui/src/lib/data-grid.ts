@@ -188,6 +188,9 @@ export const scrollCellIntoView = <TData extends RowData>(params: {
 export const getIsInPopover = (element: unknown): boolean =>
     element instanceof Element && (element.closest("[data-grid-cell-editor]") || element.closest("[data-grid-popover]")) !== null;
 
+/** Pulls the popover up over the cell so the editor opens on top of it. */
+export const overlapAnchor = ({ anchor }: { anchor: { height: number } }) => -anchor.height;
+
 export const getColumnVariant = (
     variant?: CellOptions["variant"],
 ): {

@@ -456,13 +456,14 @@ const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summa
 };
 
 /**
- * Bookkeeping after a streamed run, fire-and-forget: the reply's timing, the
- * memories its prompt carried, and — when `extractMemory` is set — memory
- * extraction from the exchange plus the activity stamp nightly reflection
- * schedules from (`memory/reflection.ts`). Billing is not here; the LLM Gateway
- * usage webhook owns it.
+ * Bookkeeping after a streamed run: the reply's timing (awaited before this
+ * returns, so the action does not end with it in flight), the memories its
+ * prompt carried, and — when `extractMemory` is set — memory extraction from
+ * the exchange plus the activity stamp nightly reflection schedules from
+ * (`memory/reflection.ts`). Billing is not here; the LLM Gateway usage webhook
+ * owns it.
  */
-export const afterRun = (
+export const afterRun = async (
     ctx: Pick<ActionCtx, "runMutation" | "scheduler">,
     args: {
         /** The bot the run is for, so its memory extraction stays in that bot's scope. */
@@ -485,37 +486,66 @@ export const afterRun = (
         timingStart: number;
         userId: string;
     },
-): void => {
-    const { firstTokenTime, prompt, savedMessages = [], steeredTexts = [], threadId, timingStart, userId } = args;
+): Promise<void> => {
+    const { firstTokenTime, savedMessages = [], timingStart } = args;
     const lastAssistantMessage = savedMessages.findLast((m) => !m.tool);
 
-    if (lastAssistantMessage) {
-        void ctx.runMutation(internal.agent.messages.patchMessageTiming, {
-            durationMs: Date.now() - timingStart,
-            messageId: lastAssistantMessage._id as Id<"messages">,
-            ...(firstTokenTime !== undefined && { ttftMs: firstTokenTime - timingStart }),
-        });
+    // Started first so it runs beside the scheduling below, awaited last so a
+    // returning action never leaves it in flight. A failed patch only loses a timing.
+    const timing = lastAssistantMessage
+        ? (async () =>
+              ctx.runMutation(internal.agent.messages.patchMessageTiming, {
+                  durationMs: Date.now() - timingStart,
+                  messageId: lastAssistantMessage._id as Id<"messages">,
+                  ...(firstTokenTime !== undefined && { ttftMs: firstTokenTime - timingStart }),
+              }))().catch((error: unknown) => {
+              streamLogger.warn("[afterRun] Recording the reply's timing failed:", error);
+          })
+        : undefined;
+
+    try {
+        const results = await scheduleAfterRun(ctx, args);
+
+        for (const result of results) {
+            if (result.status === "rejected") {
+                streamLogger.warn("[afterRun] Scheduling the post-run work failed:", result.reason);
+            }
+        }
+    } catch (error) {
+        streamLogger.warn("[afterRun] Scheduling the post-run work failed:", error);
     }
+
+    await timing;
+};
+
+/** Schedules every post-run job and settles once each `runAfter` has; a rejected one is in the result, not thrown. */
+const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Parameters<typeof afterRun>[1]): Promise<PromiseSettledResult<unknown>[]> => {
+    const { prompt, savedMessages = [], steeredTexts = [], threadId, userId } = args;
+    const scheduled: Promise<unknown>[] = [];
 
     const firstReplyRow = savedMessages.find((m) => m.message?.role !== "user");
 
     // The citation chips behind the reply's `[n]`. Messages live on the thread's
     // shard, which is where this runs.
     if (firstReplyRow && args.knowledgeSources && args.knowledgeSources.length > 0) {
-        void ctx.scheduler.runAfter(0, internal.knowledge.functions.recordKnowledgeSources, {
-            messageId: firstReplyRow._id as Id<"messages">,
-            sources: [...args.knowledgeSources],
-        });
+        scheduled.push(
+            ctx.scheduler.runAfter(0, internal.knowledge.functions.recordKnowledgeSources, {
+                messageId: firstReplyRow._id as Id<"messages">,
+                sources: [...args.knowledgeSources],
+            }),
+        );
     }
 
     // The "memories used" popover reads the memory rows on the THREAD's shard;
     // a collaborator's memories are on their own, so theirs are not recorded.
     if (firstReplyRow && args.retrievedMemories && args.retrievedMemories.length > 0 && servesUser(userId)) {
-        void ctx.scheduler.runAfter(0, internal.memory.functions.recordRetrievedMemories, {
-            memories: [...args.retrievedMemories],
-            messageId: firstReplyRow._id as Id<"messages">,
-            userId,
-        });
+        scheduled.push(
+            ctx.scheduler.runAfter(0, internal.memory.functions.recordRetrievedMemories, {
+                memories: [...args.retrievedMemories],
+                messageId: firstReplyRow._id as Id<"messages">,
+                userId,
+            }),
+        );
     }
 
     // Daily Brief (`notifications/daily-brief.ts`): activity keeps the next
@@ -523,7 +553,7 @@ export const afterRun = (
     // job is a no-op read for everyone else, and scheduling it on every reply
     // would put one job per reply on the user's lane.
     if (servesUser(userId) && shouldNoteBriefActivity(userId)) {
-        void ctx.scheduler.runAfter(0, internal.notifications.daily_brief.noteDailyBriefActivity, { userId });
+        scheduled.push(ctx.scheduler.runAfter(0, internal.notifications.daily_brief.noteDailyBriefActivity, { userId }));
     }
 
     // Usage heatmap + per-skill breakdown (`usage/activity.ts`), on the user's own shard.
@@ -536,7 +566,7 @@ export const afterRun = (
     }
 
     if (!args.extractMemory || !prompt) {
-        return;
+        return await Promise.allSettled(scheduled);
     }
 
     // Memory is the USER's: in a thread someone shared, the extraction runs on
@@ -547,7 +577,7 @@ export const afterRun = (
             ? await ctx.scheduler.runAfter(0, target as never, jobArgs as never)
             : await runAfterOnShard(ctx.scheduler, 0, target, jobArgs, memoryShard);
 
-    void scheduleMemory(internal.memory.reflection.noteMemoryActivity, { userId });
+    scheduled.push(scheduleMemory(internal.memory.reflection.noteMemoryActivity, { userId }));
 
     const assistantText = savedMessages
         .filter((m) => !m.tool && m.message?.role === "assistant")
@@ -556,21 +586,25 @@ export const afterRun = (
         .join("\n");
 
     if (assistantText.length === 0) {
-        return;
+        return await Promise.allSettled(scheduled);
     }
 
     const toolResults = summariseToolResults(savedMessages);
 
-    void scheduleMemory(internal.memory.extract.extractMemories, {
-        ...(args.botId && { botId: args.botId }),
-        assistantResponse: assistantText.slice(0, 4000),
-        threadId: threadId as Id<"threads">,
-        userId,
-        // A steer can carry the very fact worth keeping ("actually, I'm vegetarian"); `steeredFrom` keeps it whole when a long prompt is cut.
-        userMessage: [prompt, ...steeredTexts].join("\n\n"),
-        ...(steeredTexts.length > 0 && { steeredFrom: prompt.length + 2 }),
-        ...(toolResults.length > 0 && { toolResults: toolResults.slice(0, 10) }),
-    });
+    scheduled.push(
+        scheduleMemory(internal.memory.extract.extractMemories, {
+            ...(args.botId && { botId: args.botId }),
+            assistantResponse: assistantText.slice(0, 4000),
+            threadId: threadId as Id<"threads">,
+            userId,
+            // A steer can carry the very fact worth keeping ("actually, I'm vegetarian"); `steeredFrom` keeps it whole when a long prompt is cut.
+            userMessage: [prompt, ...steeredTexts].join("\n\n"),
+            ...(steeredTexts.length > 0 && { steeredFrom: prompt.length + 2 }),
+            ...(toolResults.length > 0 && { toolResults: toolResults.slice(0, 10) }),
+        }),
+    );
+
+    return await Promise.allSettled(scheduled);
 };
 
 /**
@@ -955,7 +989,7 @@ export const resumeApprovedRun = async (
             // The run that paused extracted its own prompt and steers; this one extracts the steers it took.
             const steered = steering?.steeredTexts() ?? [];
 
-            afterRun(ctx, {
+            await afterRun(ctx, {
                 ...(config.memory?.botId && { botId: config.memory.botId }),
                 extractMemory: extractMemory && config.memory !== undefined && prefs.memoryEnabled,
                 firstTokenTime,

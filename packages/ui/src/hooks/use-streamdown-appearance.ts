@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
 /**
  * The user's code-highlight and Mermaid theme choice, read by the Streamdown
@@ -73,6 +73,24 @@ const getSnapshot = (): StreamdownAppearance => store.current;
 
 const getServerSnapshot = (): StreamdownAppearance => DEFAULT_STREAMDOWN_APPEARANCE;
 
-const useStreamdownAppearance = (): StreamdownAppearance => useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+/** What Streamdown's `mermaid` prop takes: the user's diagram theme. */
+export type StreamdownMermaidConfig = { config: { theme: string } };
+
+/**
+ * The appearance plus the Mermaid config built from it. The config keeps its
+ * identity until the theme changes, so every Streamdown that takes it (the
+ * chat text, the Mermaid file preview) re-renders its diagrams only then.
+ */
+const useStreamdownAppearance = (): StreamdownAppearance & { mermaid: StreamdownMermaidConfig } => {
+    const appearance = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+    const { mermaidTheme } = appearance;
+    const mermaid = useMemo<StreamdownMermaidConfig>(() => {
+        return { config: { theme: mermaidTheme } };
+    }, [mermaidTheme]);
+
+    return useMemo(() => {
+        return { ...appearance, mermaid };
+    }, [appearance, mermaid]);
+};
 
 export default useStreamdownAppearance;

@@ -586,11 +586,17 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         // 8. Trigger session compression if thread memory count is growing large.
         // Compression stays inside one scope: a bot's rows compress into that bot's rows.
         if (args.threadId && memoriesToSave.length > 0) {
-            void ctx.runAction(internal.memory.compress.maybeCompressThreadMemories, {
-                botId: args.botId,
-                threadId: args.threadId,
-                userId: args.userId,
-            });
+            // Its own scheduled job, so it gets its own budget and is not cut off when this action returns.
+            // Never fatal: the memories are already saved, compression is a later tidy-up.
+            try {
+                await ctx.scheduler.runAfter(0, internal.memory.compress.maybeCompressThreadMemories, {
+                    botId: args.botId,
+                    threadId: args.threadId,
+                    userId: args.userId,
+                });
+            } catch (error) {
+                console.error("[memory/extract] Scheduling compression failed:", error);
+            }
         }
     });
 

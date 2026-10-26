@@ -6,6 +6,13 @@ import { describe, expect, it } from "vitest";
 
 import { loadHeavyStreamdownPlugins, needsHeavyStreamdownPlugins } from "./use-streamdown-plugins";
 
+describe("mermaid fences", () => {
+    it("routes a fence that opens a numbered list item to the heavy plugin set", () => {
+        expect(needsHeavyStreamdownPlugins("1. ```mermaid\ngraph TD\n```")).toBe(true);
+        expect(needsHeavyStreamdownPlugins("2) ```mermaid\ngraph TD\n```")).toBe(true);
+    });
+});
+
 describe("mhchem formulas", () => {
     it(String.raw`routes inline \(...\) formulas to the heavy plugin set`, () => {
         expect(needsHeavyStreamdownPlugins(String.raw`Water is \(\ce{H2O}\).`)).toBe(true);

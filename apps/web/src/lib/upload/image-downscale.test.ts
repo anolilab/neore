@@ -9,6 +9,7 @@ import {
     nextAttempt,
     pngHasAlpha,
     TARGET_IMAGE_BYTES,
+    webpIsAnimatedOrTransparent,
 } from "./image-downscale";
 
 const MEGABYTE = 1024 * 1024;
@@ -149,6 +150,44 @@ describe(pngHasAlpha, () => {
 
         expect(pngHasAlpha(jpeg)).toBe(true);
         expect(pngHasAlpha(new Uint8Array(4))).toBe(true);
+    });
+});
+
+/** A WebP head: RIFF header, then a first chunk of `type` whose payload starts with `payload`. */
+const webpHead = (type: string, payload: number[]): Uint8Array =>
+    new Uint8Array([
+        ...[..."RIFF"].map((c) => c.codePointAt(0) ?? 0),
+        ...zeros(4),
+        ...[..."WEBP"].map((c) => c.codePointAt(0) ?? 0),
+        ...[...type].map((c) => c.codePointAt(0) ?? 0),
+        ...zeros(4),
+        ...payload,
+        ...zeros(8),
+    ]);
+
+describe(webpIsAnimatedOrTransparent, () => {
+    it("is false for a lossy still", () => {
+        const lossy = zeros(10);
+
+        expect(webpIsAnimatedOrTransparent(webpHead("VP8 ", lossy))).toBe(false);
+    });
+
+    it("reads the animation and alpha flags of an extended file", () => {
+        expect(webpIsAnimatedOrTransparent(webpHead("VP8X", [0x00, 0, 0, 0]))).toBe(false);
+        expect(webpIsAnimatedOrTransparent(webpHead("VP8X", [0x02, 0, 0, 0]))).toBe(true);
+        expect(webpIsAnimatedOrTransparent(webpHead("VP8X", [0x10, 0, 0, 0]))).toBe(true);
+    });
+
+    it("reads the alpha bit of a lossless file", () => {
+        expect(webpIsAnimatedOrTransparent(webpHead("VP8L", [0x2f, 0, 0, 0, 0x00]))).toBe(false);
+        expect(webpIsAnimatedOrTransparent(webpHead("VP8L", [0x2f, 0, 0, 0, 0x10]))).toBe(true);
+    });
+
+    it("is true for bytes that are not a WebP", () => {
+        const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...zeros(40)]);
+
+        expect(webpIsAnimatedOrTransparent(jpeg)).toBe(true);
+        expect(webpIsAnimatedOrTransparent(new Uint8Array(4))).toBe(true);
     });
 });
 

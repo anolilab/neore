@@ -664,10 +664,12 @@ const registerIpc = (): void => {
         showNotification(clampedTitle, clampedBody || undefined);
     });
 
+    // Main window only: a thread window's bell shows the same count, but two windows publishing in turn
+    // could leave an older count on the dock.
     ipcMain.handle(
         CHANNEL.setBadge,
         createSetBadgeHandler({
-            isTrusted,
+            isTrusted: isMainWindow,
             platform: process.platform,
             setBadgeCount: (count) => app.setBadgeCount(count),
         }),

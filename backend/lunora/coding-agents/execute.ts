@@ -24,16 +24,7 @@ import { createE2BSandboxProvider, killE2BSandbox } from "./sandbox-provider";
 import { enqueueJob } from "../lib/job-queue";
 import { expandSecrets, redactSecrets } from "./redact";
 import type { PullRequestApi, SandboxHandle } from "./runner";
-import {
-    checkPullRequest,
-    finalizeRun,
-    openPullRequestForBranch,
-    pollRun,
-    PR_SANDBOX_TIMEOUT_MS,
-    pullRequestProblem,
-    startPullRequest,
-    startRun,
-} from "./runner";
+import { checkPullRequest, finalizeRun, openPullRequestForBranch, pollRun, PR_BUDGET_MS, pullRequestProblem, startPullRequest, startRun } from "./runner";
 
 const NOT_CONFIGURED = "Coding agents are not available on this server (no sandbox provider is configured).";
 
@@ -339,6 +330,7 @@ const startPullRequestForRun = async (
         const { followUp } = await ctx.runMutation(internal.coding_agents.functions.completePullRequest, {
             log: `Could not open the pull request: ${error}\n`,
             runId,
+            startedAt: claim.startedAt,
         });
 
         if (followUp) {
@@ -365,9 +357,21 @@ const startPullRequestForRun = async (
         return await fail(started.error ?? "the sandbox did not start");
     }
 
-    await ctx.runMutation(internal.coding_agents.functions.setPullRequestSandbox, { runId, sandboxId: started.sandboxId });
+    const attached = await ctx.runMutation(internal.coding_agents.functions.setPullRequestSandbox, {
+        runId,
+        sandboxId: started.sandboxId,
+        startedAt: claim.startedAt,
+    });
+
+    if (!attached) {
+        // The attempt was reaped or reclaimed while the sandbox started: nothing tracks this one.
+        await killE2BSandbox(E2B_API_KEY, started.sandboxId);
+
+        return { error: "The pull request attempt was superseded." };
+    }
+
     await ctx.runMutation(internal.coding_agents.functions.appendRunLog, { runId, text: "Opening a pull request…\n" });
-    await enqueueJob(internal.coding_agents.execute.pollPullRequest, { runId, seq: claim.pollSeq }, { delayMs: POLL_INTERVAL_MS });
+    await enqueueJob(internal.coding_agents.execute.pollPullRequest, { runId, seq: claim.pollSeq, startedAt: claim.startedAt }, { delayMs: POLL_INTERVAL_MS });
 
     return { started: true };
 };
@@ -409,20 +413,20 @@ export const finishRun = internalAction
  * record it, and post the follow-ups that were waiting on it.
  */
 export const pollPullRequest = internalAction
-    .input({ runId: v.id("codingAgentRuns"), seq: v.number() })
+    .input({ runId: v.id("codingAgentRuns"), seq: v.number(), startedAt: v.number() })
     .output(v.null())
-    .action(async ({ args: { runId, seq }, ctx }) => {
-        // At-least-once delivery: only the first delivery of `seq` polls.
-        if (!(await ctx.runMutation(internal.coding_agents.functions.claimPoll, { runId, seq }))) {
+    .action(async ({ args: { runId, seq, startedAt }, ctx }) => {
+        // At-least-once delivery: only the first delivery of `seq` polls, and only for the attempt that is still pending.
+        if (!(await ctx.runMutation(internal.coding_agents.functions.claimPoll, { prStartedAt: startedAt, runId, seq }))) {
             return null;
         }
 
         const next = async (): Promise<void> => {
-            await enqueueJob(internal.coding_agents.execute.pollPullRequest, { runId, seq: seq + 1 }, { delayMs: POLL_INTERVAL_MS });
+            await enqueueJob(internal.coding_agents.execute.pollPullRequest, { runId, seq: seq + 1, startedAt }, { delayMs: POLL_INTERVAL_MS });
         };
         const pr = await ctx.runQuery(internal.coding_agents.functions.getPullRequestForPoll, { runId });
 
-        if (!pr || !E2B_API_KEY) {
+        if (!pr || pr.startedAt !== startedAt || !E2B_API_KEY) {
             return null;
         }
 
@@ -431,6 +435,7 @@ export const pollPullRequest = internalAction
                 log,
                 ...(prUrl !== undefined && { prUrl }),
                 runId,
+                startedAt,
             });
 
             if (followUp) {
@@ -438,7 +443,7 @@ export const pollPullRequest = internalAction
             }
         };
 
-        if (!pr.sandboxId || Date.now() - pr.startedAt > PR_SANDBOX_TIMEOUT_MS + 60_000) {
+        if (!pr.sandboxId || Date.now() - pr.startedAt > PR_BUDGET_MS) {
             if (pr.sandboxId) {
                 await killE2BSandbox(E2B_API_KEY, pr.sandboxId);
             }
@@ -537,6 +542,32 @@ export const reapRun = internalAction
         }
 
         await ctx.scheduler.runAfter(0, internal.coding_agents.execute.finishRun, { runId: args.runId });
+
+        return null;
+    });
+
+/**
+ * Fails a PR attempt nothing finished (its poll chain broke), kills its sandbox
+ * and posts the follow-ups that were waiting on it. Acts only for the attempt it
+ * was scheduled for.
+ */
+export const reapPullRequest = internalAction
+    .input({ runId: v.id("codingAgentRuns"), startedAt: v.number() })
+    .output(v.null())
+    .action(async ({ args, ctx }) => {
+        const expired = await ctx.runMutation(internal.coding_agents.functions.expirePullRequest, args);
+
+        if (!expired) {
+            return null;
+        }
+
+        if (expired.sandboxId && E2B_API_KEY) {
+            await killE2BSandbox(E2B_API_KEY, expired.sandboxId);
+        }
+
+        if (expired.followUp) {
+            await postFollowUps(ctx, args.runId);
+        }
 
         return null;
     });

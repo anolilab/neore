@@ -225,25 +225,9 @@ for a schema table that is neither policed nor listed:
 | `auth_invitations.listInvitations` | action | adminAction | — | admin role | ok |
 | `auth_invitations.pruneInvitations` | action | adminAction | — | admin role | ok |
 | `auth_invitations.revokeInvitation` | action | adminAction | — | admin role | ok |
-| `auth_organization.acceptInvitation` | mutation | authMutation | — | caller-scoped (ctx.user) | ok |
-| `auth_organization.cancelInvitation` | mutation | authMutation + RL | — | org membership/role | ok |
 | `auth_organization.checkSlug` | query | authQuery | — | none needed (boolean) | ok |
-| `auth_organization.createOrganization` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
-| `auth_organization.deleteOrganization` | mutation | authMutation | — | org membership/role | ok |
-| `auth_organization.getActiveMember` | query | authQuery | member | caller-scoped (ctx.user) | ok |
-| `auth_organization.getOrganization` | query | authQuery | — | org membership/role | **fixed** (low) — members only; non-members get null like an unknown slug |
-| `auth_organization.getOrganizationOverview` | query | authQuery | invitation | caller-scoped (ctx.user) | accepted — the invite link is the capability |
-| `auth_organization.inviteMember` | mutation | authMutation + RL | — | org membership/role | **fixed** (medium, dormant) — only an owner invites an owner |
-| `auth_organization.leaveOrganization` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
-| `auth_organization.listMembers` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `auth_organization.listOrganizations` | query | authQuery | — | org membership/role | ok |
-| `auth_organization.listPendingInvitations` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `auth_organization.listUserInvitations` | query | authQuery | invitation | caller-scoped (ctx.user) | ok |
-| `auth_organization.rejectInvitation` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
-| `auth_organization.removeMember` | mutation | authMutation + RL | — | org membership/role | ok |
-| `auth_organization.setActiveOrganization` | mutation | authMutation + RL | — | better-auth membership check | ok |
-| `auth_organization.updateMemberRole` | mutation | authMutation + RL | member | org membership/role | **fixed** (high, dormant) — member must be in the active org; only an owner grants owner |
-| `auth_organization.updateOrganization` | mutation | authMutation + RL | — | org membership/role | ok |
 | `auth_team.addTeamMember` | mutation | authMutation + RL | member, team, teamMember | caller-scoped (ctx.user) | **fixed** (medium) — org owner/admin or team admin; any org member could add anyone |
 | `auth_team.createTeam` | mutation | authMutation + RL | team | caller-scoped (ctx.user) | ok |
 | `auth_team.deleteTeam` | mutation | authMutation + RL | team, teamMember | caller-scoped (ctx.user) | ok |

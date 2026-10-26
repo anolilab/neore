@@ -32,7 +32,7 @@ const MIN_QUALITY = 0.6;
 const QUALITY_STEP = 0.15;
 const SHRINK_MARGIN = 0.92;
 
-/** What gets re-encoded. GIF (animation), SVG (vector) and icons are left alone. */
+/** What gets re-encoded. GIF (animation), SVG (vector) and icons are left alone, and so are transparent PNGs and transparent or animated WebPs. */
 const REENCODABLE_TYPES: ReadonlySet<string> = new Set(["image/bmp", "image/jpeg", "image/png", "image/webp"]);
 
 /** The one type every re-encoded photo has: its leading bytes pass the server's sniff and it is on the allowlist. */
@@ -45,7 +45,7 @@ export interface EncodeAttempt {
     width: number;
 }
 
-/** Whether a file of this type and size is re-encoded at all. A PNG with alpha is a further check, on its bytes. */
+/** Whether a file of this type and size is re-encoded at all. A PNG or WebP with alpha, or an animated WebP, is a further check, on its bytes. */
 export const isOversizedImage = (file: { size: number; type: string }): boolean => REENCODABLE_TYPES.has(file.type) && file.size > TARGET_IMAGE_BYTES;
 
 /** The first encode of an image of `width` × `height`: the long edge clamped to {@link MAX_IMAGE_EDGE}. */
@@ -75,8 +75,8 @@ export const nextAttempt = (previous: EncodeAttempt, outputBytes: number): Encod
     return { height: Math.max(1, Math.floor(previous.height * scale)), quality: previous.quality, width: Math.max(1, Math.floor(previous.width * scale)) };
 };
 
-/** Bytes of a PNG's head to read for {@link pngHasAlpha}: its transparency chunk comes before the image data. */
-const PNG_HEAD_BYTES = 256 * 1024;
+/** Bytes of a PNG's or WebP's head to read for {@link pngHasAlpha} and {@link webpIsAnimatedOrTransparent}: both keep their flags before the image data. */
+const HEAD_BYTES = 256 * 1024;
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const IHDR_COLOR_TYPE_OFFSET = 25;
@@ -122,6 +122,40 @@ export const pngHasAlpha = (head: Uint8Array): boolean => {
     return true;
 };
 
+/* eslint-disable no-bitwise -- WebP flags are bits of one byte */
+const WEBP_FLAGS_OFFSET = 20;
+const WEBP_VP8L_ALPHA_OFFSET = 24;
+const WEBP_VP8X_ANIMATION_AND_ALPHA = 0x12;
+const WEBP_VP8L_ALPHA = 0x10;
+
+/**
+ * Whether a WebP is animated or can carry transparency, either of which a JPEG
+ * would flatten. A lossy still (`VP8 `), an extended file whose flags set neither,
+ * or a lossless one without its alpha bit is plain; a head that is not a WebP
+ * answers "yes", so the file is left as it is.
+ */
+export const webpIsAnimatedOrTransparent = (head: Uint8Array): boolean => {
+    if (head.length <= WEBP_VP8L_ALPHA_OFFSET || ascii(head, 0, 4) !== "RIFF" || ascii(head, 8, 4) !== "WEBP") {
+        return true;
+    }
+
+    switch (ascii(head, 12, 4)) {
+        case "VP8 ": {
+            return false;
+        }
+        case "VP8L": {
+            return ((head[WEBP_VP8L_ALPHA_OFFSET] ?? 0) & WEBP_VP8L_ALPHA) !== 0;
+        }
+        case "VP8X": {
+            return ((head[WEBP_FLAGS_OFFSET] ?? 0) & WEBP_VP8X_ANIMATION_AND_ALPHA) !== 0;
+        }
+        default: {
+            return true;
+        }
+    }
+};
+/* eslint-enable no-bitwise */
+
 const drawn = (bitmap: ImageBitmap, { height, width }: EncodeAttempt): HTMLCanvasElement => {
     const canvas = document.createElement("canvas");
 
@@ -165,8 +199,12 @@ export const downscaleOversizedImage = async (file: File): Promise<File> => {
     }
 
     try {
-        if (file.type === "image/png" && pngHasAlpha(new Uint8Array(await file.slice(0, PNG_HEAD_BYTES).arrayBuffer()))) {
-            return file;
+        if (file.type === "image/png" || file.type === "image/webp") {
+            const head = new Uint8Array(await file.slice(0, HEAD_BYTES).arrayBuffer());
+
+            if (file.type === "image/png" ? pngHasAlpha(head) : webpIsAnimatedOrTransparent(head)) {
+                return file;
+            }
         }
 
         const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
