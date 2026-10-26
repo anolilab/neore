@@ -246,7 +246,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                         />
                     </div>
                 )}
-                {formData.type === "schedule" && formData.botId !== "" && (
+                {formData.type === "schedule" && bots.some((bot) => bot._id === formData.botId) && (
                     <div className="flex items-center justify-between gap-4">
                         <div>
                             <Label htmlFor={quietId}>{t`Only post when there is something to report`}</Label>
