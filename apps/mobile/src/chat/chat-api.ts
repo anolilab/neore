@@ -22,6 +22,21 @@ export class ChatError extends Error {
     }
 }
 
+/** The gateway sends either a string or `{ code, message }` (a rate limit, for one); anything else keeps the status message. */
+const errorMessage = (body: { error?: unknown }): string | undefined => {
+    const { error } = body;
+
+    if (typeof error === "string") {
+        return error;
+    }
+
+    if (typeof error === "object" && error !== null && typeof (error as { message?: unknown }).message === "string") {
+        return (error as { message: string }).message;
+    }
+
+    return undefined;
+};
+
 /** Same bound as the web app's default third-party deadline (backend fetch-timeout). The reply stream is not bounded. */
 export const CHAT_START_TIMEOUT_MS = 15_000;
 
@@ -39,15 +54,15 @@ export const startChat = async (input: { body: StartChatBody; fetch: Fetch; gate
         });
 
         if (!response.ok) {
-            let body: { error?: string } = {};
+            let body: { error?: unknown } = {};
 
             try {
-                body = (await response.json()) as { error?: string };
+                body = (await response.json()) as { error?: unknown };
             } catch {
                 // A body that is not JSON keeps the status-based message.
             }
 
-            throw new ChatError(body.error ?? `Could not send (${response.status}).`);
+            throw new ChatError(errorMessage(body) ?? `Could not send (${response.status}).`);
         }
 
         return (await response.json()) as StartedChat;
