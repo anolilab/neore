@@ -115,10 +115,24 @@ const renderPrompt = (prompt: Prompt | null): void => {
         }
     }, CLICK_THROUGH_GUARD_MS);
 
-    const tick = () => {
-        const seconds = Math.max(0, Math.round((prompt.expiresAt - Date.now()) / 1000));
+    // The core drops an expired prompt without an event, so a queued one behind it would stay hidden. Ask once
+    // at the deadline; if the core still holds the expired prompt, the next tick asks again, at most once a second.
+    let asked = false;
 
-        setText("prompt-expiry", `Denied automatically in ${String(seconds)} s.`);
+    const tick = () => {
+        const remaining = prompt.expiresAt - Date.now();
+
+        if (remaining <= 0) {
+            if (!asked) {
+                asked = true;
+                clearInterval(state.expiryTimer);
+                refreshPrompt();
+            }
+
+            return;
+        }
+
+        setText("prompt-expiry", `Denied automatically in ${String(Math.round(remaining / 1000))} s.`);
     };
 
     tick();
