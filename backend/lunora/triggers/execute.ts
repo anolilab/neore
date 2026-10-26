@@ -75,6 +75,10 @@ export const executeTrigger = internalAction
         const systemPrompt = [bot?.instructions, trigger.systemPrompt].filter(Boolean).join("\n\n") || undefined;
         const triggerType = trigger.type;
 
+        // When the agent run began. A quiet routine's next window starts here, not at the end of the run:
+        // what happens while the agent works (up to 25 steps) is not in this run's output.
+        let runStartedAt: number | undefined;
+
         // 2. Create execution log entry
         const executionId = await ctx.runMutation(internal.triggers.functions.createExecution, {
             payload,
@@ -148,6 +152,9 @@ export const executeTrigger = internalAction
             // Headless runs drop `ask` tools, so each one still needs the owner's `auto` setting.
             // A bot with its computer off gets no computer here: the sandbox lookup would fall back to a throwaway one.
             const useComputer = bot?.computerEnabled === true && trigger.botComputer === true && trigger.type === "schedule";
+
+            runStartedAt = Date.now();
+
             const { text: responseText, threadId } = await runHeadlessAgent(ctx, {
                 botId: bot ? trigger.botId : undefined,
                 memory: true,
@@ -170,7 +177,7 @@ export const executeTrigger = internalAction
 
             // 6. Update trigger stats
             await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
-                lastTriggeredAt: Date.now(),
+                lastTriggeredAt: runStartedAt,
                 triggerId,
             });
 
@@ -191,7 +198,8 @@ export const executeTrigger = internalAction
             // Update trigger stats with error
             await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
                 error: errorMessage.slice(0, 500),
-                lastTriggeredAt: Date.now(),
+                // An error before the agent started (a thrown admission failure) has no start time; it counts as a run from now.
+                lastTriggeredAt: runStartedAt ?? Date.now(),
                 triggerId,
             });
         }

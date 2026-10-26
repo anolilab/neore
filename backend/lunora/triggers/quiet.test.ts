@@ -11,11 +11,11 @@ const MANUAL = { manual: true };
 const SCHEDULED = { manual: false };
 
 describe("quietWindowStart", () => {
-    it("starts at the last finished run", () => {
+    it("starts when the last run began", () => {
         expect(quietWindowStart({ createdAt: 100, lastTriggeredAt: 500 })).toBe(500);
     });
 
-    it("starts at creation before any run has finished", () => {
+    it("starts at creation before any run has begun", () => {
         expect(quietWindowStart({ createdAt: 100 })).toBe(100);
     });
 });

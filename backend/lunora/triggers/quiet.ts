@@ -16,9 +16,11 @@
  *    routines would wake each other forever. A thread is a run's by that tag, set
  *    when the run creates it, never by its title: a user can rename any chat.
  *
- * The window starts at `lastTriggeredAt`, which a run sets once it has reached the
- * agent and either completed or failed, a manual "Run now" included. A skipped run
- * and a run refused at admission (daily limit, disallowed model) do not move it.
+ * The window starts at `lastTriggeredAt`: the moment the last run began its agent
+ * (not when it ended, so what happened while the agent worked is reported by the
+ * next run). A run sets it whether it completed or failed, a manual "Run now"
+ * included. A skipped run and a run refused at admission (daily limit, disallowed
+ * model) do not move it.
  *
  * The check runs before the run writes anything, so a skipped run creates no
  * thread, sends no notification and is not charged.
@@ -73,7 +75,7 @@ export const quietBriefInputs = (snapshot: QuietSnapshot, since: number): BriefI
     };
 };
 
-/** Where the window starts: the last run that reached the agent (completed or failed), or the routine's creation before any. */
+/** Where the window starts: when the last run that reached the agent began, or the routine's creation before any. */
 export const quietWindowStart = (trigger: { createdAt: number; lastTriggeredAt?: number }): number => trigger.lastTriggeredAt ?? trigger.createdAt;
 
 /**

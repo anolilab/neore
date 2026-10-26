@@ -16,6 +16,7 @@ const state = vi.hoisted(() => {
     return {
         bot: null as Record<string, unknown> | null,
         mutations: [] as { args: unknown; name: string }[],
+        onRun: undefined as (() => void) | undefined,
         queries: [] as string[],
         runs: [] as Record<string, unknown>[],
         snapshot: null as unknown as QuietSnapshot,
@@ -28,6 +29,7 @@ vi.mock("../chat/lib/headless-run", () => {
     return {
         runHeadlessAgent: async (_ctx: unknown, options: Record<string, unknown>) => {
             state.runs.push(options);
+            state.onRun?.();
 
             return { text: "Here is the digest.", threadId: "thread-1" };
         },
@@ -85,6 +87,7 @@ beforeEach(() => {
     state.snapshot = EMPTY;
     state.snapshotError = false;
     state.mutations = [];
+    state.onRun = undefined;
     state.queries = [];
     state.runs = [];
     state.trigger = {
@@ -103,6 +106,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
 });
 
@@ -201,5 +205,52 @@ describe("a quiet routine's run", () => {
 
         expect(state.runs).toHaveLength(0);
         expect(names()).toContain("recordFilteredExecution");
+    });
+});
+
+describe("the window a run leaves for the next one", () => {
+    const START = 10_000;
+    const DURATION = 90_000;
+
+    it("starts at the run's beginning, so activity while the agent worked is reported by the next run", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(START);
+        state.onRun = () => {
+            vi.setSystemTime(START + DURATION);
+        };
+        state.trigger = { ...state.trigger, quietWhenEmpty: true };
+        state.snapshot = { ...EMPTY, threads: [{ title: "Planning", updatedAt: 1000 }] };
+
+        await run();
+
+        const stats = state.mutations.find((entry) => entry.name === "updateTriggerStats")?.args as { lastTriggeredAt: number };
+
+        expect(stats.lastTriggeredAt).toBe(START);
+
+        // A chat touched halfway through the first run: after its start, before its end.
+        state.mutations = [];
+        state.runs = [];
+        state.trigger = { ...state.trigger, lastTriggeredAt: stats.lastTriggeredAt };
+        state.snapshot = { ...EMPTY, threads: [{ title: "Mid-run chat", updatedAt: START + DURATION / 2 }] };
+
+        await run();
+
+        expect(state.runs).toHaveLength(1);
+        expect(names()).not.toContain("recordFilteredExecution");
+    });
+
+    it("records the start of a run that failed too", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(START);
+        state.onRun = () => {
+            vi.setSystemTime(START + DURATION);
+
+            throw new Error("model down");
+        };
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+        await run();
+
+        expect(state.mutations.find((entry) => entry.name === "updateTriggerStats")?.args).toMatchObject({ lastTriggeredAt: START });
     });
 });
