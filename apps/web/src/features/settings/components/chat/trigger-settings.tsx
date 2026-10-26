@@ -98,6 +98,7 @@ interface TriggerRow {
     botId: string | null;
     createdAt: number;
     cronExpression: string | null;
+    cronInZone: boolean;
     description: string | null;
     enabled: boolean;
     filters: { op: FilterOp; path: string; value: string | null }[];
@@ -463,6 +464,7 @@ const TriggerSettings: FC = () => {
     // Both ids are only ever set from `trigger._id` of the triggers list, so they carry the row brand.
     const [editingTriggerId, setEditingTriggerId] = useState<Id<"triggers"> | null>(null);
     const [editFormData, setEditFormData] = useState<TriggerFormData>(EMPTY_FORM);
+    const [editStartZone, setEditStartZone] = useState("");
     const [expandedTriggerId, setExpandedTriggerId] = useState<Id<"triggers"> | null>(null);
     // The plaintext webhook secret is returned only by `createTrigger`, so it is shown once, here.
     const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
@@ -511,7 +513,7 @@ const TriggerSettings: FC = () => {
                 name: formData.name,
                 quietWhenEmpty: formData.quietWhenEmpty || undefined,
                 systemPrompt: formData.systemPrompt || undefined,
-                timezone: formData.type === "schedule" ? formData.timezone : undefined,
+                timezone: formData.type === "schedule" ? formData.timezone.trim() || undefined : undefined,
                 type: formData.type,
                 // A provider sends its event and the server compiles the filters and the scheme; a custom trigger sends its own.
                 ...webhookCreateArgs(formData.type, formData.webhook),
@@ -550,7 +552,8 @@ const TriggerSettings: FC = () => {
                 name: editFormData.name,
                 quietWhenEmpty,
                 systemPrompt: editFormData.systemPrompt || undefined,
-                timezone: editFormData.type === "schedule" ? editFormData.timezone : undefined,
+                // Sent only when the user changed it: a zone sent with a rename would move a run time the row never had a zone for.
+                timezone: editFormData.type === "schedule" && editFormData.timezone.trim() !== editStartZone ? editFormData.timezone.trim() : undefined,
                 triggerId: editingTriggerId,
             },
             {
@@ -562,7 +565,7 @@ const TriggerSettings: FC = () => {
                 },
             },
         );
-    }, [editingTriggerId, editFormData, updateTrigger, refetch, t]);
+    }, [editingTriggerId, editFormData, editStartZone, updateTrigger, refetch, t]);
 
     const handleToggleEnabled = useCallback(
         (triggerId: Id<"triggers">, enabled: boolean) => {
@@ -632,7 +635,11 @@ const TriggerSettings: FC = () => {
     );
 
     const startEditing = useCallback((trigger: TriggerRow) => {
+        // A schedule not stored with a zone runs in UTC, whatever zone a row from before zones carries: the field stays empty, not the browser's zone.
+        const zone = trigger.cronInZone ? (trigger.timezone ?? "") : "";
+
         setEditingTriggerId(trigger._id);
+        setEditStartZone(zone);
         setEditFormData({
             botComputer: trigger.botComputer,
             botId: trigger.botId ?? "",
@@ -643,7 +650,7 @@ const TriggerSettings: FC = () => {
             name: trigger.name,
             quietWhenEmpty: trigger.quietWhenEmpty,
             systemPrompt: trigger.systemPrompt ?? "",
-            timezone: trigger.timezone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone,
+            timezone: zone,
             type: trigger.type as TriggerType,
             // A stored trigger keeps its own filters and scheme; the provider it came from is not stored.
             webhook: {
@@ -786,7 +793,7 @@ const TriggerSettings: FC = () => {
                                                         <span className="flex items-center gap-1">
                                                             <Clock aria-hidden="true" className="size-3" />
                                                             {trigger.cronExpression}
-                                                            {trigger.timezone && ` (${trigger.timezone})`}
+                                                            {trigger.cronInZone && trigger.timezone && ` (${trigger.timezone})`}
                                                         </span>
                                                     )}
                                                     <span>

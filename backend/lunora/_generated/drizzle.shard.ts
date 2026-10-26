@@ -1494,6 +1494,7 @@ export const triggers = sqliteTable("triggers", {
     botId: text("botId").references((): AnySQLiteColumn => bots._id),
     createdAt: real("createdAt").notNull(),
     cronExpression: text("cronExpression"),
+    cronInZone: integer("cronInZone", { mode: "boolean" }),
     description: text("description"),
     enabled: integer("enabled", { mode: "boolean" }).notNull(),
     eventConnectionId: text("eventConnectionId"),
