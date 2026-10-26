@@ -128,6 +128,37 @@ describe("updateTriggerStats", () => {
     });
 });
 
+describe("updateTriggerStats window", () => {
+    it("keeps the newer lastTriggeredAt when an earlier-started run finishes last", async () => {
+        const triggerId = await insertTrigger({ lastTriggeredAt: 100 });
+
+        await record({ lastTriggeredAt: 300, triggerId });
+        await record({ lastTriggeredAt: 200, triggerId });
+
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 300, triggerCount: 2 });
+
+        await record({ lastTriggeredAt: 400, triggerId });
+
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 400 });
+    });
+
+    it("records the error and the count without moving lastTriggeredAt when none is given", async () => {
+        const triggerId = await insertTrigger({ lastTriggeredAt: 100 });
+
+        await record({ error: "boom", triggerId });
+
+        expect(await readTrigger(triggerId)).toMatchObject({ lastError: "boom", lastTriggeredAt: 100, triggerCount: 1 });
+    });
+
+    it("sets lastTriggeredAt on a trigger that never had one", async () => {
+        const triggerId = await insertTrigger();
+
+        await record({ lastTriggeredAt: 50, triggerId });
+
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 50 });
+    });
+});
+
 describe("trigger schedules", () => {
     const as = () => harness.withIdentity({ userId: "user-a" } as never);
     const schedule = (cronExpression?: string) => {

@@ -727,11 +727,15 @@ export const updateTriggerStats = internalMutation
         // `lastError: undefined` REMOVES the field — a success clears the last
         // failure. A plain patch cannot express that: it refuses `undefined`,
         // and a `null` would fail every read through `getTriggers`' output.
+        // `lastTriggeredAt` only moves forward: a run that started earlier but finishes last (a long manual
+        // "Run now" over a scheduled run) must not pull a quiet routine's window back over what was already reported.
+        const advancesWindow = lastTriggeredAt !== undefined && lastTriggeredAt > (trigger.lastTriggeredAt ?? -Infinity);
+
         await patchRow(ctx.db, trigger, {
             lastError: error,
             triggerCount: (trigger.triggerCount ?? 0) + 1,
             updatedAt: ctx.now,
-            ...withoutUndefined({ lastTriggeredAt, nextTriggerAt }),
+            ...withoutUndefined({ lastTriggeredAt: advancesWindow ? lastTriggeredAt : undefined, nextTriggerAt }),
         });
 
         return null;
