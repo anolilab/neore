@@ -64,9 +64,9 @@ const TextFileLoading: FC = () => {
         <div aria-live="polite" className="space-y-2 p-4" role="status">
             <span className="sr-only">{t`Loading file…`}</span>
             <div aria-hidden="true" className="space-y-2">
-                <div className="bg-muted h-4 w-3/4 animate-pulse rounded" />
-                <div className="bg-muted h-4 w-full animate-pulse rounded" />
-                <div className="bg-muted h-4 w-5/6 animate-pulse rounded" />
+                <div className="bg-muted h-4 w-3/4 animate-pulse rounded motion-reduce:animate-none" />
+                <div className="bg-muted h-4 w-full animate-pulse rounded motion-reduce:animate-none" />
+                <div className="bg-muted h-4 w-5/6 animate-pulse rounded motion-reduce:animate-none" />
             </div>
         </div>
     );
