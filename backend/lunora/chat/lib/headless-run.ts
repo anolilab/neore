@@ -180,18 +180,21 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
         if (existingThreadId === undefined) {
             await options.beforeThread?.();
 
-            const created = await agent.createThread(ctx, { title: (options.thread as { title: string }).title, userId });
+            // The tags go in with the insert, so a reader (a quiet routine's workspace check) never sees the thread untagged,
+            // even while it runs or if the run fails.
+            const created = await agent.createThread(ctx, {
+                title: (options.thread as { title: string }).title,
+                userId,
+                ...("tags" in options.thread && options.thread.tags && { tags: options.thread.tags }),
+            });
 
             threadId = created.threadId;
             thread = created.thread!;
 
-            // Before the run: a tool call reads `thread.botId` to find the bot's computer, and the tags tell a
-            // reader (a quiet routine's workspace check) what this thread is while it is still running or if it fails.
-            const createdTags = "tags" in options.thread ? options.thread.tags : undefined;
-
-            if (options.botId || createdTags) {
+            // Before the run: a tool call reads `thread.botId` to find the bot's computer.
+            if (options.botId) {
                 await ctx.runMutation(internal.agent.threads.updateThread, {
-                    patch: { ...(options.botId && { botId: options.botId }), ...(createdTags && { tags: createdTags }) },
+                    patch: { botId: options.botId },
                     threadId: threadId as Id<"threads">,
                 });
             }
@@ -204,10 +207,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
 
         const result = await thread.generateText(generateArgs as never);
         const text = result.text ?? "";
-        const tags = "tags" in options.thread ? options.thread.tags : undefined;
 
         await ctx.runMutation(internal.agent.threads.updateThread, {
-            patch: { status: "active", ...(tags && { tags }), updatedAt: Date.now() },
+            patch: { status: "active", updatedAt: Date.now() },
             threadId: threadId as Id<"threads">,
         });
 

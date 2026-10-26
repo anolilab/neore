@@ -14,7 +14,7 @@ vi.mock("../../_generated/api", async (importOriginal) => mappedReferences(await
 vi.mock("../../_generated/internal", async (importOriginal) => mappedReferences(await importOriginal(), (reference) => reference.__lunoraRef));
 
 const seen = vi.hoisted(() => {
-    return { buildOptions: [] as unknown[], system: [] as string[], tools: [] as string[][] };
+    return { buildOptions: [] as unknown[], created: [] as unknown[], system: [] as string[], tools: [] as string[][] };
 });
 
 vi.mock("./get-agent", () => {
@@ -44,7 +44,9 @@ vi.mock("./get-agent", () => {
                 continueThread: async () => {
                     return { thread };
                 },
-                createThread: async () => {
+                createThread: async (_ctx: unknown, args: unknown) => {
+                    seen.created.push(args);
+
                     return { thread, threadId: "thread-new" };
                 },
                 options: { instructions },
@@ -140,9 +142,11 @@ describe("runHeadlessAgent personalization", () => {
 });
 
 describe("runHeadlessAgent thread tags", () => {
-    it("tags a new thread when it is created, before the run can fail", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+    beforeEach(() => {
+        seen.created = [];
+    });
 
+    const run = async (ctx: unknown, extra: Partial<Parameters<typeof runHeadlessAgent>[1]> = {}) =>
         await runHeadlessAgent(ctx as never, {
             memory: false,
             model: "test-model",
@@ -151,12 +155,31 @@ describe("runHeadlessAgent thread tags", () => {
             thread: { tags: ["trigger"], title: "Trigger: x" },
             tools: "none",
             userId: "owner",
+            ...extra,
         });
 
-        const patches = ctx.runMutation.mock.calls.map(([, args]) => (args as { patch?: { tags?: string[] } }).patch);
+    it("creates a new thread with its tags, so no later write is needed to tell it apart", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
 
-        // The first patch is the creation-time one; the last repeats the tags with the final status.
-        expect(patches[0]).toEqual({ tags: ["trigger"] });
+        await run(ctx);
+
+        expect(seen.created).toEqual([{ tags: ["trigger"], title: "Trigger: x", userId: "owner" }]);
+
+        const patches = ctx.runMutation.mock.calls.map(([, args]) => (args as { patch?: object }).patch);
+
+        expect(patches.every((patch) => !patch || !("tags" in patch))).toBe(true);
+    });
+
+    it("leaves tags out of the creation when the caller gave none, and still sets the bot", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await run(ctx, { botId: "bot-1", thread: { title: "Chat" } });
+
+        expect(seen.created).toEqual([{ title: "Chat", userId: "owner" }]);
+
+        const patches = ctx.runMutation.mock.calls.map(([, args]) => (args as { patch?: object }).patch);
+
+        expect(patches[0]).toEqual({ botId: "bot-1" });
     });
 });
 
