@@ -568,6 +568,15 @@ mod tests {
         )
     }
 
+    /// The first Bash the sandbox tests can run, by absolute path so the test
+    /// does not depend on the test process's `PATH`.
+    #[cfg(target_os = "linux")]
+    fn bash_path() -> Option<&'static str> {
+        ["/bin/bash", "/usr/bin/bash"]
+            .into_iter()
+            .find(|path| Path::new(path).exists())
+    }
+
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     fn sandbox_or_skip() -> bool {
         #[cfg(target_os = "linux")]
@@ -685,10 +694,7 @@ mod tests {
         if !sandbox_or_skip() {
             return;
         }
-        let Some(bash) = ["/bin/bash", "/usr/bin/bash"]
-            .into_iter()
-            .find(|path| Path::new(path).exists())
-        else {
+        let Some(bash) = bash_path() else {
             return;
         };
 
@@ -724,10 +730,7 @@ mod tests {
         if !sandbox_or_skip() {
             return;
         }
-        let Some(bash) = ["/bin/bash", "/usr/bin/bash"]
-            .into_iter()
-            .find(|path| Path::new(path).exists())
-        else {
+        let Some(bash) = bash_path() else {
             return;
         };
 
