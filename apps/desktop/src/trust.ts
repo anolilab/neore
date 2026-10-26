@@ -1,3 +1,6 @@
+import { isBlockedOauthUrl } from "./sign-in.js";
+import { isSameOrigin } from "./site.js";
+
 /**
  * The canvas artifact preview shell. It is served from the site origin, but its response CSP
  * sandboxes it into an opaque origin and it renders model-written HTML. It is never a site page.
@@ -44,4 +47,26 @@ export const isLocalPage = (page: URL, raw: string | undefined): boolean => {
     } catch {
         return false;
     }
+};
+
+export type UrlClass = "artifact" | "external" | "oauth" | "site";
+
+/**
+ * Where a link from a site window goes. The OAuth host is checked first, so it goes to the system
+ * browser whatever else it matches; then the site's own origin splits into the artifact preview
+ * (its own sandboxed window) and an ordinary page; everything else, an unparseable string included, is external.
+ * Window-open and navigation both decide through this, so they cannot drift apart.
+ */
+export const classifyUrl = (origin: URL, raw: string): UrlClass => {
+    if (isBlockedOauthUrl(raw)) {
+        return "oauth";
+    }
+
+    const parsed = URL.parse(raw);
+
+    if (parsed === null || !isSameOrigin(origin, parsed)) {
+        return "external";
+    }
+
+    return isArtifactPreview(parsed) ? "artifact" : "site";
 };

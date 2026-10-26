@@ -19,10 +19,10 @@ import type { DroppedFile } from "./dropped-files.js";
 import { queueDroppedFiles, readDroppedFiles } from "./dropped-files.js";
 import { loginItemMenuState } from "./login-item.js";
 import type { PendingSignIn, SignInHandoff } from "./sign-in.js";
-import { beginSignIn, completeSignIn, isBlockedOauthUrl, parseSignInCallback } from "./sign-in.js";
-import { clampText, isSameOrigin, MAX_COMPOSE_CHARS, newChatUrl, parseDeepLink, SCHEME, siteOrigin } from "./site.js";
+import { beginSignIn, completeSignIn, parseSignInCallback } from "./sign-in.js";
+import { clampText, MAX_COMPOSE_CHARS, newChatUrl, parseDeepLink, SCHEME, siteOrigin } from "./site.js";
 import { threadWindowUrl } from "./thread-window.js";
-import { isArtifactPreview, isLocalPage, isTrustedUrl } from "./trust.js";
+import { classifyUrl, isLocalPage, isTrustedUrl } from "./trust.js";
 import { createDebouncer, DEFAULT_SIZE, readWindowState, restorableState, SAVE_DEBOUNCE_MS, WINDOW_STATE_FILE, writeWindowState } from "./window-state.js";
 
 interface ShellState {
@@ -135,26 +135,30 @@ const openWebLinkExternally = (url: URL | undefined): void => {
 };
 
 const guardNavigation = (event: { preventDefault: () => void }, url: string): void => {
-    if (isBlockedOauthUrl(url)) {
-        // Google refuses embedded webviews: cancel, and run the flow in the system browser.
-        event.preventDefault();
-        startBrowserSignIn();
+    switch (classifyUrl(origin, url)) {
+        case "artifact": {
+            event.preventDefault();
+            openArtifactWindow(new URL(url));
 
-        return;
-    }
+            break;
+        }
+        case "external": {
+            event.preventDefault();
+            openWebLinkExternally(URL.parse(url) ?? undefined);
 
-    const parsed = URL.parse(url) ?? undefined;
+            break;
+        }
+        case "oauth": {
+            // Google refuses embedded webviews: cancel, and run the flow in the system browser.
+            event.preventDefault();
+            startBrowserSignIn();
 
-    if (parsed !== undefined && isSameOrigin(origin, parsed) && !isArtifactPreview(parsed)) {
-        return;
-    }
-
-    event.preventDefault();
-
-    if (parsed !== undefined && isSameOrigin(origin, parsed)) {
-        openArtifactWindow(parsed);
-    } else {
-        openWebLinkExternally(parsed);
+            break;
+        }
+        default: {
+            // "site": an ordinary page of ours navigates in place.
+            break;
+        }
     }
 };
 
@@ -213,17 +217,28 @@ const guardSiteWindow = (win: BrowserWindow): void => {
     const contents = win.webContents;
 
     contents.setWindowOpenHandler(({ url }) => {
-        const parsed = URL.parse(url) ?? undefined;
+        switch (classifyUrl(origin, url)) {
+            case "artifact": {
+                openArtifactWindow(new URL(url));
 
-        if (isBlockedOauthUrl(url)) {
-            startBrowserSignIn();
-        } else if (parsed !== undefined && isSameOrigin(origin, parsed) && isArtifactPreview(parsed)) {
-            openArtifactWindow(parsed);
-        } else if (parsed !== undefined && isSameOrigin(origin, parsed)) {
-            // A same-origin popup gets its own window: the opener keeps its page, its draft and its state.
-            openSiteWindow(parsed);
-        } else {
-            openWebLinkExternally(parsed);
+                break;
+            }
+            case "external": {
+                openWebLinkExternally(URL.parse(url) ?? undefined);
+
+                break;
+            }
+            case "oauth": {
+                startBrowserSignIn();
+
+                break;
+            }
+            default: {
+                // "site": a same-origin popup gets its own window: the opener keeps its page, its draft and its state.
+                openSiteWindow(new URL(url));
+
+                break;
+            }
         }
 
         return { action: "deny" };

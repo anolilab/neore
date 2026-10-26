@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isArtifactPreview, isLocalPage, isTrustedUrl } from "./trust";
+import { classifyUrl, isArtifactPreview, isLocalPage, isTrustedUrl } from "./trust";
 
 const SITE = new URL("https://app.example.com/");
 const COMPOSER = new URL("file:///Applications/Neore.app/Contents/Resources/app.asar/dist/quick-composer/index.html");
@@ -31,5 +31,31 @@ describe("isLocalPage", () => {
         expect(isLocalPage(COMPOSER, "https://app.example.com/quick-composer/index.html")).toBe(false);
         expect(isLocalPage(COMPOSER, "not a url")).toBe(false);
         expect(isLocalPage(COMPOSER, undefined)).toBe(false);
+    });
+});
+
+describe("classifyUrl", () => {
+    it("sends the OAuth host to the system browser", () => {
+        expect(classifyUrl(SITE, "https://accounts.google.com/o/oauth2/v2/auth?client_id=x")).toBe("oauth");
+    });
+
+    it("keeps the artifact preview on the site origin apart from site pages", () => {
+        expect(classifyUrl(SITE, "https://app.example.com/artifact-preview#abc")).toBe("artifact");
+    });
+
+    it("calls a same-origin page a site page", () => {
+        expect(classifyUrl(SITE, "https://app.example.com/chat")).toBe("site");
+    });
+
+    it("calls another origin external, including a lookalike host and a non-web scheme", () => {
+        expect(classifyUrl(SITE, "https://example.org/")).toBe("external");
+        expect(classifyUrl(SITE, "https://app.example.com.evil.test/")).toBe("external");
+        expect(classifyUrl(SITE, "https://example.org/artifact-preview")).toBe("external");
+        expect(classifyUrl(SITE, "file:///etc/passwd")).toBe("external");
+    });
+
+    it("calls an unparseable string external", () => {
+        expect(classifyUrl(SITE, "not a url")).toBe("external");
+        expect(classifyUrl(SITE, "")).toBe("external");
     });
 });
