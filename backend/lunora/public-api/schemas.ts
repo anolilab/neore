@@ -135,6 +135,45 @@ export const zMemorySchema = z.object({
     updatedAt: z.number().nullable(),
 });
 
+const zTriggerFilterOpSchema = z.enum(["equals", "not_equals", "contains", "starts_with", "exists", "not_exists"]);
+
+const zTriggerFilterSchema = z.object({ op: zTriggerFilterOpSchema, path: z.string(), value: z.string().nullable() });
+
+const zTriggerFilterRequestSchema = z.object({ op: zTriggerFilterOpSchema, path: z.string().min(1).max(200), value: z.string().max(500).optional() });
+
+export const zTriggerSchema = z.object({
+    botComputer: z.boolean(),
+    botId: z.string().nullable(),
+    createdAt: z.number(),
+    cronExpression: z.string().nullable(),
+    description: z.string().nullable(),
+    enabled: z.boolean(),
+    filters: z.array(zTriggerFilterSchema),
+    id: z.string(),
+    inputTemplate: z.string().nullable(),
+    lastError: z.string().nullable(),
+    lastTriggeredAt: z.number().nullable(),
+    model: z.string(),
+    name: z.string(),
+    nextTriggerAt: z.number().nullable(),
+    searchMode: z.string().nullable(),
+    systemPrompt: z.string().nullable(),
+    timezone: z.string().nullable(),
+    triggerCount: z.number(),
+    type: z.string().meta({ description: "schedule | webhook" }),
+    updatedAt: z.number(),
+    webhookSignatureScheme: z.string().nullable().meta({ description: "timestamped | native, for a webhook trigger." }),
+});
+
+export const zTriggerExecutionSchema = z.object({
+    completedAt: z.number().nullable(),
+    error: z.string().nullable(),
+    id: z.string(),
+    startedAt: z.number(),
+    status: z.string(),
+    threadId: z.string().nullable(),
+});
+
 // ─── Requests ───────────────────────────────────────────────────────────────
 
 export const zChatRequestSchema = z.object({
@@ -190,6 +229,39 @@ export const zTaskCreateRequestSchema = z.object({
     skillId: zIdSchema.optional(),
     successCriteria: z.string().max(5000).optional(),
     title: z.string().min(1).max(200),
+});
+
+const zTriggerFields = {
+    cronExpression: z.string().max(200).optional().meta({ description: "Five-field cron expression (UTC) that runs at most hourly. Required for a schedule." }),
+    description: z.string().max(10_000).optional(),
+    filters: z
+        .array(zTriggerFilterRequestSchema)
+        .max(10)
+        .optional()
+        .meta({ description: "Webhook triggers only. Replaces the stored set; an empty array clears it." }),
+    inputTemplate: z.string().max(100_000).optional(),
+    searchMode: z.string().max(200).optional(),
+    systemPrompt: z.string().max(100_000).optional(),
+    timezone: z.string().max(200).optional(),
+};
+
+export const zTriggerCreateRequestSchema = z.object({
+    ...zTriggerFields,
+    botId: zIdSchema.optional(),
+    model: z.string().min(1).max(200),
+    name: z.string().min(1).max(200),
+    type: z.enum(["schedule", "webhook"]),
+    webhookSignatureScheme: z
+        .enum(["timestamped", "native"])
+        .optional()
+        .meta({ description: "Webhook triggers only; fixed at creation. Defaults to `timestamped`." }),
+});
+
+export const zTriggerUpdateRequestSchema = z.object({
+    ...zTriggerFields,
+    botId: zIdSchema.nullable().optional().meta({ description: "`null` clears the bot." }),
+    model: z.string().min(1).max(200).optional(),
+    name: z.string().min(1).max(200).optional(),
 });
 
 export const zKnowledgeFileCreateRequestSchema = z.object({

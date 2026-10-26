@@ -80,6 +80,30 @@ describe("OpenAPI document", () => {
         expect(hasHeader(paths["/tasks"]!["get"]!)).toBe(false);
     });
 
+    it("documents the trigger routes with their scopes", () => {
+        const operations = {
+            createTrigger: paths["/triggers"]!["post"]!,
+            deleteTrigger: paths["/triggers/{triggerId}"]!["delete"]!,
+            getTrigger: paths["/triggers/{triggerId}"]!["get"]!,
+            listTriggers: paths["/triggers"]!["get"]!,
+            updateTrigger: paths["/triggers/{triggerId}"]!["patch"]!,
+        };
+
+        expect(Object.entries(operations).map(([id, operation]) => [id, operation["operationId"]])).toEqual(Object.keys(operations).map((id) => [id, id]));
+        expect(operations.listTriggers["x-required-scopes"]).toEqual(["triggers:read"]);
+        expect(operations.getTrigger["x-required-scopes"]).toEqual(["triggers:read"]);
+        expect(operations.createTrigger["x-required-scopes"]).toEqual(["triggers:write"]);
+        expect(operations.updateTrigger["x-required-scopes"]).toEqual(["triggers:write"]);
+        expect(operations.deleteTrigger["x-required-scopes"]).toEqual(["triggers:write"]);
+        expect(JSON.stringify(document["components"])).toContain("triggers:read");
+    });
+
+    it("does not advertise Idempotency-Key where the reply carries a one-time secret", () => {
+        const names = ((paths["/triggers"]!["post"]!["parameters"] as { name: string }[] | undefined) ?? []).map((parameter) => parameter.name);
+
+        expect(names).not.toContain("Idempotency-Key");
+    });
+
     it("renders escaped docs HTML", () => {
         const html = renderDocsHtml(document);
 

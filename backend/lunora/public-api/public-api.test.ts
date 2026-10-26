@@ -26,9 +26,24 @@ describe("scopes", () => {
         expect(hasScope(scopes, "threads", "read")).toBe(false);
     });
 
-    it("defaults to read-only everywhere", () => {
+    it("defaults to read-only on the original resources, and not on triggers", () => {
         expect(Object.values(DEFAULT_API_SCOPES).flat()).not.toContain("write");
         expect(hasScope(DEFAULT_API_SCOPES, "memories", "read")).toBe(true);
+        expect(hasScope(DEFAULT_API_SCOPES, "triggers", "read")).toBe(false);
+        // A new resource is not granted to default keys by being added: extend this list on purpose.
+        expect(DEFAULT_API_SCOPES).toEqual({
+            chat: ["read"],
+            knowledge: ["read"],
+            memories: ["read"],
+            models: ["read"],
+            skills: ["read"],
+            tasks: ["read"],
+            threads: ["read"],
+        });
+    });
+
+    it("lets a key ask for triggers by name", () => {
+        expect(scopesFromStrings(["triggers:read", "triggers:write"])).toEqual({ triggers: ["read", "write"] });
     });
 
     it("round-trips scope strings and rejects typos", () => {

@@ -62,7 +62,7 @@ const operation = (route: RouteDefinition) => {
     const scopeNote = scopes.length > 0 ? `Requires: ${scopeList}.` : "Any valid key.";
     const parameters = [...pathParameters(route.path), ...queryParameters(route)];
 
-    if (route.method === "post") {
+    if (route.method === "post" && !route.noIdempotency) {
         parameters.push({
             description: "Makes the POST safe to retry: the same key with the same body replays the first response for 24 hours.",
             in: "header",
@@ -88,7 +88,8 @@ const operation = (route: RouteDefinition) => {
             403: errorResponse("`insufficient_scope` or `forbidden`"),
             404: errorResponse("`not_found`"),
             [status]: { content: successContent, description: "Success" },
-            ...(route.method === "post" && { 409: errorResponse("`conflict` or `idempotency_in_progress`"), 422: errorResponse("`idempotency_conflict`") }),
+            ...(route.method === "post" &&
+                !route.noIdempotency && { 409: errorResponse("`conflict` or `idempotency_in_progress`"), 422: errorResponse("`idempotency_conflict`") }),
             429: errorResponse("`rate_limited` (per key) or `daily_limit_reached`; honour `Retry-After`"),
             500: errorResponse("`internal_error`"),
         },
@@ -119,7 +120,7 @@ export const buildOpenApiDocument = (serverUrl?: string): Record<string, unknown
         },
         info: {
             description: [
-                "Programmatic access to chats, threads, skills, tasks, the knowledge base and memories.",
+                "Programmatic access to chats, threads, skills, tasks, triggers, the knowledge base and memories.",
                 "",
                 `**Errors** share one shape — \`{ "error": { "code", "message", "requestId" } }\`. Codes: ${Object.keys(API_ERROR_CODES)
                     .map((code) => `\`${code}\``)

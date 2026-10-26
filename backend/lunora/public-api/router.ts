@@ -195,6 +195,11 @@ const handleOnShard = async (
 
         const url = new URL(request.url);
         const idempotencyKey = route.method === "post" ? parseIdempotencyKey(request.headers.get(IDEMPOTENCY_HEADER)) : undefined;
+
+        if (idempotencyKey && route.noIdempotency) {
+            throw new PublicApiError("invalid_request", `\`${IDEMPOTENCY_HEADER}\` is not accepted on this route.`);
+        }
+
         const body = route.method === "get" ? { parsed: undefined, raw: "" } : await readBody(route, request);
         const run = async (): Promise<Response> =>
             toResponse(

@@ -47,6 +47,10 @@ import {
     zTaskCreateRequestSchema,
     zTaskRunSchema,
     zThreadSchema,
+    zTriggerCreateRequestSchema,
+    zTriggerExecutionSchema,
+    zTriggerSchema,
+    zTriggerUpdateRequestSchema,
 } from "./schemas";
 import type { ApiAction, ApiResource } from "./scopes";
 import { scopesToStrings } from "./scopes";
@@ -74,7 +78,9 @@ export interface RouteDefinition {
     body?: z.ZodType;
     description?: string;
     handler: (input: RouteInput) => Promise<RouteResult>;
-    method: "delete" | "get" | "post";
+    method: "delete" | "get" | "patch" | "post";
+    /** Refuse an `Idempotency-Key`: the reply carries a secret shown once, and a replay would store it. */
+    noIdempotency?: boolean;
     operationId: string;
     /** OpenAPI-style path below `/api/v1`, e.g. `/threads/{threadId}`. */
     path: string;
@@ -299,6 +305,57 @@ const toPublicTask = (task: BoardTask) => {
         successCriteria: task.successCriteria,
         title: task.title,
         updatedAt: task.updatedAt,
+    };
+};
+
+interface StoredTrigger {
+    _id: string;
+    botComputer: boolean;
+    botId: string | null;
+    createdAt: number;
+    cronExpression: string | null;
+    description: string | null;
+    enabled: boolean;
+    filters: ReadonlyArray<{ op: string; path: string; value: string | null }>;
+    inputTemplate: string | null;
+    lastError: string | null;
+    lastTriggeredAt: number | null;
+    model: string;
+    name: string;
+    nextTriggerAt: number | null;
+    searchMode: string | null;
+    systemPrompt: string | null;
+    timezone: string | null;
+    triggerCount: number;
+    type: string;
+    updatedAt: number;
+    webhookSignatureScheme: string | null;
+}
+
+/** The public trigger shape: `getTriggers`' row under `id`. It never carries the webhook secret, which only `createTrigger` returns, once. */
+const toPublicTrigger = (trigger: StoredTrigger) => {
+    return {
+        botComputer: trigger.botComputer,
+        botId: trigger.botId,
+        createdAt: trigger.createdAt,
+        cronExpression: trigger.cronExpression,
+        description: trigger.description,
+        enabled: trigger.enabled,
+        filters: trigger.filters,
+        id: trigger._id,
+        inputTemplate: trigger.inputTemplate,
+        lastError: trigger.lastError,
+        lastTriggeredAt: trigger.lastTriggeredAt,
+        model: trigger.model,
+        name: trigger.name,
+        nextTriggerAt: trigger.nextTriggerAt,
+        searchMode: trigger.searchMode,
+        systemPrompt: trigger.systemPrompt,
+        timezone: trigger.timezone,
+        triggerCount: trigger.triggerCount,
+        type: trigger.type,
+        updatedAt: trigger.updatedAt,
+        webhookSignatureScheme: trigger.webhookSignatureScheme,
     };
 };
 
@@ -772,6 +829,118 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
         scopes: [["memories", "read"]],
         summary: "List memories",
         tag: "Memories",
+    },
+    {
+        handler: async ({ ctx, query }) => {
+            const triggers = await ctx.runQuery(api.triggers.functions.getTriggers, {});
+
+            return {
+                data: paginateArray(
+                    triggers.map((trigger) => toPublicTrigger(trigger)),
+                    query["cursor"],
+                    parseLimit(query["limit"]),
+                ),
+            };
+        },
+        method: "get",
+        operationId: "listTriggers",
+        path: "/triggers",
+        query: zListQuerySchema,
+        response: zPage(zTriggerSchema),
+        scopes: [["triggers", "read"]],
+        summary: "List triggers",
+        tag: "Triggers",
+    },
+    {
+        body: zTriggerCreateRequestSchema,
+        description:
+            "Creates the trigger disabled; enable it in the app. A webhook trigger answers with its `webhookSecret`, shown once and never again. For that reason this route does not accept an `Idempotency-Key`.",
+        handler: async ({ body, ctx }) => {
+            const request = body as z.infer<typeof zTriggerCreateRequestSchema>;
+            const created = await ctx.runMutation(api.triggers.functions.createTrigger, request);
+
+            return { data: { id: created.triggerId, ...(created.webhookSecret && { webhookSecret: created.webhookSecret }) }, status: 201 };
+        },
+        method: "post",
+        noIdempotency: true,
+        operationId: "createTrigger",
+        path: "/triggers",
+        response: z.object({ id: z.string(), webhookSecret: z.string().optional() }),
+        scopes: [["triggers", "write"]],
+        successStatus: 201,
+        summary: "Create a trigger",
+        tag: "Triggers",
+    },
+    {
+        handler: async (input) => {
+            const triggerId = idParameter(input, "triggerId");
+            // `getTriggerExecutions` checks the trigger belongs to the caller.
+            const executions = await input.ctx.runQuery(api.triggers.functions.getTriggerExecutions, { limit: 20, triggerId: triggerId as Id<"triggers"> });
+            const triggers = await input.ctx.runQuery(api.triggers.functions.getTriggers, {});
+            const trigger = triggers.find((candidate) => candidate._id === triggerId);
+
+            if (!trigger) {
+                throw new PublicApiError("not_found", "Trigger not found.");
+            }
+
+            return {
+                data: {
+                    ...toPublicTrigger(trigger),
+                    executions: executions.map((execution) => {
+                        return {
+                            completedAt: execution.completedAt,
+                            error: execution.error,
+                            id: execution._id,
+                            startedAt: execution.startedAt,
+                            status: execution.status,
+                            threadId: execution.threadId,
+                        };
+                    }),
+                },
+            };
+        },
+        method: "get",
+        operationId: "getTrigger",
+        path: "/triggers/{triggerId}",
+        response: zTriggerSchema.extend({ executions: z.array(zTriggerExecutionSchema) }),
+        scopes: [["triggers", "read"]],
+        summary: "Get a trigger and its recent executions",
+        tag: "Triggers",
+    },
+    {
+        body: zTriggerUpdateRequestSchema,
+        description: "Changes only the fields sent. Does not enable or disable the trigger.",
+        handler: async (input) => {
+            const triggerId = idParameter(input, "triggerId");
+
+            await input.ctx.runMutation(api.triggers.functions.updateTrigger, {
+                ...(input.body as z.infer<typeof zTriggerUpdateRequestSchema>),
+                triggerId: triggerId as Id<"triggers">,
+            });
+
+            return { data: { id: triggerId, updated: true } };
+        },
+        method: "patch",
+        operationId: "updateTrigger",
+        path: "/triggers/{triggerId}",
+        response: z.object({ id: z.string(), updated: z.boolean() }),
+        scopes: [["triggers", "write"]],
+        summary: "Update a trigger",
+        tag: "Triggers",
+    },
+    {
+        handler: async (input) => {
+            await input.ctx.runMutation(api.triggers.functions.deleteTrigger, { triggerId: idParameter(input, "triggerId") as Id<"triggers"> });
+
+            return { data: { deleted: true, id: input.params["triggerId"] } };
+        },
+        method: "delete",
+        operationId: "deleteTrigger",
+        path: "/triggers/{triggerId}",
+        response: z.object({ deleted: z.boolean(), id: z.string() }),
+        scopes: [["triggers", "write"]],
+        summary: "Delete a trigger",
+        tag: "Triggers",
     },
 ];
 

@@ -2,7 +2,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { ApiAction, ApiResource } from "@neore/backend/public-api/scopes";
-import { API_ACTIONS, API_RESOURCES } from "@neore/backend/public-api/scopes";
+import { API_ACTIONS, API_RESOURCES, DEFAULT_API_SCOPES, scopesToStrings } from "@neore/backend/public-api/scopes";
 import { Button } from "@neore/ui/components/button";
 import { Checkbox } from "@neore/ui/components/checkbox";
 import { useId } from "react";
@@ -10,7 +10,8 @@ import { useId } from "react";
 /** `threads:read`-style scope strings, the shape `createScopedApiKey` takes. */
 export type ScopeSet = ReadonlySet<string>;
 
-export const READ_ONLY_SCOPES: ScopeSet = new Set(API_RESOURCES.map((resource) => `${resource}:read`));
+// The server's own default for a key created without scopes, so a resource it holds back (triggers) is not preselected.
+export const READ_ONLY_SCOPES: ScopeSet = new Set(scopesToStrings(DEFAULT_API_SCOPES));
 
 export const ALL_SCOPES: ScopeSet = new Set(API_RESOURCES.flatMap((resource) => API_ACTIONS.map((action) => `${resource}:${action}`)));
 
@@ -32,6 +33,7 @@ const ApiKeyScopePicker = ({ onChange, value }: ApiKeyScopePickerProperties) => 
         skills: t`Skills`,
         tasks: t`Tasks`,
         threads: t`Threads`,
+        triggers: t`Triggers`,
     };
     const actionLabels: Record<ApiAction, string> = { read: t`Read`, write: t`Write` };
 
