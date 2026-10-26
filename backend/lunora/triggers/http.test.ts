@@ -546,13 +546,6 @@ describe("trigger webhook signing", () => {
 
 describe("provider signature schemes", () => {
     const GITLAB_TRIGGER = { ...SIGNED_TRIGGER, webhookSignatureScheme: "gitlab-token" };
-    const LINEAR_TRIGGER = { ...SIGNED_TRIGGER, webhookSignatureScheme: "linear" };
-
-    /** A Linear body; `webhookTimestamp` is milliseconds, inside the signed bytes. */
-    const linearBody = (webhookTimestamp: number = NOW): string => JSON.stringify({ action: "update", type: "Issue", webhookTimestamp });
-    const linearHeaders = async (body: string): Promise<Record<string, string>> => {
-        return { "linear-signature": await hmacHex(body) };
-    };
 
     it("matches the documented GitHub test vector, both prefixed and bare", async () => {
         const secret = "It's a Secret to Everybody";
@@ -561,6 +554,35 @@ describe("provider signature schemes", () => {
         expect(await verifyHmacSignature(secret, "Hello, World!", `sha256=${digest}`)).toBe(true);
         expect(await verifyHmacSignature(secret, "Hello, World!", digest)).toBe(true);
         expect(await verifyHmacSignature(secret, "Hello, World!!", digest)).toBe(false);
+    });
+
+    describe("a request carrying X-Gitlab-Token", () => {
+        const body = "{}";
+        const valid = {
+            native: async () => {
+                return { "x-hub-signature-256": `sha256=${await hmacHex(body)}` };
+            },
+            timestamped: async () => await signedHeaders(body),
+        };
+
+        for (const scheme of ["native", "timestamped"] as const) {
+            it(`is refused by a ${scheme} trigger, even with a valid ${scheme} signature`, async () => {
+                const { scheduled, statusOf } = await setup({ ...SIGNED_TRIGGER, webhookSignatureScheme: scheme });
+                const headers = await valid[scheme]();
+
+                expect(await statusOf(body, { ...headers, "x-gitlab-token": SECRET })).toBe(401);
+                expect(scheduled).toHaveLength(0);
+                // The same request without the foreign header is accepted, so the refusal is the header's.
+                expect(await statusOf(body, headers)).toBe(200);
+                expect(scheduled).toHaveLength(1);
+            });
+        }
+
+        it("is refused by a trigger with no stored scheme, which is timestamped", async () => {
+            const { statusOf } = await setup(SIGNED_TRIGGER);
+
+            expect(await statusOf(body, { ...(await signedHeaders(body)), "x-gitlab-token": SECRET })).toBe(401);
+        });
     });
 
     describe("gitlab-token", () => {
@@ -613,65 +635,6 @@ describe("provider signature schemes", () => {
 
             expect(await statusOf("{}", { "x-gitlab-token": SECRET })).toBe(401);
             expect(scheduled).toHaveLength(0);
-        });
-    });
-
-    describe("linear", () => {
-        it("accepts a bare-hex signature over a fresh body", async () => {
-            const { scheduled, statusOf } = await setup(LINEAR_TRIGGER);
-            const body = linearBody();
-
-            expect(await statusOf(body, await linearHeaders(body))).toBe(200);
-            expect(scheduled).toHaveLength(1);
-        });
-
-        it("refuses a prefixed signature, since Linear sends bare hex", async () => {
-            const { statusOf } = await setup(LINEAR_TRIGGER);
-            const body = linearBody();
-
-            expect(await statusOf(body, { "linear-signature": `sha256=${await hmacHex(body)}` })).toBe(401);
-        });
-
-        it("refuses a signature over another body", async () => {
-            const { statusOf } = await setup(LINEAR_TRIGGER);
-
-            expect(await statusOf(linearBody(), await linearHeaders(linearBody(NOW - 1)))).toBe(401);
-        });
-
-        it("refuses a body whose webhookTimestamp is outside the window, even when signed", async () => {
-            const { scheduled, statusOf } = await setup(LINEAR_TRIGGER);
-            const stale = linearBody(NOW - SIGNED_REQUEST_WINDOW_MS - 1000);
-
-            expect(await statusOf(stale, await linearHeaders(stale))).toBe(401);
-            expect(scheduled).toHaveLength(0);
-        });
-
-        it("reads webhookTimestamp as milliseconds, not seconds", async () => {
-            const { statusOf } = await setup(LINEAR_TRIGGER);
-            const seconds = linearBody(Math.floor(NOW / 1000));
-
-            expect(await statusOf(seconds, await linearHeaders(seconds))).toBe(401);
-        });
-
-        it("refuses a signed body with no webhookTimestamp", async () => {
-            const { statusOf } = await setup(LINEAR_TRIGGER);
-            const body = JSON.stringify({ action: "update", type: "Issue" });
-
-            expect(await statusOf(body, await linearHeaders(body))).toBe(401);
-        });
-
-        it("refuses the timestamped headers on a linear trigger", async () => {
-            const { statusOf } = await setup(LINEAR_TRIGGER);
-            const body = linearBody();
-
-            expect(await statusOf(body, { ...(await linearHeaders(body)), "x-neore-timestamp": String(Math.floor(NOW / 1000)) })).toBe(401);
-        });
-
-        it("fails closed when the trigger has no secret", async () => {
-            const { statusOf } = await setup({ ...LINEAR_TRIGGER, webhookSecret: undefined });
-            const body = linearBody();
-
-            expect(await statusOf(body, await linearHeaders(body))).toBe(401);
         });
     });
 });

@@ -35,6 +35,7 @@ import { notificationInputFields } from "./notifications/validators";
 import { vSkillConfig } from "./skills/validators";
 import { vSubAgentRunStatus } from "./sub-agents/validators";
 import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./tasks/validators";
+import { vWebhookSignatureScheme } from "./triggers/validators";
 
 /** Hoisted so `streamDeltasFields` is readable as a value, not just a type. */
 export const streamDeltasFields = {
@@ -2776,7 +2777,7 @@ export const schema = defineSchema({
         webhookSecret: v.optional(v.string()),
         // How a webhook delivery is signed; unset = "timestamped" (`triggers/http.ts`).
         // A trigger accepts only its own scheme's headers. Widening this union is additive.
-        webhookSignatureScheme: v.optional(v.union(v.literal("timestamped"), v.literal("native"), v.literal("gitlab-token"), v.literal("linear"))),
+        webhookSignatureScheme: v.optional(vWebhookSignatureScheme),
     })
         .shardBy("userId")
         .index("by_userId_organizationId", ["userId", "organizationId"])

@@ -40303,53 +40303,66 @@
                       },
                       "type": {},
                       "webhookPreset": {
-                        "properties": {
-                          "event": {
-                            "anyOf": [
-                              {
-                                "const": "pull_request_opened",
-                                "type": "string"
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "event": {
+                                "anyOf": [
+                                  {
+                                    "const": "pull_request_opened",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "pull_request_merged",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "pull_request_review_requested",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "issue_assigned",
+                                    "type": "string"
+                                  }
+                                ]
                               },
-                              {
-                                "const": "pull_request_merged",
-                                "type": "string"
-                              },
-                              {
-                                "const": "pull_request_review_requested",
-                                "type": "string"
-                              },
-                              {
-                                "const": "issue_assigned",
-                                "type": "string"
-                              },
-                              {
-                                "const": "merge_request_opened",
-                                "type": "string"
-                              },
-                              {
-                                "const": "merge_request_merged",
-                                "type": "string"
-                              }
-                            ]
-                          },
-                          "provider": {
-                            "anyOf": [
-                              {
+                              "provider": {
                                 "const": "github",
                                 "type": "string"
+                              }
+                            },
+                            "required": [
+                              "event",
+                              "provider"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "event": {
+                                "anyOf": [
+                                  {
+                                    "const": "merge_request_opened",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "merge_request_merged",
+                                    "type": "string"
+                                  }
+                                ]
                               },
-                              {
+                              "provider": {
                                 "const": "gitlab",
                                 "type": "string"
                               }
-                            ]
+                            },
+                            "required": [
+                              "event",
+                              "provider"
+                            ],
+                            "type": "object"
                           }
-                        },
-                        "required": [
-                          "event",
-                          "provider"
-                        ],
-                        "type": "object"
+                        ]
                       },
                       "webhookSignatureScheme": {
                         "anyOf": [
@@ -40363,10 +40376,6 @@
                           },
                           {
                             "const": "gitlab-token",
-                            "type": "string"
-                          },
-                          {
-                            "const": "linear",
                             "type": "string"
                           }
                         ]

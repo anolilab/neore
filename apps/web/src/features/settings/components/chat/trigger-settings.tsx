@@ -5,8 +5,7 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
-import type { WebhookPresetEvent, WebhookProvider, WebhookSignatureScheme } from "@neore/backend/triggers/presets";
-import { PRESET_EVENTS, PROVIDER_SCHEME } from "@neore/backend/triggers/presets";
+import type { WebhookSignatureScheme } from "@neore/backend/triggers/presets";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardHeading, CardTitle } from "@neore/ui/components/card";
@@ -44,20 +43,20 @@ import type { FC } from "react";
 import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
-import type { FilterOp, PayloadFilterRow } from "@/features/settings/lib/trigger-filters";
-import {
-    filtersToSend,
-    hasIncompleteFilters,
-    isValidFilterPath,
-    MAX_FILTER_PATH_LENGTH,
-    MAX_FILTER_VALUE_LENGTH,
-    MAX_FILTERS,
-    opTakesValue,
-} from "@/features/settings/lib/trigger-filters";
+import type { FilterOp } from "@/features/settings/lib/trigger-filters";
 import env from "@/lib/env";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import TriggerTypePicker from "./trigger-type-picker";
+import type { WebhookFormState } from "./webhook-trigger-fields";
+import {
+    EMPTY_WEBHOOK,
+    webhookCreateArgs,
+    webhookHasIncompleteFilters,
+    WebhookSigningInstructions,
+    WebhookTriggerFields,
+    webhookUpdateFilters,
+} from "./webhook-trigger-fields";
 
 /** The template variable a webhook trigger fills with the request body; code, not copy. */
 const PAYLOAD_TOKEN = "{{payload}}";
@@ -66,53 +65,11 @@ const PAYLOAD_TOKEN = "{{payload}}";
 
 type TriggerType = "event" | "schedule" | "webhook";
 
-/** "custom" is a hand-written trigger: its own scheme and filters. A provider sets both from its event. */
-type WebhookSourceChoice = "custom" | WebhookProvider;
-
-/**
- * The schemes a hand-written webhook trigger can pick. Fixed when the trigger is created, with its secret.
- * `linear` is not offered: Linear generates its own signing secret and takes none from the caller, so a
- * trigger's server-minted secret can never verify a Linear delivery until a provider-supplied secret is stored.
- */
-const CUSTOM_SCHEMES: WebhookSignatureScheme[] = ["timestamped", "native", "gitlab-token"];
-
-const SCHEME_LABELS: Record<WebhookSignatureScheme, MessageDescriptor> = {
-    linear: msg`Linear (Linear-Signature)`,
-    "gitlab-token": msg`GitLab secret token (X-Gitlab-Token)`,
-    native: msg`GitHub-style (X-Hub-Signature-256)`,
-    timestamped: msg`Neore (timestamped)`,
-};
-
-const PROVIDER_LABELS: Record<WebhookSourceChoice, MessageDescriptor> = {
-    custom: msg`Custom`,
-    github: msg`GitHub`,
-    gitlab: msg`GitLab`,
-};
-
-const PRESET_EVENT_LABELS: Record<WebhookPresetEvent, MessageDescriptor> = {
-    issue_assigned: msg`Issue assigned`,
-    merge_request_merged: msg`Merge request merged`,
-    merge_request_opened: msg`Merge request opened`,
-    pull_request_merged: msg`Pull request merged`,
-    pull_request_opened: msg`Pull request opened`,
-    pull_request_review_requested: msg`Review requested on a pull request`,
-};
-
-const FILTER_OP_LABELS: Record<FilterOp, MessageDescriptor> = {
-    contains: msg`contains`,
-    equals: msg`equals`,
-    exists: msg`exists`,
-    not_equals: msg`does not equal`,
-    not_exists: msg`does not exist`,
-    starts_with: msg`starts with`,
-};
-
 interface TriggerFormData {
     botComputer: boolean;
     botId: string;
     cronExpression: string;
     description: string;
-    filters: PayloadFilterRow[];
     inputTemplate: string;
     model: string;
     name: string;
@@ -120,10 +77,7 @@ interface TriggerFormData {
     systemPrompt: string;
     timezone: string;
     type: TriggerType;
-    /** A provider's event, when the source is a provider; the event is always one of that provider's. */
-    webhookEvent: WebhookPresetEvent;
-    webhookSignatureScheme: WebhookSignatureScheme;
-    webhookSource: WebhookSourceChoice;
+    webhook: WebhookFormState;
 }
 
 /**
@@ -180,7 +134,6 @@ const EMPTY_FORM: TriggerFormData = {
     botId: "",
     cronExpression: "0 8 * * *",
     description: "",
-    filters: [],
     inputTemplate: "",
     model: "",
     name: "",
@@ -188,9 +141,7 @@ const EMPTY_FORM: TriggerFormData = {
     systemPrompt: "",
     timezone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
     type: "schedule",
-    webhookEvent: PRESET_EVENTS.github[0],
-    webhookSignatureScheme: "timestamped",
-    webhookSource: "custom",
+    webhook: EMPTY_WEBHOOK,
 };
 
 /**
@@ -220,130 +171,6 @@ const EXECUTION_STATUS_LABELS: Partial<Record<string, MessageDescriptor>> = {
 
 // ─── Shared Trigger Form ────────────────────────────────────────────────────
 
-/** Edits a webhook trigger's payload filters: every filter must match the JSON body for a delivery to run. */
-const PayloadFiltersEditor: FC<{ filters: PayloadFilterRow[]; onChange: (filters: PayloadFilterRow[]) => void }> = ({ filters, onChange }) => {
-    const { i18n, t } = useLingui();
-    // Generated id: the create and edit forms can be open together.
-    const labelId = useId();
-    const update = (index: number, patch: Partial<PayloadFilterRow>) =>
-        onChange(filters.map((filter, at) => (at === index ? { ...filter, ...patch } : filter)));
-
-    return (
-        <div aria-labelledby={labelId} className="space-y-2" role="group">
-            <Label id={labelId}>{t`Payload filters (optional)`}</Label>
-            <p className="text-muted-foreground text-xs">
-                {t`Only run when every filter matches the JSON body. Use dotted paths such as pull_request.user.login or labels.0.name. A delivery that does not match is accepted, shown as Filtered in the history, and does not run or count against your quota.`}
-            </p>
-            {filters.map((filter, index) => (
-                // The rows have no identity of their own; they are only ever added at the end or removed.
-
-                <div className="flex items-start gap-2" key={index}>
-                    <Input
-                        aria-invalid={filter.path.length > 0 && !isValidFilterPath(filter.path)}
-                        aria-label={t`Filter path`}
-                        className="min-w-0 flex-1 font-mono text-xs"
-                        maxLength={MAX_FILTER_PATH_LENGTH}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => update(index, { path: e.target.value })}
-                        placeholder="action"
-                        value={filter.path}
-                    />
-                    <Select onValueChange={(value) => update(index, { op: value as FilterOp })} value={filter.op}>
-                        <SelectTrigger aria-label={t`Filter condition`} className="w-40 shrink-0">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {(Object.keys(FILTER_OP_LABELS) as FilterOp[]).map((op) => (
-                                <SelectItem key={op} value={op}>
-                                    {i18n._(FILTER_OP_LABELS[op])}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    {opTakesValue(filter.op) && (
-                        <Input
-                            aria-label={t`Filter value`}
-                            className="min-w-0 flex-1 text-xs"
-                            maxLength={MAX_FILTER_VALUE_LENGTH}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => update(index, { value: e.target.value })}
-                            placeholder="opened"
-                            value={filter.value}
-                        />
-                    )}
-                    <Button
-                        aria-label={t`Remove filter`}
-                        onClick={() => onChange(filters.filter((_, at) => at !== index))}
-                        size="sm"
-                        type="button"
-                        variant="ghost"
-                    >
-                        <X aria-hidden="true" className="size-4" />
-                    </Button>
-                </div>
-            ))}
-            <Button
-                disabled={filters.length >= MAX_FILTERS}
-                onClick={() => onChange([...filters, { op: "equals", path: "", value: "" }])}
-                size="sm"
-                type="button"
-                variant="outline"
-            >
-                <Plus aria-hidden="true" className="mr-1.5 size-3" />
-                {t`Add filter`}
-            </Button>
-        </div>
-    );
-};
-
-/** What a sender must send for each scheme. Requests of the other scheme are rejected. */
-const WebhookSigningInstructions: FC<{ scheme: WebhookSignatureScheme }> = ({ scheme }) => {
-    if (scheme === "native") {
-        return (
-            <p className="text-muted-foreground mt-2">
-                <Trans>
-                    Send <code className="font-mono">X-Hub-Signature-256: sha256=&lt;hex&gt;</code>, the HMAC-SHA256 of the raw request body keyed with the
-                    secret (the format GitHub webhooks use). This signature has no timestamp, so a captured request can be replayed once the 15-minute duplicate
-                    window has passed. Requests with the neore headers are rejected.
-                </Trans>
-            </p>
-        );
-    }
-
-    if (scheme === "gitlab-token") {
-        return (
-            <p className="text-muted-foreground mt-2">
-                <Trans>
-                    Send the secret as <code className="font-mono">X-Gitlab-Token</code>, in plain text, as GitLab&apos;s secret token works. GitLab does not
-                    sign the body and sends no timestamp, so the secret is a bearer token: whoever holds it can send any request. An identical body is treated
-                    as a duplicate for 15 minutes. Requests carrying other signature headers are rejected.
-                </Trans>
-            </p>
-        );
-    }
-
-    if (scheme === "linear") {
-        return (
-            <p className="text-muted-foreground mt-2">
-                <Trans>
-                    Send <code className="font-mono">Linear-Signature: &lt;hex&gt;</code>, the HMAC-SHA256 of the raw request body keyed with the secret, as
-                    bare hex with no prefix. The body&apos;s <code className="font-mono">webhookTimestamp</code> (milliseconds) must be within 5 minutes.
-                    Requests carrying the neore or GitHub headers are rejected.
-                </Trans>
-            </p>
-        );
-    }
-
-    return (
-        <p className="text-muted-foreground mt-2">
-            <Trans>
-                Every request must be signed. Send <code className="font-mono">X-Neore-Timestamp</code> (the current Unix time in seconds) and{" "}
-                <code className="font-mono">X-Signature-256: sha256=&lt;hex&gt;</code>, the HMAC-SHA256 of{" "}
-                <code className="font-mono">&lt;timestamp&gt;.&lt;raw body&gt;</code> keyed with the secret. Requests more than 5 minutes old, unsigned, or
-                replayed are rejected, as is <code className="font-mono">X-Hub-Signature-256</code>.
-            </Trans>
-        </p>
-    );
-};
-
 interface TriggerFormProps {
     formData: TriggerFormData;
     /** An existing trigger keeps its type and the scheme its secret was issued for. */
@@ -360,9 +187,6 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
     const botPickerId = useId();
     const botComputerId = useId();
     const quietId = useId();
-    const schemeId = useId();
-    const sourceId = useId();
-    const eventId = useId();
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const { data: bots = [] } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
@@ -506,87 +330,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                                 (Zapier, n8n, your own code, etc.).
                             </Trans>
                         </p>
-                        <div className="mt-3 space-y-1.5">
-                            <Label htmlFor={sourceId}>{t`Source`}</Label>
-                            <Select
-                                disabled={isExisting}
-                                onValueChange={(value) => {
-                                    const source = value as WebhookSourceChoice;
-
-                                    // A provider's event is one of that provider's, so switching provider resets it.
-                                    onChange({
-                                        ...formData,
-                                        webhookEvent: source === "custom" ? formData.webhookEvent : PRESET_EVENTS[source][0],
-                                        webhookSource: source,
-                                    });
-                                }}
-                                value={formData.webhookSource}
-                            >
-                                <SelectTrigger id={sourceId}>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {(Object.keys(PROVIDER_LABELS) as WebhookSourceChoice[]).map((source) => (
-                                        <SelectItem key={source} value={source}>
-                                            {t(PROVIDER_LABELS[source])}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {formData.webhookSource === "custom" ? (
-                            <>
-                                <div className="mt-3 space-y-1.5">
-                                    <Label htmlFor={schemeId}>{t`Signature`}</Label>
-                                    <Select
-                                        disabled={isExisting}
-                                        onValueChange={(value) => onChange({ ...formData, webhookSignatureScheme: value as WebhookSignatureScheme })}
-                                        value={formData.webhookSignatureScheme}
-                                    >
-                                        <SelectTrigger id={schemeId}>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {CUSTOM_SCHEMES.map((scheme) => (
-                                                <SelectItem key={scheme} value={scheme}>
-                                                    {t(SCHEME_LABELS[scheme])}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <WebhookSigningInstructions scheme={formData.webhookSignatureScheme} />
-                                <div className="mt-4">
-                                    <PayloadFiltersEditor filters={formData.filters} onChange={(filters) => onChange({ ...formData, filters })} />
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="mt-3 space-y-1.5">
-                                    <Label htmlFor={eventId}>{t`Event`}</Label>
-                                    <Select
-                                        disabled={isExisting}
-                                        onValueChange={(value) => onChange({ ...formData, webhookEvent: value as WebhookPresetEvent })}
-                                        value={formData.webhookEvent}
-                                    >
-                                        <SelectTrigger id={eventId}>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {PRESET_EVENTS[formData.webhookSource].map((event) => (
-                                                <SelectItem key={event} value={event}>
-                                                    {t(PRESET_EVENT_LABELS[event])}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <p className="text-muted-foreground mt-2">
-                                    <Trans>The filters and the signature come from the event. Only the provider&apos;s own deliveries for it run.</Trans>
-                                </p>
-                                <WebhookSigningInstructions scheme={PROVIDER_SCHEME[formData.webhookSource]} />
-                            </>
-                        )}
+                        <WebhookTriggerFields isExisting={isExisting} onChange={(webhook) => onChange({ ...formData, webhook })} webhook={formData.webhook} />
                     </div>
                 )}
 
@@ -633,7 +377,12 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                         {t`Cancel`}
                     </Button>
                     <Button
-                        disabled={isPending || !formData.name.trim() || formData.type === "event" || hasIncompleteFilters(formData.type, formData.filters)}
+                        disabled={
+                            isPending ||
+                            !formData.name.trim() ||
+                            formData.type === "event" ||
+                            (formData.type === "webhook" && webhookHasIncompleteFilters(formData.webhook))
+                        }
                         onClick={onSubmit}
                     >
                         {isPending && <Loader2 aria-hidden="true" className="mr-1.5 size-4 animate-spin" />}
@@ -751,17 +500,12 @@ const TriggerSettings: FC = () => {
             return;
         }
 
-        // A provider sends its event; the server compiles the filters and the scheme. A custom trigger sends its own.
-        const isProviderWebhook = formData.type === "webhook" && formData.webhookSource !== "custom";
-        const isCustomWebhook = formData.type === "webhook" && formData.webhookSource === "custom";
-
         createTrigger(
             {
                 botComputer: formData.botComputer || undefined,
                 botId: formData.botId || undefined,
                 cronExpression: formData.type === "schedule" ? formData.cronExpression : undefined,
                 description: formData.description || undefined,
-                filters: isCustomWebhook && formData.filters.length > 0 ? filtersToSend(formData.filters) : undefined,
                 inputTemplate: formData.inputTemplate || undefined,
                 model: formData.model || "anthropic/claude-sonnet-4-20250514",
                 name: formData.name,
@@ -769,9 +513,8 @@ const TriggerSettings: FC = () => {
                 systemPrompt: formData.systemPrompt || undefined,
                 timezone: formData.type === "schedule" ? formData.timezone : undefined,
                 type: formData.type,
-                webhookPreset:
-                    isProviderWebhook && formData.webhookSource !== "custom" ? { event: formData.webhookEvent, provider: formData.webhookSource } : undefined,
-                webhookSignatureScheme: isCustomWebhook ? formData.webhookSignatureScheme : undefined,
+                // A provider sends its event and the server compiles the filters and the scheme; a custom trigger sends its own.
+                ...webhookCreateArgs(formData.type, formData.webhook),
             },
             {
                 onError: () => toast.error(t`Failed to create trigger`),
@@ -798,7 +541,7 @@ const TriggerSettings: FC = () => {
                 cronExpression: editFormData.type === "schedule" ? editFormData.cronExpression : undefined,
                 description: editFormData.description || undefined,
                 // The whole set replaces the stored one; an empty set clears it.
-                filters: editFormData.type === "webhook" ? filtersToSend(editFormData.filters) : undefined,
+                filters: editFormData.type === "webhook" ? webhookUpdateFilters(editFormData.webhook) : undefined,
                 inputTemplate: editFormData.inputTemplate || undefined,
                 model: editFormData.model || undefined,
                 name: editFormData.name,
@@ -892,9 +635,6 @@ const TriggerSettings: FC = () => {
             botId: trigger.botId ?? "",
             cronExpression: trigger.cronExpression ?? "0 8 * * *",
             description: trigger.description ?? "",
-            filters: trigger.filters.map((filter) => {
-                return { op: filter.op, path: filter.path, value: filter.value ?? "" };
-            }),
             inputTemplate: trigger.inputTemplate ?? "",
             model: trigger.model,
             name: trigger.name,
@@ -903,9 +643,13 @@ const TriggerSettings: FC = () => {
             timezone: trigger.timezone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone,
             type: trigger.type as TriggerType,
             // A stored trigger keeps its own filters and scheme; the provider it came from is not stored.
-            webhookEvent: PRESET_EVENTS.github[0],
-            webhookSignatureScheme: trigger.webhookSignatureScheme ?? "timestamped",
-            webhookSource: "custom",
+            webhook: {
+                filters: trigger.filters.map((filter) => {
+                    return { op: filter.op, path: filter.path, value: filter.value ?? "" };
+                }),
+                provider: "custom",
+                scheme: trigger.webhookSignatureScheme ?? "timestamped",
+            },
         });
     }, []);
 
