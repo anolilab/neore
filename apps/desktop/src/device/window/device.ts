@@ -1,5 +1,5 @@
 /**
- * The LOCAL device window's page (port of `apps/native/src/device.js`). The only
+ * The LOCAL device window's page. The only
  * place a device call or a pairing is approved, and where shared folders, local
  * MCP servers and allow rules are managed. Bundled as a classic script
  * (`device.js`); it reaches the main process only through `window.neoreDevice`.

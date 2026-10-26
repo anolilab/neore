@@ -1,6 +1,6 @@
 // Bundles the main process, the two sandboxed preloads and the Quick Composer
-// page into `dist/`. The site origin is baked in at build time (like the Tauri
-// shell's NEORE_SITE_URL): there is no runtime override.
+// page into `dist/`. The site origin is baked in at build time (`NEORE_SITE_URL`):
+// there is no runtime override.
 import { copyFileSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -60,7 +60,7 @@ for (const [name, entryPoint, outfile] of preloadEntries) {
     assertSandboxedPreload(name, await esbuild.build({ ...common, entryPoints: [entryPoint], outfile, metafile: true }));
 }
 
-// The Quick Composer page is plain HTML/JS (as in the Tauri shell): copied, not bundled.
+// The Quick Composer page is plain HTML/JS: copied, not bundled.
 for (const file of ["index.html", "quick-composer.css", "quick-composer.js"]) {
     copyFileSync(path.join(root, "src/quick-composer", file), path.join(dist, "quick-composer", file));
 }

@@ -1,7 +1,6 @@
 /**
  * Sign-in through the SYSTEM browser, for providers that refuse embedded
- * webviews (Google answers `disallowed_useragent`). Port of
- * `apps/native/src-tauri/src/sign_in.rs`; same flow, same tests.
+ * webviews (Google answers `disallowed_useragent`).
  *
  * 1. The shell makes a verifier, a challenge and a `state`, and opens the site's
  * `auth/extension` page (with `client=native`) in the default browser.

@@ -1,6 +1,5 @@
 /**
- * The deployment this shell wraps, and every URL derived from it. Port of
- * `apps/native/src-tauri/src/site.rs`: same rules, same tests (`site.test.ts`).
+ * The deployment this shell wraps, and every URL derived from it (`site.test.ts`).
  *
  * The origin is fixed at BUILD time (`NEORE_SITE_URL`, see `scripts/build.mjs`).
  * It is also the only origin granted IPC, so a runtime override would let
