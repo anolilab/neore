@@ -715,6 +715,74 @@ mod tests {
         let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
+    /// A connected socket the parent leaves inheritable is closed in the child,
+    /// whatever the network setting: the seccomp filter only stops new sockets.
+    /// The unsandboxed control proves the descriptor does reach a child.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_sandboxed_command_cannot_use_an_inherited_socket() {
+        if !sandbox_or_skip() {
+            return;
+        }
+        let Some(bash) = ["/bin/bash", "/usr/bin/bash"]
+            .into_iter()
+            .find(|path| Path::new(path).exists())
+        else {
+            return;
+        };
+
+        let (shared, _outside) = folders("inherited");
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let client = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let fd = client.as_raw_fd();
+
+        // SAFETY: plain flag update on a descriptor this test owns.
+        assert_eq!(unsafe { libc::fcntl(fd, libc::F_SETFD, 0) }, 0);
+
+        let line = format!("{bash} -c 'echo x >&{fd}' 2>/dev/null && echo leaked || echo closed");
+        let outcome = |policy: Option<&Policy>| {
+            run(&line, &shared, Duration::from_secs(10), 4096, policy)
+                .unwrap()
+                .output
+        };
+
+        assert!(outcome(None).contains("leaked"));
+
+        for network in [false, true] {
+            let policy = Policy {
+                network,
+                ..Policy::for_roots(std::slice::from_ref(&shared), None)
+            };
+
+            assert!(
+                outcome(Some(&policy)).contains("closed"),
+                "network: {network}"
+            );
+        }
+
+        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
+    }
+
+    /// The descriptor sweep must leave the close-on-exec pipe `std` reports an
+    /// `exec` failure through, or a missing program would look like a success.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_sandboxed_spawn_still_reports_a_failed_exec() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        let (shared, _outside) = folders("exec-error");
+        let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
+        let mut command = Command::new("/nonexistent/neore-program");
+        let _guard = super::super::sandbox::confine(&mut command, &policy).unwrap();
+        let error = command.spawn().unwrap_err();
+
+        assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+
+        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
+    }
+
     /// A sandboxed command inherits only the allowlisted environment, so a
     /// variable that points at an IPC socket never reaches it.
     #[cfg(any(target_os = "linux", target_os = "macos"))]

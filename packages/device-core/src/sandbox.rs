@@ -423,6 +423,113 @@ mod linux {
         Ok(())
     }
 
+    /// Closes every socket this process would hand to the child, except those
+    /// `exec` closes anyway. The network filter refuses only NEW sockets, and
+    /// Landlock leaves open descriptors alone, so a connected socket (a service
+    /// link, a D-Bus or display connection) would still move data in the
+    /// sandbox. Pipes and files are left alone, which keeps the close-on-exec
+    /// pipe `std` reports an `exec` failure through. An error means the sweep
+    /// did not finish, so the spawn must fail. Only `open`, `getdents64`,
+    /// `fstat`, `fcntl` and `close`: safe between `fork` and `exec`, no allocation.
+    unsafe fn close_inherited_sockets() -> std::io::Result<()> {
+        let dir = libc::open(
+            c"/proc/self/fd".as_ptr(),
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC,
+        );
+
+        if dir < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+
+        // u64 elements keep the buffer aligned for `dirent64`.
+        let mut entries = [0u64; 512];
+        let mut highest: libc::c_int = 2;
+
+        loop {
+            let read = libc::syscall(
+                libc::SYS_getdents64,
+                dir,
+                entries.as_mut_ptr(),
+                std::mem::size_of_val(&entries),
+            );
+
+            if read < 0 {
+                let error = std::io::Error::last_os_error();
+
+                libc::close(dir);
+
+                return Err(error);
+            }
+
+            if read == 0 {
+                break;
+            }
+
+            let base = entries.as_ptr().cast::<u8>();
+            let mut offset = 0;
+
+            while offset < read as usize {
+                let entry = base.add(offset).cast::<libc::dirent64>();
+                let name = std::ptr::addr_of!((*entry).d_name).cast::<u8>();
+                let mut fd: libc::c_int = 0;
+                let mut numeric = *name != 0;
+                let mut index = 0;
+
+                while *name.add(index) != 0 {
+                    let byte = *name.add(index);
+
+                    if byte.is_ascii_digit() {
+                        fd = fd
+                            .saturating_mul(10)
+                            .saturating_add(libc::c_int::from(byte - b'0'));
+                    } else {
+                        numeric = false;
+                    }
+
+                    index += 1;
+                }
+
+                if numeric {
+                    highest = highest.max(fd);
+                }
+
+                offset += usize::from((*entry).d_reclen);
+            }
+        }
+
+        libc::close(dir);
+
+        for fd in 3..=highest {
+            let mut stat: libc::stat = std::mem::zeroed();
+
+            if libc::fstat(fd, &mut stat) != 0 {
+                let error = std::io::Error::last_os_error();
+
+                if error.raw_os_error() == Some(libc::EBADF) {
+                    continue;
+                }
+
+                return Err(error);
+            }
+
+            if stat.st_mode & libc::S_IFMT != libc::S_IFSOCK {
+                continue;
+            }
+
+            let flags = libc::fcntl(fd, libc::F_GETFD);
+
+            if flags < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+
+            if flags & libc::FD_CLOEXEC == 0 && libc::close(fd) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+        }
+
+        Ok(())
+    }
+
     /// The kernel's Landlock ABI version, 0 when it has none.
     pub fn abi() -> i64 {
         const LANDLOCK_CREATE_RULESET_VERSION: libc::c_uint = 1;
@@ -473,8 +580,9 @@ mod linux {
     }
 
     /// Confines `command`'s child with Landlock and, when the policy has no
-    /// network, a seccomp filter on network sockets. Fails closed: if the child
-    /// cannot restrict itself, it never execs and the spawn errors.
+    /// network, a seccomp filter on network sockets. Either way the child first
+    /// drops the sockets it inherited. Fails closed: if the child cannot
+    /// restrict itself, it never execs and the spawn errors.
     pub fn confine(command: &mut Command, policy: &Policy) -> Result<Guard, String> {
         let ruleset = ruleset(policy)?;
         let fd = ruleset.as_raw_fd();
@@ -489,6 +597,9 @@ mod linux {
         // (the guard) until the spawn has returned.
         unsafe {
             command.pre_exec(move || {
+                // First: the Landlock rules need not cover /proc.
+                close_inherited_sockets()?;
+
                 if libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0 {
                     return Err(std::io::Error::last_os_error());
                 }
