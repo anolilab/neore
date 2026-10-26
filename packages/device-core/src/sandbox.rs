@@ -308,7 +308,7 @@ mod linux {
     }
 
     /// The seccomp-bpf program for a command that may not use the network:
-    /// `socket(AF_INET | AF_INET6, ..)` and `io_uring_setup` fail with `EPERM`,
+    /// `socket(AF_INET | AF_INET6 | AF_PACKET, ..)` and `io_uring_setup` fail with `EPERM`,
     /// every other syscall is allowed, and a process of another architecture
     /// (32-bit compat, x32) is killed. Fails when this architecture has no
     /// filter, so an unsupported machine never runs a command unconfined.
@@ -339,7 +339,8 @@ mod linux {
                 branch(BPF_JMP_JEQ_K, libc::SYS_socket as u32, To::Next, To::Allow),
                 statement(BPF_LD_W_ABS, OFFSET_ARG0),
                 branch(BPF_JMP_JEQ_K, libc::AF_INET as u32, To::Deny, To::Next),
-                branch(BPF_JMP_JEQ_K, libc::AF_INET6 as u32, To::Deny, To::Allow),
+                branch(BPF_JMP_JEQ_K, libc::AF_INET6 as u32, To::Deny, To::Next),
+                branch(BPF_JMP_JEQ_K, libc::AF_PACKET as u32, To::Deny, To::Allow),
             ]);
 
             let allow = program.len();
@@ -531,6 +532,26 @@ pub const SANDBOX_EXEC: &str = "/usr/bin/sandbox-exec";
 
 /// Decides how a `shell_run` call runs: `Ok(Some)` sandboxed, `Ok(None)`
 /// unsandboxed because the user allowed that, `Err` refused.
+/// `support`, narrowed to what a command with this network setting can
+/// enforce. A command without network needs a seccomp filter, which this
+/// architecture may not be able to build, so the prompt must not claim a
+/// sandbox that every approved command would then fail to start under.
+#[cfg(target_os = "linux")]
+fn enforceable(support: &Support, network: bool) -> Support {
+    if let (Support::Available(_), false) = (support, network) {
+        if let Err(reason) = linux::network_filter() {
+            return Support::Unavailable(reason);
+        }
+    }
+
+    support.clone()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn enforceable(support: &Support, _network: bool) -> Support {
+    support.clone()
+}
+
 pub fn policy_for_call(
     support: &Support,
     allow_unsandboxed: bool,
@@ -538,7 +559,7 @@ pub fn policy_for_call(
     roots: &[PathBuf],
     home: Option<&Path>,
 ) -> Result<Option<Policy>, String> {
-    match support {
+    match enforceable(support, allow_network) {
         Support::Available(_) => Ok(Some(Policy {
             network: allow_network,
             ..Policy::for_roots(roots, home)
@@ -797,7 +818,8 @@ mod tests {
 
     /// What a forked child sees from `socket(2)` after `filter` (if any) is
     /// installed: bit 0 AF_INET failed with EPERM, bit 1 AF_INET6 failed with
-    /// EPERM, bit 2 AF_UNIX succeeded, bit 3 AF_INET succeeded. The child
+    /// EPERM, bit 2 AF_UNIX succeeded, bit 3 AF_INET succeeded, bit 4 AF_PACKET
+    /// failed with EPERM. The child
     /// allocates nothing and only `_exit`s, so forking the test process is safe.
     #[cfg(target_os = "linux")]
     fn probe_sockets(filter: Option<&[libc::sock_filter]>) -> i32 {
@@ -836,7 +858,8 @@ mod tests {
                 let bits = i32::from(denied(libc::AF_INET))
                     | i32::from(denied(libc::AF_INET6)) << 1
                     | i32::from(opens(libc::AF_UNIX)) << 2
-                    | i32::from(opens(libc::AF_INET)) << 3;
+                    | i32::from(opens(libc::AF_INET)) << 3
+                    | i32::from(denied(libc::AF_PACKET)) << 4;
 
                 libc::_exit(bits);
             }
@@ -855,7 +878,7 @@ mod tests {
     fn the_network_filter_refuses_ip_sockets_and_keeps_unix_sockets() {
         let filter = network_filter().unwrap();
 
-        assert_eq!(probe_sockets(Some(&filter)), 0b0111);
+        assert_eq!(probe_sockets(Some(&filter)), 0b1_0111);
     }
 
     #[cfg(target_os = "linux")]
