@@ -13,7 +13,8 @@
  *
  * The run re-checks everything when it fires ({@link claimDailyBrief}): still
  * enabled, recently active, inside the local morning window, not already run
- * today. A late, duplicated or stale job does nothing.
+ * today. A duplicated or stale job does nothing; one that lands outside the
+ * window books the next morning's run.
  *
  * ## Cost
  *
@@ -160,10 +161,23 @@ export const claimDailyBrief = internalMutation
 
         // Clear the pending job unless it names a LATER one (activity scheduled
         // it while this one was overdue). `undefined` removes a field (`lib/patch.ts`).
-        const clearPending = state.scheduledFor !== undefined && state.scheduledFor > now ? {} : { scheduledFor: undefined, scheduledJobId: undefined };
+        const hasLaterJob = state.scheduledFor !== undefined && state.scheduledFor > now;
+        const clearPending = hasLaterJob ? {} : { scheduledFor: undefined, scheduledJobId: undefined };
 
         if (!eligibility.eligible) {
-            await patchRow(ctx.db, state, clearPending);
+            // A run that landed outside its window (late alarm, time-zone change,
+            // DST) books the next morning instead of going quiet until the user
+            // chats again. `outside_window` is only reached by an enabled, recently
+            // active user. `nextBriefRunAt` is strictly later than `now`, so this
+            // cannot loop.
+            if (eligibility.reason === "outside_window" && !hasLaterJob) {
+                const scheduledFor = nextBriefRunAt(now, settings?.timezone, userId);
+                const scheduledJobId = await ctx.scheduler.runAt(scheduledFor, internal.notifications.daily_brief.runDailyBrief, { userId });
+
+                await patchRow(ctx.db, state, { scheduledFor, scheduledJobId });
+            } else {
+                await patchRow(ctx.db, state, clearPending);
+            }
 
             return { claimed: false as const, reason: eligibility.reason };
         }

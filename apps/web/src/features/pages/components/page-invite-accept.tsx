@@ -29,7 +29,7 @@ const PageInviteAccept: FC<{ token: string }> = ({ token }) => {
             { token },
             {
                 onSuccess: ({ ownerId, pageId }) => {
-                    // The page lives on its owner's shard (`lib/lunora/shard-routing.ts`).
+                    // The page lives on its owner's shard (`packages/client-runtime/src/shard-routing.ts`).
                     notePageShard(pageId, ownerId);
                     void navigate({ params: { pageId }, replace: true, to: "/pages/$pageId" });
                 },

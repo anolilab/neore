@@ -600,9 +600,6 @@ catalogs:
     lucide-react:
       specifier: 1.60.0
       version: 1.60.0
-    react-icons:
-      specifier: 5.7.0
-      version: 5.7.0
   lint:
     '@anolilab/commitlint-config':
       specifier: 10.1.5
@@ -3006,9 +3003,6 @@ importers:
       react-day-picker:
         specifier: catalog:forms
         version: 10.0.2(@types/react@19.3.0)(react@19.3.1)
-      react-icons:
-        specifier: catalog:icons
-        version: 5.7.0(react@19.3.1)
       react-number-format:
         specifier: catalog:forms
         version: 5.4.5(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -21499,11 +21493,6 @@ packages:
     peerDependencies:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
-
-  react-icons@5.7.0:
-    resolution: {integrity: sha512-LBLy340Rzqy6+/yVhZKT3B/QpP1BZaesGqasf09HPOBzRarcDIFH0WwXlXQfE7q7ipxK4MSiC5DIBWURCny6fw==}
-    peerDependencies:
-      react: '*'
 
   react-image-crop@11.1.2:
     resolution: {integrity: sha512-+0Pc2fxpwKL4u4oLmdKBw8XSwUceFbXbKEHvFOlsl/MGB1OVNic4uBlAPmEHGXYgoJIq+b63xHbc/aJMG0AVkA==}
@@ -45377,10 +45366,6 @@ snapshots:
     dependencies:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
-
-  react-icons@5.7.0(react@19.3.1):
-    dependencies:
-      react: 19.3.1
 
   react-image-crop@11.1.2(react@19.3.1):
     dependencies:

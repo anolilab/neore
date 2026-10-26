@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getFileRendererType, isDelimitedTable, isJsonl, isMermaid, TEXT_PREVIEW_EXTENSIONS } from "./file-type-utilities";
+import { formatFileSize, getFileRendererType, isDelimitedTable, isJsonl, isMermaid, TEXT_PREVIEW_EXTENSIONS } from "./file-type-utilities";
 
 describe("text previews are recognised by file name", () => {
     it.each(["rows.jsonl", "ROWS.JSONL", "events.ndjson"])("%s is JSON Lines", (filename) => {
@@ -67,5 +67,16 @@ describe("TEXT_PREVIEW_EXTENSIONS", () => {
         for (const extension of TEXT_PREVIEW_EXTENSIONS.table) {
             expect(isDelimitedTable(`a.${extension}`)).toBe(true);
         }
+    });
+});
+
+describe(formatFileSize, () => {
+    it("formats bytes, kilobytes, megabytes and gigabytes", () => {
+        expect(formatFileSize(0)).toBe("0 B");
+        expect(formatFileSize(500)).toBe("500 B");
+        expect(formatFileSize(1536)).toBe("1.5 KB");
+        expect(formatFileSize(1_048_576)).toBe("1.0 MB");
+        expect(formatFileSize(2_019_377_376)).toBe("1.9 GB");
+        expect(formatFileSize(42 * 1024 ** 3)).toBe("42.0 GB");
     });
 });

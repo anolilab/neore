@@ -25,7 +25,7 @@ export const ABANDONED_MEDIA_TEXT = "*Generation did not finish. Please try agai
 export const mediaJobStamp = (jobId: string | undefined): Record<string, Record<string, string>> | undefined =>
     jobId === undefined ? undefined : { [JOB_STAMP_NAMESPACE]: { jobId } };
 
-const stampedJobId = (providerMetadata: unknown): unknown =>
+export const stampedJobId = (providerMetadata: unknown): unknown =>
     (providerMetadata as Record<string, Record<string, unknown> | undefined> | undefined)?.[JOB_STAMP_NAMESPACE]?.jobId;
 
 export const failAbandonedMediaJob = internalMutation

@@ -1,8 +1,6 @@
 /**
- * @deprecated Use the unified classification from the LLM Gateway's
- * `/internal/route` endpoint (classification.taskType, classification.isComplex, etc.) instead.
- * This file is kept for backward compatibility during the migration.
- * See: services/llm-gateway/src/routing/classify.ts
+ * Local task-type detection. It runs on every turn, so it stays in the backend: a call
+ * to the gateway's classifier would add a round trip to each one.
  */
 import type { TaskType } from "@neore/ai/prompts";
 

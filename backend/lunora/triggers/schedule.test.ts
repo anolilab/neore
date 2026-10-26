@@ -171,3 +171,104 @@ describe("dueScheduleStep", () => {
         expect(dueScheduleStep(undefined, NOW)).toEqual({ kind: "run" });
     });
 });
+
+describe("findNextCronTime in a time zone", () => {
+    const at = (iso: string): number => Date.parse(iso);
+    const NEW_YORK = "America/New_York";
+    const BERLIN = "Europe/Berlin";
+
+    it("reads the fields as local time", () => {
+        // 09:00 in New York is 13:00Z in summer time and 14:00Z in winter time.
+        expect(findNextCronTime("0 9 * * *", at("2026-07-01T00:00:00Z"), NEW_YORK)).toBe(at("2026-07-01T13:00:00Z"));
+        expect(findNextCronTime("0 9 * * *", at("2026-01-15T00:00:00Z"), NEW_YORK)).toBe(at("2026-01-15T14:00:00Z"));
+    });
+
+    it("matches day of month and weekday on the local date", () => {
+        // Monday 00:00 in Tokyo (UTC+9) is Sunday 15:00Z.
+        expect(findNextCronTime("0 0 * * 1", at("2026-03-12T00:00:00Z"), "Asia/Tokyo")).toBe(at("2026-03-15T15:00:00Z"));
+        // The 1st at 00:30 in Los Angeles (UTC-7 in May) is the 1st at 07:30Z.
+        expect(findNextCronTime("30 0 1 * *", at("2026-05-02T00:00:00Z"), "America/Los_Angeles")).toBe(at("2026-06-01T07:30:00Z"));
+    });
+
+    it("starts from the local date when it differs from the UTC date", () => {
+        // 2026-03-12T03:00Z is still the 11th (23:00) in New York, so 23:30 is the same evening.
+        expect(findNextCronTime("30 23 * * *", at("2026-03-12T03:00:00Z"), NEW_YORK)).toBe(at("2026-03-12T03:30:00Z"));
+    });
+
+    describe("spring forward", () => {
+        it("runs a time inside the gap just after it, in a zone behind UTC", () => {
+            // 2026-03-08 02:30 does not exist in New York; the clocks jump from 02:00 EST to 03:00 EDT.
+            expect(findNextCronTime("30 2 * * *", at("2026-03-08T00:00:00Z"), NEW_YORK)).toBe(at("2026-03-08T07:30:00Z"));
+        });
+
+        it("runs a time inside the gap just after it, in a zone ahead of UTC", () => {
+            // 2026-03-29 02:30 does not exist in Berlin; the clocks jump from 02:00 CET to 03:00 CEST.
+            expect(findNextCronTime("30 2 * * *", at("2026-03-29T00:00:00Z"), BERLIN)).toBe(at("2026-03-29T01:30:00Z"));
+        });
+
+        it("fires once on the gap day and returns to the normal hour the day after", () => {
+            const gapRun = findNextCronTime("30 2 * * *", at("2026-03-08T00:00:00Z"), NEW_YORK)!;
+
+            expect(findNextCronTime("30 2 * * *", gapRun, NEW_YORK)).toBe(at("2026-03-09T06:30:00Z"));
+        });
+
+        it("keeps the local hour across the change for a time outside the gap", () => {
+            expect(findNextCronTime("0 9 * * *", at("2026-03-07T15:00:00Z"), NEW_YORK)).toBe(at("2026-03-08T13:00:00Z"));
+            expect(findNextCronTime("0 9 * * *", at("2026-03-08T13:00:00Z"), NEW_YORK)).toBe(at("2026-03-09T13:00:00Z"));
+        });
+    });
+
+    describe("fall back", () => {
+        it("runs an ambiguous time once, at its earlier occurrence, in a zone behind UTC", () => {
+            // 2026-11-01 01:30 happens twice in New York: 05:30Z (EDT) and 06:30Z (EST).
+            const first = findNextCronTime("30 1 * * *", at("2026-11-01T00:00:00Z"), NEW_YORK)!;
+
+            expect(first).toBe(at("2026-11-01T05:30:00Z"));
+            // The repeat hour does not fire again: the next run is the following day.
+            expect(findNextCronTime("30 1 * * *", first, NEW_YORK)).toBe(at("2026-11-02T06:30:00Z"));
+        });
+
+        it("runs an ambiguous time once, at its earlier occurrence, in a zone ahead of UTC", () => {
+            // 2026-10-25 02:30 happens twice in Berlin: 00:30Z (CEST) and 01:30Z (CET).
+            const first = findNextCronTime("30 2 * * *", at("2026-10-25T00:00:00Z"), BERLIN)!;
+
+            expect(first).toBe(at("2026-10-25T00:30:00Z"));
+            expect(findNextCronTime("30 2 * * *", first, BERLIN)).toBe(at("2026-10-26T01:30:00Z"));
+        });
+    });
+
+    describe("missing or unusable zones", () => {
+        const REF = at("2026-03-12T10:30:00Z");
+        const utc = findNextCronTime("0 9 * * *", REF);
+
+        it("reads an invalid zone as UTC", () => {
+            expect(findNextCronTime("0 9 * * *", REF, "Not/AZone")).toBe(utc);
+            expect(utc).toBe(at("2026-03-13T09:00:00Z"));
+        });
+
+        it("reads a missing, null or empty zone as UTC", () => {
+            expect(findNextCronTime("0 9 * * *", REF, undefined)).toBe(utc);
+            expect(findNextCronTime("0 9 * * *", REF, null)).toBe(utc);
+            expect(findNextCronTime("0 9 * * *", REF, "")).toBe(utc);
+        });
+
+        it("treats an explicit UTC zone like none", () => {
+            expect(findNextCronTime("0 9 * * *", REF, "UTC")).toBe(utc);
+            expect(findNextCronTime("0 9 * * *", REF, "Etc/UTC")).toBe(utc);
+        });
+    });
+
+    it("still finds a schedule that never fires, and a leap day, in a zone", () => {
+        expect(findNextCronTime("0 0 30 2 *", at("2026-03-12T00:00:00Z"), NEW_YORK)).toBeUndefined();
+        expect(findNextCronTime("0 0 29 2 *", at("2026-03-12T00:00:00Z"), NEW_YORK)).toBe(at("2028-02-29T05:00:00Z"));
+    });
+});
+
+describe("dueScheduleStep with a zone", () => {
+    it("arms the next run in the trigger's zone", () => {
+        const now = Date.parse("2026-07-01T00:00:00Z");
+
+        expect(dueScheduleStep("0 9 * * *", now, "America/New_York")).toEqual({ kind: "run", nextTime: Date.parse("2026-07-01T13:00:00Z") });
+        expect(dueScheduleStep("0 9 * * *", now, "Not/AZone")).toEqual({ kind: "run", nextTime: Date.parse("2026-07-01T09:00:00Z") });
+    });
+});
