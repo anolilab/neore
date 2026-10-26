@@ -99,6 +99,14 @@ export const dataUrlResponse = (url: string): Response => {
     const [, header = "", payload = ""] = match;
     const isBase64 = BASE64_PARAM_RE.test(header);
     const mediaType = (header.split(";", 1)[0] ?? "").trim();
+
+    // Refuse on the encoded length before anything is decoded: base64 yields at most 3 bytes per 4 characters.
+    const encodedLimit = isBase64 ? Math.ceil((MAX_FETCHED_TEXT_BYTES * 4) / 3) + 4 : MAX_FETCHED_TEXT_BYTES;
+
+    if (payload.length > encodedLimit) {
+        throw tooLarge(MAX_FETCHED_TEXT_BYTES);
+    }
+
     const decoded = decodeURIComponent(payload);
     const body = isBase64 ? Uint8Array.from(atob(decoded), (character) => character.codePointAt(0) ?? 0) : new TextEncoder().encode(decoded);
 
@@ -117,7 +125,8 @@ export const loadResource = async <T>(
     }
 
     try {
-        const response = url.startsWith("data:") ? dataUrlResponse(url) : await fetch(url, { signal });
+        // `redirect: "error"`: the destination was checked for the URL given, so a redirect to another host is refused, not followed.
+        const response = url.startsWith("data:") ? dataUrlResponse(url) : await fetch(url, { redirect: "error", signal });
 
         if (!response.ok) {
             return { status: "error" };

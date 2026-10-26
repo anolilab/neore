@@ -87,6 +87,10 @@ describe(dataUrlResponse, () => {
         await expect(readTextWithin(response, 100)).resolves.toBe("a,b\n1,2\n");
     });
 
+    it("refuses an oversized base64 payload before decoding it", () => {
+        expect(() => dataUrlResponse(`data:text/plain;base64,${"A".repeat(MAX_FETCHED_TEXT_BYTES * 2)}`)).toThrow();
+    });
+
     it("decodes a percent-encoded data URL, UTF-8 included", async () => {
         const response = dataUrlResponse(`data:text/plain,${encodeURIComponent("a€b\nc,d")}`);
 
@@ -126,6 +130,14 @@ describe(loadResource, () => {
 
         return await loadResource(url, readText, new AbortController().signal, [BACKEND]);
     };
+
+    it("refuses redirects on a fetched URL, so a redirect cannot reach another host", async () => {
+        const fetchSpy = vi.fn(async () => new Response("a,b"));
+
+        await run(`${BACKEND}/files/a.csv`, fetchSpy);
+
+        expect(fetchSpy).toHaveBeenCalledWith(`${BACKEND}/files/a.csv`, expect.objectContaining({ redirect: "error" }));
+    });
 
     it("does not fetch a foreign origin, a loopback service or another scheme", async () => {
         const fetchSpy = vi.fn();
