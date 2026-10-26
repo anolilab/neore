@@ -3,7 +3,7 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 
 import { useCRPCClient } from "@/lib/lunora/crpc";
 
-import { readThreadListCache, toThreadListData, writeThreadListCache } from "../lib/thread-list-cache";
+import { getThreadListClearGeneration, readThreadListCache, toThreadListData, writeThreadListCache } from "../lib/thread-list-cache";
 
 /** Pushes arrive in bursts while a reply streams; the stored copy only needs the last one. */
 const WRITE_DEBOUNCE_MS = 1000;
@@ -44,9 +44,15 @@ export const usePersistThreadList = (data: unknown, isPlaceholderData: boolean):
     const userId = useCacheUserId();
 
     useEffect(() => {
+        const generation = getThreadListClearGeneration();
         const timer =
             data && !isPlaceholderData && userId
                 ? setTimeout(() => {
+                      // A sign-out cleared the store while this write waited; writing now would put the list back.
+                      if (generation !== getThreadListClearGeneration()) {
+                          return;
+                      }
+
                       writeThreadListCache(userId, data);
                   }, WRITE_DEBOUNCE_MS)
                 : undefined;

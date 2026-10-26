@@ -14,6 +14,11 @@
 const CACHE_PREFIX = "neore-thread-list:";
 const CACHE_VERSION = 1;
 
+const clears = { count: 0 };
+
+/** Bumped by every clear; a write scheduled before a clear compares it to drop itself. */
+export const getThreadListClearGeneration = (): number => clears.count;
+
 /** Keyed by the signed-in user, so one account's list is never read for another. */
 const cacheKey = (userId: string): string => `${CACHE_PREFIX}v${CACHE_VERSION}:${userId}`;
 
@@ -219,6 +224,8 @@ export const writeThreadListCache = (userId: string | undefined, data: unknown, 
 
 /** Removes every user's stored list. For sign-out and anonymous-account conversion. */
 export const clearThreadListCache = (storage: Storage | undefined = getThreadListStorage()): void => {
+    clears.count += 1;
+
     if (!storage) {
         return;
     }

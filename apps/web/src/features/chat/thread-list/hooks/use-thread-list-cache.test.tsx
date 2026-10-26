@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { writeThreadListCache } from "../lib/thread-list-cache";
+import { clearThreadListCache, writeThreadListCache } from "../lib/thread-list-cache";
 import { usePersistThreadList, useThreadListPlaceholder } from "./use-thread-list-cache";
 
 const auth: { token: string | null } = { token: null };
@@ -88,5 +88,18 @@ describe("thread list cache hooks", () => {
             vi.advanceTimersByTime(2000);
         });
         expect(localStorage).toHaveLength(1);
+    });
+
+    it("drops a write that was waiting when the cache was cleared", () => {
+        vi.useFakeTimers();
+        auth.token = jwtFor("alice");
+
+        renderHook(() => usePersistThreadList(list("alice", "T"), false));
+        clearThreadListCache();
+
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        expect(localStorage).toHaveLength(0);
     });
 });

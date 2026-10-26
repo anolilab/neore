@@ -90,6 +90,9 @@ const useThreadGroups = (
     const projects = useProjects();
     const { t } = useLingui();
 
+    // The project list has no stored copy, so project chats stay out of the stored rows until it answers rather than landing in a date group and jumping.
+    const holdProjectThreads = isPlaceholderData && projects.length === 0;
+
     // Get optimistic state for instant UI updates
     const optimisticPins = useOptimisticPins();
     const optimisticStatuses = useOptimisticStatuses();
@@ -109,7 +112,7 @@ const useThreadGroups = (
         } else if (isSearching && searchType === "messages") {
             threadsToUse = messageSearchResults?.page;
         } else {
-            threadsToUse = threadsData?.page;
+            threadsToUse = holdProjectThreads ? threadsData?.page.filter((thread: any) => !thread.projectId) : threadsData?.page;
         }
 
         if (!threadsToUse) {
@@ -164,6 +167,7 @@ const useThreadGroups = (
         };
     }, [
         threadsData?.page,
+        holdProjectThreads,
         temporaryThreads?.page,
         threadSearchResults?.page,
         messageSearchResults?.page,
