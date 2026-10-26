@@ -308,7 +308,8 @@ mod linux {
     }
 
     /// The seccomp-bpf program for a command that may not use the network:
-    /// `socket(AF_INET | AF_INET6 | AF_PACKET, ..)` and `io_uring_setup` fail with `EPERM`,
+    /// `socket(AF_INET | AF_INET6 | AF_PACKET, ..)` and `io_uring_setup` fail
+    /// with `EPERM`,
     /// every other syscall is allowed, and a process of another architecture
     /// (32-bit compat, x32) is killed. Fails when this architecture has no
     /// filter, so an unsupported machine never runs a command unconfined.
@@ -530,8 +531,6 @@ pub fn support() -> Support {
 #[cfg(target_os = "macos")]
 pub const SANDBOX_EXEC: &str = "/usr/bin/sandbox-exec";
 
-/// Decides how a `shell_run` call runs: `Ok(Some)` sandboxed, `Ok(None)`
-/// unsandboxed because the user allowed that, `Err` refused.
 /// `support`, narrowed to what a command with this network setting can
 /// enforce. A command without network needs a seccomp filter, which this
 /// architecture may not be able to build, so the prompt must not claim a
@@ -552,6 +551,8 @@ fn enforceable(support: &Support, _network: bool) -> Support {
     support.clone()
 }
 
+/// Decides how a `shell_run` call runs: `Ok(Some)` sandboxed, `Ok(None)`
+/// unsandboxed because the user allowed that, `Err` refused.
 pub fn policy_for_call(
     support: &Support,
     allow_unsandboxed: bool,
@@ -819,8 +820,8 @@ mod tests {
     /// What a forked child sees from `socket(2)` after `filter` (if any) is
     /// installed: bit 0 AF_INET failed with EPERM, bit 1 AF_INET6 failed with
     /// EPERM, bit 2 AF_UNIX succeeded, bit 3 AF_INET succeeded, bit 4 AF_PACKET
-    /// failed with EPERM. The child
-    /// allocates nothing and only `_exit`s, so forking the test process is safe.
+    /// failed with EPERM. The child allocates nothing and only `_exit`s, so
+    /// forking the test process is safe.
     #[cfg(target_os = "linux")]
     fn probe_sockets(filter: Option<&[libc::sock_filter]>) -> i32 {
         // SAFETY: the child makes only raw syscalls and exits without unwinding.
