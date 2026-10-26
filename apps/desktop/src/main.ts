@@ -162,9 +162,9 @@ const guardNavigation = (event: { preventDefault: () => void }, url: string): vo
 /**
  * What this build can do, as the site must read it. `device` is listed only when the
  * core loaded AND the local device page is in the build; otherwise the relay would
- * answer "unavailable" to every call.
+ * answer "unavailable" to every call. Only the main window advertises `device`: a thread window
+ * that claimed a call would return its result to a window that may close.
  */
-// Only the main window advertises `device`: a thread window that claimed a call would return its result to a window that may close.
 const siteCapabilities = (isMain: boolean): string[] => {
     const capabilities = ["notifications", "compose", "sign-in", "thread-windows"];
 

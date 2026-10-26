@@ -7,12 +7,12 @@ import { WifiOff } from "lucide-react";
 
 import { useOfflineScreen } from "../hooks/use-offline-screen";
 
+const PROBE_TIMEOUT_MS = 5000;
+
 /**
  * A reload while the network or the server is down replaces the app with the browser's error page, so
  * the button reloads only once the origin answers. A failed probe leaves the screen up.
  */
-const PROBE_TIMEOUT_MS = 5000;
-
 const reloadWhenReachable = async (): Promise<void> => {
     // A connection that opens and then stalls would otherwise leave the retry pending forever.
     const controller = new AbortController();
