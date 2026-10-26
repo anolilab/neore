@@ -7,6 +7,8 @@
  * chats: `loadHomeOverview` keeps only the six most recently updated, so a
  * handful of routine runs updating threads after a user's chat would push that
  * chat out of view. Chats are read here by their own windowed query instead.
+ * Tasks are too: a task that finished leaves the overview's review and running
+ * sections, so the overview alone cannot tell that it finished inside the window.
  */
 import { v } from "lunorash/server";
 
@@ -20,6 +22,12 @@ const QUIET_EVENTS_READ = 50;
 
 /** Chats read: the decision needs one, and the rest only fill the brief's list of titles. */
 const QUIET_THREADS_READ = 20;
+
+/** Tasks read: the decision needs one. */
+const QUIET_TASKS_READ = 20;
+
+/** The `type` of the event a task updated inside the window becomes. */
+const TASK_EVENT_TYPE = "task";
 
 /** A column an old row may leave unset, or set to false. */
 const notSet = (field: "deleted" | "isTemporary") => {
@@ -39,7 +47,7 @@ export const loadQuietSnapshot = internalQuery
         }),
     )
     .query(async ({ args: { since, userId }, ctx }): Promise<QuietSnapshot> => {
-        const [overview, recent, chats] = await Promise.all([
+        const [overview, recent, chats, tasks] = await Promise.all([
             loadHomeOverview(ctx, userId),
             // The ignored types are left out of the read itself, so a busy routine's notifications cannot fill the limit and hide a real one.
             ctx.db.notifications.findMany({
@@ -72,12 +80,24 @@ export const loadQuietSnapshot = internalQuery
                     userId,
                 },
             }),
+            // Any status: a task that finished (or failed) since the window start is activity, and is in neither overview section.
+            // Tasks are deleted outright (no `deleted` column), and `userId` is the owner check the overview uses. `updatedAt` is required.
+            ctx.db.tasks.findMany({
+                limit: QUIET_TASKS_READ,
+                orderBy: [{ updatedAt: "desc" }],
+                where: { updatedAt: { gt: since }, userId },
+            }),
         ]);
 
         return {
-            events: recent.page.map((row) => {
-                return { createdAt: row.createdAt, type: row.type };
-            }),
+            events: [
+                ...recent.page.map((row) => {
+                    return { createdAt: row.createdAt, type: row.type };
+                }),
+                ...tasks.page.map((task) => {
+                    return { createdAt: task.updatedAt, type: TASK_EVENT_TYPE };
+                }),
+            ],
             // An approval, a coding agent and a sub-agent carry no `updatedAt`: their creation is the time they arose.
             needsYou: [
                 ...overview.approvals.map((approval) => {

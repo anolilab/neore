@@ -6,6 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
+import { isQuietRunSkipped } from "./quiet";
 import { loadQuietSnapshot } from "./quiet-inputs";
 
 const USER = "user-a";
@@ -149,5 +150,37 @@ describe("loadQuietSnapshot", () => {
 
         expect(inside.threads.map((thread: { title: string }) => thread.title)).toEqual(["Legacy"]);
         expect(outside.threads).toEqual([]);
+    });
+
+    describe("a task that finished inside the window", () => {
+        const SINCE = NOW - 60_000;
+        const ROUTINE = { botId: "bot-a", createdAt: 1, lastTriggeredAt: SINCE, quietWhenEmpty: true, type: "schedule" } as const;
+        const SCHEDULED = { manual: false };
+
+        const skipped = async () => await isQuietRunSkipped(ROUTINE, snapshotSince, SCHEDULED);
+
+        it("makes the next quiet check post, with no notification and no chat", async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.insert("tasks", { createdAt: 1, status: "done", title: "Shipped", updatedAt: SINCE + 1000, userId: USER });
+            });
+
+            await expect(skipped()).resolves.toBe(false);
+        });
+
+        it("does not, when it was last updated before the window start", async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.insert("tasks", { createdAt: 1, status: "done", title: "Old", updatedAt: SINCE - 1000, userId: USER });
+            });
+
+            await expect(skipped()).resolves.toBe(true);
+        });
+
+        it("does not, when it is another user's", async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.insert("tasks", { createdAt: 1, status: "done", title: "Theirs", updatedAt: SINCE + 1000, userId: "user-b" });
+            });
+
+            await expect(skipped()).resolves.toBe(true);
+        });
     });
 });
