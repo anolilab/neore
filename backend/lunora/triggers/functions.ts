@@ -733,7 +733,7 @@ export const getDueScheduleTriggers = internalQuery
 export const updateTriggerStats = internalMutation
     .input({
         error: v.optional(v.string()),
-        // When the run began its agent; omit it for a run that never created a thread (`quiet.ts`).
+        // When the run began its agent; a quiet routine omits it for a run that never created a thread (`quiet.ts`).
         lastTriggeredAt: v.optional(v.number()),
         nextTriggerAt: v.optional(v.number()),
         triggerId: v.id("triggers"),
