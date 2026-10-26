@@ -30,6 +30,7 @@ import { ACCENT_BOOT_SCRIPT } from "@/features/appearance/lib/accent-boot-script
 import { CHAT_TEXT_SIZE_BOOT_SCRIPT } from "@/features/appearance/lib/chat-text-size";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
+import ConnectionProvider from "@/features/connection/components/connection-provider";
 import OfflineScreen from "@/features/connection/components/offline-screen";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import usePostHogIdentity from "@/hooks/use-posthog-identity";
@@ -451,10 +452,12 @@ const RootComponent = () => {
                                                     }
                                                 >
                                                     <ImpersonationBanner />
-                                                    {/* Eager, not lazy: a lazy chunk cannot load while the app is offline, which is when this screen is needed. */}
-                                                    {isNative && <OfflineScreen />}
-                                                    <ScreenSizeDebug />
-                                                    <Outlet />
+                                                    <ConnectionProvider>
+                                                        {/* Eager, not lazy: a lazy chunk cannot load while the app is offline, which is when this screen is needed. */}
+                                                        {isNative && <OfflineScreen />}
+                                                        <ScreenSizeDebug />
+                                                        <Outlet />
+                                                    </ConnectionProvider>
                                                     <Suspense fallback={null}>
                                                         <SettingsModal />
                                                     </Suspense>

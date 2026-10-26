@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { connectionViewOf, initialConnectionState, reduceConnection } from "./connection-state";
+import {
+    bannerDelayMs,
+    CONNECTION_THRESHOLDS_MS,
+    connectionPresentationOf,
+    connectionViewOf,
+    initialConnectionState,
+    reduceConnection,
+    screenDelayMs,
+} from "./connection-state";
 
 const start = initialConnectionState(true);
 
@@ -67,5 +75,26 @@ describe("reduceConnection", () => {
         state = reduceConnection(state, { status: "idle", type: "live" });
 
         expect(state.hasConnected).toBe(true);
+    });
+});
+
+describe("connectionPresentationOf", () => {
+    it("shows nothing while online", () => {
+        expect(connectionPresentationOf("online", "screen")).toEqual({ banner: "online", screen: null });
+    });
+
+    it("shows an offline banner at once, and the screen after the offline threshold", () => {
+        expect(bannerDelayMs("offline")).toBe(0);
+        expect(screenDelayMs("offline")).toBe(CONNECTION_THRESHOLDS_MS.offlineScreen);
+        expect(connectionPresentationOf("offline", "pending")).toEqual({ banner: "offline", screen: null });
+        expect(connectionPresentationOf("offline", "screen")).toEqual({ banner: "offline", screen: "offline" });
+    });
+
+    it("holds a reconnect back for the grace period, then counts the screen threshold from the banner", () => {
+        expect(bannerDelayMs("reconnecting")).toBe(CONNECTION_THRESHOLDS_MS.reconnectingBanner);
+        expect(screenDelayMs("reconnecting")).toBe(CONNECTION_THRESHOLDS_MS.reconnectingBanner + CONNECTION_THRESHOLDS_MS.reconnectingScreen);
+        expect(connectionPresentationOf("reconnecting", "pending")).toEqual({ banner: "online", screen: null });
+        expect(connectionPresentationOf("reconnecting", "banner")).toEqual({ banner: "reconnecting", screen: null });
+        expect(connectionPresentationOf("reconnecting", "screen")).toEqual({ banner: "reconnecting", screen: "reconnecting" });
     });
 });

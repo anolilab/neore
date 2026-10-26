@@ -2,21 +2,24 @@ import { useEffect, useReducer, useState } from "react";
 
 import { useLunora } from "@/lib/lunora/crpc";
 
-import type { ConnectionView } from "../lib/connection-state";
-import { connectionViewOf, initialConnectionState, reduceConnection } from "../lib/connection-state";
+import type { ConnectionPresentation, ConnectionStage, ConnectionView } from "../lib/connection-state";
+import { bannerDelayMs, connectionPresentationOf, connectionViewOf, initialConnectionState, reduceConnection, screenDelayMs } from "../lib/connection-state";
+
+interface Lapsed {
+    readonly stage: Exclude<ConnectionStage, "pending">;
+    readonly view: ConnectionView;
+}
 
 /**
- * How long a reconnect must last before it is shown. The client bounces its
- * socket whenever the bearer's subject changes (sign-in, guest conversion), and
- * a flash of "Reconnecting" for that is noise. `offline` is never delayed.
+ * The app's connection status: what the banner and the offline screen show. It
+ * subscribes to the client and the window, so mount it once (see
+ * `ConnectionProvider`) and read it with `useConnection`. Starts `online` on the
+ * server and on first paint; reads `navigator.onLine` after mount.
  */
-export const RECONNECTING_GRACE_MS = 2000;
-
-/** The app's connection view. Starts `online` on the server and on first paint; reads `navigator.onLine` after mount. */
-export const useConnectionStatus = (): ConnectionView => {
+export const useConnectionStatus = (): ConnectionPresentation => {
     const client = useLunora();
     const [state, dispatch] = useReducer(reduceConnection, true, initialConnectionState);
-    const [graced, setGraced] = useState(false);
+    const [lapsed, setLapsed] = useState<Lapsed | null>(null);
     const view = connectionViewOf(state);
 
     useEffect(() => {
@@ -39,21 +42,26 @@ export const useConnectionStatus = (): ConnectionView => {
     }, [client]);
 
     useEffect(() => {
-        if (view !== "reconnecting") {
+        if (view === "online") {
             return undefined;
         }
 
-        const timer = setTimeout(setGraced, RECONNECTING_GRACE_MS, true);
+        const bannerDelay = bannerDelayMs(view);
+        const timers = [setTimeout(setLapsed, screenDelayMs(view), { stage: "screen", view })];
+
+        if (bannerDelay > 0) {
+            timers.push(setTimeout(setLapsed, bannerDelay, { stage: "banner", view }));
+        }
 
         return () => {
-            clearTimeout(timer);
-            setGraced(false);
+            for (const timer of timers) {
+                clearTimeout(timer);
+            }
+
+            setLapsed(null);
         };
     }, [view]);
 
-    if (view !== "reconnecting") {
-        return view;
-    }
-
-    return graced ? view : "online";
+    // Compared against the live view, so a stage left over from a previous view never shows, even before the cleanup above has run.
+    return connectionPresentationOf(view, lapsed !== null && lapsed.view === view ? lapsed.stage : "pending");
 };

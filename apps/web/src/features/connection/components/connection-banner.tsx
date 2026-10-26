@@ -3,7 +3,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { motion, useReducedMotion } from "motion/react";
 
-import { useConnectionStatus } from "../hooks/use-connection-status";
+import { useConnection } from "../hooks/use-connection";
 
 /**
  * Shows while the browser is offline or the live connection is down. The
@@ -14,7 +14,7 @@ import { useConnectionStatus } from "../hooks/use-connection-status";
  */
 const ConnectionBanner = () => {
     const { t } = useLingui();
-    const view = useConnectionStatus();
+    const { banner: view } = useConnection();
     const prefersReducedMotion = useReducedMotion();
 
     let message = "";

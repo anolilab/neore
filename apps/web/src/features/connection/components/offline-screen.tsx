@@ -5,7 +5,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogTitle } from "@neore/ui/com
 import { Button } from "@neore/ui/components/button";
 import { WifiOff } from "lucide-react";
 
-import { useOfflineScreen } from "../hooks/use-offline-screen";
+import { useConnection } from "../hooks/use-connection";
 
 const PROBE_TIMEOUT_MS = 5000;
 
@@ -39,7 +39,7 @@ const reloadWhenReachable = async (): Promise<void> => {
  */
 const OfflineScreen = () => {
     const { t } = useLingui();
-    const lapsedView = useOfflineScreen();
+    const { screen: lapsedView } = useConnection();
 
     let message = "";
 
