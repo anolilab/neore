@@ -3,6 +3,8 @@ import { PostHogProvider } from "posthog-js/react";
 import type { FC, PropsWithChildren } from "react";
 import { useEffect } from "react";
 
+import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
+
 /**
  * Apply a consent decision to PostHog.
  *
@@ -15,6 +17,8 @@ import { useEffect } from "react";
 export const syncConsentToPostHog = ({ preferences }: { preferences: Record<string, boolean> }): void => {
     if (preferences.measurement) {
         posthog.opt_in_capturing();
+        // A launch that happened before consent is reported now; its stored flag keeps it from repeating.
+        reportFirstNativeLaunch();
     } else {
         posthog.opt_out_capturing();
     }
@@ -76,6 +80,9 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                     ph.opt_in_capturing();
                     ph.debug();
                 }
+
+                // Here, not in an effect: AnalyticsProvider wraps the app, so child effects run before PostHog loads.
+                reportFirstNativeLaunch();
             },
             person_profiles: "always",
         });

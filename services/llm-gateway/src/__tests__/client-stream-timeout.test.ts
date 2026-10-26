@@ -197,6 +197,34 @@ describe("POST /v1/stream chunk poll", () => {
         const body = await response.text();
 
         expect(body).not.toContain("resume");
+        expect(body).not.toContain('"end"');
         expect(fetchMock).toHaveBeenCalledTimes(MAX_BACKEND_POLLS + 6);
+    });
+
+    it("ends a reply with the end line only for an opted-in client, and only when the backend reports it done", async () => {
+        const relay = async (status: string, isEndMarker: boolean) => {
+            vi.stubGlobal(
+                "fetch",
+                vi.fn(async () => Response.json({ chunks: [{ text: "x" }], longPoll: true, status, totalChunks: 1 })),
+            );
+
+            const response = await clientStreamRouter.request(
+                "/v1/stream",
+                {
+                    body: JSON.stringify({ endMarker: isEndMarker, resumable: true, streamToken: await createStreamToken("s1", "u1", "t1", SECRET) }),
+                    headers: { "content-type": "application/json" },
+                    method: "POST",
+                },
+                { LUNORA_URL: "https://backend.example", SIGNING_SECRET: SECRET },
+            );
+
+            const text = await response.text();
+
+            return text.trim().split("\n").at(-1);
+        };
+
+        expect(await relay("done", true)).toBe('{"type":"end"}');
+        expect(await relay("done", false)).toBe('{"text":"x"}');
+        expect(await relay("error", true)).toBe('{"text":"x"}');
     });
 });

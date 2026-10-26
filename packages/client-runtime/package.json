@@ -1,0 +1,32 @@
+{
+    "name": "@neore/client-runtime",
+    "version": "0.0.0",
+    "private": true,
+    "sideEffects": false,
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./package.json": "./package.json"
+    },
+    "scripts": {
+        "lint:types": "tsc --noEmit",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@lunora/client": "catalog:lunora",
+        "@lunora/react": "catalog:lunora",
+        "@tanstack/react-query": "catalog:tanstack"
+    },
+    "devDependencies": {
+        "@types/react": "catalog:types",
+        "react": "catalog:react",
+        "typescript": "catalog:tsc",
+        "vitest": "catalog:test"
+    },
+    "peerDependencies": {
+        "react": "*"
+    },
+    "engines": {
+        "node": ">=22.x"
+    }
+}

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { capUtf8, generateDeviceSecret, isDeviceSecret, isFreshTimestamp, parseSignedPayload, signDevicePayload, verifyDevicePayload } from "./signing";
 
 /**
- * The same vectors are pinned on the Rust side (`apps/native/src-tauri/src/device/envelope.rs`),
+ * The same vectors are pinned on the Rust side (`packages/device-core/src/envelope.rs`),
  * so a change to the wire format on either side fails both suites.
  */
 const SECRET = "0123456789abcdef".repeat(4);

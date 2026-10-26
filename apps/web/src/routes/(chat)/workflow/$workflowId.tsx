@@ -1,4 +1,5 @@
 import { Trans } from "@lingui/react/macro";
+import { isLunoraId } from "@neore/client-runtime";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
 
@@ -15,7 +16,6 @@ import {
 } from "@/features/workflow";
 import { useResolveWorkflowImages } from "@/features/workflow/hooks/use-resolve-workflow-images";
 import { startHistoryRecording } from "@/features/workflow/stores/history-store";
-import { isLunoraId } from "@/lib/lunora/ids";
 
 const WorkflowPage = () => {
     const workflowId = Route.useParams({ select: ({ workflowId: selected }) => selected });

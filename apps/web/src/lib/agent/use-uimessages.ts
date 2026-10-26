@@ -8,10 +8,8 @@ import type { SyncStreamsReturnValue } from "@neore/backend/agent/types";
 import type { UIMessage, UIStatus } from "@neore/backend/agent/ui-messages";
 import { combineUIMessages } from "@neore/backend/agent/ui-messages";
 import type { StreamArgs } from "@neore/backend/agent/validators";
+import { shardOptionsFor, withUnlockProof } from "@neore/client-runtime";
 import { useLayoutEffect, useMemo, useRef } from "react";
-
-import { shardOptionsFor } from "@/lib/lunora/shard-routing";
-import { withUnlockProof } from "@/lib/lunora/unlock-proofs";
 
 import { shareUnchangedMessages } from "./share-unchanged-messages";
 import type { BetterOmit, ErrorMessage, Expand } from "./type-utilities";

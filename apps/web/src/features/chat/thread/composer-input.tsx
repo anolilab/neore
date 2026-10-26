@@ -15,6 +15,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { isThreadLockedError } from "@neore/client-runtime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
 import { formatNumber } from "@neore/ui/utils/locale-format";
@@ -42,13 +43,12 @@ import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-st
 import { captureScreenFrame, isScreenCaptureSupported } from "@/features/chat/core/utils/capture-screen";
 import type { ComposerRestoreFile } from "@/features/chat/core/utils/composer-restore";
 import { loadRestoreFile, onComposerRestore } from "@/features/chat/core/utils/composer-restore";
-import { onComposerSubmitRequest } from "@/features/chat/core/utils/composer-submit";
+import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/chat/core/utils/composer-submit";
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { isThreadLockedError } from "@/lib/lunora/unlock-proofs";
 import { showError } from "@/lib/toast";
 
 import type { ChatReference } from "./chat-reference";
@@ -880,6 +880,17 @@ const ComposerInput = ({
             setText(requested);
         });
     }, [isAutoSubmitTarget, setText]);
+
+    // Files dropped on the dock icon (`core/utils/composer-submit.ts`) are attached the same way as a drop: uploaded, never sent.
+    useEffect(() => {
+        if (!isAutoSubmitTarget) {
+            return undefined;
+        }
+
+        return onComposerAttachRequest(({ files }) => {
+            void handleFileSelect(files);
+        });
+    }, [isAutoSubmitTarget, handleFileSelect]);
 
     useEffect(() => {
         if (autoSubmitTextRef.current === null || autoSubmitTextRef.current !== text || disabled || isStreaming) {

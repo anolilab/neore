@@ -17,6 +17,7 @@ import type { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { markdownToPlainText } from "@neore/chat-ui/utils/markdown-text";
 import { getVisibleUserText } from "@neore/chat-ui/utils/page-context";
+import { registerStreamOfThread, withUnlockProofBody } from "@neore/client-runtime";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { HistoryState } from "@tanstack/react-router";
 import { useNavigate } from "@tanstack/react-router";
@@ -33,8 +34,6 @@ import env from "@/lib/env";
 import { AppError, ErrorFactory, RateLimitError } from "@/lib/errors";
 import { providerLogger } from "@/lib/logger";
 import { useCRPC, useLunora } from "@/lib/lunora/crpc";
-import { registerStreamOfThread } from "@/lib/lunora/shard-routing";
-import { withUnlockProofBody } from "@/lib/lunora/unlock-proofs";
 import { notifyNative, shouldNotifyReplyFinished } from "@/lib/native/bridge";
 
 import { DEFAULT_MESSAGE_OPTS } from "../constants/query-options";

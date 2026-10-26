@@ -1,8 +1,8 @@
 import type { Id } from "@neore/backend/dataModel";
+import { useUnlockProof } from "@neore/client-runtime";
 import { skipToken, useQuery } from "@tanstack/react-query";
 
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
-import { useUnlockProof } from "@/lib/lunora/unlock-proofs";
 
 /**
  * Arguments for the deck reads. A deck is gated on its CHAT: a deck in a locked

@@ -1,5 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { forgetUnlockProof, rememberUnlockProof } from "@neore/client-runtime";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
@@ -9,7 +10,6 @@ import type { FormEvent } from "react";
 import { useId, useState } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
-import { forgetUnlockProof, rememberUnlockProof } from "@/lib/lunora/unlock-proofs";
 
 /** What the dialog does: set a passcode, unlock, change it, or remove it. */
 export type ThreadLockMode = "change" | "remove" | "set" | "unlock";

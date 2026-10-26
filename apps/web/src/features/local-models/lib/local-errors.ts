@@ -19,6 +19,8 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
+import { isNativeShell } from "@/lib/native/bridge";
+
 import { LocalStreamError } from "./openai-sse";
 
 export type LocalErrorKind =
@@ -55,8 +57,11 @@ export interface ClassifyContext {
 
 const SAFARI_RE = /^(?:(?!chrome|chromium|crios|edg|android|firefox|fxios).)*safari/iu;
 
-/** WebKit on desktop — the one engine that still blocks/upgrades `http://localhost` from https. */
-export const isSafariUserAgent = (userAgent: string | undefined): boolean => Boolean(userAgent && SAFARI_RE.test(userAgent));
+/**
+ * WebKit on desktop — the one engine that still blocks/upgrades `http://localhost` from https.
+ * The Electron desktop shell is Chromium, so it is never Safari, whatever its user agent says.
+ */
+export const isSafariUserAgent = (userAgent: string | undefined): boolean => !isNativeShell() && Boolean(userAgent && SAFARI_RE.test(userAgent));
 
 const errorName = (error: unknown): string | undefined => (error && typeof error === "object" && "name" in error ? String(error.name) : undefined);
 

@@ -17,9 +17,12 @@
  * polls per request; then the stream ends with
  * `{"type":"resume","lastChunkIndex":n}` as its last line, and the client asks
  * again with that `lastChunkIndex` — `n` counts every chunk relayed so far, so
- * nothing is sent twice or skipped. A client that does not opt in is relayed
- * as before, uncapped, because it would read the marker as the end of the
- * reply.
+ * nothing is sent twice or skipped. A resumable client that also sends
+ * `endMarker: true` gets `{"type":"end"}` as its last line when the reply
+ * finished, so a stream that closes without either marker reads as cut off.
+ * Old clients never send `endMarker`, so they see no new line. A client that
+ * does not opt in to resume is relayed as before, uncapped, because it would
+ * read the marker as the end of the reply.
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
 
@@ -127,7 +130,7 @@ clientStreamRouter.post("/v1/stream", async (c) => {
     const lunoraUrl = c.env.LUNORA_URL;
 
     // Parse request body
-    let body: { lastChunkIndex?: number; resumable?: boolean; streamToken: string };
+    let body: { endMarker?: boolean; lastChunkIndex?: number; resumable?: boolean; streamToken: string };
 
     try {
         body = await c.req.json();
@@ -135,7 +138,7 @@ clientStreamRouter.post("/v1/stream", async (c) => {
         return c.json({ error: "Invalid JSON body" }, 400);
     }
 
-    const { lastChunkIndex, resumable, streamToken } = body;
+    const { endMarker, lastChunkIndex, resumable, streamToken } = body;
 
     if (!streamToken) {
         return c.json({ error: "Missing required parameter: streamToken" }, 400);
@@ -251,6 +254,12 @@ clientStreamRouter.post("/v1/stream", async (c) => {
 
                     // Check if stream is finished
                     if (TERMINAL_STATUSES.has(data.status)) {
+                        // A client that asks for the end line can tell a finished reply from a cut stream.
+                        // Only a clean "done" gets it; error and timeout end without one.
+                        if (resumable === true && endMarker === true && data.status === "done") {
+                            controller.enqueue(encoder.encode(`${JSON.stringify({ type: "end" })}\n`));
+                        }
+
                         controller.close();
 
                         return;

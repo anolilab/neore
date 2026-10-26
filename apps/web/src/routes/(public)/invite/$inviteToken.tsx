@@ -1,4 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { noteThreadShard } from "@neore/client-runtime";
 import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { useMutation } from "@tanstack/react-query";
@@ -8,7 +9,6 @@ import { useState } from "react";
 
 import { requireSession } from "@/lib/auth/route-guard";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { noteThreadShard } from "@/lib/lunora/shard-routing";
 
 const InvitePage = () => {
     const { t } = useLingui();
