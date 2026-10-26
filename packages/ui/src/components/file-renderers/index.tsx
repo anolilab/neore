@@ -13,6 +13,9 @@ export { default as GenericFileCard, type GenericFileCardProps } from "./generic
  * const JsonViewer = lazy(() => import("@neore/ui/components/file-renderers/json-viewer"));
  * const HexViewer = lazy(() => import("@neore/ui/components/file-renderers/hex-viewer"));
  * const PptxPreview = lazy(() => import("@neore/ui/components/file-renderers/pptx-preview"));
+ * const JsonlViewer = lazy(() => import("@neore/ui/components/file-renderers/jsonl-viewer"));
+ * const MermaidPreview = lazy(() => import("@neore/ui/components/file-renderers/mermaid-preview"));
+ * const DelimitedTextPreview = lazy(() => import("@neore/ui/components/file-renderers/delimited-text-preview"));
  * ```
  */
 
