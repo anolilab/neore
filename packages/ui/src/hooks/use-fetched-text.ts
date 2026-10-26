@@ -130,7 +130,7 @@ export const loadResource = async <T>(
 
     try {
         // `redirect: "error"`: the destination was checked for the URL given, so a redirect to another host is refused, not followed.
-        const response = DATA_SCHEME_RE.test(url) ? dataUrlResponse(url) : await fetch(url, { redirect: "error", signal });
+        const response = DATA_SCHEME_RE.test(url) ? dataUrlResponse(url) : await fetch(url, { credentials: "omit", redirect: "error", signal });
 
         if (!response.ok) {
             return { status: "error" };

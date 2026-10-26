@@ -9,7 +9,7 @@ describe(capDelimitedColumns, () => {
     it("returns a table within the cap untouched", () => {
         const content = "a,b,c\n1,2,3\n";
 
-        expect(capDelimitedColumns(content, 3)).toStrictEqual({ content, hiddenColumns: 0 });
+        expect(capDelimitedColumns(content, 3)).toStrictEqual({ content, delimiter: ",", hiddenColumns: 0 });
     });
 
     it("keeps the first columns of every row of a wider table and counts the rest", () => {
@@ -66,7 +66,7 @@ describe(capDelimitedColumns, () => {
     });
 
     it("handles empty content", () => {
-        expect(capDelimitedColumns("", 50)).toStrictEqual({ content: "", hiddenColumns: 0 });
+        expect(capDelimitedColumns("", 50)).toStrictEqual({ content: "", delimiter: ",", hiddenColumns: 0 });
     });
 });
 
@@ -88,6 +88,12 @@ describe("a tab-separated table with commas in its fields", () => {
         expect(delimiterForFilename("data.TSV")).toBe("\t");
         expect(delimiterForFilename("data.csv")).toBeUndefined();
         expect(delimiterForFilename()).toBeUndefined();
+    });
+});
+
+describe("the delimiter a capped table is in", () => {
+    it("reports the detected delimiter, so the renderer is given the same one", () => {
+        expect(capDelimitedColumns("a;b;c\n1;2;3", 2).delimiter).toBe(";");
     });
 });
 

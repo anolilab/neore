@@ -37,9 +37,11 @@ const MAX_PREVIEW_ROWS = 20_000;
 
 const DelimitedTable: FC<{ filename?: string; text: string }> = ({ filename, text }) => {
     const { t } = useLingui();
-    // A .tsv is tab-separated; anything else is detected from the content.
-    const delimiter = delimiterForFilename(filename);
-    const { content, hiddenColumns } = useMemo(() => capDelimitedColumns(text, MAX_PREVIEW_COLUMNS, delimiter), [text, delimiter]);
+    // A .tsv is tab-separated; anything else is detected from the content, and the renderer gets what was detected.
+    const { content, delimiter, hiddenColumns } = useMemo(
+        () => capDelimitedColumns(text, MAX_PREVIEW_COLUMNS, delimiterForFilename(filename)),
+        [text, filename],
+    );
 
     // Not `compact`: the compact table renders every row, while this one pages (50 rows) and searches.
     // Titled with the file name: the default would read "CSV Data" for a .tsv.

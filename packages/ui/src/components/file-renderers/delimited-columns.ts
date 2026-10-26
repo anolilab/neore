@@ -9,6 +9,8 @@ import Papa from "papaparse";
  */
 export interface CappedColumns {
     content: string;
+    /** The delimiter the content is in: the file name's, or the one detected, so the renderer is given the same. */
+    delimiter: string;
     /** Columns cut off, for the "+N more" note. */
     hiddenColumns: number;
 }
@@ -44,16 +46,19 @@ export const capDelimitedColumns = (content: string, maxColumns: number, delimit
     const parsed = Papa.parse<string[]>(content, { delimiter, skipEmptyLines: true });
     const width = parsed.data.reduce((widest, row) => Math.max(widest, row.length), 0);
 
+    const effective = delimiter ?? parsed.meta.delimiter;
+
     if (width <= maxColumns) {
-        return { content, hiddenColumns: 0 };
+        return { content, delimiter: effective, hiddenColumns: 0 };
     }
 
     // The same delimiter is written back, so a TSV stays a TSV.
     return {
         content: Papa.unparse(
             parsed.data.map((row) => row.slice(0, maxColumns)),
-            { delimiter: delimiter ?? parsed.meta.delimiter },
+            { delimiter: effective },
         ),
+        delimiter: effective,
         hiddenColumns: width - maxColumns,
     };
 };
