@@ -41,28 +41,32 @@ import type { HttpActionCtx } from "lunorash/server";
  *                 is refused (401, after the token check). The UUID is unsigned, so it
  *                 is no defence against a holder of the token, who can forge any body
  *                 under any id anyway; it closes the replay of a CAPTURED delivery,
- *                 which repeats the UUID. Each accepted delivery is kept for the
- *                 trigger's whole life as a `webhookDeliveries` row (`deliveries.ts`),
- *                 keyed on the UUID AND the SHA-256 of the body: GitLab documents that
- *                 recursive webhooks share one event UUID, so the UUID alone would
- *                 refuse a distinct delivery. That row replaces the 15-minute body
- *                 claim, which it makes redundant. A claim keyed on the token would
- *                 swallow every delivery after the first.
+ *                 which repeats the UUID. Each accepted delivery is claimed
+ *                 (`lib/claim-once.ts`) for `TRIGGER_DELIVERY_CLAIM_TTL_MS`, effectively
+ *                 for the trigger's life, keyed on the UUID AND the SHA-256 of the body:
+ *                 GitLab documents that recursive webhooks share one event UUID, so the
+ *                 UUID alone would refuse a distinct delivery. That claim replaces the
+ *                 15-minute body claim, which it makes redundant. A delivery that does
+ *                 not run (filtered, refused at admission, failed before the agent
+ *                 started) gives the claim back so a redelivery runs. A claim keyed on
+ *                 the token would swallow every delivery after the first.
  *
  * A missing or empty secret is refused for every scheme (fail closed).
  */
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
-import { TRIGGER_CLAIM_TTL_MS } from "../lib/claim-once";
+import { TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import { hmacSha256Hex, isWithinWindow, SIGNED_REQUEST_WINDOW_MS, secretsMatch, sha256Hex, timingSafeEqual } from "../lib/crypto";
 import { decryptKey } from "../lib/encryption";
 import { httpScheduler } from "../lib/http-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
-import { MAX_DELIVERY_ID_LENGTH } from "./deliveries";
 import { decodeStrict, evaluateFilters, MAX_WEBHOOK_BODY_BYTES } from "./filters";
 import type { WebhookSignatureScheme } from "./validators";
 
 const DIGITS_ONLY = /^\d{1,12}$/u;
+
+/** Longest `X-Gitlab-Event-UUID` accepted; GitLab sends 36 characters. */
+const MAX_DELIVERY_ID_LENGTH = 128;
 
 /** `X-Hub-Signature-256` is always `sha256=<64 hex>`; anything else is refused before any HMAC work. */
 const NATIVE_SIGNATURE = /^sha256=[\da-f]{64}$/iu;
@@ -379,13 +383,15 @@ const SCHEMES: Record<WebhookSignatureScheme, SchemeHandler> = {
 /** What a delivery took to be accepted once: how the execution gives it back, and how this handler does. */
 interface ReplayGuard {
     /** Handed to `executeTrigger`, which gives the claim back if admission refuses the delivery. */
-    args: { claim: { claimedAt: number; key: string; scope: string } } | { deliveryRecord: Id<"webhookDeliveries"> };
+    args: { claim: { claimedAt: number; key: string; scope: string }; releaseUnlessRun?: true };
     giveBack: () => Promise<void>;
 }
 
 /**
- * Takes the once-only guard of a verified delivery: the permanent record for a scheme that requires a
- * delivery id, otherwise the signature's claim for `TRIGGER_CLAIM_TTL_MS`. `null` when it was taken before.
+ * Takes the once-only claim of a verified delivery, or answers `null` when it was taken before. A scheme that
+ * requires a delivery id claims it with the body's digest for `TRIGGER_DELIVERY_CLAIM_TTL_MS` (effectively
+ * permanent) and gives it back whenever the delivery does not run; the others claim their signature for
+ * `TRIGGER_CLAIM_TTL_MS`.
  */
 const takeReplayGuard = async (
     context: HttpActionCtx,
@@ -397,34 +403,24 @@ const takeReplayGuard = async (
         triggerId,
     }: { delivery: Delivery; rawBody: Uint8Array; scheme: SchemeHandler; trigger: WebhookTrigger; triggerId: string },
 ): Promise<ReplayGuard | null> => {
+    let claimKey: { key: string; scope: string };
+    let ttlMs = TRIGGER_CLAIM_TTL_MS;
+
     if (scheme.requiresDeliveryId) {
         // The handler refused a delivery without one before getting here.
         if (!delivery.deliveryId) {
             throw new Error("A delivery id is required");
         }
 
-        const recordId = await context.runMutation(internal.triggers.deliveries.claimWebhookDelivery, {
-            bodyDigest: await sha256Hex(rawBody),
-            deliveryId: delivery.deliveryId,
-            triggerId: triggerId as Id<"triggers">,
-        });
-
-        return recordId === null
-            ? null
-            : {
-                  args: { deliveryRecord: recordId },
-                  giveBack: async () => {
-                      await context.runMutation(internal.triggers.deliveries.releaseWebhookDelivery, { recordId });
-                  },
-              };
+        // The body is in the key because GitLab documents that recursive webhooks share one event UUID.
+        // The trigger id leads, so deleting the trigger can find its claims.
+        claimKey = { key: `${triggerId}:${delivery.deliveryId}:${await sha256Hex(rawBody)}`, scope: TRIGGER_DELIVERY_SCOPE };
+        ttlMs = TRIGGER_DELIVERY_CLAIM_TTL_MS;
+    } else {
+        claimKey = { key: `${triggerId}:${normalizeSignature(delivery.presented)}`, scope: "trigger-webhook" };
     }
 
-    const claimKey = { key: `${triggerId}:${normalizeSignature(delivery.presented)}`, scope: "trigger-webhook" };
-    const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, {
-        ...claimKey,
-        ttlMs: TRIGGER_CLAIM_TTL_MS,
-        userId: trigger.userId,
-    });
+    const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, { ...claimKey, ttlMs, userId: trigger.userId });
 
     if (claimedAt === null) {
         return null;
@@ -434,7 +430,7 @@ const takeReplayGuard = async (
     const claim = { ...claimKey, claimedAt };
 
     return {
-        args: { claim },
+        args: scheme.requiresDeliveryId ? { claim, releaseUnlessRun: true } : { claim },
         giveBack: async () => {
             await context.runMutation(internal.lib.claim_once.releaseKey, claim);
         },

@@ -17,9 +17,8 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
-import { releaseClaim } from "../lib/claim-once";
+import { CLAIM_PREFIX_BATCH, releaseClaim, releaseClaimsWithPrefix, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import { encryptKey } from "../lib/encryption";
-import { deleteDeliveriesOfTrigger, releaseDelivery } from "./deliveries";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
 import { assertValidFilters, evaluateFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH, MAX_WEBHOOK_BODY_BYTES } from "./filters";
@@ -558,14 +557,19 @@ export const deleteTrigger = authMutation
             .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", args.triggerId as Id<"triggers">))
             .collect();
 
-        // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes. A `gitlab-token` trigger's
-        // delivery records (`deliveries.ts`) do not; they are cleared below.
+        // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes, except a
+        // `gitlab-token` trigger's delivery claims, which last for years: one batch is cleared here, the rest on the scheduler.
         await Promise.allSettled(executions.map((row) => context.db.delete(row._id)));
 
         // Delete the trigger
         await context.db.delete(args.triggerId as Id<"triggers">);
-        // A `gitlab-token` trigger's delivery record is kept for its whole life, so it can be long: one batch here, the rest scheduled.
-        await deleteDeliveriesOfTrigger(context, args.triggerId as Id<"triggers">);
+
+        const deliveryPrefix = `${args.triggerId}:`;
+
+        if (await releaseClaimsWithPrefix(context, TRIGGER_DELIVERY_SCOPE, deliveryPrefix, CLAIM_PREFIX_BATCH)) {
+            await context.scheduler.runAfter(0, internal.lib.claim_once.purgeClaimsWithPrefix, { prefix: deliveryPrefix, scope: TRIGGER_DELIVERY_SCOPE });
+        }
+
         await deleteShardRoute(context, "trigger", args.triggerId);
 
         context.log.event("triggers.delete_trigger", { executionsDeleted: executions.length });
@@ -743,6 +747,15 @@ const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reaso
     await ctx.db.insert("triggerExecutions", { completedAt: ctx.now, error: reason, startedAt: ctx.now, status: "filtered", triggerId });
 };
 
+/** Gives a delivery's replay claim back. The refusal stands if this fails; a claim left behind only makes a redelivery read as a replay until its TTL. */
+const giveBackClaim = async (ctx: MutationCtx, claim: { claimedAt: number; key: string; scope: string }, triggerId: Id<"triggers">): Promise<void> => {
+    try {
+        await releaseClaim(ctx, claim.scope, claim.key, claim.claimedAt);
+    } catch (error) {
+        console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}:`, error);
+    }
+};
+
 /**
  * Charges one run before the paid call. A trigger draws on the same daily
  * task-run quota and model allowlist as a task round (`tasks/internal.ts`), so a
@@ -760,18 +773,25 @@ export const admitTriggerRun = internalMutation
         // The webhook delivery's replay claim. A delivery refused here gives it back, as the handler does for one
         // that misses the filters, so the owner can fix them and redeliver the same signed body.
         claim: v.optional(v.object({ claimedAt: v.number(), key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
-        // The same, for a `gitlab-token` delivery: its permanent record (`deliveries.ts`).
-        deliveryRecord: v.optional(v.id("webhookDeliveries")),
         executionId: v.optional(v.id("triggerExecutions")),
         filterPayload: v.optional(v.string().max(MAX_WEBHOOK_BODY_BYTES)),
+        // The claim is permanent (`gitlab-token`), so ANY refusal gives it back, not only a filter miss: a delivery that never ran may be redelivered.
+        releaseUnlessRun: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
     })
     .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() })))
-    .mutation(async ({ args: { claim, deliveryRecord, executionId, filterPayload, triggerId }, ctx }) => {
+    .mutation(async ({ args: { claim, executionId, filterPayload, releaseUnlessRun, triggerId }, ctx }) => {
+        const refused = async (reason: string): Promise<string> => {
+            if (claim && releaseUnlessRun) {
+                await giveBackClaim(ctx, claim, triggerId);
+            }
+
+            return reason;
+        };
         const trigger = await ctx.db.get(triggerId);
 
         if (!trigger) {
-            return "Trigger not found";
+            return await refused("Trigger not found");
         }
 
         if (filterPayload !== undefined) {
@@ -789,21 +809,7 @@ export const admitTriggerRun = internalMutation
                 }
 
                 if (claim) {
-                    try {
-                        await releaseClaim(ctx, claim.scope, claim.key, claim.claimedAt);
-                    } catch (error) {
-                        // The refusal stands; a claim left behind only makes a redelivery read as a replay until its TTL.
-                        console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}:`, error);
-                    }
-                }
-
-                if (deliveryRecord) {
-                    try {
-                        await releaseDelivery(ctx, deliveryRecord);
-                    } catch (error) {
-                        // The refusal stands; a record left behind makes a redelivery of this body read as a replay.
-                        console.error(`[Triggers] Could not release the delivery record of trigger ${triggerId}:`, error);
-                    }
+                    await giveBackClaim(ctx, claim, triggerId);
                 }
 
                 return { filtered: reason };
@@ -814,7 +820,7 @@ export const admitTriggerRun = internalMutation
         const problem = taskAccessProblem(account);
 
         if (problem || !account) {
-            return problem ?? "Your account no longer exists.";
+            return await refused(problem ?? "Your account no longer exists.");
         }
 
         const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
@@ -823,11 +829,11 @@ export const admitTriggerRun = internalMutation
         const model = bot?.model || trigger.model || DEFAULT_CHAT_MODEL;
 
         if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
-            return `The model '${model}' is no longer available for triggers. Pick another model and enable the trigger again.`;
+            return await refused(`The model '${model}' is no longer available for triggers. Pick another model and enable the trigger again.`);
         }
 
         if (!(await chargeRound(ctx, trigger.userId, account))) {
-            return DAILY_LIMIT_MESSAGE;
+            return await refused(DAILY_LIMIT_MESSAGE);
         }
 
         return null;

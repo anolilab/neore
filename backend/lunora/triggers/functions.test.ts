@@ -11,6 +11,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
+import { CLAIM_PREFIX_BATCH, purgeClaimsWithPrefix, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import {
     assertComputerRoutine,
     createTrigger,
@@ -21,7 +22,6 @@ import {
     updateTrigger,
     updateTriggerStats,
 } from "./functions";
-import { DELIVERY_PURGE_BATCH } from "./deliveries";
 import { compileWebhookPreset } from "./presets";
 import { findNextCronTime } from "./schedule";
 
@@ -507,37 +507,54 @@ describe("deleteTrigger", () => {
             await ctx.db.insert("triggerExecutions", { startedAt: 1, status: "completed", triggerId });
 
             for (let n = 0; n < deliveries; n += 1) {
-                await ctx.db.insert("webhookDeliveries", { bodyDigest: "d", createdAt: 1, deliveryId: `evt-${String(n)}`, triggerId });
+                await ctx.db.insert("idempotencyClaims", {
+                    claimedAt: 1,
+                    expiresAt: TRIGGER_DELIVERY_CLAIM_TTL_MS,
+                    key: `${triggerId}:evt-${String(n)}:digest`,
+                    scope: TRIGGER_DELIVERY_SCOPE,
+                });
             }
         });
 
         return triggerId;
     };
 
-    const deliveryCount = async (): Promise<number> => {
-        const rows = await harness.run(async (ctx: any) => await ctx.db.query("webhookDeliveries").collect());
+    const claimKeys = async (): Promise<string[]> => {
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
 
-        return rows.length;
+        return rows.map((row: { key: string }) => row.key);
     };
 
-    it("removes the trigger's delivery records with it, and nobody else's", async () => {
+    it("removes the trigger's delivery claims with it, and nobody else's", async () => {
         const triggerId = await seed(3);
         const other = await seed(2);
+
+        // A delivery id is header text: one with a character past the BMP sorts above any U+FFFF bound.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("idempotencyClaims", { claimedAt: 1, expiresAt: 2, key: `${triggerId}:😀:digest`, scope: TRIGGER_DELIVERY_SCOPE }),
+        );
 
         await as().mutation(deleteTrigger as never, { triggerId } as never);
 
         expect(await readTrigger(triggerId)).toBeNull();
         expect(await readTrigger(other)).not.toBeNull();
-        expect(await deliveryCount()).toBe(2);
+        const remaining = await claimKeys();
+
+        expect(remaining).toHaveLength(2);
+        expect(remaining.every((key) => key.startsWith(`${other}:`))).toBe(true);
         expect(harness.scheduler.list()).toEqual([]);
     });
 
     it("hands what is left past one batch to a scheduled purge", async () => {
-        const triggerId = await seed(DELIVERY_PURGE_BATCH + 4);
+        const triggerId = await seed(CLAIM_PREFIX_BATCH + 4);
 
         await as().mutation(deleteTrigger as never, { triggerId } as never);
 
-        expect(await deliveryCount()).toBe(4);
-        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ triggerId }]);
+        expect(await claimKeys()).toHaveLength(4);
+        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ prefix: `${triggerId}:`, scope: TRIGGER_DELIVERY_SCOPE }]);
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(purgeClaimsWithPrefix, { prefix: `${triggerId}:`, scope: TRIGGER_DELIVERY_SCOPE }));
+        expect(await claimKeys()).toEqual([]);
     });
 });

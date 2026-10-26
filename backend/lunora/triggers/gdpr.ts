@@ -5,9 +5,8 @@
  */
 import type { MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, full } from "../gdpr/batch";
-import { deleteDeliveries } from "./deliveries";
 
-/** Triggers with their run history and webhook delivery records. A trigger with more of either than one batch stays for the next round. */
+/** Triggers with their run history. A trigger whose history is longer than one batch stays for the next round. */
 export const eraseTriggersForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
     const triggers = await ctx.db
         .query("triggers")
@@ -24,9 +23,7 @@ export const eraseTriggersForUser = async (ctx: MutationCtx, userId: string): Pr
 
         await Promise.all(executions.map((row) => ctx.db.delete(row._id)));
 
-        const moreDeliveries = await deleteDeliveries(ctx, trigger._id, BATCH);
-
-        if (moreDeliveries || full(executions)) {
+        if (full(executions)) {
             hasMore = true;
             continue;
         }
