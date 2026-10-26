@@ -27,23 +27,27 @@ export const delimiterForFilename = (filename?: string): string | undefined => (
  * hundreds of thousands of records within the byte limit, and parsing them all is what freezes a page.
  */
 export const exceedsRowLimit = (content: string, maxRows: number): boolean => {
-    // A file has one more line than it has line breaks. LF, CRLF and a lone CR each end a line, and CRLF counts once.
-    let rows = 1;
+    // A record ends at each line break (LF, CRLF or a lone CR, CRLF counting once). A break that ends the file does
+    // not start another record, so a file of exactly `maxRows` newline-terminated records is within the limit.
+    let breaks = 0;
 
     for (let index = 0; index < content.length; index += 1) {
         const code = content.codePointAt(index) ?? 0;
-        const isLineBreak = code === 10 || (code === 13 && content.codePointAt(index + 1) !== 10);
 
-        if (isLineBreak) {
-            rows += 1;
+        if (code === 10 || (code === 13 && content.codePointAt(index + 1) !== 10)) {
+            breaks += 1;
 
-            if (rows > maxRows) {
+            if (breaks > maxRows) {
                 return true;
             }
         }
     }
 
-    return false;
+    const last = content.codePointAt(content.length - 1);
+    const endsWithBreak = last === 10 || last === 13;
+    const records = breaks + (content.length > 0 && !endsWithBreak ? 1 : 0);
+
+    return records > maxRows;
 };
 
 export const capDelimitedColumns = (content: string, maxColumns: number, delimiter?: string): CappedColumns => {

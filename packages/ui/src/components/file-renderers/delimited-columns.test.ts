@@ -114,8 +114,14 @@ describe("line breaks a row limit counts", () => {
     });
 
     it("counts a CRLF pair once, the same as LF", () => {
-        expect(exceedsRowLimit("a\r\nb\r\n", 3)).toBe(exceedsRowLimit("a\nb\n", 3));
-        expect(exceedsRowLimit("a\r\nb\r\n", 2)).toBe(true);
-        expect(exceedsRowLimit("a\r\nb\r\n", 3)).toBe(false);
+        expect(exceedsRowLimit("a\r\nb\r\n", 2)).toBe(exceedsRowLimit("a\nb\n", 2));
+        expect(exceedsRowLimit("a\r\nb\r\n", 1)).toBe(true);
+        expect(exceedsRowLimit("a\r\nb\r\n", 2)).toBe(false);
+    });
+
+    it("does not count the break that ends the file as another record", () => {
+        expect(exceedsRowLimit("a\n".repeat(20_000), 20_000)).toBe(false);
+        expect(exceedsRowLimit("a\n".repeat(20_001), 20_000)).toBe(true);
+        expect(exceedsRowLimit("a\nb", 1)).toBe(true);
     });
 });
