@@ -1,5 +1,5 @@
-//! The device engine: everything `device/mod.rs` did that is not a window, a
-//! notification or a dialog (`docs/plans/device-execution.md`).
+//! The device engine: pairing, the signed relay, approvals, the sandboxed shell and local
+//! MCP servers. Windows, notifications and dialogs belong to the host (`docs/plans/device-execution.md`).
 //!
 //! The host (the Electron shell through `device-core-node`, or any other
 //! embedder) owns the windows. It hands the engine an event sink and calls the
@@ -51,12 +51,19 @@ pub enum Event {
 /// Receives [`Event`]s. Called from engine threads; must not block.
 pub type Sink = Box<dyn Fn(Event) + Send + Sync>;
 
+/// One MCP tool the manifest offered: its server, its own name on that server, and whether it declared itself read-only.
+struct McpToolRef {
+    server: String,
+    tool: String,
+    read_only: bool,
+}
+
 pub struct DeviceState {
     audit_path: PathBuf,
     last_manifest_at: Mutex<u64>,
     mcp: McpManager,
-    /// Manifest tool name → (server, the server's own tool name).
-    mcp_tools: Mutex<HashMap<String, (String, String, bool)>>,
+    /// Manifest tool name → the MCP tool it names.
+    mcp_tools: Mutex<HashMap<String, McpToolRef>>,
     nonces: Mutex<NonceSet>,
     prompts: Prompts,
     settings: Mutex<Settings>,
@@ -92,7 +99,9 @@ impl DeviceState {
     }
 
     fn save(&self, settings: Settings) -> Result<(), String> {
-        store::save(&self.settings_path, &settings)?;
+        let previous = self.settings().pairing;
+
+        store::save_over(&self.settings_path, previous.as_ref(), &settings)?;
         *self.settings.lock().unwrap() = settings;
 
         Ok(())
@@ -445,7 +454,14 @@ impl DeviceState {
                             "name": name, "kind": "mcp", "readOnly": tool.read_only, "inputSchema": tool.input_schema,
                             "description": format!("[Local MCP server \"{}\"] {}", server.name, cap_utf8(&tool.description, 1800).0),
                         }));
-                        mcp_tools.insert(name, (server.name.clone(), tool.name, tool.read_only));
+                        mcp_tools.insert(
+                            name,
+                            McpToolRef {
+                                server: server.name.clone(),
+                                tool: tool.name,
+                                read_only: tool.read_only,
+                            },
+                        );
                     }
                 }
                 Err(error) => eprintln!(
@@ -639,7 +655,7 @@ fn plan(
     tool: &str,
     input: &Value,
     settings: &Settings,
-    mcp_tools: &HashMap<String, (String, String, bool)>,
+    mcp_tools: &HashMap<String, McpToolRef>,
 ) -> Result<Action, String> {
     let roots = shareable_roots(&settings.roots);
 
@@ -706,7 +722,11 @@ fn plan(
             })
         }
         name => {
-            let (server, tool, read_only) = mcp_tools
+            let McpToolRef {
+                server,
+                tool,
+                read_only,
+            } = mcp_tools
                 .get(name)
                 .ok_or_else(|| format!("{name} is not a tool of this device"))?;
             let server = settings
@@ -1082,7 +1102,11 @@ mod tests {
 
         state.mcp_tools.lock().unwrap().insert(
             "docs__search".to_owned(),
-            ("docs".to_owned(), "search".to_owned(), true),
+            McpToolRef {
+                server: "docs".to_owned(),
+                tool: "search".to_owned(),
+                read_only: true,
+            },
         );
 
         let unchanged: SettingsUpdate =
