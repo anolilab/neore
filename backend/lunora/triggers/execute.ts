@@ -84,6 +84,9 @@ export const executeTrigger = internalAction
         // The skip is recorded in the history (collapsed to one row, as a webhook filter miss is). A failed check posts as usual.
         // The bot must still exist: a routine whose bot was deleted keeps its flag but runs as a plain one.
         // Only a scheduled routine can be quiet, so the skip never holds a replay claim to give back.
+        // The next quiet window starts here, before the snapshot is read: anything after that read is not in this run's
+        // snapshot, so the window must reach back to it. Counting an event twice is harmless; missing one is not.
+        const windowStart = Date.now();
         const skipped = await isQuietRunSkipped(
             { ...trigger, botId: bot ? botId : undefined },
             (since) => ctx.runQuery(internal.triggers.quiet_inputs.loadQuietSnapshot, { since, userId }),
@@ -105,8 +108,7 @@ export const executeTrigger = internalAction
         const systemPrompt = [bot?.instructions, trigger.systemPrompt].filter(Boolean).join("\n\n") || undefined;
         const triggerType = trigger.type;
 
-        // When the agent run began. A quiet routine's next window starts here, not at the end of the run:
-        // what happens while the agent works (up to 25 steps) is not in this run's output.
+        // The window boundary this run leaves behind: the time taken before its quiet snapshot was read (see `windowStart`).
         let runStartedAt: number | undefined;
 
         // Whether the run created its thread. Only then did it post anything, so only then does it move the window:
@@ -194,7 +196,7 @@ export const executeTrigger = internalAction
             const useComputer = bot?.computerEnabled === true && trigger.botComputer === true && trigger.type === "schedule";
 
             started = true;
-            runStartedAt = Date.now();
+            runStartedAt = windowStart;
 
             const { text: responseText, threadId } = await runHeadlessAgent(ctx, {
                 botId: bot ? trigger.botId : undefined,
