@@ -134,7 +134,8 @@ const BASE64_PARAM_RE = /;\s*base64$/iu;
  * to the decoded bytes. Throws on a malformed URL or payload.
  */
 export const dataUrlResponse = (url: string): Response => {
-    const match = DATA_URL_RE.exec(url);
+    // A raw # starts the fragment (a literal one is escaped as %23), so the payload ends there.
+    const match = DATA_URL_RE.exec(url.split("#", 1)[0] ?? url);
 
     if (!match) {
         throw new Error("Not a valid data URL");

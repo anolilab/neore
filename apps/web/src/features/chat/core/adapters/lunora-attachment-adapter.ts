@@ -2,6 +2,7 @@ import { api } from "@neore/backend/api";
 import { CHAT_UPLOAD_CONTENT_MISMATCH, CHAT_UPLOAD_EXPIRED, CHAT_UPLOAD_TOO_LARGE, CHAT_UPLOAD_UNSUPPORTED_TYPE } from "@neore/backend/chat-upload-codes";
 import { chatAttachmentLimit } from "@neore/backend/document-limits";
 import { TEXT_PREVIEW_EXTENSIONS } from "@neore/ui/components/file-renderers/file-type-utilities";
+import { decodeTextBytes } from "@neore/ui/utils/decode-text";
 
 import type { LunoraReactClient as LunoraClient } from "@/lib/lunora/crpc";
 import { UploadFailedError } from "@/lib/upload/upload-error";
@@ -323,7 +324,7 @@ export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentA
 
         // Text files: the content inline as well.
         if (isTextContentType(attachment.contentType)) {
-            const textContent = await attachment.file.text();
+            const textContent = decodeTextBytes(new Uint8Array(await attachment.file.arrayBuffer()));
 
             return {
                 ...attachment,

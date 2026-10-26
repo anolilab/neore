@@ -165,6 +165,13 @@ describe(dataUrlResponse, () => {
         expect(() => dataUrlResponse(`data:text/plain;base64,${"A".repeat(MAX_FETCHED_TEXT_BYTES * 2)}`)).toThrow();
     });
 
+    it("leaves a URL fragment out of the payload", async () => {
+        await expect(readTextWithin(dataUrlResponse("data:text/plain,hello#note"), 100)).resolves.toBe("hello");
+        const base64Url = `data:text/plain;base64,${btoa("a,b")}#x`;
+
+        await expect(readTextWithin(dataUrlResponse(base64Url), 100)).resolves.toBe("a,b");
+    });
+
     it("decodes percent-encoded text whose escaped form is longer than the limit", async () => {
         const text = "é".repeat(170_000);
         const response = dataUrlResponse(`data:text/plain,${encodeURIComponent(text)}`);
