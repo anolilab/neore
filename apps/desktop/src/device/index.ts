@@ -3,7 +3,7 @@
  * windows, commands and events; the logic lives in `device-core`).
  *
  * Two sets of channels, two trust checks:
- * - `DEVICE_CHANNEL` (relay): reachable from the site window only, through `options.isTrusted`.
+ * - `DEVICE_CHANNEL` (relay): reachable from the site's main window only, through `options.isTrusted`.
  * The site may verify and relay; it cannot approve.
  * - `LOCAL_CHANNEL` (approvals, folders, MCP servers, audit): reachable from the device window alone,
  * which is a separate BrowserWindow with its own preload and a file: URL. The site cannot reach these,

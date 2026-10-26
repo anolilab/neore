@@ -164,14 +164,17 @@ const guardNavigation = (event: { preventDefault: () => void }, url: string): vo
  * core loaded AND the local device page is in the build; otherwise the relay would
  * answer "unavailable" to every call.
  */
-const siteCapabilities = (): string[] => {
+// Only the main window advertises `device`: a thread window that claimed a call would return its result to a window that may close.
+const siteCapabilities = (isMain: boolean): string[] => {
     const capabilities = ["notifications", "compose", "sign-in", "thread-windows"];
 
-    if (state.deviceReady && existsSync(path.join(__dirname, "device-window", "device.html"))) {
+    if (isMain && state.deviceReady && existsSync(path.join(__dirname, "device-window", "device.html"))) {
         capabilities.push("device");
     }
 
-    shellProbe.device = capabilities.includes("device");
+    if (isMain) {
+        shellProbe.device = capabilities.includes("device");
+    }
 
     return capabilities;
 };
@@ -193,10 +196,10 @@ const saveWindowState = (win: BrowserWindow): void => {
     }
 };
 
-/** What every site window gets: the site preload, isolated and sandboxed. */
-const siteWebPreferences = (): WebPreferences => {
+/** What every site window gets: the site preload, isolated and sandboxed. `isMain` decides the capabilities it advertises. */
+const siteWebPreferences = (isMain: boolean): WebPreferences => {
     return {
-        additionalArguments: [`${SITE_ORIGIN_ARG}${origin.origin}`, `${CAPABILITIES_ARG}${siteCapabilities().join(",")}`],
+        additionalArguments: [`${SITE_ORIGIN_ARG}${origin.origin}`, `${CAPABILITIES_ARG}${siteCapabilities(isMain).join(",")}`],
         contextIsolation: true,
         nodeIntegration: false,
         preload: path.join(__dirname, "preload.cjs"),
@@ -266,7 +269,7 @@ const openSiteWindow = (url: URL): BrowserWindow => {
         minWidth: 420,
         title: "Neore",
         ...macTitleBar,
-        webPreferences: siteWebPreferences(),
+        webPreferences: siteWebPreferences(false),
         width: DEFAULT_SIZE.width,
     });
 
@@ -349,7 +352,7 @@ const createMainWindow = (): BrowserWindow => {
         minWidth: 420,
         title: "Neore",
         ...macTitleBar,
-        webPreferences: siteWebPreferences(),
+        webPreferences: siteWebPreferences(true),
         width: saved?.bounds.width ?? DEFAULT_SIZE.width,
         x: saved?.bounds.x,
         y: saved?.bounds.y,
@@ -722,7 +725,7 @@ const registerIpc = (): void => {
         state.composer?.hide();
     });
 
-    state.deviceReady = registerDeviceIpc({ isTrusted });
+    state.deviceReady = registerDeviceIpc({ isTrusted: isMainWindow });
 };
 
 /**
