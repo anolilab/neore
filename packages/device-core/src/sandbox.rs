@@ -468,7 +468,8 @@ mod linux {
         };
 
         // SAFETY: only async-signal-safe syscalls between fork and exec (the
-        // filter is built here, in the parent); `fd` stays open in the parent (the guard) until the spawn has returned.
+        // filter is built here, in the parent); `fd` stays open in the parent
+        // (the guard) until the spawn has returned.
         unsafe {
             command.pre_exec(move || {
                 if libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0 {
