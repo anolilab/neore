@@ -10,6 +10,7 @@ import MessageContentUI from "@neore/chat-ui/chat/message-content";
 import type { ChatMessage, SandboxOutputs, ToolPart } from "@neore/chat-ui/types";
 import { resolveMcpToolName } from "@neore/chat-ui/utils/mcp-tool-name";
 import { FetchableOriginsProvider } from "@neore/ui/components/file-renderers/fetchable-origins-provider";
+import { originsOf } from "@neore/ui/hooks/use-fetchable-origins";
 import type { FC } from "react";
 import { lazy, memo, Suspense, useCallback, useMemo } from "react";
 
@@ -24,13 +25,7 @@ import type { UIMessage } from "@/lib/agent";
  * which serves signed storage URLs. Read raw, like `link-preview-slot`, because
  * `@/lib/env` validation would make every importer of the chat row fail to load in tests.
  */
-const FETCHABLE_ORIGINS: ReadonlyArray<string> = (() => {
-    try {
-        return [new URL(import.meta.env.VITE_LUNORA_URL as string).origin];
-    } catch {
-        return [];
-    }
-})();
+const FETCHABLE_ORIGINS = originsOf(import.meta.env.VITE_LUNORA_URL as string | undefined);
 
 const LazyDocumentArtifact = lazy(() => import("@/features/canvas/document-artifact"));
 const LazyMcpAppView = lazy(() => import("@/features/chat/thread/mcp-app-view"));

@@ -5,6 +5,30 @@ const NO_ORIGINS: ReadonlyArray<string> = [];
 
 export const FetchableOriginsContext = createContext<ReadonlyArray<string>>(NO_ORIGINS);
 
+/**
+ * The origin of each URL that is a valid http(s) one, for the provider's `origins`
+ * (an app passes its backend's URL, whichever env var holds it). An unset or
+ * malformed URL contributes nothing, so a preview then refuses the backend
+ * instead of the app failing to load.
+ */
+export const originsOf = (...urls: ReadonlyArray<string | undefined>): ReadonlyArray<string> => {
+    const origins: string[] = [];
+
+    for (const url of urls) {
+        try {
+            const { origin, protocol } = new URL(url ?? "");
+
+            if ((protocol === "http:" || protocol === "https:") && !origins.includes(origin)) {
+                origins.push(origin);
+            }
+        } catch {
+            // Unset or malformed: nothing to allow.
+        }
+    }
+
+    return origins;
+};
+
 export const useFetchableOrigins = (): ReadonlyArray<string> => use(FetchableOriginsContext);
 
 /**
