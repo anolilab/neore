@@ -1318,6 +1318,8 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "triggers_functions:getTriggerInternal": lunora_triggers_functions_171.getTriggerInternal as unknown as RegisteredLunoraFunction,
     "triggers_functions:getTriggers": lunora_triggers_functions_171.getTriggers as unknown as RegisteredLunoraFunction,
     "triggers_functions:recordFilteredExecution": lunora_triggers_functions_171.recordFilteredExecution as unknown as RegisteredLunoraFunction,
+    "triggers_functions:releaseQuietWindow": lunora_triggers_functions_171.releaseQuietWindow as unknown as RegisteredLunoraFunction,
+    "triggers_functions:reserveQuietWindow": lunora_triggers_functions_171.reserveQuietWindow as unknown as RegisteredLunoraFunction,
     "triggers_functions:setTriggerEnabled": lunora_triggers_functions_171.setTriggerEnabled as unknown as RegisteredLunoraFunction,
     "triggers_functions:setTriggerEnabledInternal": lunora_triggers_functions_171.setTriggerEnabledInternal as unknown as RegisteredLunoraFunction,
     "triggers_functions:testRunTrigger": lunora_triggers_functions_171.testRunTrigger as unknown as RegisteredLunoraFunction,
@@ -7579,6 +7581,34 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "triggerId": source["triggerId"] };
 });
+installCompiledValidatorMap(lunora_triggers_functions_171.releaseQuietWindow.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["expected"] !== undefined) {
+if (typeof source["expected"] !== "number" || !Number.isFinite(source["expected"])) return DEFER;
+__val1 = source["expected"];
+__has1 = true;
+}
+if (typeof source["triggerId"] !== "string") return DEFER;
+if (typeof source["windowStart"] !== "number" || !Number.isFinite(source["windowStart"])) return DEFER;
+return { ...(__has1 ? { "expected": __val1 } : {}), "triggerId": source["triggerId"], "windowStart": source["windowStart"] };
+});
+installCompiledValidatorMap(lunora_triggers_functions_171.reserveQuietWindow.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["expected"] !== undefined) {
+if (typeof source["expected"] !== "number" || !Number.isFinite(source["expected"])) return DEFER;
+__val1 = source["expected"];
+__has1 = true;
+}
+if (typeof source["triggerId"] !== "string") return DEFER;
+if (typeof source["windowStart"] !== "number" || !Number.isFinite(source["windowStart"])) return DEFER;
+return { ...(__has1 ? { "expected": __val1 } : {}), "triggerId": source["triggerId"], "windowStart": source["windowStart"] };
+});
 installCompiledValidatorMap(lunora_triggers_functions_171.setTriggerEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -9384,6 +9414,8 @@ export interface Caller {
             getTriggerInternal: (args: { triggerId: Id<"triggers"> }) => Promise<import("./dataModel.js").Doc_triggers | null>;
             getTriggers: (args?: {}) => Promise<({} & { _creationTime: number; _id: string; botComputer: boolean; botId: string | null; createdAt: number; cronExpression: string | null; description: string | null; enabled: boolean; filters: ({} & { op: "contains" | "equals" | "not_equals" | "starts_with" | "exists" | "not_exists"; path: string; value: string | null; })[]; inputTemplate: string | null; lastError: string | null; lastTriggeredAt: number | null; model: string; name: string; nextTriggerAt: number | null; quietWhenEmpty: boolean; searchMode: string | null; systemPrompt: string | null; timezone: string | null; triggerCount: number; type: string; updatedAt: number; webhookSignatureScheme: "native" | "timestamped" | "gitlab-token" | null; })[]>;
             recordFilteredExecution: (args: { reason: string; triggerId: Id<"triggers"> }) => Promise<null>;
+            releaseQuietWindow: (args: { expected?: number; triggerId: Id<"triggers">; windowStart: number }) => Promise<null>;
+            reserveQuietWindow: (args: { expected?: number; triggerId: Id<"triggers">; windowStart: number }) => Promise<boolean>;
             setTriggerEnabled: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
             setTriggerEnabledInternal: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<null>;
             testRunTrigger: (args: { testPayload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
@@ -11024,6 +11056,8 @@ export const createCaller = (context: CallerCtx): Caller => ({
             getTriggerInternal: (args) => callRegistered(context, "triggers_functions:getTriggerInternal", args),
             getTriggers: (args) => callRegistered(context, "triggers_functions:getTriggers", args),
             recordFilteredExecution: (args) => callRegistered(context, "triggers_functions:recordFilteredExecution", args),
+            releaseQuietWindow: (args) => callRegistered(context, "triggers_functions:releaseQuietWindow", args),
+            reserveQuietWindow: (args) => callRegistered(context, "triggers_functions:reserveQuietWindow", args),
             setTriggerEnabled: (args) => callRegistered(context, "triggers_functions:setTriggerEnabled", args),
             setTriggerEnabledInternal: (args) => callRegistered(context, "triggers_functions:setTriggerEnabledInternal", args),
             testRunTrigger: (args) => callRegistered(context, "triggers_functions:testRunTrigger", args),

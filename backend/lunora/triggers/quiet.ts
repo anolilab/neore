@@ -15,6 +15,8 @@
  *    their run threads, which carry {@link TRIGGER_THREAD_TAG}), or two quiet
  *    routines would wake each other forever. A thread is a run's by that tag, set
  *    when the run creates it, never by its title: a user can rename any chat.
+ *    The exception is a user's own reply in such a thread (a user message past
+ *    the run's prompt): that is the user working in the routine's chat, and counts.
  *
  * The window starts at `lastTriggeredAt`: the moment the last run began its agent
  * (not when it ended, so what happened while the agent worked is reported by the
@@ -27,6 +29,13 @@
  *
  * The check runs before the run writes anything, so a skipped run creates no
  * thread, sends no notification and is not charged.
+ *
+ * A run that passes the check takes its window at once (`reserveQuietWindow`
+ * moves `lastTriggeredAt` to the window start), before admission and the thread.
+ * Runs of one routine can overlap (the next slot starts while the agent still
+ * works), and both would otherwise read the same unmoved window and post the same
+ * activity twice. The run that loses the swap is recorded as skipped. A run that
+ * then posts nothing gives the window back, so the "do not move it" rule above holds.
  */
 import type { Doc } from "../_generated/dataModel";
 import type { BriefInputs } from "../notifications/daily-brief-logic";
@@ -58,7 +67,7 @@ export interface QuietSnapshot {
     /** Open requests for the user. `at` is when the request arose or last changed. */
     needsYou: { at: number; kind: string; title: string }[];
     running: { at: number; kind: string; title: string }[];
-    /** A locked chat has no title here, so it never counts. A routine's own run threads are not listed. */
+    /** A locked chat has no title here, so it never counts. A routine's run thread is listed only for a reply of the user's. */
     threads: { title?: string; updatedAt: number }[];
 }
 

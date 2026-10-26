@@ -82,6 +82,80 @@ describe("loadQuietSnapshot", () => {
         expect(threads).toEqual([{ title: "Trigger: x", updatedAt: NOW - 2000 }]);
     });
 
+    describe("a reply in a routine's run thread", () => {
+        const insertRunThread = async (rows: { at: number; order: number; role: string; stepOrder?: number }[]) => {
+            await harness.run(async (ctx: any) => {
+                const threadId = await ctx.db.insert("threads", {
+                    status: "active",
+                    tags: ["trigger"],
+                    title: "Trigger: Digest",
+                    updatedAt: NOW - 500,
+                    userId: USER,
+                });
+
+                for (const row of rows) {
+                    await ctx.db.insert("messages", {
+                        createdAt: row.at,
+                        message: { content: "text", role: row.role },
+                        order: row.order,
+                        status: "success",
+                        stepOrder: row.stepOrder ?? 0,
+                        threadId,
+                        tool: false,
+                        userId: USER,
+                    });
+                }
+            });
+        };
+
+        it("does not count the run's own prompt and answer", async () => {
+            await insertRunThread([
+                { at: NOW - 3000, order: 0, role: "user" },
+                { at: NOW - 2000, order: 0, role: "assistant" },
+            ]);
+
+            const { threads } = await snapshotSince(NOW - 60_000);
+
+            expect(threads).toEqual([]);
+        });
+
+        it("counts a user's reply newer than the window start", async () => {
+            await insertRunThread([
+                { at: NOW - 3000, order: 0, role: "user" },
+                { at: NOW - 2000, order: 0, role: "assistant" },
+                { at: NOW - 1000, order: 1, role: "user" },
+            ]);
+
+            const { threads } = await snapshotSince(NOW - 60_000);
+
+            expect(threads).toEqual([{ title: "Trigger: Digest", updatedAt: NOW - 1000 }]);
+        });
+
+        it("counts a reply whose answer has more steps than rows read", async () => {
+            const steps = Array.from({ length: 15 }, (_, index) => {
+                return { at: NOW - 900 + index, order: 1, role: index % 2 === 0 ? "assistant" : "tool", stepOrder: index + 1 };
+            });
+
+            await insertRunThread([{ at: NOW - 3000, order: 0, role: "user" }, { at: NOW - 1000, order: 1, role: "user" }, ...steps]);
+
+            const { threads } = await snapshotSince(NOW - 60_000);
+
+            expect(threads).toEqual([{ title: "Trigger: Digest", updatedAt: NOW - 1000 }]);
+        });
+
+        it("does not count a reply from before the window start, nor the routine's answer to it", async () => {
+            await insertRunThread([
+                { at: NOW - 120_000, order: 0, role: "user" },
+                { at: NOW - 119_000, order: 1, role: "user" },
+                { at: NOW - 1000, order: 1, role: "assistant" },
+            ]);
+
+            const { threads } = await snapshotSince(NOW - 60_000);
+
+            expect(threads).toEqual([]);
+        });
+    });
+
     it("still counts a chat when more routine threads than the home view keeps were updated after it", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("threads", { status: "active", title: "Planning", updatedAt: NOW - 50_000, userId: USER });

@@ -17,6 +17,8 @@ import {
     createTrigger,
     deleteTrigger,
     getTriggerExecutions,
+    releaseQuietWindow,
+    reserveQuietWindow,
     setTriggerEnabled,
     testRunTrigger,
     updateTrigger,
@@ -156,6 +158,46 @@ describe("updateTriggerStats window", () => {
         await record({ lastTriggeredAt: 50, triggerId });
 
         expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 50 });
+    });
+});
+
+describe("the quiet window reservation", () => {
+    const reserve = async (args: Record<string, unknown>): Promise<boolean> =>
+        await harness.run(async (ctx: any) => await ctx.runMutation(reserveQuietWindow, args));
+    const release = async (args: Record<string, unknown>): Promise<void> => {
+        await harness.run(async (ctx: any) => await ctx.runMutation(releaseQuietWindow, args));
+    };
+
+    it("lets only one of two runs that read the same window take it", async () => {
+        const triggerId = await insertTrigger({ lastTriggeredAt: 100 });
+
+        expect(await reserve({ expected: 100, triggerId, windowStart: 200 })).toBe(true);
+        expect(await reserve({ expected: 100, triggerId, windowStart: 210 })).toBe(false);
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 200 });
+    });
+
+    it("takes the window of a routine that never ran, and gives it back to unset", async () => {
+        const triggerId = await insertTrigger();
+
+        expect(await reserve({ triggerId, windowStart: 200 })).toBe(true);
+        expect(await reserve({ triggerId, windowStart: 210 })).toBe(false);
+
+        await release({ triggerId, windowStart: 200 });
+
+        const stored = await readTrigger(triggerId);
+
+        expect(stored.lastTriggeredAt).toBeUndefined();
+        expect(await reserve({ triggerId, windowStart: 220 })).toBe(true);
+    });
+
+    it("gives back only the window the run itself took", async () => {
+        const triggerId = await insertTrigger({ lastTriggeredAt: 100 });
+
+        await reserve({ expected: 100, triggerId, windowStart: 200 });
+        await record({ lastTriggeredAt: 300, triggerId });
+        await release({ expected: 100, triggerId, windowStart: 200 });
+
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 300 });
     });
 });
 

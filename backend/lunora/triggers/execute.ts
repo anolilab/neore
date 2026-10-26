@@ -62,11 +62,30 @@ export const executeTrigger = internalAction
             }
         };
 
+        // The quiet window this run took (see `windowStart`), and the `lastTriggeredAt` it replaced.
+        let reservedWindow: { expected: number | undefined; windowStart: number } | undefined;
+
+        /** Gives the quiet window back: a run that posted nothing leaves its activity for the next one. */
+        const releaseWindow = async (): Promise<void> => {
+            if (!reservedWindow) {
+                return;
+            }
+
+            const window = reservedWindow;
+
+            reservedWindow = undefined;
+
+            await ctx.runMutation(internal.triggers.functions.releaseQuietWindow, { ...window, triggerId }).catch((error: unknown) => {
+                console.error(`[Triggers] Could not give back the quiet window of trigger ${triggerId}:`, error);
+            });
+        };
+
         /** A failure before the agent starts means the delivery never ran: give its claim back and let the failure surface. */
         const beforeRun = async <T>(work: () => Promise<T>): Promise<T> => {
             try {
                 return await work();
             } catch (error) {
+                await releaseWindow();
                 await giveBack();
 
                 throw error;
@@ -114,6 +133,9 @@ export const executeTrigger = internalAction
         // Only a scheduled routine can be quiet, so the skip never holds a replay claim to give back.
         // The next quiet window starts here, before the snapshot is read: anything after that read is not in this run's
         // snapshot, so the window must reach back to it. Counting an event twice is harmless; missing one is not.
+        // A run that passes the check takes the window before it writes anything, so an overlapping run (the next slot
+        // starts while this one is still working) cannot post the same activity again.
+        const takesWindow = manual !== true && trigger.quietWhenEmpty === true && canBeQuiet({ botId: bot ? botId : undefined, type: trigger.type });
         const windowStart = Date.now();
         const skipped = await isQuietRunSkipped(
             { ...trigger, botId: bot ? botId : undefined },
@@ -144,6 +166,21 @@ export const executeTrigger = internalAction
         // Assigned from a callback, which the compiler does not follow: without the widening it reads the flag as always false.
         let threadCreated = false as boolean;
 
+        if (takesWindow) {
+            const expected = trigger.lastTriggeredAt;
+            const reserved = await beforeRun(
+                async () => await ctx.runMutation(internal.triggers.functions.reserveQuietWindow, { expected, triggerId, windowStart }),
+            );
+
+            if (!reserved) {
+                await ctx.runMutation(internal.triggers.functions.recordFilteredExecution, { reason: "Another run is reporting this activity", triggerId });
+
+                return;
+            }
+
+            reservedWindow = { expected, windowStart };
+        }
+
         // 2. Create execution log entry
         const executionId = await beforeRun(
             async () =>
@@ -173,6 +210,7 @@ export const executeTrigger = internalAction
                 // Recorded as filtered and not charged; the running row was replaced.
                 // The reason quotes the configured filter value (an address, a token), so it stays in the owner's execution history, not the log.
                 console.info(`[Triggers] Trigger ${triggerId} delivery no longer matches its filters, skipping`);
+                await releaseWindow();
 
                 return;
             }
@@ -183,6 +221,7 @@ export const executeTrigger = internalAction
                     executionId,
                     status: "failed",
                 });
+                await releaseWindow();
 
                 return;
             }
@@ -277,6 +316,10 @@ export const executeTrigger = internalAction
                     releaseError = error_;
                     note = RELEASE_LOST_NOTE;
                 }
+            }
+
+            if (!threadCreated) {
+                await releaseWindow();
             }
 
             // Update execution as failed

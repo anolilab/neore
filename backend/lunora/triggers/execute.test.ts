@@ -15,6 +15,7 @@ vi.mock("../_generated/internal", async (importOriginal) => mappedReferences(awa
 const state = vi.hoisted(() => {
     return {
         admissionError: undefined as Error | undefined,
+        admissionRefusal: undefined as string | undefined,
         beforeThread: undefined as (() => void) | undefined,
         bot: null as Record<string, unknown> | null,
         mutations: [] as { args: unknown; name: string }[],
@@ -53,6 +54,33 @@ const ctx = () =>
                 throw state.admissionError;
             }
 
+            // The stored window, moved atomically as the real mutations do (nothing awaits between the read and the write).
+            if (name === "reserveQuietWindow") {
+                const { expected, windowStart } = args as { expected?: number; windowStart: number };
+
+                if (state.trigger?.lastTriggeredAt !== expected) {
+                    return false;
+                }
+
+                state.trigger = { ...state.trigger, lastTriggeredAt: windowStart };
+
+                return true;
+            }
+
+            if (name === "releaseQuietWindow") {
+                const { expected, windowStart } = args as { expected?: number; windowStart: number };
+
+                if (state.trigger?.lastTriggeredAt === windowStart) {
+                    state.trigger = { ...state.trigger, lastTriggeredAt: expected };
+                }
+
+                return null;
+            }
+
+            if (name === "admitTriggerRun") {
+                return state.admissionRefusal ?? null;
+            }
+
             return name === "createExecution" ? "execution-1" : null;
         },
         runQuery: async (path: string) => {
@@ -61,7 +89,7 @@ const ctx = () =>
             state.queries.push(name);
 
             if (name === "getTriggerInternal") {
-                return state.trigger;
+                return state.trigger && { ...state.trigger };
             }
 
             if (name === "getBotForRun") {
@@ -93,6 +121,7 @@ const EMPTY: QuietSnapshot = { events: [], needsYou: [], running: [], threads: [
 beforeEach(() => {
     state.bot = { computerEnabled: false, instructions: "Be brief.", model: "bot-model" };
     state.admissionError = undefined;
+    state.admissionRefusal = undefined;
     state.beforeThread = undefined;
     state.snapshot = EMPTY;
     state.snapshotError = false;
@@ -207,6 +236,59 @@ describe("a quiet routine's run", () => {
         expect(state.runs).toHaveLength(1);
     });
 
+    it("takes the window before it creates anything, and does not give it back once the thread exists", async () => {
+        state.trigger = { ...state.trigger, quietWhenEmpty: true };
+        state.snapshot = { ...EMPTY, threads: [{ title: "Planning", updatedAt: 600 }] };
+
+        await run();
+
+        expect(names().indexOf("reserveQuietWindow")).toBeGreaterThanOrEqual(0);
+        expect(names().indexOf("reserveQuietWindow")).toBeLessThan(names().indexOf("createExecution"));
+        expect(names()).not.toContain("releaseQuietWindow");
+    });
+
+    it("lets only one of two overlapping runs post the same activity", async () => {
+        state.trigger = { ...state.trigger, quietWhenEmpty: true };
+        state.snapshot = { ...EMPTY, threads: [{ title: "Planning", updatedAt: 600 }] };
+
+        await Promise.all([run(), run()]);
+
+        expect(state.runs).toHaveLength(1);
+        expect(names().filter((name) => name === "createExecution")).toHaveLength(1);
+        expect(names().filter((name) => name === "admitTriggerRun")).toHaveLength(1);
+        expect(state.mutations.filter((entry) => entry.name === "recordFilteredExecution")).toHaveLength(1);
+    });
+
+    it("gives the window back when admission refuses the run, so the next run still reports the activity", async () => {
+        state.trigger = { ...state.trigger, quietWhenEmpty: true };
+        state.snapshot = { ...EMPTY, threads: [{ title: "Planning", updatedAt: 600 }] };
+        state.admissionRefusal = "Daily limit reached";
+
+        await run();
+
+        expect(state.runs).toHaveLength(0);
+        expect(state.trigger?.lastTriggeredAt).toBe(500);
+
+        state.admissionRefusal = undefined;
+        state.mutations = [];
+
+        await run();
+
+        expect(state.runs).toHaveLength(1);
+    });
+
+    it("does not take the window for a manual run or a routine that is not quiet", async () => {
+        state.trigger = { ...state.trigger, quietWhenEmpty: true };
+
+        await run({ ignoreDisabled: true, manual: true });
+
+        state.trigger = { ...state.trigger, quietWhenEmpty: undefined };
+
+        await run();
+
+        expect(names()).not.toContain("reserveQuietWindow");
+    });
+
     it("counts only what is newer than the last run: an older open request does not make it post", async () => {
         state.trigger = { ...state.trigger, quietWhenEmpty: true };
         state.snapshot = { ...EMPTY, needsYou: [{ at: 400, kind: "waiting_in_chat", title: "Old approval" }] };
@@ -300,6 +382,7 @@ describe("the window a run leaves for the next one", () => {
             expect(stats).not.toHaveProperty("lastTriggeredAt");
             expect(stats.error).toEqual(expect.any(String));
             expect(names()).toContain("updateExecution");
+            expect(state.trigger?.lastTriggeredAt).toBe(500);
             expect(await nextCheckPosts()).toBe(true);
         });
 

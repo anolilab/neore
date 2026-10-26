@@ -981,6 +981,8 @@ export interface InternalApiTypes {
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
             recordFilteredExecution: FunctionReference<"mutation", { reason: string; triggerId: Id<"triggers"> }, null>;
+            releaseQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers">; windowStart: number }, null>;
+            reserveQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers">; windowStart: number }, boolean>;
             setTriggerEnabledInternal: FunctionReference<"mutation", { enabled: boolean; triggerId: Id<"triggers"> }, null>;
             updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string }, null>;
             updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
@@ -2009,6 +2011,8 @@ export const internal: InternalApiTypes = {
             getDueScheduleTriggers: { __lunoraRef: "triggers_functions:getDueScheduleTriggers" },
             getTriggerInternal: { __lunoraRef: "triggers_functions:getTriggerInternal" },
             recordFilteredExecution: { __lunoraRef: "triggers_functions:recordFilteredExecution" },
+            releaseQuietWindow: { __lunoraRef: "triggers_functions:releaseQuietWindow" },
+            reserveQuietWindow: { __lunoraRef: "triggers_functions:reserveQuietWindow" },
             setTriggerEnabledInternal: { __lunoraRef: "triggers_functions:setTriggerEnabledInternal" },
             updateExecution: { __lunoraRef: "triggers_functions:updateExecution" },
             updateTriggerStats: { __lunoraRef: "triggers_functions:updateTriggerStats" },

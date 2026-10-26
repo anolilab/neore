@@ -6393,6 +6393,16 @@
     {
       "from": "function:triggers_execute:default",
       "kind": "call",
+      "to": "function:triggers_functions:releaseQuietWindow"
+    },
+    {
+      "from": "function:triggers_execute:default",
+      "kind": "call",
+      "to": "function:triggers_functions:reserveQuietWindow"
+    },
+    {
+      "from": "function:triggers_execute:default",
+      "kind": "call",
       "to": "function:triggers_functions:updateExecution"
     },
     {
@@ -14401,6 +14411,20 @@
       "id": "function:triggers_functions:recordFilteredExecution",
       "kind": "function",
       "name": "triggers.functions.recordFilteredExecution",
+      "module": "triggers"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:triggers_functions:releaseQuietWindow",
+      "kind": "function",
+      "name": "triggers.functions.releaseQuietWindow",
+      "module": "triggers"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:triggers_functions:reserveQuietWindow",
+      "kind": "function",
+      "name": "triggers.functions.reserveQuietWindow",
       "module": "triggers"
     },
     {

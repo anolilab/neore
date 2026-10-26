@@ -763,6 +763,41 @@ export const updateTriggerStats = internalMutation
         return null;
     });
 
+/**
+ * Takes a quiet run's window: moves `lastTriggeredAt` from the value the run read (`expected`) to `windowStart`, and
+ * says whether it did. Two overlapping runs read the same window, so only the first can move it; the other is
+ * refused, instead of posting a second thread for the activity the first reports. A run that then posts nothing
+ * gives it back with {@link releaseQuietWindow}.
+ */
+export const reserveQuietWindow = internalMutation
+    .input({ expected: v.optional(v.number()), triggerId: v.id("triggers"), windowStart: v.number() })
+    .output(v.boolean())
+    .mutation(async ({ args: { expected, triggerId, windowStart }, ctx }) => {
+        const trigger = await ctx.db.get(triggerId);
+
+        if (!trigger || trigger.lastTriggeredAt !== expected) {
+            return false;
+        }
+
+        await patchRow(ctx.db, trigger, { lastTriggeredAt: windowStart });
+
+        return true;
+    });
+
+/** Gives {@link reserveQuietWindow} back, only while the window is still the one that run took (a later run may have moved it). */
+export const releaseQuietWindow = internalMutation
+    .input({ expected: v.optional(v.number()), triggerId: v.id("triggers"), windowStart: v.number() })
+    .output(v.null())
+    .mutation(async ({ args: { expected, triggerId, windowStart }, ctx }) => {
+        const trigger = await ctx.db.get(triggerId);
+
+        if (trigger?.lastTriggeredAt === windowStart) {
+            await patchRow(ctx.db, trigger, { lastTriggeredAt: expected });
+        }
+
+        return null;
+    });
+
 /** The write behind {@link recordFilteredExecution}: the trigger's ONE filtered (skipped) row, created or moved to the front. */
 const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reason: string): Promise<void> => {
     // The trigger may have been deleted after the run read it. Its
