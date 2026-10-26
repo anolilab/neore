@@ -11,15 +11,23 @@ import { useOfflineScreen } from "../hooks/use-offline-screen";
  * A reload while the network or the server is down replaces the app with the browser's error page, so
  * the button reloads only once the origin answers. A failed probe leaves the screen up.
  */
+const PROBE_TIMEOUT_MS = 5000;
+
 const reloadWhenReachable = async (): Promise<void> => {
+    // A connection that opens and then stalls would otherwise leave the retry pending forever.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+
     try {
-        const response = await fetch(globalThis.location.origin, { cache: "no-store", method: "HEAD" });
+        const response = await fetch(globalThis.location.origin, { cache: "no-store", method: "HEAD", signal: controller.signal });
 
         if (response.ok) {
             globalThis.location.reload();
         }
     } catch {
-        // Still unreachable: the screen stays up.
+        // Still unreachable, or the probe timed out: the screen stays up for another attempt.
+    } finally {
+        clearTimeout(timer);
     }
 };
 
