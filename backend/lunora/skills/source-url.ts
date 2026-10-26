@@ -30,6 +30,8 @@ const SKILLS_SH_LAYOUTS = (skill: string): string[] => [`skills/${skill}`, skill
 
 /** `owner/repo`, or `https://github.com/owner/repo` (with an optional `.git`): the source a registry's command names. */
 const COMMAND_SOURCE = /^(?:https:\/\/github\.com\/)?([\w.-]{1,100})\/([\w.-]{1,100}?)(?:\.git)?$/;
+const DOT_SEGMENT = /^\.+$/;
+const WHITESPACE = /\s+/;
 const COMMAND_PREFIX = /^npx\s/i;
 
 export type SkillSourceResult = { error: string; ok: false } | { ok: true; urls: string[] };
@@ -123,7 +125,7 @@ const skillOf = (rest: string[]): string | null | undefined => {
 
 /** `npx skills add <source> [--skill <name> | -s <name> | <name>]`, read word by word; any other word or flag is refused. */
 const fromCommand = (command: string): SkillSourceResult => {
-    const [, tool, verb, source, ...rest] = command.split(/\s+/);
+    const [, tool, verb, source, ...rest] = command.split(WHITESPACE);
 
     if (tool !== "skills" || verb !== "add" || !source) {
         return fail(COMMAND_HINT);
@@ -132,7 +134,7 @@ const fromCommand = (command: string): SkillSourceResult => {
     const match = COMMAND_SOURCE.exec(source);
     const [, owner, repo] = match ?? [];
 
-    if (!owner || !repo || !GITHUB_NAME.test(owner) || !GITHUB_NAME.test(repo) || /^\.+$/.test(owner) || /^\.+$/.test(repo)) {
+    if (!owner || !repo || !GITHUB_NAME.test(owner) || !GITHUB_NAME.test(repo) || DOT_SEGMENT.test(owner) || DOT_SEGMENT.test(repo)) {
         return fail(COMMAND_HINT);
     }
 

@@ -97,6 +97,7 @@ describe("npx skills add commands", () => {
         ["a missing source", "npx skills add"],
         ["a source without a repository", "npx skills add acme"],
         ["a pasted host", "npx skills add https://evil.example/acme/skills --skill pdf"],
+        // eslint-disable-next-line unicorn/prefer-https -- the refusal of a plain-http host is the case under test
         ["a host-looking scheme", "npx skills add http://github.com/acme/skills"],
         ["a deeper GitHub link", "npx skills add https://github.com/acme/skills/tree/main/pdf"],
         ["a query", "npx skills add https://github.com/acme/skills?ref=x --skill pdf"],
