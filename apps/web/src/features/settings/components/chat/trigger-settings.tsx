@@ -552,8 +552,9 @@ const TriggerSettings: FC = () => {
                 name: editFormData.name,
                 quietWhenEmpty,
                 systemPrompt: editFormData.systemPrompt || undefined,
-                // Sent only when the user changed it: a zone sent with a rename would move a run time the row never had a zone for.
-                timezone: editFormData.type === "schedule" && editFormData.timezone.trim() !== editStartZone ? editFormData.timezone.trim() : undefined,
+                // Sent only when the user changed it: a zone sent with a rename would move a run time the row never had a zone for. Clearing it means UTC.
+                timezone:
+                    editFormData.type === "schedule" && editFormData.timezone.trim() !== editStartZone ? editFormData.timezone.trim() || "UTC" : undefined,
                 triggerId: editingTriggerId,
             },
             {

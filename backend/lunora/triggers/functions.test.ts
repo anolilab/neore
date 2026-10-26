@@ -600,6 +600,18 @@ describe("updateTrigger and the trigger's time zone", () => {
         expect(row.cronInZone).toBeUndefined();
     });
 
+    it("moves a zone-aware schedule back to UTC and keeps it zone-aware", async () => {
+        const triggerId = await insertSchedule("America/New_York");
+
+        await asOwner().mutation(updateTrigger as never, { timezone: "UTC", triggerId } as never);
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.timezone).toBe("UTC");
+        expect(row.cronInZone).toBe(true);
+        expect(row.nextTriggerAt).toBe(Date.parse("2026-07-01T09:00:00Z"));
+    });
+
     it("keeps a stray stored zone out of the cron until a zone is chosen", async () => {
         const triggerId = await insertSchedule("America/New_York", false);
 
