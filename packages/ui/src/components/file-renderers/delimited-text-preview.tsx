@@ -47,7 +47,7 @@ const DelimitedTable: FC<{ filename?: string; text: string }> = ({ filename, tex
     return (
         <>
             <div className="h-[420px]">
-                <CsvRenderer content={content} delimiter={delimiter} labels={{ title: filename || t`Table` }} />
+                <CsvRenderer content={content} delimiter={delimiter} labels={{ title: filename || t`Table` }} typed={false} />
             </div>
             {hiddenColumns > 0 && (
                 <p className="text-muted-foreground border-t px-3 py-2 text-xs">

@@ -57,17 +57,19 @@ interface CsvRendererProps {
     content: string;
     /** The field delimiter. Detected from the content when omitted. */
     delimiter?: string;
+    /** Read numbers and booleans as such (sorting, the labels). Off to show each field exactly as the file has it. */
+    typed?: boolean;
     /** Override labels for i18n */
     labels?: CsvRendererLabels;
 }
 
-const parseCSV = (content: string, delimiter?: string): { data: Record<string, unknown>[]; headers: string[] } => {
+const parseCSV = (content: string, delimiter: string | undefined, typed: boolean): { data: Record<string, unknown>[]; headers: string[] } => {
     if (!content) return { data: [], headers: [] };
 
     try {
         const results = Papa.parse<Record<string, unknown>>(content, {
             delimiter,
-            dynamicTyping: true,
+            dynamicTyping: typed,
             header: true,
             skipEmptyLines: true,
         });
@@ -85,7 +87,7 @@ const parseCSV = (content: string, delimiter?: string): { data: Record<string, u
     }
 };
 
-const CsvRenderer = ({ className, compact = false, containerHeight = 300, content, delimiter, labels }: CsvRendererProps) => {
+const CsvRenderer = ({ className, compact = false, containerHeight = 300, content, delimiter, labels, typed = true }: CsvRendererProps) => {
     const { i18n, t } = useLingui();
     const [searchTerm, setSearchTerm] = React.useState("");
     const [sortConfig, setSortConfig] = React.useState<SortConfig>({ column: "", direction: null });
@@ -93,7 +95,7 @@ const CsvRenderer = ({ className, compact = false, containerHeight = 300, conten
     const [currentPage, setCurrentPage] = React.useState(1);
     const rowsPerPage = 50;
 
-    const parsedData = React.useMemo(() => parseCSV(content, delimiter), [content, delimiter]);
+    const parsedData = React.useMemo(() => parseCSV(content, delimiter, typed), [content, delimiter, typed]);
     const unfilteredRows = parsedData.data.length.toLocaleString(i18n.locale);
     const filteredFromLabel = t`(filtered from ${unfilteredRows})`;
     const isEmpty = parsedData.data.length === 0;

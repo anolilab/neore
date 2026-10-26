@@ -271,7 +271,8 @@ const getFileLabel = (isVideo: boolean | undefined, isAudio: boolean | undefined
 };
 
 /** Accept common file types - images, text, documents, PDFs, video, audio, DOCX. The composer's file picker uses the same list. */
-export const ATTACHMENT_ACCEPT = `image/*,text/*,video/*,audio/*,application/pdf,application/json,application/xml,${DOCX_TYPE},.md,${TEXT_PREVIEW_SUFFIXES.join(",")},.txt,.docx,.mp4,.mp3,.wav,.webm,.ogg,.m4a,.mov`;
+// The types the chat upload accepts (the server's allowlist), so the picker offers nothing it would refuse.
+export const ATTACHMENT_ACCEPT = `image/*,text/plain,text/markdown,text/html,text/css,text/javascript,text/xml,text/yaml,application/pdf,application/json,application/javascript,application/typescript,application/xml,${DOCX_TYPE},.md,${TEXT_PREVIEW_SUFFIXES.join(",")},.txt,.docx`;
 
 /**
  * A closure rather than a class: two of the three adapter members never touched
