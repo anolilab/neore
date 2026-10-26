@@ -127,6 +127,10 @@ jobs:
               if: "matrix.name == 'macos'"
               run: "rustup target add x86_64-apple-darwin"
 
+            - name: "Add the arm64 macOS Rust target"
+              if: "matrix.name == 'macos'"
+              run: "rustup target add aarch64-apple-darwin"
+
             - name: "Add the arm64 Windows Rust target"
               if: "matrix.name == 'windows'"
               run: "rustup target add aarch64-pc-windows-msvc"
@@ -135,10 +139,15 @@ jobs:
             - name: "Build the device-execution addon for the runner's architecture"
               run: "pnpm --filter @neore/device-core-node run build"
 
-            # `mac.target` ships x64 as well as arm64, and an Electron x64 app needs an x64 addon.
+            # `mac.target` ships x64 as well as arm64, and each Electron app needs the addon for its own arch.
+            # Both are built explicitly, so the package does not depend on which arch the runner happens to be.
             - name: "Build the device-execution addon for x64 (macOS)"
               if: "matrix.name == 'macos'"
               run: "pnpm --filter @neore/device-core-node run build -- --target x86_64-apple-darwin"
+
+            - name: "Build the device-execution addon for arm64 (macOS)"
+              if: "matrix.name == 'macos'"
+              run: "pnpm --filter @neore/device-core-node run build -- --target aarch64-apple-darwin"
 
             # `win.target` ships arm64 as well as x64. Cross-compiled here, unverified: see the header.
             - name: "Build the device-execution addon for arm64 (Windows)"
