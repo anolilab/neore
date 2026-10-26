@@ -42,7 +42,11 @@ describe("keepVectorsOnlyIfSaved", () => {
     });
 
     it("lets the save's error win over a failing cleanup", async () => {
-        const { ctx } = fakeContext(vi.fn(async (..._arguments: unknown[]) => Promise.reject(new Error("cleanup failed"))));
+        const { ctx } = fakeContext(
+            vi.fn(async (..._arguments: unknown[]) => {
+                throw new Error("cleanup failed");
+            }),
+        );
         const failure = new Error("saveChunks failed");
         const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
 

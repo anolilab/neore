@@ -81,6 +81,10 @@ const isGithubRepo = (repoUrl: string): boolean => {
 export const canOpenPullRequest = (run: Pick<RunDoc, "diff" | "diffTruncated" | "prStatus" | "prUrl" | "repoUrl" | "status">): boolean =>
     run.status === "succeeded" && Boolean(run.diff) && run.diffTruncated !== true && !run.prUrl && run.prStatus !== "pending" && isGithubRepo(run.repoUrl);
 
+/** True while `startedAt` names the attempt that is still pending: a retry or an ended attempt makes it false. */
+const isCurrentPullRequestAttempt = (run: Pick<RunDoc, "prStartedAt" | "prStatus">, startedAt: number): boolean =>
+    run.prStatus === "pending" && run.prStartedAt === startedAt;
+
 /** A `pending` PR older than its budget plus the reaper's grace: nothing is polling it any more. */
 export const isPullRequestStale = (run: Pick<RunDoc, "prStartedAt" | "prStatus" | "updatedAt">, now: number): boolean =>
     run.prStatus === "pending" && now - (run.prStartedAt ?? run.updatedAt) > PR_REAP_AFTER_MS;
@@ -488,12 +492,17 @@ export const isCurrentPoll = (pollSeq: number | undefined, seq: number): boolean
  * in parallel with the first, forever. Only the first delivery of `seq` wins.
  */
 export const claimPoll = internalMutation
-    .input({ runId: v.id("codingAgentRuns"), seq: v.number() })
+    .input({ prStartedAt: v.optional(v.number()), runId: v.id("codingAgentRuns"), seq: v.number() })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const run = await ctx.db.get(args.runId);
 
         if (!run || !isCurrentPoll(run.pollSeq, args.seq)) {
+            return false;
+        }
+
+        // A PR poll of an earlier attempt must not use up the sequence number the retry's first poll holds.
+        if (args.prStartedAt !== undefined && !isCurrentPullRequestAttempt(run, args.prStartedAt)) {
             return false;
         }
 
@@ -636,6 +645,8 @@ export const beginPullRequest = internalMutation
                 pollSeq: v.number(),
                 prompt: v.string(),
                 repoUrl: v.string(),
+                /** Identifies this attempt (its `prStartedAt`); every later write for it must present it. */
+                startedAt: v.number(),
                 summary: v.optional(v.string()),
             }),
             v.object({ error: v.string() }),
@@ -669,21 +680,29 @@ export const beginPullRequest = internalMutation
             pollSeq: run.pollSeq ?? 0,
             prompt: run.prompt,
             repoUrl: run.repoUrl,
+            startedAt: now,
             ...(run.summary !== undefined && { summary: run.summary }),
         };
     });
 
+/**
+ * Attach the attempt's sandbox. Answers false when the attempt is no longer the
+ * pending one (reclaimed, reaped or ended): the caller then owns a sandbox
+ * nothing tracks and kills it.
+ */
 export const setPullRequestSandbox = internalMutation
-    .input({ runId: v.id("codingAgentRuns"), sandboxId: v.string() })
-    .output(v.null())
+    .input({ runId: v.id("codingAgentRuns"), sandboxId: v.string(), startedAt: v.number() })
+    .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const run = await ctx.db.get(args.runId);
 
-        if (run) {
-            await patchById(ctx.db, run._id, { prSandboxId: args.sandboxId, updatedAt: ctx.now });
+        if (!run || !isCurrentPullRequestAttempt(run, args.startedAt)) {
+            return false;
         }
 
-        return null;
+        await patchById(ctx.db, run._id, { prSandboxId: args.sandboxId, updatedAt: ctx.now });
+
+        return true;
     });
 
 /** What one PR poll needs, or `null` once no PR is in flight. */
@@ -738,12 +757,13 @@ const endPullRequest = async (ctx: MutationCtx, run: RunDoc, log: string, prUrl?
 
 /** End an in-flight PR: record the URL or the failure. Answers whether the follow-ups were waiting on it. */
 export const completePullRequest = internalMutation
-    .input({ log: v.string(), prUrl: v.optional(v.string()), runId: v.id("codingAgentRuns") })
+    .input({ log: v.string(), prUrl: v.optional(v.string()), runId: v.id("codingAgentRuns"), startedAt: v.number() })
     .output(v.object({ followUp: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const run = await ctx.db.get(args.runId);
 
-        if (!run || run.prStatus !== "pending") {
+        // Only the attempt it was started for may end it; a late one from before a retry changes nothing.
+        if (!run || !isCurrentPullRequestAttempt(run, args.startedAt)) {
             return { followUp: false };
         }
 
@@ -762,7 +782,7 @@ export const expirePullRequest = internalMutation
     .mutation(async ({ args, ctx }) => {
         const run = await ctx.db.get(args.runId);
 
-        if (!run || run.prStatus !== "pending" || run.prStartedAt !== args.startedAt) {
+        if (!run || !isCurrentPullRequestAttempt(run, args.startedAt)) {
             return null;
         }
 

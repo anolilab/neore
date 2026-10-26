@@ -23,6 +23,8 @@ import { internalQuery } from "../_generated/server";
 import schema from "../schema";
 import { scriptedModel, textStep } from "./group/test-models";
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 const { groupState, modelState, registry, skillState } = vi.hoisted(() => {
     return {
         /** What `getGroupRunConfig` answers, and how often it was asked. */
@@ -31,7 +33,7 @@ const { groupState, modelState, registry, skillState } = vi.hoisted(() => {
         modelState: { builtAgents: 0, model: undefined as unknown },
         registry: new Map<string, unknown>(),
         /** What `resolveSkillsForRun` is asked, and its answer. */
-        skillState: { answer: undefined as unknown, calls: [] as Array<{ skillSlug?: string }> },
+        skillState: { answer: undefined as unknown, calls: [] as { skillSlug?: string }[] },
     };
 });
 
@@ -121,13 +123,11 @@ beforeAll(async () => {
     // The reads whose tables the harness cannot hold, or that touch encrypted keys.
     registry.set(
         "chat_group_functions:getGroupRunConfig",
-        internalQuery
-            .input({ organizationId: v.optional(v.string()), threadId: v.string(), userId: v.string() })
-            .query(async () => {
-                groupState.calls += 1;
+        internalQuery.input({ organizationId: v.optional(v.string()), threadId: v.string(), userId: v.string() }).query(async () => {
+            groupState.calls += 1;
 
-                return groupState.config as never;
-            }),
+            return groupState.config as never;
+        }),
     );
     registry.set(
         "auth_functions:getAgentModulePreferencesQuery",
@@ -254,7 +254,7 @@ describe("runStreamingAgent: a successful turn", () => {
         const [, usageArgs] = vi.mocked(scheduleReplyUsage).mock.calls[0] as [unknown, Record<string, unknown> | undefined];
 
         // The scripted model reports 3 input and 5 output tokens; the reply is filed under the user's own calendar day.
-        expect(usageArgs).toMatchObject({ date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), replyKey: expect.any(String), tokens: 8, userId: OWNER });
+        expect(usageArgs).toMatchObject({ date: expect.stringMatching(ISO_DATE), replyKey: expect.any(String), tokens: 8, userId: OWNER });
         // A plain turn has no invoked skill, so the usage page files it under the assistant.
         expect(usageArgs).not.toHaveProperty("skillName");
     });

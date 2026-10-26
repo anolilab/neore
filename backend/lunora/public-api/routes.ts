@@ -682,9 +682,11 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
                 // Refused (quota, rate limit): the staged upload is already spent, so
                 // the vault row and object it became would be reachable by no one.
                 // The original refusal is what the client sees, whatever the cleanup does.
-                await ctx.runMutation(internal.vault.functions.discardUnfiledVaultFile, { fileId: vaultFile.fileId, userId: identity.userId }).catch((cleanupError: unknown) => {
-                    console.error("[public-api] Failed to drop the vault file of a refused knowledge file:", cleanupError);
-                });
+                await ctx
+                    .runMutation(internal.vault.functions.discardUnfiledVaultFile, { fileId: vaultFile.fileId, userId: identity.userId })
+                    .catch((cleanupError: unknown) => {
+                        console.error("[public-api] Failed to drop the vault file of a refused knowledge file:", cleanupError);
+                    });
 
                 throw error;
             }

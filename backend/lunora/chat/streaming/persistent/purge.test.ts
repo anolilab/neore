@@ -43,9 +43,15 @@ const insertStream = async (status: string, expiresAt: number, chunks = 2): Prom
 
 const purge = async (): Promise<{ chunks: number; streams: number }> => await harness.run(async (ctx: any) => await ctx.runMutation(purgeFinishedStreams, {}));
 
-const count = async (table: string): Promise<number> => await harness.run(async (ctx: any) => (await ctx.db.query(table).collect()).length);
+const count = async (table: string): Promise<number> =>
+    await harness.run(async (ctx: any) => {
+        const rows = await ctx.db.query(table).collect();
 
-const exists = async (id: string): Promise<boolean> => await harness.run(async (ctx: any) => (await ctx.db.persistentStreams.findFirst({ where: { _id: id } })) !== null);
+        return rows.length;
+    });
+
+const exists = async (id: string): Promise<boolean> =>
+    await harness.run(async (ctx: any) => (await ctx.db.persistentStreams.findFirst({ where: { _id: id } })) !== null);
 
 describe("purgeFinishedStreams", () => {
     it("removes old finished streams and their chunks across batches", async () => {

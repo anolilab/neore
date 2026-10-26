@@ -487,7 +487,13 @@ describe("usage of a cancelled stream is registered with waitUntil before the re
 
         context.waitUntil = (promise) => {
             registered.push(promise);
-            void promise.then(() => settledAt.push(Date.now()));
+            promise
+                .then(() => {
+                    settledAt.push(Date.now());
+
+                    return undefined;
+                })
+                .catch(() => undefined);
             waitUntil(promise);
         };
 

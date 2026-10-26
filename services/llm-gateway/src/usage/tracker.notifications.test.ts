@@ -66,7 +66,7 @@ describe(sendNotifications, () => {
         const sizes = fetchMock.mock.calls.map(([, init]) => (JSON.parse(String(init.body)) as { notifications: unknown[] }).notifications.length);
 
         // Slices drain through a worker pool, so the order of the requests is not fixed; the sizes are.
-        expect([...sizes].sort((a, b) => a - b)).toEqual([20, 50, 50]);
+        expect(sizes.toSorted((a, b) => a - b)).toEqual([20, 50, 50]);
     });
 
     it("sends slices with bounded concurrency rather than one after another", async () => {

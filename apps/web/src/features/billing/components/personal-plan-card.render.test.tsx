@@ -5,6 +5,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const UPGRADE_TO_PRO = /Upgrade to Pro/;
+
 const harness = vi.hoisted(() => {
     return {
         checkoutPending: false,
@@ -120,7 +122,7 @@ describe("PersonalPlanCard", () => {
         mount();
 
         expect(await screen.findByText("Pro")).toBeTruthy();
-        expect(screen.queryByRole("button", { name: /Upgrade to Pro/ })).toBeNull();
+        expect(screen.queryByRole("button", { name: UPGRADE_TO_PRO })).toBeNull();
 
         fireEvent.click(screen.getByRole("button", { name: "Manage subscription" }));
 
@@ -152,6 +154,6 @@ describe("PersonalPlanCard", () => {
         harness.planPending = true;
         mount();
 
-        expect(screen.queryByRole("button", { name: /Upgrade to Pro/ })).toBeNull();
+        expect(screen.queryByRole("button", { name: UPGRADE_TO_PRO })).toBeNull();
     });
 });

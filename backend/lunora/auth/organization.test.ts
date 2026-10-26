@@ -67,7 +67,15 @@ const insertMember = async (userId: string, organizationId: string, role = "memb
 const insertInvitation = async (email: string, organizationId: string, extra: Record<string, unknown> = {}): Promise<string> =>
     await seed(
         async (db) =>
-            await db.insert("invitation", { email, expiresAt: 9_999_999_999_999, inviterId: "inviter", organizationId, role: "member", status: "pending", ...extra }),
+            await db.insert("invitation", {
+                email,
+                expiresAt: 9_999_999_999_999,
+                inviterId: "inviter",
+                organizationId,
+                role: "member",
+                status: "pending",
+                ...extra,
+            }),
     );
 
 beforeEach(async () => {
@@ -123,7 +131,7 @@ describe("listOrganizations", () => {
         const mine = (await as(ALICE).query(listOrganizations as never, {} as never)) as { organizations: { id: string }[] };
         const bobs = (await as(BOB).query(listOrganizations as never, {} as never)) as { organizations: { id: string }[] };
 
-        expect(mine.organizations.map((org) => org.id).sort()).toEqual([acme, beta].sort());
+        expect(mine.organizations.map((org) => org.id).toSorted((a, b) => a.localeCompare(b))).toEqual([acme, beta].toSorted((a, b) => a.localeCompare(b)));
         expect(bobs.organizations).toEqual([]);
         expect(mine.organizations.map((org) => org.id)).not.toContain(gamma);
     });
@@ -172,7 +180,9 @@ describe("assertOwnOrganizationId in createPrompt", () => {
     // The allowed path is not driven here: `createPrompt` then calls `runMutation(internal.lib.action_cache.remove)`,
     // which needs the generated function registry the in-memory harness does not load.
     // `lib/organization-helpers.test.ts` covers the accepting branches of the assertion itself.
-    const prompt = (organizationId: string) => ({ content: "Hello", name: "Greeting", organizationId });
+    const prompt = (organizationId: string) => {
+        return { content: "Hello", name: "Greeting", organizationId };
+    };
 
     const promptRows = async (): Promise<{ organizationId?: string; userId: string }[]> =>
         await seed(async (db) => {

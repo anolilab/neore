@@ -51,7 +51,10 @@ const assertTriggerTypeSupported = (type: "event" | "schedule" | "webhook"): voi
  */
 const assertCronExpression = (cronExpression: string): void => {
     if (!isHourlyOrSlowerCronExpression(cronExpression)) {
-        throw new LunoraError("BAD_REQUEST", 'Schedule must be a 5-field cron expression (read in the trigger time zone, UTC by default) that runs at most hourly, e.g. "0 9 * * 1"');
+        throw new LunoraError(
+            "BAD_REQUEST",
+            'Schedule must be a 5-field cron expression (read in the trigger time zone, UTC by default) that runs at most hourly, e.g. "0 9 * * 1"',
+        );
     }
 };
 

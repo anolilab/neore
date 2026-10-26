@@ -1,4 +1,5 @@
 import type { Id } from "@neore/backend/dataModel";
+import { withUnlockProofBody } from "@neore/client-runtime";
 import type { QueryClient } from "@tanstack/react-query";
 import type { HistoryState, useNavigate } from "@tanstack/react-router";
 import type { Dispatch, RefObject, SetStateAction } from "react";
@@ -9,7 +10,6 @@ import { trackEvent } from "@/lib/analytics";
 import { AppError } from "@/lib/errors";
 import { providerLogger } from "@/lib/logger";
 import type { useCRPC } from "@/lib/lunora/crpc";
-import { withUnlockProofBody } from "@neore/client-runtime";
 
 import { DEFAULT_MESSAGE_OPTS } from "../constants/query-options";
 import type { PendingAttachment } from "../stores/chat-ui-store";

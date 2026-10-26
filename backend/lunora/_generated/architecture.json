@@ -2471,6 +2471,11 @@
       "to": "table:messages"
     },
     {
+      "from": "function:chat_media_stale:failStaleMediaRows",
+      "kind": "schedule",
+      "to": "function:chat_media_stale:failStaleMediaRows"
+    },
+    {
       "from": "function:chat_pins_functions:createPin",
       "kind": "write",
       "to": "table:threadPins"
@@ -17486,91 +17491,91 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 526,
+      "line": 532,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 535,
+      "line": 543,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 547,
+      "line": 556,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 568,
+      "line": 577,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 675,
+      "line": 688,
       "reason": "\"createRunSteering\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 727,
+      "line": 740,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 735,
+      "line": 748,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 747,
+      "line": 760,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 792,
+      "line": 805,
       "reason": "\"endStoppedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 890,
+      "line": 903,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 974,
+      "line": 987,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1059,
+      "line": 1072,
       "reason": "\"setThreadStatus\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1079,
+      "line": 1092,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1086,
+      "line": 1099,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1097,
+      "line": 1110,
       "reason": "\"failRun\" is not a registered function"
     },
     {
@@ -19718,19 +19723,19 @@
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 705,
+      "line": 707,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 749,
+      "line": 751,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 764,
+      "line": 766,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {

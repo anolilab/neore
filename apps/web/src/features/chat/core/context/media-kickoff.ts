@@ -1,7 +1,8 @@
+import { withUnlockProofBody } from "@neore/client-runtime";
+
 import env from "@/lib/env";
 import { NetworkError } from "@/lib/errors";
 import { providerLogger } from "@/lib/logger";
-import { withUnlockProofBody } from "@neore/client-runtime";
 
 import type { MediaGenerationFailure } from "../lib/start-media-generation";
 import { startMediaGeneration } from "../lib/start-media-generation";

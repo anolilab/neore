@@ -2,7 +2,16 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { appendToLog, beginPullRequest, canOpenPullRequest, completePullRequest, expirePullRequest, isPullRequestStale } from "./functions";
+import {
+    appendToLog,
+    beginPullRequest,
+    canOpenPullRequest,
+    claimPoll,
+    completePullRequest,
+    expirePullRequest,
+    isPullRequestStale,
+    setPullRequestSandbox,
+} from "./functions";
 import { PR_BUDGET_MS } from "./runner";
 
 describe("appendToLog", () => {
@@ -101,7 +110,7 @@ describe("pull request reaper", () => {
 
     it("does not touch a finished PR", async () => {
         const opened = await insertRun({ prUrl: "https://github.com/a/b/pull/1" });
-        const failed = await insertRun({ prStatus: "failed", log: "earlier\n" });
+        const failed = await insertRun({ log: "earlier\n", prStatus: "failed" });
 
         expect(await mutate(expirePullRequest, { runId: opened, startedAt: 100 })).toBeNull();
         expect(await mutate(expirePullRequest, { runId: failed, startedAt: 100 })).toBeNull();
@@ -112,10 +121,83 @@ describe("pull request reaper", () => {
     it("does not touch a PR that completed after the reaper was scheduled", async () => {
         const runId = await insertRun({ prStartedAt: 100, prStatus: "pending" });
 
-        await mutate(completePullRequest, { log: "Opened\n", prUrl: "https://github.com/a/b/pull/2", runId });
+        await mutate(completePullRequest, { log: "Opened\n", prUrl: "https://github.com/a/b/pull/2", runId, startedAt: 100 });
 
         expect(await mutate(expirePullRequest, { runId, startedAt: 100 })).toBeNull();
         expect(await getRun(runId)).toMatchObject({ prUrl: "https://github.com/a/b/pull/2" });
+    });
+
+    it("completes the current attempt normally", async () => {
+        const runId = await insertRun({ prFollowUp: true, prSandboxId: "sbx-1", prStartedAt: 100, prStatus: "pending" });
+
+        expect(await mutate(completePullRequest, { log: "Opened\n", prUrl: "https://github.com/a/b/pull/3", runId, startedAt: 100 })).toStrictEqual({
+            followUp: true,
+        });
+
+        const run = await getRun(runId);
+
+        expect(run.prUrl).toBe("https://github.com/a/b/pull/3");
+        expect("prStatus" in run).toBe(false);
+        expect("prSandboxId" in run).toBe(false);
+    });
+
+    describe("a retry after an earlier attempt", () => {
+        // Attempt 100 was reclaimed by attempt 200, which already holds its own sandbox.
+        const retry = async (): Promise<string> => await insertRun({ prFollowUp: true, prSandboxId: "sbx-new", prStartedAt: 200, prStatus: "pending" });
+
+        it("hands the attempt its identifier when it claims", async () => {
+            const runId = await insertRun();
+            const claim = await mutate(beginPullRequest, { followUp: false, runId, userId: USER });
+
+            const run = await getRun(runId);
+
+            expect(claim.startedAt).toBe(run.prStartedAt);
+        });
+
+        it("ignores a late start action attaching its sandbox", async () => {
+            const runId = await retry();
+
+            expect(await mutate(setPullRequestSandbox, { runId, sandboxId: "sbx-old", startedAt: 100 })).toBe(false);
+            expect(await getRun(runId)).toMatchObject({ prSandboxId: "sbx-new", prStartedAt: 200 });
+        });
+
+        it("attaches the sandbox of the current attempt", async () => {
+            const runId = await insertRun({ prStartedAt: 200, prStatus: "pending" });
+
+            expect(await mutate(setPullRequestSandbox, { runId, sandboxId: "sbx-new", startedAt: 200 })).toBe(true);
+            expect(await getRun(runId)).toMatchObject({ prSandboxId: "sbx-new" });
+        });
+
+        it("does not attach a sandbox once the attempt has ended", async () => {
+            const runId = await insertRun({ prStatus: "failed" });
+
+            expect(await mutate(setPullRequestSandbox, { runId, sandboxId: "sbx-old", startedAt: 100 })).toBe(false);
+            expect("prSandboxId" in (await getRun(runId))).toBe(false);
+        });
+
+        it("ignores a late poll completing the retry with a failure or a URL", async () => {
+            const runId = await retry();
+
+            expect(await mutate(completePullRequest, { log: "timed out\n", runId, startedAt: 100 })).toStrictEqual({ followUp: false });
+            expect(await mutate(completePullRequest, { log: "Opened\n", prUrl: "https://github.com/a/b/pull/9", runId, startedAt: 100 })).toStrictEqual({
+                followUp: false,
+            });
+            expect(await getRun(runId)).toMatchObject({ prSandboxId: "sbx-new", prStartedAt: 200, prStatus: "pending" });
+            expect("prUrl" in (await getRun(runId))).toBe(false);
+        });
+
+        it("lets only the current attempt's poll claim a sequence number", async () => {
+            const runId = await retry();
+
+            expect(await mutate(claimPoll, { prStartedAt: 100, runId, seq: 0 })).toBe(false);
+            const row191 = await getRun(runId);
+
+            expect(row191.pollSeq).toBeUndefined();
+            expect(await mutate(claimPoll, { prStartedAt: 200, runId, seq: 0 })).toBe(true);
+            const row193 = await getRun(runId);
+
+            expect(row193.pollSeq).toBe(1);
+        });
     });
 
     it("schedules the reaper when it claims the PR", async () => {

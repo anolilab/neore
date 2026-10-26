@@ -635,19 +635,48 @@ export const ACTIVITY_RECORD_INTERVAL_MS = 10 * 60 * 1000;
 /** Never schedule a run closer than this — a job due in seconds is a reschedule race. */
 const MIN_SCHEDULE_LEAD_MS = 5 * 60 * 1000;
 
-/** `Intl` throws `RangeError` for an unknown zone; anything unusable reads as UTC. */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * The wall-clock formatter for `timeZone`, built once per zone: constructing an
+ * `Intl.DateTimeFormat` is the expensive part, and a zoned cron search calls
+ * `localParts` thousands of times. `undefined` for an unknown zone, which is not
+ * cached (user-supplied names would grow the map without bound).
+ */
+const formatterFor = (timeZone: string): Intl.DateTimeFormat | undefined => {
+    const cached = formatters.get(timeZone);
+
+    if (cached) {
+        return cached;
+    }
+
+    try {
+        const formatter = new Intl.DateTimeFormat("en-US", {
+            day: "numeric",
+            hour: "numeric",
+            hourCycle: "h23",
+            minute: "numeric",
+            month: "numeric",
+            timeZone,
+            year: "numeric",
+        });
+
+        formatters.set(timeZone, formatter);
+
+        return formatter;
+    } catch {
+        // `Intl` throws `RangeError` for an unknown zone.
+        return undefined;
+    }
+};
+
+/** Anything unusable reads as UTC. */
 export const resolveTimeZone = (timeZone: string | null | undefined): string => {
     if (!timeZone) {
         return "UTC";
     }
 
-    try {
-        new Intl.DateTimeFormat("en-US", { timeZone }).format(0);
-
-        return timeZone;
-    } catch {
-        return "UTC";
-    }
+    return formatterFor(timeZone) ? timeZone : "UTC";
 };
 
 interface LocalParts {
@@ -659,15 +688,8 @@ interface LocalParts {
 }
 
 export const localParts = (instant: number, timeZone: string): LocalParts => {
-    const parts = new Intl.DateTimeFormat("en-US", {
-        day: "numeric",
-        hour: "numeric",
-        hourCycle: "h23",
-        minute: "numeric",
-        month: "numeric",
-        timeZone: resolveTimeZone(timeZone),
-        year: "numeric",
-    }).formatToParts(instant);
+    // An unusable zone reads as UTC, as in `resolveTimeZone`, without resolving twice.
+    const parts = (formatterFor(timeZone) ?? formatterFor("UTC")!).formatToParts(instant);
     const get = (type: Intl.DateTimeFormatPartTypes): number => Number(parts.find((p) => p.type === type)?.value ?? 0);
 
     return { day: get("day"), hour: get("hour"), minute: get("minute"), month: get("month"), year: get("year") };

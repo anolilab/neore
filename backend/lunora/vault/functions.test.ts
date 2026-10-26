@@ -76,11 +76,14 @@ describe("deleteAttachments", () => {
 });
 
 describe("discardUnfiledVaultFile", () => {
-    const discard = async (fileId: string, userId = OWNER) => await harness.run(async (ctx: any) => await ctx.runMutation(discardUnfiledVaultFile, { fileId, userId }));
+    const discard = async (fileId: string, userId = OWNER) =>
+        await harness.run(async (ctx: any) => await ctx.runMutation(discardUnfiledVaultFile, { fileId, userId }));
     const exists = async (id: string) => await harness.run(async (ctx: any) => Boolean(await ctx.db.get(id)));
 
     it("deletes an unfiled chat-less file of the user", async () => {
-        const id = await harness.run(async (ctx: any) => await ctx.db.insert("files", { key: "k1", name: "a.txt", size: 1, type: "text/plain", userId: OWNER }));
+        const id = await harness.run(
+            async (ctx: any) => await ctx.db.insert("files", { key: "k1", name: "a.txt", size: 1, type: "text/plain", userId: OWNER }),
+        );
 
         await discard(id);
 
@@ -91,7 +94,15 @@ describe("discardUnfiledVaultFile", () => {
         const id = await harness.run(async (ctx: any) => {
             const fileId = await ctx.db.insert("files", { key: "k2", name: "b.txt", size: 1, type: "text/plain", userId: OWNER });
 
-            await ctx.db.insert("knowledgeFiles", { createdAt: 1, mimeType: "text/plain", name: "b.txt", size: 1, status: "pending", userId: OWNER, vaultFileId: fileId });
+            await ctx.db.insert("knowledgeFiles", {
+                createdAt: 1,
+                mimeType: "text/plain",
+                name: "b.txt",
+                size: 1,
+                status: "pending",
+                userId: OWNER,
+                vaultFileId: fileId,
+            });
 
             return fileId;
         });

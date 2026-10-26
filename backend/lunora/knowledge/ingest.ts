@@ -330,24 +330,21 @@ export const ingestFile = internalAction
             // the vectors just written, so they go now.
             // A save that throws leaves the vectors just as orphaned: no chunk row
             // points at them, and file removal follows chunk rows.
-            const saved = await keepVectorsOnlyIfSaved(
-                ctx,
-                embeddingIds as string[],
-                () =>
-                    ctx.runMutation(internal.knowledge.functions.saveChunks, {
-                        chunks: chunks.map((chunk, i) => {
-                            return {
-                                chunkIndex: chunk.index,
-                                content: chunk.content,
-                                embeddingId: (embeddingIds[i] as string) ?? undefined,
-                                pageNumber: chunk.pageNumber,
-                                sectionHeading: chunk.sectionHeading,
-                                tokenCount: estimateTokens(chunk.content),
-                            };
-                        }),
-                        fileId: args.knowledgeFileId,
-                        userId: args.userId,
+            const saved = await keepVectorsOnlyIfSaved(ctx, embeddingIds as string[], () =>
+                ctx.runMutation(internal.knowledge.functions.saveChunks, {
+                    chunks: chunks.map((chunk, i) => {
+                        return {
+                            chunkIndex: chunk.index,
+                            content: chunk.content,
+                            embeddingId: (embeddingIds[i] as string) ?? undefined,
+                            pageNumber: chunk.pageNumber,
+                            sectionHeading: chunk.sectionHeading,
+                            tokenCount: estimateTokens(chunk.content),
+                        };
                     }),
+                    fileId: args.knowledgeFileId,
+                    userId: args.userId,
+                }),
             );
 
             if (!saved) {

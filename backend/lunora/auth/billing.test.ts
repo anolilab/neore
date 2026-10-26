@@ -105,13 +105,17 @@ afterEach(() => {
 });
 
 describe("setOrganizationBillingTier", () => {
-    const args = (organizationId: string) => ({ baseTier: "enterprise", creditsPerUser: 5000, organizationId });
+    const args = (organizationId: string) => {
+        return { baseTier: "enterprise", creditsPerUser: 5000, organizationId };
+    };
 
     it.each([OWNER, ORG_ADMIN, MEMBER, OUTSIDER])("refuses %s, who is not a platform admin, and leaves the tier alone", async (userId) => {
         await expect(as(userId).mutation(setOrganizationBillingTier as never, args(orgId) as never)).rejects.toMatchObject(forbidden);
 
         expect(await readOrganization(orgId)).toMatchObject({ baseTier: "free" });
-        expect((await readOrganization(orgId)).creditsPerUser).toBeUndefined();
+        const row114 = await readOrganization(orgId);
+
+        expect(row114.creditsPerUser).toBeUndefined();
     });
 
     it("refuses an anonymous caller", async () => {
@@ -135,13 +139,19 @@ describe("setOrganizationBillingTier", () => {
     });
 
     it("rejects a negative allowance and an unknown tier before writing", async () => {
-        await expect(as(PLATFORM_ADMIN).mutation(setOrganizationBillingTier as never, { creditsPerUser: -1, organizationId: orgId } as never)).rejects.toMatchObject({
+        await expect(
+            as(PLATFORM_ADMIN).mutation(setOrganizationBillingTier as never, { creditsPerUser: -1, organizationId: orgId } as never),
+        ).rejects.toMatchObject({
             code: "VALIDATION_ERROR",
         });
-        await expect(as(PLATFORM_ADMIN).mutation(setOrganizationBillingTier as never, { baseTier: "platinum", organizationId: orgId } as never)).rejects.toMatchObject({
+        await expect(
+            as(PLATFORM_ADMIN).mutation(setOrganizationBillingTier as never, { baseTier: "platinum", organizationId: orgId } as never),
+        ).rejects.toMatchObject({
             code: "VALIDATION_ERROR",
         });
-        expect((await readOrganization(orgId)).creditsPerUser).toBeUndefined();
+        const row148 = await readOrganization(orgId);
+
+        expect(row148.creditsPerUser).toBeUndefined();
     });
 
     it("answers NOT_FOUND for an organization that does not exist", async () => {
@@ -154,7 +164,9 @@ describe("setOrganizationBillingTier", () => {
 });
 
 describe("setMemberCreditOverride", () => {
-    const args = (userId: string, creditOverride: number | null, organizationId = orgId) => ({ creditOverride, organizationId, userId });
+    const args = (userId: string, creditOverride: number | null, organizationId = orgId) => {
+        return { creditOverride, organizationId, userId };
+    };
 
     it.each([OWNER, ORG_ADMIN, MEMBER])("refuses %s, so nobody can grant themselves credits", async (userId) => {
         await expect(as(userId).mutation(setMemberCreditOverride as never, args(userId, 1_000_000) as never)).rejects.toMatchObject(forbidden);
@@ -167,10 +179,14 @@ describe("setMemberCreditOverride", () => {
         expect(await readCredits(orgId, MEMBER)).toMatchObject({ creditOverride: 250, usedCredits: 0 });
 
         await as(PLATFORM_ADMIN).mutation(setMemberCreditOverride as never, args(MEMBER, 400) as never);
-        expect((await readCredits(orgId, MEMBER)).creditOverride).toBe(400);
+        const row174 = await readCredits(orgId, MEMBER);
+
+        expect(row174.creditOverride).toBe(400);
 
         await as(PLATFORM_ADMIN).mutation(setMemberCreditOverride as never, args(MEMBER, null) as never);
-        expect((await readCredits(orgId, MEMBER)).creditOverride).toBeUndefined();
+        const row177 = await readCredits(orgId, MEMBER);
+
+        expect(row177.creditOverride).toBeUndefined();
     });
 
     it("writes no row when clearing an override that was never set", async () => {
@@ -190,7 +206,9 @@ describe("updateBillingSettings", () => {
     it.each([ORG_ADMIN, MEMBER])("refuses %s: only the owner edits billing preferences", async (userId) => {
         await expect(as(userId).mutation(updateBillingSettings as never, { billingEmail: "x@example.com" } as never)).rejects.toMatchObject(forbidden);
 
-        expect((await readOrganization(orgId)).billingEmail).toBeUndefined();
+        const row197 = await readOrganization(orgId);
+
+        expect(row197.billingEmail).toBeUndefined();
     });
 
     it("lets the owner change the contact and model list, but never the tier", async () => {
@@ -202,7 +220,9 @@ describe("updateBillingSettings", () => {
     it("only ever writes to the caller's active organization", async () => {
         await as(OWNER).mutation(updateBillingSettings as never, { billingEmail: "pay@example.com" } as never);
 
-        expect((await readOrganization(otherOrgId)).billingEmail).toBeUndefined();
+        const row209 = await readOrganization(otherOrgId);
+
+        expect(row209.billingEmail).toBeUndefined();
     });
 
     it("refuses a caller with no active organization", async () => {
@@ -231,7 +251,7 @@ describe("member credit reads", () => {
 
         const rows = (await as(OWNER).query(listMemberCredits as never, {} as never)) as { userId: string }[];
 
-        expect(rows.map((row) => row.userId).sort()).toEqual([MEMBER, ORG_ADMIN, OWNER].sort());
+        expect(rows.map((row) => row.userId).toSorted((a, b) => a.localeCompare(b))).toEqual([MEMBER, ORG_ADMIN, OWNER].toSorted((a, b) => a.localeCompare(b)));
     });
 
     it("returns nothing for a caller with no active organization", async () => {

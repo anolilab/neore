@@ -8,7 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import schema from "../schema";
-import { deleteThread, deleteThreads } from "./functions";
+import { deleteThread, deleteThreads, hardDeleteThread, softDeleteThread } from "./functions";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -111,5 +111,18 @@ describe("share routes of a deleted thread", () => {
         await as(OWNER).mutation(deleteThread as never, { threadId } as never);
 
         await expect(routeKeys()).resolves.toEqual([]);
+    });
+
+    it("hardDeleteThread, run after a soft delete, removes the routes too", async () => {
+        const threadId = await publicThread("tok-1");
+        const other = await publicThread("tok-2");
+
+        await as(OWNER).mutation(softDeleteThread as never, { threadId } as never);
+        await expect(routeKeys()).resolves.toContain("thread-public:tok-1");
+
+        // Internal procedures are unreachable from the harness boundary; call it the way the scheduler does.
+        await harness.run(async (ctx: any) => await ctx.runMutation(hardDeleteThread, { threadId }));
+
+        await expect(routeKeys()).resolves.toEqual([`thread-public:tok-2`, `thread-share:${other}`]);
     });
 });

@@ -28,7 +28,11 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@tanstack/react-router", () => {
-    return { useSearch: () => ({}) };
+    return {
+        useSearch: () => {
+            return {};
+        },
+    };
 });
 
 vi.mock("@/features/auth/lib/auth-ui-provider", () => {
@@ -221,9 +225,7 @@ describe("SignUpForm", () => {
         fill("not-an-email");
         submit();
 
-        await waitFor(() => {
-            expect(document.querySelector("[data-slot='form-message']")?.textContent).toBeTruthy();
-        });
+        expect(await screen.findByText("Invalid email format or aliasing not allowed")).toBeTruthy();
 
         expect(harness.signUpEmail).not.toHaveBeenCalled();
     });

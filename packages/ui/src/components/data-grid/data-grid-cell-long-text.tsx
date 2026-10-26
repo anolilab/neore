@@ -9,6 +9,9 @@ import useDebouncedCallback from "@ui/hooks/use-debounced-callback";
 import type { DataGridCellProps } from "@ui/types/data-grid";
 import * as React from "react";
 
+/** Pulls the popover up over the cell so the editor opens on top of it. */
+const overlapAnchor = ({ anchor }: { anchor: { height: number } }) => -anchor.height;
+
 export const LongTextCell = <TData extends RowData>({
     cell,
     columnId,
@@ -27,7 +30,6 @@ export const LongTextCell = <TData extends RowData>({
     const [value, setValue] = React.useState(initialValue ?? "");
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
     const containerRef = React.useRef<HTMLDivElement>(null);
-    const sideOffset = -(containerRef.current?.clientHeight ?? 0);
 
     const [prevInitialValue, setPrevInitialValue] = React.useState(initialValue);
 
@@ -166,7 +168,7 @@ export const LongTextCell = <TData extends RowData>({
                 data-grid-cell-editor=""
                 initialFocus={initialFocus}
                 side="bottom"
-                sideOffset={sideOffset}
+                sideOffset={overlapAnchor}
             >
                 <Textarea
                     className="max-h-[300px] min-h-[150px] resize-none overflow-y-auto rounded-none border-0 shadow-none focus-visible:ring-0"

@@ -45,25 +45,39 @@ describe(countPromptTextChars, () => {
 describe(deferWaitUntil, () => {
     it("registers a pending promise at once and settles it with the handed work", async () => {
         const registered: Promise<unknown>[] = [];
-        const settle = deferWaitUntil({ waitUntil: (promise) => registered.push(promise) });
-        let done = false;
+        const settle = deferWaitUntil({
+            waitUntil: (promise) => {
+                registered.push(promise);
+            },
+        });
+        let isDone = false;
 
-        void registered[0]!.then(() => {
-            done = true;
+        const watcher = registered[0]!.then(() => {
+            isDone = true;
+
+            return isDone;
         });
 
         expect(registered).toHaveLength(1);
         await Promise.resolve();
-        expect(done).toBe(false);
+        expect(isDone).toBe(false);
 
-        settle(new Promise((resolve) => setTimeout(resolve, 5)));
-        await registered[0];
-        expect(done).toBe(true);
+        settle(
+            new Promise((resolve) => {
+                setTimeout(resolve, 5);
+            }),
+        );
+        await watcher;
+        expect(isDone).toBe(true);
     });
 
     it("swallows a failure of the handed work", async () => {
         const registered: Promise<unknown>[] = [];
-        const settle = deferWaitUntil({ waitUntil: (promise) => registered.push(promise) });
+        const settle = deferWaitUntil({
+            waitUntil: (promise) => {
+                registered.push(promise);
+            },
+        });
 
         settle(Promise.reject(new Error("boom")));
         await expect(registered[0]).resolves.toBeUndefined();

@@ -71,22 +71,24 @@ const addRule = (rule: RuleRow): string => {
 
     const id = rule.id ?? `rule-${t.rowId}`;
 
-    t.db.prepare(
-        `INSERT INTO notification_rules (id, user_id, name, metric, threshold, period, model_filter, action, is_active, last_triggered_at)
+    t.db
+        .prepare(
+            `INSERT INTO notification_rules (id, user_id, name, metric, threshold, period, model_filter, action, is_active, last_triggered_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? IS NULL THEN NULL ELSE datetime('now', ?) END)`,
-    ).run(
-        id,
-        rule.user ?? "user-1",
-        rule.name ?? `Rule ${t.rowId}`,
-        rule.metric ?? "request_count",
-        rule.threshold,
-        rule.period ?? "day",
-        rule.modelFilter ?? null,
-        rule.action ?? "notify",
-        rule.active === false ? 0 : 1,
-        rule.triggered ?? null,
-        rule.triggered ?? "+0 seconds",
-    );
+        )
+        .run(
+            id,
+            rule.user ?? "user-1",
+            rule.name ?? `Rule ${t.rowId}`,
+            rule.metric ?? "request_count",
+            rule.threshold,
+            rule.period ?? "day",
+            rule.modelFilter ?? null,
+            rule.action ?? "notify",
+            rule.active === false ? 0 : 1,
+            rule.triggered ?? null,
+            rule.triggered ?? "+0 seconds",
+        );
 
     return id;
 };
@@ -99,7 +101,16 @@ const addLogs = (...rows: LogRow[]): void => {
 
     for (const row of rows) {
         t.rowId += 1;
-        insert.run(`log-${t.rowId}`, `req-${t.rowId}`, row.user ?? "user-1", row.model ?? "model-a", row.prompt ?? 0, row.completion ?? 0, row.cost ?? 0, row.createdAt);
+        insert.run(
+            `log-${t.rowId}`,
+            `req-${t.rowId}`,
+            row.user ?? "user-1",
+            row.model ?? "model-a",
+            row.prompt ?? 0,
+            row.completion ?? 0,
+            row.cost ?? 0,
+            row.createdAt,
+        );
     }
 };
 
@@ -182,7 +193,11 @@ describe("evaluateRules metrics", () => {
     });
 
     it("counts only the rule owner's usage", async () => {
-        addLogs({ createdAt: "2026-10-19 09:00:00" }, { createdAt: "2026-10-19 09:00:00", user: "user-2" }, { createdAt: "2026-10-19 09:00:00", user: "user-2" });
+        addLogs(
+            { createdAt: "2026-10-19 09:00:00" },
+            { createdAt: "2026-10-19 09:00:00", user: "user-2" },
+            { createdAt: "2026-10-19 09:00:00", user: "user-2" },
+        );
         addRule({ threshold: 2 });
 
         expect(await notificationsFor()).toEqual([]);
@@ -332,7 +347,9 @@ describe("evaluateRules actions", () => {
 
         expect(await evaluateRules(t.env, "user-1", undefined, usage())).toEqual({
             blocked: false,
-            notifications: [{ action: "notify", currentValue: 1, firedAt: NOW, metric: "request_count", ruleId: "r", ruleName: "Daily requests", threshold: 1 }],
+            notifications: [
+                { action: "notify", currentValue: 1, firedAt: NOW, metric: "request_count", ruleId: "r", ruleName: "Daily requests", threshold: 1 },
+            ],
         });
     });
 

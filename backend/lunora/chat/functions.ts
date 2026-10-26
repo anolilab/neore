@@ -2983,6 +2983,8 @@ export const hardDeleteThread = internalMutation
 
         // Record audit history for hard delete
         if (threadBeforeDelete) {
+            await deleteThreadShardRoutes(context, threadBeforeDelete, threadId);
+
             await context.runMutation(internal.lib.document_history.recordHistory, {
                 attribution: { action: "delete", metadata: { hardDelete: true }, source: "manual" },
                 doc: null,

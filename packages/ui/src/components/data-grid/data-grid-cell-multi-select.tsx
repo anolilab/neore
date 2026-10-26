@@ -13,6 +13,9 @@ import cn from "@ui/utils/cn";
 import { Check, X } from "lucide-react";
 import * as React from "react";
 
+/** Pulls the popover up over the cell so the editor opens on top of it. */
+const overlapAnchor = ({ anchor }: { anchor: { height: number } }) => -anchor.height;
+
 export const MultiSelectCell = <TData extends RowData>({
     cell,
     columnId,
@@ -42,7 +45,6 @@ export const MultiSelectCell = <TData extends RowData>({
     const inputRef = React.useRef<HTMLInputElement>(null);
     const cellOptions = cell.column.columnDef.meta?.cell;
     const options = cellOptions?.variant === "multi-select" ? cellOptions.options : [];
-    const sideOffset = -(containerRef.current?.clientHeight ?? 0);
 
     const [prevCellValue, setPrevCellValue] = React.useState(cellValue);
 
@@ -186,7 +188,7 @@ export const MultiSelectCell = <TData extends RowData>({
                         className="w-[300px] rounded-none p-0"
                         data-grid-cell-editor=""
                         initialFocus={inputRef}
-                        sideOffset={sideOffset}
+                        sideOffset={overlapAnchor}
                     >
                         <div className="**:data-[slot=command-input-wrapper]:h-auto **:data-[slot=command-input-wrapper]:border-none **:data-[slot=command-input-wrapper]:p-0 [&_[data-slot=command-input-wrapper]_svg]:hidden">
                             <Command>

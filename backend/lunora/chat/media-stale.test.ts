@@ -90,6 +90,39 @@ describe("failStaleMediaRows", () => {
     });
 });
 
+describe("failStaleMediaRows past the per-run cap", () => {
+    it("reaches a stale placeholder that sorts behind more than a run's worth of skipped rows", async () => {
+        const threadId = await insertThread();
+
+        // Old pending text rows: skipped on every run, and older than the placeholder.
+        await harness.run(async (ctx: any) => {
+            for (let order = 0; order < 520; order += 1) {
+                await ctx.db.insert("messages", { order, status: "pending", stepOrder: 0, text: "partial reply", threadId, tool: false, userId: "u1" });
+            }
+        });
+        ageBy(1000);
+
+        const placeholder = await pendingRow(threadId, "__IMAGE_GENERATING__");
+
+        ageBy(MEDIA_STALE_AFTER_MS + 1000);
+
+        // The first run stops at its cap and queues its continuation from the cursor.
+        await expect(sweep()).resolves.toStrictEqual({ failed: 0 });
+        expect(await read(placeholder)).toMatchObject({ status: "pending" });
+
+        const [continuation, ...others] = harness.scheduler.list();
+
+        expect(others).toHaveLength(0);
+        expect(continuation!.functionPath).toBe("chat_media_stale:failStaleMediaRows");
+        expect(continuation!.args.cursor).toEqual(expect.any(String));
+
+        // Running the continuation (the fake scheduler cannot dispatch it) reaches the placeholder and queues nothing more.
+        await expect(harness.run(async (ctx: any) => await ctx.runMutation(failStaleMediaRows, continuation!.args))).resolves.toStrictEqual({ failed: 1 });
+        expect(await read(placeholder)).toMatchObject({ status: "failed", text: ABANDONED_MEDIA_TEXT });
+        expect(harness.scheduler.list()).toHaveLength(1);
+    });
+});
+
 describe("MEDIA_STALE_AFTER_MS", () => {
     it("outlasts every media model's typical render", () => {
         for (const model of MODEL_REGISTRY) {

@@ -10,7 +10,6 @@
  * - Actions: sendMessage, cancelStream, reload
  */
 
-
 import { useLingui } from "@lingui/react/macro";
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import type { Id } from "@neore/backend/dataModel";
@@ -644,10 +643,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // Posts the media kick-off for a reply `/v1/chat` created. A refusal (the daily limit, a 401, a 404) or a
     // dead connection goes to the chat error UI of the thread; `onRefused` clears the caller's sending state.
     const kickOffMedia = useCallback(
-        (
-            media: { messageId: string; streamingConfig: { contentType: string; imageSize?: string; model: string }; threadId: string },
-            onRefused?: () => void,
-        ) =>
+        (media: { messageId: string; streamingConfig: { contentType: string; imageSize?: string; model: string }; threadId: string }, onRefused?: () => void) =>
             kickOffMediaGeneration(
                 media,
                 authHeader(),
@@ -688,7 +684,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     texts: {
                         bannedContent: () => t`Your message contains inappropriate content that cannot be sent.`,
                         localTextOnly: () => t`Local models are text only. Remove the attachments to send.`,
-                        sessionNotReady: () => t`We could not confirm your session in time. Your message is still in the composer. Please try sending it again.`,
+                        sessionNotReady: () =>
+                            t`We could not confirm your session in time. Your message is still in the composer. Please try sending it again.`,
                     },
                     threadDataRef,
                     threadId,

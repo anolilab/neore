@@ -3868,6 +3868,18 @@ if (typeof source["claimKey"] !== "string") return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "claimKey": source["claimKey"], "threadId": source["threadId"] };
 });
+installCompiledValidatorMap(lunora_chat_media_stale_57.failStaleMediaRows.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["cursor"] !== undefined) {
+if (typeof source["cursor"] !== "string") return DEFER;
+__val1 = source["cursor"];
+__has1 = true;
+}
+return { ...(__has1 ? { "cursor": __val1 } : {}) };
+});
 installCompiledValidatorMap(lunora_chat_sharing_61.getPublicThreadOwner.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -4413,7 +4425,8 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["seq"] !== "number" || !Number.isFinite(source["seq"])) return DEFER;
-return { "runId": source["runId"], "seq": source["seq"] };
+if (typeof source["startedAt"] !== "number" || !Number.isFinite(source["startedAt"])) return DEFER;
+return { "runId": source["runId"], "seq": source["seq"], "startedAt": source["startedAt"] };
 });
 installCompiledValidatorMap(lunora_coding_agents_execute_75.reapPullRequest.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -4464,9 +4477,16 @@ return { "runId": source["runId"] };
 installCompiledValidatorMap(lunora_coding_agents_functions_76.claimPoll.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["prStartedAt"] !== undefined) {
+if (typeof source["prStartedAt"] !== "number" || !Number.isFinite(source["prStartedAt"])) return DEFER;
+__val1 = source["prStartedAt"];
+__has1 = true;
+}
 if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["seq"] !== "number" || !Number.isFinite(source["seq"])) return DEFER;
-return { "runId": source["runId"], "seq": source["seq"] };
+return { ...(__has1 ? { "prStartedAt": __val1 } : {}), "runId": source["runId"], "seq": source["seq"] };
 });
 installCompiledValidatorMap(lunora_coding_agents_functions_76.claimRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -4486,7 +4506,8 @@ __val1 = source["prUrl"];
 __has1 = true;
 }
 if (typeof source["runId"] !== "string") return DEFER;
-return { "log": source["log"], ...(__has1 ? { "prUrl": __val1 } : {}), "runId": source["runId"] };
+if (typeof source["startedAt"] !== "number" || !Number.isFinite(source["startedAt"])) return DEFER;
+return { "log": source["log"], ...(__has1 ? { "prUrl": __val1 } : {}), "runId": source["runId"], "startedAt": source["startedAt"] };
 });
 installCompiledValidatorMap(lunora_coding_agents_functions_76.expirePullRequest.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -4567,7 +4588,8 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["sandboxId"] !== "string") return DEFER;
-return { "runId": source["runId"], "sandboxId": source["sandboxId"] };
+if (typeof source["startedAt"] !== "number" || !Number.isFinite(source["startedAt"])) return DEFER;
+return { "runId": source["runId"], "sandboxId": source["sandboxId"], "startedAt": source["startedAt"] };
 });
 installCompiledValidatorMap(lunora_coding_agents_functions_76.setRunSandbox.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8369,7 +8391,7 @@ export interface Caller {
             failAbandonedMediaJob: (args: { claimKey: string; threadId: Id<"threads"> }) => Promise<boolean>;
         };
         media_stale: {
-            failStaleMediaRows: (args?: {}) => Promise<{ failed: number }>;
+            failStaleMediaRows: (args: { cursor?: string }) => Promise<{ failed: number }>;
         };
         pins: {
             functions: {
@@ -8520,19 +8542,19 @@ export interface Caller {
             finishRun: (args: { runId: Id<"codingAgentRuns"> }) => Promise<null>;
             killRunSandbox: (args: { sandboxId: string }) => Promise<null>;
             pollCodingAgentRun: (args: { runId: Id<"codingAgentRuns">; seq: number }) => Promise<null>;
-            pollPullRequest: (args: { runId: Id<"codingAgentRuns">; seq: number }) => Promise<null>;
+            pollPullRequest: (args: { runId: Id<"codingAgentRuns">; seq: number; startedAt: number }) => Promise<null>;
             reapPullRequest: (args: { runId: Id<"codingAgentRuns">; startedAt: number }) => Promise<null>;
             reapRun: (args: { runId: Id<"codingAgentRuns"> }) => Promise<null>;
             startCodingAgentRun: (args: { runId: Id<"codingAgentRuns"> }) => Promise<null>;
         };
         functions: {
             appendRunLog: (args: { runId: Id<"codingAgentRuns">; text: string }) => Promise<{ cancelled: boolean }>;
-            beginPullRequest: (args: { followUp: boolean; runId: Id<"codingAgentRuns">; userId: string }) => Promise<{ baseBranch: string; diff: string; pollSeq: number; prompt: string; repoUrl: string; summary?: string } | { error: string }>;
+            beginPullRequest: (args: { followUp: boolean; runId: Id<"codingAgentRuns">; userId: string }) => Promise<{ baseBranch: string; diff: string; pollSeq: number; prompt: string; repoUrl: string; startedAt: number; summary?: string } | { error: string }>;
             cancelRun: (args: { runId: Id<"codingAgentRuns"> }) => Promise<null>;
             claimFinish: (args: { runId: Id<"codingAgentRuns"> }) => Promise<{ claimed: boolean; wantsPr: boolean }>;
-            claimPoll: (args: { runId: Id<"codingAgentRuns">; seq: number }) => Promise<boolean>;
+            claimPoll: (args: { prStartedAt?: number; runId: Id<"codingAgentRuns">; seq: number }) => Promise<boolean>;
             claimRun: (args: { runId: Id<"codingAgentRuns"> }) => Promise<{ agent: "claude_code" | "codex"; branch?: string; openPr: boolean; prompt: string; repoUrl: string; userId: string } | null>;
-            completePullRequest: (args: { log: string; prUrl?: string; runId: Id<"codingAgentRuns"> }) => Promise<{ followUp: boolean }>;
+            completePullRequest: (args: { log: string; prUrl?: string; runId: Id<"codingAgentRuns">; startedAt: number }) => Promise<{ followUp: boolean }>;
             completeRun: (args: { baseBranch?: string; baseSha?: string; diff?: string; diffStat?: string; diffTruncated?: boolean; error?: string; exitCode?: number; runId: Id<"codingAgentRuns">; status: "succeeded" | "failed" | "cancelled"; summary?: string }) => Promise<null>;
             createRun: (args: { agent: "claude_code" | "codex"; branch?: string; openPr: boolean; prompt: string; repoUrl: string; taskId?: Id<"tasks">; taskRunId?: Id<"taskRuns">; threadId?: string; toolCallId?: string; userId: string }) => Promise<{ runId: Id<"codingAgentRuns"> } | { error: string }>;
             expirePullRequest: (args: { runId: Id<"codingAgentRuns">; startedAt: number }) => Promise<{ followUp: boolean; sandboxId?: string } | null>;
@@ -8547,7 +8569,7 @@ export interface Caller {
             hasProviderKey: (args: { provider: "anthropic" | "openai"; userId: string }) => Promise<boolean>;
             postRunResult: (args: { agentName: string; runId: Id<"codingAgentRuns">; text: string; threadId: string; userId: string }) => Promise<null>;
             recordPoll: (args: { offset: number; runId: Id<"codingAgentRuns">; summary?: string; text: string }) => Promise<{ cancelled: boolean }>;
-            setPullRequestSandbox: (args: { runId: Id<"codingAgentRuns">; sandboxId: string }) => Promise<null>;
+            setPullRequestSandbox: (args: { runId: Id<"codingAgentRuns">; sandboxId: string; startedAt: number }) => Promise<boolean>;
             setRunSandbox: (args: { runId: Id<"codingAgentRuns">; sandboxId: string }) => Promise<{ cancelled: boolean }>;
         };
         gdpr: {

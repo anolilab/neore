@@ -18,6 +18,9 @@ import { File, FileArchive, FileAudio, FileImage, FileSpreadsheet, FileText, Fil
 import * as React from "react";
 import { toast } from "sonner";
 
+/** Pulls the popover up over the cell so the editor opens on top of it. */
+const overlapAnchor = ({ anchor }: { anchor: { height: number } }) => -anchor.height;
+
 const getFileIcon = (type: string): React.ComponentType<React.SVGProps<SVGSVGElement>> => {
     if (type.startsWith("image/")) {
         return FileImage;
@@ -116,7 +119,6 @@ export const FileCell = <TData extends RowData>({
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const dropzoneRef = React.useRef<HTMLDivElement>(null);
     const cellOptions = cell.column.columnDef.meta?.cell;
-    const sideOffset = -(containerRef.current?.clientHeight ?? 0);
 
     const fileCellOptions = cellOptions?.variant === "file" ? cellOptions : null;
     const maxFileSize = fileCellOptions?.maxFileSize ?? 10 * 1024 * 1024;
@@ -658,7 +660,7 @@ export const FileCell = <TData extends RowData>({
                         className="w-[400px] rounded-none p-0"
                         data-grid-cell-editor=""
                         initialFocus={dropzoneRef}
-                        sideOffset={sideOffset}
+                        sideOffset={overlapAnchor}
                     >
                         <div className="flex flex-col gap-2 p-3">
                             <span className="sr-only" id={labelId}>

@@ -38,8 +38,13 @@ type Harness = ReturnType<typeof lunoraTest>;
 
 let harness: Harness;
 
-const charge = async (args: { count?: number; kind: "Audio" | "Image" | "Text"; organizationId?: string; requestId?: string; userId: string }): Promise<boolean> =>
-    await harness.run(async (ctx: any) => await ctx.runMutation(chargeDailyUnit, args));
+const charge = async (args: {
+    count?: number;
+    kind: "Audio" | "Image" | "Text";
+    organizationId?: string;
+    requestId?: string;
+    userId: string;
+}): Promise<boolean> => await harness.run(async (ctx: any) => await ctx.runMutation(chargeDailyUnit, args));
 
 const remaining = async (key: string, userId: string): Promise<number> =>
     await harness.run(async (ctx: any) => {

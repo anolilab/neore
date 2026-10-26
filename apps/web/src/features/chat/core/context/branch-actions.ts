@@ -1,9 +1,9 @@
+import { withUnlockProofBody } from "@neore/client-runtime";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
 import type useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
-import { withUnlockProofBody } from "@neore/client-runtime";
 
 import { useModelStore } from "../stores/model-store";
 import type { ChangedSettings, ChatActionBase } from "./chat-action-shared";

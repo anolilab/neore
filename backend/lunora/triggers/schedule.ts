@@ -187,9 +187,7 @@ export const findNextCronTime = (expression: string, after: number, timeZone?: s
     // counter, so the process's own time zone never enters. The zone only decides
     // which date `start` falls on and where a wall time lands on the timeline.
     const startDate = new Date(start);
-    const first = isUtc
-        ? { day: startDate.getUTCDate(), month: startDate.getUTCMonth() + 1, year: startDate.getUTCFullYear() }
-        : localParts(start, zone);
+    const first = isUtc ? { day: startDate.getUTCDate(), month: startDate.getUTCMonth() + 1, year: startDate.getUTCFullYear() } : localParts(start, zone);
 
     for (let offset = 0; offset < SEARCH_DAYS; offset += 1) {
         const dayStart = Date.UTC(first.year, first.month - 1, first.day + offset);

@@ -346,7 +346,7 @@ export interface InternalApiTypes {
             failAbandonedMediaJob: FunctionReference<"mutation", { claimKey: string; threadId: Id<"threads"> }, boolean>;
         };
         media_stale: {
-            failStaleMediaRows: FunctionReference<"mutation", {}, { failed: number }>;
+            failStaleMediaRows: FunctionReference<"mutation", { cursor?: string }, { failed: number }>;
         };
         sharing: {
             checkThreadAccess: FunctionReference<"query", { requiredPermission?: "read" | "write" | "admin"; threadId: string; userId: string }, boolean>;
@@ -434,18 +434,18 @@ export interface InternalApiTypes {
             finishRun: FunctionReference<"action", { runId: Id<"codingAgentRuns"> }, null>;
             killRunSandbox: FunctionReference<"action", { sandboxId: string }, null>;
             pollCodingAgentRun: FunctionReference<"action", { runId: Id<"codingAgentRuns">; seq: number }, null>;
-            pollPullRequest: FunctionReference<"action", { runId: Id<"codingAgentRuns">; seq: number }, null>;
+            pollPullRequest: FunctionReference<"action", { runId: Id<"codingAgentRuns">; seq: number; startedAt: number }, null>;
             reapPullRequest: FunctionReference<"action", { runId: Id<"codingAgentRuns">; startedAt: number }, null>;
             reapRun: FunctionReference<"action", { runId: Id<"codingAgentRuns"> }, null>;
             startCodingAgentRun: FunctionReference<"action", { runId: Id<"codingAgentRuns"> }, null>;
         };
         functions: {
             appendRunLog: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; text: string }, { cancelled: boolean }>;
-            beginPullRequest: FunctionReference<"mutation", { followUp: boolean; runId: Id<"codingAgentRuns">; userId: string }, { baseBranch: string; diff: string; pollSeq: number; prompt: string; repoUrl: string; summary?: string } | { error: string }>;
+            beginPullRequest: FunctionReference<"mutation", { followUp: boolean; runId: Id<"codingAgentRuns">; userId: string }, { baseBranch: string; diff: string; pollSeq: number; prompt: string; repoUrl: string; startedAt: number; summary?: string } | { error: string }>;
             claimFinish: FunctionReference<"mutation", { runId: Id<"codingAgentRuns"> }, { claimed: boolean; wantsPr: boolean }>;
-            claimPoll: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; seq: number }, boolean>;
+            claimPoll: FunctionReference<"mutation", { prStartedAt?: number; runId: Id<"codingAgentRuns">; seq: number }, boolean>;
             claimRun: FunctionReference<"mutation", { runId: Id<"codingAgentRuns"> }, { agent: "claude_code" | "codex"; branch?: string; openPr: boolean; prompt: string; repoUrl: string; userId: string } | null>;
-            completePullRequest: FunctionReference<"mutation", { log: string; prUrl?: string; runId: Id<"codingAgentRuns"> }, { followUp: boolean }>;
+            completePullRequest: FunctionReference<"mutation", { log: string; prUrl?: string; runId: Id<"codingAgentRuns">; startedAt: number }, { followUp: boolean }>;
             completeRun: FunctionReference<"mutation", { baseBranch?: string; baseSha?: string; diff?: string; diffStat?: string; diffTruncated?: boolean; error?: string; exitCode?: number; runId: Id<"codingAgentRuns">; status: "succeeded" | "failed" | "cancelled"; summary?: string }, null>;
             createRun: FunctionReference<"mutation", { agent: "claude_code" | "codex"; branch?: string; openPr: boolean; prompt: string; repoUrl: string; taskId?: Id<"tasks">; taskRunId?: Id<"taskRuns">; threadId?: string; toolCallId?: string; userId: string }, { runId: Id<"codingAgentRuns"> } | { error: string }>;
             expirePullRequest: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; startedAt: number }, { followUp: boolean; sandboxId?: string } | null>;
@@ -457,7 +457,7 @@ export interface InternalApiTypes {
             hasProviderKey: FunctionReference<"query", { provider: "anthropic" | "openai"; userId: string }, boolean>;
             postRunResult: FunctionReference<"mutation", { agentName: string; runId: Id<"codingAgentRuns">; text: string; threadId: string; userId: string }, null>;
             recordPoll: FunctionReference<"mutation", { offset: number; runId: Id<"codingAgentRuns">; summary?: string; text: string }, { cancelled: boolean }>;
-            setPullRequestSandbox: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; sandboxId: string }, null>;
+            setPullRequestSandbox: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; sandboxId: string; startedAt: number }, boolean>;
             setRunSandbox: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; sandboxId: string }, { cancelled: boolean }>;
         };
         gdpr: {

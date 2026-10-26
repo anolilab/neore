@@ -198,9 +198,7 @@ describe("SignInForm", () => {
         fill("not-an-email", "correct horse battery");
         submit();
 
-        await waitFor(() => {
-            expect(document.querySelector("[data-slot='form-message']")?.textContent).toBeTruthy();
-        });
+        expect(await screen.findByText("Invalid email format or aliasing not allowed")).toBeTruthy();
 
         expect(harness.signInEmail).not.toHaveBeenCalled();
     });

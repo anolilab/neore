@@ -504,7 +504,13 @@ export const afterRun = async (
         : undefined;
 
     try {
-        scheduleAfterRun(ctx, args);
+        const results = await scheduleAfterRun(ctx, args);
+
+        for (const result of results) {
+            if (result.status === "rejected") {
+                streamLogger.warn("[afterRun] Scheduling the post-run work failed:", result.reason);
+            }
+        }
     } catch (error) {
         streamLogger.warn("[afterRun] Scheduling the post-run work failed:", error);
     }
@@ -512,31 +518,34 @@ export const afterRun = async (
     await timing;
 };
 
-const scheduleAfterRun = (
-    ctx: Pick<ActionCtx, "scheduler">,
-    args: Parameters<typeof afterRun>[1],
-): void => {
+/** Schedules every post-run job and settles once each `runAfter` has; a rejected one is in the result, not thrown. */
+const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Parameters<typeof afterRun>[1]): Promise<PromiseSettledResult<unknown>[]> => {
     const { prompt, savedMessages = [], steeredTexts = [], threadId, userId } = args;
+    const scheduled: Promise<unknown>[] = [];
 
     const firstReplyRow = savedMessages.find((m) => m.message?.role !== "user");
 
     // The citation chips behind the reply's `[n]`. Messages live on the thread's
     // shard, which is where this runs.
     if (firstReplyRow && args.knowledgeSources && args.knowledgeSources.length > 0) {
-        void ctx.scheduler.runAfter(0, internal.knowledge.functions.recordKnowledgeSources, {
-            messageId: firstReplyRow._id as Id<"messages">,
-            sources: [...args.knowledgeSources],
-        });
+        scheduled.push(
+            ctx.scheduler.runAfter(0, internal.knowledge.functions.recordKnowledgeSources, {
+                messageId: firstReplyRow._id as Id<"messages">,
+                sources: [...args.knowledgeSources],
+            }),
+        );
     }
 
     // The "memories used" popover reads the memory rows on the THREAD's shard;
     // a collaborator's memories are on their own, so theirs are not recorded.
     if (firstReplyRow && args.retrievedMemories && args.retrievedMemories.length > 0 && servesUser(userId)) {
-        void ctx.scheduler.runAfter(0, internal.memory.functions.recordRetrievedMemories, {
-            memories: [...args.retrievedMemories],
-            messageId: firstReplyRow._id as Id<"messages">,
-            userId,
-        });
+        scheduled.push(
+            ctx.scheduler.runAfter(0, internal.memory.functions.recordRetrievedMemories, {
+                memories: [...args.retrievedMemories],
+                messageId: firstReplyRow._id as Id<"messages">,
+                userId,
+            }),
+        );
     }
 
     // Daily Brief (`notifications/daily-brief.ts`): activity keeps the next
@@ -544,7 +553,7 @@ const scheduleAfterRun = (
     // job is a no-op read for everyone else, and scheduling it on every reply
     // would put one job per reply on the user's lane.
     if (servesUser(userId) && shouldNoteBriefActivity(userId)) {
-        void ctx.scheduler.runAfter(0, internal.notifications.daily_brief.noteDailyBriefActivity, { userId });
+        scheduled.push(ctx.scheduler.runAfter(0, internal.notifications.daily_brief.noteDailyBriefActivity, { userId }));
     }
 
     // Usage heatmap + per-skill breakdown (`usage/activity.ts`), on the user's own shard.
@@ -557,7 +566,7 @@ const scheduleAfterRun = (
     }
 
     if (!args.extractMemory || !prompt) {
-        return;
+        return await Promise.allSettled(scheduled);
     }
 
     // Memory is the USER's: in a thread someone shared, the extraction runs on
@@ -568,7 +577,7 @@ const scheduleAfterRun = (
             ? await ctx.scheduler.runAfter(0, target as never, jobArgs as never)
             : await runAfterOnShard(ctx.scheduler, 0, target, jobArgs, memoryShard);
 
-    void scheduleMemory(internal.memory.reflection.noteMemoryActivity, { userId });
+    scheduled.push(scheduleMemory(internal.memory.reflection.noteMemoryActivity, { userId }));
 
     const assistantText = savedMessages
         .filter((m) => !m.tool && m.message?.role === "assistant")
@@ -577,21 +586,25 @@ const scheduleAfterRun = (
         .join("\n");
 
     if (assistantText.length === 0) {
-        return;
+        return await Promise.allSettled(scheduled);
     }
 
     const toolResults = summariseToolResults(savedMessages);
 
-    void scheduleMemory(internal.memory.extract.extractMemories, {
-        ...(args.botId && { botId: args.botId }),
-        assistantResponse: assistantText.slice(0, 4000),
-        threadId: threadId as Id<"threads">,
-        userId,
-        // A steer can carry the very fact worth keeping ("actually, I'm vegetarian"); `steeredFrom` keeps it whole when a long prompt is cut.
-        userMessage: [prompt, ...steeredTexts].join("\n\n"),
-        ...(steeredTexts.length > 0 && { steeredFrom: prompt.length + 2 }),
-        ...(toolResults.length > 0 && { toolResults: toolResults.slice(0, 10) }),
-    });
+    scheduled.push(
+        scheduleMemory(internal.memory.extract.extractMemories, {
+            ...(args.botId && { botId: args.botId }),
+            assistantResponse: assistantText.slice(0, 4000),
+            threadId: threadId as Id<"threads">,
+            userId,
+            // A steer can carry the very fact worth keeping ("actually, I'm vegetarian"); `steeredFrom` keeps it whole when a long prompt is cut.
+            userMessage: [prompt, ...steeredTexts].join("\n\n"),
+            ...(steeredTexts.length > 0 && { steeredFrom: prompt.length + 2 }),
+            ...(toolResults.length > 0 && { toolResults: toolResults.slice(0, 10) }),
+        }),
+    );
+
+    return await Promise.allSettled(scheduled);
 };
 
 /**

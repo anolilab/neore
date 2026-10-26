@@ -312,12 +312,23 @@ describe("Discord through acceptInbound", () => {
 });
 
 describe("a paused connection", () => {
-    const claimCount = async (): Promise<number> => await harness.run(async (ctx: any) => (await ctx.db.query("idempotencyClaims").collect()).length);
+    const claimCount = async (): Promise<number> =>
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("idempotencyClaims").collect();
+
+            return rows.length;
+        });
     const pausedConnection = async (platform: string, status = "paused") => await connection(platform, { platformUserId: SENDER, status });
 
     const TELEGRAM_KEYS = { telegram_bot_token: "bot", telegram_webhook_secret: "tg-secret" };
     const telegramUpdate = JSON.stringify({
-        message: { chat: { id: 77, type: "private" }, date: NOW_SECONDS, from: { first_name: "Ada", id: Number(SENDER), is_bot: false }, message_id: 1, text: "hello" },
+        message: {
+            chat: { id: 77, type: "private" },
+            date: NOW_SECONDS,
+            from: { first_name: "Ada", id: Number(SENDER), is_bot: false },
+            message_id: 1,
+            text: "hello",
+        },
         update_id: 1,
     });
     const telegram = async (context: never, connectionId: string, secret = TELEGRAM_KEYS.telegram_webhook_secret) =>
@@ -397,9 +408,9 @@ describe("a paused connection", () => {
 
         expect(await jsonOf(handleSlackWebhook(context, post(challenge, await slackSigned(challenge)), pausedId))).toStrictEqual({ challenge: "abc" });
         expect(await statusOf(handleSlackWebhook(context, post(slackEvent, {}), pausedId))).toBe(401);
-        expect(await statusOf(handleSlackWebhook(context, post(slackEvent, await slackSigned(slackEvent)), await pausedConnection("slack", "disconnected")))).toBe(
-            401,
-        );
+        expect(
+            await statusOf(handleSlackWebhook(context, post(slackEvent, await slackSigned(slackEvent)), await pausedConnection("slack", "disconnected"))),
+        ).toBe(401);
     });
 
     it("answers WhatsApp 200 with a valid signature and drops the message", async () => {

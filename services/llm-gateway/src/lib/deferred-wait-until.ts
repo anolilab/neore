@@ -16,10 +16,7 @@ export const deferWaitUntil = (executionContext: { waitUntil: (promise: Promise<
     executionContext.waitUntil(
         new Promise<void>((resolve) => {
             hand = (work) => {
-                resolve(work.then(
-                    () => undefined,
-                    () => undefined,
-                ));
+                resolve(work.then(() => undefined).catch(() => undefined));
             };
         }),
     );

@@ -9,10 +9,16 @@
  * This sweep (per-shard housekeeping, `lib/shard-housekeeping.ts`) fails those
  * rows once they are older than any generation can still be running. Stamped
  * rows are left to the claim reaper, which knows whether its job is alive.
+ *
+ * The scan is bounded per run, in creation order. When it stops with rows left
+ * it schedules itself again from its cursor (as `crons.ts#deleteUnusedFiles`
+ * does), so rows it skips — non-media pending text, stamped rows, locked
+ * chats — cannot hide a stale placeholder that sorts behind them.
  */
 import { MODEL_REGISTRY } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
+import { internal } from "../_generated/internal";
 import { internalMutation } from "../_generated/server";
 import { patchRow } from "../lib/patch";
 import { isThreadLocked } from "../lib/thread-lock";
@@ -21,12 +27,20 @@ import { ABANDONED_MEDIA_TEXT, stampedJobId } from "./media-abandon";
 const MINUTE_MS = 60 * 1000;
 
 /** The placeholder texts the generate actions write (image, audio, video, music). */
-export const MEDIA_GENERATING_MARKERS: ReadonlySet<string> = new Set(["__AUDIO_GENERATING__", "__IMAGE_GENERATING__", "__MUSIC_GENERATING__", "__VIDEO_GENERATING__"]);
+export const MEDIA_GENERATING_MARKERS: ReadonlySet<string> = new Set([
+    "__AUDIO_GENERATING__",
+    "__IMAGE_GENERATING__",
+    "__MUSIC_GENERATING__",
+    "__VIDEO_GENERATING__",
+]);
 
 const MEDIA_MODES: ReadonlySet<string> = new Set(["image", "music", "text-to-speech", "video"]);
 
 /** The slowest media model's typical latency; `avgLatencyMs` is an average, hence the factor below. */
-const SLOWEST_MEDIA_LATENCY_MS = Math.max(0, ...MODEL_REGISTRY.filter((model) => model.mode && MEDIA_MODES.has(model.mode)).map((model) => model.avgLatencyMs ?? 0));
+const SLOWEST_MEDIA_LATENCY_MS = Math.max(
+    0,
+    ...MODEL_REGISTRY.filter((model) => model.mode && MEDIA_MODES.has(model.mode)).map((model) => model.avgLatencyMs ?? 0),
+);
 
 /** A generate action runs inside an action, which Cloudflare ends at 15 minutes wall time. */
 const ACTION_WALL_TIME_MS = 15 * MINUTE_MS;
@@ -53,12 +67,12 @@ const markerOf = (row: { message?: unknown; text?: string }): string | undefined
 };
 
 export const failStaleMediaRows = internalMutation
-    .input({})
+    .input({ cursor: v.optional(v.string()) })
     .output(v.object({ failed: v.number() }))
-    .mutation(async ({ ctx }) => {
+    .mutation(async ({ args, ctx }) => {
         const cutoff = ctx.now - MEDIA_STALE_AFTER_MS;
         const lockedThreads = new Map<string, boolean>();
-        let cursor: string | undefined;
+        let { cursor } = args;
         let failed = 0;
         let scanned = 0;
 
@@ -66,6 +80,7 @@ export const failStaleMediaRows = internalMutation
             const page = await ctx.db.messages.findMany({
                 cursor,
                 limit: PAGE_SIZE,
+                orderBy: [{ _creationTime: "asc" }],
                 where: { _creationTime: { lt: cutoff }, status: "pending", tool: false },
             });
 
@@ -99,6 +114,10 @@ export const failStaleMediaRows = internalMutation
                 failed += 1;
             }
         } while (cursor && scanned < MAX_ROWS_PER_RUN);
+
+        if (cursor) {
+            await ctx.scheduler.runAfter(0, internal.chat.media_stale.failStaleMediaRows, { cursor });
+        }
 
         return { failed };
     });
