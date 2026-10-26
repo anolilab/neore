@@ -7585,16 +7585,22 @@ if (typeof source["error"] !== "string") return DEFER;
 __val1 = source["error"];
 __has1 = true;
 }
-if (typeof source["lastTriggeredAt"] !== "number" || !Number.isFinite(source["lastTriggeredAt"])) return DEFER;
 let __has2 = false;
 let __val2;
-if (source["nextTriggerAt"] !== undefined) {
-if (typeof source["nextTriggerAt"] !== "number" || !Number.isFinite(source["nextTriggerAt"])) return DEFER;
-__val2 = source["nextTriggerAt"];
+if (source["lastTriggeredAt"] !== undefined) {
+if (typeof source["lastTriggeredAt"] !== "number" || !Number.isFinite(source["lastTriggeredAt"])) return DEFER;
+__val2 = source["lastTriggeredAt"];
 __has2 = true;
 }
+let __has3 = false;
+let __val3;
+if (source["nextTriggerAt"] !== undefined) {
+if (typeof source["nextTriggerAt"] !== "number" || !Number.isFinite(source["nextTriggerAt"])) return DEFER;
+__val3 = source["nextTriggerAt"];
+__has3 = true;
+}
 if (typeof source["triggerId"] !== "string") return DEFER;
-return { ...(__has1 ? { "error": __val1 } : {}), "lastTriggeredAt": source["lastTriggeredAt"], ...(__has2 ? { "nextTriggerAt": __val2 } : {}), "triggerId": source["triggerId"] };
+return { ...(__has1 ? { "error": __val1 } : {}), ...(__has2 ? { "lastTriggeredAt": __val2 } : {}), ...(__has3 ? { "nextTriggerAt": __val3 } : {}), "triggerId": source["triggerId"] };
 });
 installCompiledValidatorMap(lunora_triggers_quiet_inputs_171.loadQuietSnapshot.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9355,7 +9361,7 @@ export interface Caller {
             testRunTrigger: (args: { testPayload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
             updateExecution: (args: { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string }) => Promise<null>;
             updateTrigger: (args: { botComputer?: boolean; botId?: string | null; cronExpression?: string; description?: string; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model?: string; name?: string; quietWhenEmpty?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; triggerId: Id<"triggers"> }) => Promise<void>;
-            updateTriggerStats: (args: { error?: string; lastTriggeredAt: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }) => Promise<null>;
+            updateTriggerStats: (args: { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }) => Promise<null>;
         };
         quiet_inputs: {
             loadQuietSnapshot: (args: { since: number; userId: string }) => Promise<{ events: Array<{ createdAt: number; type: string }>; needsYou: Array<{ at: number; kind: string; title: string }>; running: Array<{ at: number; kind: string; title: string }>; threads: Array<{ title?: string; updatedAt: number }> }>;

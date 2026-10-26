@@ -18,9 +18,12 @@
  *
  * The window starts at `lastTriggeredAt`: the moment the last run began its agent
  * (not when it ended, so what happened while the agent worked is reported by the
- * next run). A run sets it whether it completed or failed, a manual "Run now"
- * included. A skipped run and a run refused at admission (daily limit, disallowed
- * model) do not move it.
+ * next run). A run sets it once its thread exists, whether it then completed or
+ * failed, a manual "Run now" included. A skipped run, a run refused at admission
+ * (daily limit, disallowed model), a thrown admission error and a failure before
+ * the thread was created do not move it: they posted nothing, so the activity
+ * that prompted them is still unreported. It only moves forward: a run that
+ * started earlier but finishes last leaves a later start in place.
  *
  * The check runs before the run writes anything, so a skipped run creates no
  * thread, sends no notification and is not charged.
@@ -75,7 +78,7 @@ export const quietBriefInputs = (snapshot: QuietSnapshot, since: number): BriefI
     };
 };
 
-/** Where the window starts: when the last run that reached the agent began, or the routine's creation before any. */
+/** Where the window starts: when the last run that created its thread began, or the routine's creation before any. */
 export const quietWindowStart = (trigger: { createdAt: number; lastTriggeredAt?: number }): number => trigger.lastTriggeredAt ?? trigger.createdAt;
 
 /**

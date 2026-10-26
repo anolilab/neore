@@ -14,6 +14,8 @@ vi.mock("../_generated/internal", async (importOriginal) => mappedReferences(awa
 
 const state = vi.hoisted(() => {
     return {
+        admissionError: undefined as Error | undefined,
+        beforeThread: undefined as (() => void) | undefined,
         bot: null as Record<string, unknown> | null,
         mutations: [] as { args: unknown; name: string }[],
         onRun: undefined as (() => void) | undefined,
@@ -29,6 +31,8 @@ vi.mock("../chat/lib/headless-run", () => {
     return {
         runHeadlessAgent: async (_ctx: unknown, options: Record<string, unknown>) => {
             state.runs.push(options);
+            state.beforeThread?.();
+            await (options.onThread as ((threadId: string) => void) | undefined)?.("thread-1");
             state.onRun?.();
 
             return { text: "Here is the digest.", threadId: "thread-1" };
@@ -44,6 +48,10 @@ const ctx = () =>
             const name = NAME_SUFFIX(path);
 
             state.mutations.push({ args, name });
+
+            if (name === "admitTriggerRun" && state.admissionError) {
+                throw state.admissionError;
+            }
 
             return name === "createExecution" ? "execution-1" : null;
         },
@@ -84,6 +92,8 @@ const EMPTY: QuietSnapshot = { events: [], needsYou: [], running: [], threads: [
 
 beforeEach(() => {
     state.bot = { computerEnabled: false, instructions: "Be brief.", model: "bot-model" };
+    state.admissionError = undefined;
+    state.beforeThread = undefined;
     state.snapshot = EMPTY;
     state.snapshotError = false;
     state.mutations = [];
@@ -252,5 +262,60 @@ describe("the window a run leaves for the next one", () => {
         await run();
 
         expect(state.mutations.find((entry) => entry.name === "updateTriggerStats")?.args).toMatchObject({ lastTriggeredAt: START });
+    });
+
+    describe("a run that posted nothing", () => {
+        const ACTIVITY = 1000;
+
+        /** Applies the recorded stats to the stored trigger as `updateTriggerStats` does, then checks again with the same activity. */
+        const nextCheckPosts = async (): Promise<boolean> => {
+            const stats = state.mutations.find((entry) => entry.name === "updateTriggerStats")?.args as { lastTriggeredAt?: number } | undefined;
+
+            expect(stats).toBeDefined();
+            state.trigger = { ...state.trigger, lastTriggeredAt: stats?.lastTriggeredAt ?? state.trigger?.lastTriggeredAt };
+            state.admissionError = undefined;
+            state.beforeThread = undefined;
+            state.mutations = [];
+            state.runs = [];
+
+            await run();
+
+            return state.runs.length === 1 && !names().includes("recordFilteredExecution");
+        };
+
+        beforeEach(() => {
+            vi.spyOn(console, "error").mockImplementation(() => undefined);
+            state.trigger = { ...state.trigger, lastTriggeredAt: 500, quietWhenEmpty: true };
+            state.snapshot = { ...EMPTY, threads: [{ title: "Planning", updatedAt: ACTIVITY }] };
+        });
+
+        it("leaves lastTriggeredAt unchanged on a thrown admission error, still counting the run and the error", async () => {
+            state.admissionError = new Error("admission store unavailable");
+
+            await run();
+
+            const stats = state.mutations.find((entry) => entry.name === "updateTriggerStats")?.args as Record<string, unknown>;
+
+            expect(state.runs).toHaveLength(0);
+            expect(stats).not.toHaveProperty("lastTriggeredAt");
+            expect(stats.error).toEqual(expect.any(String));
+            expect(names()).toContain("updateExecution");
+            expect(await nextCheckPosts()).toBe(true);
+        });
+
+        it("leaves lastTriggeredAt unchanged on a failure before the thread exists", async () => {
+            state.beforeThread = () => {
+                throw new Error("model gateway down");
+            };
+
+            await run();
+
+            // The fake only reports a thread after `beforeThread`, as the real run does after its create call.
+            const stats = state.mutations.find((entry) => entry.name === "updateTriggerStats")?.args as Record<string, unknown>;
+
+            expect(stats).not.toHaveProperty("lastTriggeredAt");
+            expect(stats.error).toEqual(expect.any(String));
+            expect(await nextCheckPosts()).toBe(true);
+        });
     });
 });

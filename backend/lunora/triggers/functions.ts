@@ -711,7 +711,8 @@ export const getDueScheduleTriggers = internalQuery
 export const updateTriggerStats = internalMutation
     .input({
         error: v.optional(v.string()),
-        lastTriggeredAt: v.number(),
+        // When the run began its agent; omit it for a run that never created a thread (`quiet.ts`).
+        lastTriggeredAt: v.optional(v.number()),
         nextTriggerAt: v.optional(v.number()),
         triggerId: v.id("triggers"),
     })
@@ -728,10 +729,9 @@ export const updateTriggerStats = internalMutation
         // and a `null` would fail every read through `getTriggers`' output.
         await patchRow(ctx.db, trigger, {
             lastError: error,
-            lastTriggeredAt,
             triggerCount: (trigger.triggerCount ?? 0) + 1,
             updatedAt: ctx.now,
-            ...withoutUndefined({ nextTriggerAt }),
+            ...withoutUndefined({ lastTriggeredAt, nextTriggerAt }),
         });
 
         return null;

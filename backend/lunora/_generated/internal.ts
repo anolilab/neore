@@ -978,7 +978,7 @@ export interface InternalApiTypes {
             recordFilteredExecution: FunctionReference<"mutation", { reason: string; triggerId: Id<"triggers"> }, null>;
             setTriggerEnabledInternal: FunctionReference<"mutation", { enabled: boolean; triggerId: Id<"triggers"> }, null>;
             updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string }, null>;
-            updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
+            updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
         };
         quiet_inputs: {
             loadQuietSnapshot: FunctionReference<"query", { since: number; userId: string }, { events: Array<{ createdAt: number; type: string }>; needsYou: Array<{ at: number; kind: string; title: string }>; running: Array<{ at: number; kind: string; title: string }>; threads: Array<{ title?: string; updatedAt: number }> }>;

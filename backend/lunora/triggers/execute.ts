@@ -81,6 +81,11 @@ export const executeTrigger = internalAction
         // what happens while the agent works (up to 25 steps) is not in this run's output.
         let runStartedAt: number | undefined;
 
+        // Whether the run created its thread. Only then did it post anything, so only then does it move the window:
+        // a run refused at admission or failed before a thread existed leaves its activity for the next run to report.
+        // Assigned from a callback, which the compiler does not follow: without the widening it reads the flag as always false.
+        let threadCreated = false as boolean;
+
         // 2. Create execution log entry
         const executionId = await ctx.runMutation(internal.triggers.functions.createExecution, {
             payload,
@@ -162,6 +167,9 @@ export const executeTrigger = internalAction
                 botId: bot ? trigger.botId : undefined,
                 memory: true,
                 model,
+                onThread: () => {
+                    threadCreated = true;
+                },
                 personalization: "full",
                 prompt: inputMessage,
                 system: systemPrompt,
@@ -201,8 +209,7 @@ export const executeTrigger = internalAction
             // Update trigger stats with error
             await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
                 error: errorMessage.slice(0, 500),
-                // An error before the agent started (a thrown admission failure) has no start time; it counts as a run from now.
-                lastTriggeredAt: runStartedAt ?? Date.now(),
+                ...(threadCreated && { lastTriggeredAt: runStartedAt }),
                 triggerId,
             });
         }

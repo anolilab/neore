@@ -16193,73 +16193,73 @@
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 373,
+      "line": 383,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1053,
+      "line": 1063,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1085,
+      "line": 1095,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1176,
+      "line": 1186,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1219,
+      "line": 1229,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1247,
+      "line": 1257,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1287,
+      "line": 1297,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1305,
+      "line": 1315,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1317,
+      "line": 1327,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1369,
+      "line": 1379,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1386,
+      "line": 1396,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1400,
+      "line": 1410,
       "reason": "at module scope"
     },
     {
@@ -16415,19 +16415,19 @@
     {
       "file": "agent/client/threads",
       "kind": "call",
-      "line": 36,
+      "line": 37,
       "reason": "\"getThreadMetadata\" is not a registered function"
     },
     {
       "file": "agent/client/threads",
       "kind": "call",
-      "line": 52,
+      "line": 53,
       "reason": "\"updateThreadMetadata\" is not a registered function"
     },
     {
       "file": "agent/client/threads",
       "kind": "call",
-      "line": 67,
+      "line": 68,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -17723,19 +17723,19 @@
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 193,
+      "line": 196,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 209,
+      "line": 211,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "schedule",
-      "line": 215,
+      "line": 217,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
