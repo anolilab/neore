@@ -9,7 +9,8 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { createRatelimit } from "../lib/rate-limiter";
 import schema from "../schema";
 import { LOCKED_THREAD_TITLE } from "../lib/thread-lock";
-import { chargeDailyBrief, loadDailyBriefInputs, runDailyBrief } from "./daily-brief";
+import { chargeDailyBrief, claimDailyBrief, loadDailyBriefInputs, runDailyBrief } from "./daily-brief";
+import { checkBriefEligibility, nextBriefRunAt } from "./daily-brief-logic";
 
 const { generateText, registry, users } = vi.hoisted(() => {
     return { generateText: vi.fn(), registry: new Map<string, unknown>(), users: new Set<string>() };
@@ -149,5 +150,101 @@ describe("the summarizer's input", () => {
         const { events } = await inputsSince(NOW - 60_000);
 
         expect(events).toContainEqual({ title: "Plans", type: "task" });
+    });
+});
+
+describe("a claim outside the morning window", () => {
+    const HOUR = 60 * 60 * 1000;
+    // 13:00 UTC: past the 06:00-11:00 window, so the job is late.
+    const LATE = Date.UTC(2026, 8, 25, 13, 0);
+
+    const claim = async (): Promise<{ claimed: boolean; reason?: string }> =>
+        await harness.run(async (ctx: any) => await ctx.runMutation(claimDailyBrief, { userId: USER }));
+
+    const state = async () => await harness.run(async (ctx: any) => await ctx.db.dailyBriefState.findFirst({ where: { userId: USER } }));
+
+    // Nothing else schedules in these tests, and a by-reference job carries no path in the harness.
+    const briefJobs = () => harness.scheduler.list().filter((job) => job.args.userId === USER);
+
+    beforeEach(() => {
+        vi.setSystemTime(LATE);
+    });
+
+    it("books exactly one job at the next local morning", async () => {
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.dailyBriefState.findFirst({ where: { userId: USER } });
+
+            await ctx.db.patch(row._id, { lastActiveAt: LATE - HOUR });
+        });
+
+        await expect(claim()).resolves.toEqual({ claimed: false, reason: "outside_window" });
+
+        const expected = nextBriefRunAt(LATE, "UTC", USER);
+        const jobs = briefJobs();
+        const row = await state();
+
+        expect(jobs).toHaveLength(1);
+        expect(jobs[0]?.scheduledFor).toBe(expected);
+        expect(row).toMatchObject({ scheduledFor: expected, scheduledJobId: jobs[0]?.id });
+        expect(new Date(expected).getUTCHours()).toBe(7);
+        expect(new Date(expected).getUTCDate()).toBe(26);
+    });
+
+    it("books a time that is strictly later and passes eligibility in the same zone", async () => {
+        for (const zone of ["UTC", "Europe/Berlin", "America/New_York", "Asia/Kolkata", "Pacific/Auckland"]) {
+            for (let hour = 0; hour < 24; hour += 1) {
+                const now = Date.UTC(2026, 2, 28, hour, 17);
+                const next = nextBriefRunAt(now, zone, USER);
+
+                expect(next).toBeGreaterThan(now);
+                expect(
+                    checkBriefEligibility({ enabled: true, lastActiveAt: next - HOUR, lastRunLocalDay: undefined, now: next, timeZone: zone }),
+                ).toMatchObject({
+                    eligible: true,
+                });
+            }
+        }
+    });
+
+    it("still clears the pending job when the user disabled the brief", async () => {
+        await harness.run(async (ctx: any) => {
+            const settings = await ctx.db.userSettings.findFirst({ where: { userId: USER } });
+            const row = await ctx.db.dailyBriefState.findFirst({ where: { userId: USER } });
+
+            await ctx.db.patch(settings._id, { dailyBriefEnabled: false });
+            await ctx.db.patch(row._id, { lastActiveAt: LATE - HOUR, scheduledFor: LATE - 1000, scheduledJobId: "job-old" });
+        });
+
+        await expect(claim()).resolves.toEqual({ claimed: false, reason: "disabled" });
+        expect(briefJobs()).toHaveLength(0);
+        expect((await state()).scheduledFor).toBeUndefined();
+        expect((await state()).scheduledJobId).toBeUndefined();
+    });
+
+    it("still clears the pending job when the user is inactive", async () => {
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.dailyBriefState.findFirst({ where: { userId: USER } });
+
+            await ctx.db.patch(row._id, { lastActiveAt: LATE - 3 * 24 * HOUR, scheduledFor: LATE - 1000, scheduledJobId: "job-old" });
+        });
+
+        await expect(claim()).resolves.toEqual({ claimed: false, reason: "inactive" });
+        expect(briefJobs()).toHaveLength(0);
+        expect((await state()).scheduledFor).toBeUndefined();
+        expect((await state()).scheduledJobId).toBeUndefined();
+    });
+
+    it("books nothing when activity already scheduled a later job", async () => {
+        const later = nextBriefRunAt(LATE, "UTC", USER);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.dailyBriefState.findFirst({ where: { userId: USER } });
+
+            await ctx.db.patch(row._id, { lastActiveAt: LATE - HOUR, scheduledFor: later, scheduledJobId: "job-later" });
+        });
+
+        await expect(claim()).resolves.toEqual({ claimed: false, reason: "outside_window" });
+        expect(briefJobs()).toHaveLength(0);
+        expect(await state()).toMatchObject({ scheduledFor: later, scheduledJobId: "job-later" });
     });
 });

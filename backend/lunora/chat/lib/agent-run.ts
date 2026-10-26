@@ -456,13 +456,14 @@ const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summa
 };
 
 /**
- * Bookkeeping after a streamed run, fire-and-forget: the reply's timing, the
- * memories its prompt carried, and — when `extractMemory` is set — memory
- * extraction from the exchange plus the activity stamp nightly reflection
- * schedules from (`memory/reflection.ts`). Billing is not here; the LLM Gateway
- * usage webhook owns it.
+ * Bookkeeping after a streamed run: the reply's timing (awaited before this
+ * returns, so the action does not end with it in flight), the memories its
+ * prompt carried, and — when `extractMemory` is set — memory extraction from
+ * the exchange plus the activity stamp nightly reflection schedules from
+ * (`memory/reflection.ts`). Billing is not here; the LLM Gateway usage webhook
+ * owns it.
  */
-export const afterRun = (
+export const afterRun = async (
     ctx: Pick<ActionCtx, "runMutation" | "scheduler">,
     args: {
         /** The bot the run is for, so its memory extraction stays in that bot's scope. */
@@ -485,17 +486,37 @@ export const afterRun = (
         timingStart: number;
         userId: string;
     },
-): void => {
-    const { firstTokenTime, prompt, savedMessages = [], steeredTexts = [], threadId, timingStart, userId } = args;
+): Promise<void> => {
+    const { firstTokenTime, savedMessages = [], timingStart } = args;
     const lastAssistantMessage = savedMessages.findLast((m) => !m.tool);
 
-    if (lastAssistantMessage) {
-        void ctx.runMutation(internal.agent.messages.patchMessageTiming, {
-            durationMs: Date.now() - timingStart,
-            messageId: lastAssistantMessage._id as Id<"messages">,
-            ...(firstTokenTime !== undefined && { ttftMs: firstTokenTime - timingStart }),
-        });
+    // Started first so it runs beside the scheduling below, awaited last so a
+    // returning action never leaves it in flight. A failed patch only loses a timing.
+    const timing = lastAssistantMessage
+        ? (async () =>
+              ctx.runMutation(internal.agent.messages.patchMessageTiming, {
+                  durationMs: Date.now() - timingStart,
+                  messageId: lastAssistantMessage._id as Id<"messages">,
+                  ...(firstTokenTime !== undefined && { ttftMs: firstTokenTime - timingStart }),
+              }))().catch((error: unknown) => {
+              streamLogger.warn("[afterRun] Recording the reply's timing failed:", error);
+          })
+        : undefined;
+
+    try {
+        scheduleAfterRun(ctx, args);
+    } catch (error) {
+        streamLogger.warn("[afterRun] Scheduling the post-run work failed:", error);
     }
+
+    await timing;
+};
+
+const scheduleAfterRun = (
+    ctx: Pick<ActionCtx, "scheduler">,
+    args: Parameters<typeof afterRun>[1],
+): void => {
+    const { prompt, savedMessages = [], steeredTexts = [], threadId, userId } = args;
 
     const firstReplyRow = savedMessages.find((m) => m.message?.role !== "user");
 
@@ -955,7 +976,7 @@ export const resumeApprovedRun = async (
             // The run that paused extracted its own prompt and steers; this one extracts the steers it took.
             const steered = steering?.steeredTexts() ?? [];
 
-            afterRun(ctx, {
+            await afterRun(ctx, {
                 ...(config.memory?.botId && { botId: config.memory.botId }),
                 extractMemory: extractMemory && config.memory !== undefined && prefs.memoryEnabled,
                 firstTokenTime,

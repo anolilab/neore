@@ -2,6 +2,7 @@
  * Daily usage aggregation queries for the usage dashboard.
  */
 import type { AppEnv } from "../env.js";
+import { sqliteTime } from "../lib/sqlite-time.js";
 
 export interface DailyUsage {
     avgLatencyMs: number;
@@ -36,7 +37,7 @@ export class UsageAggregator {
      * Get usage summary for a user over a given period.
      */
     async getUserUsage(userId: string, days: number = 30): Promise<UsageSummary> {
-        const since = new Date(Date.now() - days * 86_400_000).toISOString();
+        const since = sqliteTime(Date.now() - days * 86_400_000);
 
         const result = await this.db
             .prepare(

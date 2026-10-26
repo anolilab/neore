@@ -674,7 +674,7 @@ export const localParts = (instant: number, timeZone: string): LocalParts => {
 };
 
 /** Offset of `timeZone` from UTC at `instant`, in ms (positive east of Greenwich). */
-const zoneOffset = (instant: number, timeZone: string): number => {
+export const zoneOffset = (instant: number, timeZone: string): number => {
     const p = localParts(instant, timeZone);
     const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
 

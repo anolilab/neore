@@ -22,6 +22,7 @@ import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
 import { assertValidFilters, evaluateFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH, MAX_WEBHOOK_BODY_BYTES } from "./filters";
+import { resolveTimeZone } from "../memory/reflection-logic";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
 import { noteShardDue } from "../lib/shard-housekeeping";
@@ -50,7 +51,7 @@ const assertTriggerTypeSupported = (type: "event" | "schedule" | "webhook"): voi
  */
 const assertCronExpression = (cronExpression: string): void => {
     if (!isHourlyOrSlowerCronExpression(cronExpression)) {
-        throw new LunoraError("BAD_REQUEST", 'Schedule must be a 5-field cron expression (UTC) that runs at most hourly, e.g. "0 9 * * 1"');
+        throw new LunoraError("BAD_REQUEST", 'Schedule must be a 5-field cron expression (read in the trigger time zone, UTC by default) that runs at most hourly, e.g. "0 9 * * 1"');
     }
 };
 
@@ -63,7 +64,7 @@ const assertCronExpression = (cronExpression: string): void => {
  */
 const firstRunOf = (trigger: Doc<"triggers">, now: number): number | undefined =>
     trigger.type === "schedule" && trigger.cronExpression && (trigger.nextTriggerAt === undefined || (trigger.enabled !== true && trigger.nextTriggerAt < now))
-        ? findNextCronTime(trigger.cronExpression, now)
+        ? findNextCronTime(trigger.cronExpression, now, trigger.timezone)
         : undefined;
 
 /**
@@ -367,17 +368,25 @@ export const updateTrigger = authMutation
 
         if (args.searchMode !== undefined) patch.searchMode = args.searchMode;
 
-        // Only a schedule has a next run. A new schedule moves it; the old time would fire once more on the old schedule.
+        // Only a schedule has a next run. A new schedule, or a new time zone, moves it; the old time would fire once more on the old schedule.
         // A disabled schedule may store one too: enabling replaces it if it has passed (`firstRunOf`).
-        // Re-saving the same expression keeps a pending due time, so a run the tick has not taken yet still fires.
+        // Re-saving the same expression and zone keeps a pending due time, so a run the tick has not taken yet still fires.
+        // Zones are compared as the scheduler reads them (`resolveTimeZone`): the settings form sends one on every save.
         const isSchedule = trigger.type === "schedule";
+        const nextZone = args.timezone ?? trigger.timezone;
+        const nextCron = args.cronExpression ?? trigger.cronExpression;
+        const cronChanged = args.cronExpression !== undefined && args.cronExpression !== trigger.cronExpression;
+        const zoneChanged = args.timezone !== undefined && resolveTimeZone(args.timezone) !== resolveTimeZone(trigger.timezone);
         let nextTriggerAt: number | undefined;
 
         if (isSchedule) {
-            nextTriggerAt =
-                args.cronExpression === undefined || (args.cronExpression === trigger.cronExpression && trigger.nextTriggerAt !== undefined)
-                    ? trigger.nextTriggerAt
-                    : findNextCronTime(args.cronExpression, context.now);
+            const touched = args.cronExpression !== undefined || zoneChanged;
+            const kept = trigger.nextTriggerAt !== undefined && !cronChanged && !zoneChanged;
+            const recomputed = touched && nextCron !== undefined ? findNextCronTime(nextCron, context.now, nextZone) : undefined;
+
+            // A zone-only edit of a row whose stored expression no longer parses keeps its due time:
+            // the tick switches such a schedule off with a reason, which dropping the time would hide.
+            nextTriggerAt = !touched || kept || (!cronChanged && recomputed === undefined) ? trigger.nextTriggerAt : recomputed;
         }
 
         if (args.cronExpression !== undefined) {
@@ -414,7 +423,7 @@ export const updateTrigger = authMutation
             ...withoutUndefined(patch),
             // `undefined` removes a stale time; enabling recomputes it (`firstRunOf`).
             // Also clears a time a non-schedule trigger stored before this check existed.
-            ...((args.cronExpression !== undefined || !isSchedule) && { nextTriggerAt }),
+            ...((args.cronExpression !== undefined || zoneChanged || !isSchedule) && { nextTriggerAt }),
             ...(args.botId !== undefined && { botId: nextBotId }),
             // An empty array removes the filters; leaving the argument out leaves them as they are.
             ...(args.filters !== undefined && { filters }),

@@ -7,6 +7,7 @@
  *   - notify_and_block: both
  */
 import type { AppEnv } from "../env.js";
+import { sqliteTime } from "../lib/sqlite-time.js";
 import type { UsageLogEntry } from "./tracker.js";
 
 export interface NotificationEvent {
@@ -165,16 +166,16 @@ const getPeriodStart = (period: string): string => {
 
     switch (period) {
         case "day": {
-            return new Date(now.getTime() - 86_400_000).toISOString();
+            return sqliteTime(now.getTime() - 86_400_000);
         }
         case "hour": {
-            return new Date(now.getTime() - 3_600_000).toISOString();
+            return sqliteTime(now.getTime() - 3_600_000);
         }
         case "month": {
-            return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+            return sqliteTime(new Date(now.getFullYear(), now.getMonth(), 1).getTime());
         }
         default: {
-            return new Date(now.getTime() - 86_400_000).toISOString();
+            return sqliteTime(now.getTime() - 86_400_000);
         }
     }
 };

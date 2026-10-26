@@ -29,6 +29,7 @@ import type { DeviceManifestTool } from "../../devices/lib/manifest";
 import { capUtf8 } from "../../devices/lib/signing";
 import { computeTaint } from "../../devices/lib/taint";
 import { toolsLogger } from "../../lib/logger";
+import { sleep } from "../tools/utilities";
 
 /** Where a device runtime tool goes. The runtime name alone cannot say. */
 export interface DeviceToolDescriptor {
@@ -120,12 +121,6 @@ export const toDeviceToolOutput = (state: CallState | null): DeviceToolOutput =>
             return { error: state.error ?? "The device did not answer in time.", ok: false, status: "expired" };
         }
     }
-};
-
-const sleep = async (ms: number): Promise<void> => {
-    await new Promise((resolve) => {
-        setTimeout(resolve, ms);
-    });
 };
 
 type DeviceCtx = Pick<ActionCtx, "runMutation" | "runQuery">;

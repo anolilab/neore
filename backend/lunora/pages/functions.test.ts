@@ -182,6 +182,36 @@ describe("access", () => {
         await as(READER).action(acceptPageInvite as never, { token } as never);
         await expect(as(STRANGER).action(acceptPageInvite as never, { token } as never)).rejects.toThrow("not valid");
     });
+
+    const permissionOf = async (pageId: string, userId: string): Promise<string | undefined> =>
+        await harness.run(
+            async (ctx: any) =>
+                ((await ctx.db.query("pageAccess").collect()) as { pageId: string; permission: string; userId: string }[]).find(
+                    (row) => row.pageId === pageId && row.userId === userId,
+                )?.permission,
+        );
+
+    it("keeps a write grant when the same person redeems a read invite, and still spends it", async () => {
+        const pageId = await newPage();
+
+        await grant(pageId, WRITER, "write");
+
+        const { token } = (await as(OWNER).mutation(createPageInvite as never, { expiresInDays: 1, pageId, permission: "read" } as never)) as { token: string };
+
+        await as(WRITER).action(acceptPageInvite as never, { token } as never);
+
+        await expect(permissionOf(pageId, WRITER)).resolves.toBe("write");
+        await expect(as(STRANGER).action(acceptPageInvite as never, { token } as never)).rejects.toThrow("not valid");
+    });
+
+    it("raises a read grant when the same person redeems a write invite", async () => {
+        const pageId = await newPage();
+
+        await grant(pageId, READER, "read");
+        await grant(pageId, READER, "write");
+
+        await expect(permissionOf(pageId, READER)).resolves.toBe("write");
+    });
 });
 
 describe("tree", () => {
@@ -267,6 +297,24 @@ describe("public link", () => {
 
         await as(OWNER).mutation(setPagePublic as never, { isPublic: false, pageId } as never);
         await expect(harness.action(getPublicPage as never, { publicAccessToken } as never)).resolves.toBeNull();
+    });
+});
+
+describe("public link route", () => {
+    const routeOf = async (token: string) =>
+        await harness.run(async (ctx: any) => await ctx.db.shardRoutes.findFirst({ where: { key: `page-public:${token}` } }));
+
+    it("is dropped with a deleted public page, and a private page costs none", async () => {
+        const pageId = await newPage();
+        const { publicAccessToken } = (await as(OWNER).mutation(setPagePublic as never, { isPublic: true, pageId } as never)) as { publicAccessToken: string };
+
+        expect(await routeOf(publicAccessToken)).toMatchObject({ ownerId: OWNER });
+
+        await as(OWNER).mutation(deletePage as never, { pageId } as never);
+
+        expect(await routeOf(publicAccessToken)).toBeNull();
+
+        await expect(as(OWNER).mutation(deletePage as never, { pageId: await newPage() } as never)).resolves.toEqual({ deleted: 1 });
     });
 });
 

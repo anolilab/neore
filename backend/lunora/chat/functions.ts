@@ -92,6 +92,7 @@ import {
 import { getAgentForUser } from "./lib/thread-helpers";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
+import { deleteThreadShardRoutes } from "../lib/shard-routes";
 import { retryClipStore } from "../workflow/clip-store-retry";
 
 const DATA_URL_BASE64_RE = /^data:[^;]+;base64,/;
@@ -1929,6 +1930,8 @@ export const deleteThread = authMutation
             });
         }
 
+        await deleteThreadShardRoutes(context, threadBeforeDelete, threadId);
+
         context.log.event("chat.delete_thread", { isDone: result.isDone });
 
         return result;
@@ -1993,6 +1996,16 @@ export const deleteThreads = authMutation
 
         // Count successful deletions
         const deletedCount = deletionResults.filter((result) => result.status === "fulfilled" && result.value !== null).length;
+
+        // The share routes of the threads that went, one at a time and outside the
+        // fan-out above: a route write never fails (or reorders) a delete.
+        for (const [index, result] of deletionResults.entries()) {
+            const thread = threads[index];
+
+            if (thread && result.status === "fulfilled" && result.value !== null) {
+                await deleteThreadShardRoutes(context, thread, thread._id);
+            }
+        }
 
         context.log.event("chat.delete_threads", { deletedCount, requested: threadIds.length });
 

@@ -10,9 +10,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { claimKey } from "../lib/claim-once";
-import { bytesToHex, hmacSha256Hex } from "../lib/crypto";
+import { bytesToHex, hmacSha256, hmacSha256Hex } from "../lib/crypto";
 import { findOrCreateMessengerThread, getConnectionById, pairConnection, saveMessengerMessage, touchConnection } from "./functions";
-import { handleDiscordWebhook, handleSlackWebhook, handleTelegramWebhook } from "./webhooks";
+import { handleDiscordWebhook, handleSlackWebhook, handleTelegramWebhook, handleWhatsAppWebhook } from "./webhooks";
 
 const rateLimit = vi.hoisted(() => {
     return { ok: true, operations: [] as string[] };
@@ -308,5 +308,124 @@ describe("Discord through acceptInbound", () => {
 
         expect(await statusOf(handleDiscordWebhook(context, post(message, await signed(pair, message, NOW_SECONDS - 301)), connectionId))).toBe(401);
         expect(replies()).toHaveLength(0);
+    });
+});
+
+describe("a paused connection", () => {
+    const claimCount = async (): Promise<number> => await harness.run(async (ctx: any) => (await ctx.db.query("idempotencyClaims").collect()).length);
+    const pausedConnection = async (platform: string, status = "paused") => await connection(platform, { platformUserId: SENDER, status });
+
+    const TELEGRAM_KEYS = { telegram_bot_token: "bot", telegram_webhook_secret: "tg-secret" };
+    const telegramUpdate = JSON.stringify({
+        message: { chat: { id: 77, type: "private" }, date: NOW_SECONDS, from: { first_name: "Ada", id: Number(SENDER), is_bot: false }, message_id: 1, text: "hello" },
+        update_id: 1,
+    });
+    const telegram = async (context: never, connectionId: string, secret = TELEGRAM_KEYS.telegram_webhook_secret) =>
+        await handleTelegramWebhook(context, post(telegramUpdate, { "x-telegram-bot-api-secret-token": secret }), connectionId);
+
+    const SLACK_KEYS = { slack_bot_token: "xoxb", slack_signing_secret: "slack-secret" };
+    const slackSigned = async (body: string) => {
+        return {
+            "x-slack-request-timestamp": String(NOW_SECONDS),
+            "x-slack-signature": `v0=${await hmacSha256Hex(SLACK_KEYS.slack_signing_secret, `v0:${String(NOW_SECONDS)}:${body}`)}`,
+        };
+    };
+    const slackEvent = JSON.stringify({
+        event: { channel: "C1", text: "hi", ts: `${String(NOW_SECONDS)}.000100`, type: "message", user: SENDER },
+        type: "event_callback",
+    });
+
+    const WHATSAPP_KEYS = { whatsapp_access_token: "tok", whatsapp_app_secret: "wa-secret", whatsapp_phone_number_id: "106540352242922" };
+    const whatsappBody = JSON.stringify({
+        entry: [
+            {
+                changes: [
+                    {
+                        field: "messages",
+                        value: {
+                            contacts: [{ profile: { name: "Ada" }, wa_id: SENDER }],
+                            messages: [{ from: SENDER, id: "wamid.1", text: { body: "hi" }, timestamp: String(NOW_SECONDS), type: "text" }],
+                            metadata: { phone_number_id: WHATSAPP_KEYS.whatsapp_phone_number_id },
+                        },
+                    },
+                ],
+                id: "WABA",
+            },
+        ],
+        object: "whatsapp_business_account",
+    });
+    const whatsapp = async (context: never, connectionId: string, signature?: string) =>
+        await handleWhatsAppWebhook(
+            context,
+            post(whatsappBody, {
+                "x-hub-signature-256": signature ?? `sha256=${bytesToHex(await hmacSha256(WHATSAPP_KEYS.whatsapp_app_secret, whatsappBody))}`,
+            }),
+            connectionId,
+        );
+
+    it("answers Telegram 200 with a valid secret and drops the update", async () => {
+        const connectionId = await pausedConnection("telegram");
+        const { context, replies } = httpContext(TELEGRAM_KEYS);
+
+        expect(await statusOf(telegram(context, connectionId))).toBe(200);
+        expect(replies()).toHaveLength(0);
+        expect(await savedTexts()).toStrictEqual([]);
+        expect(await claimCount()).toBe(0);
+    });
+
+    it("still refuses a bad Telegram secret and a disconnected connection with 401", async () => {
+        const { context } = httpContext(TELEGRAM_KEYS);
+
+        expect(await statusOf(telegram(context, await pausedConnection("telegram"), "wrong"))).toBe(401);
+        expect(await statusOf(telegram(context, await pausedConnection("telegram", "disconnected")))).toBe(401);
+    });
+
+    it("answers Slack 200 with a valid signature and drops the event", async () => {
+        const connectionId = await pausedConnection("slack");
+        const { context, replies } = httpContext(SLACK_KEYS);
+
+        expect(await statusOf(handleSlackWebhook(context, post(slackEvent, await slackSigned(slackEvent)), connectionId))).toBe(200);
+        expect(replies()).toHaveLength(0);
+        expect(await savedTexts()).toStrictEqual([]);
+        expect(await claimCount()).toBe(0);
+    });
+
+    it("still answers Slack url_verification while paused, and refuses a bad signature and a disconnected connection with 401", async () => {
+        const { context } = httpContext(SLACK_KEYS);
+        const challenge = JSON.stringify({ challenge: "abc", type: "url_verification" });
+        const pausedId = await pausedConnection("slack");
+
+        expect(await jsonOf(handleSlackWebhook(context, post(challenge, await slackSigned(challenge)), pausedId))).toStrictEqual({ challenge: "abc" });
+        expect(await statusOf(handleSlackWebhook(context, post(slackEvent, {}), pausedId))).toBe(401);
+        expect(await statusOf(handleSlackWebhook(context, post(slackEvent, await slackSigned(slackEvent)), await pausedConnection("slack", "disconnected")))).toBe(
+            401,
+        );
+    });
+
+    it("answers WhatsApp 200 with a valid signature and drops the message", async () => {
+        const connectionId = await pausedConnection("whatsapp");
+        const { context, replies } = httpContext(WHATSAPP_KEYS);
+
+        expect(await statusOf(whatsapp(context, connectionId))).toBe(200);
+        expect(replies()).toHaveLength(0);
+        expect(await savedTexts()).toStrictEqual([]);
+        expect(await claimCount()).toBe(0);
+    });
+
+    it("still refuses a bad WhatsApp signature and a disconnected connection with 401", async () => {
+        const { context } = httpContext(WHATSAPP_KEYS);
+
+        expect(await statusOf(whatsapp(context, await pausedConnection("whatsapp"), "sha256=00"))).toBe(401);
+        expect(await statusOf(whatsapp(context, await pausedConnection("whatsapp", "disconnected")))).toBe(401);
+    });
+
+    it("accepts the same update once the connection is resumed", async () => {
+        const connectionId = await pausedConnection("telegram");
+        const { context, replies } = httpContext(TELEGRAM_KEYS);
+
+        expect(await statusOf(telegram(context, connectionId))).toBe(200);
+        await harness.run(async (ctx: any) => await ctx.db.patch(connectionId, { status: "active" }));
+        expect(await statusOf(telegram(context, connectionId))).toBe(200);
+        expect(replies()).toHaveLength(1);
     });
 });

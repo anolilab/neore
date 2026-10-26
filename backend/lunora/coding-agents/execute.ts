@@ -29,7 +29,7 @@ import {
     finalizeRun,
     openPullRequestForBranch,
     pollRun,
-    PR_SANDBOX_TIMEOUT_MS,
+    PR_BUDGET_MS,
     pullRequestProblem,
     startPullRequest,
     startRun,
@@ -438,7 +438,7 @@ export const pollPullRequest = internalAction
             }
         };
 
-        if (!pr.sandboxId || Date.now() - pr.startedAt > PR_SANDBOX_TIMEOUT_MS + 60_000) {
+        if (!pr.sandboxId || Date.now() - pr.startedAt > PR_BUDGET_MS) {
             if (pr.sandboxId) {
                 await killE2BSandbox(E2B_API_KEY, pr.sandboxId);
             }
@@ -537,6 +537,32 @@ export const reapRun = internalAction
         }
 
         await ctx.scheduler.runAfter(0, internal.coding_agents.execute.finishRun, { runId: args.runId });
+
+        return null;
+    });
+
+/**
+ * Fails a PR attempt nothing finished (its poll chain broke), kills its sandbox
+ * and posts the follow-ups that were waiting on it. Acts only for the attempt it
+ * was scheduled for.
+ */
+export const reapPullRequest = internalAction
+    .input({ runId: v.id("codingAgentRuns"), startedAt: v.number() })
+    .output(v.null())
+    .action(async ({ args, ctx }) => {
+        const expired = await ctx.runMutation(internal.coding_agents.functions.expirePullRequest, args);
+
+        if (!expired) {
+            return null;
+        }
+
+        if (expired.sandboxId && E2B_API_KEY) {
+            await killE2BSandbox(E2B_API_KEY, expired.sandboxId);
+        }
+
+        if (expired.followUp) {
+            await postFollowUps(ctx, args.runId);
+        }
 
         return null;
     });

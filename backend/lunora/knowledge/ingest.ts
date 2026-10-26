@@ -39,6 +39,45 @@ const EMBEDDING_MODEL_NAME = "text-embedding-004";
  */
 const MAX_FILE_SIZE = MAX_EXTRACTION_DOCUMENT_BYTES;
 
+/**
+ * Runs the chunk save and deletes `embeddingIds` when the chunks were not kept:
+ * refused (`false`, the file was removed meanwhile) or thrown (rethrown, for the
+ * caller to mark the file failed). A failing cleanup is logged, never allowed to
+ * replace the save's own error.
+ */
+export const keepVectorsOnlyIfSaved = async (
+    ctx: Pick<ActionCtx, "runAction">,
+    embeddingIds: ReadonlyArray<string>,
+    save: () => Promise<boolean>,
+): Promise<boolean> => {
+    const dropVectors = async (): Promise<void> => {
+        if (embeddingIds.length === 0) {
+            return;
+        }
+
+        try {
+            await ctx.runAction(internal.knowledge.delete_embeddings.deleteEmbeddingsBatch, { embeddingIds: [...embeddingIds] });
+        } catch (cleanupError) {
+            console.error("[knowledge/ingest] Failed to delete orphaned embeddings:", cleanupError);
+        }
+    };
+    let saved: boolean;
+
+    try {
+        saved = await save();
+    } catch (error) {
+        await dropVectors();
+
+        throw error;
+    }
+
+    if (!saved) {
+        await dropVectors();
+    }
+
+    return saved;
+};
+
 // ============================================================================
 // Services
 // ============================================================================
@@ -289,26 +328,29 @@ export const ingestFile = internalAction
             // Insert chunks with their embedding IDs. Refused when the file was
             // removed while it was embedded: nothing else would ever delete
             // the vectors just written, so they go now.
-            const saved = await ctx.runMutation(internal.knowledge.functions.saveChunks, {
-                chunks: chunks.map((chunk, i) => {
-                    return {
-                        chunkIndex: chunk.index,
-                        content: chunk.content,
-                        embeddingId: (embeddingIds[i] as string) ?? undefined,
-                        pageNumber: chunk.pageNumber,
-                        sectionHeading: chunk.sectionHeading,
-                        tokenCount: estimateTokens(chunk.content),
-                    };
-                }),
-                fileId: args.knowledgeFileId,
-                userId: args.userId,
-            });
+            // A save that throws leaves the vectors just as orphaned: no chunk row
+            // points at them, and file removal follows chunk rows.
+            const saved = await keepVectorsOnlyIfSaved(
+                ctx,
+                embeddingIds as string[],
+                () =>
+                    ctx.runMutation(internal.knowledge.functions.saveChunks, {
+                        chunks: chunks.map((chunk, i) => {
+                            return {
+                                chunkIndex: chunk.index,
+                                content: chunk.content,
+                                embeddingId: (embeddingIds[i] as string) ?? undefined,
+                                pageNumber: chunk.pageNumber,
+                                sectionHeading: chunk.sectionHeading,
+                                tokenCount: estimateTokens(chunk.content),
+                            };
+                        }),
+                        fileId: args.knowledgeFileId,
+                        userId: args.userId,
+                    }),
+            );
 
             if (!saved) {
-                if (embeddingIds.length > 0) {
-                    await ctx.runAction(internal.knowledge.delete_embeddings.deleteEmbeddingsBatch, { embeddingIds: embeddingIds as string[] });
-                }
-
                 return;
             }
 

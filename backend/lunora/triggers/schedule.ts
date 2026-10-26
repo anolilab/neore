@@ -10,11 +10,14 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalMutation } from "../_generated/server";
+import { localParts, resolveTimeZone, zonedTimeToUtc, zoneOffset } from "../memory/reflection-logic";
 
 const WHITESPACE_RE = /\s+/;
 const DIGITS_RE = /^\d+$/;
 // Max triggers to process per cron run to avoid mutation limits
 const TRIGGER_BATCH_SIZE = 25;
+
+const HOUR_MS = 3_600_000;
 
 const SWITCHED_OFF_REASON = "Schedule must run at most hourly and fire at least once in the next 28 years. It was switched off.";
 
@@ -27,12 +30,13 @@ const SWITCHED_OFF_REASON = "Schedule must run at most hourly and fire at least 
 export const dueScheduleStep = (
     cronExpression: string | undefined,
     now: number,
+    timeZone?: string | null,
 ): { kind: "run"; nextTime?: number } | { kind: "switchOff"; reason: string } => {
     if (!cronExpression) {
         return { kind: "run" };
     }
 
-    const nextTime = isHourlyOrSlowerCronExpression(cronExpression) ? findNextCronTime(cronExpression, now) : undefined;
+    const nextTime = isHourlyOrSlowerCronExpression(cronExpression) ? findNextCronTime(cronExpression, now, timeZone) : undefined;
 
     return nextTime === undefined ? { kind: "switchOff", reason: SWITCHED_OFF_REASON } : { kind: "run", nextTime };
 };
@@ -58,7 +62,7 @@ export const checkDueTriggers = internalMutation
 
         for (const trigger of batch) {
             const triggerId = trigger._id;
-            const step = dueScheduleStep(trigger.cronExpression, now);
+            const step = dueScheduleStep(trigger.cronExpression, now, trigger.timezone);
 
             if (step.kind === "switchOff") {
                 await ctx.db.patch(triggerId, { enabled: false, lastError: step.reason, updatedAt: now });
@@ -112,10 +116,43 @@ export const checkDueTriggers = internalMutation
 const SEARCH_DAYS = 366 * 28;
 
 /**
+ * The UTC instant of a local wall-clock time, with one rule for every zone.
+ * `zonedTimeToUtc` alone is not enough: for a time inside a spring-forward gap it
+ * lands an hour early in the Americas and an hour late in Europe, and in a
+ * fall-back overlap it picks either occurrence. Here a gap time runs just after
+ * the gap (02:30 becomes 03:30), and an overlap time runs at its earlier occurrence.
+ */
+const wallTimeToUtc = (year: number, month: number, day: number, hour: number, minute: number, zone: string): number => {
+    const wall = Date.UTC(year, month - 1, day, hour, minute);
+    const guess = zonedTimeToUtc(year, month, day, hour, minute, zone);
+    // The offset in force before the guess, so a gap resolves to the instant after it.
+    const shifted = wall - zoneOffset(guess - 3 * HOUR_MS, zone);
+    const isWallTime = (instant: number): boolean => {
+        const p = localParts(instant, zone);
+
+        return p.year === year && p.month === month && p.day === day && p.hour === hour && p.minute === minute;
+    };
+    const guessFits = isWallTime(guess);
+    const shiftedFits = isWallTime(shifted);
+
+    if (guessFits && shiftedFits) {
+        return Math.min(guess, shifted);
+    }
+
+    return guessFits ? guess : shifted;
+};
+
+/**
  * The first time `expression` fires strictly after `after`, or `undefined` when
  * it never does (an invalid expression, or one like Feb 30). Only whole days that
  * match are searched in detail, so a monthly or yearly schedule costs a day loop,
  * not a minute loop.
+ *
+ * The fields are read in `timeZone` (an IANA name). A missing or unusable zone
+ * reads as UTC, so a trigger stored without one keeps firing at its UTC times.
+ * Day, month and weekday are matched on the LOCAL date. A local time that does
+ * not exist on a spring-forward day runs just after the gap; one that occurs
+ * twice on a fall-back day runs once, at its earlier occurrence.
  *
  * Supports: minute (0-59), hour (0-23), day-of-month (1-31), month (1-12), day-of-week (0-6).
  * Supports: *, specific values, comma-separated lists, ranges (1-5), steps (0/15 * * * *).
@@ -123,7 +160,7 @@ const SEARCH_DAYS = 366 * 28;
  *
  * Returns a timestamp in milliseconds.
  */
-export const findNextCronTime = (expression: string, after: number): number | undefined => {
+export const findNextCronTime = (expression: string, after: number, timeZone?: string | null): number | undefined => {
     // Checked as a whole: the field parser reads an unknown token as a wildcard, so
     // `bad 0 * * *` would otherwise come back as a time.
     if (!isValidCronExpression(expression)) {
@@ -141,28 +178,44 @@ export const findNextCronTime = (expression: string, after: number): number | un
     const months = parseCronField(monthField!, 1, 12);
     const dows = parseCronField(dowField!, 0, 6);
 
+    const zone = resolveTimeZone(timeZone);
+    const isUtc = zone === "UTC";
+
     // The next whole minute after `after`.
     const start = Math.floor((after + 60_000) / 60_000) * 60_000;
+    // The calendar below is walked with UTC getters on purpose: it is a plain date
+    // counter, so the process's own time zone never enters. The zone only decides
+    // which date `start` falls on and where a wall time lands on the timeline.
     const startDate = new Date(start);
+    const first = isUtc
+        ? { day: startDate.getUTCDate(), month: startDate.getUTCMonth() + 1, year: startDate.getUTCFullYear() }
+        : localParts(start, zone);
 
     for (let offset = 0; offset < SEARCH_DAYS; offset += 1) {
-        // UTC throughout, deliberately: a cron expression here is UTC by contract.
-        // Local getters made "0 8,12,18 * * *" depend on the process's time zone.
-        const dayStart = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate() + offset);
+        const dayStart = Date.UTC(first.year, first.month - 1, first.day + offset);
         const day = new Date(dayStart);
 
         if (!days.includes(day.getUTCDate()) || !months.includes(day.getUTCMonth() + 1) || !dows.includes(day.getUTCDay())) {
             continue;
         }
 
+        // The earliest, not the first: a gap time shifts forward and may pass a later slot.
+        let earliest: number | undefined;
+
         for (const hour of hours) {
             for (const minute of minutes) {
-                const candidate = dayStart + hour * 3_600_000 + minute * 60_000;
+                const candidate = isUtc
+                    ? dayStart + hour * HOUR_MS + minute * 60_000
+                    : wallTimeToUtc(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate(), hour, minute, zone);
 
-                if (candidate >= start) {
-                    return candidate;
+                if (candidate >= start && (earliest === undefined || candidate < earliest)) {
+                    earliest = candidate;
                 }
             }
+        }
+
+        if (earliest !== undefined) {
+            return earliest;
         }
     }
 
@@ -170,8 +223,8 @@ export const findNextCronTime = (expression: string, after: number): number | un
 };
 
 /**
- * The next time from {@link findNextCronTime}, or one hour from `after` when there is no
- * match. Only for callers that need a number (recurring tasks). Arming paths must use
+ * The next time from {@link findNextCronTime} in UTC, or one hour from `after` when there is no
+ * match. Only for callers that need a number (recurring tasks, which are UTC). Arming paths must use
  * `findNextCronTime`: the one-hour value would arm a run that was never scheduled.
  */
 export const getNextCronTime = (expression: string, after: number): number => findNextCronTime(expression, after) ?? after + 3_600_000;
@@ -189,7 +242,7 @@ const CRON_RANGES: ReadonlyArray<readonly [number, number]> = [
 ];
 
 /**
- * The schedule format {@link getNextCronTime} reads: five UTC fields, each `*`,
+ * The schedule format {@link getNextCronTime} reads: five fields, each `*`,
  * a value, a range or a step, comma-separated. Stricter than the parser, which
  * quietly treats garbage as a wildcard — so an expression that fails here would
  * fire every minute. Triggers and recurring tasks both refuse one at save time.

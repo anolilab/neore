@@ -9,13 +9,14 @@
 import { streamText } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { app } from "../index.js";
 import { createProviderModelForEnv } from "../providers/factory.js";
 import { PricingService } from "../providers/pricing.js";
 import { UsageReporter } from "../usage/reporter.js";
 import type { UsageLogEntry } from "../usage/tracker.js";
 import { UsageTracker } from "../usage/tracker.js";
 import { bindingEnv } from "./helpers/internal.js";
-import { createMockEnv } from "./helpers/mock-env.js";
+import { createMockCtx, createMockEnv } from "./helpers/mock-env.js";
 import { useTrackedAppFetch } from "./helpers/tracked-app-fetch.js";
 
 vi.mock("ai", async (importOriginal) => {
@@ -437,5 +438,150 @@ describe("a cancelled stream bills the tokens it already produced", () => {
         expect(entry).toMatchObject(ESTIMATED_ENTRY);
         expect(entry).not.toHaveProperty("errorCode");
         expect(report).toMatchObject(ESTIMATED_REPORT);
+    });
+});
+
+/**
+ * A cancelled relay finishes AFTER the response has ended, behind a pricing read.
+ * The runtime may cancel work that is not registered with `waitUntil` by then, so
+ * the registration must exist before the Response is returned and settle only once
+ * the usage is recorded and reported.
+ */
+describe("usage of a cancelled stream is registered with waitUntil before the response is returned", () => {
+    const PROMPT = "x".repeat(400);
+    const DELTA = "y".repeat(20);
+
+    let recordSpy: ReturnType<typeof vi.spyOn>;
+    let reportSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => new Response(null, { status: 204 })),
+        );
+        recordSpy = vi.spyOn(UsageTracker.prototype, "record");
+        reportSpy = vi.spyOn(UsageReporter.prototype, "report").mockResolvedValue(true);
+        // A slow pricing read keeps the relay's tail running after the client has gone.
+        vi.spyOn(PricingService.prototype, "getPricing").mockImplementation(async () => {
+            await new Promise((resolve) => {
+                setTimeout(resolve, 25);
+            });
+
+            return { inputPerMillion: 1, outputPerMillion: 2 };
+        });
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+        vi.mocked(streamText).mockReset();
+        vi.mocked(createProviderModelForEnv).mockReset();
+    });
+
+    /** Runs the request with a context that logs when each `waitUntil` promise is registered and when it settles. */
+    const send = async (path: string, payload: object) => {
+        const context = createMockCtx();
+        const registered: Promise<unknown>[] = [];
+        const settledAt: number[] = [];
+        const { waitUntil } = context;
+
+        context.waitUntil = (promise) => {
+            registered.push(promise);
+            void promise.then(() => settledAt.push(Date.now()));
+            waitUntil(promise);
+        };
+
+        const res = await app.fetch(
+            new Request(`http://localhost${path}`, {
+                body: JSON.stringify({ modelApiId: "gpt-test-1", modelId: "gpt-test", provider: "openai", userId: "user-1", ...payload }),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+            }),
+            bindingEnv(createMockEnv()) as never,
+            context as unknown as ExecutionContext,
+        );
+
+        return { context, registeredBeforeBody: registered.length, res, settledAt };
+    };
+
+    const cancelAfterFirstEvent = async (res: Response): Promise<void> => {
+        const reader = res.body!.getReader();
+
+        await reader.read();
+        await reader.cancel("user stopped");
+    };
+
+    it("POST /internal/model/proxy", async () => {
+        vi.mocked(createProviderModelForEnv).mockResolvedValueOnce({
+            doStream: async () => {
+                return {
+                    stream: new ReadableStream({
+                        start(controller) {
+                            controller.enqueue({ delta: DELTA, id: "t1", type: "text-delta" });
+                        },
+                    }),
+                };
+            },
+        } as never);
+
+        const { context, registeredBeforeBody, res, settledAt } = await send("/internal/model/proxy", {
+            action: "stream",
+            callOptions: { prompt: [{ content: [{ text: PROMPT, type: "text" }], role: "user" }] },
+            requestId: "req-proxy-wait-until",
+        });
+
+        expect(registeredBeforeBody).toBeGreaterThanOrEqual(1);
+        expect(recordSpy).not.toHaveBeenCalled();
+
+        await cancelAfterFirstEvent(res);
+        await context.flush();
+
+        // Flushing what was registered is enough: the tail ran inside that promise.
+        expect(settledAt.length).toBeGreaterThanOrEqual(1);
+        expect(recordSpy).toHaveBeenCalledTimes(1);
+        expect(reportSpy).toHaveBeenCalledTimes(1);
+        expect(recordedEntries(recordSpy)[0]).toMatchObject({ completionTokens: 5, finishReason: "cancelled", promptTokens: 100 });
+    });
+
+    it("POST /internal/stream", async () => {
+        const aborted = (({ abortSignal }: { abortSignal: AbortSignal }) => {
+            const gone = new Promise<void>((resolve) => {
+                abortSignal.addEventListener("abort", () => resolve(), { once: true });
+            });
+            const rejectOnAbort = gone.then(() => {
+                throw new Error("aborted");
+            });
+
+            rejectOnAbort.catch(() => undefined);
+
+            return {
+                finishReason: rejectOnAbort,
+                fullStream: (async function* partsOf() {
+                    yield { text: DELTA, type: "text-delta" };
+                    await gone;
+                })(),
+                usage: rejectOnAbort,
+            };
+        }) as never;
+
+        vi.mocked(streamText).mockImplementationOnce(aborted);
+        vi.mocked(createProviderModelForEnv).mockResolvedValueOnce({} as never);
+
+        const { context, registeredBeforeBody, res, settledAt } = await send("/internal/stream", {
+            messages: [{ content: PROMPT, role: "user" }],
+            requestId: "req-stream-wait-until",
+            warmupTimeoutMs: 0,
+        });
+
+        expect(registeredBeforeBody).toBeGreaterThanOrEqual(1);
+        expect(recordSpy).not.toHaveBeenCalled();
+
+        await cancelAfterFirstEvent(res);
+        await context.flush();
+
+        expect(settledAt.length).toBeGreaterThanOrEqual(1);
+        expect(recordSpy).toHaveBeenCalledTimes(1);
+        expect(reportSpy).toHaveBeenCalledTimes(1);
+        expect(recordedEntries(recordSpy)[0]).toMatchObject({ completionTokens: 5, finishReason: "cancelled", promptTokens: 100 });
     });
 });
