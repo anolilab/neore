@@ -108,6 +108,21 @@ describe("loadQuietSnapshot", () => {
         expect(threads).toEqual([{ title: "Planning", updatedAt: NOW - 50_000 }]);
     });
 
+    it("still counts a titled chat when more untitled threads than the limit were updated after it", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("threads", { status: "active", title: "Planning", updatedAt: NOW - 50_000, userId: USER });
+
+            for (let index = 0; index < 25; index += 1) {
+                await ctx.db.insert("threads", { status: "active", title: "", updatedAt: NOW - index, userId: USER });
+                await ctx.db.insert("threads", { status: "active", updatedAt: NOW - index, userId: USER });
+            }
+        });
+
+        const { threads } = await snapshotSince(NOW - 60_000);
+
+        expect(threads).toEqual([{ title: "Planning", updatedAt: NOW - 50_000 }]);
+    });
+
     it("reads only live, unlocked, titled chats of the user from inside the window", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("threads", { status: "active", title: "Old", updatedAt: NOW - 120_000, userId: USER });

@@ -55,7 +55,8 @@ export const loadQuietSnapshot = internalQuery
             }),
             // Every exclusion is in the query, so routine and temporary threads cannot use up the limit and hide a chat.
             // A routine's run thread is told by its tag (`tags` is a JSON array, so the quoted label matches whole entries).
-            // A locked or untitled chat never counts. A row with no `updatedAt` is dated by its creation, as the home view does.
+            // A locked or untitled chat never counts (an empty title counts as untitled, and is left out in the query so untitled threads cannot fill the limit).
+            // A row with no `updatedAt` is dated by its creation, as the home view does.
             ctx.db.threads.findMany({
                 limit: QUIET_THREADS_READ,
                 orderBy: [{ updatedAt: "desc" }, { _creationTime: "desc" }],
@@ -67,7 +68,7 @@ export const loadQuietSnapshot = internalQuery
                         { OR: [{ updatedAt: { gt: since } }, { AND: [{ updatedAt: { isNull: true } }, { _creationTime: { gt: since } }] }] },
                     ],
                     lockedAt: { isNull: true },
-                    title: { isNull: false },
+                    title: { isNull: false, ne: "" },
                     userId,
                 },
             }),
