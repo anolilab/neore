@@ -11,7 +11,7 @@
  * | ------------------ | ------------------------ | ----------------------------- | ---------------------------- |
  * | `messenger`        | `<connectionId>:<event>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/webhooks.ts`      |
  * | `trigger-webhook`  | `<triggerId>:<sig hex>`  | {@link TRIGGER_CLAIM_TTL_MS}   | `triggers/http.ts`           |
- * (A `gitlab-token` trigger takes no claim: its deliveries are kept for the trigger's life in `webhookDeliveries`, `triggers/deliveries.ts`.)
+ * | `trigger-delivery` | `<triggerId>:<event uuid>:<body sha256>` | {@link TRIGGER_DELIVERY_CLAIM_TTL_MS} | `triggers/http.ts` (`gitlab-token`) |
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
  * | `messenger-ai-disclosure` | `<threadId>`      | {@link AI_DISCLOSURE_CLAIM_TTL_MS} | `messenger/functions.ts` |
@@ -68,6 +68,18 @@ export const AI_DISCLOSURE_CLAIM_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
 
 /** Trigger webhooks: must outlast the signed-timestamp window on either side (`lib/crypto.ts`). */
 export const TRIGGER_CLAIM_TTL_MS = 15 * 60 * 1000;
+
+/**
+ * A `gitlab-token` trigger's deliveries (`triggers/http.ts`): GitLab sends no timestamp, so no window ends
+ * the replay risk, and the claim must outlast any trigger. Ten years, like {@link AI_DISCLOSURE_CLAIM_TTL_MS},
+ * is effectively forever while staying a finite `expiresAt`, so {@link purgeExpiredClaims} still reaps it.
+ * It is cleared sooner by {@link releaseClaimsWithPrefix} when the trigger is deleted, and with the account
+ * (the claim is tagged with the owner).
+ */
+export const TRIGGER_DELIVERY_CLAIM_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
+
+/** The scope of those claims; their keys start with the trigger id, which is how a deleted trigger's are found. */
+export const TRIGGER_DELIVERY_SCOPE = "trigger-delivery";
 
 /** Queue jobs: well past the queue's retry window (seconds to minutes); a day is plenty. */
 export const JOB_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
@@ -173,6 +185,47 @@ export const releaseClaim = async (ctx: ClaimCtx, scope: string, key: string, cl
         await ctx.db.delete(existing._id);
     }
 };
+
+/**
+ * The first string past every key that starts with `prefix`: the prefix with its last character advanced by one.
+ * Correct under both byte-wise (SQLite) and code-unit ordering, which a sentinel suffix such as U+FFFF is not
+ * for a key continuing with an astral character.
+ */
+const prefixEnd = (prefix: string): string => {
+    const last = prefix.length - 1;
+
+    return `${prefix.slice(0, last)}${String.fromCodePoint(prefix.codePointAt(last)! + 1)}`;
+};
+
+/** Rows deleted per {@link releaseClaimsWithPrefix} call. */
+export const CLAIM_PREFIX_BATCH = 500;
+
+/**
+ * Deletes up to `limit` claims of `scope` whose key starts with `prefix` and says whether more may remain.
+ * For a caller that scopes its keys by an owner (`<triggerId>:…`) and must clear them when the owner goes.
+ */
+export const releaseClaimsWithPrefix = async (ctx: ClaimCtx, scope: string, prefix: string, limit: number = CLAIM_PREFIX_BATCH): Promise<boolean> => {
+    const rows = await ctx.db
+        .query("idempotencyClaims")
+        .withIndex("by_scope_key", (q) => q.eq("scope", scope).gte("key", prefix).lt("key", prefixEnd(prefix)))
+        .take(limit);
+
+    await Promise.all(rows.map(async (row) => await ctx.db.delete(row._id)));
+
+    return rows.length >= limit;
+};
+
+/** {@link releaseClaimsWithPrefix} for what a deletion left past its first batch: one batch per call, rescheduling itself while batches come back full. */
+export const purgeClaimsWithPrefix = internalMutation
+    .input({ prefix: v.string().max(200), scope: v.string().max(200) })
+    .output(v.null())
+    .mutation(async ({ args: { prefix, scope }, ctx }) => {
+        if (await releaseClaimsWithPrefix(ctx, scope, prefix)) {
+            await ctx.scheduler.runAfter(0, internal.lib.claim_once.purgeClaimsWithPrefix, { prefix, scope });
+        }
+
+        return null;
+    });
 
 // ─── Mutations, for callers outside a transaction (HTTP actions, actions) ─────
 

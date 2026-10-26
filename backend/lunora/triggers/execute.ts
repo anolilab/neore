@@ -21,8 +21,6 @@ export const executeTrigger = internalAction
         // The webhook delivery's replay claim, given back if admission refuses the delivery. A manual run has none.
         // `claimedAt` fences the release: the run may start after the claim expired and a redelivery took the key.
         claim: v.optional(v.object({ claimedAt: v.number(), key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
-        // A `gitlab-token` delivery's permanent record, given back on the same terms as `claim` (`deliveries.ts`).
-        deliveryRecord: v.optional(v.id("webhookDeliveries")),
         // A manual test run ("Run now") fires a disabled trigger too.
         ignoreDisabled: v.optional(v.boolean()),
         // The webhook body was not valid UTF-8, so `payload` is its lossy decode and filters see an empty body.
@@ -30,20 +28,48 @@ export const executeTrigger = internalAction
         // A manual run ("Run now"): the user is waiting for a chat, so a quiet routine is not skipped.
         manual: v.optional(v.boolean()),
         payload: v.optional(v.string()), // Webhook payload or scheduled input
+        // The claim is permanent (`gitlab-token`): every way this delivery ends without a run gives it back, so a redelivery can run.
+        releaseUnlessRun: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
     })
-    .action(async ({ args: { claim, deliveryRecord, ignoreDisabled, invalidUtf8, manual, payload, triggerId }, ctx }) => {
+    .action(async ({ args: { claim, ignoreDisabled, invalidUtf8, manual, payload, releaseUnlessRun, triggerId }, ctx }) => {
+        /** Gives a permanent claim back; the admission refusals do their own, inside their transaction. */
+        const giveBack = async (): Promise<void> => {
+            if (!claim || !releaseUnlessRun) {
+                return;
+            }
+
+            try {
+                await ctx.runMutation(internal.lib.claim_once.releaseKey, claim);
+            } catch (error) {
+                console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}:`, error);
+            }
+        };
+
+        /** A failure before the agent starts means the delivery never ran: give its claim back and let the failure surface. */
+        const beforeRun = async <T>(work: () => Promise<T>): Promise<T> => {
+            try {
+                return await work();
+            } catch (error) {
+                await giveBack();
+
+                throw error;
+            }
+        };
+
         // 1. Fetch trigger config
-        const trigger = await ctx.runQuery(internal.triggers.functions.getTriggerInternal, { triggerId });
+        const trigger = await beforeRun(async () => await ctx.runQuery(internal.triggers.functions.getTriggerInternal, { triggerId }));
 
         if (!trigger) {
             console.error(`[Triggers] Trigger ${triggerId} not found`);
+            await giveBack();
 
             return;
         }
 
         if (trigger.enabled !== true && ignoreDisabled !== true) {
             console.warn(`[Triggers] Trigger ${triggerId} is disabled, skipping`);
+            await giveBack();
 
             return;
         }
@@ -51,13 +77,15 @@ export const executeTrigger = internalAction
         const { userId } = trigger;
 
         // A bot routine runs on the bot's model, with the bot's instructions ahead of the routine's own.
-        const bot = trigger.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: trigger.botId, userId }) : null;
+        const { botId } = trigger;
+        const bot = botId ? await beforeRun(async () => await ctx.runQuery(internal.bots.functions.getBotForRun, { botId, userId })) : null;
 
         // 1b. A quiet routine skips a run with nothing to report, before any row, thread or charge is written.
         // The skip is recorded in the history (collapsed to one row, as a webhook filter miss is). A failed check posts as usual.
         // The bot must still exist: a routine whose bot was deleted keeps its flag but runs as a plain one.
+        // Only a scheduled routine can be quiet, so the skip never holds a replay claim to give back.
         const skipped = await isQuietRunSkipped(
-            { ...trigger, botId: bot ? trigger.botId : undefined },
+            { ...trigger, botId: bot ? botId : undefined },
             (since) => ctx.runQuery(internal.triggers.quiet_inputs.loadQuietSnapshot, { since, userId }),
             { manual: manual === true },
         ).catch((error: unknown) => {
@@ -87,10 +115,14 @@ export const executeTrigger = internalAction
         let threadCreated = false as boolean;
 
         // 2. Create execution log entry
-        const executionId = await ctx.runMutation(internal.triggers.functions.createExecution, {
-            payload,
-            triggerId,
-        });
+        const executionId = await beforeRun(
+            async () =>
+                await ctx.runMutation(internal.triggers.functions.createExecution, {
+                    payload,
+                    triggerId,
+                }),
+        );
+        let started = false;
 
         try {
             // 2b. Charge the run before any paid call. A refused run is recorded as a
@@ -101,9 +133,9 @@ export const executeTrigger = internalAction
             // because the owner may have saved stricter ones since the webhook handler evaluated them.
             const refusal = await ctx.runMutation(internal.triggers.functions.admitTriggerRun, {
                 claim,
-                deliveryRecord,
                 executionId,
                 filterPayload: triggerType === "webhook" && ignoreDisabled !== true ? filterTextOf(payload, invalidUtf8) : undefined,
+                releaseUnlessRun,
                 triggerId,
             });
 
@@ -161,6 +193,7 @@ export const executeTrigger = internalAction
             // A bot with its computer off gets no computer here: the sandbox lookup would fall back to a throwaway one.
             const useComputer = bot?.computerEnabled === true && trigger.botComputer === true && trigger.type === "schedule";
 
+            started = true;
             runStartedAt = Date.now();
 
             const { text: responseText, threadId } = await runHeadlessAgent(ctx, {
@@ -198,6 +231,11 @@ export const executeTrigger = internalAction
             const errorMessage = toUserFacingError(error);
 
             console.error(`[Triggers] Trigger ${trigger.name} failed:`, error);
+
+            // Admission or the setup before the agent threw: the delivery never ran.
+            if (!started) {
+                await giveBack();
+            }
 
             // Update execution as failed
             await ctx.runMutation(internal.triggers.functions.updateExecution, {

@@ -8,9 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { internal } from "../_generated/internal";
-import { claimKey, claimKeyFenced, releaseKey, TRIGGER_CLAIM_TTL_MS } from "../lib/claim-once";
+import { claimKey, claimKeyFenced, releaseKey, TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import { SIGNED_REQUEST_WINDOW_MS } from "../lib/crypto";
-import { claimWebhookDelivery, releaseWebhookDelivery } from "./deliveries";
 import { recordFilteredExecution } from "./functions";
 import handleTriggerWebhook, { verifyHmacSignature } from "./http";
 
@@ -49,14 +48,6 @@ const SIGNED_TRIGGER = { enabled: true, type: "webhook", webhookSecret: SECRET }
 const claimMutation = (reference: unknown) => {
     if (reference === internal.lib.claim_once.releaseKey) {
         return releaseKey;
-    }
-
-    if (reference === internal.triggers.deliveries.claimWebhookDelivery) {
-        return claimWebhookDelivery;
-    }
-
-    if (reference === internal.triggers.deliveries.releaseWebhookDelivery) {
-        return releaseWebhookDelivery;
     }
 
     return reference === internal.lib.claim_once.claimKeyFenced ? claimKeyFenced : claimKey;
@@ -554,7 +545,7 @@ describe("trigger webhook signing", () => {
 });
 
 describe("provider signature schemes", () => {
-    const GITLAB_TRIGGER = { ...SIGNED_TRIGGER, webhookSignatureScheme: "gitlab-token" };
+    const GITLAB_TRIGGER = { ...SIGNED_TRIGGER, userId: "u", webhookSignatureScheme: "gitlab-token" };
 
     it("matches the documented GitHub test vector, both prefixed and bare", async () => {
         const secret = "It's a Secret to Everybody";
@@ -599,23 +590,34 @@ describe("provider signature schemes", () => {
         const gitlab = (uuid: string = UUID) => {
             return { "x-gitlab-event-uuid": uuid, "x-gitlab-token": SECRET };
         };
-        const records = async (): Promise<{ bodyDigest: string; createdAt: number; deliveryId: string }[]> =>
-            await harness.run(async (ctx: any) => await ctx.db.query("webhookDeliveries").collect());
+        const claims = async (): Promise<{ claimedAt: number; expiresAt: number; key: string; scope: string; userId?: string }[]> =>
+            await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
+        const records = async () => {
+            const rows = await claims();
 
-        it("accepts the token with a delivery id, and records the delivery", async () => {
-            const { scheduled, statusOf } = await setup(GITLAB_TRIGGER);
+            return rows.filter((row) => row.scope === TRIGGER_DELIVERY_SCOPE);
+        };
+
+        it("accepts the token with a delivery id, and claims the delivery for the long TTL", async () => {
+            const { scheduled, statusOf, triggerId } = await setup(GITLAB_TRIGGER);
 
             expect(await statusOf('{"object_kind":"merge_request"}', gitlab())).toBe(200);
             expect(scheduled).toHaveLength(1);
-            expect(await records()).toEqual([expect.objectContaining({ createdAt: NOW, deliveryId: UUID })]);
+            const rows = await records();
+
+            expect(rows).toHaveLength(1);
+            expect(rows[0]).toMatchObject({ claimedAt: NOW, expiresAt: NOW + TRIGGER_DELIVERY_CLAIM_TTL_MS, userId: "u" });
+            expect(rows[0]!.key).toMatch(new RegExp(String.raw`^${triggerId}:${UUID}:[\da-f]{64}$`, "u"));
         });
 
-        it("takes no body claim: the permanent record is the only replay guard", async () => {
+        it("takes no 15-minute body claim: the delivery claim is the only replay guard", async () => {
             const { statusOf } = await setup(GITLAB_TRIGGER);
 
             await statusOf('{"n":1}', gitlab());
 
-            expect(await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect())).toEqual([]);
+            const rows = await claims();
+
+            expect(rows.map((row) => row.scope)).toEqual([TRIGGER_DELIVERY_SCOPE]);
         });
 
         it("runs two different deliveries that carry the same token", async () => {
@@ -720,15 +722,18 @@ describe("provider signature schemes", () => {
             expect(scheduled).toHaveLength(0);
         });
 
-        it("passes the record to the execution instead of a claim", async () => {
+        it("tells the execution to give the claim back whenever the delivery does not run", async () => {
             const { scheduled, statusOf } = await setup(GITLAB_TRIGGER);
 
             expect(await statusOf('{"n":1}', gitlab())).toBe(200);
+            expect(scheduled[0]).toMatchObject({ claim: { scope: TRIGGER_DELIVERY_SCOPE }, releaseUnlessRun: true });
+        });
 
-            const args = scheduled[0] as { claim?: unknown; deliveryRecord?: string };
+        it("leaves the other schemes' claims to lapse as before", async () => {
+            const { scheduled, statusOf } = await setup();
 
-            expect(args.claim).toBeUndefined();
-            expect(args.deliveryRecord).toEqual(expect.any(String));
+            expect(await statusOf("{}", await signedHeaders("{}"))).toBe(200);
+            expect(scheduled[0]).not.toHaveProperty("releaseUnlessRun");
         });
 
         it("refuses a request carrying another scheme's header", async () => {

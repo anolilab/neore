@@ -179,8 +179,9 @@ export const WebhookSigningInstructions: FC<{ scheme: WebhookSignatureScheme }> 
                 <p className="text-muted-foreground mt-2">
                     <Trans>
                         Send the secret as <code className="font-mono">X-Gitlab-Token</code>, in plain text, as GitLab&apos;s secret token works. GitLab does
-                        not sign the body and sends no timestamp, so the secret is a bearer token: whoever holds it can send any request. An identical body is
-                        treated as a duplicate for 15 minutes. Requests carrying other signature headers are rejected.
+                        not sign the body and sends no timestamp, so the secret is a bearer token: whoever holds it can send any request. Every delivery must
+                        also carry <code className="font-mono">X-Gitlab-Event-UUID</code>, which GitLab sends itself. Each accepted delivery is remembered by
+                        that UUID and its body, and a resend of it is answered as a duplicate. Requests carrying other signature headers are rejected.
                     </Trans>
                 </p>
             );
