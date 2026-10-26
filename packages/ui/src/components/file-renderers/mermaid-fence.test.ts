@@ -17,4 +17,15 @@ describe(toMermaidFence, () => {
         expect(fenced.startsWith("````mermaid\n")).toBe(true);
         expect(fenced.endsWith("\n````")).toBe(true);
     });
+
+    it("keeps the heavy-plugin check true when the source holds a triple-backtick run", () => {
+        const fenced = toMermaidFence('graph TD\nA["```code```"]-->B');
+
+        expect(needsHeavyStreamdownPlugins(fenced)).toBe(true);
+    });
+
+    it("does not detect a plain code block with no mermaid language", () => {
+        expect(needsHeavyStreamdownPlugins("```ts\nconst a = 1;\n```")).toBe(false);
+        expect(needsHeavyStreamdownPlugins("````\nmermaid\n````")).toBe(false);
+    });
 });
