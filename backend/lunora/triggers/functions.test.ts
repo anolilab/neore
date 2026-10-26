@@ -314,6 +314,98 @@ describe("updateTrigger on a new schedule", () => {
     });
 });
 
+describe("updateTrigger and the trigger's time zone", () => {
+    const NOW = Date.parse("2026-07-01T00:00:00Z");
+
+    const insertSchedule = async (timezone: string | undefined): Promise<string> =>
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("triggers", {
+                    createdAt: NOW,
+                    cronExpression: "0 9 * * *",
+                    enabled: true,
+                    model: "m",
+                    name: "Daily",
+                    nextTriggerAt: findNextCronTime("0 9 * * *", NOW, timezone),
+                    triggerCount: 0,
+                    type: "schedule",
+                    updatedAt: NOW,
+                    userId: "user-a",
+                    ...(timezone !== undefined && { timezone }),
+                }),
+        );
+
+    beforeEach(() => {
+        harness.close();
+        harness = lunoraTest(schema as never, { now: NOW } as never);
+    });
+
+    it("moves the next run when only the zone changes", async () => {
+        const triggerId = await insertSchedule(undefined);
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.nextTriggerAt).toBe(Date.parse("2026-07-01T09:00:00Z"));
+
+        await harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { timezone: "America/New_York", triggerId } as never);
+
+        const updated = await readTrigger(triggerId);
+
+        expect(updated.timezone).toBe("America/New_York");
+        expect(updated.nextTriggerAt).toBe(Date.parse("2026-07-01T13:00:00Z"));
+    });
+
+    it("moves the next run when the expression and the zone are saved together", async () => {
+        const triggerId = await insertSchedule("America/New_York");
+
+        await harness
+            .withIdentity({ userId: "user-a" } as never)
+            .mutation(updateTrigger as never, { cronExpression: "0 9 * * *", timezone: "Europe/Berlin", triggerId } as never);
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.nextTriggerAt).toBe(Date.parse("2026-07-01T07:00:00Z"));
+    });
+
+    it("keeps a due run the tick has not taken when the same zone is re-saved", async () => {
+        const due = NOW - 60_000;
+        const triggerId = await insertSchedule("America/New_York");
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await harness
+            .withIdentity({ userId: "user-a" } as never)
+            .mutation(updateTrigger as never, { cronExpression: "0 9 * * *", timezone: "America/New_York", triggerId } as never);
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.nextTriggerAt).toBe(due);
+    });
+
+    it("does not treat UTC and a missing zone as a change", async () => {
+        const due = NOW - 60_000;
+        const triggerId = await insertSchedule(undefined);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { timezone: "UTC", triggerId } as never);
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.nextTriggerAt).toBe(due);
+    });
+
+    it("arms an enabled schedule in its zone", async () => {
+        const triggerId = await insertSchedule("Asia/Tokyo");
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { enabled: false, nextTriggerAt: NOW - 1 }));
+        await harness.withIdentity({ userId: "user-a" } as never).mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
+
+        // 09:00 in Tokyo (UTC+9) is 00:00Z.
+        const row = await readTrigger(triggerId);
+
+        expect(row.nextTriggerAt).toBe(Date.parse("2026-07-02T00:00:00Z"));
+    });
+});
+
 describe("webhook payload filters", () => {
     const as = () => harness.withIdentity({ userId: "user-a" } as never);
     const webhook = { model: "m", name: "Hook", type: "webhook" };

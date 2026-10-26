@@ -1,9 +1,9 @@
 "use client";
 
+import { formatFileSize } from "@neore/ui/components/file-renderers/file-type-utilities";
 import cn from "@neore/ui/utils/cn";
 import { File, FileArchive, FileAudio, FileImage, FileText, FileVideo } from "lucide-react";
 
-import { formatFileSize } from "../lib/utilities";
 import ItemActions from "./item-actions";
 
 type FileItem = {

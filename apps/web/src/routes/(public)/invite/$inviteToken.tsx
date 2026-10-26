@@ -24,7 +24,7 @@ const InvitePage = () => {
         try {
             const result = await acceptInviteMutation.mutateAsync({ inviteToken });
 
-            // The thread lives on its owner's shard (`lib/lunora/shard-routing.ts`).
+            // The thread lives on its owner's shard (`packages/client-runtime/src/shard-routing.ts`).
             noteThreadShard(result.threadId, result.ownerId);
             setStatus("success");
             // Redirect to the thread after a short delay

@@ -33,6 +33,7 @@ import updateLocale, { isSupportedLocale } from "@/functions/update-locale";
 import { resetAnalyticsIdentity } from "@/lib/analytics";
 import type { AuthClient } from "@/lib/auth/client";
 import { DEFAULT_LOCALE, deLocalizeUrl, dynamicActivate, locales as appLocales, shouldIgnorePath } from "@/lib/intl/client";
+import { setNativeBadge } from "@/lib/native/bridge";
 
 const LOCALE_DISPLAY_NAMES: Record<string, string> = {
     de: "Deutsch",
@@ -284,9 +285,11 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                                     variant: "error",
                                 });
                             },
-                            onSuccess: () => {
+                            onSuccess: async () => {
                                 resetAnalyticsIdentity();
                                 clearThreadListCache();
+                                // Only after the session ends: a failed sign-out keeps the badge.
+                                await setNativeBadge(0);
                                 globalThis.location.reload();
                             },
                         },

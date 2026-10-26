@@ -135,6 +135,26 @@ describe("thread list cache", () => {
             expect(localStorage.getItem(key)).toBeNull();
         });
 
+        it.each([
+            ["an object-valued thread title", { threads: { title: { placeholder: true } } }],
+            ["a thread without an id", { threads: { _id: undefined } }],
+            ["a thread with an unknown field", { threads: { messages: "x" } }],
+            ["a numeric tag name", { tags: { name: 1 } }],
+            ["a non-string tag id list", { threads: { tagIds: [1] } }],
+        ])("drops an entry with %s", (_name, patch) => {
+            const key = seed();
+            const entry = JSON.parse(localStorage.getItem(key) as string);
+
+            for (const [list, fields] of Object.entries(patch)) {
+                entry.data[list][0] = { ...entry.data[list][0], ...fields };
+            }
+
+            localStorage.setItem(key, JSON.stringify(entry));
+
+            expect(readThreadListCache("alice")).toBeUndefined();
+            expect(localStorage.getItem(key)).toBeNull();
+        });
+
         it("swallows a quota error on write", () => {
             vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
                 throw new DOMException("full", "QuotaExceededError");

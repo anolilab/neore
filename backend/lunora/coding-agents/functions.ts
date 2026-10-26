@@ -24,13 +24,17 @@ import { patchById, patchRow } from "../lib/patch";
 import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
 import { loadTaskAccount } from "../tasks/account";
-import { isValidBranchName, parseRepoUrl, PROMPT_MAX, RUN_TIMEOUT_MS } from "./commands";
+import { isValidBranchName, parseRepoUrl, prBranchName, PROMPT_MAX, RUN_TIMEOUT_MS } from "./commands";
 import { repoLabel } from "./repo-label";
+import { PR_BUDGET_MS } from "./runner";
 import { vCodingAgentId, vCodingAgentRunStatus } from "./validators";
 import { isThreadLocked } from "../lib/thread-lock";
 
 /** The reaper fires this long after the budget, for a runner that died without reporting. */
 const REAPER_GRACE_MS = 3 * 60 * 1000;
+
+/** A PR attempt still pending this long after its claim has lost its poll chain. */
+const PR_REAP_AFTER_MS = PR_BUDGET_MS + REAPER_GRACE_MS;
 
 /** Tail of the log kept on the row; older output is dropped with a marker. */
 const LOG_MAX_CHARS = 96 * 1024;
@@ -76,6 +80,14 @@ const isGithubRepo = (repoUrl: string): boolean => {
 /** Whether "Create PR" applies. Whether GitHub is connected is only known to the action. */
 export const canOpenPullRequest = (run: Pick<RunDoc, "diff" | "diffTruncated" | "prStatus" | "prUrl" | "repoUrl" | "status">): boolean =>
     run.status === "succeeded" && Boolean(run.diff) && run.diffTruncated !== true && !run.prUrl && run.prStatus !== "pending" && isGithubRepo(run.repoUrl);
+
+/** True while `startedAt` names the attempt that is still pending: a retry or an ended attempt makes it false. */
+const isCurrentPullRequestAttempt = (run: Pick<RunDoc, "prStartedAt" | "prStatus">, startedAt: number): boolean =>
+    run.prStatus === "pending" && run.prStartedAt === startedAt;
+
+/** A `pending` PR older than its budget plus the reaper's grace: nothing is polling it any more. */
+export const isPullRequestStale = (run: Pick<RunDoc, "prStartedAt" | "prStatus" | "updatedAt">, now: number): boolean =>
+    run.prStatus === "pending" && now - (run.prStartedAt ?? run.updatedAt) > PR_REAP_AFTER_MS;
 
 const toView = (run: RunDoc) => {
     return {
@@ -480,12 +492,17 @@ export const isCurrentPoll = (pollSeq: number | undefined, seq: number): boolean
  * in parallel with the first, forever. Only the first delivery of `seq` wins.
  */
 export const claimPoll = internalMutation
-    .input({ runId: v.id("codingAgentRuns"), seq: v.number() })
+    .input({ prStartedAt: v.optional(v.number()), runId: v.id("codingAgentRuns"), seq: v.number() })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const run = await ctx.db.get(args.runId);
 
         if (!run || !isCurrentPoll(run.pollSeq, args.seq)) {
+            return false;
+        }
+
+        // A PR poll of an earlier attempt must not use up the sequence number the retry's first poll holds.
+        if (args.prStartedAt !== undefined && !isCurrentPullRequestAttempt(run, args.prStartedAt)) {
             return false;
         }
 
@@ -628,6 +645,8 @@ export const beginPullRequest = internalMutation
                 pollSeq: v.number(),
                 prompt: v.string(),
                 repoUrl: v.string(),
+                /** Identifies this attempt (its `prStartedAt`); every later write for it must present it. */
+                startedAt: v.number(),
                 summary: v.optional(v.string()),
             }),
             v.object({ error: v.string() }),
@@ -640,17 +659,20 @@ export const beginPullRequest = internalMutation
             return { error: "Run not found" };
         }
 
-        if (run.prStatus === "pending") {
+        const { now } = ctx;
+
+        // A stale `pending` is claimed again; its reaper may not have run.
+        if (run.prStatus === "pending" && !isPullRequestStale(run, now)) {
             return { error: "A pull request for this run is already being opened." };
         }
 
-        if (!canOpenPullRequest(run) || !run.diff || !run.baseBranch) {
+        if (!canOpenPullRequest({ ...run, prStatus: undefined }) || !run.diff || !run.baseBranch) {
             return { error: "This run has no change that can be turned into a pull request." };
         }
 
-        const { now } = ctx;
-
-        await patchById(ctx.db, run._id, { prFollowUp: args.followUp, prStartedAt: now, prStatus: "pending", updatedAt: now });
+        await patchById(ctx.db, run._id, { prFollowUp: args.followUp, prSandboxId: undefined, prStartedAt: now, prStatus: "pending", updatedAt: now });
+        // Fails the attempt if its poll chain is lost; a no-op once it has ended or been claimed again.
+        await ctx.scheduler.runAfter(PR_REAP_AFTER_MS, internal.coding_agents.execute.reapPullRequest, { runId: run._id, startedAt: now });
 
         return {
             baseBranch: run.baseBranch,
@@ -658,21 +680,29 @@ export const beginPullRequest = internalMutation
             pollSeq: run.pollSeq ?? 0,
             prompt: run.prompt,
             repoUrl: run.repoUrl,
+            startedAt: now,
             ...(run.summary !== undefined && { summary: run.summary }),
         };
     });
 
+/**
+ * Attach the attempt's sandbox. Answers false when the attempt is no longer the
+ * pending one (reclaimed, reaped or ended): the caller then owns a sandbox
+ * nothing tracks and kills it.
+ */
 export const setPullRequestSandbox = internalMutation
-    .input({ runId: v.id("codingAgentRuns"), sandboxId: v.string() })
-    .output(v.null())
+    .input({ runId: v.id("codingAgentRuns"), sandboxId: v.string(), startedAt: v.number() })
+    .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const run = await ctx.db.get(args.runId);
 
-        if (run) {
-            await patchById(ctx.db, run._id, { prSandboxId: args.sandboxId, updatedAt: ctx.now });
+        if (!run || !isCurrentPullRequestAttempt(run, args.startedAt)) {
+            return false;
         }
 
-        return null;
+        await patchById(ctx.db, run._id, { prSandboxId: args.sandboxId, updatedAt: ctx.now });
+
+        return true;
     });
 
 /** What one PR poll needs, or `null` once no PR is in flight. */
@@ -710,28 +740,60 @@ export const getPullRequestForPoll = internalQuery
         };
     });
 
+/** Ends a `pending` PR attempt: the URL, or `failed`. Clears everything the attempt held. Answers whether the follow-ups were waiting on it. */
+const endPullRequest = async (ctx: MutationCtx, run: RunDoc, log: string, prUrl?: string): Promise<boolean> => {
+    await patchRow(ctx.db, run, {
+        log: appendToLog(run.log, log),
+        prFollowUp: undefined,
+        prSandboxId: undefined,
+        prStartedAt: undefined,
+        prStatus: prUrl === undefined ? "failed" : undefined,
+        ...(prUrl !== undefined && { prUrl }),
+        updatedAt: ctx.now,
+    });
+
+    return run.prFollowUp === true;
+};
+
 /** End an in-flight PR: record the URL or the failure. Answers whether the follow-ups were waiting on it. */
 export const completePullRequest = internalMutation
-    .input({ log: v.string(), prUrl: v.optional(v.string()), runId: v.id("codingAgentRuns") })
+    .input({ log: v.string(), prUrl: v.optional(v.string()), runId: v.id("codingAgentRuns"), startedAt: v.number() })
     .output(v.object({ followUp: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const run = await ctx.db.get(args.runId);
 
-        if (!run || run.prStatus !== "pending") {
+        // Only the attempt it was started for may end it; a late one from before a retry changes nothing.
+        if (!run || !isCurrentPullRequestAttempt(run, args.startedAt)) {
             return { followUp: false };
         }
 
-        await patchRow(ctx.db, run, {
-            log: appendToLog(run.log, args.log),
-            prFollowUp: undefined,
-            prSandboxId: undefined,
-            prStartedAt: undefined,
-            prStatus: args.prUrl === undefined ? "failed" : undefined,
-            ...(args.prUrl !== undefined && { prUrl: args.prUrl }),
-            updatedAt: ctx.now,
-        });
+        return { followUp: await endPullRequest(ctx, run, args.log, args.prUrl) };
+    });
 
-        return { followUp: run.prFollowUp === true };
+/**
+ * The PR reaper's half: fail the attempt scheduled for `startedAt` if it is
+ * still pending. A finished attempt, or one claimed again since (a different
+ * `prStartedAt`), is left alone. Returns the sandbox to kill and whether the
+ * follow-ups were waiting.
+ */
+export const expirePullRequest = internalMutation
+    .input({ runId: v.id("codingAgentRuns"), startedAt: v.number() })
+    .output(v.union(v.object({ followUp: v.boolean(), sandboxId: v.optional(v.string()) }), v.null()))
+    .mutation(async ({ args, ctx }) => {
+        const run = await ctx.db.get(args.runId);
+
+        if (!run || !isCurrentPullRequestAttempt(run, args.startedAt)) {
+            return null;
+        }
+
+        // The script may have pushed its branch before the PR was lost: name it.
+        const followUp = await endPullRequest(
+            ctx,
+            run,
+            `Could not open the pull request: timed out. If the branch ${prBranchName(run._id)} was pushed, it has no pull request; open one from it, or retry.\n`,
+        );
+
+        return { followUp, ...(run.prSandboxId !== undefined && { sandboxId: run.prSandboxId }) };
     });
 
 /**

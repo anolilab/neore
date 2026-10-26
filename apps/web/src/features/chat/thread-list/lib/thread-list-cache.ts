@@ -124,11 +124,50 @@ export const getThreadListStorage = (): Storage | undefined => {
     }
 };
 
+const FIELD_TYPES: Record<string, (value: unknown) => boolean> = {
+    _creationTime: (value) => typeof value === "number",
+    _id: (value) => typeof value === "string",
+    branchPoint: (value) => typeof value === "number",
+    branchType: (value) => typeof value === "string",
+    category: (value) => typeof value === "string",
+    color: (value) => typeof value === "string",
+    createdAt: (value) => typeof value === "number",
+    expiresAt: (value) => typeof value === "number",
+    lockedAt: (value) => typeof value === "number",
+    model: (value) => typeof value === "string",
+    name: (value) => typeof value === "string",
+    order: (value) => typeof value === "number",
+    parentThreadId: (value) => typeof value === "string",
+    projectId: (value) => typeof value === "string",
+    source: (value) => typeof value === "string",
+    statelessMode: (value) => typeof value === "boolean",
+    status: (value) => typeof value === "string",
+    tagIds: isStringArray,
+    threadId: (value) => typeof value === "string",
+    title: (value) => typeof value === "string",
+    updatedAt: (value) => typeof value === "number",
+};
+
+const REQUIRED_FIELDS: Record<keyof PersistedThreadList, ReadonlyArray<string>> = {
+    pinnedThreads: ["_id"],
+    relationships: ["parentThreadId", "threadId"],
+    tags: ["_id"],
+    temporaryThreads: ["_id"],
+    threadOrders: ["_id"],
+    threads: ["_id"],
+};
+
+/** A stored row is only trusted when it holds its identifying fields and every field has the type the sidebar reads. */
+const isPersistedRow = (row: unknown, required: ReadonlyArray<string>): boolean =>
+    isRecord(row) && required.every((field) => row[field] !== undefined) && Object.entries(row).every(([field, value]) => FIELD_TYPES[field]?.(value) === true);
+
 const isPersistedList = (value: unknown): value is PersistedThreadList =>
     isRecord(value) &&
-    ["pinnedThreads", "relationships", "tags", "temporaryThreads", "threadOrders", "threads"].every(
-        (name) => Array.isArray(value[name]) && (value[name] as unknown[]).every(isRecord),
-    );
+    (Object.keys(REQUIRED_FIELDS) as (keyof PersistedThreadList)[]).every((name) => {
+        const rows = value[name];
+
+        return Array.isArray(rows) && rows.every((row) => isPersistedRow(row, REQUIRED_FIELDS[name]));
+    });
 
 /**
  * The stored list for `userId`. A missing user, a missing entry, or one that is

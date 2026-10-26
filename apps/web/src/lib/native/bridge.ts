@@ -29,6 +29,8 @@ interface NativeBridge {
     onFiles?: (handler: () => void) => UnlistenFunction;
     onSignIn: (handler: () => void) => UnlistenFunction;
     openThreadWindow: (threadId: string) => Promise<void>;
+    /** The dock / launcher badge count. Optional: older shells lack it. */
+    setBadge?: (count: number) => Promise<void>;
     startBrowserSignIn: () => Promise<void>;
     takePendingCompose: () => Promise<string | undefined>;
     takePendingDraft?: () => Promise<string | undefined>;
@@ -83,6 +85,18 @@ export const notifyNative = async ({ body, title }: NativeNotification): Promise
  * was not visible when it finished.
  */
 export const shouldNotifyReplyFinished = (durationMs: number, documentHidden: boolean): boolean => documentHidden || durationMs >= LONG_REPLY_MS;
+
+/**
+ * Sets the dock / launcher badge to the unread count (the shell clamps it to 0..999 and skips Windows).
+ * Never throws: the badge is cosmetic, so a refused call must not break the page.
+ */
+export const setNativeBadge = async (count: number): Promise<void> => {
+    try {
+        await getNative()?.setBadge?.(count);
+    } catch {
+        // Not the app's origin, or the shell is too old to have the badge.
+    }
+};
 
 /** Whether the shell can open a thread in its own window. Known synchronously, so a menu can show or hide the item. */
 export const supportsThreadWindows = (): boolean => getNative()?.capabilities.includes("thread-windows") === true;
