@@ -1,7 +1,7 @@
 import Papa from "papaparse";
 import { describe, expect, it } from "vitest";
 
-import { capDelimitedColumns } from "./delimited-columns";
+import { capDelimitedColumns, delimiterForFilename } from "./delimited-columns";
 
 const wideRow = (columns: number, delimiter = ","): string => Array.from({ length: columns }, (_, index) => `c${index}`).join(delimiter);
 
@@ -67,5 +67,26 @@ describe(capDelimitedColumns, () => {
 
     it("handles empty content", () => {
         expect(capDelimitedColumns("", 50)).toStrictEqual({ content: "", hiddenColumns: 0 });
+    });
+});
+
+describe("a tab-separated table with commas in its fields", () => {
+    const tsv = "name\tcity\textra\n\"Doe, Jane\"\tOslo, Norway\tx\nSmith, Bob\tRome, Italy\ty\n";
+
+    it("keeps the right fields when the tab delimiter is given", () => {
+        const result = capDelimitedColumns(tsv, 2, "\t");
+
+        expect(result.hiddenColumns).toBe(1);
+        expect(Papa.parse(result.content, { delimiter: "\t" }).data).toStrictEqual([
+            ["name", "city"],
+            ["Doe, Jane", "Oslo, Norway"],
+            ["Smith, Bob", "Rome, Italy"],
+        ]);
+    });
+
+    it("picks the tab delimiter for a .tsv name and detects it for any other", () => {
+        expect(delimiterForFilename("data.TSV")).toBe("\t");
+        expect(delimiterForFilename("data.csv")).toBeUndefined();
+        expect(delimiterForFilename()).toBeUndefined();
     });
 });

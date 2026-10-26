@@ -13,9 +13,16 @@ export interface CappedColumns {
     hiddenColumns: number;
 }
 
-export const capDelimitedColumns = (content: string, maxColumns: number): CappedColumns => {
+/**
+ * The delimiter a file name fixes, or `undefined` to detect it from the content.
+ * A TSV is tab-separated whatever its fields hold: left to detection, a comma
+ * inside unquoted fields can outvote the tabs.
+ */
+export const delimiterForFilename = (filename?: string): string | undefined => (filename?.toLowerCase().endsWith(".tsv") ? "\t" : undefined);
+
+export const capDelimitedColumns = (content: string, maxColumns: number, delimiter?: string): CappedColumns => {
     // Blank lines are skipped, as `CsvRenderer` skips them: its header is the first row with content.
-    const parsed = Papa.parse<string[]>(content, { skipEmptyLines: true });
+    const parsed = Papa.parse<string[]>(content, { delimiter, skipEmptyLines: true });
     const width = parsed.data.reduce((widest, row) => Math.max(widest, row.length), 0);
 
     if (width <= maxColumns) {
@@ -26,7 +33,7 @@ export const capDelimitedColumns = (content: string, maxColumns: number): Capped
     return {
         content: Papa.unparse(
             parsed.data.map((row) => row.slice(0, maxColumns)),
-            { delimiter: parsed.meta.delimiter },
+            { delimiter: delimiter ?? parsed.meta.delimiter },
         ),
         hiddenColumns: width - maxColumns,
     };
