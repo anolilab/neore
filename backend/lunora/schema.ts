@@ -2738,6 +2738,8 @@ export const schema = defineSchema({
         eventFilter: v.optional(v.string()),
         eventProvider: v.optional(v.string()),
         eventType: v.optional(v.string()),
+        // Consecutive runs that failed for a reason the owner can fix; absent = 0. Enough of them pause the trigger (`triggers/failure-streak.ts`).
+        failureStreak: v.optional(v.number()),
         // Webhook triggers: every filter must match the JSON body for a delivery to run (`triggers/filters.ts`).
         filters: v.optional(
             v.array(

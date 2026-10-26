@@ -29,6 +29,8 @@ import { notifyQuietly } from "../notifications/notify";
 import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
+import { advanceStreak, modelUnavailableMessage, pausedNoticeBody, runOutcome } from "./failure-streak";
+import type { RunOutcome } from "./failure-streak";
 
 // "event" stays in the union because existing rows carry it; removing a member is a breaking schema change.
 const triggerTypeSchema = v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event"));
@@ -459,6 +461,8 @@ export const setTriggerEnabled = authMutation
         await context.db.patch(args.triggerId as Id<"triggers">, {
             enabled: args.enabled,
             updatedAt: context.now,
+            // Turning it back on is the owner saying the cause is fixed: the streak starts over.
+            ...(args.enabled && { failureStreak: 0 }),
             ...(firstRun !== undefined && { nextTriggerAt: firstRun }),
         });
 
@@ -741,7 +745,7 @@ export const admitTriggerRun = internalMutation
         const model = bot?.model || trigger.model || DEFAULT_CHAT_MODEL;
 
         if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
-            return `The model '${model}' is no longer available for triggers. Pick another model and enable the trigger again.`;
+            return modelUnavailableMessage(model);
         }
 
         if (!(await chargeRound(ctx, trigger.userId, account))) {
@@ -790,15 +794,48 @@ export const recordFilteredExecution = internalMutation
         return null;
     });
 
+/**
+ * Settles one run's effect on its trigger's failure streak. Only an ENABLED trigger is
+ * counted: a paused one (or a disabled one a manual "Run now" fired) has nothing left to
+ * pause, so its runs can neither re-pause it nor notify again. Returns whether this run
+ * paused the trigger.
+ */
+const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, outcome: RunOutcome): Promise<boolean> => {
+    if (trigger.enabled !== true) {
+        return false;
+    }
+
+    const current = trigger.failureStreak ?? 0;
+    const { pause, streak } = advanceStreak(current, outcome);
+
+    if (pause) {
+        await patchRow(ctx.db, trigger, { enabled: false, failureStreak: streak, updatedAt: ctx.now });
+    } else if (streak !== current) {
+        await patchRow(ctx.db, trigger, { failureStreak: streak });
+    }
+
+    return pause;
+};
+
+/**
+ * Closes an execution and tells the owner. A run is counted toward the trigger's failure
+ * streak once, on the `running` to settled transition of its own execution row: a
+ * redelivered call finds it already settled. `userFixable` marks a failure only the owner
+ * can cure; any other failure leaves the streak where it was.
+ */
 export const updateExecution = internalMutation
     .input({
         error: v.optional(v.string()),
         executionId: v.id("triggerExecutions"),
         status: v.string(),
         threadId: v.optional(v.string()),
+        userFixable: v.optional(v.boolean()),
     })
     .output(v.null())
-    .mutation(async ({ args: { error, executionId, status, threadId }, ctx }) => {
+    .mutation(async ({ args: { error, executionId, status, threadId, userFixable }, ctx }) => {
+        const execution = await ctx.db.get(executionId);
+        const settling = execution?.status === "running";
+
         await ctx.db.patch(executionId, {
             status,
             ...(threadId && { threadId }),
@@ -806,20 +843,24 @@ export const updateExecution = internalMutation
             completedAt: ctx.now,
         });
 
-        if (status === "completed" || status === "failed") {
-            const execution = await ctx.db.get(executionId);
+        // A settle for a run that is no longer `running` is a redelivery, and the first one already told the owner.
+        if (settling && (status === "completed" || status === "failed")) {
             const trigger = execution ? await ctx.db.get(execution.triggerId) : null;
 
             if (trigger) {
+                const paused = await settleFailureStreak(ctx, trigger, runOutcome(status, userFixable));
+
                 await notifyQuietly(ctx, {
-                    dedupeKey: `trigger:${executionId}`,
+                    // One pause per streak: the execution that tipped it names the episode, so a redelivery or a later
+                    // run of the same (already paused) trigger cannot send a second one.
+                    dedupeKey: paused ? `trigger-paused:${trigger._id}:${executionId}` : `trigger:${executionId}`,
                     emailOutcome: Boolean(threadId),
                     link: threadId ? `/chat/${threadId}` : "/dashboard/settings/chat/triggers",
                     outcome: status === "completed" ? "success" : "failure",
                     title: trigger.name,
                     type: "trigger",
                     userId: trigger.userId,
-                    ...(error && { body: error }),
+                    ...(paused ? { body: pausedNoticeBody(error) } : error && { body: error }),
                 });
             }
         }
@@ -837,7 +878,12 @@ export const setTriggerEnabledInternal = internalMutation
         const trigger = await ctx.db.get(triggerId);
         const firstRun = enabled && trigger ? firstRunOf(trigger, ctx.now) : undefined;
 
-        await ctx.db.patch(triggerId, { enabled, updatedAt: ctx.now, ...(firstRun !== undefined && { nextTriggerAt: firstRun }) });
+        await ctx.db.patch(triggerId, {
+            enabled,
+            updatedAt: ctx.now,
+            ...(enabled && { failureStreak: 0 }),
+            ...(firstRun !== undefined && { nextTriggerAt: firstRun }),
+        });
 
         if (enabled && trigger) {
             await noteShardDue(ctx, firstRun ?? trigger.nextTriggerAt ?? ctx.now, trigger.userId);

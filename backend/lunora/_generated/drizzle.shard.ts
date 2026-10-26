@@ -1500,6 +1500,7 @@ export const triggers = sqliteTable("triggers", {
     eventFilter: text("eventFilter"),
     eventProvider: text("eventProvider"),
     eventType: text("eventType"),
+    failureStreak: real("failureStreak"),
     filters: text("filters", { mode: "json" }).$type<Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>>(),
     inputTemplate: text("inputTemplate"),
     lastError: text("lastError"),

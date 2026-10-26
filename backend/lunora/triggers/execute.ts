@@ -10,10 +10,15 @@ import { v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { SANDBOX_TOOLS } from "../chat/lib/tool-builder";
+import { AgentRunError } from "../chat/lib/agent-run";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
+import { isModelUnavailableRefusal, USER_FIXABLE_RUN_ERRORS } from "./failure-streak";
 import { filterTextOf } from "./filters";
+
+/** A run error only the owner's settings can cure; it repeats until they do, so it counts toward pausing the trigger. */
+export const isUserFixableRunError = (error: unknown): error is AgentRunError => error instanceof AgentRunError && USER_FIXABLE_RUN_ERRORS.has(error.kind);
 
 export const executeTrigger = internalAction
     .input({
@@ -84,6 +89,7 @@ export const executeTrigger = internalAction
                     error: refusal,
                     executionId,
                     status: "failed",
+                    userFixable: isModelUnavailableRefusal(refusal),
                 });
 
                 return;
@@ -152,8 +158,10 @@ export const executeTrigger = internalAction
 
             console.info(`[Triggers] Trigger ${trigger.name} executed successfully. Thread: ${threadId}, Response length: ${responseText.length}`);
         } catch (error) {
+            const userFixable = isUserFixableRunError(error);
             // The owner reads this in the trigger history; the raw error is logged only.
-            const errorMessage = toUserFacingError(error);
+            // A run's own refusal carries a message written for the owner, which says what to fix.
+            const errorMessage = userFixable ? error.message : toUserFacingError(error);
 
             console.error(`[Triggers] Trigger ${trigger.name} failed:`, error);
 
@@ -162,6 +170,7 @@ export const executeTrigger = internalAction
                 error: errorMessage.slice(0, 2000),
                 executionId,
                 status: "failed",
+                userFixable,
             });
 
             // Update trigger stats with error

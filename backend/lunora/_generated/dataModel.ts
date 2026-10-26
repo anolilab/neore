@@ -1746,6 +1746,7 @@ export interface Doc_triggers {
     eventFilter?: string;
     eventProvider?: string;
     eventType?: string;
+    failureStreak?: number;
     filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;
     inputTemplate?: string;
     lastError?: string;
@@ -4477,6 +4478,7 @@ export interface Insert_triggers {
     eventFilter?: string;
     eventProvider?: string;
     eventType?: string;
+    failureStreak?: number;
     filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;
     inputTemplate?: string;
     lastError?: string;

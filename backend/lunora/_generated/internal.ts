@@ -972,7 +972,7 @@ export interface InternalApiTypes {
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
             recordFilteredExecution: FunctionReference<"mutation", { reason: string; triggerId: Id<"triggers"> }, null>;
             setTriggerEnabledInternal: FunctionReference<"mutation", { enabled: boolean; triggerId: Id<"triggers"> }, null>;
-            updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string }, null>;
+            updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string; userFixable?: boolean }, null>;
             updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
         };
         schedule: {
