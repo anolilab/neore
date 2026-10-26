@@ -884,10 +884,12 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn without_the_filter_ip_sockets_open() {
+    fn without_the_filter_unix_sockets_open() {
+        // IP sockets are not asserted here: a runner may already deny them to the
+        // test process, and the filter test above is what pins the IP verdicts.
         let bits = probe_sockets(None);
 
-        assert_eq!(bits & 0b1011, 0b1000, "control run: {bits:#06b}");
+        assert_eq!(bits & 0b0100, 0b0100, "control run: {bits:#06b}");
     }
 
     #[cfg(target_os = "linux")]
