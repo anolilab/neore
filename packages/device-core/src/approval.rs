@@ -33,6 +33,16 @@ impl Answer {
     }
 }
 
+/// How a shell call is confined, so the window need not parse the prompt text.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxState {
+    /// The command runs inside the OS sandbox (false = full access, which the user allowed).
+    pub confined: bool,
+    /// The prompt's line about the sandbox.
+    pub note: String,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(
     rename_all = "camelCase",
@@ -49,6 +59,8 @@ pub enum PromptBody {
         /// What exactly will happen, spelled out (the command line, the path…).
         detail: String,
         input: String,
+        /// Set for shell calls only.
+        sandbox: Option<SandboxState>,
         tainted_by: Vec<String>,
         thread_title: String,
         tool: String,
@@ -165,6 +177,7 @@ mod tests {
             allow_always,
             detail: String::new(),
             input: "{}".into(),
+            sandbox: None,
             tainted_by: vec![],
             thread_title: String::new(),
             tool: "fs_read".into(),

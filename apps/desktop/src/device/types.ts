@@ -17,6 +17,7 @@ export interface Prompt {
             detail: string;
             input: string;
             kind: "call";
+            sandbox: { confined: boolean; note: string } | null;
             taintedBy: string[];
             threadTitle: string;
             tool: string;

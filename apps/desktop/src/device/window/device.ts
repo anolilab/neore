@@ -90,11 +90,10 @@ const renderPrompt = (prompt: Prompt | null): void => {
         );
         setText("prompt-detail", body.detail);
 
-        // The shell's detail starts with the sandbox verdict on its first line.
-        const sandboxLine = body.toolKind === "shell" ? body.detail.split("\n", 1)[0] ?? "" : "";
+        const sandboxLine = body.sandbox?.note ?? "";
 
         setHidden("prompt-sandbox", !sandboxLine);
-        $("prompt-sandbox").className = sandboxLine.startsWith("Sandboxed") ? "muted" : "warning";
+        $("prompt-sandbox").className = body.sandbox?.confined ? "muted" : "warning";
         setText("prompt-sandbox", sandboxLine);
         setHidden("prompt-input-box", false);
         setText("prompt-input", body.input);

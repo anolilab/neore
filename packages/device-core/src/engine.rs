@@ -17,7 +17,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::approval::{Answer, Prompt, PromptBody, Prompts};
+use crate::approval::{Answer, Prompt, PromptBody, Prompts, SandboxState};
 use crate::envelope::{self, Domain, NonceSet, Signed};
 use crate::fs;
 use crate::mcp::{self, McpManager, McpServerConfig};
@@ -333,6 +333,7 @@ impl DeviceState {
                         allow_always: offer_always,
                         detail: detail.clone(),
                         input: serde_json::to_string_pretty(&call.input).unwrap_or_default(),
+                        sandbox: action.sandbox_state(),
                         tainted_by: call.tainted_by.clone(),
                         thread_title: call.thread_title.clone(),
                         tool: call.tool.clone(),
@@ -596,6 +597,20 @@ impl Action {
             Action::List(_) | Action::Read(_) | Action::Write { .. } => "fs",
             Action::Shell { .. } => "shell",
             Action::Mcp { .. } => "mcp",
+        }
+    }
+
+    fn sandbox_state(&self) -> Option<SandboxState> {
+        match self {
+            Action::Shell {
+                sandbox,
+                sandbox_note,
+                ..
+            } => Some(SandboxState {
+                confined: sandbox.is_some(),
+                note: sandbox_note.clone(),
+            }),
+            _ => None,
         }
     }
 
