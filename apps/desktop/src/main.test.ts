@@ -410,21 +410,23 @@ describe("IPC", () => {
         expect(fake().notifications.at(-1)).toStrictEqual({ body: "x".repeat(300), title: "t".repeat(120) });
     });
 
-    it("hands a deep-linked compose to the page once, and only to the site", () => {
+    it("hands a deep-linked text to the page as a draft, once, and only to the site", () => {
+        const sentBefore = mainWindow().sent.length;
+
         fake().appHandlers.get("second-instance")?.({}, ["neore", "neore://new?text=hello%20there"]);
 
-        const take = fake().ipc.get("neore:take-pending-compose");
+        const take = fake().ipc.get("neore:take-pending-draft");
 
         expect(take?.(sender("https://example.org/"))).toBeUndefined();
         expect(take?.(siteSender())).toBe("hello there");
         expect(take?.(siteSender())).toBeUndefined();
-        expect(mainWindow().sent).toContain("neore:compose");
+        expect(mainWindow().sent.slice(sentBefore)).toStrictEqual(["neore:draft"]);
     });
 
     it("accepts a deep link whose scheme is written in capitals", () => {
         fake().appHandlers.get("second-instance")?.({}, ["NEORE://new?text=hello"]);
 
-        expect(fake().ipc.get("neore:take-pending-compose")?.(siteSender())).toBe("hello");
+        expect(fake().ipc.get("neore:take-pending-draft")?.(siteSender())).toBe("hello");
     });
 
     it("refuses a hand-off to a thread window, which is a site page but not the main window", () => {
@@ -435,8 +437,8 @@ describe("IPC", () => {
 
         fake().appHandlers.get("second-instance")?.({}, ["neore://new?text=hello"]);
 
-        expect(fake().ipc.get("neore:take-pending-compose")?.(threadSender)).toBeUndefined();
-        expect(fake().ipc.get("neore:take-pending-compose")?.(siteSender())).toBe("hello");
+        expect(fake().ipc.get("neore:take-pending-draft")?.(threadSender)).toBeUndefined();
+        expect(fake().ipc.get("neore:take-pending-draft")?.(siteSender())).toBe("hello");
     });
 
     it("brings an open thread's window forward instead of opening a copy", () => {
@@ -494,7 +496,7 @@ describe("browser sign-in", () => {
         expect(takeSignIn()).toBeUndefined();
     });
 
-    it("drops a callback with a foreign state, and the flow is spent", () => {
+    it("refuses a callback with a foreign state without ending the flow, so the real callback still completes it", () => {
         const url = startFlow();
         const state = url.searchParams.get("state") ?? "";
         const code = "c".repeat(43);
@@ -502,8 +504,9 @@ describe("browser sign-in", () => {
         fake().appHandlers.get("second-instance")?.({}, [`neore://auth/callback?code=${code}&state=${"x".repeat(22)}`]);
         expect(takeSignIn()).toBeUndefined();
 
-        // The real state arrives after the flow was consumed: still refused.
+        // The real state still completes the flow, once.
         fake().appHandlers.get("second-instance")?.({}, [`neore://auth/callback?code=${code}&state=${state}`]);
+        expect(takeSignIn()).toMatchObject({ code });
         expect(takeSignIn()).toBeUndefined();
     });
 });

@@ -89,6 +89,14 @@ export const parseSignInCallback = (link: URL): { code: string; state: string } 
  * so a wrong or replayed `state` cannot be retried against it. Throws with the
  * reason; the caller logs it without the code.
  */
+/** Whether a callback's `state` is the one the flow in progress issued. Constant-time, like the check in `completeSignIn`. */
+export const isFlowState = (pending: PendingSignIn, state: string): boolean => {
+    const expected = Buffer.from(pending.state);
+    const received = Buffer.from(state);
+
+    return expected.length === received.length && timingSafeEqual(expected, received);
+};
+
 export const completeSignIn = (pending: PendingSignIn | undefined, code: string, state: string, now: number = Date.now()): SignInHandoff => {
     if (pending === undefined) {
         throw new Error("no sign-in in progress");

@@ -19,7 +19,7 @@ import type { DroppedFile } from "./dropped-files.js";
 import { queueDroppedFiles, readDroppedFiles } from "./dropped-files.js";
 import { loginItemMenuState } from "./login-item.js";
 import type { PendingSignIn, SignInHandoff } from "./sign-in.js";
-import { beginSignIn, completeSignIn, parseSignInCallback } from "./sign-in.js";
+import { beginSignIn, completeSignIn, isFlowState, parseSignInCallback } from "./sign-in.js";
 import { clampText, MAX_COMPOSE_CHARS, newChatUrl, parseDeepLink, SCHEME, siteOrigin } from "./site.js";
 import { threadWindowUrl } from "./thread-window.js";
 import { classifyUrl, isLocalPage, isTrustedUrl } from "./trust.js";
@@ -32,6 +32,7 @@ interface ShellState {
     isQuitting: boolean;
     mainWindow?: BrowserWindow;
     pendingCompose?: string;
+    pendingDraft?: string;
     pendingFiles?: DroppedFile[];
     pendingSignIn?: SignInHandoff;
     signInFlow?: PendingSignIn;
@@ -443,10 +444,24 @@ const handOffCompose = (text: string): void => {
     state.mainWindow?.webContents.send(CHANNEL.compose);
 };
 
+/** A deep link's text goes into the composer for the user to read and send. The shell never sends it. */
+const handOffDraft = (text: string): void => {
+    state.pendingDraft = text;
+    focusMain();
+    state.mainWindow?.webContents.send(CHANNEL.draft);
+};
+
 const finishBrowserSignIn = (code: string, callbackState: string): void => {
-    // The flow is consumed whatever the outcome, so a replayed callback cannot retry it.
     const pending = state.signInFlow;
 
+    // Anything can send a callback, so one whose state is not the flow's is refused without ending the flow: the real one must still arrive.
+    if (pending !== undefined && !isFlowState(pending, callbackState)) {
+        log("dropped a sign-in callback that does not match the sign-in in progress");
+
+        return;
+    }
+
+    // The flow is consumed whatever the outcome, so a replayed callback cannot retry it.
     state.signInFlow = undefined;
 
     try {
@@ -495,7 +510,7 @@ const handleDeepLink = (raw: string): void => {
     }
 
     if (action.kind === "compose") {
-        handOffCompose(action.text);
+        handOffDraft(action.text);
     } else if (action.kind === "open") {
         state.mainWindow.loadURL(action.url.href);
         focusMain();
@@ -680,6 +695,18 @@ const registerIpc = (): void => {
         const text = state.pendingCompose;
 
         state.pendingCompose = undefined;
+
+        return text;
+    });
+
+    ipcMain.handle(CHANNEL.takePendingDraft, (event): string | undefined => {
+        if (!isMainWindow(event)) {
+            return undefined;
+        }
+
+        const text = state.pendingDraft;
+
+        state.pendingDraft = undefined;
 
         return text;
     });

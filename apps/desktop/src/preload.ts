@@ -52,6 +52,8 @@ if (siteOrigin !== undefined && document.location.origin === siteOrigin) {
         device: capabilities.includes("device") ? deviceRelay : undefined,
         notify: (title: string, body?: string) => ipcRenderer.invoke(CHANNEL.notify, { body, title }),
         onCompose: (handler: () => void): () => void => listen(CHANNEL.compose, () => handler()),
+        /** A deep link's text for the composer, which is not sent. Pair with `takePendingDraft`. */
+        onDraft: (handler: () => void): () => void => listen(CHANNEL.draft, () => handler()),
         onFiles: (handler: () => void): () => void => listen(CHANNEL.files, () => handler()),
         onSignIn: (handler: () => void): () => void => listen(CHANNEL.signIn, () => handler()),
         /** Opens a thread in its own window. Exposed only with the `thread-windows` capability. */
@@ -60,6 +62,7 @@ if (siteOrigin !== undefined && document.location.origin === siteOrigin) {
         setBadge: (count: number): Promise<void> => ipcRenderer.invoke(CHANNEL.setBadge, count),
         startBrowserSignIn: (): Promise<void> => ipcRenderer.invoke(CHANNEL.startBrowserSignIn),
         takePendingCompose: (): Promise<string | undefined> => ipcRenderer.invoke(CHANNEL.takePendingCompose),
+        takePendingDraft: (): Promise<string | undefined> => ipcRenderer.invoke(CHANNEL.takePendingDraft),
         takePendingFiles: (): Promise<{ data: Uint8Array; name: string }[]> => ipcRenderer.invoke(CHANNEL.takePendingFiles),
         takePendingSignIn: (): Promise<{ code: string; codeVerifier: string; redirectUri: string } | undefined> =>
             ipcRenderer.invoke(CHANNEL.takePendingSignIn),

@@ -23,12 +23,15 @@ interface NativeBridge {
     device?: NativeDeviceRelay;
     notify: (title: string, body?: string) => Promise<void>;
     onCompose: (handler: () => void) => UnlistenFunction;
+    /** A `neore://new?text=` link's text, for the composer to show and not send. Optional: older shells lack it. */
+    onDraft?: (handler: () => void) => UnlistenFunction;
     /** Files dropped on the dock icon (macOS). Optional: older shells lack it. */
     onFiles?: (handler: () => void) => UnlistenFunction;
     onSignIn: (handler: () => void) => UnlistenFunction;
     openThreadWindow: (threadId: string) => Promise<void>;
     startBrowserSignIn: () => Promise<void>;
     takePendingCompose: () => Promise<string | undefined>;
+    takePendingDraft?: () => Promise<string | undefined>;
     takePendingFiles?: () => Promise<NativeDroppedFile[]>;
     takePendingSignIn: () => Promise<NativeSignIn | undefined>;
 }
@@ -96,6 +99,17 @@ export const openThreadWindow = async (threadId: string): Promise<boolean> => {
         return true;
     } catch {
         return false;
+    }
+};
+
+/** Takes (and clears) the text of a deep link the shell is holding for the composer, if any. */
+export const takePendingDraft = async (): Promise<string | undefined> => {
+    try {
+        const text = await getNative()?.takePendingDraft?.();
+
+        return typeof text === "string" && text.trim() !== "" ? text : undefined;
+    } catch {
+        return undefined;
     }
 };
 
@@ -177,6 +191,13 @@ export const onNativeFiles = (handler: (files: File[]) => void): UnlistenFunctio
  */
 export const onNativeCompose = (handler: (text: string) => void): UnlistenFunction =>
     onNativePending((listener) => getNative()?.onCompose(listener), takePendingCompose, handler);
+
+/**
+ * Calls `handler` with the text of every `neore://new?text=` link, including one that arrived before the page
+ * loaded. The text is for the composer to show and the user to send: a link never sends it.
+ */
+export const onNativeDraft = (handler: (text: string) => void): UnlistenFunction =>
+    onNativePending((listener) => getNative()?.onDraft?.(listener), takePendingDraft, handler);
 
 /** A system-browser sign-in the shell received: the code, and the verifier that proves this app started it. */
 export interface NativeSignIn {

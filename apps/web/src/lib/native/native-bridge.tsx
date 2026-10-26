@@ -8,7 +8,7 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { trackEvent } from "@/lib/analytics";
 
-import { completeNativeSignIn, getNativeDeviceStatus, onNativeCompose, onNativeFiles, onNativeSignIn } from "./bridge";
+import { completeNativeSignIn, getNativeDeviceStatus, onNativeCompose, onNativeDraft, onNativeFiles, onNativeSignIn } from "./bridge";
 
 /** Only the desktop shell ever loads it. */
 const DeviceRelay = lazy(async () => await import("@/features/devices/components/device-relay"));
@@ -68,6 +68,20 @@ const NativeBridge = (): JSX.Element | null => {
             onNativeCompose((text) => {
                 void (async () => {
                     await requestSend(text);
+                    await openNewChat();
+                })();
+            }),
+        [openNewChat],
+    );
+
+    useEffect(
+        () =>
+            onNativeDraft((text) => {
+                void (async () => {
+                    // Into the composer, not sent: a link cannot send a message the user did not submit.
+                    const { requestComposerRestore } = await import("@/features/chat/core/utils/composer-restore");
+
+                    requestComposerRestore({ files: [], text });
                     await openNewChat();
                 })();
             }),

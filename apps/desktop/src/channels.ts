@@ -2,6 +2,7 @@
 export const CHANNEL = {
     closeQuickComposer: "neore:close-quick-composer",
     compose: "neore:compose",
+    draft: "neore:draft",
     /** Files dropped on the dock icon are waiting: the page then calls `takePendingFiles`. */
     files: "neore:files",
     notify: "neore:notify",
@@ -14,6 +15,7 @@ export const CHANNEL = {
     signIn: "neore:sign-in",
     startBrowserSignIn: "neore:start-browser-sign-in",
     takePendingCompose: "neore:take-pending-compose",
+    takePendingDraft: "neore:take-pending-draft",
     takePendingFiles: "neore:take-pending-files",
     takePendingSignIn: "neore:take-pending-sign-in",
 } as const;
