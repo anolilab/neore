@@ -10,8 +10,10 @@
 //!   the network off, a seccomp-bpf filter is installed right after it: it
 //!   makes `socket(2)` fail with `EPERM` for every family except `AF_UNIX` and
 //!   `AF_NETLINK` (and refuses `io_uring_setup`, whose `IORING_OP_SOCKET` would
-//!   sidestep it). If the filter cannot be installed the spawn fails, so the
-//!   command never runs unconfined.
+//!   sidestep it). If the filter cannot be installed the spawn fails. Only
+//!   little-endian x86_64 and aarch64 have the filter: elsewhere a command
+//!   without network keeps its Landlock confinement ([`Policy::network_gap`]),
+//!   and the prompt says its network is not blocked.
 //! - **macOS:** `sandbox-exec` with a generated SBPL profile. Every path reaches
 //!   the profile as a `-D` parameter, never spliced into its text.
 //! - **Windows:** no sandbox. Commands run in a kill-on-close Job Object
@@ -49,6 +51,10 @@ pub struct Policy {
     /// Linux refuses every socket family but Unix and netlink (seccomp). Windows
     /// does not enforce it.
     pub network: bool,
+    /// Why `network: false` cannot be enforced (Linux on a CPU the seccomp
+    /// filter does not cover). The command keeps its Landlock confinement and
+    /// the prompt says the network is open.
+    pub network_gap: Option<String>,
 }
 
 /// Read-only system folders on Linux. `/run` is NOT listed whole: the user's
@@ -143,6 +149,7 @@ impl Policy {
             readable,
             home: home.map(Path::to_path_buf),
             network: false,
+            network_gap: None,
         }
     }
 }
@@ -470,7 +477,7 @@ mod linux {
     pub fn confine(command: &mut Command, policy: &Policy) -> Result<Guard, String> {
         let ruleset = ruleset(policy)?;
         let fd = ruleset.as_raw_fd();
-        let filter = if policy.network {
+        let filter = if policy.network || policy.network_gap.is_some() {
             None
         } else {
             Some(network_filter()?)
@@ -538,24 +545,20 @@ pub fn support() -> Support {
 #[cfg(target_os = "macos")]
 pub const SANDBOX_EXEC: &str = "/usr/bin/sandbox-exec";
 
-/// `support`, narrowed to what a command with this network setting can
-/// enforce. A command without network needs a seccomp filter, which this
-/// architecture may not be able to build, so the prompt must not claim a
-/// sandbox that every approved command would then fail to start under.
+/// Why a command without network cannot get its seccomp filter on this
+/// architecture, which leaves it Landlock only.
 #[cfg(target_os = "linux")]
-fn enforceable(support: &Support, network: bool) -> Support {
-    if let (Support::Available(_), false) = (support, network) {
-        if let Err(reason) = linux::network_filter() {
-            return Support::Unavailable(reason);
-        }
+fn network_gap(network: bool) -> Option<String> {
+    if network {
+        return None;
     }
 
-    support.clone()
+    linux::network_filter().err()
 }
 
 #[cfg(not(target_os = "linux"))]
-fn enforceable(support: &Support, _network: bool) -> Support {
-    support.clone()
+fn network_gap(_network: bool) -> Option<String> {
+    None
 }
 
 /// Decides how a `shell_run` call runs: `Ok(Some)` sandboxed, `Ok(None)`
@@ -567,9 +570,28 @@ pub fn policy_for_call(
     roots: &[PathBuf],
     home: Option<&Path>,
 ) -> Result<Option<Policy>, String> {
-    match enforceable(support, allow_network) {
+    plan_call(
+        support,
+        allow_unsandboxed,
+        allow_network,
+        network_gap(allow_network),
+        roots,
+        home,
+    )
+}
+
+fn plan_call(
+    support: &Support,
+    allow_unsandboxed: bool,
+    allow_network: bool,
+    network_gap: Option<String>,
+    roots: &[PathBuf],
+    home: Option<&Path>,
+) -> Result<Option<Policy>, String> {
+    match support {
         Support::Available(_) => Ok(Some(Policy {
             network: allow_network,
+            network_gap,
             ..Policy::for_roots(roots, home)
         })),
         Support::Unavailable(_) if allow_unsandboxed => Ok(None),
@@ -630,10 +652,14 @@ fn network_sentence(_policy: &Policy) -> &'static str {
 pub fn describe(support: &Support, policy: Option<&Policy>) -> String {
     match (support, policy) {
         (Support::Available(mechanism), Some(policy)) => {
-            format!(
-                "Sandboxed ({mechanism}): {SANDBOX_LIMITS}{}",
-                network_sentence(policy)
-            )
+            let network = match &policy.network_gap {
+                Some(reason) => format!(
+                    " Network access is NOT blocked, although it is off in this computer's device settings: {reason}."
+                ),
+                None => network_sentence(policy).to_owned(),
+            };
+
+            format!("Sandboxed ({mechanism}): {SANDBOX_LIMITS}{network}")
         }
         (Support::Unavailable(reason), _) => {
             format!("NOT sandboxed ({reason}): it runs with your full access to this computer.")
@@ -654,6 +680,7 @@ mod tests {
             readable: vec![PathBuf::from("/usr"), PathBuf::from("/home/me/.rustup")],
             home: Some(PathBuf::from("/home/me")),
             network: false,
+            network_gap: None,
         }
     }
 
@@ -782,6 +809,34 @@ mod tests {
     }
 
     #[test]
+    fn a_missing_network_filter_keeps_the_filesystem_sandbox_and_says_so() {
+        let roots = vec![PathBuf::from("/srv/p")];
+        let available = Support::Available("Landlock ABI 5".into());
+        let gap = Some("no filter for riscv64".to_owned());
+        let policy = plan_call(&available, true, false, gap.clone(), &roots, None)
+            .unwrap()
+            .unwrap();
+        let note = describe(&available, Some(&policy));
+
+        assert_eq!(policy.writable, roots);
+        assert!(!policy.network);
+        assert_eq!(policy.network_gap, gap);
+        assert!(note.starts_with("Sandboxed (Landlock ABI 5)"));
+        assert!(note.contains("Network access is NOT blocked"));
+        assert!(note.contains("no filter for riscv64"));
+        assert!(plan_call(&available, false, false, gap, &roots, None)
+            .unwrap()
+            .is_some());
+        assert_eq!(
+            plan_call(&available, false, false, None, &roots, None)
+                .unwrap()
+                .unwrap()
+                .network_gap,
+            None
+        );
+    }
+
+    #[test]
     fn the_seatbelt_profile_denies_the_network_unless_allowed() {
         let (blocked, _) = seatbelt_profile(&policy());
         let (allowed, _) = seatbelt_profile(&Policy {
@@ -885,7 +940,9 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn the_network_filter_refuses_ip_sockets_and_keeps_unix_sockets() {
-        let filter = network_filter().unwrap();
+        let Ok(filter) = network_filter() else {
+            return;
+        };
 
         assert_eq!(probe_sockets(Some(&filter)), 0b11_0111);
     }
@@ -903,7 +960,9 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn the_network_filter_ends_in_its_three_verdicts_and_jumps_stay_inside() {
-        let filter = network_filter().unwrap();
+        let Ok(filter) = network_filter() else {
+            return;
+        };
         let len = filter.len();
 
         assert_eq!(filter[len - 3].k, libc::SECCOMP_RET_ALLOW);

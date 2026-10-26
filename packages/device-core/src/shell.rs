@@ -570,6 +570,14 @@ mod tests {
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     fn sandbox_or_skip() -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            if let Err(reason) = super::super::sandbox::network_filter() {
+                eprintln!("skipping: {reason}");
+                return false;
+            }
+        }
+
         match super::super::sandbox::support() {
             super::super::sandbox::Support::Available(_) => true,
             super::super::sandbox::Support::Unavailable(reason) => {

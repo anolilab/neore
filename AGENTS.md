@@ -570,8 +570,9 @@ written here is what is not.
   folders + a per-run `$TMPDIR` and hides the rest of `$HOME`. Network is blocked
   on macOS and Linux unless the user turns on "Allow network for shell commands" (default
   off); on Linux that is a seccomp filter making `socket(2)` fail with `EPERM` for
-  every family except `AF_UNIX` and `AF_NETLINK` (and `io_uring_setup`); Windows does not
-  restrict it. MCP servers are NOT sandboxed. Where there is no sandbox the call
+  every family except `AF_UNIX` and `AF_NETLINK` (and `io_uring_setup`), on little-endian
+  x86_64 and aarch64 only (elsewhere the command keeps Landlock and the prompt says the
+  network is NOT blocked); Windows does not restrict it. MCP servers are NOT sandboxed. Where there is no sandbox the call
   is REFUSED unless the user turned off "Require sandbox for shell commands"
   (stored inverted, `allowUnsandboxedShell`, so absent = required). Allow
   rules, shared folders, that setting and local MCP servers live only in Rust. **The pairing secret crosses the page exactly once**
