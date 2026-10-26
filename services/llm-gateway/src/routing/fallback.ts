@@ -29,6 +29,17 @@ const CONTENT_POLICY_KEYWORDS = [
     "not allowed",
 ];
 
+/** Lowercase phrases a provider uses when it rejects a prompt for exceeding the model's context window. */
+const CONTEXT_OVERFLOW_KEYWORDS = [
+    "context_length_exceeded",
+    "context length",
+    "context window",
+    "prompt is too long",
+    "input is too long",
+    "too many tokens",
+    "maximum number of tokens",
+];
+
 /**
  * Model IDs (in priority order) to use for content-policy fallbacks.
  * These are permissive open-source models that are less likely to refuse.
@@ -56,6 +67,11 @@ export const classifyFailure = (statusCode: number, body: string, promptTokens: 
 
     if (statusCode === 400) {
         const lower = body.toLowerCase();
+
+        // The provider said so itself: the local token estimate misses tool schemas, images and tokenizer differences.
+        if (CONTEXT_OVERFLOW_KEYWORDS.some((k) => lower.includes(k))) {
+            return "context_overflow";
+        }
 
         // Content-policy refusal: 400 + refusal keywords
         if (CONTENT_POLICY_KEYWORDS.some((k) => lower.includes(k))) {

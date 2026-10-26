@@ -65,6 +65,21 @@ describe("classifyFailure", () => {
         });
     });
 
+    describe("context_overflow from the provider's wording", () => {
+        it.each([
+            ['{"error":{"code":"context_length_exceeded","message":"This model\'s maximum context length is 128000 tokens."}}'],
+            ['{"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long: 210000 tokens > 200000 maximum"}}'],
+            ["Input is too long for requested model"],
+            ["The input token count exceeds the context window of this model"],
+        ])("classifies a 400 saying %s as context_overflow even when the estimate is far below the window", (body) => {
+            expect(classifyFailure(400, body, 100, 128_000)).toBe("context_overflow");
+        });
+
+        it("does not read a 5xx with that wording as overflow", () => {
+            expect(classifyFailure(503, "context window service unavailable", 100, 128_000)).toBe("infra");
+        });
+    });
+
     describe("content_policy fallback", () => {
         it("classifies 400 with content_policy keyword", () => {
             expect(classifyFailure(400, '{"error": "content_policy violation detected"}', 100, 128_000)).toBe("content_policy");

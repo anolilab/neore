@@ -1,0 +1,111 @@
+/**
+ * A provider failure on `/internal/model/proxy` carries the gateway's own
+ * classification (`error.fallbackReason`), so the backend retries a reply on the
+ * user's backup model only for an infrastructure failure.
+ */
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { createProviderModelForEnv } from "../providers/factory.js";
+import { bindingEnv } from "./helpers/internal.js";
+import { createMockEnv } from "./helpers/mock-env.js";
+import { useTrackedAppFetch } from "./helpers/tracked-app-fetch.js";
+
+vi.mock("../providers/factory.js", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../providers/factory.js")>()),
+        createProviderModelForEnv: vi.fn(),
+        resolveApiKey: vi.fn().mockReturnValue("test-api-key"),
+    };
+});
+
+const fetchApp = useTrackedAppFetch();
+
+/** A provider rejection shaped like the AI SDK's `APICallError`. */
+const providerError = (statusCode: number | undefined, responseBody: string) =>
+    Object.assign(new Error(responseBody), { responseBody, ...(statusCode !== undefined && { statusCode }) });
+
+const proxy = async (action: "generate" | "stream", error: Error, promptText = "hi") => {
+    const failing = async () => {
+        throw error;
+    };
+
+    vi.mocked(createProviderModelForEnv).mockResolvedValueOnce({ doGenerate: failing, doStream: failing } as never);
+
+    const response = await fetchApp(
+        new Request("http://localhost/internal/model/proxy", {
+            body: JSON.stringify({
+                action,
+                callOptions: { prompt: [{ content: [{ text: promptText, type: "text" }], role: "user" }] },
+                modelApiId: "gemini-2.5-flash",
+                modelId: "gemini-2.5-flash",
+                provider: "google",
+                requestId: "req-fallback-1",
+                userId: "user-1",
+            }),
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+        }),
+        bindingEnv(createMockEnv()),
+    );
+
+    return { body: (await response.json()) as { error: { code: string; fallbackReason?: string } }, status: response.status };
+};
+
+describe("POST /internal/model/proxy tags a provider failure with its fallback reason", () => {
+    afterEach(() => {
+        vi.mocked(createProviderModelForEnv).mockReset();
+    });
+
+    it.each(["generate", "stream"] as const)("%s: a 5xx is infra", async (action) => {
+        const { body, status } = await proxy(action, providerError(503, "service unavailable"));
+
+        expect(status).toBe(502);
+        expect(body.error.fallbackReason).toBe("infra");
+    });
+
+    it("a 429 is infra", async () => {
+        const { body } = await proxy("generate", providerError(429, "rate limited"));
+
+        expect(body.error.fallbackReason).toBe("infra");
+    });
+
+    it("an error with no status (a timeout, a dropped connection) is infra", async () => {
+        const { body } = await proxy("generate", providerError(undefined, "fetch failed"));
+
+        expect(body.error.fallbackReason).toBe("infra");
+    });
+
+    it("a 400 refusal is content_policy", async () => {
+        const { body } = await proxy("generate", providerError(400, '{"error":{"message":"Request blocked by content policy"}}'));
+
+        expect(body.error.fallbackReason).toBe("content_policy");
+    });
+
+    it("a 413 is context_overflow", async () => {
+        const { body } = await proxy("generate", providerError(413, "payload too large"));
+
+        expect(body.error.fallbackReason).toBe("context_overflow");
+    });
+
+    it("a 400 on a prompt past the model's context window is context_overflow", async () => {
+        // gemini-2.5-flash has a 1M-token window; 4M characters estimate to 1M tokens.
+        const { body } = await proxy("generate", providerError(400, "invalid argument: input is too long"), "x".repeat(4_000_000));
+
+        expect(body.error.fallbackReason).toBe("context_overflow");
+    });
+
+    it.each([
+        ['{"error":{"code":"context_length_exceeded","message":"This model\'s maximum context length is 128000 tokens."}}'],
+        ['{"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long: 210000 tokens > 200000 maximum"}}'],
+    ])("a 400 that says the context limit was exceeded is context_overflow on a short prompt: %s", async (responseBody) => {
+        const { body } = await proxy("generate", providerError(400, responseBody));
+
+        expect(body.error.fallbackReason).toBe("context_overflow");
+    });
+
+    it("a 400 on a prompt inside the window stays infra", async () => {
+        const { body } = await proxy("generate", providerError(400, "invalid argument: bad schema"));
+
+        expect(body.error.fallbackReason).toBe("infra");
+    });
+});

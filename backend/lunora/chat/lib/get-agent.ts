@@ -8,6 +8,8 @@ import type { ToolSet } from "ai";
 import { api } from "../../_generated/api";
 import { Agent } from "../../agent/client";
 import type { ServiceFetch } from "../../lib/services.js";
+import { eligibleBackupModel } from "./backup-model.js";
+import { FallbackLanguageModel } from "./fallback-language-model.js";
 import { type GatewayCustomProviderConfig, GatewayLanguageModel } from "./gateway-language-model.js";
 
 // Lazy singleton — providers are loaded via dynamic import() the first time this
@@ -31,6 +33,14 @@ export interface GetAgentOptions {
      * - Datasource: Data validation and source verification
      */
     agentMode?: AgentModeConfig;
+
+    /**
+     * The user's backup model. When the chosen model fails with an infrastructure
+     * error, the call is retried once on it (`FallbackLanguageModel`). Ignored for
+     * a custom endpoint, for an id the registry cannot serve, and when it is the
+     * chosen model itself. The caller has already checked the user may run it.
+     */
+    backupModelId?: string;
 
     /**
      * Resolved (decrypted) user endpoint for a `custom:<providerId>/<modelId>`
@@ -159,6 +169,23 @@ export interface GetAgentOptions {
     userProviderKeys?: Record<string, string>;
 }
 
+const PROVIDER_KEY_NAMES: Record<string, string> = {
+    fal: "fal",
+    google: "google",
+    groq: "groq",
+    openai: "openai",
+    openrouter: "openrouter",
+    requesty: "requesty",
+    xai: "xai",
+};
+
+/** The user's own key for `provider`, when they set one. */
+const resolveProviderKey = (provider: string, userProviderKeys: Record<string, string> | undefined): string | undefined => {
+    const keyName = PROVIDER_KEY_NAMES[provider];
+
+    return keyName ? userProviderKeys?.[keyName] || undefined : undefined;
+};
+
 const getAgent = async (model: AgentModel | string, options: GetAgentOptions): Promise<Agent> => {
     const agents = await getAgents();
     let agent = agents[model as string];
@@ -218,37 +245,27 @@ const getAgent = async (model: AgentModel | string, options: GetAgentOptions): P
         const modelDefinition = MODEL_REGISTRY.find((m) => m.id === effectiveModel);
 
         if (modelDefinition && modelDefinition.provider !== "external") {
-            // Resolve BYOK key if available — pass to gateway instead of instantiating locally
-            let providerApiKey: string | undefined;
+            const gatewayModel = (definition: typeof modelDefinition) =>
+                new GatewayLanguageModel({
+                    gateway,
+                    modelApiId: definition.modelApiId,
+                    modelFilterRules: options?.modelFilterRules,
+                    modelId: definition.id,
+                    orgId: undefined,
+                    provider: definition.provider,
+                    // BYOK: the user's key for this provider goes to the gateway rather than a local instance
+                    providerApiKey: resolveProviderKey(definition.provider, options?.userProviderKeys),
+                    threadId: options?.threadId,
+                    userId: options?.userId,
+                }) as unknown as LanguageModelV3;
 
-            if (options?.userProviderKeys) {
-                const providerKeyMap: Record<string, string> = {
-                    fal: "fal",
-                    google: "google",
-                    groq: "groq",
-                    openai: "openai",
-                    openrouter: "openrouter",
-                    requesty: "requesty",
-                    xai: "xai",
-                };
-                const keyName = providerKeyMap[modelDefinition.provider];
+            chat = gatewayModel(modelDefinition);
 
-                if (keyName && options.userProviderKeys[keyName]) {
-                    providerApiKey = options.userProviderKeys[keyName];
-                }
+            const backup = eligibleBackupModel(options.backupModelId, effectiveModel);
+
+            if (backup) {
+                chat = new FallbackLanguageModel(chat, gatewayModel(backup));
             }
-
-            chat = new GatewayLanguageModel({
-                gateway,
-                modelApiId: modelDefinition.modelApiId,
-                modelFilterRules: options?.modelFilterRules,
-                modelId: effectiveModel,
-                orgId: undefined,
-                provider: modelDefinition.provider,
-                providerApiKey,
-                threadId: options?.threadId,
-                userId: options?.userId,
-            }) as unknown as LanguageModelV3;
         }
     }
 

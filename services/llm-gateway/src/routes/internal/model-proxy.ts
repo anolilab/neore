@@ -25,6 +25,7 @@ import { createProviderModelForEnv, resolveApiKey } from "../../providers/factor
 import { ProviderHealthService } from "../../providers/health.js";
 import type { ModelPricing } from "../../providers/pricing.js";
 import { calculateCost, PricingService } from "../../providers/pricing.js";
+import { classifyFailure, extractProviderErrorInfo } from "../../routing/fallback.js";
 import type { ModelFilterRules } from "../../routing/filters.js";
 import { getModelRejectionReason, hasActiveFilters } from "../../routing/filters.js";
 import type { BillingMode } from "../../usage/billing.js";
@@ -484,10 +485,21 @@ modelProxyRouter.openapi(
                 return c.json(error.toJSON(), error.statusCode);
             }
 
+            // Tells the caller whether another model could serve this request:
+            // only an `infra` failure is worth retrying elsewhere.
+            const { body: errorBody, statusCode: errorStatus } = extractProviderErrorInfo(error);
+            const fallbackReason = classifyFailure(
+                errorStatus,
+                errorBody,
+                Math.ceil(countPromptTextChars((body.callOptions.prompt as { content: unknown }[] | undefined) ?? []) / 4),
+                MODEL_MAP.get(body.modelId)?.contextWindow,
+            );
+
             return c.json(
                 {
                     error: {
                         code: "PROVIDER_ERROR",
+                        fallbackReason,
                         message: error instanceof Error ? error.message : "Unknown provider error",
                     },
                 },

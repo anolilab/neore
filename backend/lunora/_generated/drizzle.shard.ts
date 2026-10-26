@@ -1602,6 +1602,7 @@ export const userSettings = sqliteTable("userSettings", {
     accentColor: text("accentColor"),
     autoArchiveAfterDays: real("autoArchiveAfterDays"),
     autoReadReplies: integer("autoReadReplies", { mode: "boolean" }),
+    backupModel: text("backupModel"),
     capLongCodeBlocks: integer("capLongCodeBlocks", { mode: "boolean" }),
     codeFont: text("codeFont"),
     codeHighlightTheme: text("codeHighlightTheme"),

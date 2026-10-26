@@ -28,6 +28,7 @@ import roleGuard from "./lib/role-guard";
 import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
+import { eligibleBackupModel } from "../chat/lib/backup-model";
 import { normalizeModelNicknames } from "./lib/model-nicknames";
 import { isValidShortcut } from "./lib/shortcut";
 
@@ -203,6 +204,11 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
             }
 
             toStore.searchDomainBlocklist = domains;
+        }
+
+        // A backup model must be one a chat reply can run on; "" clears it.
+        if (typeof toStore.backupModel === "string" && toStore.backupModel !== "" && !eligibleBackupModel(toStore.backupModel, "")) {
+            throw new LunoraError("BAD_REQUEST", "Not a model that can be used as a backup");
         }
 
         if (toStore.modelNicknames && typeof toStore.modelNicknames === "object") {
@@ -994,6 +1000,7 @@ export const getUserPreferencesQuery = internalQuery
     .output(
         v.object({
             aboutMe: v.optional(v.string()),
+            backupModel: v.optional(v.string()),
             customInstructions: v.optional(v.string()),
             dictationLanguage: v.optional(v.string()),
             language: v.optional(v.string()),
@@ -1014,6 +1021,7 @@ export const getUserPreferencesQuery = internalQuery
 
             return {
                 aboutMe: userSettings?.aboutMe ?? undefined,
+                backupModel: userSettings?.backupModel ?? undefined,
                 customInstructions: userSettings?.customInstructions ?? undefined,
                 dictationLanguage: userSettings?.dictationLanguage ?? undefined,
                 language: userSettings?.language ?? undefined,
@@ -1027,6 +1035,7 @@ export const getUserPreferencesQuery = internalQuery
         } catch {
             return {
                 aboutMe: undefined,
+                backupModel: undefined,
                 customInstructions: undefined,
                 dictationLanguage: undefined,
                 language: undefined,

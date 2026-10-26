@@ -221,6 +221,10 @@ describe(resumeApprovedRun, () => {
                 return pending;
             }
 
+            if (ref === internal.auth.functions.getUserPreferencesQuery) {
+                return {};
+            }
+
             return ref === internal.auth.functions.getDecryptedProviderKeysQuery ? {} : null;
         });
         const runCtx = { runMutation: ctx.runMutation, runQuery };

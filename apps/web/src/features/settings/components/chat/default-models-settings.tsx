@@ -24,6 +24,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
 import { toast } from "sonner";
 
+import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -44,25 +45,37 @@ type DefaultModels = {
 
 type DefaultModelKey = keyof DefaultModels;
 
-interface ModelSelectProps {
+interface ModelSelectProps<Field extends string> {
     description: string;
     disabled?: boolean;
-    field: DefaultModelKey;
+    /** Shown for "no model" when there is no system default to name. */
+    emptyLabel?: string;
+    field: Field;
     label: string;
     models: GatewayModel[];
-    onChange: (field: DefaultModelKey, modelId: string | null) => void;
+    onChange: (field: Field, modelId: string | null) => void;
     /** The system fallback model ID shown in the "System default" option */
     systemDefaultId?: string;
     value: string | undefined;
 }
 
-const ModelSelect: FC<ModelSelectProps> = ({ description, disabled, field, label, models, onChange, systemDefaultId, value }) => {
+const ModelSelect = <Field extends string>({
+    description,
+    disabled,
+    emptyLabel,
+    field,
+    label,
+    models,
+    onChange,
+    systemDefaultId,
+    value,
+}: ModelSelectProps<Field>) => {
     const { t } = useLingui();
     const selectedModel = models.find((m) => m.id === value);
     const allModels = useFeatureFlaggedModels();
     const systemDefaultModel = systemDefaultId ? allModels.find((m) => m.id === systemDefaultId) : undefined;
 
-    const systemDefaultLabel = systemDefaultModel ? systemDefaultModel.name : t`System default`;
+    const systemDefaultLabel = systemDefaultModel ? systemDefaultModel.name : (emptyLabel ?? t`System default`);
 
     return (
         <div className="flex items-start justify-between gap-4">
@@ -98,7 +111,7 @@ const ModelSelect: FC<ModelSelectProps> = ({ description, disabled, field, label
                                 <span className="text-muted-foreground/60 text-xs">{t`(default)`}</span>
                             </span>
                         ) : (
-                            <span className="text-muted-foreground">{t`System default`}</span>
+                            <span className="text-muted-foreground">{emptyLabel ?? t`System default`}</span>
                         )}
                     </SelectItem>
                     {models.map((m) => (
@@ -116,6 +129,33 @@ const ModelSelect: FC<ModelSelectProps> = ({ description, disabled, field, label
                 </SelectContent>
             </Select>
         </div>
+    );
+};
+
+/** The model a reply is retried on, once, when the chosen model fails with an infrastructure error. */
+const BackupModelSetting: FC<{ disabled?: boolean; models: GatewayModel[] }> = ({ disabled, models }) => {
+    const { t } = useLingui();
+    const { data: userSettings } = useUserSettings();
+    const { isPending, updateLatest } = useUpdateUserSettings();
+
+    const handleChange = (_field: "backupModel", modelId: string | null) => {
+        // "" clears it: a patch cannot carry an absent value.
+        updateLatest(() => {
+            return { backupModel: modelId ?? "" };
+        }).catch(() => toast.error(t`Failed to update backup model`));
+    };
+
+    return (
+        <ModelSelect
+            description={t`If your chosen model is unavailable, the reply is retried once on this model`}
+            disabled={disabled || isPending}
+            emptyLabel={t`None`}
+            field="backupModel"
+            label={t`Backup model`}
+            models={models}
+            onChange={handleChange}
+            value={userSettings?.backupModel || undefined}
+        />
     );
 };
 
@@ -213,6 +253,8 @@ const DefaultModelsSettings: FC = () => {
                         systemDefaultId={DEFAULT_VIDEO_TO_TEXT_MODEL}
                         value={defaults.videoToText}
                     />
+                    <Separator />
+                    <BackupModelSetting disabled={isPending} models={textModels} />
                 </CardContent>
             </Card>
 

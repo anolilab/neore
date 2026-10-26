@@ -224,6 +224,13 @@ const deserializeFromWire = <T>(object: T): T => {
     return object;
 };
 
+/**
+ * An error from the gateway's model proxy. `fallbackReason` is the gateway's own
+ * classification of a provider failure (`infra`, `content_policy`,
+ * `context_overflow`); absent on errors the gateway did not classify.
+ */
+export type GatewayError = Error & { fallbackReason?: string; statusCode?: number };
+
 // ── GatewayLanguageModel ─────────────────────────────────────────────────────
 
 export class GatewayLanguageModel implements LanguageModelV3 {
@@ -406,13 +413,18 @@ export class GatewayLanguageModel implements LanguageModelV3 {
      */
     private async throwStructuredError(response: Response): Promise<never> {
         let message = `Gateway model proxy failed (${response.status})`;
+        let fallbackReason: string | undefined;
 
         try {
             // `Response.json()` is `Promise<unknown>` — this whole block reads a
             // shape off an error body, so it declares the one it reads.
-            const body = (await response.json()) as { error?: { message?: string } };
+            const body = (await response.json()) as { error?: { fallbackReason?: unknown; message?: string } };
 
             message = body?.error?.message ? `${message}: ${body.error.message}` : `${message}: ${JSON.stringify(body)}`;
+
+            if (typeof body?.error?.fallbackReason === "string") {
+                fallbackReason = body.error.fallbackReason;
+            }
         } catch {
             const text = await response.text().catch(() => "");
 
@@ -423,6 +435,11 @@ export class GatewayLanguageModel implements LanguageModelV3 {
 
         // Attach status code so AI SDK retry/error handlers can inspect it
         (error as Error & { statusCode: number }).statusCode = response.status;
+
+        if (fallbackReason !== undefined) {
+            (error as GatewayError).fallbackReason = fallbackReason;
+        }
+
         throw error;
     }
 

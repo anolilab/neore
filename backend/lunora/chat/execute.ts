@@ -35,6 +35,7 @@ import {
     isAgentRunError,
     loadRunContext,
     memoryToCarry,
+    resolveBackupModelId,
     resolveRunModel,
     resumeApprovedRun,
     setResearchDepth,
@@ -269,6 +270,7 @@ export const runStreamingAgent = internalAction
 
             const agent = await getAgent(model, {
                 agentMode,
+                backupModelId: await resolveBackupModelId(ctx, userId, prefs.backupModel, model),
                 customProvider,
                 enabledSkills: skillRun.enabledSkills.length > 0 ? skillRun.enabledSkills : undefined,
                 gateway: gatewayFetch(ctx),

@@ -1862,6 +1862,7 @@ export interface Doc_userSettings {
     accentColor?: string;
     autoArchiveAfterDays?: number;
     autoReadReplies?: boolean;
+    backupModel?: string;
     capLongCodeBlocks?: boolean;
     codeFont?: string;
     codeHighlightTheme?: string;
@@ -4593,6 +4594,7 @@ export interface Insert_userSettings {
     accentColor?: string;
     autoArchiveAfterDays?: number;
     autoReadReplies?: boolean;
+    backupModel?: string;
     capLongCodeBlocks?: boolean;
     codeFont?: string;
     codeHighlightTheme?: string;

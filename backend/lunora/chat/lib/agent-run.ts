@@ -25,6 +25,7 @@ import type { ResearchDepth } from "../../agent/client/create-tool";
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
+import { eligibleBackupModel } from "./backup-model";
 import { byokPaysFor, paidModelRefusal } from "./paid-model";
 import { compressContextMessages, getMaxSteps, getModelContextWindow } from "./auto-continue";
 import { isLocalBrowserProvider, toGatewayFormat } from "./custom-providers";
@@ -151,6 +152,22 @@ const assertModelAllowed = async (ctx: Pick<ActionCtx, "runQuery">, model: strin
     }
 
     throw new AgentRunError("plan-required", paidModelRefusal(definition.name ?? definition.id, byokPaysFor(definition)));
+};
+
+/**
+ * The user's backup model for a run on `model` (`FallbackLanguageModel`), or `undefined`: none set, a stale id,
+ * the run's own model, or one the user's plan cannot run — a backup must not open a paid model the run's own
+ * gate (`canRunPaidModel`) would refuse.
+ */
+export const resolveBackupModelId = async (
+    ctx: Pick<ActionCtx, "runQuery">,
+    userId: string,
+    backupModel: string | undefined,
+    model: string,
+): Promise<string | undefined> => {
+    const definition = eligibleBackupModel(backupModel, model);
+
+    return definition && (await canRunPaidModel(ctx, userId, definition)) ? definition.id : undefined;
 };
 
 export const resolveRunModel = async (ctx: Pick<ActionCtx, "runQuery">, model: string, userId: string): Promise<RunModel> => {
@@ -405,6 +422,7 @@ export const loadRunContext = async (
         knowledgeSources: knowledgeContext?.sources ?? [],
         memoryEnabled: prefs.memoryEnabled,
         prefs: {
+            backupModel: prefs.backupModel,
             language: args.threadLanguage || prefs.language,
             location: prefs.location,
             personalization: toPersonalization(prefs),
@@ -848,7 +866,7 @@ export const resumeApprovedRun = async (
 ): Promise<{ lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
     const { answer, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
-    const [toolResult, userProviderKeys] = await Promise.all([
+    const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
             ...(options.admittedRun && { admittedRun: true }),
             autoMediaEnrichment: config.autoMediaEnrichment,
@@ -860,6 +878,7 @@ export const resumeApprovedRun = async (
             userId,
         }),
         loadUserProviderKeys(ctx, userId),
+        ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
     ]);
 
     try {
@@ -890,6 +909,7 @@ export const resumeApprovedRun = async (
         }
 
         const agent = await getAgent(config.model, {
+            backupModelId: await resolveBackupModelId(ctx, userId, preferences.backupModel, config.model),
             customProvider,
             gateway: gatewayFetch(ctx),
             maxSteps: getMaxSteps(config.shouldAutoContinue),
