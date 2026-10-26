@@ -78,15 +78,18 @@ export interface FetchedTextPreviewProps {
     className?: string;
     fallbackName: string;
     filename?: string;
+    /** For a text that should not be previewed: the reason, shown on the download card alone. */
+    refusal?: (text: string) => string | undefined;
     url: string;
 }
 
-export const FetchedTextPreview: FC<FetchedTextPreviewProps> = ({ children, className, fallbackName, filename, url }) => {
+export const FetchedTextPreview: FC<FetchedTextPreviewProps> = ({ children, className, fallbackName, filename, refusal, url }) => {
     const { t } = useLingui();
     const fetched = useFetchedText(url);
+    const refusedBecause = fetched.status === "ready" ? refusal?.(fetched.value) : undefined;
 
-    if (fetched.status === "error") {
-        return <GenericFileCard className={className} description={t`Could not preview · Click to download`} filename={filename} url={url} />;
+    if (fetched.status === "error" || refusedBecause) {
+        return <GenericFileCard className={className} description={refusedBecause ?? t`Could not preview · Click to download`} filename={filename} url={url} />;
     }
 
     return (

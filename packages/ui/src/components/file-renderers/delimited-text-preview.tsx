@@ -21,7 +21,6 @@ import { memo, useMemo } from "react";
 import { CsvRenderer } from "../spreadsheet/csv-renderer";
 import { capDelimitedColumns, delimiterForFilename, exceedsRowLimit } from "./delimited-columns";
 import { FetchedTextPreview } from "./fetched-text-preview";
-import GenericFileCard from "./generic-file-card";
 
 export interface DelimitedTextPreviewProps {
     className?: string;
@@ -61,16 +60,12 @@ const DelimitedTable: FC<{ filename?: string; text: string }> = ({ filename, tex
 
 const DelimitedTextPreview: FC<DelimitedTextPreviewProps> = memo(({ className, filename, url }) => {
     const { t } = useLingui();
+    const refusal = (text: string): string | undefined =>
+        exceedsRowLimit(text, MAX_PREVIEW_ROWS) ? t`Too many rows to preview · Click to download` : undefined;
 
     return (
-        <FetchedTextPreview className={className} fallbackName={t`Table`} filename={filename} url={url}>
-            {(text) =>
-                exceedsRowLimit(text, MAX_PREVIEW_ROWS) ? (
-                    <GenericFileCard className={className} description={t`Too many rows to preview · Click to download`} filename={filename} url={url} />
-                ) : (
-                    <DelimitedTable filename={filename} text={text} />
-                )
-            }
+        <FetchedTextPreview className={className} fallbackName={t`Table`} filename={filename} refusal={refusal} url={url}>
+            {(text) => <DelimitedTable filename={filename} text={text} />}
         </FetchedTextPreview>
     );
 });
