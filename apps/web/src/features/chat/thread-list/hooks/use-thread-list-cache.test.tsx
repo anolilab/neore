@@ -102,4 +102,56 @@ describe("thread list cache hooks", () => {
         });
         expect(localStorage).toHaveLength(0);
     });
+
+    it("stops persisting once another tab clears the stored lists", () => {
+        vi.useFakeTimers();
+        auth.token = jwtFor("alice");
+
+        const { rerender } = renderHook(({ owner, title }) => usePersistThreadList(list(owner, title), false), {
+            initialProps: { owner: "alice", title: "T" },
+        });
+
+        act(() => {
+            globalThis.dispatchEvent(new StorageEvent("storage", { key: "neore-thread-list:v1:alice", newValue: null, oldValue: "{}" }));
+        });
+        rerender({ owner: "alice", title: "Later push" });
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        expect(localStorage).toHaveLength(0);
+
+        setToken(jwtFor("bob"));
+        rerender({ owner: "bob", title: "Bob push" });
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        expect(localStorage).toHaveLength(1);
+    });
+
+    it("ignores a storage event for an unrelated key or a write by another tab", () => {
+        vi.useFakeTimers();
+        auth.token = jwtFor("alice");
+
+        renderHook(() => usePersistThreadList(list("alice", "T"), false));
+
+        act(() => {
+            globalThis.dispatchEvent(new StorageEvent("storage", { key: "other", newValue: null }));
+            globalThis.dispatchEvent(new StorageEvent("storage", { key: "neore-thread-list:v1:alice", newValue: "{}" }));
+            vi.advanceTimersByTime(2000);
+        });
+        expect(localStorage).toHaveLength(1);
+    });
+
+    it("skips a write when the session user changed before it fired", () => {
+        vi.useFakeTimers();
+        auth.token = jwtFor("alice");
+
+        renderHook(() => usePersistThreadList(list("alice", "T"), false));
+        auth.token = jwtFor("bob");
+
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        expect(localStorage).toHaveLength(0);
+    });
 });

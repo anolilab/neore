@@ -19,6 +19,21 @@ const clears = { count: 0 };
 /** Bumped by every clear; a write scheduled before a clear compares it to drop itself. */
 export const getThreadListClearGeneration = (): number => clears.count;
 
+/** Calls `listener` when another tab removes stored lists (its sign-out), the only moment `localStorage` fires `storage` for a key removal. */
+export const subscribeToForeignThreadListClears = (listener: () => void): (() => void) => {
+    const onStorage = (event: StorageEvent) => {
+        if (event.key === null || (event.key.startsWith(CACHE_PREFIX) && event.newValue === null)) {
+            listener();
+        }
+    };
+
+    globalThis.addEventListener("storage", onStorage);
+
+    return () => {
+        globalThis.removeEventListener("storage", onStorage);
+    };
+};
+
 /** Keyed by the signed-in user, so one account's list is never read for another. */
 const cacheKey = (userId: string): string => `${CACHE_PREFIX}v${CACHE_VERSION}:${userId}`;
 
