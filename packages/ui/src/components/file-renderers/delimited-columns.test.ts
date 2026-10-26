@@ -108,6 +108,41 @@ describe(exceedsRowLimit, () => {
     });
 });
 
+describe("records a row limit counts", () => {
+    it("does not count a line break inside a quoted field, so a multiline cell is one row", () => {
+        expect(exceedsRowLimit('h\n"a\nb\nc"\n', 2)).toBe(false);
+        expect(exceedsRowLimit('h\n"a\nb\nc"\n"d\ne"\n', 2)).toBe(true);
+    });
+
+    it("reads an escaped quote inside a quoted field as text, not as the end of it", () => {
+        expect(exceedsRowLimit('"say ""hi""\nthere"\nx\n', 2)).toBe(false);
+        expect(exceedsRowLimit('"say ""hi""\nthere"\nx\ny\n', 2)).toBe(true);
+    });
+
+    it("treats a quote inside an unquoted field as text", () => {
+        expect(exceedsRowLimit('a"b\nc\n', 2)).toBe(false);
+        expect(exceedsRowLimit('a"b\nc\nd\n', 2)).toBe(true);
+    });
+
+    it("opens a quoted field only after the delimiter, so a tab before a quote does not hide a break", () => {
+        expect(exceedsRowLimit('a,b\t"c\nd"\n', 1, ",")).toBe(true);
+    });
+
+    it("skips a line that is only an empty quoted field, as Papa does", () => {
+        expect(exceedsRowLimit('""\nb\nc\n', 2)).toBe(false);
+    });
+
+    it("skips blank lines, as the renderer does", () => {
+        expect(exceedsRowLimit("a\n\n\nb\n\n", 2)).toBe(false);
+        expect(exceedsRowLimit("a\n\n\nb\n\nc\n", 2)).toBe(true);
+    });
+
+    it("admits exactly 20,000 newline-terminated records and refuses one more", () => {
+        expect(exceedsRowLimit("a,b\n".repeat(20_000), 20_000)).toBe(false);
+        expect(exceedsRowLimit("a,b\n".repeat(20_001), 20_000)).toBe(true);
+    });
+});
+
 describe("line breaks a row limit counts", () => {
     it("counts a lone CR as a line break, so a CR-only table of too many rows is refused", () => {
         expect(exceedsRowLimit("a\r".repeat(20_001), 20_000)).toBe(true);

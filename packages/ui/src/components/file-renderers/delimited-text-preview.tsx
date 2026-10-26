@@ -61,7 +61,7 @@ const DelimitedTable: FC<{ filename?: string; text: string }> = ({ filename, tex
 const DelimitedTextPreview: FC<DelimitedTextPreviewProps> = memo(({ className, filename, url }) => {
     const { t } = useLingui();
     const refusal = (text: string): string | undefined =>
-        exceedsRowLimit(text, MAX_PREVIEW_ROWS) ? t`Too many rows to preview · Click to download` : undefined;
+        exceedsRowLimit(text, MAX_PREVIEW_ROWS, delimiterForFilename(filename)) ? t`Too many rows to preview · Click to download` : undefined;
 
     return (
         <FetchedTextPreview className={className} fallbackName={t`Table`} filename={filename} refusal={refusal} url={url}>

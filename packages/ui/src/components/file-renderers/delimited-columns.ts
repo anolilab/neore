@@ -22,32 +22,68 @@ export interface CappedColumns {
  */
 export const delimiterForFilename = (filename?: string): string | undefined => (filename?.toLowerCase().endsWith(".tsv") ? "\t" : undefined);
 
-/**
- * Whether `content` has more than `maxRows` lines, counted without splitting it. A file of short rows can hold
- * hundreds of thousands of records within the byte limit, and parsing them all is what freezes a page.
- */
-export const exceedsRowLimit = (content: string, maxRows: number): boolean => {
-    // A record ends at each line break (LF, CRLF or a lone CR, CRLF counting once). A break that ends the file does
-    // not start another record, so a file of exactly `maxRows` newline-terminated records is within the limit.
-    let breaks = 0;
+/** Whether a quote at `index` opens a field: it starts the record or follows the delimiter (Papa's rule). */
+const opensField = (content: string, index: number, delimiter: string): boolean =>
+    index === 0 || content[index - 1] === delimiter || content[index - 1] === "\n" || content[index - 1] === "\r";
 
-    for (let index = 0; index < content.length; index += 1) {
-        const code = content.codePointAt(index) ?? 0;
+/** The index just past the quote that closes the quoted field opened at `start`, or the end of the content if it never closes. */
+const quotedFieldEnd = (content: string, start: number): number => {
+    let index = start + 1;
 
-        if (code === 10 || (code === 13 && content.codePointAt(index + 1) !== 10)) {
-            breaks += 1;
-
-            if (breaks > maxRows) {
-                return true;
-            }
+    while (index < content.length) {
+        if (content[index] !== '"') {
+            index += 1;
+        } else if (content[index + 1] === '"') {
+            index += 2;
+        } else {
+            return index + 1;
         }
     }
 
-    const last = content.codePointAt(content.length - 1);
-    const endsWithBreak = last === 10 || last === 13;
-    const records = breaks + (content.length > 0 && !endsWithBreak ? 1 : 0);
+    return content.length;
+};
 
-    return records > maxRows;
+/** The index of the line break that ends the record starting at `start`, or the content's length if none does. */
+const recordEnd = (content: string, start: number, delimiter: string): number => {
+    let index = start;
+
+    while (index < content.length && content[index] !== "\n" && content[index] !== "\r") {
+        index = content[index] === '"' && opensField(content, index, delimiter) ? quotedFieldEnd(content, index) : index + 1;
+    }
+
+    return index;
+};
+
+/**
+ * Whether `content` has more than `maxRows` records, counted without parsing it. A file of short rows can hold
+ * hundreds of thousands of them within the byte limit, and parsing them all is what freezes a page.
+ *
+ * A record ends at a line break outside quotes (LF, CRLF or a lone CR), so a line break inside a quoted field does
+ * not count. A line with no text is skipped, as `CsvRenderer` skips it. A break that ends the file does not start
+ * another record, so a file of exactly `maxRows` records is within the limit.
+ */
+export const exceedsRowLimit = (content: string, maxRows: number, delimiter?: string): boolean => {
+    // Papa sniffs the delimiter from the first rows when none is given, as `CsvRenderer` does.
+    const separator = delimiter ?? Papa.parse(content, { preview: 10 }).meta.delimiter;
+    let records = 0;
+    let index = 0;
+
+    while (index < content.length) {
+        const end = recordEnd(content, index, separator);
+
+        // A line that is only `""` is one empty field, which Papa's skipEmptyLines drops as it drops a blank line.
+        if (end > index && content.slice(index, end) !== '""') {
+            records += 1;
+
+            if (records > maxRows) {
+                return true;
+            }
+        }
+
+        index = end + (content[end] === "\r" && content[end + 1] === "\n" ? 2 : 1);
+    }
+
+    return false;
 };
 
 export const capDelimitedColumns = (content: string, maxColumns: number, delimiter?: string): CappedColumns => {
