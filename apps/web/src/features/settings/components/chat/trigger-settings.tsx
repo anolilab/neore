@@ -193,6 +193,13 @@ const EMPTY_FORM: TriggerFormData = {
     webhookSource: "custom",
 };
 
+/**
+ * Only a scheduled routine with a bot can use a computer or stay quiet when it has nothing to report.
+ * Applied wherever the bot or the type changes, so the form never holds a flag its routine cannot have.
+ */
+const withBotOptions = (form: TriggerFormData): TriggerFormData =>
+    form.type === "schedule" && form.botId !== "" ? form : { ...form, botComputer: false, quietWhenEmpty: false };
+
 const CRON_PRESETS: { expression: string; label: MessageDescriptor }[] = [
     { expression: "0 8 * * *", label: msg`Every day at 8 AM` },
     { expression: "0 8 * * 1-5", label: msg`Weekdays at 8 AM` },
@@ -384,7 +391,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 <div className="space-y-1.5">
                     <Label htmlFor={botPickerId}>{t`Run as bot (optional)`}</Label>
                     <Select
-                        onValueChange={(value) => onChange({ ...formData, botComputer: false, botId: value === NO_BOT ? "" : (value ?? "") })}
+                        onValueChange={(value) => onChange(withBotOptions({ ...formData, botComputer: false, botId: value === NO_BOT ? "" : (value ?? "") }))}
                         value={formData.botId || NO_BOT}
                     >
                         <SelectTrigger id={botPickerId}>
@@ -449,7 +456,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                     <Label>{t`Trigger Type`}</Label>
                     <TriggerTypePicker
                         disabled={isExisting || formData.type === "event"}
-                        onSelect={(type) => onChange({ ...formData, type })}
+                        onSelect={(type) => onChange(withBotOptions({ ...formData, type }))}
                         value={formData.type}
                     />
                 </div>
@@ -750,7 +757,7 @@ const TriggerSettings: FC = () => {
 
         createTrigger(
             {
-                botComputer: formData.type === "schedule" && formData.botId !== "" && formData.botComputer ? true : undefined,
+                botComputer: formData.botComputer || undefined,
                 botId: formData.botId || undefined,
                 cronExpression: formData.type === "schedule" ? formData.cronExpression : undefined,
                 description: formData.description || undefined,
@@ -758,7 +765,7 @@ const TriggerSettings: FC = () => {
                 inputTemplate: formData.inputTemplate || undefined,
                 model: formData.model || "anthropic/claude-sonnet-4-20250514",
                 name: formData.name,
-                quietWhenEmpty: formData.type === "schedule" && formData.botId !== "" && formData.quietWhenEmpty ? true : undefined,
+                quietWhenEmpty: formData.quietWhenEmpty || undefined,
                 systemPrompt: formData.systemPrompt || undefined,
                 timezone: formData.type === "schedule" ? formData.timezone : undefined,
                 type: formData.type,
@@ -786,7 +793,7 @@ const TriggerSettings: FC = () => {
         updateTrigger(
             {
                 // `null` clears the bot; the form always carries the row's current botId, so this is never "leave unchanged".
-                botComputer: editFormData.type === "schedule" && editFormData.botId !== "" && editFormData.botComputer,
+                botComputer: editFormData.botComputer,
                 botId: editFormData.botId || null,
                 cronExpression: editFormData.type === "schedule" ? editFormData.cronExpression : undefined,
                 description: editFormData.description || undefined,
@@ -795,7 +802,7 @@ const TriggerSettings: FC = () => {
                 inputTemplate: editFormData.inputTemplate || undefined,
                 model: editFormData.model || undefined,
                 name: editFormData.name,
-                quietWhenEmpty: editFormData.type === "schedule" && editFormData.botId !== "" && editFormData.quietWhenEmpty,
+                quietWhenEmpty: editFormData.quietWhenEmpty,
                 systemPrompt: editFormData.systemPrompt || undefined,
                 timezone: editFormData.type === "schedule" ? editFormData.timezone : undefined,
                 triggerId: editingTriggerId,
