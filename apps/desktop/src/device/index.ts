@@ -1,6 +1,6 @@
 /**
- * Device execution in the Electron main process (port of `device/mod.rs`'s
- * windows, commands and events; the logic lives in `device-core`).
+ * Device execution in the Electron main process: the windows, the commands and the
+ * events. The logic lives in `device-core`.
  *
  * Two sets of channels, two trust checks:
  * - `DEVICE_CHANNEL` (relay): reachable from the site's main window only, through `options.isTrusted`.
@@ -20,7 +20,7 @@ import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
 import type { CoreEvent, DeviceCore, Prompt, Signed } from "./types";
 import { readPairing, readPromptAnswer, readSettingsUpdate, readSigned } from "./validate";
 
-/** Stopping idle MCP servers runs once a minute, as the Tauri shell did. */
+/** Stopping idle MCP servers runs once a minute. */
 const REAP_INTERVAL_MS = 60_000;
 const WINDOW_DIR = path.join(__dirname, "device-window");
 const LOCAL_PAGE = path.join(WINDOW_DIR, "device.html");
@@ -98,7 +98,10 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         win.webContents.setWindowOpenHandler(() => {
             return { action: "deny" };
         });
+        // Same guards as every other window: a redirect or a webview cannot move the device window off its page.
         win.webContents.on("will-navigate", (event) => event.preventDefault());
+        win.webContents.on("will-redirect", (event) => event.preventDefault());
+        win.webContents.on("will-attach-webview", (event) => event.preventDefault());
         win.on("closed", () => {
             // Closing the window is a "no" to everything it was asking.
             state.local = undefined;
