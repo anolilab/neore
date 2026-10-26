@@ -9,6 +9,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
     return (
         <Sonner
             className="toaster group"
+            closeButton
             icons={{
                 error: <OctagonXIcon aria-hidden="true" className="size-4" />,
                 info: <InfoIcon aria-hidden="true" className="size-4" />,

@@ -16,9 +16,12 @@ export interface StreamSpeaker {
  * with `resumable: true` — the resume marker
  * `{ type: "resume", lastChunkIndex }`, always the last line of a relay that
  * ran out of its per-request budget. It is not a chunk: the reader asks again
- * with that `lastChunkIndex` and counts nothing for it.
+ * with that `lastChunkIndex` and counts nothing for it. A reply that finished, for
+ * a request that sent `endMarker: true`, ends with `{ type: "end" }`, so the reader
+ * can tell it from a cut stream.
  */
 export type ParsedStreamLine =
+    | { kind: "end" }
     | { error: unknown; kind: "error" }
     /** `restart`: the reply continues below a message the user steered into it; what came before is saved. */
     | { kind: "chunk"; reasoning: string; restart?: true; speaker?: StreamSpeaker; text: string }
@@ -67,6 +70,10 @@ export const parseStreamLine = (line: string): ParsedStreamLine => {
 
     if (type === "resume" && typeof lastChunkIndex === "number" && Number.isSafeInteger(lastChunkIndex) && lastChunkIndex >= 0) {
         return { kind: "resume", lastChunkIndex };
+    }
+
+    if (type === "end") {
+        return { kind: "end" };
     }
 
     const speaker = readSpeaker(rawSpeaker);

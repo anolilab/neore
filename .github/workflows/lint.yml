@@ -118,6 +118,11 @@ jobs:
             - name: "Setup Rust Worker toolchain"
               uses: "./.github/actions/setup-rust-worker"
 
+            # `lint:types` builds packages/device-core-node, whose Linux keyring backend links libdbus at build time.
+            - name: "Install libdbus for the Linux keyring"
+              shell: "bash"
+              run: "sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config"
+
             - name: "Type check"
               shell: "bash"
               run: "pnpm lint:types"

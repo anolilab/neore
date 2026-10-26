@@ -150,7 +150,7 @@ const ComposerBase = ({
                     "bg-card/70 w-full overflow-hidden rounded-xl backdrop-blur-xl",
                     "border transition-[border-color,box-shadow] duration-300",
                     "data-[dragging=true]:border-ring data-[dragging=true]:bg-accent/50 data-[dragging=true]:border-dashed",
-                    "relative",
+                    "relative z-10",
                 )}
                 data-dragging={isDragging}
                 data-view-transition={viewTransitionName}

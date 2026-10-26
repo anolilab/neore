@@ -136,7 +136,7 @@ the add-on whose id it derives from, and AMO signs one add-on per id, so a code
 sent there cannot reach a web page or another extension.
 
 The desktop/mobile shell reuses this grant with the redirect URI
-`neore://auth/callback` (see `apps/native/README.md`). That URI is opt-in only,
+`neore://auth/callback` (see `docs/plans/desktop-and-mobile-apps.md`). That URI is opt-in only,
 never part of the default, and is NOT browser-intercepted: any local app can
 register the scheme, so only the PKCE verifier protects its codes, and they can
 only become a cookie session through `/api/auth/client-grant/cookie`.

@@ -1,47 +1,64 @@
 /**
- * The web side of the Tauri shell in `apps/native`. Every export is a NO-OP
- * outside it, so callers need no platform check of their own.
+ * The web side of the desktop shell in `apps/desktop` (Electron). Every export
+ * is a NO-OP outside it, so callers need no platform check of their own.
  *
- * Detection is `window.__TAURI__` (the shell sets `withGlobalTauri`), read
- * lazily so SSR and the plain browser never touch it. There is deliberately no
- * `@tauri-apps/api` dependency: the shell grants the remote origin four
- * commands (`notify`, `take_pending_compose`, `start_browser_sign_in_command`,
- * `take_pending_sign_in`), on desktop the five device-relay commands
- * (`device_*`, see "Device execution" below) plus event listening, and that
- * fits in a few lines against the global.
- *
- * The page's CSP does NOT allow Tauri's `ipc:` / `ipc.localhost` transport. That is intentional: Tauri falls back to `postMessage` IPC when
- * the fetch is blocked (one console warning per page load), so the web CSP
- * stays identical for every visitor. See `apps/native/README.md`.
+ * The shell's preload exposes `window.neoreNative` on the site origin only, and
+ * it lists in `capabilities` what this build can do. Anything not listed here
+ * (sign-in in the system browser, device execution) is inert: device calls
+ * reach the shell only when it advertises `device`, and `device` is the relay
+ * in `apps/desktop/src/preload.ts`. See `docs/plans/desktop-and-mobile-apps.md` §4.
  */
 
 type UnlistenFunction = () => void;
 
-/** Arguments of the shell's commands — strings only, all optional on the wire. */
-type NativeCommandArgs = Partial<Record<string, string | undefined>>;
-
-interface TauriGlobal {
-    core: {
-        invoke: <T = unknown>(command: string, args?: NativeCommandArgs) => Promise<T>;
-    };
-    event: {
-        listen: (event: string, handler: (event: unknown) => void) => Promise<UnlistenFunction>;
-    };
+/** A file the shell read from disk for the page; `File` is built from it here. */
+export interface NativeDroppedFile {
+    data: Uint8Array<ArrayBuffer>;
+    name: string;
 }
 
-/** Event the shell emits when text is waiting for a new chat. Mirrors `COMPOSE_EVENT` in `apps/native/src-tauri/src/lib.rs`. */
-export const NATIVE_COMPOSE_EVENT = "neore:compose";
+/** What the Electron preload exposes (`apps/desktop/src/preload.ts`). */
+interface NativeBridge {
+    capabilities: ReadonlyArray<string>;
+    device?: NativeDeviceRelay;
+    notify: (title: string, body?: string) => Promise<void>;
+    onCompose: (handler: () => void) => UnlistenFunction;
+    /** A `neore://new?text=` link's text, for the composer to show and not send. Optional: older shells lack it. */
+    onDraft?: (handler: () => void) => UnlistenFunction;
+    /** Files dropped on the dock icon (macOS). Optional: older shells lack it. */
+    onFiles?: (handler: () => void) => UnlistenFunction;
+    onSignIn: (handler: () => void) => UnlistenFunction;
+    openThreadWindow: (threadId: string) => Promise<void>;
+    startBrowserSignIn: () => Promise<void>;
+    takePendingCompose: () => Promise<string | undefined>;
+    takePendingDraft?: () => Promise<string | undefined>;
+    takePendingFiles?: () => Promise<NativeDroppedFile[]>;
+    takePendingSignIn: () => Promise<NativeSignIn | undefined>;
+}
+
+/** The device relay the shell exposes when it advertises `device` (`apps/desktop/src/preload.ts`). Relay only. */
+interface NativeDeviceRelay {
+    execute: (call: { envelope: string; signature: string }) => Promise<NativeSigned>;
+    manifest: () => Promise<NativeSigned>;
+    onChanged: (handler: () => void) => UnlistenFunction;
+    onProgress: (handler: (report: NativeDeviceProgress) => void) => UnlistenFunction;
+    openSettings: () => Promise<void>;
+    pair: (pairing: { accountLabel: string; deviceId: string; secret: string }) => Promise<boolean>;
+    status: () => Promise<NativeDeviceStatus | null>;
+}
 
 /** A reply shorter than this finished while the user was probably still watching. */
 export const LONG_REPLY_MS = 15_000;
 
-const getTauri = (): TauriGlobal | undefined => {
-    const candidate = (globalThis as { __TAURI__?: Partial<TauriGlobal> }).__TAURI__;
+const getNative = (): NativeBridge | undefined => {
+    const candidate = (globalThis as { neoreNative?: Partial<NativeBridge> }).neoreNative;
 
-    return typeof candidate?.core?.invoke === "function" && typeof candidate.event?.listen === "function" ? (candidate as TauriGlobal) : undefined;
+    return typeof candidate?.notify === "function" && typeof candidate.takePendingCompose === "function" && typeof candidate.onCompose === "function"
+        ? (candidate as NativeBridge)
+        : undefined;
 };
 
-export const isNativeShell = (): boolean => getTauri() !== undefined;
+export const isNativeShell = (): boolean => getNative() !== undefined;
 
 export interface NativeNotification {
     body?: string;
@@ -54,14 +71,8 @@ export interface NativeNotification {
  * notification is best-effort and must not break the flow that triggered it.
  */
 export const notifyNative = async ({ body, title }: NativeNotification): Promise<void> => {
-    const tauri = getTauri();
-
-    if (!tauri) {
-        return;
-    }
-
     try {
-        await tauri.core.invoke("notify", { body, title });
+        await getNative()?.notify(title, body);
     } catch {
         // Permission denied (not the app's origin), notifications disabled, …
     }
@@ -73,16 +84,28 @@ export const notifyNative = async ({ body, title }: NativeNotification): Promise
  */
 export const shouldNotifyReplyFinished = (durationMs: number, documentHidden: boolean): boolean => documentHidden || durationMs >= LONG_REPLY_MS;
 
-/** Takes (and clears) the text the shell is holding for a new chat, if any. */
-export const takePendingCompose = async (): Promise<string | undefined> => {
-    const tauri = getTauri();
+/** Whether the shell can open a thread in its own window. Known synchronously, so a menu can show or hide the item. */
+export const supportsThreadWindows = (): boolean => getNative()?.capabilities.includes("thread-windows") === true;
 
-    if (!tauri) {
-        return undefined;
+/** Opens the thread in its own shell window. `false` unless the shell advertises `thread-windows`, or when it refuses the id. */
+export const openThreadWindow = async (threadId: string): Promise<boolean> => {
+    if (!supportsThreadWindows()) {
+        return false;
     }
 
     try {
-        const text = await tauri.core.invoke<string | null>("take_pending_compose");
+        await getNative()?.openThreadWindow(threadId);
+
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+/** Takes (and clears) the text of a deep link the shell is holding for the composer, if any. */
+export const takePendingDraft = async (): Promise<string | undefined> => {
+    try {
+        const text = await getNative()?.takePendingDraft?.();
 
         return typeof text === "string" && text.trim() !== "" ? text : undefined;
     } catch {
@@ -90,20 +113,39 @@ export const takePendingCompose = async (): Promise<string | undefined> => {
     }
 };
 
-/**
- * Pulls a value the shell is holding once on subscribe (a cold start where the
- * page was not listening yet) and again on every `event`. Returns the
- * unsubscribe function; a no-op outside the shell.
- */
-const onNativePending = <T>(event: string, take: () => Promise<T | undefined>, handler: (value: T) => void): UnlistenFunction => {
-    const tauri = getTauri();
+/** Takes (and clears) the text the shell is holding for a new chat, if any. */
+export const takePendingCompose = async (): Promise<string | undefined> => {
+    try {
+        const text = await getNative()?.takePendingCompose();
 
-    if (!tauri) {
-        return () => {};
+        return typeof text === "string" && text.trim() !== "" ? text : undefined;
+    } catch {
+        return undefined;
     }
+};
 
+/** Takes (and clears) the files the shell was handed on the dock icon, as `File`s. */
+export const takePendingFiles = async (): Promise<File[]> => {
+    try {
+        const files = await getNative()?.takePendingFiles?.();
+
+        return (files ?? []).map(({ data, name }) => new File([data], name));
+    } catch {
+        return [];
+    }
+};
+
+/**
+ * Pulls what the shell holds once on subscribe (a value that arrived before the
+ * page listened) and again on every `listen` notification. `listen` returns
+ * `undefined` when the shell does not offer that event, and then nothing is pulled.
+ */
+const onNativePending = <T>(
+    listen: (listener: () => void) => UnlistenFunction | undefined,
+    take: () => Promise<T | undefined>,
+    handler: (value: T) => void,
+): UnlistenFunction => {
     let disposed = false;
-    let unlisten: UnlistenFunction | undefined;
 
     const drain = async () => {
         const value = await take();
@@ -113,82 +155,88 @@ const onNativePending = <T>(event: string, take: () => Promise<T | undefined>, h
         }
     };
 
-    const subscribe = async () => {
-        try {
-            const stop = await tauri.event.listen(event, () => {
-                void drain();
-            });
+    const stop = listen(() => drain());
 
-            if (disposed) {
-                stop();
-            } else {
-                unlisten = stop;
-            }
-        } catch {
-            // Listening denied: anything already pending is still drained below.
-        }
-    };
+    if (stop === undefined) {
+        return () => {};
+    }
 
-    void subscribe();
     void drain();
 
     return () => {
         disposed = true;
-        unlisten?.();
+        stop();
     };
 };
+
+/**
+ * Calls `handler` with each batch of files the shell is handed (the dock icon),
+ * including a batch that arrived before the page loaded. Returns the unsubscribe function.
+ */
+export const onNativeFiles = (handler: (files: File[]) => void): UnlistenFunction =>
+    onNativePending(
+        (listener) => getNative()?.onFiles?.(listener),
+        async () => {
+            const files = await takePendingFiles();
+
+            return files.length > 0 ? files : undefined;
+        },
+        handler,
+    );
 
 /**
  * Calls `handler` with every text the shell hands over (Quick Composer, a
  * `neore://new?text=` link, a share), including one that arrived before the
  * page loaded. Returns the unsubscribe function.
  */
-export const onNativeCompose = (handler: (text: string) => void): UnlistenFunction => onNativePending(NATIVE_COMPOSE_EVENT, takePendingCompose, handler);
+export const onNativeCompose = (handler: (text: string) => void): UnlistenFunction =>
+    onNativePending((listener) => getNative()?.onCompose(listener), takePendingCompose, handler);
 
-/** Mirrors `SIGN_IN_EVENT` in `apps/native/src-tauri/src/lib.rs`. */
-export const NATIVE_SIGN_IN_EVENT = "neore:sign-in";
+/**
+ * Calls `handler` with the text of every `neore://new?text=` link, including one that arrived before the page
+ * loaded. The text is for the composer to show and the user to send: a link never sends it.
+ */
+export const onNativeDraft = (handler: (text: string) => void): UnlistenFunction =>
+    onNativePending((listener) => getNative()?.onDraft?.(listener), takePendingDraft, handler);
 
-/** A system-browser sign-in the shell received — see `apps/native/src-tauri/src/sign_in.rs`. */
+/** A system-browser sign-in the shell received: the code, and the verifier that proves this app started it. */
 export interface NativeSignIn {
     code: string;
     codeVerifier: string;
     redirectUri: string;
 }
 
-const isNativeSignIn = (value: unknown): value is NativeSignIn => {
-    const candidate = value as Partial<NativeSignIn> | null;
+/** Only a shell that advertises `sign-in` has the flow; anywhere else every sign-in call is a no-op. */
+const getSignInBridge = (): NativeBridge | undefined => {
+    const native = getNative();
 
-    return typeof candidate?.code === "string" && typeof candidate.codeVerifier === "string" && typeof candidate.redirectUri === "string";
+    return native?.capabilities.includes("sign-in") ? native : undefined;
 };
 
-/** Takes (and clears) the completed browser sign-in the shell is holding, if any. */
+/** Takes (and clears) the sign-in the shell is holding for this page, if any. */
 export const takePendingSignIn = async (): Promise<NativeSignIn | undefined> => {
-    const tauri = getTauri();
-
-    if (!tauri) {
-        return undefined;
-    }
-
     try {
-        const value = await tauri.core.invoke<unknown>("take_pending_sign_in");
+        const signIn = await getSignInBridge()?.takePendingSignIn();
 
-        return isNativeSignIn(value) ? value : undefined;
+        return signIn ?? undefined;
     } catch {
         return undefined;
     }
 };
-
-export const onNativeSignIn = (handler: (signIn: NativeSignIn) => void): UnlistenFunction => onNativePending(NATIVE_SIGN_IN_EVENT, takePendingSignIn, handler);
 
 /**
- * Asks the shell to run sign-in in the system browser. The shell also starts
- * it by itself when the page navigates to a provider that blocks webviews.
+ * Calls `handler` with each browser sign-in the shell receives, including one
+ * that arrived before the page subscribed. Returns the unsubscribe function.
  */
+export const onNativeSignIn = (handler: (signIn: NativeSignIn) => void): UnlistenFunction =>
+    onNativePending((listener) => getSignInBridge()?.onSignIn(listener), takePendingSignIn, handler);
+
+/** Opens the system browser on the sign-in page (the shell does the same when Google is opened in the window). */
 export const startNativeBrowserSignIn = async (): Promise<void> => {
     try {
-        await getTauri()?.core.invoke("start_browser_sign_in_command");
+        await getSignInBridge()?.startBrowserSignIn();
     } catch {
-        // Not permitted here; nothing to do.
+        // Best-effort: the browser did not open; the user can sign in another way.
     }
 };
 
@@ -217,15 +265,12 @@ export const completeNativeSignIn = async (signIn: NativeSignIn, fetchImpl: type
     }
 };
 
-// ─── Device execution (`apps/native/src-tauri/src/device/`) ─────────────────
+// ─── Device execution ───────────────────────────────────────────────────────
 //
-// The page is only a RELAY: it passes the backend's signed call envelopes to
-// the shell and the shell's signed results back. It cannot approve a call,
-// change what the shell shares, or read the pairing secret — those live in the
-// shell's local window. See docs/plans/device-execution.md.
-
-/** Mirrors `CHANGED_EVENT` in `apps/native/src-tauri/src/device/mod.rs`: the tool set changed. */
-export const NATIVE_DEVICE_CHANGED_EVENT = "neore:device-changed";
+// The shell's relay: the main process (`registerDeviceIpc`), the preload's `deviceRelay`, and
+// the Rust core. Each function forwards to it when the shell advertises `device`, and answers
+// "not available" otherwise, so the devices UI shows pairing as unavailable instead of failing a
+// call. The page only relays signed envelopes; the core verifies them and asks the user locally.
 
 export type NativeDevicePlatform = "linux" | "macos" | "windows";
 
@@ -242,130 +287,67 @@ export interface NativeSigned {
     signature: string;
 }
 
-const isSigned = (value: unknown): value is NativeSigned =>
-    typeof (value as Partial<NativeSigned> | null)?.payload === "string" && typeof (value as Partial<NativeSigned>).signature === "string";
+/** Only a shell that advertises `device` has the relay; anywhere else every device call is inert. */
+const getDeviceBridge = (): NativeDeviceRelay | undefined => {
+    const native = getNative();
+    const relay = native?.capabilities.includes("device") ? native.device : undefined;
 
-/** The shell's pairing state; `undefined` outside the desktop shell (mobile has no device tools). */
+    return relay !== undefined && typeof relay.execute === "function" ? relay : undefined;
+};
+
+/** `undefined` until the shell advertises `device`; also `undefined` when the core failed to load. */
 export const getNativeDeviceStatus = async (): Promise<NativeDeviceStatus | undefined> => {
     try {
-        const status = await getTauri()?.core.invoke<NativeDeviceStatus>("device_status");
-
-        return status && typeof status.platform === "string" ? status : undefined;
+        return (await getDeviceBridge()?.status()) ?? undefined;
     } catch {
         return undefined;
     }
 };
 
-/**
- * Hands a freshly registered device's secret to the shell. The shell stores it
- * only after the user confirms in its local window; `false` when they declined.
- */
+/** `false` until the shell advertises `device`, and when the shell refuses the pairing. */
 export const pairNativeDevice = async (pairing: { accountLabel: string; deviceId: string; secret: string }): Promise<boolean> => {
-    const tauri = getTauri();
-
-    if (!tauri) {
+    try {
+        return (await getDeviceBridge()?.pair(pairing)) === true;
+    } catch {
         return false;
     }
-
-    return (await tauri.core.invoke<boolean>("device_pair", pairing)) === true;
 };
 
-/** The shell's signed tool list; `undefined` when unpaired or outside the shell. */
-export const getNativeDeviceManifest = async (): Promise<NativeSigned | undefined> => {
-    try {
-        const manifest = await getTauri()?.core.invoke<unknown>("device_manifest");
+/** `undefined` until the shell advertises `device`. */
+export const getNativeDeviceManifest = async (): Promise<NativeSigned | undefined> => getDeviceBridge()?.manifest();
 
-        return isSigned(manifest) ? manifest : undefined;
-    } catch {
-        return undefined;
-    }
-};
-
-/**
- * Relays one signed call to the shell, which verifies it, asks the user and
- * runs it. Resolves with the signed result; rejects when the shell refused the
- * envelope itself (not paired, expired, forged).
- */
+/** Rejects until the shell advertises `device`; otherwise the shell's own rejection reaches the caller. */
 export const executeOnNativeDevice = async (call: { envelope: string; signature: string }): Promise<NativeSigned> => {
-    const tauri = getTauri();
+    const relay = getDeviceBridge();
 
-    if (!tauri) {
-        throw new Error("Not running in the desktop app");
+    if (relay === undefined) {
+        throw new Error("This desktop app has no device execution yet");
     }
 
-    const result = await tauri.core.invoke<unknown>("device_execute", call);
-
-    if (!isSigned(result)) {
-        throw new Error("The desktop app returned no result");
-    }
-
-    return result;
+    return relay.execute(call);
 };
 
-/** Opens the shell's local window: shared folders, local MCP servers, allow rules. */
+/** Opens the shell's local window. A no-op until the shell advertises `device`. */
 export const openNativeDeviceSettings = async (): Promise<void> => {
     try {
-        await getTauri()?.core.invoke("device_open_settings");
+        await getDeviceBridge()?.openSettings();
     } catch {
-        // Not permitted here; nothing to do.
+        // The window did not open; the user can still open it from the shell's menu.
     }
 };
-
-/** Mirrors `PROGRESS_EVENT` in `apps/native/src-tauri/src/device/mod.rs`: where a call is on the device. */
-export const NATIVE_DEVICE_PROGRESS_EVENT = "neore:device-progress";
 
 /** A signed "prompting" / "running" report for one call, relayed as-is to `reportDeviceCallProgress`. */
 export interface NativeDeviceProgress extends NativeSigned {
     callId: string;
 }
 
-const isProgress = (value: unknown): value is NativeDeviceProgress => isSigned(value) && typeof (value as Partial<NativeDeviceProgress>).callId === "string";
+/** Signed progress reports for calls this page relayed; a no-op until the shell advertises `device`. */
+export const onNativeDeviceProgress = (handler: (report: NativeDeviceProgress) => void): UnlistenFunction =>
+    getDeviceBridge()?.onProgress(handler) ?? (() => {});
 
-/**
- * Calls `handler` with each signed progress report the shell emits while it
- * works on a call (the approval window showed it; it started running). The page
- * cannot read or forge what it relays — the backend verifies the signature.
- */
-export const onNativeDeviceProgress = (handler: (report: NativeDeviceProgress) => void): UnlistenFunction => {
-    const tauri = getTauri();
+/** Calls `handler` once on subscribe, then on each shell change; only the one call outside the shell. */
+export const onNativeDeviceChanged = (handler: () => void): UnlistenFunction => {
+    handler();
 
-    if (!tauri) {
-        return () => {};
-    }
-
-    let disposed = false;
-    let unlisten: UnlistenFunction | undefined;
-
-    void (async () => {
-        try {
-            const stop = await tauri.event.listen(NATIVE_DEVICE_PROGRESS_EVENT, (event) => {
-                const payload = (event as { payload?: unknown } | null)?.payload;
-
-                if (!disposed && isProgress(payload)) {
-                    handler({ callId: payload.callId, payload: payload.payload, signature: payload.signature });
-                }
-            });
-
-            if (disposed) {
-                stop();
-            } else {
-                unlisten = stop;
-            }
-        } catch {
-            // Listening denied: the chat then shows the call as sent until it finishes.
-        }
-    })();
-
-    return () => {
-        disposed = true;
-        unlisten?.();
-    };
+    return getDeviceBridge()?.onChanged(handler) ?? (() => {});
 };
-
-/** Calls `handler` once on subscribe and again whenever the shell's tool set changed (folders, servers, pairing). */
-export const onNativeDeviceChanged = (handler: () => void): UnlistenFunction =>
-    onNativePending(
-        NATIVE_DEVICE_CHANGED_EVENT,
-        async () => true,
-        () => handler(),
-    );

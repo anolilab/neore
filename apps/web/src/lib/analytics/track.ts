@@ -25,20 +25,22 @@ export const resetAnalyticsIdentity = (): void => {
  * not opted out of capturing.
  */
 
-export const trackEvent = <E extends AnalyticsEvent>(event: E, properties: AnalyticsEventMap[E]): void => {
+export const trackEvent = <E extends AnalyticsEvent>(event: E, properties: AnalyticsEventMap[E]): boolean => {
     // posthog-js is a singleton – if it was never initialised (e.g. in dev
     // mode or when the env-var is missing) the `__loaded` flag will be falsy.
     if (!posthog.__loaded) {
-        return;
+        return false;
     }
 
     // Respect consent – PostHog will silently no-op when opted-out, but we
     // guard here to keep the intent explicit.
     if (posthog.has_opted_out_capturing()) {
-        return;
+        return false;
     }
 
     posthog.capture(event, properties as Record<string, unknown>);
+
+    return true;
 };
 
 /**

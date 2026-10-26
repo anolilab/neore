@@ -22,6 +22,6 @@ jobs:
         with:
             # `actions` analyses the workflow files themselves (script injection,
             # untrusted checkouts) alongside the application code; `rust` covers
-            # services/document-parser and the Tauri shell in apps/native.
+            # services/document-parser.
             languages: '["javascript-typescript", "actions", "rust"]'
             branches: '["main"]'

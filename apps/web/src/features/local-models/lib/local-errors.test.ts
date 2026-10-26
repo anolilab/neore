@@ -70,6 +70,22 @@ describe(isSafariUserAgent, () => {
         expect(isSafariUserAgent(FIREFOX)).toBe(false);
         expect(isSafariUserAgent(undefined)).toBe(false);
     });
+
+    it("is never Safari inside the Electron desktop shell, whatever its user agent says", () => {
+        expect.assertions(3);
+        const ELECTRON = `${CHROME} Electron/44.0.0`;
+
+        expect(isSafariUserAgent(ELECTRON)).toBe(false);
+
+        vi.stubGlobal("neoreNative", { capabilities: [], notify: vi.fn(), onCompose: vi.fn(), takePendingCompose: vi.fn() });
+
+        try {
+            expect(isSafariUserAgent(ELECTRON)).toBe(false);
+            expect(isSafariUserAgent(SAFARI)).toBe(false);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
 });
 
 describe(probeReachableWithoutCors, () => {

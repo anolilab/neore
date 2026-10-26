@@ -12,6 +12,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { withUnlockProofBody } from "@neore/client-runtime";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
@@ -21,7 +22,6 @@ import { supportsReasoningEffort } from "@/features/chat/model-settings/reasonin
 import { useGatewayModels } from "@/hooks/use-gateway-models";
 import env from "@/lib/env";
 import { useCRPC, useLunora } from "@/lib/lunora/crpc";
-import { withUnlockProofBody } from "@/lib/lunora/unlock-proofs";
 
 import type { ComparisonBranch } from "../../thread/comparison-view";
 import type { PendingAttachment } from "../stores/chat-ui-store";
