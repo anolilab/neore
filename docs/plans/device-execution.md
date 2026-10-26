@@ -205,8 +205,8 @@ by RFC 4231 test vectors) — **no new crate**.
   toolchain folders; the rest of `$HOME` is invisible. Network is blocked on
   macOS and Linux while "Allow network for shell commands" (`allow_shell_network`,
   default off) is off; Windows does not restrict it. On Linux that is a seccomp-bpf
-  filter that makes `socket(2)` fail with `EPERM` for `AF_INET`/`AF_INET6` (and refuses
-  `io_uring_setup`); `AF_UNIX` stays open. Linux uses Landlock (best effort across ABIs; no Landlock → no
+  filter that makes `socket(2)` fail with `EPERM` for every family except `AF_UNIX` and
+  `AF_NETLINK` (and refuses `io_uring_setup`); local Unix and netlink sockets stay open. Linux uses Landlock (best effort across ABIs; no Landlock → no
   sandbox) with `PR_SET_NO_NEW_PRIVS`, macOS `sandbox-exec` with a generated
   profile, Windows has none (a kill-on-close Job Object, reported unsandboxed).
   The Rust-side setting "Require sandbox for shell commands" (default ON)

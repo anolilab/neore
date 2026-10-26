@@ -8,18 +8,18 @@
 //!   only makes a few syscalls. Best effort across ABIs (5.13+), but a kernel
 //!   without Landlock is reported as unavailable, never silently skipped. With
 //!   the network off, a seccomp-bpf filter is installed right after it: it
-//!   makes `socket(2)` fail with `EPERM` for `AF_INET` and `AF_INET6` (and
-//!   refuses `io_uring_setup`, whose `IORING_OP_SOCKET` would sidestep it).
-//!   `AF_UNIX` and the rest stay open. If the filter cannot be installed the
-//!   spawn fails, so the command never runs unconfined.
+//!   makes `socket(2)` fail with `EPERM` for every family except `AF_UNIX` and
+//!   `AF_NETLINK` (and refuses `io_uring_setup`, whose `IORING_OP_SOCKET` would
+//!   sidestep it). If the filter cannot be installed the spawn fails, so the
+//!   command never runs unconfined.
 //! - **macOS:** `sandbox-exec` with a generated SBPL profile. Every path reaches
 //!   the profile as a `-D` parameter, never spliced into its text.
 //! - **Windows:** no sandbox. Commands run in a kill-on-close Job Object
 //!   (`shell.rs`) and are reported as unsandboxed.
 //!
 //! Network access is blocked on macOS and Linux unless the user allows it
-//! ([`Policy::network`]); on Linux that means no new IPv4/IPv6 sockets. Windows
-//! does not restrict it. The user's
+//! ([`Policy::network`]); on Linux that means no sockets except local Unix and
+//! netlink ones. Windows does not restrict it. The user's
 //! "Require sandbox for shell commands" setting (default on) refuses `shell_run`
 //! where [`support`] says unavailable.
 
@@ -46,7 +46,8 @@ pub struct Policy {
     /// Linux everything not listed is hidden anyway).
     pub home: Option<PathBuf>,
     /// Whether the command may reach the network. macOS denies it when false;
-    /// Linux refuses new IPv4/IPv6 sockets (seccomp). Windows does not enforce it.
+    /// Linux refuses every socket family but Unix and netlink (seccomp). Windows
+    /// does not enforce it.
     pub network: bool,
 }
 
@@ -273,10 +274,8 @@ mod linux {
     const BPF_RET_K: u16 = 0x06;
 
     // `struct seccomp_data` offsets: `nr`, `arch`, then `args[0]`. Argument 0
-    // is read as its low 32-bit word, which sits first only on little endian.
-    #[cfg(target_endian = "big")]
-    compile_error!("the seccomp network filter reads argument 0 as a little-endian word");
-
+    // is read as its low 32-bit word, which sits first only on little endian,
+    // so `network_filter` refuses every other byte order at runtime.
     const OFFSET_NR: u32 = 0;
     const OFFSET_ARCH: u32 = 4;
     const OFFSET_ARG0: u32 = 16;
@@ -308,18 +307,27 @@ mod linux {
     }
 
     /// The seccomp-bpf program for a command that may not use the network:
-    /// `socket(AF_INET | AF_INET6 | AF_PACKET, ..)` and `io_uring_setup` fail
-    /// with `EPERM`,
-    /// every other syscall is allowed, and a process of another architecture
-    /// (32-bit compat, x32) is killed. Fails when this architecture has no
-    /// filter, so an unsupported machine never runs a command unconfined.
+    /// `socket(2)` fails with `EPERM` for every family except `AF_UNIX` and
+    /// `AF_NETLINK` (both local to the kernel), `io_uring_setup` fails with
+    /// `EPERM`, every other syscall is allowed, and a process of another
+    /// architecture (32-bit compat, x32) is killed. Fails when this architecture
+    /// has no filter, so an unsupported machine never runs a command unconfined.
     pub fn network_filter() -> Result<Vec<libc::sock_filter>, String> {
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        #[cfg(not(all(
+            any(target_arch = "x86_64", target_arch = "aarch64"),
+            target_endian = "little"
+        )))]
         {
-            Err("the network sandbox supports only x86_64 and aarch64 Linux".to_owned())
+            Err(
+                "the network sandbox supports only little-endian x86_64 and aarch64 Linux"
+                    .to_owned(),
+            )
         }
 
-        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "aarch64"),
+            target_endian = "little"
+        ))]
         {
             let mut program = vec![
                 statement(BPF_LD_W_ABS, OFFSET_ARCH),
@@ -339,9 +347,8 @@ mod linux {
                 ),
                 branch(BPF_JMP_JEQ_K, libc::SYS_socket as u32, To::Next, To::Allow),
                 statement(BPF_LD_W_ABS, OFFSET_ARG0),
-                branch(BPF_JMP_JEQ_K, libc::AF_INET as u32, To::Deny, To::Next),
-                branch(BPF_JMP_JEQ_K, libc::AF_INET6 as u32, To::Deny, To::Next),
-                branch(BPF_JMP_JEQ_K, libc::AF_PACKET as u32, To::Deny, To::Allow),
+                branch(BPF_JMP_JEQ_K, libc::AF_UNIX as u32, To::Allow, To::Next),
+                branch(BPF_JMP_JEQ_K, libc::AF_NETLINK as u32, To::Allow, To::Deny),
             ]);
 
             let allow = program.len();
@@ -458,8 +465,8 @@ mod linux {
     }
 
     /// Confines `command`'s child with Landlock and, when the policy has no
-    /// network, a seccomp filter on new IPv4/IPv6 sockets. Fails closed: if the
-    /// child cannot restrict itself, it never execs and the spawn errors.
+    /// network, a seccomp filter on network sockets. Fails closed: if the child
+    /// cannot restrict itself, it never execs and the spawn errors.
     pub fn confine(command: &mut Command, policy: &Policy) -> Result<Guard, String> {
         let ruleset = ruleset(policy)?;
         let fd = ruleset.as_raw_fd();
@@ -610,7 +617,7 @@ fn network_sentence(policy: &Policy) -> &'static str {
     if policy.network {
         " Network access is allowed by this computer's device settings."
     } else {
-        " New IPv4 and IPv6 connections are blocked (Unix sockets are not). Turn on \"Allow network for shell commands\" in this computer's device settings to allow them."
+        " Network sockets are blocked; local Unix and netlink sockets are not. Turn on \"Allow network for shell commands\" in this computer's device settings to allow them."
     }
 }
 
@@ -802,7 +809,7 @@ mod tests {
         assert!(describe(&available, Some(&policy())).contains("Network access is blocked"));
         #[cfg(target_os = "linux")]
         assert!(describe(&available, Some(&policy()))
-            .contains("New IPv4 and IPv6 connections are blocked (Unix sockets are not)"));
+            .contains("Network sockets are blocked; local Unix and netlink sockets are not"));
         #[cfg(target_os = "linux")]
         assert!(!describe(&available, Some(&policy())).contains("network access are NOT"));
         #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -820,8 +827,8 @@ mod tests {
     /// What a forked child sees from `socket(2)` after `filter` (if any) is
     /// installed: bit 0 AF_INET failed with EPERM, bit 1 AF_INET6 failed with
     /// EPERM, bit 2 AF_UNIX succeeded, bit 3 AF_INET succeeded, bit 4 AF_PACKET
-    /// failed with EPERM. The child allocates nothing and only `_exit`s, so
-    /// forking the test process is safe.
+    /// failed with EPERM, bit 5 AF_VSOCK failed with EPERM. The child allocates
+    /// nothing and only `_exit`s, so forking the test process is safe.
     #[cfg(target_os = "linux")]
     fn probe_sockets(filter: Option<&[libc::sock_filter]>) -> i32 {
         // SAFETY: the child makes only raw syscalls and exits without unwinding.
@@ -860,7 +867,8 @@ mod tests {
                     | i32::from(denied(libc::AF_INET6)) << 1
                     | i32::from(opens(libc::AF_UNIX)) << 2
                     | i32::from(opens(libc::AF_INET)) << 3
-                    | i32::from(denied(libc::AF_PACKET)) << 4;
+                    | i32::from(denied(libc::AF_PACKET)) << 4
+                    | i32::from(denied(libc::AF_VSOCK)) << 5;
 
                 libc::_exit(bits);
             }
@@ -879,7 +887,7 @@ mod tests {
     fn the_network_filter_refuses_ip_sockets_and_keeps_unix_sockets() {
         let filter = network_filter().unwrap();
 
-        assert_eq!(probe_sockets(Some(&filter)), 0b1_0111);
+        assert_eq!(probe_sockets(Some(&filter)), 0b11_0111);
     }
 
     #[cfg(target_os = "linux")]

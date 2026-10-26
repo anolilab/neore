@@ -569,8 +569,8 @@ written here is what is not.
   Landlock / `sandbox-exec`; Windows has none) that writes only the shared
   folders + a per-run `$TMPDIR` and hides the rest of `$HOME`. Network is blocked
   on macOS and Linux unless the user turns on "Allow network for shell commands" (default
-  off); on Linux that is a seccomp filter making `socket(AF_INET | AF_INET6)`
-  (and `io_uring_setup`) fail with `EPERM`, so `AF_UNIX` still works; Windows does not
+  off); on Linux that is a seccomp filter making `socket(2)` fail with `EPERM` for
+  every family except `AF_UNIX` and `AF_NETLINK` (and `io_uring_setup`); Windows does not
   restrict it. MCP servers are NOT sandboxed. Where there is no sandbox the call
   is REFUSED unless the user turned off "Require sandbox for shell commands"
   (stored inverted, `allowUnsandboxedShell`, so absent = required). Allow
