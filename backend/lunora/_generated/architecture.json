@@ -6306,6 +6306,21 @@
       "to": "table:tasks"
     },
     {
+      "from": "function:triggers_deliveries:claimWebhookDelivery",
+      "kind": "read",
+      "to": "table:webhookDeliveries"
+    },
+    {
+      "from": "function:triggers_deliveries:claimWebhookDelivery",
+      "kind": "write",
+      "to": "table:webhookDeliveries"
+    },
+    {
+      "from": "function:triggers_deliveries:purgeDeliveries",
+      "kind": "schedule",
+      "to": "function:triggers_deliveries:purgeDeliveries"
+    },
+    {
       "from": "function:triggers_execute:default",
       "kind": "call",
       "to": "function:bots_functions:getBotForRun"
@@ -14309,6 +14324,27 @@
       "module": "tasks"
     },
     {
+      "detail": "mutation",
+      "id": "function:triggers_deliveries:claimWebhookDelivery",
+      "kind": "function",
+      "name": "triggers.deliveries.claimWebhookDelivery",
+      "module": "triggers"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:triggers_deliveries:purgeDeliveries",
+      "kind": "function",
+      "name": "triggers.deliveries.purgeDeliveries",
+      "module": "triggers"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:triggers_deliveries:releaseWebhookDelivery",
+      "kind": "function",
+      "name": "triggers.deliveries.releaseWebhookDelivery",
+      "module": "triggers"
+    },
+    {
       "detail": "action",
       "id": "function:triggers_execute:default",
       "kind": "function",
@@ -15693,6 +15729,12 @@
       "module": "auth"
     },
     {
+      "id": "table:webhookDeliveries",
+      "kind": "table",
+      "name": "webhookDeliveries",
+      "module": "triggers"
+    },
+    {
       "id": "table:workflowExecutions",
       "kind": "table",
       "name": "workflowExecutions",
@@ -16035,7 +16077,8 @@
       "name": "triggers",
       "tables": [
         "triggerExecutions",
-        "triggers"
+        "triggers",
+        "webhookDeliveries"
       ]
     },
     {
@@ -19121,67 +19164,67 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 96,
+      "line": 97,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 96,
+      "line": 97,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 96,
+      "line": 97,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 96,
+      "line": 97,
       "reason": "\"hasClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 96,
+      "line": 97,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 115,
+      "line": 116,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 115,
+      "line": 116,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 118,
+      "line": 119,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 118,
+      "line": 119,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 172,
+      "line": 173,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 239,
+      "line": 240,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -20055,63 +20098,87 @@
       "reason": "\"loadUserTasks\" is not a registered function"
     },
     {
+      "file": "triggers/deliveries",
+      "kind": "write",
+      "line": 72,
+      "reason": "\"releaseDelivery\" is not a registered function"
+    },
+    {
+      "file": "triggers/deliveries",
+      "kind": "read",
+      "line": 87,
+      "reason": "\"deleteDeliveries\" is not a registered function"
+    },
+    {
+      "file": "triggers/deliveries",
+      "kind": "write",
+      "line": 92,
+      "reason": "\"deleteDeliveries\" is not a registered function"
+    },
+    {
+      "file": "triggers/deliveries",
+      "kind": "schedule",
+      "line": 119,
+      "reason": "\"deleteDeliveriesOfTrigger\" is not a registered function"
+    },
+    {
       "file": "triggers/gdpr",
       "kind": "read",
-      "line": 11,
+      "line": 12,
       "reason": "\"eraseTriggersForUser\" is not a registered function"
     },
     {
       "file": "triggers/gdpr",
       "kind": "read",
-      "line": 19,
+      "line": 20,
       "reason": "\"eraseTriggersForUser\" is not a registered function"
     },
     {
       "file": "triggers/gdpr",
       "kind": "write",
-      "line": 24,
+      "line": 25,
       "reason": "\"eraseTriggersForUser\" is not a registered function"
     },
     {
       "file": "triggers/gdpr",
       "kind": "write",
-      "line": 31,
+      "line": 34,
       "reason": "\"eraseTriggersForUser\" is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 96,
+      "line": 103,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 206,
+      "line": 239,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 237,
+      "line": 401,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 242,
+      "line": 412,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 247,
+      "line": 418,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 271,
+      "line": 434,
       "reason": "the default export is not a registered function"
     },
     {

@@ -3023,6 +3023,18 @@ export const schema = defineSchema({
         .index("identifier", ["identifier"])
         .triggers((t) => auditTriggersFor(t, "verification", AUDIT_TABLES["verification"]!)),
 
+    // One row per accepted delivery of a `gitlab-token` webhook trigger, kept for the trigger's whole
+    // life (`triggers/deliveries.ts`). No owner column: reached through the parent trigger, like `triggerExecutions`.
+    webhookDeliveries: defineTable({
+        // SHA-256 of the body. GitLab says recursive webhooks share one event UUID, so the id alone would refuse a
+        // distinct delivery; the pair is what makes a captured delivery a replay.
+        bodyDigest: v.string(),
+        createdAt: v.number(),
+        // GitLab's `X-Gitlab-Event-UUID`.
+        deliveryId: v.string(),
+        triggerId: v.id("triggers"),
+    }).index("by_triggerId_deliveryId_bodyDigest", ["triggerId", "deliveryId", "bodyDigest"]),
+
     workflowExecutions: defineTable({
         completedAt: v.optional(v.number()),
         error: v.optional(v.string()),

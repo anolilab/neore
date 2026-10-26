@@ -711,6 +711,7 @@ class AppBuilder<Env extends object> {
             ["userSkills", { mode: { field: "userId", kind: "shardBy" } }],
             ["userVariableDefaults", { mode: { kind: "global" } }],
             ["verification", { mode: { kind: "global" } }],
+            ["webhookDeliveries", { mode: { kind: "root" } }],
             ["workflowExecutions", { mode: { field: "userId", kind: "shardBy" } }],
             ["workflowPresence", { mode: { field: "userId", kind: "shardBy" } }],
             ["workflowVersions", { mode: { field: "userId", kind: "shardBy" } }],

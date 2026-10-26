@@ -1657,6 +1657,17 @@ export const userSkills = sqliteTable("userSkills", {
     by_user_and_skill: index("by_user_and_skill").on(t.userId, t.skillId),
 }));
 
+export const webhookDeliveries = sqliteTable("webhookDeliveries", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    bodyDigest: text("bodyDigest").notNull(),
+    createdAt: real("createdAt").notNull(),
+    deliveryId: text("deliveryId").notNull(),
+    triggerId: text("triggerId").references((): AnySQLiteColumn => triggers._id).notNull(),
+}, (t) => ({
+    by_triggerId_deliveryId_bodyDigest: index("by_triggerId_deliveryId_bodyDigest").on(t.triggerId, t.deliveryId, t.bodyDigest),
+}));
+
 export const workflowExecutions = sqliteTable("workflowExecutions", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

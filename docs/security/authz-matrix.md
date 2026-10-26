@@ -141,6 +141,7 @@ for a schema table that is neither policed nor listed:
 | `threadKnowledge` | link rows with no owner column; every access follows a thread access check |
 | `triggerExecutions` | no owner column; every access follows the parent trigger's owner check |
 | `verification` | better-auth verification tokens |
+| `webhookDeliveries` | no owner column; written and read only by the webhook handler and the parent trigger's deletion |
 
 ## Procedures
 

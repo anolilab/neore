@@ -10,6 +10,7 @@ import schema from "../schema";
 import { internal } from "../_generated/internal";
 import { claimKey, claimKeyFenced, releaseKey, TRIGGER_CLAIM_TTL_MS } from "../lib/claim-once";
 import { SIGNED_REQUEST_WINDOW_MS } from "../lib/crypto";
+import { claimWebhookDelivery, releaseWebhookDelivery } from "./deliveries";
 import { recordFilteredExecution } from "./functions";
 import handleTriggerWebhook, { verifyHmacSignature } from "./http";
 
@@ -48,6 +49,14 @@ const SIGNED_TRIGGER = { enabled: true, type: "webhook", webhookSecret: SECRET }
 const claimMutation = (reference: unknown) => {
     if (reference === internal.lib.claim_once.releaseKey) {
         return releaseKey;
+    }
+
+    if (reference === internal.triggers.deliveries.claimWebhookDelivery) {
+        return claimWebhookDelivery;
+    }
+
+    if (reference === internal.triggers.deliveries.releaseWebhookDelivery) {
+        return releaseWebhookDelivery;
     }
 
     return reference === internal.lib.claim_once.claimKeyFenced ? claimKeyFenced : claimKey;
@@ -586,55 +595,165 @@ describe("provider signature schemes", () => {
     });
 
     describe("gitlab-token", () => {
-        it("accepts the token header", async () => {
+        const UUID = "0a2f7c1e-6c1d-4b53-9d3a-1f7e4d0c9b11";
+        const gitlab = (uuid: string = UUID) => {
+            return { "x-gitlab-event-uuid": uuid, "x-gitlab-token": SECRET };
+        };
+        const records = async (): Promise<{ bodyDigest: string; createdAt: number; deliveryId: string }[]> =>
+            await harness.run(async (ctx: any) => await ctx.db.query("webhookDeliveries").collect());
+
+        it("accepts the token with a delivery id, and records the delivery", async () => {
             const { scheduled, statusOf } = await setup(GITLAB_TRIGGER);
 
-            expect(await statusOf('{"object_kind":"merge_request"}', { "x-gitlab-token": SECRET })).toBe(200);
+            expect(await statusOf('{"object_kind":"merge_request"}', gitlab())).toBe(200);
             expect(scheduled).toHaveLength(1);
+            expect(await records()).toEqual([expect.objectContaining({ createdAt: NOW, deliveryId: UUID })]);
+        });
+
+        it("takes no body claim: the permanent record is the only replay guard", async () => {
+            const { statusOf } = await setup(GITLAB_TRIGGER);
+
+            await statusOf('{"n":1}', gitlab());
+
+            expect(await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect())).toEqual([]);
         });
 
         it("runs two different deliveries that carry the same token", async () => {
             // The token is the same on every delivery, so a claim keyed on it would swallow the second.
             const { scheduled, statusOf } = await setup(GITLAB_TRIGGER);
 
-            expect(await statusOf('{"n":1}', { "x-gitlab-token": SECRET })).toBe(200);
-            expect(await statusOf('{"n":2}', { "x-gitlab-token": SECRET })).toBe(200);
+            expect(await statusOf('{"n":1}', gitlab("11111111-1111-4111-8111-111111111111"))).toBe(200);
+            expect(await statusOf('{"n":2}', gitlab("22222222-2222-4222-8222-222222222222"))).toBe(200);
             expect(scheduled).toHaveLength(2);
         });
 
-        it("answers an identical body within the claim window as a duplicate", async () => {
+        it("answers the same delivery id and body as a duplicate", async () => {
             const { post, scheduled } = await setup(GITLAB_TRIGGER);
             const body = '{"n":1}';
 
-            await post(body, { "x-gitlab-token": SECRET });
+            await post(body, gitlab());
 
-            const replay = await post(body, { "x-gitlab-token": SECRET });
+            const replay = await post(body, gitlab());
 
             expect(replay.status).toBe(200);
             expect(await replay.json()).toMatchObject({ duplicate: true });
             expect(scheduled).toHaveLength(1);
+            expect(await records()).toHaveLength(1);
         });
 
-        it("refuses a wrong or missing token", async () => {
+        it("still refuses the replay after the 15-minute claim window, and long after", async () => {
+            const { post, scheduled, statusOf } = await setup(GITLAB_TRIGGER);
+            const body = '{"n":1}';
+
+            expect(await statusOf(body, gitlab())).toBe(200);
+
+            for (const elapsed of [TRIGGER_CLAIM_TTL_MS + 1, 30 * 24 * 60 * 60 * 1000]) {
+                vi.setSystemTime(NOW + elapsed);
+
+                const replay = await post(body, gitlab());
+
+                expect(await replay.json()).toMatchObject({ duplicate: true });
+            }
+
+            expect(scheduled).toHaveLength(1);
+        });
+
+        it("runs a delivery that shares the event id but not the body (recursive webhooks share one)", async () => {
             const { scheduled, statusOf } = await setup(GITLAB_TRIGGER);
 
-            expect(await statusOf("{}", { "x-gitlab-token": "not-the-secret" })).toBe(401);
-            expect(await statusOf("{}", {})).toBe(401);
+            expect(await statusOf('{"object_kind":"push"}', gitlab())).toBe(200);
+            expect(await statusOf('{"object_kind":"note"}', gitlab())).toBe(200);
+            expect(scheduled).toHaveLength(2);
+        });
+
+        it("refuses a verified delivery with no delivery id, an empty one or an over-long one, charging nothing", async () => {
+            const { scheduled, statusOf } = await setup(GITLAB_TRIGGER);
+
+            expect(await statusOf("{}", { "x-gitlab-token": SECRET })).toBe(401);
+            expect(await statusOf("{}", { "x-gitlab-event-uuid": " ".repeat(3), "x-gitlab-token": SECRET })).toBe(401);
+            expect(await statusOf("{}", gitlab("a".repeat(129)))).toBe(401);
             expect(scheduled).toHaveLength(0);
+            expect(rateLimit.charged).toBe(0);
+            expect(await records()).toEqual([]);
+        });
+
+        it("checks the token before the delivery id, so a caller without the token learns nothing about it", async () => {
+            const { post } = await setup(GITLAB_TRIGGER);
+            const noId = await post("{}", { "x-gitlab-token": "not-the-secret" });
+            const withId = await post("{}", { ...gitlab(), "x-gitlab-token": "not-the-secret" });
+            const missingId = await post("{}", { "x-gitlab-token": SECRET });
+
+            // The same answer with and without an id; only the right token reaches the id check.
+            expect(noId.status).toBe(401);
+            expect(await noId.json()).toEqual({ error: "Invalid signature" });
+            expect(await withId.json()).toEqual({ error: "Invalid signature" });
+            expect(await missingId.json()).toEqual({ error: "Missing or invalid delivery identifier" });
+        });
+
+        it("refuses a wrong or missing token even with a valid delivery id, and records nothing", async () => {
+            const { scheduled, statusOf } = await setup(GITLAB_TRIGGER);
+
+            expect(await statusOf("{}", { ...gitlab(), "x-gitlab-token": "not-the-secret" })).toBe(401);
+            expect(await statusOf("{}", { "x-gitlab-event-uuid": UUID })).toBe(401);
+            expect(scheduled).toHaveLength(0);
+            expect(await records()).toEqual([]);
+        });
+
+        it("gives the record back when scheduling fails, so the sender's retry runs", async () => {
+            const { scheduled, scheduler, statusOf } = await setup(GITLAB_TRIGGER);
+            const body = '{"n":1}';
+
+            scheduler.fail = true;
+            expect(await statusOf(body, gitlab())).toBe(500);
+            expect(await records()).toEqual([]);
+
+            scheduler.fail = false;
+            expect(await statusOf(body, gitlab())).toBe(200);
+            expect(scheduled).toHaveLength(1);
+        });
+
+        it("gives the record back for a filtered delivery, so a redelivery after fixing the filters is evaluated again", async () => {
+            const { scheduled, statusOf } = await setup({ ...GITLAB_TRIGGER, filters: [{ op: "equals", path: "object_kind", value: "push" }] });
+
+            expect(await statusOf('{"object_kind":"note"}', gitlab())).toBe(202);
+            expect(await records()).toEqual([]);
+            expect(scheduled).toHaveLength(0);
+        });
+
+        it("passes the record to the execution instead of a claim", async () => {
+            const { scheduled, statusOf } = await setup(GITLAB_TRIGGER);
+
+            expect(await statusOf('{"n":1}', gitlab())).toBe(200);
+
+            const args = scheduled[0] as { claim?: unknown; deliveryRecord?: string };
+
+            expect(args.claim).toBeUndefined();
+            expect(args.deliveryRecord).toEqual(expect.any(String));
         });
 
         it("refuses a request carrying another scheme's header", async () => {
             const { scheduled, statusOf } = await setup(GITLAB_TRIGGER);
 
-            expect(await statusOf("{}", { "x-gitlab-token": SECRET, "x-hub-signature-256": `sha256=${await hmacHex("{}")}` })).toBe(401);
+            expect(await statusOf("{}", { ...gitlab(), "x-hub-signature-256": `sha256=${await hmacHex("{}")}` })).toBe(401);
             expect(scheduled).toHaveLength(0);
         });
 
         it("fails closed when the trigger has no secret", async () => {
             const { scheduled, statusOf } = await setup({ ...GITLAB_TRIGGER, webhookSecret: undefined });
 
-            expect(await statusOf("{}", { "x-gitlab-token": SECRET })).toBe(401);
+            expect(await statusOf("{}", gitlab())).toBe(401);
             expect(scheduled).toHaveLength(0);
         });
+
+        for (const scheme of ["native", "timestamped"] as const) {
+            it(`does not make a ${scheme} trigger require or record a delivery id`, async () => {
+                const { scheduled, statusOf } = await setup({ ...SIGNED_TRIGGER, webhookSignatureScheme: scheme });
+                const headers = scheme === "native" ? { "x-hub-signature-256": `sha256=${await hmacHex("{}")}` } : await signedHeaders("{}");
+
+                expect(await statusOf("{}", { ...headers, "x-gitlab-event-uuid": UUID })).toBe(200);
+                expect(scheduled).toHaveLength(1);
+                expect(await records()).toEqual([]);
+            });
+        }
     });
 });

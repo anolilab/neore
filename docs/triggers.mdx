@@ -79,9 +79,9 @@ Set the secret shown when you create the trigger as the **secret** of the provid
 
 ##### GitLab secret token
 
-GitLab does not sign the request body. It sends the secret you configured, as plain text, in the `X-Gitlab-Token` header, and sends no timestamp. Neore compares it in constant time, but it is a **bearer token**: whoever holds the secret can send any request to the trigger, and a captured request can be sent again.
+GitLab does not sign the request body. It sends the secret you configured, as plain text, in the `X-Gitlab-Token` header, and sends no timestamp. Neore compares it in constant time, but it is a **bearer token**: whoever holds the secret can send any request to the trigger.
 
-The only replay defence is a duplicate rule: a delivery whose body is identical to one accepted within the last 15 minutes is answered `200` with `{"duplicate": true}` and does not run again. Two deliveries with different bodies both run, even though they carry the same token. A body sent again after the 15 minutes is accepted again. Treat the secret like a password, and rotate it by creating a new trigger if it leaks.
+Every GitLab delivery also carries an `X-Gitlab-Event-UUID` header. A delivery without one is refused with `401`. Neore remembers each accepted delivery, by that identifier and the body, for as long as the trigger exists. A delivery that repeats one it already accepted, however long ago, is answered `200` with `{"duplicate": true}` and does not run again, so a captured request cannot be sent again. Deliveries that differ in either the identifier or the body both run. The identifier is not signed, so this does not stop someone who holds the secret, who can send any request under a new identifier. Treat the secret like a password, and rotate it by creating a new trigger if it leaks. Deleting the trigger deletes these records.
 
 ### Event (not available)
 

@@ -19,6 +19,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { releaseClaim } from "../lib/claim-once";
 import { encryptKey } from "../lib/encryption";
+import { deleteDeliveriesOfTrigger, releaseDelivery } from "./deliveries";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
 import { assertValidFilters, evaluateFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH, MAX_WEBHOOK_BODY_BYTES } from "./filters";
@@ -557,11 +558,14 @@ export const deleteTrigger = authMutation
             .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", args.triggerId as Id<"triggers">))
             .collect();
 
-        // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes.
+        // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes. A `gitlab-token` trigger's
+        // delivery records (`deliveries.ts`) do not; they are cleared below.
         await Promise.allSettled(executions.map((row) => context.db.delete(row._id)));
 
         // Delete the trigger
         await context.db.delete(args.triggerId as Id<"triggers">);
+        // A `gitlab-token` trigger's delivery record is kept for its whole life, so it can be long: one batch here, the rest scheduled.
+        await deleteDeliveriesOfTrigger(context, args.triggerId as Id<"triggers">);
         await deleteShardRoute(context, "trigger", args.triggerId);
 
         context.log.event("triggers.delete_trigger", { executionsDeleted: executions.length });
@@ -756,12 +760,14 @@ export const admitTriggerRun = internalMutation
         // The webhook delivery's replay claim. A delivery refused here gives it back, as the handler does for one
         // that misses the filters, so the owner can fix them and redeliver the same signed body.
         claim: v.optional(v.object({ claimedAt: v.number(), key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
+        // The same, for a `gitlab-token` delivery: its permanent record (`deliveries.ts`).
+        deliveryRecord: v.optional(v.id("webhookDeliveries")),
         executionId: v.optional(v.id("triggerExecutions")),
         filterPayload: v.optional(v.string().max(MAX_WEBHOOK_BODY_BYTES)),
         triggerId: v.id("triggers"),
     })
     .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() })))
-    .mutation(async ({ args: { claim, executionId, filterPayload, triggerId }, ctx }) => {
+    .mutation(async ({ args: { claim, deliveryRecord, executionId, filterPayload, triggerId }, ctx }) => {
         const trigger = await ctx.db.get(triggerId);
 
         if (!trigger) {
@@ -788,6 +794,15 @@ export const admitTriggerRun = internalMutation
                     } catch (error) {
                         // The refusal stands; a claim left behind only makes a redelivery read as a replay until its TTL.
                         console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}:`, error);
+                    }
+                }
+
+                if (deliveryRecord) {
+                    try {
+                        await releaseDelivery(ctx, deliveryRecord);
+                    } catch (error) {
+                        // The refusal stands; a record left behind makes a redelivery of this body read as a replay.
+                        console.error(`[Triggers] Could not release the delivery record of trigger ${triggerId}:`, error);
                     }
                 }
 
