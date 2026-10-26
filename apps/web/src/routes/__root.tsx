@@ -11,6 +11,7 @@ import geistLatinFont from "@fontsource-variable/geist/files/geist-latin-wght-no
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useAuth } from "@lunora/react";
+import { seedHydratedAuthToken, TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@neore/client-runtime";
 import { IconSpriteSheet } from "@neore/ui/components/ai-elements/provider-icon";
 import { CSPProvider } from "@neore/ui/components/csp-provider";
 import { DirectionProvider } from "@neore/ui/components/direction";
@@ -20,7 +21,7 @@ import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts, useRouteContext, useRouter } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
-import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef } from "react";
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import type { SettingsTab } from "@/components/settings/settings-modal";
 import ImpersonationBanner from "@/features/admin/components/impersonation-banner";
@@ -29,6 +30,8 @@ import { ACCENT_BOOT_SCRIPT } from "@/features/appearance/lib/accent-boot-script
 import { CHAT_TEXT_SIZE_BOOT_SCRIPT } from "@/features/appearance/lib/chat-text-size";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
+import ConnectionProvider from "@/features/connection/components/connection-provider";
+import OfflineScreen from "@/features/connection/components/offline-screen";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import usePostHogIdentity from "@/hooks/use-posthog-identity";
 import { authClient } from "@/lib/auth/client";
@@ -36,8 +39,7 @@ import getSessionToken, { getSessionAuthState } from "@/lib/auth/server-function
 import env from "@/lib/env";
 import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
-import { seedHydratedAuthToken } from "@/lib/lunora/hydrate-auth-token";
-import { TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@/lib/lunora/token-refresh";
+import { isNativeShell, setNativeBadge } from "@/lib/native/bridge";
 import NativeBridge from "@/lib/native/native-bridge";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
 import { forgetClientPostHog, readRequestContext, rememberClientPostHog } from "@/lib/request-context";
@@ -247,6 +249,11 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         const wasAuthenticated = previousAuthStateRef.current;
         const wasAnonymous = previousIsAnonymousRef.current;
 
+        // A reload after the session ended starts signed out, so no transition shows it: clear the badge here too.
+        if (wasAuthenticated === null && !isAuthenticated) {
+            void setNativeBadge(0);
+        }
+
         // User just logged in (was not authenticated, now is)
         if (wasAuthenticated === false && isAuthenticated) {
             console.log("[AuthRecovery] User logged in - refetching all active queries");
@@ -267,6 +274,8 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         else if (wasAuthenticated === true && !isAuthenticated) {
             console.log("[AuthRecovery] User logged out - clearing queries");
             queryClient.clear();
+            // An expired session skips both sign-out handlers, so the dock badge is cleared here.
+            void setNativeBadge(0);
         }
 
         previousAuthStateRef.current = isAuthenticated;
@@ -354,6 +363,13 @@ const RootComponent = () => {
     // in the browser, so this is the only place the SSR token reaches the
     // browser's client. See `seedHydratedAuthToken`.
     seedHydratedAuthToken(context.lunoraClient, context.token);
+    // The native bridge exists only in the browser, so it is read after mount: the
+    // server and the first client render must match.
+    const [isNative, setIsNative] = useState(false);
+
+    useEffect(() => {
+        setIsNative(isNativeShell());
+    }, []);
     const router = useRouter();
     const { i18n } = useLingui();
     const direction = useUIStateStore((state) => state.layout.direction);
@@ -443,8 +459,12 @@ const RootComponent = () => {
                                                     }
                                                 >
                                                     <ImpersonationBanner />
-                                                    <ScreenSizeDebug />
-                                                    <Outlet />
+                                                    <ConnectionProvider>
+                                                        {/* Eager, not lazy: a lazy chunk cannot load while the app is offline, which is when this screen is needed. */}
+                                                        {isNative && <OfflineScreen />}
+                                                        <ScreenSizeDebug />
+                                                        <Outlet />
+                                                    </ConnectionProvider>
                                                     <Suspense fallback={null}>
                                                         <SettingsModal />
                                                     </Suspense>

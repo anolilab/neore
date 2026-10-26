@@ -1,26 +1,20 @@
 import type { ImageModelV3, JSONValue } from "@ai-sdk/provider";
 import type { SharedV4ProviderOptions } from "@ai-sdk/provider";
 import type { Context as AiContext } from "@ai-sdk/provider-utils";
-import { type FlexibleSchema, getErrorMessage, type IdGenerator, type InferSchema, type ToolContent } from "@ai-sdk/provider-utils";
+import { type FlexibleSchema, getErrorMessage, type IdGenerator, type InferSchema } from "@ai-sdk/provider-utils";
 import type {
     CallSettings,
-    CallWarning,
     GenerateObjectResult,
     GenerateTextResult,
     LanguageModel,
-    LanguageModelRequestMetadata,
-    LanguageModelUsage,
     ModelMessage,
-    StaticToolError,
-    StaticToolResult,
     StepResult,
     StopCondition,
     StreamTextResult,
-    Tool,
     ToolChoice,
     ToolSet,
 } from "ai";
-import { generateText, Output as AIOutput, stepCountIs, streamText as streamTextAI } from "ai";
+import { generateText, stepCountIs } from "ai";
 import type { ArgsOf } from "lunorash/client";
 import type { PaginationOptions, PaginationResult } from "lunorash/server";
 import { v } from "lunorash/server";
@@ -33,25 +27,28 @@ import { internalAction as internalActionGeneric, internalMutation as internalMu
 import { compressContextMessages, getModelContextWindow, isContextExceededError } from "../../chat/lib/auto-continue";
 import { omit, pick } from "../../lib/collections";
 import { assert } from "../../lib/error-helpers";
-import { serializeMessage, serializeNewMessagesInStep, serializeObjectResult, toModelMessage } from "../mapping";
-import { createToolModelOutput, getModelName, getProviderName } from "../shared";
+import { toModelMessage } from "../mapping";
+import { getModelName } from "../shared";
 import {
     type Message,
     type MessageDoc,
     type MessageStatus,
     type MessageWithMetadata,
-    type MessageWithMetadataInternal,
     type StreamArgs,
     type ThreadDoc,
     vSafeObjectArgsFields,
     vTextArgsFields,
 } from "../validators";
 import type { VectorDimension } from "../vector/tables";
-import { listMessages, type SaveMessageArgs, saveMessages, type SaveMessagesArgs } from "./messages";
-import { embedMany, embedMessages, fetchContextMessages, generateAndSaveEmbeddings } from "./search";
+import type { ContextRetryMarker, ReadableAgentContext, StreamObjectCompatResult, WritableAgentContext } from "./agent-types";
+import { generateAndSaveEmbeddingsFor, saveMessagesFor, saveObjectFor, saveStepFor, updateMessageFor } from "./message-persistence";
+import { listMessages, type SaveMessageArgs, type SaveMessagesArgs } from "./messages";
+import { embedMany, embedMessages, fetchContextMessages } from "./search";
 import startGeneration from "./start";
 import streamText from "./stream-text";
+import { generateObjectFor, streamObjectFor } from "./structured-output";
 import { type StreamingOptions, syncStreams } from "./streaming";
+import { approveToolCallFor, denyToolCallFor } from "./tool-approval";
 import { createThread, getThreadMetadata } from "./threads";
 import type {
     ActionCtx as ActionContext,
@@ -66,7 +63,6 @@ import type {
     ObjectMode,
     Options,
     Output,
-    QueryCtx as QueryContext,
     RunnerCtx,
     StreamingTextArgs,
     StreamObjectArgs,
@@ -74,49 +70,9 @@ import type {
     TextArgs,
     Thread,
 } from "./types";
-import { asId, asIdArray, asOptionalIdArray, willContinue } from "./utilities";
-
-/** Any context that can read: a query, a mutation or an action. */
-type ReadableAgentContext = QueryContext | MutationContext | ActionContext;
-
-/** Any context that can write: a mutation, an action, or a runner. */
-type WritableAgentContext = MutationContext | ActionContext | RunnerCtx;
+import { asId, asIdArray, willContinue } from "./utilities";
 
 export { deriveUIMessagesFromDeltas } from "../deltas";
-
-/**
- * Compatibility type for streamObject return value.
- * Maps the new AI SDK v6 Output API (streamText with Output) to the old streamObject interface.
- */
-interface StreamObjectCompatResult<RESULT> {
-    /** Promise that resolves to the final complete object */
-    readonly object: Promise<RESULT>;
-    /** Stream of partial objects as they are being generated */
-    readonly partialObjectStream: AsyncIterable<Partial<RESULT>>;
-    /** Request metadata */
-    readonly request: Promise<LanguageModelRequestMetadata>;
-    /** Convert the stream to a Response for HTTP streaming */
-    toTextStreamResponse: () => Response;
-    /** Token usage information */
-    readonly usage: Promise<LanguageModelUsage>;
-    /** Warnings from the model provider */
-    readonly warnings: Promise<CallWarning[] | undefined>;
-}
-
-/**
- * Sentinel stamped onto the args of a context-compression retry so the retry
- * cannot recurse. It is deliberately not part of `TextArgs` — it never reaches
- * the model — so it needs its own carrier type rather than widening the
- * public argument type.
- */
-type ContextRetryMarker = { _contextRetried?: boolean };
-
-/**
- * Marker that `createTool` stamps on tools wanting our `ToolCtx` injected.
- * ai@7's `Tool` has no slot for it, so reading it needs this narrowing.
- * @see ./createTool.ts
- */
-type ContextAcceptingTool = { __acceptsCtx?: boolean };
 export { docsToModelMessages, guessMimeType, serializeDataOrUrl, serializeMessage, toModelMessage, toUIFilePart } from "../mapping";
 export { listMessagesByThreadIdHandler } from "../messages";
 // NOTE: these are also exported via validators
@@ -629,88 +585,7 @@ export class Agent<
          */
         options?: Options,
     ): Promise<GenerateObjectResult<RESULT> & GenerationOutputMetadata> {
-        const { args, fail, getSavedMessages, order, promptMessageId, save } = await this.start(context, generateObjectArgs, { ...threadOptions, ...options });
-
-        try {
-            // Extract schema/enum from args and determine the Output type
-            const {
-                enum: enumValues,
-                mode,
-                schema,
-                ...restArgs
-            } = args as typeof args & {
-                enum?: RESULT[];
-                mode?: OUTPUT;
-                schema?: SCHEMA;
-            };
-
-            // Build the output specification based on the mode/args
-            let output;
-
-            if (enumValues && enumValues.length > 0) {
-                // Enum mode: use AIOutput.choice
-                output = AIOutput.choice({ options: enumValues as string[] });
-            } else if (mode === "array" && schema) {
-                // Array mode: use AIOutput.array
-                output = AIOutput.array({ element: schema });
-            } else if (schema) {
-                // Object mode (default): use AIOutput.object
-                output = AIOutput.object({ schema });
-            } else {
-                // No schema: use AIOutput.json for unstructured JSON
-                output = AIOutput.json();
-            }
-
-            // Call generateText with the Output API
-            const textResult = await generateText({
-                ...restArgs,
-                output,
-            });
-
-            // Extract the output - use Output API result if available, otherwise parse text as JSON
-            let outputObject: RESULT;
-
-            try {
-                // Try to get structured output from the Output API
-                outputObject = textResult.output as RESULT;
-            } catch {
-                // Fallback: parse text response as JSON for models that don't support structured outputs
-                if (textResult.text) {
-                    try {
-                        outputObject = JSON.parse(textResult.text) as RESULT;
-                    } catch {
-                        throw new Error(`Failed to parse model response as JSON: ${textResult.text}`);
-                    }
-                } else {
-                    throw new Error("No output generated: model returned neither structured output nor parseable text");
-                }
-            }
-
-            // Map the result to GenerateObjectResult format for backward compatibility
-            const result = {
-                finishReason: textResult.finishReason,
-                object: outputObject,
-                providerMetadata: textResult.providerMetadata,
-                reasoning: textResult.reasoningText,
-                request: textResult.request,
-                response: textResult.response,
-                toJsonResponse: () => Response.json(textResult.output),
-                usage: textResult.usage,
-                warnings: textResult.warnings,
-            } as GenerateObjectResult<RESULT>;
-
-            await save({ object: result });
-            const metadata: GenerationOutputMetadata = {
-                order,
-                promptMessageId,
-                savedMessages: getSavedMessages(),
-            };
-
-            return Object.assign(result, metadata);
-        } catch (error) {
-            await fail(getErrorMessage(error));
-            throw error;
-        }
+        return generateObjectFor<CustomContext, AgentTools, SCHEMA, OUTPUT, RESULT>(this, context, threadOptions, generateObjectArgs, options);
     }
 
     /**
@@ -742,116 +617,7 @@ export class Agent<
          */
         options?: Options,
     ): Promise<GenerationOutputMetadata & StreamObjectCompatResult<RESULT>> {
-        const { args, fail, getSavedMessages, order, promptMessageId, save } = await this.start(context, streamObjectArgs, { ...threadOptions, ...options });
-
-        // Extract schema/enum from args and determine the Output type
-        const {
-            enum: enumValues,
-            mode,
-            onError,
-            onFinish,
-            schema,
-            ...restArgs
-        } = args as typeof args & {
-            enum?: RESULT[];
-            mode?: OUTPUT;
-            onError?: (error: { error: unknown }) => void | Promise<void>;
-            onFinish?: (result: any) => void | Promise<void>;
-            schema?: SCHEMA;
-        };
-
-        // Build the output specification based on the mode/args
-        let output;
-
-        if (enumValues && enumValues.length > 0) {
-            output = AIOutput.choice({ options: enumValues as string[] });
-        } else if (mode === "array" && schema) {
-            output = AIOutput.array({ element: schema });
-        } else if (schema) {
-            output = AIOutput.object({ schema });
-        } else {
-            output = AIOutput.json();
-        }
-
-        // Store references for the onFinish callback
-        let streamRef: ReturnType<typeof streamTextAI> | null = null;
-
-        // Call streamText with the Output API
-        const stream = streamTextAI({
-            ...restArgs,
-            onError: async (error) => {
-                console.error(" streamObject onError", error);
-                await fail(getErrorMessage(error.error));
-
-                return onError?.(error);
-            },
-            onFinish: async (result) => {
-                // Get the output from the stream
-                const outputValue = streamRef ? await streamRef.output : undefined;
-                const requestValue = streamRef ? await streamRef.request : ({} as LanguageModelRequestMetadata);
-
-                await save({
-                    object: {
-                        finishReason: result.finishReason,
-                        object: outputValue,
-                        providerMetadata: result.providerMetadata,
-                        reasoning: result.reasoningText,
-                        request: requestValue,
-                        response: result.response,
-                        toJsonResponse: () => streamRef?.toTextStreamResponse() ?? new Response(),
-                        usage: result.usage,
-                        warnings: result.warnings,
-                    },
-                });
-
-                // Adapt the result for the onFinish callback
-                if (onFinish) {
-                    const adaptedResult = {
-                        error: undefined,
-                        object: outputValue,
-                        providerMetadata: result.providerMetadata,
-                        response: result.response,
-                        usage: result.usage,
-                        warnings: result.warnings,
-                    };
-
-                    await onFinish(adaptedResult);
-                }
-            },
-            output,
-        });
-
-        // Store the stream reference for use in onFinish
-        streamRef = stream;
-
-        // Create a compatibility wrapper that exposes partialObjectStream (mapped from partialOutputStream)
-        const compatStream: StreamObjectCompatResult<RESULT> = {
-            get object() {
-                return stream.output as unknown as Promise<RESULT>;
-            },
-            // Map partialOutputStream to partialObjectStream for backward compatibility
-            get partialObjectStream() {
-                return stream.partialOutputStream as unknown as AsyncIterable<Partial<RESULT>>;
-            },
-            get request() {
-                return stream.request as unknown as Promise<LanguageModelRequestMetadata>;
-            },
-            toTextStreamResponse: () => stream.toTextStreamResponse(),
-            get usage() {
-                return stream.usage as unknown as Promise<LanguageModelUsage>;
-            },
-            get warnings() {
-                return stream.warnings as unknown as Promise<CallWarning[] | undefined>;
-            },
-        };
-
-        const metadata: GenerationOutputMetadata = {
-            order,
-            promptMessageId,
-            savedMessages: getSavedMessages(),
-        };
-
-        return Object.assign(compatStream, metadata);
+        return streamObjectFor<CustomContext, AgentTools, SCHEMA, OUTPUT, RESULT>(this, context, threadOptions, streamObjectArgs, options);
     }
 
     /**
@@ -908,36 +674,7 @@ export class Agent<
             skipEmbeddings?: boolean;
         },
     ): Promise<{ messages: MessageDoc[] }> {
-        let embeddings: { model: string; vectors: (number[] | null)[] } | undefined;
-        const { skipEmbeddings, ...rest } = args;
-
-        if (args.embeddings) {
-            embeddings = args.embeddings;
-        } else if (!skipEmbeddings && this.options.embeddingModel) {
-            if (!("runAction" in ctx)) {
-                console.warn(
-                    "You're trying to save messages and generate embeddings, but you're in a mutation. " +
-                        "Pass `skipEmbeddings: true` to skip generating embeddings in the mutation and skip this warning. " +
-                        "They will be generated lazily when you generate or stream text / objects. " +
-                        "You can explicitly generate them asynchronously by using the scheduler to run an action later that calls `agent.generateAndSaveEmbeddings`.",
-                );
-            } else if ("workflowId" in ctx) {
-                console.warn(
-                    "You're trying to save messages and generate embeddings, but you're in a workflow. " +
-                        "Pass `skipEmbeddings: true` to skip generating embeddings in the workflow and skip this warning. " +
-                        "They will be generated lazily when you generate or stream text / objects. " +
-                        "You can explicitly generate them asynchronously by using the scheduler to run an action later that calls `agent.generateAndSaveEmbeddings`.",
-                );
-            } else {
-                embeddings = await this.generateEmbeddings(ctx, { threadId: args.threadId, userId: args.userId ?? undefined }, args.messages);
-            }
-        }
-
-        return saveMessages(ctx, {
-            ...rest,
-            agentName: this.options.name,
-            embeddings,
-        });
+        return saveMessagesFor(this, ctx, args);
     }
 
     /**
@@ -1091,53 +828,7 @@ export class Agent<
      * @param args The messageIds to generate embeddings for.
      */
     async generateAndSaveEmbeddings(ctx: ActionContext, args: { messageIds: string[] }) {
-        // Raw rows: embeddings are stored with their thread's id and search already filters locked threads.
-        const fetched = await ctx.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, {
-            messageIds: asIdArray<"messages">(args.messageIds),
-        });
-        const messages = fetched.filter((m): m is NonNullable<typeof m> => m !== null);
-
-        if (messages.length !== args.messageIds.length) {
-            throw new Error(`Some messages were not found: ${args.messageIds.filter((id) => messages.every((m) => m?._id !== id)).join(", ")}`);
-        }
-
-        if (messages.length === 0) {
-            throw new Error("No messages provided to generate embeddings for");
-        }
-
-        if (messages.some((m) => !m.message)) {
-            throw new Error(
-                `Some messages don't have a message: ${messages
-                    .filter((m) => !m.message)
-                    .map((m) => m._id)
-                    .join(", ")}`,
-            );
-        }
-
-        const { embeddingModel } = this.options;
-
-        if (!embeddingModel) {
-            throw new Error("No embeddings were generated for the messages. You must pass an embeddingModel to the agent constructor.");
-        }
-
-        const firstMessage = messages[0];
-
-        if (!firstMessage) {
-            throw new Error("No messages to generate embeddings for");
-        }
-
-        await generateAndSaveEmbeddings(
-            ctx,
-            this.component,
-            {
-                ...this.options,
-                agentName: this.options.name,
-                embeddingModel,
-                threadId: firstMessage.threadId,
-                userId: firstMessage.userId,
-            },
-            messages,
-        );
+        return generateAndSaveEmbeddingsFor(this, ctx, args);
     }
 
     /**
@@ -1173,28 +864,7 @@ export class Agent<
             userId?: string;
         },
     ): Promise<{ messages: MessageDoc[] }> {
-        const { messages } = await serializeNewMessagesInStep(ctx, args.step, {
-            model: args.model ?? getModelName(this.options.languageModel),
-            provider: args.provider ?? getProviderName(this.options.languageModel),
-        });
-        const embeddings = await this.generateEmbeddings(
-            ctx,
-            { threadId: args.threadId, userId: args.userId },
-            messages.map((m) => m.message),
-        );
-
-        return ctx.runMutation(internal.agent.messages.addMessages, {
-            agentName: this.options.name,
-            embeddings,
-            failPendingSteps: false,
-            // The serializers produce the public `MessageWithMetadata` whose
-            // `fileIds` are bare strings; `addMessages` takes the internal shape
-            // with branded `Id<"chatFiles">`. Only the brand differs.
-            messages: messages as MessageWithMetadataInternal[],
-            promptMessageId: asId<"messages">(args.promptMessageId),
-            threadId: asId<"threads">(args.threadId),
-            userId: args.userId,
-        });
+        return saveStepFor(this, ctx, args);
     }
 
     /**
@@ -1216,27 +886,7 @@ export class Agent<
             userId: string | undefined;
         },
     ): Promise<{ messages: MessageDoc[] }> {
-        const { messages } = await serializeObjectResult(ctx, args.result, {
-            model: args.model ?? args.metadata?.model ?? getModelName(this.options.languageModel),
-            provider: args.provider ?? args.metadata?.provider ?? getProviderName(this.options.languageModel),
-        });
-        const embeddings = await this.generateEmbeddings(
-            ctx,
-            { threadId: args.threadId, userId: args.userId },
-            messages.map((m) => m.message),
-        );
-
-        return ctx.runMutation(internal.agent.messages.addMessages, {
-            agentName: this.options.name,
-            embeddings,
-            failPendingSteps: false,
-            // See `saveStep`: only the `fileIds` brand differs between the
-            // public and internal message shapes.
-            messages: messages as MessageWithMetadataInternal[],
-            promptMessageId: asId<"messages">(args.promptMessageId),
-            threadId: asId<"threads">(args.threadId),
-            userId: args.userId,
-        });
+        return saveObjectFor(this, ctx, args);
     }
 
     /**
@@ -1292,17 +942,7 @@ export class Agent<
             };
         },
     ): Promise<void> {
-        const { fileIds, message } = await serializeMessage(ctx, args.patch.message);
-
-        await ctx.runMutation(internal.agent.messages.updateMessage, {
-            messageId: asId<"messages">(args.messageId),
-            patch: {
-                error: args.patch.error,
-                fileIds: asOptionalIdArray<"chatFiles">(args.patch.fileIds ? [...args.patch.fileIds, ...(fileIds ?? [])] : fileIds),
-                message,
-                status: args.patch.status === "success" ? "success" : "failed",
-            },
-        });
+        return updateMessageFor(ctx, args);
     }
 
     /**
@@ -1652,142 +1292,7 @@ export class Agent<
             saveStreamDeltas?: boolean | StreamingOptions;
         },
     ): Promise<GenerationOutputMetadata & StreamTextResult<AgentTools, AiContext, never>> {
-        const { approvalId, reason } = approvalArgs;
-
-        const toolInfo = await this._findToolCallInfo(ctx, threadId, approvalId);
-
-        if (!toolInfo) {
-            throw new Error(`Could not find tool call for approval ID: ${approvalId}`);
-        }
-
-        if (toolInfo.alreadyHandled) {
-            if (toolInfo.wasApproved) {
-                throw new Error(`Tool call was already approved for approval ID: ${approvalId}`);
-            }
-
-            throw new Error(`Cannot approve tool call that was already denied for approval ID: ${approvalId}`);
-        }
-
-        const { parentMessageId, toolCallId, toolInput, toolName } = toolInfo;
-
-        // Race-narrowing re-check: two concurrent approveToolCall invocations
-        // with the same approvalId can both pass the initial alreadyHandled
-        // gate. Re-check just before tool execution to shrink the window. A
-        // strict guarantee would require an atomic claim mutation; this
-        // mitigates the common case (slow human review issuing duplicate
-        // clicks) without rearchitecting the flow.
-        const recheck = await this._findToolCallInfo(ctx, threadId, approvalId);
-
-        if (recheck && recheck.alreadyHandled) {
-            if (recheck.wasApproved) {
-                throw new Error(`Tool call was already approved for approval ID: ${approvalId}`);
-            }
-
-            throw new Error(`Cannot approve tool call that was already denied for approval ID: ${approvalId}`);
-        }
-
-        // Execute the tool
-        const { tools } = this.options;
-        const tool = tools?.[toolName] as Tool<any, StaticToolResult<AgentTools> | StaticToolError<AgentTools>>;
-
-        if (!tool) {
-            throw new Error(`Tool not found: ${toolName}`);
-        }
-
-        // Get thread metadata to propagate userId to tool context if needed
-        let resolvedUserId = userId;
-
-        if (!resolvedUserId) {
-            ({ userId: resolvedUserId } = await this.getThreadMetadata(ctx, { threadId }));
-        }
-
-        const toolResult: ToolContent = [
-            {
-                approvalId,
-                approved: true,
-                reason,
-                type: "tool-approval-response" as const,
-            },
-        ];
-
-        try {
-            // Execute with context injection (like wrapTools does)
-            const toolContext = {
-                ...ctx,
-                agent: this,
-                threadId,
-                userId: resolvedUserId,
-            };
-            const wrappedTool = (tool as ContextAcceptingTool).__acceptsCtx ? { ...tool, ctx: toolContext } : tool;
-            // `context: {}` is new. ai@7's `ToolExecutionOptions<CONTEXT>` carries a
-            // required `context` — the SDK's own per-call context mechanism, which
-            // is separate from ours: our tools read the ctx off the tool object via
-            // `__acceptsCtx` / `getCtx(this)`, which is what `toolCtx` above is
-            // doing. Nothing here uses the SDK's, so it is empty rather than
-            // duplicated.
-            const output = await wrappedTool.execute?.call(wrappedTool, toolInput, {
-                context: {},
-                messages: [],
-                toolCallId,
-            });
-
-            toolResult.push({
-                output: await createToolModelOutput({
-                    errorMode: "none",
-                    input: toolInput,
-                    output,
-                    tool,
-                    toolCallId,
-                }),
-                toolCallId,
-                toolName,
-                type: "tool-result" as const,
-            });
-        } catch (error) {
-            toolResult.push({
-                output: {
-                    type: "error-text",
-                    value: error instanceof Error ? error.message : String(error),
-                },
-                toolCallId,
-                toolName,
-                type: "tool-result" as const,
-            });
-            console.error("Tool execution error:", error);
-        }
-
-        // Save approval response and tool result together
-        const { messageId: toolResultId } = await this.saveMessage(ctx, {
-            message: {
-                content: toolResult,
-                role: "tool",
-            },
-            promptMessageId: parentMessageId,
-            skipEmbeddings: true,
-            threadId,
-        });
-
-        // Continue generation with forceNewOrder to create a separate message.
-        //
-        // The cast below is the one thing here worth explaining. `streamText`
-        // returns `StreamTextResult<TOOLS extends undefined ? AgentTools : TOOLS, …>`;
-        // instantiating TOOLS as `AgentTools` leaves a DEFERRED conditional,
-        // because TypeScript will not reduce `T extends undefined ? A : A` while
-        // `T` is an unbound class parameter. So the result is provably the declared
-        // type and is not assignable to it. Dropping the explicit generic does not
-        // help either — TOOLS is then inferred from `streamTextArgs.tools`.
-        return (await this.streamText<AgentTools>(
-            ctx,
-            { threadId },
-            // Same deferred-conditional story on the way IN: the parameter type is
-            // `StreamingTextArgs<TOOLS extends undefined ? AgentTools : TOOLS>`, and
-            // `streamTextArgs` here is typed against the plain `AgentTools`.
-            { ...streamTextArgs, forceNewOrder: true, promptMessageId: toolResultId } as never,
-            {
-                ...options,
-                saveStreamDeltas: options?.saveStreamDeltas ?? { chunking: "word", throttleMs: 100 },
-            },
-        )) as unknown as GenerationOutputMetadata & StreamTextResult<AgentTools, AiContext, never>;
+        return approveToolCallFor(this, ctx, { threadId, userId }, approvalArgs, streamTextArgs, options);
     }
 
     /**
@@ -1817,171 +1322,6 @@ export class Agent<
         streamTextArgs?: AgentPrompt & StreamingTextArgs<AgentTools>,
         options?: Options & { saveStreamDeltas?: boolean | StreamingOptions },
     ): Promise<GenerationOutputMetadata & StreamTextResult<ToolSet, AiContext, never>> {
-        const { approvalId, reason, threadId } = args;
-
-        const toolInfo = await this._findToolCallInfo(ctx, threadId, approvalId);
-
-        if (!toolInfo) {
-            throw new Error(`Could not find tool call for approval ID: ${approvalId}`);
-        }
-
-        if (toolInfo.alreadyHandled) {
-            if (!toolInfo.wasApproved) {
-                throw new Error(`Tool call was already denied for approval ID: ${approvalId}`);
-            }
-
-            throw new Error(`Cannot deny tool call that was already approved for approval ID: ${approvalId}`);
-        }
-
-        const { parentMessageId, toolCallId, toolName } = toolInfo;
-        const denialReason = reason ?? "Tool execution was denied by the user";
-
-        // Save approval response (denied) and tool result with execution-denied
-        const { messageId: toolResultId } = await this.saveMessage(ctx, {
-            message: {
-                content: [
-                    {
-                        approvalId,
-                        approved: false,
-                        reason: denialReason,
-                        type: "tool-approval-response",
-                    },
-                    {
-                        output: {
-                            reason: denialReason,
-                            type: "execution-denied",
-                        },
-                        toolCallId,
-                        toolName,
-                        type: "tool-result",
-                    },
-                ],
-                role: "tool",
-            },
-            promptMessageId: parentMessageId,
-            skipEmbeddings: true,
-            threadId,
-        });
-
-        // Continue generation with forceNewOrder to create a separate message
-        return this.streamText(
-            ctx,
-            { threadId },
-            // `as never`: the same deferred-conditional parameter type as in `approveToolCall`.
-            { ...streamTextArgs, forceNewOrder: true, promptMessageId: toolResultId } as never,
-            {
-                ...options,
-                saveStreamDeltas: options?.saveStreamDeltas ?? { chunking: "word", throttleMs: 0 },
-            },
-        );
-    }
-
-    /**
-     * Find tool call information for an approval ID.
-     * Returns either:
-     * - Tool info if approval is pending
-     * - { alreadyHandled: true, wasApproved } if already approved/denied
-     * - null if approval request not found.
-     * @internal
-     */
-    private async _findToolCallInfo(
-        context: ActionContext,
-        threadId: string,
-        approvalId: string,
-    ): Promise<
-        | {
-              alreadyHandled?: false;
-              parentMessageId: string;
-              toolCallId: string;
-              toolInput: Record<string, JSONValue>;
-              toolName: string;
-          }
-        | { alreadyHandled: true; wasApproved: boolean }
-        | null
-    > {
-        // Walk all pages until we find an existing response (already handled),
-        // the originating approval request, and the matching tool-call. A
-        // 20-message window would silently miss approvals that scrolled out
-        // for long-running threads or slow human review.
-        const allMessages: Awaited<ReturnType<typeof this.listMessages>>["page"] = [];
-        let cursor: string | null = null;
-        const PAGE_SIZE = 100;
-        const MAX_MESSAGES = 5000;
-
-        while (allMessages.length < MAX_MESSAGES) {
-            const messagesResult = await this.listMessages(context, {
-                paginationOpts: { cursor, numItems: PAGE_SIZE },
-                threadId,
-            });
-
-            allMessages.push(...messagesResult.page);
-
-            if (messagesResult.isDone || !messagesResult.continueCursor) break;
-
-            cursor = messagesResult.continueCursor;
-        }
-
-        // First, check if this approval has already been handled
-        for (const message of allMessages) {
-            if (message.message?.role === "tool" && Array.isArray(message.message.content)) {
-                for (const part of message.message.content) {
-                    if (part.type === "tool-approval-response" && part.approvalId === approvalId) {
-                        return { alreadyHandled: true, wasApproved: part.approved === true };
-                    }
-                }
-            }
-        }
-
-        let toolCallId: string | undefined;
-        let parentMessageId: string | undefined;
-
-        // Second pass: find the approval request to get toolCallId and parent message
-        for (const message of allMessages) {
-            if (message.message?.role === "assistant" && Array.isArray(message.message.content)) {
-                for (const part of message.message.content) {
-                    if (part.type === "tool-approval-request" && part.approvalId === approvalId) {
-                        parentMessageId = message._id;
-                        toolCallId = part.toolCallId;
-                        break;
-                    }
-                }
-            }
-
-            if (toolCallId) {
-                break;
-            }
-        }
-
-        if (!toolCallId || !parentMessageId) {
-            return null;
-        }
-
-        let toolName: string | undefined;
-        let toolInput: Record<string, JSONValue> | undefined;
-
-        // Third pass: find the tool-call with matching toolCallId to get toolName and input
-        for (const message of allMessages) {
-            if (message.message?.role === "assistant" && Array.isArray(message.message.content)) {
-                for (const part of message.message.content) {
-                    if (part.type === "tool-call" && part.toolCallId === toolCallId) {
-                        toolName = part.toolName;
-                        // `input` is `v.any()` in the message schema — the stored
-                        // tool arguments have no narrower type than a JSON object.
-                        toolInput = (part.input ?? {}) as Record<string, JSONValue>;
-                        break;
-                    }
-                }
-            }
-
-            if (toolName) {
-                break;
-            }
-        }
-
-        if (!toolName || !toolInput) {
-            return null;
-        }
-
-        return { parentMessageId, toolCallId, toolInput, toolName };
+        return denyToolCallFor(this, ctx, args, streamTextArgs, options);
     }
 }

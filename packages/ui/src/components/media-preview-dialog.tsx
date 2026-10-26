@@ -5,6 +5,7 @@ import { Button } from "@ui/components/button";
 import { Dialog, DialogClose, DialogPopup } from "@ui/components/dialog";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@ui/components/resizable";
 import { ScrollArea } from "@ui/components/scroll-area";
+import { ZoomableImage } from "@ui/components/zoomable-image";
 import cn from "@ui/utils/cn";
 import { Download, ImageIcon, Pause, Play, VideoIcon } from "lucide-react";
 import * as React from "react";
@@ -133,7 +134,7 @@ const MediaPreviewPanel = ({ children, className, defaultSize = 60, minSize = 30
             <span>{t`Failed to load image`}</span>
         </div>
     ) : (
-        <img alt={media.alt || t`Preview`} className="max-h-full max-w-full object-contain" onError={() => setImageError(true)} src={media.src} />
+        <ZoomableImage alt={media.alt || t`Preview`} key={media.id} onError={() => setImageError(true)} src={media.src} />
     );
 
     return (

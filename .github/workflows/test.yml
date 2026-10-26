@@ -38,6 +38,7 @@ jobs:
         outputs:
             packages: "${{ steps.changes.outputs.packages }}"
             e2e: "${{ steps.changes.outputs.e2e }}"
+            desktop: "${{ steps.changes.outputs.desktop }}"
         steps:
             - name: "Harden Runner"
               uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
@@ -100,6 +101,12 @@ jobs:
               shell: "bash"
               run: "pnpm --filter document-parser run build:worker"
 
+            # `vis affected build` also builds packages/device-core-node, whose Linux
+            # keyring backend links libdbus at build time (see the Rust job below).
+            - name: "Install libdbus for the Linux keyring"
+              shell: "bash"
+              run: "sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config"
+
             - name: "Build affected packages"
               shell: "bash"
               env:
@@ -117,11 +124,12 @@ jobs:
             # 5 s, a 50 ms tokenizer taking 5.6 s). Two at a time keeps the run well inside the timeout.
             - name: "Run tests (affected)"
               shell: "bash"
-              run: 'pnpm exec vis affected test:coverage --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast --parallel 2'
+              run: 'pnpm exec vis affected test:coverage --if-present --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast --parallel 2'
 
             # The Rust Worker is the one project with a `test` target and no
             # `test:coverage` (cargo test has no v8 coverage), so it is not part
-            # of the step above.
+            # of the step above. `--if-present` keeps a change that touches only
+            # it from failing that step; this step runs its tests.
             - name: "Run the Rust Worker tests (affected)"
               shell: "bash"
               run: 'pnpm exec vis affected test --tag document-parser --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
@@ -345,8 +353,152 @@ jobs:
                   path: "apps/web/e2e/.report"
                   retention-days: 7
 
+    # packages/device-core is the Rust core of the desktop shell's device execution. The
+    # `test` job covers the Worker only, so the core's own tests run here on each OS it
+    # targets. Toolchain and cache pins match desktop.yml.
+    device-core:
+        name: "Rust device-core tests (${{ matrix.os }})"
+        runs-on: "${{ matrix.os }}"
+        timeout-minutes: 30
+        strategy:
+            fail-fast: false
+            matrix:
+                os: ["ubuntu-22.04", "windows-latest", "macos-latest"]
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Install Rust (stable)"
+              uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # master
+              with:
+                  toolchain: "stable"
+
+            - name: "Cache Rust build"
+              uses: "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6" # v2.9.2
+              with:
+                  workspaces: "packages/device-core -> target"
+
+            # The Linux keyring backend (`keyring`'s Secret Service) links libdbus at build time.
+            - name: "Install libdbus for the Linux keyring"
+              if: "matrix.os == 'ubuntu-22.04'"
+              run: "sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config"
+
+            # rustfmt is OS-independent, so it runs once, on the Linux leg.
+            - name: "Check Rust formatting"
+              if: "matrix.os == 'ubuntu-22.04'"
+              shell: "bash"
+              run: "cargo fmt --manifest-path packages/device-core/Cargo.toml -- --check && cargo fmt --manifest-path packages/device-core-node/Cargo.toml -- --check"
+
+            - name: "Run cargo test"
+              shell: "bash"
+              run: "cargo test --manifest-path packages/device-core/Cargo.toml"
+
+    # Packages the desktop shell without signing, so a packager break (the xmldom override,
+    # a missing addon in the asar) shows on the PR instead of at the next `desktop-v*` tag.
+    # Linux x64 only: it is the cheapest runner, and desktop.yml still builds every platform
+    # on a tag. `--dir` writes the unpacked app and no installer, so nothing is published.
+    desktop-package:
+        name: "Desktop package (linux-x64)"
+        if: "needs.files-changed.outputs.desktop == 'true'"
+        needs: "files-changed"
+        runs-on: "ubuntu-22.04"
+        timeout-minutes: 45
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              with:
+                  node-version: "22"
+                  skip-playwright: "true"
+
+            - name: "Install Rust (stable)"
+              uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # master
+              with:
+                  toolchain: "stable"
+
+            - name: "Cache Rust build"
+              uses: "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6" # v2.9.2
+              with:
+                  workspaces: "packages/device-core-node -> target"
+
+            - name: "Install libdbus for the Linux keyring"
+              run: "sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config"
+
+            - name: "Build the device-execution addon"
+              run: "pnpm --filter @neore/device-core-node run build"
+
+            - name: "Bundle the main process and preloads"
+              run: "pnpm --filter @neore/desktop run build"
+
+            - name: "Smoke-test the bundles and the addon"
+              run: "pnpm --filter @neore/desktop run smoke"
+
+            - name: "Package the unpacked Linux app"
+              run: "pnpm --filter @neore/desktop exec electron-builder --dir --linux --x64 --config electron-builder.yml --publish never"
+
+    # The macOS half of the desktop check. It builds the addon and the shell bundles and runs the
+    # smoke test, and stops there: no installer, no signing, nothing published. A break that only
+    # shows on darwin (the addon's link step, the sandbox code path) surfaces here, not on the tag.
+    desktop-macos-check:
+        name: "Desktop check (macos-arm64)"
+        if: "needs.files-changed.outputs.desktop == 'true'"
+        needs: "files-changed"
+        runs-on: "macos-latest"
+        timeout-minutes: 45
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              with:
+                  node-version: "22"
+                  skip-playwright: "true"
+
+            - name: "Install Rust (stable)"
+              uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # master
+              with:
+                  toolchain: "stable"
+
+            - name: "Cache Rust build"
+              uses: "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6" # v2.9.2
+              with:
+                  workspaces: "packages/device-core-node -> target"
+
+            - name: "Build the device-execution addon"
+              run: "pnpm --filter @neore/device-core-node run build"
+
+            - name: "Bundle the main process and preloads"
+              run: "pnpm --filter @neore/desktop run build"
+
+            - name: "Smoke-test the bundles and the addon"
+              run: "pnpm --filter @neore/desktop run smoke"
+
     test-required-check:
-        needs: ["files-changed", "test", "e2e"]
+        needs: ["files-changed", "test", "e2e", "device-core", "desktop-package", "desktop-macos-check"]
         name: "Check Test Run"
         # `always()` and nothing else: a job skipped by its own `if:` reports
         # success to a ruleset, so gating this one on its needs' results made the

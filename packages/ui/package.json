@@ -114,7 +114,6 @@
         "papaparse": "catalog:canvas-spreadsheet",
         "pdfjs-dist": "catalog:file-renderers",
         "react-day-picker": "catalog:forms",
-        "react-icons": "catalog:icons",
         "react-number-format": "catalog:forms",
         "react-pdf": "catalog:file-renderers",
         "react-resizable-panels": "catalog:ui",

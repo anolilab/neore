@@ -36,6 +36,7 @@
  * `relay_budget` error pointing at the thread's messages; a blocking read
  * stretches its polls ({@link blockingPollDelay}) to fit its five minutes.
  */
+import { sleep } from "../chat/tools/utilities";
 
 export type StreamEvent =
     | { error: { code: string; message: string }; type: "error" }
@@ -101,12 +102,6 @@ export interface PollOptions {
 
 const streamingPollDelay = (_reads: number, emptyPolls: number): number => (emptyPolls >= BACKOFF_AFTER_EMPTY_POLLS ? POLL_SLOW_MS : POLL_FAST_MS);
 
-const defaultSleep = async (ms: number): Promise<void> => {
-    await new Promise((resolve) => {
-        setTimeout(resolve, ms);
-    });
-};
-
 export const chunkToEvents = (chunk: StreamChunk): StreamEvent[] => {
     const events: StreamEvent[] = [];
 
@@ -138,7 +133,7 @@ export const chunkToEvents = (chunk: StreamChunk): StreamEvent[] => {
  * without the chunks written before it.
  */
 export async function* pollStream(source: StreamSource, options: PollOptions = {}): AsyncGenerator<StreamEvent> {
-    const sleep = options.sleep ?? defaultSleep;
+    const wait = options.sleep ?? sleep;
     const now = options.now ?? Date.now;
     const delay = options.delay ?? streamingPollDelay;
     const maxReads = options.maxReads ?? STREAM_MAX_READS;
@@ -196,7 +191,7 @@ export async function* pollStream(source: StreamSource, options: PollOptions = {
         }
 
         emptyPolls = chunks.length > 0 ? 0 : emptyPolls + 1;
-        await sleep(delay(reads, emptyPolls));
+        await wait(delay(reads, emptyPolls));
     }
 }
 

@@ -17,6 +17,7 @@ import {
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { CardContent } from "@neore/ui/components/card";
+import { formatFileSize } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { BookOpenIcon, FileTextIcon, GlobeIcon, Loader2Icon, Trash2Icon, UploadIcon } from "lucide-react";
 import type { FC } from "react";
@@ -56,14 +57,6 @@ const ACCEPTED_FILE_TYPES: Record<string, string[]> = {
     "text/csv": [".csv"],
     "text/markdown": [".md"],
     "text/plain": [".txt"],
-};
-
-const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 /** What a row shows: the stored fields both an own file and a shared collection's file carry. */

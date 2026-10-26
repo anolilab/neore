@@ -184,6 +184,11 @@ const attemptStream = async (
             return true;
         }
 
+        // The end line closes a reply that asked for one (the mobile client does). It is not a chunk: nothing to show, and the caller must not count it.
+        if (parsed.kind === "end") {
+            return true;
+        }
+
         if ((parsed.text || parsed.reasoning) && !isFirstTokenFired) {
             isFirstTokenFired = true;
             onFirstToken?.();

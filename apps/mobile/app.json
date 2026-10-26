@@ -1,0 +1,21 @@
+{
+    "expo": {
+        "name": "Neore",
+        "slug": "neore",
+        "version": "0.0.0",
+        "scheme": "neore-mobile",
+        "orientation": "portrait",
+        "userInterfaceStyle": "automatic",
+        "ios": {
+            "bundleIdentifier": "ai.neore.mobile",
+            "supportsTablet": false
+        },
+        "android": {
+            "package": "ai.neore.mobile"
+        },
+        "plugins": ["expo-router", "expo-secure-store", "expo-web-browser"],
+        "experiments": {
+            "typedRoutes": false
+        }
+    }
+}

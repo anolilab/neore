@@ -345,6 +345,9 @@ export interface InternalApiTypes {
         media_abandon: {
             failAbandonedMediaJob: FunctionReference<"mutation", { claimKey: string; threadId: Id<"threads"> }, boolean>;
         };
+        media_stale: {
+            failStaleMediaRows: FunctionReference<"mutation", { cursor?: string }, { failed: number }>;
+        };
         sharing: {
             checkThreadAccess: FunctionReference<"query", { requiredPermission?: "read" | "write" | "admin"; threadId: string; userId: string }, boolean>;
             checkThreadAccessWithData: FunctionReference<"query", { requiredPermission?: "read" | "write" | "admin"; threadId: string; userId: string }, { hasAccess: true; permission: "read" | "write" | "admin"; thread: { category?: string; createdBy?: string; customSystemPrompt?: string; deleted?: boolean; deletedAt?: number; dictationLanguage?: string; enabledFeatures?: Array<string>; externalThreadId?: string; isPublic?: boolean; isTemporary?: boolean; language?: string; lastCompressionStartedAt?: number; messengerConnectionId?: string; mode?: "text" | "image" | "video"; model?: string; multiChat?: boolean; organizationId?: string; parentThreadIds?: Array<string>; pinnedAt?: number; projectId?: string; publicAccessToken?: string; reasoningEffort?: number; source?: string; statelessMode?: boolean; summary?: string; tags?: Array<string>; teamId?: string; title?: string; updatedAt?: number; userId?: string; _creationTime: number; _id: string; activeLeafMessageId?: string; botId?: string; createdAt?: number; groupChat?: { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ addedAt: number; skillId: string }>; stopRequestedAt?: number; synthesizerSkillId?: string }; lockedAt?: number; order?: number; status: "active" | "archived" | "running" | "abort" | "error" | "finish"; tagIds?: Array<string> } } | { hasAccess: false; permission: null; thread: null }>;
@@ -382,6 +385,9 @@ export interface InternalApiTypes {
                     setStreamStatus: FunctionReference<"mutation", { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }, void>;
                     stopActiveForThread: FunctionReference<"mutation", { messageId?: string; threadId: string }, boolean>;
                 };
+                purge: {
+                    purgeFinishedStreams: FunctionReference<"mutation", {}, { chunks: number; streams: number }>;
+                };
             };
         };
         tool_permissions: {
@@ -392,7 +398,7 @@ export interface InternalApiTypes {
         tools: {
             browser_node: {
                 closeBrowserSession: FunctionReference<"action", { sessionId: Id<"browserSessions"> }, void>;
-                executeBrowserAction: FunctionReference<"action", { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }, import("@neore/service-sdk/browser-renderer").BrowserActionResponse>;
+                executeBrowserAction: FunctionReference<"action", { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }, unknown>;
             };
             code_execution_node: {
                 default: FunctionReference<"action", { code: string; threadId?: Id<"threads">; timeoutMs?: number; userId?: string }, { files: import("../chat/tools/sandbox-outputs.js").SandboxOutputFile[]; skippedFiles: import("../chat/tools/sandbox-outputs.js").SkippedOutputFile[]; error: string | undefined; results: { type: "text"; value: string; }[]; stderr: string; stdout: string; } | { error: string; results: { type: "error"; value: string; }[]; stderr: string; stdout: string; } | { error: string | undefined; results: { format?: string; type: "text" | "image" | "error"; value: string; }[]; stderr: string; stdout: string; }>;
@@ -428,19 +434,21 @@ export interface InternalApiTypes {
             finishRun: FunctionReference<"action", { runId: Id<"codingAgentRuns"> }, null>;
             killRunSandbox: FunctionReference<"action", { sandboxId: string }, null>;
             pollCodingAgentRun: FunctionReference<"action", { runId: Id<"codingAgentRuns">; seq: number }, null>;
-            pollPullRequest: FunctionReference<"action", { runId: Id<"codingAgentRuns">; seq: number }, null>;
+            pollPullRequest: FunctionReference<"action", { runId: Id<"codingAgentRuns">; seq: number; startedAt: number }, null>;
+            reapPullRequest: FunctionReference<"action", { runId: Id<"codingAgentRuns">; startedAt: number }, null>;
             reapRun: FunctionReference<"action", { runId: Id<"codingAgentRuns"> }, null>;
             startCodingAgentRun: FunctionReference<"action", { runId: Id<"codingAgentRuns"> }, null>;
         };
         functions: {
             appendRunLog: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; text: string }, { cancelled: boolean }>;
-            beginPullRequest: FunctionReference<"mutation", { followUp: boolean; runId: Id<"codingAgentRuns">; userId: string }, { baseBranch: string; diff: string; pollSeq: number; prompt: string; repoUrl: string; summary?: string } | { error: string }>;
+            beginPullRequest: FunctionReference<"mutation", { followUp: boolean; runId: Id<"codingAgentRuns">; userId: string }, { baseBranch: string; diff: string; pollSeq: number; prompt: string; repoUrl: string; startedAt: number; summary?: string } | { error: string }>;
             claimFinish: FunctionReference<"mutation", { runId: Id<"codingAgentRuns"> }, { claimed: boolean; wantsPr: boolean }>;
-            claimPoll: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; seq: number }, boolean>;
+            claimPoll: FunctionReference<"mutation", { prStartedAt?: number; runId: Id<"codingAgentRuns">; seq: number }, boolean>;
             claimRun: FunctionReference<"mutation", { runId: Id<"codingAgentRuns"> }, { agent: "claude_code" | "codex"; branch?: string; openPr: boolean; prompt: string; repoUrl: string; userId: string } | null>;
-            completePullRequest: FunctionReference<"mutation", { log: string; prUrl?: string; runId: Id<"codingAgentRuns"> }, { followUp: boolean }>;
+            completePullRequest: FunctionReference<"mutation", { log: string; prUrl?: string; runId: Id<"codingAgentRuns">; startedAt: number }, { followUp: boolean }>;
             completeRun: FunctionReference<"mutation", { baseBranch?: string; baseSha?: string; diff?: string; diffStat?: string; diffTruncated?: boolean; error?: string; exitCode?: number; runId: Id<"codingAgentRuns">; status: "succeeded" | "failed" | "cancelled"; summary?: string }, null>;
             createRun: FunctionReference<"mutation", { agent: "claude_code" | "codex"; branch?: string; openPr: boolean; prompt: string; repoUrl: string; taskId?: Id<"tasks">; taskRunId?: Id<"taskRuns">; threadId?: string; toolCallId?: string; userId: string }, { runId: Id<"codingAgentRuns"> } | { error: string }>;
+            expirePullRequest: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; startedAt: number }, { followUp: boolean; sandboxId?: string } | null>;
             expireRun: FunctionReference<"mutation", { runId: Id<"codingAgentRuns"> }, { sandboxId?: string } | null>;
             getPullRequestForPoll: FunctionReference<"query", { runId: Id<"codingAgentRuns"> }, { baseBranch: string; prompt: string; repoUrl: string; sandboxId?: string; startedAt: number; summary?: string; userId: string } | null>;
             getRunForFollowUp: FunctionReference<"query", { runId: Id<"codingAgentRuns"> }, { agent: "claude_code" | "codex"; diffStat?: string; error?: string; hasDiff: boolean; prUrl?: string; repoUrl: string; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; summary?: string; taskRunId?: Id<"taskRuns">; threadId?: string; userId: string } | null>;
@@ -449,7 +457,7 @@ export interface InternalApiTypes {
             hasProviderKey: FunctionReference<"query", { provider: "anthropic" | "openai"; userId: string }, boolean>;
             postRunResult: FunctionReference<"mutation", { agentName: string; runId: Id<"codingAgentRuns">; text: string; threadId: string; userId: string }, null>;
             recordPoll: FunctionReference<"mutation", { offset: number; runId: Id<"codingAgentRuns">; summary?: string; text: string }, { cancelled: boolean }>;
-            setPullRequestSandbox: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; sandboxId: string }, null>;
+            setPullRequestSandbox: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; sandboxId: string; startedAt: number }, boolean>;
             setRunSandbox: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; sandboxId: string }, { cancelled: boolean }>;
         };
         gdpr: {
@@ -999,6 +1007,7 @@ export interface InternalApiTypes {
         };
         functions: {
             applyFileMetadata: FunctionReference<"mutation", { key: string; size: number; type: string; userId: string }, null>;
+            discardUnfiledVaultFile: FunctionReference<"mutation", { fileId: string; userId: string }, null>;
             insertVaultFile: FunctionReference<"mutation", { key: string; name: string; organizationId?: string; size: number; type: string; userId: string }, Id<"files">>;
             internalSaveGenerated: FunctionReference<"mutation", { chatId: string; fileName: string; fileSize: number; fileType: string; key: string; url?: string; userId: string }, Id<"files">>;
             markNsfwChecking: FunctionReference<"mutation", { fileId: Id<"files"> }, null>;
@@ -1364,6 +1373,9 @@ export const internal: InternalApiTypes = {
         media_abandon: {
             failAbandonedMediaJob: { __lunoraRef: "chat_media_abandon:failAbandonedMediaJob" },
         },
+        media_stale: {
+            failStaleMediaRows: { __lunoraRef: "chat_media_stale:failStaleMediaRows" },
+        },
         sharing: {
             checkThreadAccess: { __lunoraRef: "chat_sharing:checkThreadAccess" },
             checkThreadAccessWithData: { __lunoraRef: "chat_sharing:checkThreadAccessWithData" },
@@ -1400,6 +1412,9 @@ export const internal: InternalApiTypes = {
                     getStreamText: { __lunoraRef: "chat_streaming_persistent_library:getStreamText" },
                     setStreamStatus: { __lunoraRef: "chat_streaming_persistent_library:setStreamStatus" },
                     stopActiveForThread: { __lunoraRef: "chat_streaming_persistent_library:stopActiveForThread" },
+                },
+                purge: {
+                    purgeFinishedStreams: { __lunoraRef: "chat_streaming_persistent_purge:purgeFinishedStreams" },
                 },
             },
         },
@@ -1448,6 +1463,7 @@ export const internal: InternalApiTypes = {
             killRunSandbox: { __lunoraRef: "coding_agents_execute:killRunSandbox" },
             pollCodingAgentRun: { __lunoraRef: "coding_agents_execute:pollCodingAgentRun" },
             pollPullRequest: { __lunoraRef: "coding_agents_execute:pollPullRequest" },
+            reapPullRequest: { __lunoraRef: "coding_agents_execute:reapPullRequest" },
             reapRun: { __lunoraRef: "coding_agents_execute:reapRun" },
             startCodingAgentRun: { __lunoraRef: "coding_agents_execute:startCodingAgentRun" },
         },
@@ -1460,6 +1476,7 @@ export const internal: InternalApiTypes = {
             completePullRequest: { __lunoraRef: "coding_agents_functions:completePullRequest" },
             completeRun: { __lunoraRef: "coding_agents_functions:completeRun" },
             createRun: { __lunoraRef: "coding_agents_functions:createRun" },
+            expirePullRequest: { __lunoraRef: "coding_agents_functions:expirePullRequest" },
             expireRun: { __lunoraRef: "coding_agents_functions:expireRun" },
             getPullRequestForPoll: { __lunoraRef: "coding_agents_functions:getPullRequestForPoll" },
             getRunForFollowUp: { __lunoraRef: "coding_agents_functions:getRunForFollowUp" },
@@ -2018,6 +2035,7 @@ export const internal: InternalApiTypes = {
         },
         functions: {
             applyFileMetadata: { __lunoraRef: "vault_functions:applyFileMetadata" },
+            discardUnfiledVaultFile: { __lunoraRef: "vault_functions:discardUnfiledVaultFile" },
             insertVaultFile: { __lunoraRef: "vault_functions:insertVaultFile" },
             internalSaveGenerated: { __lunoraRef: "vault_functions:internalSaveGenerated" },
             markNsfwChecking: { __lunoraRef: "vault_functions:markNsfwChecking" },

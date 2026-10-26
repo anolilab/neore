@@ -151,6 +151,7 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         }
 
         // 2. Read the request body (enforce 1MB size limit to prevent DoS)
+        // Content-Length is only checked up front: a chunked body is read in full before the cap below applies.
         const contentLength = request.headers.get("content-length");
 
         if (contentLength && Number.parseInt(contentLength, 10) > MAX_WEBHOOK_BODY_BYTES) {
