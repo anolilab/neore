@@ -77,9 +77,35 @@ export const readTextWithin = async (response: Response, maxBytes: number): Prom
     return text + decoder.decode();
 };
 
+const DATA_URL_RE = /^data:([^,]*),(.*)$/isu;
+const MEDIA_TYPE_RE = /^[\w.+-]+\/[\w.+-]+$/u;
+const BASE64_PARAM_RE = /;\s*base64$/iu;
+
+/**
+ * A `data:` URL as a `Response`, decoded here rather than fetched: the app's
+ * CSP `connect-src` does not list `data:`, so `fetch` would refuse it. A body
+ * goes through the same readers as a fetched one, so the byte budget applies
+ * to the decoded bytes. Throws on a malformed URL or payload.
+ */
+export const dataUrlResponse = (url: string): Response => {
+    const match = DATA_URL_RE.exec(url);
+
+    if (!match) {
+        throw new Error("Not a valid data URL");
+    }
+
+    const [, header = "", payload = ""] = match;
+    const isBase64 = BASE64_PARAM_RE.test(header);
+    const mediaType = (header.split(";", 1)[0] ?? "").trim();
+    const decoded = decodeURIComponent(payload);
+    const body = isBase64 ? Uint8Array.from(atob(decoded), (character) => character.codePointAt(0) ?? 0) : new TextEncoder().encode(decoded);
+
+    return new Response(body, MEDIA_TYPE_RE.test(mediaType) ? { headers: { "content-type": mediaType } } : undefined);
+};
+
 const load = async <T>(url: string, read: (response: Response) => Promise<T>, signal: AbortSignal): Promise<FetchedResource<T>> => {
     try {
-        const response = await fetch(url, { signal });
+        const response = url.startsWith("data:") ? dataUrlResponse(url) : await fetch(url, { signal });
 
         if (!response.ok) {
             return { status: "error" };

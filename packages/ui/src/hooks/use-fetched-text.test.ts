@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_FETCHED_TEXT_BYTES, readTextWithin } from "./use-fetched-text";
+import { dataUrlResponse, MAX_FETCHED_TEXT_BYTES, readTextWithin } from "./use-fetched-text";
 
 const encoder = new TextEncoder();
 
@@ -75,5 +75,35 @@ describe(readTextWithin, () => {
 
     it("is 1 MB for a preview", () => {
         expect(MAX_FETCHED_TEXT_BYTES).toBe(1_000_000);
+    });
+});
+
+describe(dataUrlResponse, () => {
+    it("decodes a base64 data URL without fetch", async () => {
+        const payload = btoa("a,b\n1,2\n");
+        const response = dataUrlResponse(`data:text/csv;charset=utf-8;base64,${payload}`);
+
+        expect(response.headers.get("content-type")).toBe("text/csv");
+        await expect(readTextWithin(response, 100)).resolves.toBe("a,b\n1,2\n");
+    });
+
+    it("decodes a percent-encoded data URL, UTF-8 included", async () => {
+        const response = dataUrlResponse(`data:text/plain,${encodeURIComponent("a€b\nc,d")}`);
+
+        await expect(readTextWithin(response, 100)).resolves.toBe("a€b\nc,d");
+    });
+
+    it("applies the byte budget to the decoded bytes", async () => {
+        const base64 = dataUrlResponse(`data:text/plain;base64,${btoa("x".repeat(26))}`);
+        const percent = dataUrlResponse(`data:text/plain,${"x".repeat(26)}`);
+
+        await expect(readTextWithin(base64, 25)).rejects.toThrow(LARGER_THAN_25);
+        await expect(readTextWithin(percent, 25)).rejects.toThrow(LARGER_THAN_25);
+        await expect(readTextWithin(dataUrlResponse(`data:text/plain,${"x".repeat(25)}`), 25)).resolves.toHaveLength(25);
+    });
+
+    it("throws on a malformed payload so the preview shows its error state", () => {
+        expect(() => dataUrlResponse("data:text/plain")).toThrow(Error);
+        expect(() => dataUrlResponse("data:text/plain;base64,@@@")).toThrow(Error);
     });
 });
