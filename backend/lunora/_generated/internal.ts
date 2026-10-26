@@ -961,12 +961,17 @@ export interface InternalApiTypes {
         };
     };
     triggers: {
+        deliveries: {
+            claimWebhookDelivery: FunctionReference<"mutation", { bodyDigest: string; deliveryId: string; triggerId: Id<"triggers"> }, null | Id<"webhookDeliveries">>;
+            purgeDeliveries: FunctionReference<"mutation", { triggerId: Id<"triggers"> }, null>;
+            releaseWebhookDelivery: FunctionReference<"mutation", { recordId: Id<"webhookDeliveries"> }, null>;
+        };
         execute: {
-            default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
-            executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; deliveryRecord?: Id<"webhookDeliveries">; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; deliveryRecord?: Id<"webhookDeliveries">; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
-            admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }, null | string | { filtered: string }>;
+            admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; deliveryRecord?: Id<"webhookDeliveries">; executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }, null | string | { filtered: string }>;
             createExecution: FunctionReference<"mutation", { payload?: string; triggerId: Id<"triggers"> }, Id<"triggerExecutions">>;
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
@@ -1978,6 +1983,11 @@ export const internal: InternalApiTypes = {
         },
     },
     triggers: {
+        deliveries: {
+            claimWebhookDelivery: { __lunoraRef: "triggers_deliveries:claimWebhookDelivery" },
+            purgeDeliveries: { __lunoraRef: "triggers_deliveries:purgeDeliveries" },
+            releaseWebhookDelivery: { __lunoraRef: "triggers_deliveries:releaseWebhookDelivery" },
+        },
         execute: {
             default: { __lunoraRef: "triggers_execute:default" },
             executeTrigger: { __lunoraRef: "triggers_execute:executeTrigger" },

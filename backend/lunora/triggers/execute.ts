@@ -21,6 +21,8 @@ export const executeTrigger = internalAction
         // The webhook delivery's replay claim, given back if admission refuses the delivery. A manual run has none.
         // `claimedAt` fences the release: the run may start after the claim expired and a redelivery took the key.
         claim: v.optional(v.object({ claimedAt: v.number(), key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
+        // A `gitlab-token` delivery's permanent record, given back on the same terms as `claim` (`deliveries.ts`).
+        deliveryRecord: v.optional(v.id("webhookDeliveries")),
         // A manual test run ("Run now") fires a disabled trigger too.
         ignoreDisabled: v.optional(v.boolean()),
         // The webhook body was not valid UTF-8, so `payload` is its lossy decode and filters see an empty body.
@@ -30,7 +32,7 @@ export const executeTrigger = internalAction
         payload: v.optional(v.string()), // Webhook payload or scheduled input
         triggerId: v.id("triggers"),
     })
-    .action(async ({ args: { claim, ignoreDisabled, invalidUtf8, manual, payload, triggerId }, ctx }) => {
+    .action(async ({ args: { claim, deliveryRecord, ignoreDisabled, invalidUtf8, manual, payload, triggerId }, ctx }) => {
         // 1. Fetch trigger config
         const trigger = await ctx.runQuery(internal.triggers.functions.getTriggerInternal, { triggerId });
 
@@ -94,6 +96,7 @@ export const executeTrigger = internalAction
             // because the owner may have saved stricter ones since the webhook handler evaluated them.
             const refusal = await ctx.runMutation(internal.triggers.functions.admitTriggerRun, {
                 claim,
+                deliveryRecord,
                 executionId,
                 filterPayload: triggerType === "webhook" && ignoreDisabled !== true ? filterTextOf(payload, invalidUtf8) : undefined,
                 triggerId,

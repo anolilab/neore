@@ -14,12 +14,14 @@ import schema from "../schema";
 import {
     assertBotRoutineOptions,
     createTrigger,
+    deleteTrigger,
     getTriggerExecutions,
     setTriggerEnabled,
     testRunTrigger,
     updateTrigger,
     updateTriggerStats,
 } from "./functions";
+import { DELIVERY_PURGE_BATCH } from "./deliveries";
 import { compileWebhookPreset } from "./presets";
 import { findNextCronTime } from "./schedule";
 
@@ -557,5 +559,50 @@ describe("getTriggerExecutions", () => {
         for (const limit of [0, 101, -1, 1.5, NaN, Infinity]) {
             await expect(as().query(getTriggerExecutions as never, { limit, triggerId } as never)).rejects.toThrow();
         }
+    });
+});
+
+describe("deleteTrigger", () => {
+    const as = () => harness.withIdentity({ userId: "user-a" } as never);
+
+    const seed = async (deliveries: number) => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("triggerExecutions", { startedAt: 1, status: "completed", triggerId });
+
+            for (let n = 0; n < deliveries; n += 1) {
+                await ctx.db.insert("webhookDeliveries", { bodyDigest: "d", createdAt: 1, deliveryId: `evt-${String(n)}`, triggerId });
+            }
+        });
+
+        return triggerId;
+    };
+
+    const deliveryCount = async (): Promise<number> => {
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("webhookDeliveries").collect());
+
+        return rows.length;
+    };
+
+    it("removes the trigger's delivery records with it, and nobody else's", async () => {
+        const triggerId = await seed(3);
+        const other = await seed(2);
+
+        await as().mutation(deleteTrigger as never, { triggerId } as never);
+
+        expect(await readTrigger(triggerId)).toBeNull();
+        expect(await readTrigger(other)).not.toBeNull();
+        expect(await deliveryCount()).toBe(2);
+        expect(harness.scheduler.list()).toEqual([]);
+    });
+
+    it("hands what is left past one batch to a scheduled purge", async () => {
+        const triggerId = await seed(DELIVERY_PURGE_BATCH + 4);
+
+        await as().mutation(deleteTrigger as never, { triggerId } as never);
+
+        expect(await deliveryCount()).toBe(4);
+        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ triggerId }]);
     });
 });

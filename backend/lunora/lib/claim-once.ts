@@ -11,6 +11,7 @@
  * | ------------------ | ------------------------ | ----------------------------- | ---------------------------- |
  * | `messenger`        | `<connectionId>:<event>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/webhooks.ts`      |
  * | `trigger-webhook`  | `<triggerId>:<sig hex>`  | {@link TRIGGER_CLAIM_TTL_MS}   | `triggers/http.ts`           |
+ * (A `gitlab-token` trigger takes no claim: its deliveries are kept for the trigger's life in `webhookDeliveries`, `triggers/deliveries.ts`.)
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
  * | `messenger-ai-disclosure` | `<threadId>`      | {@link AI_DISCLOSURE_CLAIM_TTL_MS} | `messenger/functions.ts` |

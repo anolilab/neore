@@ -449,6 +449,7 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     threadKnowledge: "link rows with no owner column; every access follows a thread access check",
     triggerExecutions: "no owner column; every access follows the parent trigger's owner check",
     verification: "better-auth verification tokens",
+    webhookDeliveries: "no owner column; written and read only by the webhook handler and the parent trigger's deletion",
 };
 
 export const POLICIES = definePolicies<PolicyCtx>(Object.entries(RULES).flatMap(([table, rules]) => policiesFor(table, rules)));
