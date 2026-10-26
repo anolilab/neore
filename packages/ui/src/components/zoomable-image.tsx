@@ -72,13 +72,20 @@ const ToolbarButton = ({ children, label, onClick }: { children: ReactNode; labe
  * The group is not itself a tab stop: a focusable region with no interactive
  * role fails the jsx-a11y rules.
  *
- * Zoom state lives here, so a caller that changes the image should key this
- * component by it to reset the view.
+ * The view resets whenever `src` changes, so a new image always starts fitted.
  */
 const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => {
     const { i18n, t } = useLingui();
     const [{ eased, view }, setState] = useState<ZoomState>(INITIAL_STATE);
+    const [shownSource, setShownSource] = useState(src);
     const [isDragging, setIsDragging] = useState(false);
+
+    // A new image starts fitted. Adjusted during render, so the old view never paints for the new image.
+    if (shownSource !== src) {
+        setShownSource(src);
+        setState(INITIAL_STATE);
+    }
+
     const isZoomed = view.scale > MIN_ZOOM;
     const rootRef = useRef<HTMLDivElement>(null);
     const surfaceRef = useRef<HTMLDivElement>(null);
@@ -94,7 +101,8 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
         const surface = surfaceRef.current;
         const image = imageRef.current;
 
-        if (!surface || !image) {
+        // Before the image has layout its size is zero, and a cursor-anchored zoom would clamp its pan to nothing.
+        if (!surface || !image || image.offsetWidth === 0 || image.offsetHeight === 0) {
             return;
         }
 
@@ -254,6 +262,7 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
     return (
         <div
             aria-describedby={hintId}
+            aria-label={alt}
             aria-roledescription={t`Zoomable image`}
             className={cn("relative h-full w-full outline-none", className)}
             ref={rootRef}
