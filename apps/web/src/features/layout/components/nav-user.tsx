@@ -26,6 +26,7 @@ import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import useCheckout from "@/features/billing/hooks/use-checkout";
+import { clearThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
 import updateLocale, { isSupportedLocale } from "@/functions/update-locale";
@@ -285,6 +286,7 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                             },
                             onSuccess: () => {
                                 resetAnalyticsIdentity();
+                                clearThreadListCache();
                                 globalThis.location.reload();
                             },
                         },

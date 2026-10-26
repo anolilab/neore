@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { clearThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
 import { resetAnalyticsIdentity, trackEvent } from "@/lib/analytics";
 
@@ -21,6 +22,9 @@ const SignOut = () => {
         signingOut.current = true;
 
         trackEvent("signed_out", {});
+
+        // Before the sign-out call, so the error branch (an account the server already dropped) leaves none of this user's list behind either.
+        clearThreadListCache();
 
         // A full load of sign-in, not a reload: reloading `/auth/sign-out` would
         // mount this view again and sign out in a loop. A full load (rather than

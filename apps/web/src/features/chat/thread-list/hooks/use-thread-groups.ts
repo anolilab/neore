@@ -11,6 +11,7 @@ import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 import { useDateBoundaries } from "../contexts/date-boundaries-context";
 import { selectSelectedTagIds, useThreadListUIStore } from "../stores/thread-list-ui-store";
 import type { BranchNode, GroupType, MinimalThreadRelationship, ThreadGroup } from "../types";
+import { usePersistThreadList, useThreadListPlaceholder } from "./use-thread-list-cache";
 
 /**
  * Sorts threads by custom order, then by creation time (newest first).
@@ -64,9 +65,15 @@ const useThreadGroups = (
 
     // Composite query for thread list data (threads + temporary + pinned + orders)
     // This replaces 4 separate queries with 1 query that fetches all in parallel server-side
-    const { data: compositeData } = useQuery(
-        crpc.chat.composite.getThreadListData.queryOptions(useCompositeQuery ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS } : skipToken),
-    );
+    // The stored copy paints the sidebar until the first answer; it is a placeholder, so it never enters the query cache.
+    const storedThreadList = useThreadListPlaceholder();
+    const { data: compositeData, isPlaceholderData } = useQuery({
+        ...crpc.chat.composite.getThreadListData.queryOptions(useCompositeQuery ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS } : skipToken),
+        // The stored rows carry only the sidebar's fields, so they do not satisfy the full result type.
+        placeholderData: storedThreadList as never,
+    });
+
+    usePersistThreadList(compositeData, isPlaceholderData);
 
     // Derive data from composite query
     const threadsData = compositeData?.threads;
