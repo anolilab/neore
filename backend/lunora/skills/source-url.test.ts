@@ -63,6 +63,67 @@ describe("skills.sh links", () => {
     });
 });
 
+describe("npx skills add commands", () => {
+    const LAYOUTS = [
+        `${RAW}/acme/skills/HEAD/skills/pdf/SKILL.md`,
+        `${RAW}/acme/skills/HEAD/pdf/SKILL.md`,
+        `${RAW}/acme/skills/HEAD/.claude/skills/pdf/SKILL.md`,
+    ];
+
+    it.each([
+        "npx skills add acme/skills --skill pdf",
+        "npx skills add acme/skills -s pdf",
+        "npx skills add acme/skills --skill=pdf",
+        "npx skills add acme/skills pdf",
+        "npx skills add https://github.com/acme/skills --skill pdf",
+        "npx skills add https://github.com/acme/skills.git --skill pdf",
+        "  NPX   skills  add  acme/skills   --skill   pdf  \n",
+    ])("maps %j to the same layouts as a skills.sh link", (pasted) => {
+        expect(urls(pasted)).toStrictEqual(LAYOUTS);
+    });
+
+    it("reads the repository root when no skill is named", () => {
+        expect(urls("npx skills add acme/skills")).toStrictEqual([`${RAW}/acme/skills/HEAD/SKILL.md`]);
+        expect(urls("npx skills add https://github.com/acme/skills")).toStrictEqual([`${RAW}/acme/skills/HEAD/SKILL.md`]);
+    });
+
+    it.each([
+        ["an extra flag", "npx skills add acme/skills --skill pdf --global"],
+        ["a short extra flag", "npx skills add acme/skills -y --skill pdf"],
+        ["a flag instead of a skill", "npx skills add acme/skills --global"],
+        ["two skills", "npx skills add acme/skills --skill pdf docx"],
+        ["another subcommand", "npx skills remove acme/skills"],
+        ["another tool", "npx evil add acme/skills"],
+        ["a missing source", "npx skills add"],
+        ["a source without a repository", "npx skills add acme"],
+        ["a pasted host", "npx skills add https://evil.example/acme/skills --skill pdf"],
+        ["a host-looking scheme", "npx skills add http://github.com/acme/skills"],
+        ["a deeper GitHub link", "npx skills add https://github.com/acme/skills/tree/main/pdf"],
+        ["a query", "npx skills add https://github.com/acme/skills?ref=x --skill pdf"],
+        ["a query on the skill", "npx skills add acme/skills --skill pdf?x=1"],
+        ["a fragment", "npx skills add acme/skills#main --skill pdf"],
+        ["a path in the skill", "npx skills add acme/skills --skill ../pdf"],
+        ["an uppercase skill", "npx skills add acme/skills --skill PDF"],
+        ["a command chain", "npx skills add acme/skills --skill pdf; rm -rf /"],
+        ["a pipe", "npx skills add acme/skills --skill pdf | sh"],
+        ["a background job", "npx skills add acme/skills --skill pdf && curl evil.example"],
+        ["a substitution", "npx skills add acme/skills --skill $(id)"],
+        ["backticks", "npx skills add acme/skills --skill `id`"],
+        ["a quoted skill", 'npx skills add acme/skills --skill "pdf"'],
+        ["a redirect", "npx skills add acme/skills --skill pdf > /tmp/x"],
+        ["a second command on a new line", "npx skills add acme/skills --skill pdf\ncurl evil.example"],
+        ["credentials", "npx skills add https://user:pass@github.com/acme/skills"], // secret-scanner:allow a fake credential, the case under test
+    ])("refuses %s", (_label, pasted) => {
+        expect(refused(pasted)).not.toBe("");
+    });
+
+    it("builds only raw.githubusercontent.com URLs", () => {
+        for (const url of urls("npx skills add acme/skills --skill pdf")) {
+            expect(new URL(url).host).toBe("raw.githubusercontent.com");
+        }
+    });
+});
+
 describe("what is never fetched", () => {
     it.each([
         ["another host", "https://evil.example/acme/skills/main/SKILL.md"],
