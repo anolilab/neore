@@ -6,7 +6,7 @@
  *
  *   node tools/generate-gateway-models.mjs
  *
- * Generated: 2026-10-18
+ * Generated: 2026-10-26
  * Total: 288 models (138 text, 67 image, 70 video, 2 speech-to-text, 7 text-to-speech)
  */
 
@@ -212,7 +212,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         maxResolution: "2048x2048",
         avgLatencyMs: 5000,
         supportsNegativePrompt: false,
-        filterCapabilities: ["image_generation", "vision"],
+        filterCapabilities: ["image_generation"],
     },
     {
         id: "moonshotai/kimi-k2-0905",
@@ -245,6 +245,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "anthropic/claude-sonnet-4",
@@ -261,6 +262,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "anthropic/claude-sonnet-4.5",
@@ -277,6 +279,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "anthropic/claude-opus-4",
@@ -293,7 +296,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "anthropic/claude-opus-4.1",
@@ -310,7 +313,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "anthropic/claude-opus-4.5",
@@ -327,7 +330,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "anthropic/claude-sonnet-4.6",
@@ -344,6 +347,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "anthropic/claude-opus-4.6",
@@ -360,7 +364,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "anthropic/claude-sonnet-4.5:thinking",
@@ -377,7 +381,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "anthropic/claude-sonnet-4.6:thinking",
@@ -395,7 +399,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: true,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "anthropic/claude-opus-4.5:thinking",
@@ -412,7 +416,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "anthropic/claude-opus-4.6:thinking",
@@ -430,7 +434,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: true,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "deepseek/deepseek-chat-v3-0324",
@@ -614,6 +618,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "google/gemini-2.0-flash-lite-001",
@@ -630,6 +635,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "google/gemini-2.5-flash",
@@ -646,6 +652,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "google/gemini-2.5-flash-lite",
@@ -662,6 +669,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "google/gemini-2.5-pro",
@@ -678,6 +686,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "google/gemini-3-flash-preview",
@@ -694,6 +703,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "google/gemini-3-pro-preview",
@@ -710,6 +720,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "google/gemini-3.1-pro-preview",
@@ -727,6 +738,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: false,
         isPremium: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "google/gemini-2.5-flash:thinking",
@@ -743,7 +755,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "google/gemini-2.5-pro:thinking",
@@ -760,7 +772,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "google/gemini-3-flash-preview:thinking",
@@ -778,7 +790,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: true,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "openai/gpt-5",
@@ -795,6 +807,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "openai/gpt-5-mini",
@@ -811,6 +824,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "openai/gpt-5-nano",
@@ -827,6 +841,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "openai/gpt-5.1",
@@ -843,6 +858,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "openai/gpt-5.2",
@@ -859,6 +875,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "openai/gpt-5.2-pro",
@@ -876,6 +893,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: false,
         isPremium: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "openai/gpt-4.1",
@@ -892,7 +910,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "openai/gpt-4.1-mini",
@@ -909,6 +927,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "openai/gpt-4.1-nano",
@@ -925,6 +944,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "openai/o3",
@@ -941,7 +961,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "openai/o4-mini",
@@ -958,7 +978,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "openai/gpt-5-medium",
@@ -975,7 +995,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "openai/gpt-5.1:thinking",
@@ -992,7 +1012,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "openai/gpt-5.2:thinking",
@@ -1010,7 +1030,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: true,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "openai/gpt-5-codex",
@@ -1027,7 +1047,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning", "coding"],
+        filterCapabilities: ["reasoning", "coding", "vision"],
     },
     {
         id: "openai/gpt-5.1-codex",
@@ -1044,7 +1064,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning", "coding"],
+        filterCapabilities: ["reasoning", "coding", "vision"],
     },
     {
         id: "openai/gpt-5.1-codex-mini",
@@ -1061,7 +1081,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning", "coding"],
+        filterCapabilities: ["reasoning", "coding", "vision"],
     },
     {
         id: "openai/gpt-5.1-codex-max",
@@ -1079,7 +1099,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: true,
         isPremium: true,
-        filterCapabilities: ["reasoning", "coding"],
+        filterCapabilities: ["reasoning", "coding", "vision"],
     },
     {
         id: "openai/gpt-5.2-codex",
@@ -1096,7 +1116,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning", "coding"],
+        filterCapabilities: ["reasoning", "coding", "vision"],
     },
     {
         id: "openai/gpt-5.3-codex",
@@ -1114,7 +1134,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: true,
         isNew: true,
-        filterCapabilities: ["reasoning", "coding"],
+        filterCapabilities: ["reasoning", "coding", "vision"],
     },
     {
         id: "openai/gpt-oss-20b",
@@ -1163,6 +1183,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "qwen/qwen3-235b-a22b-thinking-2507",
@@ -1332,7 +1353,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: false,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "qwen/qwen3.5-plus",
@@ -1350,7 +1371,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: false,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "qwen/qwen3.5-flash",
@@ -1368,6 +1389,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: false,
         isNew: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "qwen/qwen3-vl-30b-instruct",
@@ -1384,6 +1406,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "qwen/qwen3-vl-30b-instruct:thinking",
@@ -1400,7 +1423,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "qwen/qwen3-next-80b-a3b-instruct",
@@ -1500,7 +1523,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "qwen/qwen3-vl-72b-instruct:thinking",
@@ -1517,7 +1540,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "minimax/minimax-m2",
@@ -1534,6 +1557,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "minimax/minimax-m2.1",
@@ -1550,6 +1574,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "minimax/minimax-m1-80k",
@@ -1652,7 +1677,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: false,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "moonshotai/kimi-k2.5:thinking",
@@ -1670,7 +1695,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: false,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "meta-llama/llama-3.3-70b-instruct",
@@ -1703,6 +1728,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "z-ai/glm-4.5",
@@ -1735,6 +1761,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "z-ai/glm-4.5-air",
@@ -1783,6 +1810,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "z-ai/glm-4.7",
@@ -1815,7 +1843,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "z-ai/glm-4.7-flash",
@@ -1832,7 +1860,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "z-ai/glm-5",
@@ -1885,6 +1913,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: true,
         isNew: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "grok-4-1",
@@ -1901,7 +1930,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "grok-3-mini",
@@ -1918,7 +1947,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "grok-3",
@@ -1935,6 +1964,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "x-ai/grok-4.1-fast:thinking",
@@ -1952,7 +1982,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: false,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "x-ai/grok-4-fast",
@@ -1969,6 +1999,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "x-ai/grok-4-fast:thinking",
@@ -1985,7 +2016,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "x-ai/grok-code-fast-1",
@@ -2020,6 +2051,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: true,
         isNew: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "mistralai/ministral-8b-2501",
@@ -2037,6 +2069,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: true,
         isNew: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "mistralai/ministral-14b-2512",
@@ -2054,6 +2087,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: true,
         isNew: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "mistralai/devstral-small-2512",
@@ -2089,6 +2123,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: true,
         isNew: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "mistralai/mistral-medium-latest",
@@ -2105,6 +2140,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
+        filterCapabilities: ["vision"],
     },
     {
         id: "mistralai/magistral-small-2506",
@@ -2121,7 +2157,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "mistralai/magistral-medium-2506",
@@ -2138,7 +2174,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "cohere/command-a",
@@ -2190,7 +2226,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: false,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "bytedance-seed/seed-1.6",
@@ -2208,7 +2244,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: false,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "bytedance-seed/seed-1.8",
@@ -2225,7 +2261,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "bytedance-seed/seed-1.6-flash",
@@ -2243,7 +2279,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: false,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "arcee-ai/trinity-large-preview",
@@ -2261,7 +2297,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsMultimodal: true,
         supportsFileInput: false,
         isNew: true,
-        filterCapabilities: ["reasoning"],
+        filterCapabilities: ["reasoning", "vision"],
     },
     {
         id: "arcee-ai/trinity-mini",
@@ -2343,6 +2379,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: false,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "llama-4-scout-17b",
@@ -2355,6 +2392,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "gpt-oss-20b",
@@ -2367,6 +2405,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "gpt-oss-120b",
@@ -2379,6 +2418,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "qwen3-32b",
@@ -2391,6 +2431,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         supportsTools: true,
         supportsMultimodal: true,
         supportsFileInput: false,
+        filterCapabilities: ["vision"],
     },
     {
         id: "gpt-4",

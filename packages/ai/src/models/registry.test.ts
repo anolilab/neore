@@ -107,6 +107,25 @@ describe("MODEL_REGISTRY", () => {
             expect(found, `Expected ${model.slug} to be in TEXT_CATALOG`).toBeDefined();
         }
     });
+
+    it("lists vision exactly for the models that accept image input", () => {
+        const withImages = MODEL_REGISTRY.filter((m) => m.supportsImages === true);
+
+        expect(withImages.length).toBeGreaterThan(0);
+
+        for (const model of MODEL_REGISTRY) {
+            expect(model.filterCapabilities?.includes("vision") ?? false, `vision on ${model.id}`).toBe(model.supportsImages === true);
+        }
+    });
+
+    it("never repeats a filter capability or leaves the list empty", () => {
+        for (const model of MODEL_REGISTRY) {
+            if (model.filterCapabilities) {
+                expect(model.filterCapabilities.length, model.id).toBeGreaterThan(0);
+                expect(new Set(model.filterCapabilities).size, model.id).toBe(model.filterCapabilities.length);
+            }
+        }
+    });
 });
 
 describe("buildAgents without a Replicate token", () => {
