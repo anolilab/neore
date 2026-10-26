@@ -1144,7 +1144,7 @@ const ComposerInput = ({
             onDrop={handleDrop}
         >
             {/* Hidden file input (attachment button) */}
-            <input accept="image/*,.pdf,.doc,.docx,.txt,.md" className="hidden" multiple onChange={handleFileInputChange} ref={fileInputRef} type="file" />
+            <input accept={attachmentAdapter.accept} className="hidden" multiple onChange={handleFileInputChange} ref={fileInputRef} type="file" />
             {/* Hidden file input (@ mention trigger - dynamic accept) */}
             <input className="hidden" multiple onChange={handleFileInputChange} ref={mentionFileInputRef} type="file" />
 

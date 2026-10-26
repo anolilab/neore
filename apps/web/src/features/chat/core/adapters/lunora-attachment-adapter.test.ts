@@ -148,6 +148,14 @@ describe(createLunoraAttachmentAdapter, () => {
         expect(action).not.toHaveBeenCalled();
     });
 
+    it("offers the text-preview suffixes in the accept list the composer's file picker uses", () => {
+        const accept = createLunoraAttachmentAdapter(client().lunora).accept.split(",");
+
+        for (const suffix of [".jsonl", ".ndjson", ".mermaid", ".mmd", ".csv", ".tsv"]) {
+            expect(accept).toContain(suffix);
+        }
+    });
+
     it("refuses a type it does not attach, as a typed error", async () => {
         const adapter = createLunoraAttachmentAdapter(client().lunora);
 
