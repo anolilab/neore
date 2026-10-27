@@ -22,6 +22,9 @@ import { parseScopes } from "./scopes";
 
 export const PUBLIC_API_PREFIX = "/api/v1";
 
+/** The MCP endpoint below the prefix. Not a route-table entry: it dispatches over the table. */
+export const MCP_PATH = "/mcp";
+
 /** Keys minted by this app start with this. Older/foreign keys still verify; the prefix only helps humans and secret scanners. */
 export const API_KEY_PREFIX = "nk_";
 

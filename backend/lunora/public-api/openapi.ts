@@ -7,7 +7,7 @@ import z from "zod/v4";
 
 import { API_ERROR_CODES } from "./errors";
 import { IDEMPOTENCY_HEADER } from "./idempotency";
-import { PUBLIC_API_PREFIX } from "./identity";
+import { MCP_PATH, PUBLIC_API_PREFIX } from "./identity";
 import type { RouteDefinition } from "./routes";
 import { ROUTES } from "./routes";
 import { zErrorBodySchema } from "./schemas";
@@ -32,12 +32,12 @@ const errorResponse = (description: string) => {
     return { content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } }, description };
 };
 
-const pathParameters = (path: string) =>
+export const pathParameters = (path: string) =>
     [...path.matchAll(/\{(\w+)\}/gu)].map((match) => {
         return { in: "path", name: match[1], required: true, schema: { type: "string" } };
     });
 
-const queryParameters = (route: RouteDefinition) => {
+export const queryParameters = (route: RouteDefinition) => {
     if (!route.query) {
         return [];
     }
@@ -79,8 +79,10 @@ const operation = (route: RouteDefinition) => {
             ? { "application/x-ndjson": { schema: { type: "string" } } }
             : { "application/json": { schema: toSchema(route.response, "output") } };
 
+    const mcpNote = route.mcp ? `Also an MCP tool (\`POST ${MCP_PATH}\`): ${route.mcp.map((entry) => `\`${entry.tool}\``).join(", ")}.` : undefined;
+
     return {
-        description: [route.description, scopeNote].filter(Boolean).join("\n\n"),
+        description: [route.description, scopeNote, mcpNote].filter(Boolean).join("\n\n"),
         operationId: route.operationId,
         ...(parameters.length > 0 && { parameters }),
         ...(route.body && { requestBody: { content: { "application/json": { schema: toSchema(route.body, "input") } }, required: true } }),
@@ -102,7 +104,35 @@ const operation = (route: RouteDefinition) => {
         security: [{ bearerAuth: [] }],
         summary: route.summary,
         tags: [route.tag],
+        ...(route.mcp && { "x-mcp-tools": route.mcp.map((entry) => entry.tool) }),
         "x-required-scopes": scopes,
+    };
+};
+
+const MCP_TAG = "MCP";
+
+/** The MCP endpoint is not a route-table entry (it dispatches over them), so the document describes it by hand. */
+const mcpOperation = () => {
+    const tools = ROUTES.flatMap((route) => route.mcp?.map((entry) => entry.tool) ?? []);
+
+    return {
+        description: [
+            "A Streamable HTTP MCP endpoint over this API: one JSON-RPC message per POST, answered as JSON. It serves `initialize`, `server/discover`, `ping`, `tools/list` and `tools/call`, with no sessions, streams, resources or prompts.",
+            `Tools: ${tools.map((tool) => `\`${tool}\``).join(", ")}. \`tools/list\` shows only the tools the key's scopes allow, and \`tools/call\` checks them again.`,
+            "A tool call runs the route behind it with the same scopes and per-key limits. A refusal (`insufficient_scope`, `not_found`, `rate_limited`) is a tool result with `isError: true` carrying this API's error body.",
+        ].join("\n\n"),
+        operationId: "mcp",
+        requestBody: { content: { "application/json": { schema: { type: "object" } } }, required: true },
+        responses: {
+            200: { content: { "application/json": { schema: { type: "object" } } }, description: "A JSON-RPC response." },
+            202: { description: "A notification was accepted." },
+            400: { description: "A malformed or unsupported JSON-RPC message." },
+            401: errorResponse("`unauthenticated` or `invalid_api_key`"),
+            405: errorResponse("`method_not_allowed`: only POST is supported."),
+        },
+        security: [{ bearerAuth: [] }],
+        summary: "Talk to the API as an MCP server",
+        tags: [MCP_TAG],
     };
 };
 
@@ -112,6 +142,8 @@ export const buildOpenApiDocument = (serverUrl?: string): Record<string, unknown
     for (const route of ROUTES) {
         paths[route.path] = { ...paths[route.path], [route.method]: operation(route) };
     }
+
+    paths[MCP_PATH] = { post: mcpOperation() };
 
     return {
         components: {
@@ -142,7 +174,7 @@ export const buildOpenApiDocument = (serverUrl?: string): Record<string, unknown
         openapi: "3.1.0",
         paths,
         servers: [{ url: serverUrl ? `${serverUrl.replace(TRAILING_SLASH, "")}${PUBLIC_API_PREFIX}` : PUBLIC_API_PREFIX }],
-        tags: [...new Set(ROUTES.map((route) => route.tag))].map((name) => {
+        tags: [...new Set([...ROUTES.map((route) => route.tag), MCP_TAG])].map((name) => {
             return { name };
         }),
     };

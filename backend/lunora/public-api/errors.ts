@@ -22,6 +22,7 @@ export const API_ERROR_CODES = {
     internal_error: 500,
     invalid_api_key: 401,
     invalid_request: 400,
+    method_not_allowed: 405,
     not_found: 404,
     payload_too_large: 413,
     rate_limited: 429,
