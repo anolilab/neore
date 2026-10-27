@@ -5,6 +5,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { addMessagesHandler } from "../agent/messages";
 import schema from "../schema";
 import { isQuietRunSkipped } from "./quiet";
 import { loadQuietSnapshot } from "./quiet-inputs";
@@ -83,13 +84,13 @@ describe("loadQuietSnapshot", () => {
     });
 
     describe("a reply in a routine's run thread", () => {
-        const insertRunThread = async (rows: { at: number; order: number; role: string; stepOrder?: number }[]) => {
+        const insertRunThread = async (rows: { at: number; order: number; role: string; stepOrder?: number }[], threadUpdatedAt = NOW - 500) => {
             await harness.run(async (ctx: any) => {
                 const threadId = await ctx.db.insert("threads", {
                     status: "active",
                     tags: ["trigger"],
                     title: "Trigger: Digest",
-                    updatedAt: NOW - 500,
+                    updatedAt: threadUpdatedAt,
                     userId: USER,
                 });
 
@@ -200,6 +201,28 @@ describe("loadQuietSnapshot", () => {
                     { manual: false },
                 ),
             ).toBe(false);
+        });
+
+        it("counts a reply saved through the message write even when no stream ever starts", async () => {
+            await insertRunThread(
+                [
+                    { at: NOW - 3000, order: 0, role: "user" },
+                    { at: NOW - 2000, order: 0, role: "assistant" },
+                ],
+                NOW - 120_000,
+            );
+
+            // Only the save: `createStreamWithMessage` (the later `updatedAt` bump) never runs.
+            await harness.run(async (ctx: any) => {
+                const thread = await ctx.db.threads.findFirst({ where: { userId: USER } });
+
+                await addMessagesHandler(ctx, { messages: [{ message: { content: "reply", role: "user" } }], threadId: thread._id, userId: USER });
+            });
+
+            const { threads } = await snapshotSince(NOW - 60_000);
+
+            expect(threads).toHaveLength(1);
+            expect(threads[0]?.title).toBe("Trigger: Digest");
         });
 
         it("does not count a reply from before the window start, nor the routine's answer to it", async () => {

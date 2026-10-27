@@ -384,6 +384,12 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
         toReturn.push((await context.db.get(messageId))!);
     }
 
+    // A saved reply is activity on its own: readers that look at threads by `updatedAt` (the routines' quiet check)
+    // must see it even when the stream that would normally bump the thread never starts.
+    if (threadDocument && messages.some((item) => item.message.role === "user")) {
+        await context.db.patch(threadId, { updatedAt: Date.now() });
+    }
+
     return { messages: toReturn.map((item) => publicMessage(item)) };
 }
 
