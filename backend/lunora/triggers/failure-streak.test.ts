@@ -11,7 +11,7 @@ import type { AgentRunErrorKind } from "../chat/lib/agent-run";
 import schema from "../schema";
 import { isUserFixableRunError } from "./execute";
 import { advanceStreak, isModelUnavailableRefusal, modelUnavailableMessage, TRIGGER_PAUSE_AFTER_FAILURES } from "./failure-streak";
-import { createExecution, setTriggerEnabledInternal, updateExecution } from "./functions";
+import { admitTriggerRun, createExecution, setTriggerEnabledInternal, updateExecution } from "./functions";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -321,5 +321,42 @@ describe("pausing a trigger after repeated user-fixable failures", () => {
         expect(paused[0]?.dedupeKey).toBe(`trigger-paused:${triggerId}:${pausingRun}`);
         expect(await noticesKeyed(`trigger:${pausingRun}`)).toHaveLength(0);
         expect(await fieldOf(triggerId, "failureStreak")).toBe(TRIGGER_PAUSE_AFTER_FAILURES);
+    });
+
+    it("ignores failures from runs that started before a success that settled first", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+
+        try {
+            vi.setSystemTime(1000);
+
+            const triggerId = await insertTrigger();
+            const older: string[] = [];
+
+            for (let index = 0; index < TRIGGER_PAUSE_AFTER_FAILURES; index += 1) {
+                older.push(await startRun(triggerId));
+            }
+
+            vi.setSystemTime(2000);
+            await run(triggerId, "completed");
+
+            for (const executionId of older) {
+                await settle(executionId, "failed", true);
+            }
+
+            expect(await readTrigger(triggerId)).toMatchObject({ enabled: true, failureStreak: 0 });
+            expect(await noticesKeyed("trigger-paused:")).toHaveLength(0);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("refuses an automatic run of a trigger that was paused after the caller checked it", async () => {
+        const triggerId = await insertTrigger({ enabled: false });
+        const admit = async (requireEnabled: boolean): Promise<unknown> =>
+            await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, { requireEnabled, triggerId }));
+
+        expect(await admit(true)).toBe("Skipped: the trigger is disabled.");
+        // A manual "Run now" does not ask for it, so a disabled trigger still reaches the rest of admission.
+        expect(await admit(false)).not.toBe("Skipped: the trigger is disabled.");
     });
 });

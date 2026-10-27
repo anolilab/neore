@@ -15545,6 +15545,12 @@
           "optional": true,
           "unique": false
         },
+        "lastSuccessStartedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "lastTriggeredAt": {
           "kind": "number",
           "nullable": false,

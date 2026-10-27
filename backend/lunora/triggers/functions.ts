@@ -894,10 +894,12 @@ export const admitTriggerRun = internalMutation
         filterPayload: v.optional(v.string().max(MAX_WEBHOOK_BODY_BYTES)),
         // The claim is permanent (`gitlab-token`), so ANY refusal gives it back, not only a filter miss: a delivery that never ran may be redelivered.
         releaseUnlessRun: v.optional(v.boolean()),
+        // An automatic run: re-checked here, in the transaction that charges it, because another run may have paused the trigger since the caller looked.
+        requireEnabled: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
     })
     .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() })))
-    .mutation(async ({ args: { claim, executionId, filterPayload, releaseUnlessRun, triggerId }, ctx }) => {
+    .mutation(async ({ args: { claim, executionId, filterPayload, releaseUnlessRun, requireEnabled, triggerId }, ctx }) => {
         const refused = async (reason: string): Promise<string> => {
             if (claim && releaseUnlessRun) {
                 await giveBackClaim(ctx, claim, triggerId, true);
@@ -909,6 +911,10 @@ export const admitTriggerRun = internalMutation
 
         if (!trigger) {
             return await refused("Trigger not found");
+        }
+
+        if (requireEnabled === true && trigger.enabled !== true) {
+            return await refused("Skipped: the trigger is disabled.");
         }
 
         if (filterPayload !== undefined) {
@@ -1005,7 +1011,13 @@ export const recordFilteredExecution = internalMutation
  */
 const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, startedAt: number, outcome: RunOutcome): Promise<boolean> => {
     // A run that began before the owner last turned the trigger on belongs to the episode they just closed.
-    if (trigger.enabled !== true || (trigger.enabledAt !== undefined && startedAt < trigger.enabledAt)) {
+    // Outcomes settle in completion order, so a run that began before the latest success is stale too: it must not
+    // count toward a streak that success already cleared.
+    if (
+        trigger.enabled !== true ||
+        (trigger.enabledAt !== undefined && startedAt < trigger.enabledAt) ||
+        (trigger.lastSuccessStartedAt !== undefined && startedAt < trigger.lastSuccessStartedAt)
+    ) {
         return false;
     }
 
@@ -1015,6 +1027,8 @@ const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, s
     if (pause) {
         await patchRow(ctx.db, trigger, { enabled: false, failureStreak: streak, updatedAt: ctx.now });
         console.info(`[Triggers] Trigger ${trigger._id} paused after ${streak} consecutive failures its owner can fix`);
+    } else if (outcome === "success") {
+        await patchRow(ctx.db, trigger, { failureStreak: streak, lastSuccessStartedAt: startedAt });
     } else if (streak !== current) {
         await patchRow(ctx.db, trigger, { failureStreak: streak });
     }

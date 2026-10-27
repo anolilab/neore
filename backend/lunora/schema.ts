@@ -2768,6 +2768,8 @@ export const schema = defineSchema({
         ),
         inputTemplate: v.optional(v.string()),
         lastError: v.optional(v.string()),
+        // Start time of the latest run that succeeded; a run that began earlier no longer counts toward the failure streak.
+        lastSuccessStartedAt: v.optional(v.number()),
         lastTriggeredAt: v.optional(v.number()),
         model: v.string(),
         name: v.string(),

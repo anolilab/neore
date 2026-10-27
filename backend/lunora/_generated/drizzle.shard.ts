@@ -1507,6 +1507,7 @@ export const triggers = sqliteTable("triggers", {
     filters: text("filters", { mode: "json" }).$type<Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>>(),
     inputTemplate: text("inputTemplate"),
     lastError: text("lastError"),
+    lastSuccessStartedAt: real("lastSuccessStartedAt"),
     lastTriggeredAt: real("lastTriggeredAt"),
     model: text("model").notNull(),
     name: text("name").notNull(),

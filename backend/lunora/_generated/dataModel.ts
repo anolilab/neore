@@ -1753,6 +1753,7 @@ export interface Doc_triggers {
     filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;
     inputTemplate?: string;
     lastError?: string;
+    lastSuccessStartedAt?: number;
     lastTriggeredAt?: number;
     model: string;
     name: string;
@@ -4489,6 +4490,7 @@ export interface Insert_triggers {
     filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;
     inputTemplate?: string;
     lastError?: string;
+    lastSuccessStartedAt?: number;
     lastTriggeredAt?: number;
     model: string;
     name: string;

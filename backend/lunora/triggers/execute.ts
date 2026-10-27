@@ -216,6 +216,7 @@ export const executeTrigger = internalAction
                 executionId,
                 filterPayload: triggerType === "webhook" && ignoreDisabled !== true ? filterTextOf(payload, invalidUtf8) : undefined,
                 releaseUnlessRun,
+                requireEnabled: ignoreDisabled !== true,
                 triggerId,
             });
 
