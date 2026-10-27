@@ -298,7 +298,6 @@ impl DeviceState {
                     &settings.mcp_servers,
                     &servers,
                     &mut settings.allow_rules,
-                    &self.mcp_tools.lock().unwrap(),
                 );
                 settings.mcp_servers = servers;
                 // The cached `readOnly` flags describe the old servers. Dropping them makes every MCP call
@@ -581,31 +580,23 @@ pub fn cap_utf8(text: &str, max: usize) -> (String, bool) {
 
 /// Forgets the "Always allow" rules of every MCP server that was removed, replaced or added. A rule is keyed on the
 /// tool's manifest name, which only carries the server's NAME, so a different program under the same name would
-/// otherwise inherit the approval the user gave the old one.
-///
-/// A rule belongs to the server `owners` (the manifest's routing table) says it calls, so changing `a` leaves the
-/// rules of `a__x` alone even though `mcp__a__` is a prefix of both. A rule `owners` does not know (no manifest
-/// since start) cannot be attributed, so it falls back to the changed servers' name prefix: it may drop too much,
-/// never too little.
+/// otherwise inherit the approval the user gave the old one. `validate_servers` refuses names whose tool-name
+/// prefixes overlap, so the server's exact prefix owns its rules and no other server's.
 fn drop_rules_of_changed_servers(
     old: &[McpServerConfig],
     new: &[McpServerConfig],
     rules: &mut Vec<String>,
-    owners: &HashMap<String, McpToolRef>,
 ) {
-    let changed: Vec<&str> = old
+    let changed = old
         .iter()
         .filter(|server| !new.contains(server))
-        .chain(new.iter().filter(|server| !old.contains(server)))
-        .map(|server| server.name.as_str())
-        .collect();
+        .chain(new.iter().filter(|server| !old.contains(server)));
 
-    rules.retain(|rule| match owners.get(rule) {
-        Some(owner) => !changed.contains(&owner.server.as_str()),
-        None => !changed
-            .iter()
-            .any(|name| rule.starts_with(&mcp::tool_name(name, ""))),
-    });
+    for server in changed {
+        let prefix = mcp::tool_name(&server.name, "");
+
+        rules.retain(|rule| !rule.starts_with(&prefix));
+    }
 }
 
 /// Tools that may never skip the prompt: they change things irreversibly.
@@ -1131,18 +1122,34 @@ pub fn validate_roots(roots: &[String]) -> Result<Vec<String>, String> {
     Ok(valid)
 }
 
+/// Whether two server names could produce the same tool name: a tool name is `mcp__<server>__<tool>` over the
+/// sanitised names, so `a` and `a__x` (or `a` and `a_`) both reach `mcp__a__x__t` and could not be told apart.
+fn names_overlap(a: &str, b: &str) -> bool {
+    let (a, b) = (
+        format!("{}__", mcp::sanitize(a)),
+        format!("{}__", mcp::sanitize(b)),
+    );
+
+    a.starts_with(&b) || b.starts_with(&a)
+}
+
 pub fn validate_servers(servers: &[McpServerConfig]) -> Result<(), String> {
     if servers.len() > MAX_MCP_SERVERS {
         return Err(format!("at most {MAX_MCP_SERVERS} servers"));
     }
 
     for (index, server) in servers.iter().enumerate() {
-        // Tool names carry the SANITISED server name, so two names that sanitise alike would share tool names
-        // (and allow rules).
-        let name_ok = (1..=40).contains(&server.name.chars().count())
-            && !servers[..index]
-                .iter()
-                .any(|other| mcp::sanitize(&other.name) == mcp::sanitize(&server.name));
+        let name_ok = (1..=40).contains(&server.name.chars().count());
+
+        if let Some(other) = servers[..index]
+            .iter()
+            .find(|other| names_overlap(&other.name, &server.name))
+        {
+            return Err(format!(
+                "servers \"{}\" and \"{}\" would share tool names; rename one",
+                other.name, server.name
+            ));
+        }
 
         if !name_ok
             || server.command.trim().is_empty()
@@ -1259,18 +1266,18 @@ mod tests {
 
         // Unchanged servers keep their rules.
         let mut kept = rules();
-        drop_rules_of_changed_servers(&old, &old, &mut kept, &HashMap::new());
+        drop_rules_of_changed_servers(&old, &old, &mut kept);
         assert_eq!(kept, rules());
 
         // Same name, different program: the rule goes, the other server's stays.
         let mut replaced = rules();
         let swapped = vec![server("git", "evil"), server("docs", "docs-mcp")];
-        drop_rules_of_changed_servers(&old, &swapped, &mut replaced, &HashMap::new());
+        drop_rules_of_changed_servers(&old, &swapped, &mut replaced);
         assert_eq!(replaced, vec!["fs_read", "mcp__docs__search"]);
 
         // Removed outright.
         let mut removed = rules();
-        drop_rules_of_changed_servers(&old, &old[1..], &mut removed, &HashMap::new());
+        drop_rules_of_changed_servers(&old, &old[1..], &mut removed);
         assert_eq!(removed, vec!["fs_read", "mcp__docs__search"]);
     }
 
@@ -1825,33 +1832,32 @@ mod tests {
     }
 
     #[test]
-    fn changing_a_server_keeps_the_rules_of_a_server_whose_name_extends_it() {
-        let owner = |server: &str, tool: &str| McpToolRef {
-            server: server.to_owned(),
-            tool: tool.to_owned(),
-            read_only: true,
-        };
-        let owners = HashMap::from([
-            ("mcp__a__q".to_owned(), owner("a", "q")),
-            ("mcp__a__x__t".to_owned(), owner("a__x", "t")),
-        ]);
-        let old = vec![server("a", "one"), server("a__x", "two")];
-        let new = vec![server("a", "changed"), server("a__x", "two")];
-        let mut rules = vec!["mcp__a__q".to_owned(), "mcp__a__x__t".to_owned()];
+    fn changing_a_server_keeps_the_rules_of_an_unrelated_server() {
+        let old = vec![server("a", "one"), server("ab", "two")];
+        let new = vec![server("a", "changed"), server("ab", "two")];
+        let mut rules = vec!["mcp__a__q".to_owned(), "mcp__ab__t".to_owned()];
 
-        drop_rules_of_changed_servers(&old, &new, &mut rules, &owners);
+        drop_rules_of_changed_servers(&old, &new, &mut rules);
 
-        assert_eq!(rules, vec!["mcp__a__x__t"]);
-
-        // Without the routing table the rule cannot be attributed, so it goes (fail closed).
-        let mut unknown = vec!["mcp__a__q".to_owned(), "mcp__a__x__t".to_owned()];
-        drop_rules_of_changed_servers(&old, &new, &mut unknown, &HashMap::new());
-        assert!(unknown.is_empty());
+        assert_eq!(rules, vec!["mcp__ab__t"]);
     }
 
     #[test]
-    fn server_names_that_sanitise_alike_are_refused() {
-        assert!(validate_servers(&[server("my-server", "x"), server("my_server", "y")]).is_err());
-        assert!(validate_servers(&[server("a", "x"), server("a__x", "y")]).is_ok());
+    fn server_names_whose_tool_names_could_collide_are_refused() {
+        for (a, b) in [
+            ("my-server", "my_server"),
+            ("a", "a__x"),
+            ("a__x", "a"),
+            ("a", "a_"),
+        ] {
+            assert!(
+                validate_servers(&[server(a, "x"), server(b, "y")]).is_err(),
+                "{a} {b}"
+            );
+        }
+
+        assert!(
+            validate_servers(&[server("a", "x"), server("ab", "y"), server("a_b", "z")]).is_ok()
+        );
     }
 }
