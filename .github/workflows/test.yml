@@ -431,8 +431,18 @@ jobs:
                   fi
                   cargo build --manifest-path "$manifest" --release --no-default-features --bin neore-host
                   binary=packages/device-core/target/release/neore-host
-                  ldd "$binary" | tee /dev/stderr | { ! grep -qi dbus; }
-                  strings "$binary" | { ! grep -q "dev.neore.device"; }
+                  # Captured first: under pipefail an early `grep -q` exit could SIGPIPE the producer and hide a match.
+                  deps="$(ldd "$binary")"
+                  echo "$deps"
+                  if grep -qi dbus <<< "$deps"; then
+                      echo "neore-host links libdbus" >&2
+                      exit 1
+                  fi
+                  strings "$binary" > "$RUNNER_TEMP/neore-host.strings"
+                  if grep -q "dev.neore.device" "$RUNNER_TEMP/neore-host.strings"; then
+                      echo "neore-host carries the keychain service name" >&2
+                      exit 1
+                  fi
 
             # The binary that gets copied to a remote machine must not depend on that machine's libc.
             # A static musl build runs on any Linux of the same architecture, so it is built, checked for
