@@ -68,4 +68,41 @@ describe("public API and locked threads", () => {
         expect(result.data.data.map((thread) => thread.id)).toEqual(["open"]);
         expect(JSON.stringify(result)).not.toContain("Secret plan");
     });
+
+    describe("deleting", () => {
+        const deleteInput = (runQuery: () => Promise<unknown>) => {
+            const runMutation = vi.fn(async () => {
+                return { isDone: true };
+            });
+
+            return { ctx: { runMutation, runQuery }, runMutation };
+        };
+
+        it("does not delete a thread the read returns locked", async () => {
+            const { ctx, runMutation } = deleteInput(async () => {
+                return { _id: "t1", lockedAt: 1, status: "active", userId: "owner" };
+            });
+
+            await expect(route("deleteThread").handler(input(ctx) as never)).rejects.toMatchObject({ code: "not_found" });
+            expect(runMutation).not.toHaveBeenCalled();
+        });
+
+        it("does not delete a thread the read refuses as locked", async () => {
+            const { ctx, runMutation } = deleteInput(async () => {
+                throw lockedError();
+            });
+
+            await expect(route("deleteThread").handler(input(ctx) as never)).rejects.toMatchObject({ code: "not_found" });
+            expect(runMutation).not.toHaveBeenCalled();
+        });
+
+        it("deletes an unlocked thread", async () => {
+            const { ctx, runMutation } = deleteInput(async () => {
+                return { _id: "t1", status: "active", userId: "owner" };
+            });
+
+            await expect(route("deleteThread").handler(input(ctx) as never)).resolves.toEqual({ data: { deleted: true, id: "t1" } });
+            expect(runMutation).toHaveBeenCalledOnce();
+        });
+    });
 });

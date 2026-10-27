@@ -24,7 +24,8 @@ pattern. Writes into host-run threads are refused server-side, in
 - `backend/lunora/public-api/identity.ts`: on `/api/v1/*`, `resolveIdentity`
   accepts an API key and nothing else: no JWT, no cookie.
 - `backend/lunora/public-api/scopes.ts`: resources `chat`, `threads`, `skills`,
-  `tasks`, `knowledge`, `memories`, `models`; actions `read`, `write`. **`write`
+  `tasks`, `knowledge`, `memories`, `models`, `triggers` (not in the default
+  scope set); actions `read`, `write`. **`write`
   does not imply `read`.** The default scope set is read-only on everything.
   Scoped keys are minted by `auth_api_keys.createScopedApiKey`.
 - `backend/lunora/public-api/routes.ts`: `ROUTES`, each with `method`, `path`,
@@ -48,7 +49,8 @@ pattern. Writes into host-run threads are refused server-side, in
   calls `deleteThread`, which checks ownership only. Open item before any thread
   route gets an `mcp` tag: make the DELETE handler load the thread through
   `notFoundIfLocked` first. No thread route gets a tag until every one of them
-  refuses a locked thread.
+  refuses a locked thread. (Done in S1: the DELETE handler reads through
+  `notFoundIfLocked` first.)
 - Key creation UI with a scope picker exists:
   `apps/web/src/features/auth/components/settings/api-key/create-api-key-dialog.tsx`,
   `api-key-scope-picker.tsx`.
@@ -63,6 +65,11 @@ pattern. Writes into host-run threads are refused server-side, in
   prefix and `authenticate`. Transport and protocol version follow the published
   MCP spec at S1. The handler answers `initialize`, `tools/list` and
   `tools/call`, and nothing else in v1 (no resources, no prompts, no sampling).
+  The current spec revision (2026-07-28) has no `initialize` handshake: each request
+  carries its version in `_meta` and mirrors it in headers, and `server/discover`
+  replaces the handshake. The endpoint serves both eras (no sessions, JSON replies
+  only): `initialize` for 2025-03-26 to 2025-11-25 clients, `_meta` plus
+  `server/discover` for 2026-07-28, and `ping` for both.
 - The endpoint itself is not a `ROUTES` entry. It is a dispatcher over them.
 
 ### Tools generated from routes

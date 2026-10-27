@@ -109,6 +109,17 @@ describe("OpenAPI document", () => {
         expect(Object.keys(paths["/triggers/{triggerId}"]!["patch"]!["responses"] as object)).toContain("409");
     });
 
+    it("documents the MCP endpoint and tags the routes behind its tools", () => {
+        const operation = paths["/mcp"]!["post"]!;
+
+        expect(operation["operationId"]).toBe("mcp");
+        expect(operation["description"]).toContain("`get_thread`");
+        expect(Object.keys(operation["responses"] as object)).toEqual(expect.arrayContaining(["200", "202", "401", "405"]));
+        expect(paths["/threads/{threadId}"]!["get"]!["x-mcp-tools"]).toEqual(["get_thread"]);
+        expect(paths["/threads/{threadId}"]!["delete"]!["x-mcp-tools"]).toBeUndefined();
+        expect((document["tags"] as { name: string }[]).map((tag) => tag.name)).toContain("MCP");
+    });
+
     it("renders escaped docs HTML", () => {
         const html = renderDocsHtml(document);
 

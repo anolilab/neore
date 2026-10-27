@@ -11,6 +11,8 @@
  *   6. handler    — an existing procedure, as the key's owner
  *
  * and every failure is rendered by `errors.ts` in the one public error shape.
+ * `POST /mcp` (`mcp.ts`) enters at step 2 for each tool call, through the same
+ * `assertScopes` and `runRoute`.
  */
 import { Hono } from "hono";
 import type { Context } from "hono";
@@ -24,7 +26,8 @@ import { errorResponse, fromProcedureError, PublicApiError } from "./errors";
 import type { IdempotencyRecord, IdempotencyStore } from "./idempotency";
 import { IDEMPOTENCY_FAMILY, IDEMPOTENCY_HEADER, parseIdempotencyKey, withIdempotency } from "./idempotency";
 import type { ApiKeyIdentity } from "./identity";
-import { extractApiKey, readApiKeyIdentity } from "./identity";
+import { extractApiKey, MCP_PATH, readApiKeyIdentity } from "./identity";
+import { buildMcpTools, serveMcp, toolRequest } from "./mcp";
 import { buildOpenApiDocument, renderDocsHtml } from "./openapi";
 import type { RouteDefinition, RouteResult } from "./routes";
 import { ROUTES, toHonoPath } from "./routes";
@@ -43,6 +46,14 @@ const requestIdOf = (c: Context<LunoraHttpEnv>): string => {
 /** The scopes a route needs that this key lacks. */
 export const missingScopes = (identity: ApiKeyIdentity, route: Pick<RouteDefinition, "scopes">): string[] =>
     route.scopes.filter(([resource, action]) => !hasScope(identity.apiKeyScopes, resource, action)).map(([resource, action]) => formatScope(resource, action));
+
+const assertScopes = (identity: ApiKeyIdentity, route: Pick<RouteDefinition, "scopes">): void => {
+    const missing = missingScopes(identity, route);
+
+    if (missing.length > 0) {
+        throw new PublicApiError("insufficient_scope", `This API key lacks the required scope: ${missing.join(", ")}.`, { required: missing });
+    }
+};
 
 const authenticate = async (ctx: HttpActionCtx, request: Request): Promise<ApiKeyIdentity> => {
     const identity = readApiKeyIdentity(await ctx.auth.getIdentity(), ctx.auth.userId);
@@ -69,7 +80,7 @@ const applyKeyRateLimit = async (ctx: HttpActionCtx, identity: ApiKeyIdentity, i
     }
 };
 
-const readBody = async (route: RouteDefinition, request: Request): Promise<{ parsed: unknown; raw: string }> => {
+const readCappedText = async (request: Request): Promise<string> => {
     // Content-Length is only checked up front: a chunked body is read in full before the cap below applies.
     const declared = Number(request.headers.get("Content-Length") ?? "0");
 
@@ -82,6 +93,12 @@ const readBody = async (route: RouteDefinition, request: Request): Promise<{ par
     if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) {
         throw new PublicApiError("payload_too_large", `Request bodies are limited to ${String(MAX_BODY_BYTES)} bytes.`);
     }
+
+    return raw;
+};
+
+const readBody = async (route: RouteDefinition, request: Request): Promise<{ parsed: unknown; raw: string }> => {
+    const raw = await readCappedText(request);
 
     if (!route.body) {
         return { parsed: undefined, raw };
@@ -127,23 +144,67 @@ const idempotencyStore = (ctx: HttpActionCtx): IdempotencyStore => {
 const toResponse = (route: RouteDefinition, result: RouteResult): Response =>
     result instanceof Response ? result : Response.json(result.data, { status: result.status ?? route.successStatus ?? 200 });
 
+/**
+ * Steps 3-6 for a key that holds the route's scopes, rendered as a `Response`
+ * either way. Everything the key does runs on its owner's shard, where their
+ * rows live — the per-key limit included.
+ */
+const runRoute = async (
+    route: RouteDefinition,
+    lunora: HttpActionCtx,
+    identity: ApiKeyIdentity,
+    requestId: string,
+    request: Request,
+    params: Record<string, string>,
+): Promise<Response> => {
+    try {
+        return await inShard(lunora, identity.userId, async (ctx) => await handleOnShard(route, ctx, identity, requestId, request, params));
+    } catch (error) {
+        return failure(route.operationId, error, requestId);
+    }
+};
+
 const handle = async (route: RouteDefinition, c: Context<LunoraHttpEnv>): Promise<Response> => {
+    const requestId = requestIdOf(c);
+
+    try {
+        const identity = await authenticate(c.var.lunora, c.req.raw);
+
+        assertScopes(identity, route);
+
+        return await runRoute(route, c.var.lunora, identity, requestId, c.req.raw, c.req.param() as Record<string, string>);
+    } catch (error) {
+        return failure(route.operationId, error, requestId);
+    }
+};
+
+/** `POST /mcp`: the dispatcher in `mcp.ts`, with each tool call run as the route it names. */
+const handleMcp = async (routes: ReadonlyArray<RouteDefinition>, c: Context<LunoraHttpEnv>): Promise<Response> => {
     const requestId = requestIdOf(c);
     const request = c.req.raw;
 
     try {
         const identity = await authenticate(c.var.lunora, request);
-        const missing = missingScopes(identity, route);
+        const rawBody = await readCappedText(request);
 
-        if (missing.length > 0) {
-            throw new PublicApiError("insufficient_scope", `This API key lacks the required scope: ${missing.join(", ")}.`, { required: missing });
-        }
+        return await serveMcp(rawBody, {
+            callTool: async (tool, args) => {
+                try {
+                    assertScopes(identity, tool.route);
 
-        // Everything the key does runs on its owner's shard, where their rows
-        // live — the per-key limit included.
-        return await inShard(c.var.lunora, identity.userId, async (ctx) => await handleOnShard(route, c, ctx, identity, requestId));
+                    const call = toolRequest(tool, args, request);
+
+                    return await runRoute(tool.route, c.var.lunora, identity, requestId, call.request, call.params);
+                } catch (error) {
+                    return failure(tool.route.operationId, error, requestId);
+                }
+            },
+            canUse: (route) => missingScopes(identity, route).length === 0,
+            request,
+            tools: buildMcpTools(routes),
+        });
     } catch (error) {
-        return failure(route, error, requestId);
+        return failure("mcp", error, requestId);
     }
 };
 
@@ -156,11 +217,8 @@ const handle = async (route: RouteDefinition, c: Context<LunoraHttpEnv>): Promis
 export const publicApiUploadGate = async (ctx: HttpActionCtx, request: Request): Promise<Response | undefined> => {
     try {
         const identity = await authenticate(ctx, request);
-        const missing = missingScopes(identity, { scopes: [["knowledge", "write"]] });
 
-        if (missing.length > 0) {
-            throw new PublicApiError("insufficient_scope", `This API key lacks the required scope: ${missing.join(", ")}.`, { required: missing });
-        }
+        assertScopes(identity, { scopes: [["knowledge", "write"]] });
 
         if (request.method === "POST") {
             await applyKeyRateLimit(ctx, identity, true);
@@ -172,11 +230,11 @@ export const publicApiUploadGate = async (ctx: HttpActionCtx, request: Request):
     }
 };
 
-const failure = (route: RouteDefinition, error: unknown, requestId: string): Response => {
+const failure = (operationId: string, error: unknown, requestId: string): Response => {
     const apiError = fromProcedureError(error);
 
     if (apiError.code === "internal_error") {
-        httpLogger.error(`[public-api] ${route.operationId} failed (${requestId}):`, error);
+        httpLogger.error(`[public-api] ${operationId} failed (${requestId}):`, error);
     }
 
     return errorResponse(apiError, requestId);
@@ -184,13 +242,12 @@ const failure = (route: RouteDefinition, error: unknown, requestId: string): Res
 
 const handleOnShard = async (
     route: RouteDefinition,
-    c: Context<LunoraHttpEnv>,
     ctx: HttpActionCtx,
     identity: ApiKeyIdentity,
     requestId: string,
+    request: Request,
+    params: Record<string, string>,
 ): Promise<Response> => {
-    const request = c.req.raw;
-
     try {
         await applyKeyRateLimit(ctx, identity, route.method !== "get");
 
@@ -214,7 +271,7 @@ const handleOnShard = async (
                     body: body.parsed,
                     ctx,
                     identity,
-                    params: c.req.param() as Record<string, string>,
+                    params,
                     query: Object.fromEntries(url.searchParams),
                     signal: request.signal,
                 }),
@@ -232,20 +289,26 @@ const handleOnShard = async (
 
         return response;
     } catch (error) {
-        return failure(route, error, requestId);
+        return failure(route.operationId, error, requestId);
     }
 };
 
-export const createPublicApiRouter = (): Hono<LunoraHttpEnv> => {
+export const createPublicApiRouter = (routes: ReadonlyArray<RouteDefinition> = ROUTES): Hono<LunoraHttpEnv> => {
     const router = new Hono<LunoraHttpEnv>();
 
     // Public: the contract itself. Built per request — it is cheap and depends on nothing mutable.
     router.get("/openapi.json", (c) => c.json(buildOpenApiDocument(PUBLIC_ORIGIN || undefined)));
     router.get("/docs", (c) => c.html(renderDocsHtml(buildOpenApiDocument(PUBLIC_ORIGIN || undefined))));
 
-    for (const route of ROUTES) {
+    for (const route of routes) {
         router.on(route.method.toUpperCase(), toHonoPath(route.path), async (c) => await handle(route, c));
     }
+
+    router.post(MCP_PATH, async (c) => await handleMcp(routes, c));
+    // No server-initiated stream and no session to end (the transport allows both to be refused).
+    router.all(MCP_PATH, (c) =>
+        errorResponse(new PublicApiError("method_not_allowed", "The MCP endpoint takes POST only."), requestIdOf(c), { Allow: "POST" }),
+    );
 
     // Anything else under /api/v1 answers in the API's own error shape, not the app's.
     router.all("*", (c) => errorResponse(new PublicApiError("not_found", `No route ${c.req.method} ${new URL(c.req.url).pathname}.`), requestIdOf(c)));
