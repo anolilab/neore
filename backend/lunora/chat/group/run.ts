@@ -299,7 +299,13 @@ const runSpeaker = async (
             threadEffort: turn.reasoningEffort.thread,
         });
         const streamTextArgs: Record<string, unknown> = {
-            ...buildRunStreamArgs({ backupModelId, model, reasoningEffort, shouldAutoContinue: turn.shouldAutoContinue }),
+            ...buildRunStreamArgs({
+                backupModelId,
+                hasTools: Object.keys(toolResult.tools).length > 0,
+                model,
+                reasoningEffort,
+                shouldAutoContinue: turn.shouldAutoContinue,
+            }),
             system,
             ...(isFirstSpeaker ? { promptMessageId: turn.promptMessageId } : { forceNewOrder: true, promptMessageId: position.continueFromMessageId }),
         };

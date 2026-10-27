@@ -623,11 +623,13 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
  */
 export const buildRunStreamArgs = (options: {
     backupModelId?: string;
+    /** Whether the calls carry tools: a backup that cannot call them is skipped for such a call, so it does not size the prompt. */
+    hasTools?: boolean;
     model: string;
     reasoningEffort: number | undefined;
     shouldAutoContinue?: boolean;
 }): Record<string, unknown> => {
-    const { backupModelId, model, reasoningEffort } = options;
+    const { backupModelId, hasTools, model, reasoningEffort } = options;
     const modelDefinition = MODEL_LOOKUP.get(model);
     const supportsReasoningEffort =
         modelDefinition?.filterCapabilities?.includes("effort_control") || modelDefinition?.filterCapabilities?.includes("reasoning");
@@ -649,7 +651,10 @@ export const buildRunStreamArgs = (options: {
     // run's tool results pile up after the one-shot check in `applyLateCompression`.
     // `shouldAutoContinue` no longer changes this; it stays in the type so callers
     // need no edit.
-    const contextLimit = getFallbackContextWindow(model, backupModelId);
+    const contextLimit = getFallbackContextWindow(
+        model,
+        hasTools && MODEL_LOOKUP.get(backupModelId ?? "")?.supportsToolCalling === false ? undefined : backupModelId,
+    );
 
     streamTextArgs.prepareStep = ({ messages }: { messages: unknown[] }) => {
         const compressed = compressContextMessages(messages as never, contextLimit);
@@ -968,6 +973,7 @@ export const resumeApprovedRun = async (
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({
             backupModelId,
+            hasTools: Object.keys(toolResult.tools).length > 0,
             model: config.model,
             reasoningEffort: config.reasoningEffort,
             shouldAutoContinue: config.shouldAutoContinue,

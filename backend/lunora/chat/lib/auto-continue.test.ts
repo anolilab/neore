@@ -303,6 +303,21 @@ describe("a backup model with a smaller window", () => {
     });
 });
 
+describe("a backup that cannot call tools", () => {
+    type Prepare = { prepareStep: (options: { messages: ModelMessage[] }) => { messages: ModelMessage[] } | undefined };
+    const big = thread(10, 2, "y".repeat(40_000));
+    const args = (hasTools: boolean) =>
+        buildRunStreamArgs({ backupModelId: "kimi-k2-instruct", hasTools, model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
+
+    it("does not shrink the context of a call that carries tools, since the backup would be skipped", () => {
+        expect(args(true).prepareStep({ messages: big })).toBeUndefined();
+    });
+
+    it("still sizes a tool-less call for it", () => {
+        expect(args(false).prepareStep({ messages: big })?.messages.length).toBeLessThan(big.length);
+    });
+});
+
 describe("buildRunStreamArgs", () => {
     it("installs compression for every run, not only auto-continue ones", () => {
         const { prepareStep } = buildRunStreamArgs({ model: "gpt-4o", reasoningEffort: undefined }) as {

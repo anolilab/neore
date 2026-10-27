@@ -311,6 +311,7 @@ export const runStreamingAgent = internalAction
             // Reasoning provider options and, for auto-continue, step compression.
             const streamTextArgs: any = buildRunStreamArgs({
                 backupModelId,
+                hasTools: Object.keys(tools).length > 0,
                 model,
                 reasoningEffort: threadReasoningEffort,
                 shouldAutoContinue: isAutoContinue,

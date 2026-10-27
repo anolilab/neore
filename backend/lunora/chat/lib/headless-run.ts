@@ -185,6 +185,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
         const generateArgs: Record<string, unknown> = {
             ...buildRunStreamArgs({
                 backupModelId,
+                hasTools: Object.keys(toolResult.tools).length > 0,
                 model,
                 reasoningEffort: skill?.config?.reasoningEffort,
                 shouldAutoContinue: options.maxSteps === undefined,
