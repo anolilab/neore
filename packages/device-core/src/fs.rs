@@ -157,20 +157,21 @@ mod confined {
         Ok(unsafe { OwnedFd::from_raw_fd(fd) })
     }
 
-    /// Opens `path` (canonical, inside one of `roots`) by walking down from the root one component at a time,
-    /// never following a symlink: one swapped in below the root since the path was resolved fails with `ELOOP`.
+    /// Opens `path` (canonical, inside one of `roots`) by walking down from `/` one component at a time, never
+    /// following a symlink: `O_NOFOLLOW` only guards the last component of a path, so the root's own ancestors are
+    /// walked the same way. One swapped for a link since the path was resolved fails with `ELOOP`.
     pub fn open_dir(roots: &[PathBuf], path: &Path) -> io::Result<OwnedFd> {
-        let root = roots
-            .iter()
-            .find(|root| path.starts_with(root))
-            .ok_or_else(outside_roots)?;
-        let directory = libc::O_RDONLY | libc::O_DIRECTORY;
-        let mut dir = openat(libc::AT_FDCWD, root.as_os_str(), directory)?;
+        if !roots.iter().any(|root| path.starts_with(root)) {
+            return Err(outside_roots());
+        }
 
-        for component in path.strip_prefix(root).unwrap_or(path).components() {
+        let directory = libc::O_RDONLY | libc::O_DIRECTORY;
+        let mut dir = openat(libc::AT_FDCWD, OsStr::new("/"), directory)?;
+
+        for component in path.components() {
             match component {
+                Component::RootDir | Component::CurDir => {}
                 Component::Normal(name) => dir = openat(dir.as_raw_fd(), name, directory)?,
-                Component::CurDir => {}
                 _ => return Err(outside_roots()),
             }
         }
@@ -610,5 +611,33 @@ mod tests {
         assert_eq!(names, ["a.txt", "sub"]);
         assert_eq!(read(&roots, &roots[0].join("a.txt")).unwrap(), "hello");
         assert!(read(&roots, &roots[0]).is_err());
+    }
+
+    /// An ancestor of the root replaced by a link after the roots were read must not be followed.
+    #[cfg(unix)]
+    #[test]
+    fn a_root_ancestor_swapped_for_a_symlink_is_not_followed() {
+        let dir = scratch("ancestor");
+        let outside = dir.join("outside");
+        fs::create_dir_all(outside.join("inner")).unwrap();
+        fs::write(outside.join("inner/a.txt"), "outside").unwrap();
+        fs::create_dir_all(dir.join("parent/inner")).unwrap();
+        fs::write(dir.join("parent/inner/a.txt"), "inside").unwrap();
+        let roots = canonical_roots(&[dir.join("parent/inner").to_string_lossy().into_owned()]);
+        let file = resolve_existing("a.txt", &roots).unwrap();
+
+        assert_eq!(read(&roots, &file).unwrap(), "inside");
+
+        // `parent` (an ancestor of the root) is swapped for a link to a look-alike tree.
+        fs::rename(dir.join("parent"), dir.join("parent-moved")).unwrap();
+        std::os::unix::fs::symlink(&outside, dir.join("parent")).unwrap();
+
+        assert!(read(&roots, &file).is_err());
+        assert!(list(&roots, &roots[0]).is_err());
+        assert!(write(&roots, &file, "pwned", true).is_err());
+        assert_eq!(
+            fs::read_to_string(outside.join("inner/a.txt")).unwrap(),
+            "outside"
+        );
     }
 }
