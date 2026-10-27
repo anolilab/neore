@@ -17,7 +17,8 @@ const NATIVE = { degradation: "none", supported: true } as const;
  */
 export const CLOUD_INTERACTIVE_CAPABILITIES: CapabilityReport = {
     groups: {
-        streaming: { reasoning: NATIVE, text: NATIVE, toolParts: NATIVE },
+        // Live chunks carry text and reasoning only; a tool part arrives with its saved step.
+        streaming: { reasoning: NATIVE, text: NATIVE },
         // `respondToToolApproval` takes approve, always and deny; a deny resumes the run.
         tools: { approvalRequest: NATIVE, call: NATIVE, declinePath: NATIVE },
         // Stop in `chat/functions.ts`; `steerRun` queues into the running stream at a step boundary.
@@ -46,8 +47,8 @@ export const CLOUD_HEADLESS_CAPABILITIES: CapabilityReport = {
 export const LOCAL_BROWSER_CAPABILITIES: CapabilityReport = {
     groups: {
         streaming: { text: NATIVE },
-        // The browser aborts its own request.
-        turns: { cancel: NATIVE, followUp: { kind: "none" } },
+        // The browser aborts its own request; the composer holds a prompt sent mid-stream and sends it after.
+        turns: { cancel: NATIVE, followUp: { kind: "queue" } },
     },
     reportedAt: 0,
     version: 1,

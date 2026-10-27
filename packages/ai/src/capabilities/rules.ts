@@ -27,14 +27,21 @@ export const UNKNOWN_CAPABILITY: Capability = { reason: "unknown", supported: fa
 
 export const isAvailable = (capability: Capability | null | undefined): boolean => capability?.supported === true;
 
+const DEGRADATIONS = new Set<unknown>(["divergent", "restart", "synthetic"]);
+const UNSUPPORTED_REASONS = new Set<unknown>(["not_enforced", "not_offered", "unknown"]);
+
 const isCapability = (value: unknown): value is Capability => {
     if (typeof value !== "object" || value === null) {
         return false;
     }
 
-    const { supported } = value as { supported?: unknown };
+    const { degradation, note, reason, supported } = value as { degradation?: unknown; note?: unknown; reason?: unknown; supported?: unknown };
 
-    return supported === true ? "degradation" in value : supported === false && "reason" in value;
+    if (supported === true) {
+        return degradation === "none" || (DEGRADATIONS.has(degradation) && typeof note === "string");
+    }
+
+    return supported === false && UNSUPPORTED_REASONS.has(reason);
 };
 
 /** The member, or `unknown` when the report does not carry it. */
@@ -49,15 +56,25 @@ export const followUpControl = (report: CapabilityReportInput | null | undefined
     const followUp = report?.groups?.turns?.followUp;
 
     if (followUp?.kind === "steer") {
-        return followUp.degradation === "restart" ? "steer-restart" : "steer";
+        if (followUp.degradation === undefined) {
+            return "steer";
+        }
+
+        return followUp.degradation === "restart" ? "steer-restart" : "none";
     }
 
     return followUp?.kind === "queue" ? "queue" : "none";
 };
 
 /** The modes the runner enforces itself. A mode it lists but ignores is not in the list. */
-export const visibleModes = (report: CapabilityReportInput | null | undefined): string[] => [...(report?.groups?.permissions?.modes ?? [])];
+export const visibleModes = (report: CapabilityReportInput | null | undefined): string[] => {
+    const modes: unknown = report?.groups?.permissions?.modes;
 
-export const selectableModels = (report: CapabilityReportInput | null | undefined): { id: string; name: string }[] => [
-    ...(report?.groups?.identity?.models ?? []),
-];
+    return Array.isArray(modes) ? [...modes] : [];
+};
+
+export const selectableModels = (report: CapabilityReportInput | null | undefined): { id: string; name: string }[] => {
+    const models: unknown = report?.groups?.identity?.models;
+
+    return Array.isArray(models) ? [...models] : [];
+};

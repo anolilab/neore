@@ -98,8 +98,12 @@ describe("followUpControl", () => {
         expect(followUpControl(CLOUD_INTERACTIVE_CAPABILITIES)).toBe("steer");
     });
 
-    it("is none for a local browser model", () => {
-        expect(followUpControl(LOCAL_BROWSER_CAPABILITIES)).toBe("none");
+    it("is queue for a local browser model", () => {
+        expect(followUpControl(LOCAL_BROWSER_CAPABILITIES)).toBe("queue");
+    });
+
+    it("is none for a steer degradation outside the declared shape", () => {
+        expect(followUpControl({ groups: { turns: { followUp: { degradation: "bogus", kind: "steer" } } } } as unknown as CapabilityReport)).toBe("none");
     });
 
     it("is steer-restart for a steer that ends the run first", () => {
@@ -134,6 +138,21 @@ describe("visibleModes", () => {
     });
 });
 
+describe("malformed reports", () => {
+    it("reads a supported member without a valid degradation, or a degraded one without its note, as unknown", () => {
+        const read = (member: unknown) => capabilityOf({ groups: { turns: { cancel: member } } } as unknown as CapabilityReport, "turns.cancel");
+
+        expect(read({ degradation: "bogus", supported: true })).toBe(UNKNOWN_CAPABILITY);
+        expect(read({ degradation: "restart", supported: true })).toBe(UNKNOWN_CAPABILITY);
+        expect(read({ reason: "bogus", supported: false })).toBe(UNKNOWN_CAPABILITY);
+    });
+
+    it("returns an empty list for modes or models that are not arrays", () => {
+        expect(visibleModes({ groups: { permissions: { modes: 3 } } } as unknown as CapabilityReport)).toEqual([]);
+        expect(selectableModels({ groups: { identity: { models: { length: 1 } } } } as unknown as CapabilityReport)).toEqual([]);
+    });
+});
+
 describe("selectableModels", () => {
     it("returns the models the report lists, and none when it lacks them", () => {
         expect(selectableModels({ groups: { identity: { models: [{ id: "a", name: "A" }] } } })).toEqual([{ id: "a", name: "A" }]);
@@ -157,6 +176,7 @@ describe("static declarations", () => {
         const claimed = (report: CapabilityReport) => ALL_KEYS.filter((key) => isAvailable(capabilityOf(report, key)));
 
         expect(claimed(LOCAL_BROWSER_CAPABILITIES)).toEqual(["streaming.text", "turns.cancel"]);
+        expect(isAvailable(capabilityOf(CLOUD_INTERACTIVE_CAPABILITIES, "streaming.toolParts"))).toBe(false);
         expect(claimed(CLOUD_HEADLESS_CAPABILITIES)).toEqual(["turns.cancel"]);
     });
 
