@@ -75,8 +75,9 @@ export const alive = (pid: number): boolean => {
         process.kill(pid, 0);
 
         return true;
-    } catch {
-        return false;
+    } catch (error) {
+        // Only ESRCH says the process is gone; EPERM says it is there and cannot be signalled.
+        return (error as NodeJS.ErrnoException).code !== "ESRCH";
     }
 };
 

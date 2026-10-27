@@ -116,6 +116,25 @@ describe("a recorded session", () => {
 });
 
 describe("the end of a turn", () => {
+    it("cancels the requests the finished turn left waiting", async () => {
+        const cancelled: string[] = [];
+        const gate: PermissionGate = {
+            ask: async () => {
+                return { outcome: "cancelled" };
+            },
+            cancelSession: (id) => {
+                cancelled.push(id);
+            },
+        };
+        const { player, session, steps } = await setup(gate);
+
+        session.send("say hi");
+        await player.play(steps.slice(4));
+        await expect.poll(() => session.snapshot().status).toBe("idle");
+
+        expect(cancelled).toContain(session.id);
+    });
+
     const update = (sessionUpdate: string, rest: Record<string, unknown>) => {
         return { method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate, ...rest } } };
     };

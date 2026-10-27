@@ -281,6 +281,9 @@ export class AgentSession {
         }
 
         turn.end(this.cancelRequested ? "cancelled" : reason);
+        // A request the agent made during this turn and left unanswered must not stay answerable: an Allow now
+        // would authorize something for a turn that is over. A queued turn asks for its own once it starts.
+        this.options.gate.cancelSession(this.id);
         clearTimeout(this.cancelTimer);
         this.cancelTimer = undefined;
         this.current = undefined;

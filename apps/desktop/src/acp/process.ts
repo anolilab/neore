@@ -91,13 +91,14 @@ export const spawnAgent: Spawner = (plan) => {
 
     child.stderr?.setEncoding("utf8");
     child.stderr?.on("data", (chunk: string) => {
-        stderr = (stderr + chunk).slice(-STDERR_KEEP_BYTES);
+        // Scrubbed before it is cut, so a cut cannot leave the tail of a value that the scrub would no longer match.
+        stderr = scrub(stderr + chunk, plan).slice(-STDERR_KEEP_BYTES);
     });
 
     const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
         // `error` is a failed spawn (ENOENT, EACCES): the process never ran.
         child.once("error", (error) => {
-            stderr = `${stderr}${error.message}`.slice(-STDERR_KEEP_BYTES);
+            stderr = scrub(`${stderr}${error.message}`, plan).slice(-STDERR_KEEP_BYTES);
             resolve({ code: null, signal: null });
         });
         child.once("exit", (code, signal) => {

@@ -104,11 +104,12 @@ const slug = (name: string): string => {
         .join("-")
         .slice(0, 30)
         .replace(TRAILING_DASH, "");
-    let key = base === "" ? "agent" : base;
+    const root = base === "" ? "agent" : base;
+    let key = root;
     let n = 2;
 
     while (state.view.agents.some((agent) => agent.key === key)) {
-        key = `${base}-${String(n)}`;
+        key = `${root}-${String(n)}`;
         n += 1;
     }
 
@@ -224,8 +225,16 @@ const renderAgents = (): void => {
 
 const answerRequests = (action: () => Promise<unknown>) =>
     guarded(async () => {
-        await action();
-        await refreshRequests();
+        try {
+            await action();
+        } finally {
+            // A request that timed out or was answered elsewhere fails here, and the bar must still drop it.
+            try {
+                await refreshRequests();
+            } catch {
+                // The answer's own error is the one to show.
+            }
+        }
     });
 
 const requestLine = (request: PermissionView): HTMLElement => {
