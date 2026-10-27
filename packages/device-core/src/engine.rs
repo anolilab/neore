@@ -267,6 +267,11 @@ impl DeviceState {
 
             if let Some(servers) = update.mcp_servers {
                 validate_servers(&servers)?;
+                drop_rules_of_changed_servers(
+                    &settings.mcp_servers,
+                    &servers,
+                    &mut settings.allow_rules,
+                );
                 settings.mcp_servers = servers;
                 // The cached `readOnly` flags describe the old servers. Dropping them makes every MCP call
                 // fail closed until the next manifest, so none can skip its prompt on stale metadata.
@@ -530,6 +535,26 @@ pub fn cap_utf8(text: &str, max: usize) -> (String, bool) {
     }
 
     (text[..end].to_owned(), true)
+}
+
+/// Forgets the "Always allow" rules of every MCP server that was removed, replaced or added. A rule is keyed on the
+/// tool's manifest name, which only carries the server's NAME, so a different program under the same name would
+/// otherwise inherit the approval the user gave the old one.
+fn drop_rules_of_changed_servers(
+    old: &[McpServerConfig],
+    new: &[McpServerConfig],
+    rules: &mut Vec<String>,
+) {
+    let changed = old
+        .iter()
+        .filter(|server| !new.contains(server))
+        .chain(new.iter().filter(|server| !old.contains(server)));
+
+    for server in changed {
+        let prefix = mcp::tool_name(&server.name, "");
+
+        rules.retain(|rule| !rule.starts_with(&prefix));
+    }
 }
 
 /// Tools that may never skip the prompt: they change things irreversibly.
@@ -1154,6 +1179,75 @@ mod tests {
         let replaced: SettingsUpdate = serde_json::from_str(r#"{"mcpServers":[]}"#).unwrap();
         state.settings_update(replaced).unwrap();
         assert!(state.mcp_tools.lock().unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn server(name: &str, command: &str) -> McpServerConfig {
+        McpServerConfig {
+            args: Vec::new(),
+            command: command.to_owned(),
+            env: Default::default(),
+            name: name.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_replaced_or_removed_mcp_server_loses_its_allow_rules() {
+        let old = vec![server("git", "git-mcp"), server("docs", "docs-mcp")];
+        let rules = || {
+            vec![
+                "fs_read".to_owned(),
+                "mcp__git__status".to_owned(),
+                "mcp__docs__search".to_owned(),
+            ]
+        };
+
+        // Unchanged servers keep their rules.
+        let mut kept = rules();
+        drop_rules_of_changed_servers(&old, &old, &mut kept);
+        assert_eq!(kept, rules());
+
+        // Same name, different program: the rule goes, the other server's stays.
+        let mut replaced = rules();
+        let swapped = vec![server("git", "evil"), server("docs", "docs-mcp")];
+        drop_rules_of_changed_servers(&old, &swapped, &mut replaced);
+        assert_eq!(replaced, vec!["fs_read", "mcp__docs__search"]);
+
+        // Removed outright.
+        let mut removed = rules();
+        drop_rules_of_changed_servers(&old, &old[1..], &mut removed);
+        assert_eq!(removed, vec!["fs_read", "mcp__docs__search"]);
+    }
+
+    #[test]
+    fn replacing_a_server_through_settings_update_drops_its_saved_rule() {
+        let dir =
+            std::env::temp_dir().join(format!("neore-device-mcp-rules-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                allow_rules: vec!["mcp__git__status".to_owned()],
+                mcp_servers: vec![server("git", "git-mcp")],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+        let same: SettingsUpdate =
+            serde_json::from_str(r#"{"mcpServers":[{"name":"git","command":"git-mcp"}]}"#).unwrap();
+        assert_eq!(state.settings_update(same).unwrap().allow_rules.len(), 1);
+
+        let swapped: SettingsUpdate =
+            serde_json::from_str(r#"{"mcpServers":[{"name":"git","command":"evil"}]}"#).unwrap();
+        assert!(state
+            .settings_update(swapped)
+            .unwrap()
+            .allow_rules
+            .is_empty());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
