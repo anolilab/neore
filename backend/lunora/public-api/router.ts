@@ -187,12 +187,28 @@ const handleMcp = async (routes: ReadonlyArray<RouteDefinition>, c: Context<Luno
         const identity = await authenticate(c.var.lunora, request);
         const rawBody = await readCappedText(request);
 
+        // A tool call is limited by its own route; the protocol calls around it draw on the same read allowance.
+        const chargeProtocolCall = async (): Promise<void> => {
+            await inShard(c.var.lunora, identity.userId, async (ctx) => {
+                await applyKeyRateLimit(ctx, identity, false);
+            });
+        };
+
         return await serveMcp(rawBody, {
             callTool: async (tool, args) => {
                 try {
                     assertScopes(identity, tool.route);
 
-                    const call = toolRequest(tool, args, request);
+                    let call: ReturnType<typeof toolRequest>;
+
+                    try {
+                        call = toolRequest(tool, args, request);
+                    } catch (error) {
+                        // Arguments the route never sees are charged here, as the route would have.
+                        await chargeProtocolCall();
+
+                        throw error;
+                    }
 
                     return await runRoute(tool.route, c.var.lunora, identity, requestId, call.request, call.params);
                 } catch (error) {
@@ -200,12 +216,7 @@ const handleMcp = async (routes: ReadonlyArray<RouteDefinition>, c: Context<Luno
                 }
             },
             canUse: (route) => missingScopes(identity, route).length === 0,
-            // A tool call is limited by its own route; the protocol calls around it draw on the same read allowance.
-            chargeProtocolCall: async () => {
-                await inShard(c.var.lunora, identity.userId, async (ctx) => {
-                    await applyKeyRateLimit(ctx, identity, false);
-                });
-            },
+            chargeProtocolCall,
             request,
             tools: buildMcpTools(routes),
         });

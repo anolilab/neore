@@ -339,6 +339,15 @@ describe("MCP tools/call", () => {
         expect(rateLimitCalls(rest.calls)).toEqual(expected);
     });
 
+    it("charges the key for a call the route never sees: an unknown tool and arguments it refuses", async () => {
+        const unknown = await callTool({}, "no_such_tool", {});
+        const badArguments = await callTool({}, "get_thread", { nope: "x", threadId: "t1" });
+
+        expect(rateLimitCalls(unknown.calls)).toHaveLength(1);
+        expect(badArguments.result?.isError).toBe(true);
+        expect(rateLimitCalls(badArguments.calls)).toHaveLength(1);
+    });
+
     it("answers rate_limited, and runs nothing, when the key's limit is spent", async () => {
         const { calls, result } = await callTool({ limit: { ok: false, retryAfter: 2000 } }, "get_thread", { threadId: "t1" });
 

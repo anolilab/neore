@@ -298,11 +298,16 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
             const args = params?.["arguments"] ?? {};
             const tool = typeof name === "string" ? dependencies.tools.find((candidate) => candidate.name === name) : undefined;
 
+            // A call that is refused here never reaches its route, which is where a tool call is charged.
             if (!tool) {
+                await dependencies.chargeProtocolCall();
+
                 return rpcError(id, INVALID_PARAMS, `Unknown tool: ${typeof name === "string" ? name : "(no name)"}`);
             }
 
             if (!args || typeof args !== "object" || Array.isArray(args)) {
+                await dependencies.chargeProtocolCall();
+
                 return rpcError(id, INVALID_PARAMS, "`arguments` must be an object.");
             }
 
