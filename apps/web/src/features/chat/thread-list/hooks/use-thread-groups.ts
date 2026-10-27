@@ -5,7 +5,7 @@ import { useCallback, useMemo } from "react";
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import { useOptimisticDeletions, useOptimisticPins, useOptimisticStatuses } from "@/features/chat/core/stores/thread-store-hooks";
 import { matchesThreadFilters, pruneSelectedTagIds, resolveThreadTags } from "@/features/chat/tags/thread-tag-logic";
-import { useProjects } from "@/features/projects/hooks/use-projects";
+import { useProjectList } from "@/features/projects/hooks/use-projects";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import { useDateBoundaries } from "../contexts/date-boundaries-context";
@@ -87,11 +87,11 @@ const useThreadGroups = (
     const rawSelectedTagIds = useThreadListUIStore(selectSelectedTagIds);
     const selectedTagIds = useMemo(() => pruneSelectedTagIds(rawSelectedTagIds, compositeData?.tags), [rawSelectedTagIds, compositeData?.tags]);
 
-    const projects = useProjects();
+    const { isAnswered: projectsAnswered, projects } = useProjectList();
     const { t } = useLingui();
 
-    // The project list has no stored copy, so project chats stay out of the stored rows until it answers rather than landing in a date group and jumping.
-    const holdProjectThreads = isPlaceholderData && projects.length === 0;
+    // The project list has no stored copy, so until it answers (not merely while it is empty or failed) the stored project chats wait in one stable group rather than landing in a date group and jumping.
+    const holdProjectThreads = isPlaceholderData && !projectsAnswered;
 
     // Get optimistic state for instant UI updates
     const optimisticPins = useOptimisticPins();
@@ -112,7 +112,7 @@ const useThreadGroups = (
         } else if (isSearching && searchType === "messages") {
             threadsToUse = messageSearchResults?.page;
         } else {
-            threadsToUse = holdProjectThreads ? threadsData?.page.filter((thread: any) => !thread.projectId) : threadsData?.page;
+            threadsToUse = threadsData?.page;
         }
 
         if (!threadsToUse) {
@@ -167,7 +167,6 @@ const useThreadGroups = (
         };
     }, [
         threadsData?.page,
-        holdProjectThreads,
         temporaryThreads?.page,
         threadSearchResults?.page,
         messageSearchResults?.page,
@@ -330,9 +329,12 @@ const useThreadGroups = (
         const projectsMap = new Map<string, any>((projects || []).map((p: any) => [p._id, p]));
         const map = new Map<string, BranchNode[]>();
         const threadsWithoutProject: BranchNode[] = [];
+        const heldProjectThreads: BranchNode[] = [];
 
         for (const thread of regularThreads) {
-            if (thread.projectId && projectsMap.has(thread.projectId)) {
+            if (thread.projectId && holdProjectThreads) {
+                heldProjectThreads.push(thread);
+            } else if (thread.projectId && projectsMap.has(thread.projectId)) {
                 const existing = map.get(thread.projectId);
 
                 if (existing) {
@@ -345,8 +347,8 @@ const useThreadGroups = (
             }
         }
 
-        return { map, threadsWithoutProject };
-    }, [hierarchyData, projects, searchQuery]);
+        return { heldProjectThreads, map, threadsWithoutProject };
+    }, [hierarchyData, holdProjectThreads, projects, searchQuery]);
 
     // Memoize search results separately - this is a common hot path
     const searchResultsGroup = useMemo(() => {
@@ -383,7 +385,7 @@ const useThreadGroups = (
         }
 
         const { statelessThreads, temporaryThreadsList } = hierarchyData;
-        const { threadsWithoutProject } = threadsByProject;
+        const { heldProjectThreads, threadsWithoutProject } = threadsByProject;
 
         // Group threads by time periods using context date boundaries
         const { sevenDaysAgo, thirtyDaysAgo, today: todayTimestamp } = dateBoundaries;
@@ -458,6 +460,16 @@ const useThreadGroups = (
             // Finally by creation time (newest first)
             return b.createdAt - a.createdAt;
         });
+
+        // Project chats from the stored copy, until the project list answers and they regroup under their projects.
+        if (heldProjectThreads.length > 0) {
+            groups.push({
+                groupType: "project" as GroupType,
+                isCollapsed: collapsedGroups.has("project"),
+                threads: sortThreadsInGroup(heldProjectThreads.filter((candidate) => candidate.status !== "archived")),
+                title: t`Projects`,
+            });
+        }
 
         for (const project of sortedProjects) {
             const projectId = project._id;
