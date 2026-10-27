@@ -75,38 +75,54 @@ export const nextAttempt = (previous: EncodeAttempt, outputBytes: number): Encod
     return { height: Math.max(1, Math.floor(previous.height * scale)), quality: previous.quality, width: Math.max(1, Math.floor(previous.width * scale)) };
 };
 
-/** Bytes of a file's head to read for {@link pngHasAlpha}, {@link bmpHasAlpha} and {@link webpIsAnimatedOrTransparent}: both keep their flags before the image data. */
+/** Bytes of a file's head to read for {@link bmpHasAlpha} and {@link webpIsAnimatedOrTransparent}: both keep their flags before the image data. */
 const HEAD_BYTES = 256 * 1024;
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const IHDR_COLOR_TYPE_OFFSET = 25;
+const IHDR_END_OFFSET = 33;
 const CHUNK_HEADER_BYTES = 8;
 const CHUNK_OVERHEAD_BYTES = 12;
 
 const ascii = (bytes: Uint8Array, offset: number, length: number): string => String.fromCodePoint(...bytes.subarray(offset, offset + length));
 
+/** Chunk headers read while looking for `IDAT`, and the file bytes they may skip over; past either the PNG is left as it is. */
+const MAX_PNG_CHUNKS = 256;
+const MAX_PNG_WALK_BYTES = 64 * MEGABYTE;
+
+const readBytes = async (blob: Blob, start: number, end: number): Promise<Uint8Array> => new Uint8Array(await blob.slice(start, end).arrayBuffer());
+
 /**
- * Whether a PNG can carry transparency: a colour type with an alpha channel (4
- * greyscale+alpha, 6 RGBA), or a `tRNS` chunk on a palette/greyscale/RGB image.
- * Read from the head alone. When the head ends before the image data starts
- * (or is not a PNG) the answer is "yes", so the file is left as it is.
+ * Whether a PNG can carry transparency or animation: a colour type with an
+ * alpha channel (4 greyscale+alpha, 6 RGBA), or a `tRNS` or `acTL` chunk before
+ * the image data. The chunks are walked header by header with small reads,
+ * skipping each payload, so a large ICC profile or text chunk does not hide the
+ * answer. When the structure cannot be verified (not a PNG, truncated, too many
+ * chunks) the answer is "yes", so the file is left as it is.
  */
-export const pngHasAlpha = (head: Uint8Array): boolean => {
-    if (head.length <= IHDR_COLOR_TYPE_OFFSET || PNG_SIGNATURE.some((byte, index) => head[index] !== byte)) {
+export const pngHasAlpha = async (file: Blob): Promise<boolean> => {
+    const start = await readBytes(file, 0, IHDR_END_OFFSET);
+
+    if (start.length < IHDR_END_OFFSET || PNG_SIGNATURE.some((byte, index) => start[index] !== byte)) {
         return true;
     }
 
-    const colorType = head[IHDR_COLOR_TYPE_OFFSET];
+    const colorType = start[IHDR_COLOR_TYPE_OFFSET];
 
     if (colorType === 4 || colorType === 6) {
         return true;
     }
 
-    const view = new DataView(head.buffer, head.byteOffset, head.byteLength);
-    let offset = PNG_SIGNATURE.length;
+    let offset = IHDR_END_OFFSET;
 
-    while (offset + CHUNK_HEADER_BYTES <= head.length) {
-        const type = ascii(head, offset + 4, 4);
+    for (let chunks = 0; chunks < MAX_PNG_CHUNKS && offset < MAX_PNG_WALK_BYTES; chunks += 1) {
+        const header = await readBytes(file, offset, offset + CHUNK_HEADER_BYTES);
+
+        if (header.length < CHUNK_HEADER_BYTES) {
+            return true;
+        }
+
+        const type = ascii(header, 4, 4);
 
         // tRNS: transparency. acTL: an animated PNG, whose frames a JPEG would drop.
         if (type === "tRNS" || type === "acTL") {
@@ -117,7 +133,7 @@ export const pngHasAlpha = (head: Uint8Array): boolean => {
             return false;
         }
 
-        offset += view.getUint32(offset) + CHUNK_OVERHEAD_BYTES;
+        offset += new DataView(header.buffer).getUint32(0) + CHUNK_OVERHEAD_BYTES;
     }
 
     return true;
@@ -199,11 +215,11 @@ const encoded = async (canvas: HTMLCanvasElement, quality: number): Promise<Blob
         canvas.toBlob((blob) => resolve(blob ?? undefined), REENCODED_TYPE, quality);
     });
 
-/** Per type, whether the head of a file says a JPEG would lose something (alpha, animation). A type with no entry is always re-encoded. */
-const JPEG_LOSES: Readonly<Record<string, ((head: Uint8Array) => boolean) | undefined>> = {
-    "image/bmp": bmpHasAlpha,
+/** Per type, whether the file says a JPEG would lose something (alpha, animation). A type with no entry is always re-encoded. */
+const JPEG_LOSES: Readonly<Record<string, ((file: File) => Promise<boolean>) | undefined>> = {
+    "image/bmp": async (file) => bmpHasAlpha(await readBytes(file, 0, HEAD_BYTES)),
     "image/png": pngHasAlpha,
-    "image/webp": webpIsAnimatedOrTransparent,
+    "image/webp": async (file) => webpIsAnimatedOrTransparent(await readBytes(file, 0, HEAD_BYTES)),
 };
 
 const EXTENSION = /\.[^./\\]+$/;
@@ -227,7 +243,7 @@ export const downscaleOversizedImage = async (file: File): Promise<File> => {
     try {
         const losesSomething = JPEG_LOSES[file.type];
 
-        if (losesSomething && losesSomething(new Uint8Array(await file.slice(0, HEAD_BYTES).arrayBuffer()))) {
+        if (losesSomething && (await losesSomething(file))) {
             return file;
         }
 

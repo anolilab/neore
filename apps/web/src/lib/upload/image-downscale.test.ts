@@ -114,16 +114,27 @@ describe(nextAttempt, () => {
     });
 });
 
+/** An opaque PNG whose `iCCP` chunk (a colour profile) is `profileBytes` long, so it ends far past any fixed head read. */
+const pngWithProfile = (profileBytes: number): Blob =>
+    new Blob([
+        pngHead(2, []),
+        new Uint8Array([...uint32(profileBytes), ...[..."iCCP"].map((c) => c.codePointAt(0) ?? 0)]),
+        new Uint8Array(profileBytes + 4),
+        pngHead(2, [["IDAT", 8]]).subarray(33),
+    ]);
+
+const pngHasAlphaOf = async (bytes: Uint8Array<ArrayBuffer>): Promise<boolean> => await pngHasAlpha(new Blob([bytes]));
+
 describe(pngHasAlpha, () => {
-    it("is true for greyscale+alpha and RGBA", () => {
-        expect(pngHasAlpha(pngHead(4))).toBe(true);
-        expect(pngHasAlpha(pngHead(6))).toBe(true);
+    it("is true for greyscale+alpha and RGBA", async () => {
+        expect(await pngHasAlphaOf(pngHead(4))).toBe(true);
+        expect(await pngHasAlphaOf(pngHead(6))).toBe(true);
     });
 
-    it("is false for RGB, greyscale and palette images with no tRNS chunk", () => {
+    it("is false for RGB, greyscale and palette images with no tRNS chunk", async () => {
         for (const colorType of [0, 2, 3]) {
             expect(
-                pngHasAlpha(
+                await pngHasAlphaOf(
                     pngHead(colorType, [
                         ["gAMA", 4],
                         ["IDAT", 8],
@@ -133,9 +144,9 @@ describe(pngHasAlpha, () => {
         }
     });
 
-    it("is true when a tRNS chunk comes before the image data", () => {
+    it("is true when a tRNS chunk comes before the image data", async () => {
         expect(
-            pngHasAlpha(
+            await pngHasAlphaOf(
                 pngHead(3, [
                     ["PLTE", 6],
                     ["tRNS", 2],
@@ -145,9 +156,9 @@ describe(pngHasAlpha, () => {
         ).toBe(true);
     });
 
-    it("is true for an animated PNG, whose acTL chunk comes before the image data", () => {
+    it("is true for an animated PNG, whose acTL chunk comes before the image data", async () => {
         expect(
-            pngHasAlpha(
+            await pngHasAlphaOf(
                 pngHead(2, [
                     ["acTL", 8],
                     ["IDAT", 8],
@@ -156,12 +167,22 @@ describe(pngHasAlpha, () => {
         ).toBe(true);
     });
 
-    it("is true when the head ends before the image data, and for bytes that are not a PNG", () => {
-        expect(pngHasAlpha(pngHead(2, [["iCCP", 200]]))).toBe(true);
+    it("is false for an opaque PNG whose large pre-IDAT chunk runs past 256 KiB", async () => {
+        expect(await pngHasAlpha(pngWithProfile(600 * 1024))).toBe(false);
+    });
+
+    it("is true when a tRNS chunk follows a large chunk", async () => {
+        const blob = new Blob([pngWithProfile(600 * 1024).slice(0, -20), pngHead(3, [["tRNS", 2]]).subarray(33)]);
+
+        expect(await pngHasAlpha(blob)).toBe(true);
+    });
+
+    it("is true when the head ends before the image data, and for bytes that are not a PNG", async () => {
+        expect(await pngHasAlphaOf(pngHead(2, [["iCCP", 200]]))).toBe(true);
         const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...zeros(40)]);
 
-        expect(pngHasAlpha(jpeg)).toBe(true);
-        expect(pngHasAlpha(new Uint8Array(4))).toBe(true);
+        expect(await pngHasAlphaOf(jpeg)).toBe(true);
+        expect(await pngHasAlphaOf(new Uint8Array(4))).toBe(true);
     });
 });
 
@@ -309,6 +330,16 @@ describe(downscaleOversizedImage, () => {
             const result = await downscaleOversizedImage(file);
 
             expect(result.name).toBe("a.jpg");
+        });
+
+        it("re-encodes an opaque PNG with a colour profile over 256 KiB", async () => {
+            stubBrowser(() => TARGET_IMAGE_BYTES - 1);
+
+            const file = new File([pngWithProfile(600 * 1024), new Uint8Array(TARGET_IMAGE_BYTES)], "big.png", { type: "image/png" });
+
+            const result = await downscaleOversizedImage(file);
+
+            expect(result.type).toBe("image/jpeg");
         });
 
         it("leaves an opaque animated PNG alone", async () => {
