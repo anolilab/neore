@@ -84,83 +84,56 @@ describe("loadQuietSnapshot", () => {
     });
 
     describe("a reply in a routine's run thread", () => {
-        const insertRunThread = async (rows: { at: number; order: number; role: string; stepOrder?: number }[], threadUpdatedAt = NOW - 500) => {
-            await harness.run(async (ctx: any) => {
-                const threadId = await ctx.db.insert("threads", {
-                    status: "active",
-                    tags: ["trigger"],
-                    title: "Trigger: Digest",
-                    updatedAt: threadUpdatedAt,
-                    userId: USER,
-                });
+        const insertRunThread = async (extra: Record<string, unknown> = {}, title = "Trigger: Digest") =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("threads", { status: "active", tags: ["trigger"], title, updatedAt: NOW - 500, userId: USER, ...extra }),
+            );
 
-                for (const row of rows) {
-                    await ctx.db.insert("messages", {
-                        createdAt: row.at,
-                        message: { content: "text", role: row.role },
-                        order: row.order,
-                        status: "success",
-                        stepOrder: row.stepOrder ?? 0,
-                        threadId,
-                        tool: false,
-                        userId: USER,
-                    });
-                }
+        const save = async (threadId: string, role: "assistant" | "user") =>
+            await harness.run(async (ctx: any) => {
+                await addMessagesHandler(ctx, { messages: [{ message: { content: "text", role } }], threadId: threadId as never, userId: USER });
             });
-        };
 
         it("does not count the run's own prompt and answer", async () => {
-            await insertRunThread([
-                { at: NOW - 3000, order: 0, role: "user" },
-                { at: NOW - 2000, order: 0, role: "assistant" },
-            ]);
+            const threadId = await insertRunThread({ updatedAt: NOW - 120_000 });
+
+            await save(threadId, "user");
+            await save(threadId, "assistant");
+
+            const { threads } = await snapshotSince(NOW - 60_000);
+
+            expect(threads).toEqual([]);
+            const row = await harness.run(async (ctx: any) => await ctx.db.threads.findFirst({ where: { _id: threadId } }));
+
+            expect(row.lastUserMessageAt).toBeUndefined();
+        });
+
+        it("counts a reply saved through the message write even when no stream ever starts", async () => {
+            const threadId = await insertRunThread({ updatedAt: NOW - 120_000 });
+
+            await save(threadId, "user");
+            await save(threadId, "assistant");
+            // Only the save: `createStreamWithMessage` (the later `updatedAt` bump) never runs.
+            await save(threadId, "user");
+
+            const { threads } = await snapshotSince(NOW - 60_000);
+
+            expect(threads).toHaveLength(1);
+            expect(threads[0]?.title).toBe("Trigger: Digest");
+        });
+
+        it("does not count a reply from before the window start", async () => {
+            await insertRunThread({ lastUserMessageAt: NOW - 120_000 });
 
             const { threads } = await snapshotSince(NOW - 60_000);
 
             expect(threads).toEqual([]);
         });
 
-        it("counts a user's reply newer than the window start", async () => {
-            await insertRunThread([
-                { at: NOW - 3000, order: 0, role: "user" },
-                { at: NOW - 2000, order: 0, role: "assistant" },
-                { at: NOW - 1000, order: 1, role: "user" },
-            ]);
+        it("dates the activity by the reply and finds it behind more newer run threads than the limit", async () => {
+            await insertRunThread({ lastUserMessageAt: NOW - 2000 });
 
-            const { threads } = await snapshotSince(NOW - 60_000);
-
-            expect(threads).toEqual([{ title: "Trigger: Digest", updatedAt: NOW - 1000 }]);
-        });
-
-        it("counts a reply whose answer has more steps than rows read", async () => {
-            const steps = Array.from({ length: 15 }, (_, index) => {
-                return { at: NOW - 900 + index, order: 1, role: index % 2 === 0 ? "assistant" : "tool", stepOrder: index + 1 };
-            });
-
-            await insertRunThread([{ at: NOW - 3000, order: 0, role: "user" }, { at: NOW - 1000, order: 1, role: "user" }, ...steps]);
-
-            const { threads } = await snapshotSince(NOW - 60_000);
-
-            expect(threads).toEqual([{ title: "Trigger: Digest", updatedAt: NOW - 1000 }]);
-        });
-
-        it("counts a reply with more later turns than rows read", async () => {
-            const answers = Array.from({ length: 12 }, (_, index) => {
-                return { at: NOW - 900 + index, order: index + 2, role: "assistant" };
-            });
-
-            await insertRunThread([{ at: NOW - 3000, order: 0, role: "user" }, { at: NOW - 1000, order: 1, role: "user" }, ...answers]);
-
-            const { threads } = await snapshotSince(NOW - 60_000);
-
-            expect(threads).toEqual([{ title: "Trigger: Digest", updatedAt: NOW - 1000 }]);
-        });
-
-        it("finds a reply in an older run thread behind more newer run threads than the limit", async () => {
-            await insertRunThread([
-                { at: NOW - 3000, order: 0, role: "user" },
-                { at: NOW - 2000, order: 1, role: "user" },
-            ]);
             await harness.run(async (ctx: any) => {
                 for (let index = 0; index < 25; index += 1) {
                     await ctx.db.insert("threads", {
@@ -178,7 +151,7 @@ describe("loadQuietSnapshot", () => {
             expect(threads).toEqual([{ title: "Trigger: Digest", updatedAt: NOW - 2000 }]);
         });
 
-        it("reads as activity when more run threads than the scan ceiling are in the window", async () => {
+        it("does not read as activity when many run threads were updated and nobody replied", async () => {
             await harness.run(async (ctx: any) => {
                 for (let index = 0; index < 120; index += 1) {
                     await ctx.db.insert("threads", {
@@ -193,48 +166,14 @@ describe("loadQuietSnapshot", () => {
 
             const snapshot = await snapshotSince(NOW - 60_000);
 
-            expect(snapshot.threads).toHaveLength(1);
+            expect(snapshot.threads).toEqual([]);
             expect(
                 await isQuietRunSkipped(
                     { botId: "bot-a", createdAt: 1, lastTriggeredAt: NOW - 60_000, quietWhenEmpty: true, type: "schedule" },
                     snapshotSince,
                     { manual: false },
                 ),
-            ).toBe(false);
-        });
-
-        it("counts a reply saved through the message write even when no stream ever starts", async () => {
-            await insertRunThread(
-                [
-                    { at: NOW - 3000, order: 0, role: "user" },
-                    { at: NOW - 2000, order: 0, role: "assistant" },
-                ],
-                NOW - 120_000,
-            );
-
-            // Only the save: `createStreamWithMessage` (the later `updatedAt` bump) never runs.
-            await harness.run(async (ctx: any) => {
-                const thread = await ctx.db.threads.findFirst({ where: { userId: USER } });
-
-                await addMessagesHandler(ctx, { messages: [{ message: { content: "reply", role: "user" } }], threadId: thread._id, userId: USER });
-            });
-
-            const { threads } = await snapshotSince(NOW - 60_000);
-
-            expect(threads).toHaveLength(1);
-            expect(threads[0]?.title).toBe("Trigger: Digest");
-        });
-
-        it("does not count a reply from before the window start, nor the routine's answer to it", async () => {
-            await insertRunThread([
-                { at: NOW - 120_000, order: 0, role: "user" },
-                { at: NOW - 119_000, order: 1, role: "user" },
-                { at: NOW - 1000, order: 1, role: "assistant" },
-            ]);
-
-            const { threads } = await snapshotSince(NOW - 60_000);
-
-            expect(threads).toEqual([]);
+            ).toBe(true);
         });
     });
 

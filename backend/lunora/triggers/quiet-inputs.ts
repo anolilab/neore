@@ -12,7 +12,6 @@
  */
 import { v } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { loadHomeOverview } from "../home/overview";
@@ -32,95 +31,31 @@ const QUIET_TASKS_READ = 20;
 /** The `type` of the event a task updated inside the window becomes. */
 const TASK_EVENT_TYPE = "task";
 
-/** Rows read per page when looking for a reply in a run thread. */
-const QUIET_REPLY_ROWS_READ = 10;
-
-/** Pages of run threads scanned for a reply; each thread costs a message query, so the scan has a ceiling. */
-const QUIET_REPLY_PAGES_MAX = 5;
-
-/** Stands for the run threads left unscanned once the ceiling is hit: unknown is treated as activity. */
-const UNSCANNED_THREADS_TITLE = "Routine run threads";
-
 /** A column an old row may leave unset, or set to false. */
 const notSet = (field: "deleted" | "isTemporary") => {
     return { OR: [{ [field]: { isNull: true } }, { [field]: false }] };
 };
 
 /**
- * When the user last wrote in a routine's run thread after `since`, or undefined. The run's own prompt is a user
- * message too, at the thread's first `order`, so only a message past it is a reply; the routine's own answers are
- * assistant rows and never count. Read newest first, a page at a time, so assistant rows after a reply cannot hide it.
- */
-const newestUserReplyAt = async (ctx: QueryCtx, threadId: Id<"threads">, since: number): Promise<number | undefined> => {
-    let cursor: string | undefined;
-
-    do {
-        const result = await ctx.db.messages.findMany({
-            cursor,
-            limit: QUIET_REPLY_ROWS_READ,
-            orderBy: [{ order: "desc" }, { stepOrder: "desc" }, { _creationTime: "desc" }],
-            where: { _creationTime: { gt: since }, order: { gt: 0 }, stepOrder: 0, threadId, tool: false },
-        });
-        const times = result.page.flatMap((row) => {
-            const at = row.createdAt ?? row._creationTime;
-
-            return (row.message as { role?: string } | undefined)?.role === "user" && at > since ? [at] : [];
-        });
-
-        if (times.length > 0) {
-            return Math.max(...times);
-        }
-
-        cursor = result.isDone ? undefined : (result.continueCursor ?? undefined);
-    } while (cursor !== undefined);
-
-    return undefined;
-};
-
-/**
- * The titled run threads of a routine updated inside the window that hold a user's reply, newest first. The threads
- * are paged, so other routines' run threads updated later do not push out one with a reply, but only up to
- * QUIET_REPLY_PAGES_MAX pages: past that the rest is unknown, and one entry dated by the last thread scanned is added
- * so the check reads activity (the routine posts and its window moves forward) rather than growing without bound.
+ * The titled run threads of a routine in which the user saved a reply after `since`, newest first. One bounded read:
+ * `threads.lastUserMessageAt` is stamped by the message write for a user message past the thread's first, so the
+ * routine's own prompt and answers never set it.
  */
 const repliedRunThreads = async (ctx: QueryCtx, userId: string, since: number): Promise<{ title: string; updatedAt: number }[]> => {
-    const replied: { title: string; updatedAt: number }[] = [];
-    let cursor: string | undefined;
-    let pages = 0;
+    const result = await ctx.db.threads.findMany({
+        limit: QUIET_THREADS_READ,
+        orderBy: [{ lastUserMessageAt: "desc" }, { _creationTime: "desc" }],
+        where: {
+            AND: [notSet("deleted"), notSet("isTemporary"), { tags: { contains: JSON.stringify(TRIGGER_THREAD_TAG) } }, { lastUserMessageAt: { gt: since } }],
+            lockedAt: { isNull: true },
+            title: { isNull: false, ne: "" },
+            userId,
+        },
+    });
 
-    do {
-        pages += 1;
-
-        const result = await ctx.db.threads.findMany({
-            cursor,
-            limit: QUIET_THREADS_READ,
-            orderBy: [{ updatedAt: "desc" }, { _creationTime: "desc" }],
-            where: {
-                AND: [notSet("deleted"), notSet("isTemporary"), { tags: { contains: JSON.stringify(TRIGGER_THREAD_TAG) } }, { updatedAt: { gt: since } }],
-                lockedAt: { isNull: true },
-                title: { isNull: false, ne: "" },
-                userId,
-            },
-        });
-        const replies = await Promise.all(result.page.map(async (thread) => await newestUserReplyAt(ctx, thread._id, since)));
-
-        result.page.forEach((thread, index) => {
-            const updatedAt = replies[index];
-
-            if (updatedAt !== undefined && thread.title) {
-                replied.push({ title: thread.title, updatedAt });
-            }
-        });
-
-        cursor = result.isDone || replied.length >= QUIET_THREADS_READ ? undefined : (result.continueCursor ?? undefined);
-
-        if (cursor !== undefined && pages >= QUIET_REPLY_PAGES_MAX) {
-            replied.push({ title: UNSCANNED_THREADS_TITLE, updatedAt: result.page.at(-1)?.updatedAt ?? since + 1 });
-            cursor = undefined;
-        }
-    } while (cursor !== undefined);
-
-    return replied;
+    return result.page.flatMap((thread) =>
+        thread.title && thread.lastUserMessageAt !== undefined ? [{ title: thread.title, updatedAt: thread.lastUserMessageAt }] : [],
+    );
 };
 
 const vItem = v.object({ at: v.number(), kind: v.string(), title: v.string() });

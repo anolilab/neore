@@ -11737,6 +11737,9 @@
                         ],
                         "type": "object"
                       },
+                      "lastUserMessageAt": {
+                        "type": "number"
+                      },
                       "lockedAt": {
                         "type": "number"
                       },
@@ -12198,6 +12201,9 @@
                       },
                       "isPublic": {
                         "type": "boolean"
+                      },
+                      "lastUserMessageAt": {
+                        "type": "number"
                       },
                       "lockedAt": {
                         "type": "number"

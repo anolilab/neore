@@ -2588,6 +2588,9 @@ export const schema = defineSchema({
         isTemporary: v.optional(v.boolean()),
         language: v.optional(v.string()),
         lastCompressionStartedAt: v.optional(v.number()),
+        // When the user last saved a reply in the thread (not the prompt a routine run opens it with).
+        // Written by `agent/messages.ts#addMessagesHandler`; the routines' quiet check reads it.
+        lastUserMessageAt: v.optional(v.number()),
         // Set while the thread has a passcode (locked). Content is refused
         // without a proof; `lib/thread-lock.ts`. The hash lives in `threadPasscodes`.
         lockedAt: v.optional(v.number()),

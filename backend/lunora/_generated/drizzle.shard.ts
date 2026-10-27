@@ -1389,6 +1389,7 @@ export const threads = sqliteTable("threads", {
     isTemporary: integer("isTemporary", { mode: "boolean" }),
     language: text("language"),
     lastCompressionStartedAt: real("lastCompressionStartedAt"),
+    lastUserMessageAt: real("lastUserMessageAt"),
     lockedAt: real("lockedAt"),
     messengerConnectionId: text("messengerConnectionId").references((): AnySQLiteColumn => messengerConnections._id),
     mode: text("mode"),

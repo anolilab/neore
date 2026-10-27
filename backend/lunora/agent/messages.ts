@@ -259,6 +259,9 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
 
     const toReturn: Doc<"messages">[] = [];
     let insertedAny = false;
+    // A user message past the thread's first `order` is a reply; the first is the prompt that opened it (a routine
+    // run's own prompt), which must not read as the user writing back.
+    let savedReply = false;
 
     if (embeddings) {
         assert(embeddings.vectors.length === messages.length, "embeddings.vectors.length must match messages.length");
@@ -365,6 +368,7 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
         });
 
         insertedAny = true;
+        savedReply ||= message.message.role === "user" && order > 0;
         const messageId = insertedId as Id<"messages">;
 
         if (activeLeafId) {
@@ -387,7 +391,9 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
     // A saved reply is activity on its own: readers that look at threads by `updatedAt` (the routines' quiet check)
     // must see it even when the stream that would normally bump the thread never starts.
     if (threadDocument && messages.some((item) => item.message.role === "user")) {
-        await context.db.patch(threadId, { updatedAt: Date.now() });
+        const now = Date.now();
+
+        await context.db.patch(threadId, { updatedAt: now, ...(savedReply && { lastUserMessageAt: now }) });
     }
 
     return { messages: toReturn.map((item) => publicMessage(item)) };

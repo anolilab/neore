@@ -1663,6 +1663,7 @@ export interface Doc_threads {
     isTemporary?: boolean;
     language?: string;
     lastCompressionStartedAt?: number;
+    lastUserMessageAt?: number;
     lockedAt?: number;
     messengerConnectionId?: Id<"messengerConnections">;
     mode?: string;
@@ -4396,6 +4397,7 @@ export interface Insert_threads {
     isTemporary?: boolean;
     language?: string;
     lastCompressionStartedAt?: number;
+    lastUserMessageAt?: number;
     lockedAt?: number;
     messengerConnectionId?: Id<"messengerConnections">;
     mode?: string;
