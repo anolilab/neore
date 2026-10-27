@@ -327,15 +327,20 @@ impl DeviceState {
 
             if let Some(servers) = update.mcp_servers {
                 validate_servers(&servers)?;
+                let changed = changed_server_names(&settings.mcp_servers, &servers);
                 drop_rules_of_changed_servers(
                     &settings.mcp_servers,
                     &servers,
                     &mut settings.allow_rules,
                 );
                 settings.mcp_servers = servers;
-                // The cached `readOnly` flags describe the old servers. Dropping them makes every MCP call
-                // fail closed until the next manifest, so none can skip its prompt on stale metadata.
-                self.mcp_tools.lock().unwrap().clear();
+                // The cached `readOnly` flags of a removed or changed server describe the old one. Dropping them
+                // makes its MCP calls fail closed until the next manifest, so none can skip its prompt on stale
+                // metadata; the tools of servers that did not change stay, so a call to one is not cancelled.
+                self.mcp_tools
+                    .lock()
+                    .unwrap()
+                    .retain(|_, tool| !changed.contains(&tool.server));
             }
 
             if let Some(required) = update.require_shell_sandbox {
@@ -634,6 +639,15 @@ pub fn cap_utf8(text: &str, max: usize) -> (String, bool) {
     (text[..end].to_owned(), true)
 }
 
+/// Names of the servers that were removed, changed or added.
+fn changed_server_names(old: &[McpServerConfig], new: &[McpServerConfig]) -> Vec<String> {
+    old.iter()
+        .filter(|server| !new.contains(server))
+        .chain(new.iter().filter(|server| !old.contains(server)))
+        .map(|server| server.name.clone())
+        .collect()
+}
+
 /// Forgets the "Always allow" rules of every MCP server that was removed, replaced or added. A rule is keyed on the
 /// tool's manifest name, which only carries the server's NAME, so a different program under the same name would
 /// otherwise inherit the approval the user gave the old one. `validate_servers` refuses names whose tool-name
@@ -643,13 +657,8 @@ fn drop_rules_of_changed_servers(
     new: &[McpServerConfig],
     rules: &mut Vec<String>,
 ) {
-    let changed = old
-        .iter()
-        .filter(|server| !new.contains(server))
-        .chain(new.iter().filter(|server| !old.contains(server)));
-
-    for server in changed {
-        let prefix = mcp::tool_name(&server.name, "");
+    for name in changed_server_names(old, new) {
+        let prefix = mcp::tool_name(&name, "");
 
         rules.retain(|rule| !rule.starts_with(&prefix));
     }
@@ -1278,6 +1287,14 @@ mod tests {
         let dir =
             std::env::temp_dir().join(format!("neore-device-mcp-cache-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                mcp_servers: vec![server("docs", "docs-mcp")],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
         let state = DeviceState::new(&dir, Box::new(|_| {}));
 
         state.mcp_tools.lock().unwrap().insert(
@@ -2164,6 +2181,70 @@ mod tests {
         assert!(!state.approval_holds(planned, ("fs_read", &input, false), &action, false, &old));
         assert!(!state.approval_holds(planned, ("fs_read", &input, false), &action, true, &old));
         assert!(state.settings().allow_rules.is_empty());
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// Adding a server must not cancel a pending call to another one: only the changed servers lose their tools.
+    #[test]
+    fn adding_a_server_keeps_a_pending_call_to_another_server_valid() {
+        let dir = std::env::temp_dir().join(format!("neore-device-addsrv-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                mcp_servers: vec![server("x", "x-mcp")],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+        state.mcp_tools.lock().unwrap().insert(
+            "mcp__x__t".to_owned(),
+            McpToolRef {
+                server: "x".to_owned(),
+                tool: "t".to_owned(),
+                read_only: false,
+            },
+        );
+        let input = json!({});
+        let action = plan(
+            "mcp__x__t",
+            &input,
+            &state.settings(),
+            &state.mcp_tools.lock().unwrap(),
+        )
+        .unwrap();
+        let planned = state.generation.load(Ordering::SeqCst);
+
+        state
+            .settings_update(
+                serde_json::from_str(
+                    r#"{"mcpServers":[{"name":"x","command":"x-mcp"},{"name":"y","command":"y-mcp"}]}"#,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+
+        assert_ne!(state.generation.load(Ordering::SeqCst), planned);
+        assert!(state.mcp_tools.lock().unwrap().contains_key("mcp__x__t"));
+        assert!(plan(
+            "mcp__x__t",
+            &input,
+            &state.settings(),
+            &state.mcp_tools.lock().unwrap()
+        )
+        .is_ok_and(|again| again == action));
+
+        // Replacing x itself still refuses it.
+        state
+            .settings_update(
+                serde_json::from_str(r#"{"mcpServers":[{"name":"x","command":"evil"}]}"#).unwrap(),
+            )
+            .unwrap();
+        assert!(!state.mcp_tools.lock().unwrap().contains_key("mcp__x__t"));
 
         let _ = stdfs::remove_dir_all(&dir);
     }
