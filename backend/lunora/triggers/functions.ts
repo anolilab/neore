@@ -582,7 +582,8 @@ export const setTriggerEnabled = authMutation
         await context.db.patch(args.triggerId as Id<"triggers">, {
             enabled: args.enabled,
             updatedAt: context.now,
-            ...(args.enabled && restartedStreak(trigger, context.now)),
+            // Turning a disabled trigger back on is the owner saying the cause is fixed: the streak starts over. Enabling one that is already on changes nothing.
+            ...(args.enabled && trigger.enabled !== true && { enabledAt: context.now, failureStreak: 0 }),
             ...(firstRun !== undefined && { nextTriggerAt: firstRun }),
         });
 
@@ -997,13 +998,6 @@ export const recordFilteredExecution = internalMutation
     });
 
 /**
- * Turning a disabled trigger back on is the owner saying the cause is fixed: the streak starts over.
- * Enabling one that is already on changes nothing, so it cannot erase failures it has collected.
- */
-const restartedStreak = (trigger: Doc<"triggers">, now: number): { enabledAt?: number; failureStreak?: number } =>
-    trigger.enabled === true ? {} : { enabledAt: now, failureStreak: 0 };
-
-/**
  * Settles one run's effect on its trigger's failure streak. Only an ENABLED trigger is
  * counted: a paused one (or a disabled one a manual "Run now" fired) has nothing left to
  * pause, so its runs can neither re-pause it nor notify again. Returns whether this run
@@ -1114,7 +1108,7 @@ export const setTriggerEnabledInternal = internalMutation
         await ctx.db.patch(triggerId, {
             enabled,
             updatedAt: ctx.now,
-            ...(enabled && trigger && restartedStreak(trigger, ctx.now)),
+            ...(enabled && trigger && trigger.enabled !== true && { enabledAt: ctx.now, failureStreak: 0 }),
             ...(firstRun !== undefined && { nextTriggerAt: firstRun }),
         });
 
