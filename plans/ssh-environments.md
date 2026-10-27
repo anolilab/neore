@@ -17,7 +17,8 @@ backend-signed call and runs local approval in the local window. Only then does
 it forward the approved action over the SSH stdio pipe. The remote binary,
 `neore-host`, a headless target of the same crate, trusts exactly that pipe. It
 holds no device secret, no pairing and no keychain entry, and it opens no
-listener. Host keys are pinned in a Neore-owned store behind a trust prompt, and
+listener. That stops anyone from impersonating the desktop to the backend. It does
+not make a host's results true (§10). Host keys are pinned in a Neore-owned store behind a trust prompt, and
 a changed key is refused. One long-lived connection per host, multiplexed with
 `ControlMaster`. `ForwardAgent` is off by default.
 
@@ -221,9 +222,13 @@ Folder download as one tar stream.
 ## 10. Risks
 
 - **Remote box compromise.** Accepted. An attacker with root there can read the
-  host's shared folders and lie on the pipe. They cannot forge backend calls or
-  results, because the box holds no secret (§1). Results from a host are shown as
-  coming from that host.
+  host's shared folders and lie on the pipe. They cannot forge a backend call or sign
+  anything themselves, because the box holds no secret (§1). But the desktop signs
+  and relays what the host returns, so a compromised host can fabricate the output
+  or status of an action it was asked to run, and the backend accepts the desktop's
+  valid signature. Results are labelled with the host they came from, and host
+  output is untrusted content: S3 checks how a host-origin result enters
+  `taintedBy`, so a later call that follows it still prompts.
 - **Reconnect storms** against connection or firewall limits. Covered by one
   master per host and the S5 acceptance.
 - **Inherited agent sockets** that die with their session. Covered by §6.

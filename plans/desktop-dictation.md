@@ -16,8 +16,10 @@ Decisions:
   not send the audio to the cloud. Switching to the cloud is a user action.
 - **Capture and recognition run in a dedicated local window**, with its own
   sandboxed preload and no network access. The site page gets no new channel and no
-  audio. The text comes back through the existing compose channel
-  (`apps/web/src/lib/native/bridge.ts`, `onNativeCompose`).
+  audio. The text comes back through the existing draft channel
+  (`apps/web/src/lib/native/bridge.ts`, `onNativeDraft`), which puts it in the
+  composer. It does not use `onNativeCompose`, which submits a new chat. Sending
+  stays a separate action by the user.
 - **The model is a downloadable asset.** It is pinned by version, verified by
   checksum before first use, and deleted from settings on request.
 
@@ -45,9 +47,10 @@ Decisions:
 - **Recognition.** A recognizer runs in a helper process, so a crash cannot take
   down the app. The helper loads the model from the app data directory. It returns
   text segments and a final transcript.
-- **Insert.** The final text goes to the composer through the existing compose
-  channel. If the composer is not open, the text goes to the clipboard and the user
-  is told where it went.
+- **Insert.** The final text goes to the composer through the existing draft
+  channel, which opens a new chat with the text restored in the composer and sends
+  nothing. If the main window cannot take it (it is closed, or on the sign-in
+  screen), the main process copies the text to the clipboard and tells the user.
 - **Model store.** The model is listed in settings with its size, version and a
   delete action. A download is checked against a checksum shipped in the desktop
   build. A mismatch leaves no model on disk.

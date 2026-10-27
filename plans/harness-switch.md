@@ -37,8 +37,10 @@ context.
 
 ### The switch
 
-- `switchThreadAgent({ threadId, target, clientId })`, an owner-only mutation.
-  `target` is a cloud model id, or an offered (agent, folder, host) pair from the
+- `switchThreadAgent({ threadId, target, clientId })`, a mutation. A cloud-model
+  switch needs a write grant on the thread, the same right a collaborator already
+  has to pick the model of a send. A host target, and any fork, is owner-only
+  (host threads cannot be shared). `target` is a cloud model id, or an offered (agent, folder, host) pair from the
   ACP host's offer list. A host target on a cloud thread, or a cloud target on a
   host thread, returns `forked: <threadId>` and creates the linked thread instead.
   `clientId` makes it claim-once (scope `switch`), so a double tap switches once.
@@ -160,7 +162,8 @@ report says it can load a saved session. Needs ACP S6 (saved session ids).
 - Claim-once on `clientId` for switches. Redelivered handoff summaries do not
   re-charge.
 - `chargeRound` once for the cloud summary call. Never for host switches.
-- RLS: a switch is owner-only; the handoff is built from the owner's thread.
+- RLS: a cloud-model switch needs a write grant, a host switch or fork is
+  owner-only; the handoff is built from the thread's own rows.
 - `.output()` on `switchThreadAgent`, and an authz-matrix row.
 - A new message part kind goes through `agent/table-writes.ts`, not a direct
   insert.
