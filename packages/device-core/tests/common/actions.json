@@ -1,5 +1,5 @@
 {
-    "fixture": { "a.txt": "hello", "sub/b.txt": "nested" },
+    "fixture": { "a.txt": "hello", "sub/b.txt": "nested", "../outside.txt": "secret" },
     "vectors": [
         {
             "name": "list the shared folder",
@@ -35,7 +35,7 @@
             "name": "read outside the shared folders",
             "tool": "fs_read",
             "input": { "path": "../outside.txt" },
-            "expect": { "status": "failed", "error": "../outside.txt: not found" }
+            "expect": { "status": "failed", "error": "../outside.txt: outside the shared folders" }
         },
         {
             "name": "write a new file",
