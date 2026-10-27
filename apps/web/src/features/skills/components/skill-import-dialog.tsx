@@ -180,7 +180,6 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                     <div className="flex gap-2">
                         <Input
                             id={linkId}
-                            inputMode="url"
                             onChange={(event) => {
                                 // A fetch in flight is for the link the user just replaced: its result must not land.
                                 uploadRevision.current += 1;
@@ -188,7 +187,7 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                             }}
                             onKeyDown={handleLinkKeyDown}
                             placeholder="https://github.com/owner/repo/tree/main/skills/my-skill"
-                            type="url"
+                            type="text"
                             value={link}
                         />
                         <Button disabled={!link.trim() || isFetching} onClick={handleFetchLink} type="button" variant="outline">
@@ -200,7 +199,7 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                         </span>
                     </div>
                     <p className="text-muted-foreground text-xs">
-                        {t`A GitHub link to a skill folder or its SKILL.md, or a skills.sh link. Only the SKILL.md is imported; scripts and other files in the skill are not.`}
+                        {t`A GitHub link to a skill folder or its SKILL.md, a skills.sh link, or an npx skills add command. Only the SKILL.md is imported; scripts and other files in the skill are not.`}
                     </p>
                 </div>
                 <div className="space-y-1.5">

@@ -977,7 +977,7 @@ export interface InternalApiTypes {
             executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
-            admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, null | string | { filtered: string }>;
+            admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }, null | string | { filtered: string } | { skipped: "disabled" }>;
             createExecution: FunctionReference<"mutation", { payload?: string; triggerId: Id<"triggers"> }, Id<"triggerExecutions">>;
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
@@ -985,7 +985,7 @@ export interface InternalApiTypes {
             releaseQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers"> }, null>;
             reserveQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers">; windowStart: number }, boolean>;
             setTriggerEnabledInternal: FunctionReference<"mutation", { enabled: boolean; triggerId: Id<"triggers"> }, null>;
-            updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string }, null>;
+            updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string; userFixable?: boolean }, null>;
             updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
         };
         quiet_inputs: {

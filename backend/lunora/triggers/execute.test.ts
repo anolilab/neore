@@ -12,13 +12,6 @@ import type { QuietSnapshot } from "./quiet";
 // A reference is read as its dispatch key (`<module>:<function>`), which the fake ctx below switches on.
 vi.mock("../_generated/internal", async (importOriginal) => mappedReferences(await importOriginal(), (reference) => reference.__lunoraRef));
 
-/** Shaped like `AgentRunError` of kind `custom-endpoint`, which this module's import graph cannot load in a unit test. */
-class CustomEndpointError extends Error {
-    public readonly kind = "custom-endpoint";
-
-    public override readonly name = "AgentRunError";
-}
-
 const state = vi.hoisted(() => {
     return {
         admissionError: undefined as Error | undefined,
@@ -380,19 +373,6 @@ describe("the window a run leaves for the next one", () => {
         await run();
 
         expect(state.mutations.find((entry) => entry.name === "updateTriggerStats")?.args).toMatchObject({ lastTriggeredAt: START });
-    });
-
-    it("tells the owner when the model's custom endpoint is no longer runnable", async () => {
-        state.onRun = () => {
-            throw new CustomEndpointError("Custom endpoint missing or disabled");
-        };
-        vi.spyOn(console, "error").mockImplementation(() => undefined);
-
-        await run();
-
-        const failed = state.mutations.find((entry) => entry.name === "updateExecution" && (entry.args as { status?: string }).status === "failed");
-
-        expect((failed?.args as { error: string }).error).toContain("Custom endpoint missing or disabled. Check the model");
     });
 
     describe("a run that posted nothing", () => {

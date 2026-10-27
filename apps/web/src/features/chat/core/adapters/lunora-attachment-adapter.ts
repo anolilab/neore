@@ -5,6 +5,7 @@ import { TEXT_PREVIEW_EXTENSIONS } from "@neore/ui/components/file-renderers/fil
 import { decodeTextBytes } from "@neore/ui/utils/decode-text";
 
 import type { LunoraReactClient as LunoraClient } from "@/lib/lunora/crpc";
+import { downscaleOversizedImage } from "@/lib/upload/image-downscale";
 import { UploadFailedError } from "@/lib/upload/upload-error";
 import { uploadFile } from "@/lib/upload/upload-file";
 
@@ -41,6 +42,14 @@ export const getAttachmentFileId = (attachment: Attachment): string | undefined 
     const fileId = attachment.metadata?.fileId;
 
     return typeof fileId === "string" ? fileId : undefined;
+};
+
+/**
+ * What the composer keeps of an uploaded attachment: the file id plus the file and name
+ * that were actually sent, which differ from the picked ones when a photo was re-encoded.
+ */
+export const uploadedAttachment = (attachment: Attachment): { file: File; fileId: string | undefined; name: string } => {
+    return { file: attachment.file, fileId: getAttachmentFileId(attachment), name: attachment.name };
 };
 
 type ProgressState = { file: File; onProgress?: (progress: number) => void };
@@ -294,15 +303,19 @@ export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentA
 
         const limit = attachmentSizeLimit(state.file);
 
+        // Before any decode: a file over the cap is refused without being opened as an image.
         if (state.file.size > limit.maxBytes) {
             throw new AttachmentTooLargeError(state.file.name, limit);
         }
 
+        // A 12 MB photo is shrunk to fit the provider, not refused for its weight; the result is never larger than the original.
+        const file = await downscaleOversizedImage(state.file);
+
         return {
-            contentType,
-            file: state.file,
+            contentType: attachmentContentType(file),
+            file,
             id: crypto.randomUUID(),
-            name: state.file.name,
+            name: file.name,
             status: { reason: "composer-send", type: "requires-action" },
             type: isImage ? "image" : "document",
         };

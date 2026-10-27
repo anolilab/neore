@@ -151,8 +151,9 @@ const XAI_FILE_MIME_TYPES = DEFAULT_FILE_MIME_TYPES;
  *  - Set listed: true + slug/name/desc/displayProvider/tier to show on marketing pages.
  *  - Set enabled: false to hide from BOTH the picker and marketing catalog.
  *  - Set provider: "external" for models we don't have API access to (marketing only).
+ *  - Never write "vision" in filterCapabilities: `supportsImages: true` yields it (see MODEL_REGISTRY).
  */
-export const MODEL_REGISTRY: ModelDefinition[] = [
+const REGISTRY_ENTRIES: ModelDefinition[] = [
     // ── OpenRouter — Free / Misc ──────────────────────────────────
     {
         contextOptions: { recentMessages: 10 },
@@ -228,7 +229,7 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
         avgLatencyMs: 5000,
         contextOptions: { recentMessages: 10 },
         enabled: true,
-        filterCapabilities: ["image_generation", "vision"],
+        filterCapabilities: ["image_generation"],
         id: "google/gemini-2.5-flash-image",
         maxResolution: "2048x2048",
         maxRetries: 2,
@@ -5495,6 +5496,21 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
         tier: "medium",
     },
 ];
+
+/**
+ * The registry every consumer reads. `"vision"` is a pure function of `supportsImages`, so it is
+ * derived here (and the gateway generator, which reads this export, inherits it) rather than
+ * repeated on each entry where it could drift.
+ */
+export const MODEL_REGISTRY: ModelDefinition[] = REGISTRY_ENTRIES.map((entry) => {
+    const capabilities = (entry.filterCapabilities ?? []).filter((capability) => capability !== "vision");
+
+    if (entry.supportsImages === true) {
+        capabilities.push("vision");
+    }
+
+    return { ...entry, filterCapabilities: capabilities.length > 0 ? capabilities : undefined };
+});
 
 /**
  * The most reference media any registry model takes, per kind. Every site that caps a reference

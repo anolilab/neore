@@ -12,10 +12,15 @@ import {
     AttachmentUploadError,
     createLunoraAttachmentAdapter,
     uploadChatAttachment,
+    uploadedAttachment,
 } from "./lunora-attachment-adapter";
 
-const { uploadFile } = vi.hoisted(() => {
-    return { uploadFile: vi.fn() };
+const { downscaleOversizedImage, uploadFile } = vi.hoisted(() => {
+    return { downscaleOversizedImage: vi.fn(async (file: File) => file), uploadFile: vi.fn() };
+});
+
+vi.mock(import("@/lib/upload/image-downscale"), async (importOriginal) => {
+    return { ...(await importOriginal()), downscaleOversizedImage };
 });
 
 vi.mock(import("@/lib/upload/upload-file"), () => {
@@ -149,6 +154,25 @@ describe(createLunoraAttachmentAdapter, () => {
         expect(action).not.toHaveBeenCalled();
     });
 
+    it("refuses an image over the cap before it is decoded", async () => {
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const file = new File(["x"], "huge.png", { type: "image/png" });
+
+        Object.defineProperty(file, "size", { value: 25 * MB });
+
+        await expect(adapter.upload({ file })).rejects.toBeInstanceOf(AttachmentTooLargeError);
+        expect(downscaleOversizedImage).not.toHaveBeenCalled();
+    });
+
+    it("hands an image within the cap to the downscaler", async () => {
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const file = new File(["x"], "photo.jpg", { type: "image/jpeg" });
+
+        await adapter.upload({ file });
+
+        expect(downscaleOversizedImage).toHaveBeenCalledWith(file);
+    });
+
     it("offers the text-preview suffixes in the accept list the composer's file picker uses", () => {
         const accept = ATTACHMENT_ACCEPT.split(",");
 
@@ -243,5 +267,24 @@ describe(attachmentTextChars, () => {
         [{ name: "blob.bin", size: 5000, type: "" }, 0],
     ])("%o adds %i characters to the prompt", (file, expected) => {
         expect(attachmentTextChars(file)).toBe(expected);
+    });
+});
+
+describe(uploadedAttachment, () => {
+    it("carries the file and name that were sent, not the ones picked", () => {
+        const sent = new File(["jpeg"], "photo.jpg", { type: "image/jpeg" });
+
+        expect(
+            uploadedAttachment({
+                content: [],
+                contentType: "image/jpeg",
+                file: sent,
+                id: "a",
+                metadata: { fileId: "file-1" },
+                name: "photo.jpg",
+                status: { type: "complete" },
+                type: "image",
+            }),
+        ).toStrictEqual({ file: sent, fileId: "file-1", name: "photo.jpg" });
     });
 });
