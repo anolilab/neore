@@ -346,10 +346,13 @@ modelProxyRouter.openapi(
                     let emittedChars = 0;
                     let reasoningChars = 0;
 
-                    try {
-                        // Until a part the user would see goes out, the caller can still retry the call elsewhere.
-                        let hasContent = false;
+                    // Until a part the user would see goes out, the caller can still retry the call elsewhere.
+                    let hasContent = false;
+                    // False once the provider's stream has ended: what follows (pricing, telemetry, usage reporting) is our own
+                    // bookkeeping, and a failure there says nothing about the provider, so it never carries a retry reason.
+                    let isReadingProvider = true;
 
+                    try {
                         while (true) {
                             const { done, value } = await reader.read();
 
@@ -415,6 +418,8 @@ modelProxyRouter.openapi(
                             send(`data: ${JSON.stringify(fallbackReason ? { ...serialized, fallbackReason } : serialized)}\n\n`);
                         }
 
+                        isReadingProvider = false;
+
                         // Record usage even when the client cancelled: the provider already produced these tokens.
                         // A cancel before the `finish` part leaves no usage, so it is estimated from what was sent.
                         // A cancelled stream is not a successful one, so it does not count toward health.
@@ -478,7 +483,9 @@ modelProxyRouter.openapi(
                             }),
                         ]);
                     } catch (error) {
-                        const fallbackReason = failureReason(error);
+                        // Retryable only while the call has produced nothing the user saw (the rule of `isVisiblePart`).
+                        // Retryable only while the call has produced nothing the user saw (the rule of `isVisiblePart`).
+                        const fallbackReason = !hasContent && isReadingProvider ? failureReason(error) : undefined;
                         const errorChunk = {
                             error: error instanceof Error ? error.message : "Unknown stream error",
                             ...(fallbackReason && { fallbackReason }),

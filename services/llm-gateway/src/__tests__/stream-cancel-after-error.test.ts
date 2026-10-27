@@ -31,13 +31,17 @@ const reportSpy = vi.spyOn(UsageReporter.prototype, "report");
 /** A provider stream that has sent `parts` and then stays open, as a live provider connection does. */
 const openStream = async (
     parts: unknown[],
-    { closes = false }: { closes?: boolean } = {},
+    { closes = false, failsWith }: { closes?: boolean; failsWith?: Error } = {},
     prompt: unknown = [{ content: [{ text: "hello there", type: "text" }], role: "user" }],
 ) => {
     vi.mocked(createProviderModelForEnv).mockResolvedValueOnce({
         doStream: async () => {
             return {
                 stream: new ReadableStream({
+                    // Once the parts have been read, the provider connection breaks.
+                    pull(controller) {
+                        if (failsWith) controller.error(failsWith);
+                    },
                     start(controller) {
                         for (const part of parts) controller.enqueue(part);
 
@@ -154,6 +158,32 @@ describe("a client closing a proxied stream", () => {
         expect(firstEntry()).not.toHaveProperty("errorCode");
         expect(failureSpy).not.toHaveBeenCalled();
         expect(successSpy).not.toHaveBeenCalled();
+    });
+});
+
+describe("a provider stream that breaks", () => {
+    const outage = () => Object.assign(new Error("overloaded"), { statusCode: 529 });
+    const errorEvent = async (response: Response) => {
+        const text = await response.text();
+
+        return text
+            .split("\n\n")
+            .filter((line) => line.startsWith("data: "))
+            .map((line) => JSON.parse(line.slice(6)) as { fallbackReason?: string; type: string })
+            .find((event) => event.type === "error");
+    };
+
+    it("is retryable when it breaks before anything was sent", async () => {
+        const event = await errorEvent(await openStream([], { failsWith: outage() }));
+
+        expect(event?.fallbackReason).toBe("infra");
+    });
+
+    it("carries no retry reason once the first text has gone out", async () => {
+        const event = await errorEvent(await openStream([{ delta: "partial", id: "t1", type: "text-delta" }], { failsWith: outage() }));
+
+        expect(event).toBeDefined();
+        expect(event).not.toHaveProperty("fallbackReason");
     });
 });
 
