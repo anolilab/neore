@@ -498,6 +498,27 @@ describe("ending a terminal", () => {
         }
     });
 
+    it("does not signal the shells of a cancelled quit when the next quit ends", async () => {
+        vi.useFakeTimers();
+
+        const signal = vi.spyOn(process, "kill").mockImplementation(() => true);
+
+        try {
+            await terminals.open(folder);
+            await startShell();
+            fake.appListeners.get("before-quit")?.();
+            vi.advanceTimersByTime(6000);
+            lastWindow().close();
+            signal.mockClear();
+
+            fake.appListeners.get("will-quit")?.();
+
+            expect(signal).not.toHaveBeenCalledWith(9000, "SIGKILL");
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("ends the host of a shell that is still starting", async () => {
         await terminals.open(folder);
 

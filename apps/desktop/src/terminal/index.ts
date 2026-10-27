@@ -348,6 +348,7 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
         clearTimeout(quitReset);
         quitReset = setTimeout(() => {
             quitting = false;
+            quitPids.clear();
         }, QUIT_RESET_MS);
         quitReset.unref();
 
@@ -384,7 +385,11 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
         }
     };
 
-    app.on("before-quit", hangUpAll);
+    app.on("before-quit", () => {
+        // Only the shells of this attempt are signalled at the end: an id left from a cancelled one may be someone else's now.
+        quitPids.clear();
+        hangUpAll();
+    });
     app.on("will-quit", finishQuit);
 
     return {
