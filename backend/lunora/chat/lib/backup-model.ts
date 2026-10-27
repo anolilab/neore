@@ -1,4 +1,12 @@
-import { deriveModelRegions, getModelRejectionReason, hasActiveFilters, MODEL_LOOKUP, type ModelDefinition, type ModelFilterRules } from "@neore/ai/models";
+import {
+    deriveModelRegions,
+    parseCustomModelId,
+    getModelRejectionReason,
+    hasActiveFilters,
+    MODEL_LOOKUP,
+    type ModelDefinition,
+    type ModelFilterRules,
+} from "@neore/ai/models";
 
 /**
  * The registry row of the user's backup model (`userSettings.backupModel`), when
@@ -28,3 +36,18 @@ export const backupFilterRejection = (definition: ModelDefinition, rules: ModelF
     hasActiveFilters(rules)
         ? getModelRejectionReason({ modelId: definition.id, provider: definition.provider, regions: deriveModelRegions(definition) }, rules)
         : null;
+
+/**
+ * Whether a run on `primaryModel` can fall back at all: only a registry model served by the gateway is wrapped
+ * (`getAgent`), never a custom endpoint. Backup resolution and the wrapper both ask this, so prompt sizing
+ * never plans for a retry that cannot happen.
+ */
+export const supportsBackupFallback = (primaryModel: string): boolean => {
+    if (parseCustomModelId(primaryModel)) {
+        return false;
+    }
+
+    const definition = MODEL_LOOKUP.get(primaryModel);
+
+    return definition !== undefined && definition.provider !== "external";
+};

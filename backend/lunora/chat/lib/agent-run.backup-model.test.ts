@@ -37,6 +37,10 @@ describe("resolveBackupModelId", () => {
         await expect(resolveBackupModelId(makeCtx(), "u1", OTHER_FREE_MODEL, FREE_MODEL)).resolves.toBe(OTHER_FREE_MODEL);
     });
 
+    it("is none for a custom endpoint, which is never wrapped for a fallback", async () => {
+        await expect(resolveBackupModelId(makeCtx(), "u1", OTHER_FREE_MODEL, "custom:abc/some-model")).resolves.toBeUndefined();
+    });
+
     it("is none when unset, stale or the run's own model", async () => {
         await expect(resolveBackupModelId(makeCtx(), "u1", undefined, FREE_MODEL)).resolves.toBeUndefined();
         await expect(resolveBackupModelId(makeCtx(), "u1", "no-such-model", FREE_MODEL)).resolves.toBeUndefined();

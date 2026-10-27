@@ -20,6 +20,7 @@ const seen = vi.hoisted(() => {
         buildOptions: [] as unknown[],
         created: [] as unknown[],
         failAt: undefined as "generate" | "keys" | "thread" | undefined,
+        prepareSteps: [] as unknown[],
         system: [] as string[],
         tools: [] as string[][],
     };
@@ -43,7 +44,9 @@ vi.mock("./get-agent", () => {
 
             const instructions = getSystemPrompt(options.timezone, options.location, options.language, options.personalization);
             const thread = {
-                generateText: async (args: { system?: string }) => {
+                generateText: async (args: { prepareStep?: (options: { messages: unknown[] }) => unknown; system?: string }) => {
+                    seen.prepareSteps.push(args.prepareStep);
+
                     if (seen.failAt === "generate") {
                         throw new Error("model call failed");
                     }
@@ -166,6 +169,10 @@ describe("runHeadlessAgent personalization", () => {
 describe("runHeadlessAgent backup model", () => {
     const BACKUP = MODEL_REGISTRY.find((m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text" && !requiresPaidPlan(m))!.id;
 
+    const PRIMARY = MODEL_REGISTRY.find(
+        (m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text" && !requiresPaidPlan(m) && m.id !== BACKUP,
+    )!.id;
+
     const ctxWith = (backupModel: string | undefined) => {
         const ctx = fakeCtx() as unknown as { runQuery: ReturnType<typeof vi.fn> };
         const base = ctx.runQuery.getMockImplementation() as (reference: string, args: unknown) => Promise<unknown>;
@@ -182,7 +189,7 @@ describe("runHeadlessAgent backup model", () => {
     const run = async (ctx: unknown) =>
         await runHeadlessAgent(ctx as never, {
             memory: false,
-            model: "test-model",
+            model: PRIMARY,
             personalization: "none",
             prompt: "Do the thing",
             thread: { threadId: "thread-1" },
@@ -204,6 +211,58 @@ describe("runHeadlessAgent backup model", () => {
         await run(ctxWith(undefined));
 
         expect(seen.backups).toEqual([undefined]);
+    });
+});
+
+describe("runHeadlessAgent context sizing for a backup", () => {
+    // A 1M-window primary and a 128k backup that cannot call tools.
+    const PRIMARY = "google/gemini-2.5-flash";
+    const NO_TOOLS_BACKUP = MODEL_REGISTRY.find(
+        (m) => m.supportsToolCalling === false && m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text",
+    )!.id;
+    const big = Array.from({ length: 24 }, (_, index) => {return { content: "y".repeat(40_000), role: index % 2 === 0 ? "user" : "assistant" }});
+
+    beforeEach(() => {
+        seen.prepareSteps = [];
+    });
+
+    const sizedFor = async (toolAllowlist: string[]) => {
+        const ctx = fakeCtx() as unknown as { runQuery: ReturnType<typeof vi.fn> };
+        const base = ctx.runQuery.getMockImplementation() as (reference: string, args: unknown) => Promise<unknown>;
+
+        ctx.runQuery.mockImplementation(async (reference: string, args: unknown) => {
+            if (reference === "auth_functions:getUserRunPlanQuery") {
+                return { isAdmin: true, plan: null };
+            }
+
+            const result = await base(reference, args);
+
+            return reference === "auth_functions:getUserPreferencesQuery" ? { ...(result as object), backupModel: NO_TOOLS_BACKUP } : result;
+        });
+
+        await runHeadlessAgent(ctx as never, {
+            maxSteps: 5,
+            memory: false,
+            model: PRIMARY,
+            personalization: "none",
+            prompt: "go",
+            thread: { threadId: "thread-1" },
+            toolAllowlist,
+            tools: "headless",
+            userId: "owner",
+        });
+
+        const prepareStep = seen.prepareSteps[0] as (options: { messages: unknown[] }) => unknown;
+
+        return prepareStep({ messages: big });
+    };
+
+    it("sizes a run the allowlist strips of every tool for the backup, which then takes the call", async () => {
+        expect(await sizedFor(["no-such-tool"])).toBeDefined();
+    });
+
+    it("leaves a run that still carries tools sized for the primary, since the backup would be skipped", async () => {
+        expect(await sizedFor(["webSearch"])).toBeUndefined();
     });
 });
 

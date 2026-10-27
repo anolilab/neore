@@ -8,7 +8,7 @@ import type { ToolSet } from "ai";
 import { api } from "../../_generated/api";
 import { Agent } from "../../agent/client";
 import type { ServiceFetch } from "../../lib/services.js";
-import { eligibleBackupModel } from "./backup-model.js";
+import { eligibleBackupModel, supportsBackupFallback } from "./backup-model.js";
 import { FallbackLanguageModel } from "./fallback-language-model.js";
 import { type GatewayCustomProviderConfig, GatewayLanguageModel } from "./gateway-language-model.js";
 
@@ -264,7 +264,7 @@ const getAgent = async (model: AgentModel | string, options: GetAgentOptions): P
 
             chat = gatewayModel(modelDefinition);
 
-            const backup = eligibleBackupModel(options.backupModelId, effectiveModel);
+            const backup = supportsBackupFallback(effectiveModel) ? eligibleBackupModel(options.backupModelId, effectiveModel) : undefined;
 
             if (backup) {
                 chat = new FallbackLanguageModel(chat, gatewayModel(backup), {

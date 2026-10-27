@@ -164,6 +164,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
         const existingThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
         const personal = options.personalization === "full";
         const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model);
+        // The tools the call carries: after the allowlist, so a run it strips bare is sized for a backup that cannot call tools.
+        const runTools = applyToolAllowlist(toolResult.tools, toolAllowlist);
         const agent = await getAgent(model, {
             backupModelId,
             customProvider,
@@ -175,7 +177,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
             skillContext: skill ? { config: skill.config, instructions: skill.instructions } : undefined,
             threadId: existingThreadId,
             timezone: prefs.timezone,
-            tools: applyToolAllowlist(toolResult.tools, toolAllowlist),
+            tools: runTools,
             userId,
             userProviderKeys,
         });
@@ -185,7 +187,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
         const generateArgs: Record<string, unknown> = {
             ...buildRunStreamArgs({
                 backupModelId,
-                hasTools: Object.keys(toolResult.tools).length > 0,
+                hasTools: Object.keys(runTools).length > 0,
                 model,
                 reasoningEffort: skill?.config?.reasoningEffort,
                 shouldAutoContinue: options.maxSteps === undefined,

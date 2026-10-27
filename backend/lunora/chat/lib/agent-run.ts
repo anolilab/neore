@@ -25,7 +25,7 @@ import type { ResearchDepth } from "../../agent/client/create-tool";
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
-import { backupFilterRejection, eligibleBackupModel } from "./backup-model";
+import { backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
 import { compressContextMessages, getFallbackContextWindow, getMaxSteps } from "./auto-continue";
 import { isLocalBrowserProvider, toGatewayFormat } from "./custom-providers";
@@ -157,7 +157,7 @@ export const resolveBackupModelId = async (
     model: string,
     filterRules?: ModelFilterRules,
 ): Promise<string | undefined> => {
-    const definition = eligibleBackupModel(backupModel, model);
+    const definition = supportsBackupFallback(model) ? eligibleBackupModel(backupModel, model) : undefined;
 
     if (!definition || backupFilterRejection(definition, filterRules) !== null) {
         return undefined;
