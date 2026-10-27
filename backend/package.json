@@ -36,6 +36,7 @@
         "./schema": "./lunora/schema.ts",
         "./server": "./lunora/_generated/server.ts",
         "./skills/markdown": "./lunora/skills/markdown.ts",
+        "./triggers/presets": "./lunora/triggers/presets.ts",
         "./workflow/mentions": "./lunora/workflow/mentions.ts"
     },
     "scripts": {

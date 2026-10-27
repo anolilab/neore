@@ -39,7 +39,7 @@ import getSessionToken, { getSessionAuthState } from "@/lib/auth/server-function
 import env from "@/lib/env";
 import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
-import { isNativeShell } from "@/lib/native/bridge";
+import { isNativeShell, setNativeBadge } from "@/lib/native/bridge";
 import NativeBridge from "@/lib/native/native-bridge";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
 import { forgetClientPostHog, readRequestContext, rememberClientPostHog } from "@/lib/request-context";
@@ -249,6 +249,11 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         const wasAuthenticated = previousAuthStateRef.current;
         const wasAnonymous = previousIsAnonymousRef.current;
 
+        // A reload after the session ended starts signed out, so no transition shows it: clear the badge here too.
+        if (wasAuthenticated === null && !isAuthenticated) {
+            void setNativeBadge(0);
+        }
+
         // User just logged in (was not authenticated, now is)
         if (wasAuthenticated === false && isAuthenticated) {
             console.log("[AuthRecovery] User logged in - refetching all active queries");
@@ -269,6 +274,8 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         else if (wasAuthenticated === true && !isAuthenticated) {
             console.log("[AuthRecovery] User logged out - clearing queries");
             queryClient.clear();
+            // An expired session skips both sign-out handlers, so the dock badge is cleared here.
+            void setNativeBadge(0);
         }
 
         previousAuthStateRef.current = isAuthenticated;

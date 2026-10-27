@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { countPromptTextChars, estimateCancelledUsage } from "../lib/cancelled-usage.js";
+import { deferWaitUntil } from "../lib/deferred-wait-until.js";
 
 describe(estimateCancelledUsage, () => {
     it("estimates nothing from nothing", () => {
@@ -38,5 +39,47 @@ describe(countPromptTextChars, () => {
         ];
 
         expect(countPromptTextChars(messages, "sys")).toBe(3 + 7 + 5);
+    });
+});
+
+describe(deferWaitUntil, () => {
+    it("registers a pending promise at once and settles it with the handed work", async () => {
+        const registered: Promise<unknown>[] = [];
+        const settle = deferWaitUntil({
+            waitUntil: (promise) => {
+                registered.push(promise);
+            },
+        });
+        let isDone = false;
+
+        const watcher = registered[0]!.then(() => {
+            isDone = true;
+
+            return undefined;
+        });
+
+        expect(registered).toHaveLength(1);
+        await Promise.resolve();
+        expect(isDone).toBe(false);
+
+        settle(
+            new Promise((resolve) => {
+                setTimeout(resolve, 5);
+            }),
+        );
+        await watcher;
+        expect(isDone).toBe(true);
+    });
+
+    it("swallows a failure of the handed work", async () => {
+        const registered: Promise<unknown>[] = [];
+        const settle = deferWaitUntil({
+            waitUntil: (promise) => {
+                registered.push(promise);
+            },
+        });
+
+        settle(Promise.reject(new Error("boom")));
+        await expect(registered[0]).resolves.toBeUndefined();
     });
 });

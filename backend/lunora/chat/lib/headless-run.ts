@@ -63,6 +63,12 @@ export interface HeadlessRunOptions {
     /** Retrieve memories before, and extract them after. */
     memory: boolean;
     model: string;
+    /**
+     * Called right before the model is asked, after the model, keys, tools and thread are ready: the
+     * point from which a failure means the run reached the model (and may have been billed). A caller
+     * that must give something back when a run never started tells the two apart with it.
+     */
+    onGenerationStart?: () => Promise<void> | void;
     /** Called with the new thread's id before generation starts, so a failure can still point at it. */
     onThread?: (threadId: string) => Promise<void> | void;
     /** Whether the user's personalization reaches the prompt — `"none"` when someone else reads the reply. */
@@ -180,28 +186,39 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
         if (existingThreadId === undefined) {
             await options.beforeThread?.();
 
-            const created = await agent.createThread(ctx, { title: (options.thread as { title: string }).title, userId });
+            // The tags go in with the insert, so a reader (a quiet routine's workspace check) never sees the thread untagged,
+            // even while it runs or if the run fails.
+            const created = await agent.createThread(ctx, {
+                title: (options.thread as { title: string }).title,
+                userId,
+                ...("tags" in options.thread && options.thread.tags && { tags: options.thread.tags }),
+            });
 
             threadId = created.threadId;
             thread = created.thread!;
 
+            // As soon as the thread exists, so a failed bot patch below cannot leave it unrecorded.
+            await options.onThread?.(threadId);
+
             // Before the run: a tool call reads `thread.botId` to find the bot's computer.
             if (options.botId) {
-                await ctx.runMutation(internal.agent.threads.updateThread, { patch: { botId: options.botId }, threadId: threadId as Id<"threads"> });
+                await ctx.runMutation(internal.agent.threads.updateThread, {
+                    patch: { botId: options.botId },
+                    threadId: threadId as Id<"threads">,
+                });
             }
-
-            await options.onThread?.(threadId);
         } else {
             threadId = existingThreadId;
             ({ thread } = await agent.continueThread(ctx, { threadId, userId }));
         }
 
+        await options.onGenerationStart?.();
+
         const result = await thread.generateText(generateArgs as never);
         const text = result.text ?? "";
-        const tags = "tags" in options.thread ? options.thread.tags : undefined;
 
         await ctx.runMutation(internal.agent.threads.updateThread, {
-            patch: { status: "active", ...(tags && { tags }), updatedAt: Date.now() },
+            patch: { status: "active", updatedAt: Date.now() },
             threadId: threadId as Id<"threads">,
         });
 

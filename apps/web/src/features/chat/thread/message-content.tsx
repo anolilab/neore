@@ -9,6 +9,8 @@ import { useLingui } from "@lingui/react/macro";
 import MessageContentUI from "@neore/chat-ui/chat/message-content";
 import type { ChatMessage, SandboxOutputs, ToolPart } from "@neore/chat-ui/types";
 import { resolveMcpToolName } from "@neore/chat-ui/utils/mcp-tool-name";
+import { FetchableOriginsProvider } from "@neore/ui/components/file-renderers/fetchable-origins-provider";
+import { originsOf } from "@neore/ui/hooks/use-fetchable-origins";
 import type { FC } from "react";
 import { lazy, memo, Suspense, useCallback, useMemo } from "react";
 
@@ -17,6 +19,13 @@ import LinkPreviewSlot from "@/features/chat/link-preview/link-preview-slot";
 import TOOL_WIDGETS from "@/features/chat/thread/widgets";
 import KnowledgeSourceGroup from "@/features/knowledge/components/knowledge-source-group";
 import type { UIMessage } from "@/lib/agent";
+
+/**
+ * The origins a file preview may fetch besides the app's own: the backend's,
+ * which serves signed storage URLs. Read raw, like `link-preview-slot`, because
+ * `@/lib/env` validation would make every importer of the chat row fail to load in tests.
+ */
+const FETCHABLE_ORIGINS = originsOf(import.meta.env.VITE_LUNORA_URL as string | undefined);
 
 const LazyDocumentArtifact = lazy(() => import("@/features/canvas/document-artifact"));
 const LazyMcpAppView = lazy(() => import("@/features/chat/thread/mcp-app-view"));
@@ -129,7 +138,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
     }, [toolMeta]);
 
     return (
-        <>
+        <FetchableOriginsProvider origins={FETCHABLE_ORIGINS}>
             <MessageContentUI
                 citationLabel={citationLabel}
                 className={className}
@@ -138,7 +147,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
                 message={message as unknown as ChatMessage}
             />
             <LinkPreviewSlot isStreaming={isStreaming} message={message} />
-        </>
+        </FetchableOriginsProvider>
     );
 });
 

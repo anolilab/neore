@@ -1,9 +1,6 @@
 /**
- * Query Classifier
- * @deprecated Use the unified classification from the LLM Gateway's
- * `/internal/route` endpoint (classification.searchMode) instead.
- * This file is kept for backward compatibility during the migration.
- * See: services/llm-gateway/src/routing/classify.ts
+ * Query Classifier. It runs on every turn, so it stays in the backend: a call to the
+ * gateway's classifier would add a round trip to each one.
  *
  * Lightweight heuristic-based classifier that determines whether a query
  * actually needs web search or can be answered from LLM knowledge alone.

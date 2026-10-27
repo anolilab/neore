@@ -31,7 +31,7 @@ import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import Composer from "@/features/chat/thread/composer";
 
-import hero from "../assets/background.jpg?url";
+import hero from "../assets/background.webp?url";
 import useScrollSticky from "../hooks/use-scroll-sticky";
 import LandingChatProvider from "./landing-chat-provider";
 import LandingFooter from "./landing-footer";

@@ -6,6 +6,8 @@ import ChatView from "@neore/chat-ui/chat/chat-view";
 import DocumentArtifact from "@neore/chat-ui/chat/document-artifact";
 import McpAppView from "@neore/chat-ui/chat/mcp-app-view";
 import PresentationArtifact from "@neore/chat-ui/chat/presentation-artifact";
+import { FetchableOriginsProvider } from "@neore/ui/components/file-renderers/fetchable-origins-provider";
+import { originsOf } from "@neore/ui/hooks/use-fetchable-origins";
 import { AlertCircleIcon, FilePlus2Icon, Loader2Icon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -26,6 +28,9 @@ interface ChatPageProps {
     seed?: ChatSeed;
     threadId: string | null;
 }
+
+// File previews fetch the backend's signed storage URLs, so its origin is the one the provider admits.
+const FETCHABLE_ORIGINS = originsOf(LUNORA_URL);
 
 const components = {
     DocumentArtifact,
@@ -164,28 +169,30 @@ export function ChatPage({ onBack, onThreadCreated, seed, threadId }: ChatPagePr
 
     return (
         <main className="h-full">
-            <ChatView
-                availableModels={models}
-                components={components}
-                composerDraft={draft}
-                composerSlot={composerSlot}
-                hasMoreMessages={hasMore}
-                isStreaming={busy}
-                messages={messages}
-                onBack={onBack}
-                onLoadMoreMessages={loadMore}
-                onSelectModel={setChosenModelId}
-                onSendMessage={(text) => {
-                    void handleSend(text);
-                }}
-                selectedModelId={modelId}
-                thread={{
-                    _creationTime: thread?._creationTime ?? 0,
-                    _id: threadId ?? "",
-                    model: thread?.model,
-                    title: thread?.title ?? (threadId ? undefined : "New chat"),
-                }}
-            />
+            <FetchableOriginsProvider origins={FETCHABLE_ORIGINS}>
+                <ChatView
+                    availableModels={models}
+                    components={components}
+                    composerDraft={draft}
+                    composerSlot={composerSlot}
+                    hasMoreMessages={hasMore}
+                    isStreaming={busy}
+                    messages={messages}
+                    onBack={onBack}
+                    onLoadMoreMessages={loadMore}
+                    onSelectModel={setChosenModelId}
+                    onSendMessage={(text) => {
+                        void handleSend(text);
+                    }}
+                    selectedModelId={modelId}
+                    thread={{
+                        _creationTime: thread?._creationTime ?? 0,
+                        _id: threadId ?? "",
+                        model: thread?.model,
+                        title: thread?.title ?? (threadId ? undefined : "New chat"),
+                    }}
+                />
+            </FetchableOriginsProvider>
         </main>
     );
 }

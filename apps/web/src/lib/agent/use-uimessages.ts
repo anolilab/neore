@@ -184,8 +184,8 @@ export const useUIMessages = <Query extends UIMessagesQuery<any, any>>(
     // message type from the query's `M` parameter. They are the same type for every
     // real query, but TypeScript cannot see that through two unresolved generics —
     // so `.order` and `.status` came back missing on a value that has both.
-    // A shared thread's messages live on its owner's shard (`lib/lunora/shard-routing.ts`).
-    // A locked chat's messages need its in-memory proof (`lib/lunora/unlock-proofs.ts`).
+    // A shared thread's messages live on its owner's shard (`packages/client-runtime/src/shard-routing.ts`).
+    // A locked chat's messages need its in-memory proof (`packages/client-runtime/src/unlock-proofs.ts`).
     const paginated = usePaginatedQuery(query, withUnlockProof(args) as PaginatedArgs<Query> | "skip", {
         initialNumItems: options.initialNumItems,
         ...shardOptionsFor(args),

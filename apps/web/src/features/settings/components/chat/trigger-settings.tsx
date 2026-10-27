@@ -5,6 +5,7 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import type { WebhookSignatureScheme } from "@neore/backend/triggers/presets";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardHeading, CardTitle } from "@neore/ui/components/card";
@@ -42,20 +43,20 @@ import type { FC } from "react";
 import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
-import type { FilterOp, PayloadFilterRow } from "@/features/settings/lib/trigger-filters";
-import {
-    filtersToSend,
-    hasIncompleteFilters,
-    isValidFilterPath,
-    MAX_FILTER_PATH_LENGTH,
-    MAX_FILTER_VALUE_LENGTH,
-    MAX_FILTERS,
-    opTakesValue,
-} from "@/features/settings/lib/trigger-filters";
+import type { FilterOp } from "@/features/settings/lib/trigger-filters";
 import env from "@/lib/env";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import TriggerTypePicker from "./trigger-type-picker";
+import type { WebhookFormState } from "./webhook-trigger-fields";
+import {
+    EMPTY_WEBHOOK,
+    webhookCreateArgs,
+    webhookHasIncompleteFilters,
+    WebhookSigningInstructions,
+    WebhookTriggerFields,
+    webhookUpdateFilters,
+} from "./webhook-trigger-fields";
 
 /** The template variable a webhook trigger fills with the request body; code, not copy. */
 const PAYLOAD_TOKEN = "{{payload}}";
@@ -64,31 +65,19 @@ const PAYLOAD_TOKEN = "{{payload}}";
 
 type TriggerType = "event" | "schedule" | "webhook";
 
-/** How a webhook sender signs its requests; fixed when the trigger is created, with its secret. */
-type WebhookSignatureScheme = "native" | "timestamped";
-
-const FILTER_OP_LABELS: Record<FilterOp, MessageDescriptor> = {
-    contains: msg`contains`,
-    equals: msg`equals`,
-    exists: msg`exists`,
-    not_equals: msg`does not equal`,
-    not_exists: msg`does not exist`,
-    starts_with: msg`starts with`,
-};
-
 interface TriggerFormData {
     botComputer: boolean;
     botId: string;
     cronExpression: string;
     description: string;
-    filters: PayloadFilterRow[];
     inputTemplate: string;
     model: string;
     name: string;
+    quietWhenEmpty: boolean;
     systemPrompt: string;
     timezone: string;
     type: TriggerType;
-    webhookSignatureScheme: WebhookSignatureScheme;
+    webhook: WebhookFormState;
 }
 
 /**
@@ -118,6 +107,7 @@ interface TriggerRow {
     model: string;
     name: string;
     nextTriggerAt: number | null;
+    quietWhenEmpty: boolean;
     searchMode: string | null;
     systemPrompt: string | null;
     timezone: string | null;
@@ -144,15 +134,22 @@ const EMPTY_FORM: TriggerFormData = {
     botId: "",
     cronExpression: "0 8 * * *",
     description: "",
-    filters: [],
     inputTemplate: "",
     model: "",
     name: "",
+    quietWhenEmpty: false,
     systemPrompt: "",
     timezone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
     type: "schedule",
-    webhookSignatureScheme: "timestamped",
+    webhook: EMPTY_WEBHOOK,
 };
+
+/**
+ * Only a scheduled routine with a bot can use a computer or stay quiet when it has nothing to report.
+ * Applied wherever the bot or the type changes, so the form never holds a flag its routine cannot have.
+ */
+const withBotOptions = (form: TriggerFormData): TriggerFormData =>
+    form.type === "schedule" && form.botId !== "" ? form : { ...form, botComputer: false, quietWhenEmpty: false };
 
 const CRON_PRESETS: { expression: string; label: MessageDescriptor }[] = [
     { expression: "0 8 * * *", label: msg`Every day at 8 AM` },
@@ -165,7 +162,7 @@ const CRON_PRESETS: { expression: string; label: MessageDescriptor }[] = [
 const EXECUTION_STATUS_LABELS: Partial<Record<string, MessageDescriptor>> = {
     completed: msg`Completed`,
     failed: msg`Failed`,
-    filtered: msg`Filtered`,
+    filtered: msg`Skipped`,
     pending: msg`Pending`,
     running: msg`Running`,
 };
@@ -173,101 +170,6 @@ const EXECUTION_STATUS_LABELS: Partial<Record<string, MessageDescriptor>> = {
 // ─── Component ─────────────────────────────────────────────────────────────
 
 // ─── Shared Trigger Form ────────────────────────────────────────────────────
-
-/** Edits a webhook trigger's payload filters: every filter must match the JSON body for a delivery to run. */
-const PayloadFiltersEditor: FC<{ filters: PayloadFilterRow[]; onChange: (filters: PayloadFilterRow[]) => void }> = ({ filters, onChange }) => {
-    const { i18n, t } = useLingui();
-    // Generated id: the create and edit forms can be open together.
-    const labelId = useId();
-    const update = (index: number, patch: Partial<PayloadFilterRow>) =>
-        onChange(filters.map((filter, at) => (at === index ? { ...filter, ...patch } : filter)));
-
-    return (
-        <div aria-labelledby={labelId} className="space-y-2" role="group">
-            <Label id={labelId}>{t`Payload filters (optional)`}</Label>
-            <p className="text-muted-foreground text-xs">
-                {t`Only run when every filter matches the JSON body. Use dotted paths such as pull_request.user.login or labels.0.name. A delivery that does not match is accepted, shown as Filtered in the history, and does not run or count against your quota.`}
-            </p>
-            {filters.map((filter, index) => (
-                // The rows have no identity of their own; they are only ever added at the end or removed.
-
-                <div className="flex items-start gap-2" key={index}>
-                    <Input
-                        aria-invalid={filter.path.length > 0 && !isValidFilterPath(filter.path)}
-                        aria-label={t`Filter path`}
-                        className="min-w-0 flex-1 font-mono text-xs"
-                        maxLength={MAX_FILTER_PATH_LENGTH}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => update(index, { path: e.target.value })}
-                        placeholder="action"
-                        value={filter.path}
-                    />
-                    <Select onValueChange={(value) => update(index, { op: value as FilterOp })} value={filter.op}>
-                        <SelectTrigger aria-label={t`Filter condition`} className="w-40 shrink-0">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {(Object.keys(FILTER_OP_LABELS) as FilterOp[]).map((op) => (
-                                <SelectItem key={op} value={op}>
-                                    {i18n._(FILTER_OP_LABELS[op])}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    {opTakesValue(filter.op) && (
-                        <Input
-                            aria-label={t`Filter value`}
-                            className="min-w-0 flex-1 text-xs"
-                            maxLength={MAX_FILTER_VALUE_LENGTH}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => update(index, { value: e.target.value })}
-                            placeholder="opened"
-                            value={filter.value}
-                        />
-                    )}
-                    <Button
-                        aria-label={t`Remove filter`}
-                        onClick={() => onChange(filters.filter((_, at) => at !== index))}
-                        size="sm"
-                        type="button"
-                        variant="ghost"
-                    >
-                        <X aria-hidden="true" className="size-4" />
-                    </Button>
-                </div>
-            ))}
-            <Button
-                disabled={filters.length >= MAX_FILTERS}
-                onClick={() => onChange([...filters, { op: "equals", path: "", value: "" }])}
-                size="sm"
-                type="button"
-                variant="outline"
-            >
-                <Plus aria-hidden="true" className="mr-1.5 size-3" />
-                {t`Add filter`}
-            </Button>
-        </div>
-    );
-};
-
-/** What a sender must send for each scheme. Requests of the other scheme are rejected. */
-const WebhookSigningInstructions: FC<{ scheme: WebhookSignatureScheme }> = ({ scheme }) =>
-    scheme === "native" ? (
-        <p className="text-muted-foreground mt-2">
-            <Trans>
-                Send <code className="font-mono">X-Hub-Signature-256: sha256=&lt;hex&gt;</code>, the HMAC-SHA256 of the raw request body keyed with the secret
-                (the format GitHub webhooks use). This signature has no timestamp, so a captured request can be replayed once the 15-minute duplicate window has
-                passed. Requests with the neore headers are rejected.
-            </Trans>
-        </p>
-    ) : (
-        <p className="text-muted-foreground mt-2">
-            <Trans>
-                Every request must be signed. Send <code className="font-mono">X-Neore-Timestamp</code> (the current Unix time in seconds) and{" "}
-                <code className="font-mono">X-Signature-256: sha256=&lt;hex&gt;</code>, the HMAC-SHA256 of{" "}
-                <code className="font-mono">&lt;timestamp&gt;.&lt;raw body&gt;</code> keyed with the secret. Requests more than 5 minutes old, unsigned, or
-                replayed are rejected, as is <code className="font-mono">X-Hub-Signature-256</code>.
-            </Trans>
-        </p>
-    );
 
 interface TriggerFormProps {
     formData: TriggerFormData;
@@ -284,7 +186,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
     // Generated ids: the create and edit forms can be open together, and fixed ids would make their labels ambiguous.
     const botPickerId = useId();
     const botComputerId = useId();
-    const schemeId = useId();
+    const quietId = useId();
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const { data: bots = [] } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
@@ -313,7 +215,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 <div className="space-y-1.5">
                     <Label htmlFor={botPickerId}>{t`Run as bot (optional)`}</Label>
                     <Select
-                        onValueChange={(value) => onChange({ ...formData, botComputer: false, botId: value === NO_BOT ? "" : (value ?? "") })}
+                        onValueChange={(value) => onChange(withBotOptions({ ...formData, botComputer: false, botId: value === NO_BOT ? "" : (value ?? "") }))}
                         value={formData.botId || NO_BOT}
                     >
                         <SelectTrigger id={botPickerId}>
@@ -344,6 +246,21 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                         />
                     </div>
                 )}
+                {formData.type === "schedule" && bots.some((bot) => bot._id === formData.botId) && (
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <Label htmlFor={quietId}>{t`Only post when there is something to report`}</Label>
+                            <p className="text-muted-foreground text-xs">
+                                {t`Skips a run when your workspace has had no new activity since the routine last posted. A skipped run creates no chat and sends no notification.`}
+                            </p>
+                        </div>
+                        <Switch
+                            checked={formData.quietWhenEmpty}
+                            id={quietId}
+                            onCheckedChange={(checked: boolean) => onChange({ ...formData, quietWhenEmpty: checked })}
+                        />
+                    </div>
+                )}
 
                 <div className="space-y-1.5">
                     <Label htmlFor="trigger-desc">{t`Description (optional)`}</Label>
@@ -363,7 +280,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                     <Label>{t`Trigger Type`}</Label>
                     <TriggerTypePicker
                         disabled={isExisting || formData.type === "event"}
-                        onSelect={(type) => onChange({ ...formData, type })}
+                        onSelect={(type) => onChange(withBotOptions({ ...formData, type }))}
                         value={formData.type}
                     />
                 </div>
@@ -413,26 +330,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                                 (Zapier, n8n, your own code, etc.).
                             </Trans>
                         </p>
-                        <div className="mt-3 space-y-1.5">
-                            <Label htmlFor={schemeId}>{t`Signature`}</Label>
-                            <Select
-                                disabled={isExisting}
-                                onValueChange={(value) => onChange({ ...formData, webhookSignatureScheme: value === "native" ? "native" : "timestamped" })}
-                                value={formData.webhookSignatureScheme}
-                            >
-                                <SelectTrigger id={schemeId}>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="timestamped">{t`Neore (timestamped)`}</SelectItem>
-                                    <SelectItem value="native">{t`GitHub-style (X-Hub-Signature-256)`}</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <WebhookSigningInstructions scheme={formData.webhookSignatureScheme} />
-                        <div className="mt-4">
-                            <PayloadFiltersEditor filters={formData.filters} onChange={(filters) => onChange({ ...formData, filters })} />
-                        </div>
+                        <WebhookTriggerFields isExisting={isExisting} onChange={(webhook) => onChange({ ...formData, webhook })} webhook={formData.webhook} />
                     </div>
                 )}
 
@@ -479,7 +377,12 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                         {t`Cancel`}
                     </Button>
                     <Button
-                        disabled={isPending || !formData.name.trim() || formData.type === "event" || hasIncompleteFilters(formData.type, formData.filters)}
+                        disabled={
+                            isPending ||
+                            !formData.name.trim() ||
+                            formData.type === "event" ||
+                            (formData.type === "webhook" && webhookHasIncompleteFilters(formData.webhook))
+                        }
                         onClick={onSubmit}
                     >
                         {isPending && <Loader2 aria-hidden="true" className="mr-1.5 size-4 animate-spin" />}
@@ -560,6 +463,7 @@ const TriggerSettings: FC = () => {
     // Both ids are only ever set from `trigger._id` of the triggers list, so they carry the row brand.
     const [editingTriggerId, setEditingTriggerId] = useState<Id<"triggers"> | null>(null);
     const [editFormData, setEditFormData] = useState<TriggerFormData>(EMPTY_FORM);
+    const [editStartZone, setEditStartZone] = useState("");
     const [expandedTriggerId, setExpandedTriggerId] = useState<Id<"triggers"> | null>(null);
     // The plaintext webhook secret is returned only by `createTrigger`, so it is shown once, here.
     const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
@@ -599,18 +503,19 @@ const TriggerSettings: FC = () => {
 
         createTrigger(
             {
-                botComputer: formData.type === "schedule" && formData.botId !== "" && formData.botComputer ? true : undefined,
+                botComputer: formData.botComputer || undefined,
                 botId: formData.botId || undefined,
                 cronExpression: formData.type === "schedule" ? formData.cronExpression : undefined,
                 description: formData.description || undefined,
-                filters: formData.type === "webhook" && formData.filters.length > 0 ? filtersToSend(formData.filters) : undefined,
                 inputTemplate: formData.inputTemplate || undefined,
                 model: formData.model || "anthropic/claude-sonnet-4-20250514",
                 name: formData.name,
+                quietWhenEmpty: formData.quietWhenEmpty || undefined,
                 systemPrompt: formData.systemPrompt || undefined,
-                timezone: formData.type === "schedule" ? formData.timezone : undefined,
+                timezone: formData.type === "schedule" ? formData.timezone.trim() || undefined : undefined,
                 type: formData.type,
-                webhookSignatureScheme: formData.type === "webhook" ? formData.webhookSignatureScheme : undefined,
+                // A provider sends its event and the server compiles the filters and the scheme; a custom trigger sends its own.
+                ...webhookCreateArgs(formData.type, formData.webhook),
             },
             {
                 onError: () => toast.error(t`Failed to create trigger`),
@@ -629,20 +534,26 @@ const TriggerSettings: FC = () => {
     const handleUpdate = useCallback(() => {
         if (!editingTriggerId || !editFormData.name.trim()) return;
 
+        // A stored row may carry a flag its type cannot have (the switches are hidden there): send it as off, which the backend accepts and clears.
+        const { botComputer, quietWhenEmpty } = withBotOptions(editFormData);
+
         updateTrigger(
             {
                 // `null` clears the bot; the form always carries the row's current botId, so this is never "leave unchanged".
-                botComputer: editFormData.type === "schedule" && editFormData.botId !== "" && editFormData.botComputer,
+                botComputer,
                 botId: editFormData.botId || null,
                 cronExpression: editFormData.type === "schedule" ? editFormData.cronExpression : undefined,
                 description: editFormData.description || undefined,
                 // The whole set replaces the stored one; an empty set clears it.
-                filters: editFormData.type === "webhook" ? filtersToSend(editFormData.filters) : undefined,
+                filters: editFormData.type === "webhook" ? webhookUpdateFilters(editFormData.webhook) : undefined,
                 inputTemplate: editFormData.inputTemplate || undefined,
                 model: editFormData.model || undefined,
                 name: editFormData.name,
+                quietWhenEmpty,
                 systemPrompt: editFormData.systemPrompt || undefined,
-                timezone: editFormData.type === "schedule" ? editFormData.timezone : undefined,
+                // Sent only when the user changed it: a zone sent with a rename would move a run time the row never had a zone for. Clearing it means UTC.
+                timezone:
+                    editFormData.type === "schedule" && editFormData.timezone.trim() !== editStartZone ? editFormData.timezone.trim() || "UTC" : undefined,
                 triggerId: editingTriggerId,
             },
             {
@@ -654,7 +565,7 @@ const TriggerSettings: FC = () => {
                 },
             },
         );
-    }, [editingTriggerId, editFormData, updateTrigger, refetch, t]);
+    }, [editingTriggerId, editFormData, editStartZone, updateTrigger, refetch, t]);
 
     const handleToggleEnabled = useCallback(
         (triggerId: Id<"triggers">, enabled: boolean) => {
@@ -724,22 +635,31 @@ const TriggerSettings: FC = () => {
     );
 
     const startEditing = useCallback((trigger: TriggerRow) => {
+        // A schedule stored without a zone runs in UTC: the field stays empty, not the browser's zone.
+        const zone = trigger.timezone ?? "";
+
         setEditingTriggerId(trigger._id);
+        setEditStartZone(zone);
         setEditFormData({
             botComputer: trigger.botComputer,
             botId: trigger.botId ?? "",
             cronExpression: trigger.cronExpression ?? "0 8 * * *",
             description: trigger.description ?? "",
-            filters: trigger.filters.map((filter) => {
-                return { op: filter.op, path: filter.path, value: filter.value ?? "" };
-            }),
             inputTemplate: trigger.inputTemplate ?? "",
             model: trigger.model,
             name: trigger.name,
+            quietWhenEmpty: trigger.quietWhenEmpty,
             systemPrompt: trigger.systemPrompt ?? "",
-            timezone: trigger.timezone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone,
+            timezone: zone,
             type: trigger.type as TriggerType,
-            webhookSignatureScheme: trigger.webhookSignatureScheme ?? "timestamped",
+            // A stored trigger keeps its own filters and scheme; the provider it came from is not stored.
+            webhook: {
+                filters: trigger.filters.map((filter) => {
+                    return { op: filter.op, path: filter.path, value: filter.value ?? "" };
+                }),
+                provider: "custom",
+                scheme: trigger.webhookSignatureScheme ?? "timestamped",
+            },
         });
     }, []);
 

@@ -92,14 +92,12 @@ const technicalFeatures = [
 ];
 
 const apiEndpoints = [
-    { description: msg`Text generation with streaming support`, method: "POST", path: "/v1/completions" },
+    { description: msg`Text generation with streaming support`, method: "POST", path: "/v1/chat/completions" },
     { description: msg`Vector embeddings for any text`, method: "POST", path: "/v1/embeddings" },
-    { description: msg`Image generation (DALL-E, Imagen, FLUX)`, method: "POST", path: "/v1/images" },
-    { description: msg`Speech synthesis and transcription`, method: "POST", path: "/v1/audio" },
     { description: msg`Video generation (Runway, Luma, Kling)`, method: "POST", path: "/v1/videos" },
     { description: msg`List all available models and pricing`, method: "GET", path: "/v1/models" },
     { description: msg`Query usage analytics and costs`, method: "GET", path: "/v1/usage" },
-    { description: msg`Prompt cache management`, method: "POST", path: "/v1/cache" },
+    { description: msg`Prompt cache management`, method: "DELETE", path: "/v1/cache" },
 ];
 
 const pricingTiers = [

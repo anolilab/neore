@@ -24,6 +24,7 @@ export const extractTokenCounts = (usage: Partial<LanguageModelUsage> | undefine
 
     return {
         cachedTokens: usage.inputTokenDetails?.cacheReadTokens ?? 0,
+        // Total output, reasoning included (providers set `total` = text + reasoning); `calculateCost` subtracts it.
         completionTokens: usage.outputTokens ?? 0,
         promptTokens: usage.inputTokens ?? 0,
         reasoningTokens: usage.outputTokenDetails?.reasoningTokens ?? 0,

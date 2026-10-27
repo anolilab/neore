@@ -56,7 +56,7 @@ const useDeltaStreams = <Query extends StreamQuery<any> = StreamQuery<object>>(
         }
     }
 
-    // A shared thread's streams live on its owner's shard (`lib/lunora/shard-routing.ts`).
+    // A shared thread's streams live on its owner's shard (`packages/client-runtime/src/shard-routing.ts`).
     const shardOptions = shardOptionsFor(args);
 
     // Get all the active streams

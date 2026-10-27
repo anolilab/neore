@@ -313,8 +313,8 @@ msgid "{0, plural, one {Unsupported query parameter} other {Unsupported query pa
 msgstr "{0, plural, one {Nieobsługiwany parametr zapytania} few {Nieobsługiwane parametry zapytania} many {Nieobsługiwane parametry zapytania} other {Nieobsługiwane parametry zapytania}}: {1}"
 
 #. placeholder {0}: pull.progress.status
-#. placeholder {1}: formatBytes(pull.progress.completed ?? 0)
-#. placeholder {2}: formatBytes(pull.progress.total)
+#. placeholder {1}: formatFileSize(pull.progress.completed ?? 0)
+#. placeholder {2}: formatFileSize(pull.progress.total)
 #: src/features/local-models/components/ollama-model-manager.tsx:317
 msgid "{0} — {1} of {2}"
 msgstr "{0} — {1} z {2}"
