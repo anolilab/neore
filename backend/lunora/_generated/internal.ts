@@ -1004,7 +1004,7 @@ export interface InternalApiTypes {
         };
         functions: {
             applyFileMetadata: FunctionReference<"mutation", { key: string; size: number; type: string; userId: string }, null>;
-            discardUnfiledVaultFile: FunctionReference<"mutation", { fileId: string; userId: string }, null>;
+            discardUnfiledVaultFile: FunctionReference<"mutation", { fileId: Id<"files">; userId: string }, null>;
             insertVaultFile: FunctionReference<"mutation", { key: string; name: string; organizationId?: string; size: number; type: string; userId: string }, Id<"files">>;
             internalSaveGenerated: FunctionReference<"mutation", { chatId: string; fileName: string; fileSize: number; fileType: string; key: string; url?: string; userId: string }, Id<"files">>;
             markNsfwChecking: FunctionReference<"mutation", { fileId: Id<"files"> }, null>;
