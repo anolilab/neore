@@ -73,6 +73,7 @@ interface TriggerFormData {
     inputTemplate: string;
     model: string;
     name: string;
+    quietWhenEmpty: boolean;
     systemPrompt: string;
     timezone: string;
     type: TriggerType;
@@ -106,6 +107,7 @@ interface TriggerRow {
     model: string;
     name: string;
     nextTriggerAt: number | null;
+    quietWhenEmpty: boolean;
     searchMode: string | null;
     systemPrompt: string | null;
     timezone: string | null;
@@ -135,11 +137,19 @@ const EMPTY_FORM: TriggerFormData = {
     inputTemplate: "",
     model: "",
     name: "",
+    quietWhenEmpty: false,
     systemPrompt: "",
     timezone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
     type: "schedule",
     webhook: EMPTY_WEBHOOK,
 };
+
+/**
+ * Only a scheduled routine with a bot can use a computer or stay quiet when it has nothing to report.
+ * Applied wherever the bot or the type changes, so the form never holds a flag its routine cannot have.
+ */
+const withBotOptions = (form: TriggerFormData): TriggerFormData =>
+    form.type === "schedule" && form.botId !== "" ? form : { ...form, botComputer: false, quietWhenEmpty: false };
 
 const CRON_PRESETS: { expression: string; label: MessageDescriptor }[] = [
     { expression: "0 8 * * *", label: msg`Every day at 8 AM` },
@@ -152,7 +162,7 @@ const CRON_PRESETS: { expression: string; label: MessageDescriptor }[] = [
 const EXECUTION_STATUS_LABELS: Partial<Record<string, MessageDescriptor>> = {
     completed: msg`Completed`,
     failed: msg`Failed`,
-    filtered: msg`Filtered`,
+    filtered: msg`Skipped`,
     pending: msg`Pending`,
     running: msg`Running`,
 };
@@ -176,6 +186,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
     // Generated ids: the create and edit forms can be open together, and fixed ids would make their labels ambiguous.
     const botPickerId = useId();
     const botComputerId = useId();
+    const quietId = useId();
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const { data: bots = [] } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
@@ -204,7 +215,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 <div className="space-y-1.5">
                     <Label htmlFor={botPickerId}>{t`Run as bot (optional)`}</Label>
                     <Select
-                        onValueChange={(value) => onChange({ ...formData, botComputer: false, botId: value === NO_BOT ? "" : (value ?? "") })}
+                        onValueChange={(value) => onChange(withBotOptions({ ...formData, botComputer: false, botId: value === NO_BOT ? "" : (value ?? "") }))}
                         value={formData.botId || NO_BOT}
                     >
                         <SelectTrigger id={botPickerId}>
@@ -235,6 +246,21 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                         />
                     </div>
                 )}
+                {formData.type === "schedule" && bots.some((bot) => bot._id === formData.botId) && (
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <Label htmlFor={quietId}>{t`Only post when there is something to report`}</Label>
+                            <p className="text-muted-foreground text-xs">
+                                {t`Skips a run when your workspace has had no new activity since the routine last posted. A skipped run creates no chat and sends no notification.`}
+                            </p>
+                        </div>
+                        <Switch
+                            checked={formData.quietWhenEmpty}
+                            id={quietId}
+                            onCheckedChange={(checked: boolean) => onChange({ ...formData, quietWhenEmpty: checked })}
+                        />
+                    </div>
+                )}
 
                 <div className="space-y-1.5">
                     <Label htmlFor="trigger-desc">{t`Description (optional)`}</Label>
@@ -254,7 +280,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                     <Label>{t`Trigger Type`}</Label>
                     <TriggerTypePicker
                         disabled={isExisting || formData.type === "event"}
-                        onSelect={(type) => onChange({ ...formData, type })}
+                        onSelect={(type) => onChange(withBotOptions({ ...formData, type }))}
                         value={formData.type}
                     />
                 </div>
@@ -437,6 +463,7 @@ const TriggerSettings: FC = () => {
     // Both ids are only ever set from `trigger._id` of the triggers list, so they carry the row brand.
     const [editingTriggerId, setEditingTriggerId] = useState<Id<"triggers"> | null>(null);
     const [editFormData, setEditFormData] = useState<TriggerFormData>(EMPTY_FORM);
+    const [editStartZone, setEditStartZone] = useState("");
     const [expandedTriggerId, setExpandedTriggerId] = useState<Id<"triggers"> | null>(null);
     // The plaintext webhook secret is returned only by `createTrigger`, so it is shown once, here.
     const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
@@ -476,15 +503,16 @@ const TriggerSettings: FC = () => {
 
         createTrigger(
             {
-                botComputer: formData.type === "schedule" && formData.botId !== "" && formData.botComputer ? true : undefined,
+                botComputer: formData.botComputer || undefined,
                 botId: formData.botId || undefined,
                 cronExpression: formData.type === "schedule" ? formData.cronExpression : undefined,
                 description: formData.description || undefined,
                 inputTemplate: formData.inputTemplate || undefined,
                 model: formData.model || "anthropic/claude-sonnet-4-20250514",
                 name: formData.name,
+                quietWhenEmpty: formData.quietWhenEmpty || undefined,
                 systemPrompt: formData.systemPrompt || undefined,
-                timezone: formData.type === "schedule" ? formData.timezone : undefined,
+                timezone: formData.type === "schedule" ? formData.timezone.trim() || undefined : undefined,
                 type: formData.type,
                 // A provider sends its event and the server compiles the filters and the scheme; a custom trigger sends its own.
                 ...webhookCreateArgs(formData.type, formData.webhook),
@@ -506,10 +534,13 @@ const TriggerSettings: FC = () => {
     const handleUpdate = useCallback(() => {
         if (!editingTriggerId || !editFormData.name.trim()) return;
 
+        // A stored row may carry a flag its type cannot have (the switches are hidden there): send it as off, which the backend accepts and clears.
+        const { botComputer, quietWhenEmpty } = withBotOptions(editFormData);
+
         updateTrigger(
             {
                 // `null` clears the bot; the form always carries the row's current botId, so this is never "leave unchanged".
-                botComputer: editFormData.type === "schedule" && editFormData.botId !== "" && editFormData.botComputer,
+                botComputer,
                 botId: editFormData.botId || null,
                 cronExpression: editFormData.type === "schedule" ? editFormData.cronExpression : undefined,
                 description: editFormData.description || undefined,
@@ -518,8 +549,11 @@ const TriggerSettings: FC = () => {
                 inputTemplate: editFormData.inputTemplate || undefined,
                 model: editFormData.model || undefined,
                 name: editFormData.name,
+                quietWhenEmpty,
                 systemPrompt: editFormData.systemPrompt || undefined,
-                timezone: editFormData.type === "schedule" ? editFormData.timezone : undefined,
+                // Sent only when the user changed it: a zone sent with a rename would move a run time the row never had a zone for. Clearing it means UTC.
+                timezone:
+                    editFormData.type === "schedule" && editFormData.timezone.trim() !== editStartZone ? editFormData.timezone.trim() || "UTC" : undefined,
                 triggerId: editingTriggerId,
             },
             {
@@ -531,7 +565,7 @@ const TriggerSettings: FC = () => {
                 },
             },
         );
-    }, [editingTriggerId, editFormData, updateTrigger, refetch, t]);
+    }, [editingTriggerId, editFormData, editStartZone, updateTrigger, refetch, t]);
 
     const handleToggleEnabled = useCallback(
         (triggerId: Id<"triggers">, enabled: boolean) => {
@@ -601,7 +635,11 @@ const TriggerSettings: FC = () => {
     );
 
     const startEditing = useCallback((trigger: TriggerRow) => {
+        // A schedule stored without a zone runs in UTC: the field stays empty, not the browser's zone.
+        const zone = trigger.timezone ?? "";
+
         setEditingTriggerId(trigger._id);
+        setEditStartZone(zone);
         setEditFormData({
             botComputer: trigger.botComputer,
             botId: trigger.botId ?? "",
@@ -610,8 +648,9 @@ const TriggerSettings: FC = () => {
             inputTemplate: trigger.inputTemplate ?? "",
             model: trigger.model,
             name: trigger.name,
+            quietWhenEmpty: trigger.quietWhenEmpty,
             systemPrompt: trigger.systemPrompt ?? "",
-            timezone: trigger.timezone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone,
+            timezone: zone,
             type: trigger.type as TriggerType,
             // A stored trigger keeps its own filters and scheme; the provider it came from is not stored.
             webhook: {
