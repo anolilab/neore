@@ -441,7 +441,7 @@ export interface InternalApiTypes {
         };
         functions: {
             appendRunLog: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; text: string }, { cancelled: boolean }>;
-            beginPullRequest: FunctionReference<"mutation", { followUp: boolean; runId: Id<"codingAgentRuns">; userId: string }, { baseBranch: string; diff: string; pollSeq: number; prompt: string; repoUrl: string; startedAt: number; summary?: string } | { error: string }>;
+            beginPullRequest: FunctionReference<"mutation", { followUp: boolean; runId: Id<"codingAgentRuns">; userId: string }, { baseBranch: string; diff: string; pollSeq: number; prompt: string; repoUrl: string; staleSandboxId?: string; startedAt: number; summary?: string } | { error: string }>;
             claimFinish: FunctionReference<"mutation", { runId: Id<"codingAgentRuns"> }, { claimed: boolean; wantsPr: boolean }>;
             claimPoll: FunctionReference<"mutation", { prStartedAt?: number; runId: Id<"codingAgentRuns">; seq: number }, boolean>;
             claimRun: FunctionReference<"mutation", { runId: Id<"codingAgentRuns"> }, { agent: "claude_code" | "codex"; branch?: string; openPr: boolean; prompt: string; repoUrl: string; userId: string } | null>;
@@ -1002,7 +1002,7 @@ export interface InternalApiTypes {
         };
         functions: {
             applyFileMetadata: FunctionReference<"mutation", { key: string; size: number; type: string; userId: string }, null>;
-            discardUnfiledVaultFile: FunctionReference<"mutation", { fileId: string; userId: string }, null>;
+            discardUnfiledVaultFile: FunctionReference<"mutation", { fileId: Id<"files">; userId: string }, null>;
             insertVaultFile: FunctionReference<"mutation", { key: string; name: string; organizationId?: string; size: number; type: string; userId: string }, Id<"files">>;
             internalSaveGenerated: FunctionReference<"mutation", { chatId: string; fileName: string; fileSize: number; fileType: string; key: string; url?: string; userId: string }, Id<"files">>;
             markNsfwChecking: FunctionReference<"mutation", { fileId: Id<"files"> }, null>;

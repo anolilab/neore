@@ -326,6 +326,12 @@ const startPullRequestForRun = async (
     }
 
     const { runId } = input;
+
+    // A reclaimed attempt whose reaper never ran left its sandbox behind; the new attempt owns that cleanup.
+    if (claim.staleSandboxId) {
+        await killE2BSandbox(E2B_API_KEY, claim.staleSandboxId).catch(() => undefined);
+    }
+
     const fail = async (error: string): Promise<{ error: string; followUpsPosted: boolean }> => {
         const { followUp } = await ctx.runMutation(internal.coding_agents.functions.completePullRequest, {
             log: `Could not open the pull request: ${error}\n`,

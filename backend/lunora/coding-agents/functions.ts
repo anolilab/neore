@@ -645,6 +645,8 @@ export const beginPullRequest = internalMutation
                 pollSeq: v.number(),
                 prompt: v.string(),
                 repoUrl: v.string(),
+                /** The sandbox of the stale attempt this one replaced, for the caller to kill: nothing else tracks it. */
+                staleSandboxId: v.optional(v.string()),
                 /** Identifies this attempt (its `prStartedAt`); every later write for it must present it. */
                 startedAt: v.number(),
                 summary: v.optional(v.string()),
@@ -680,6 +682,7 @@ export const beginPullRequest = internalMutation
             pollSeq: run.pollSeq ?? 0,
             prompt: run.prompt,
             repoUrl: run.repoUrl,
+            ...(run.prStatus === "pending" && run.prSandboxId !== undefined && { staleSandboxId: run.prSandboxId }),
             startedAt: now,
             ...(run.summary !== undefined && { summary: run.summary }),
         };

@@ -215,13 +215,42 @@ describe("pull request reaper", () => {
         expect(await mutate(beginPullRequest, { followUp: false, runId: fresh, userId: USER })).toStrictEqual({
             error: "A pull request for this run is already being opened.",
         });
-        expect(await mutate(beginPullRequest, { followUp: false, runId: stale, userId: USER })).toMatchObject({ baseBranch: "main" });
+        expect(await mutate(beginPullRequest, { followUp: false, runId: stale, userId: USER })).toMatchObject({ baseBranch: "main", staleSandboxId: "sbx-old" });
 
         const run = await getRun(stale);
 
         expect(run.prStatus).toBe("pending");
         expect("prSandboxId" in run).toBe(false);
         expect(run.prStartedAt).toBeGreaterThan(Date.now() - 60_000);
+    });
+});
+
+describe("beginPullRequest sandbox hand-off", () => {
+    it("reports no stale sandbox for a first attempt or a failed one", async () => {
+        const harness = lunoraTest(schema as never);
+        const make = async (extra: Record<string, unknown>) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("codingAgentRuns", {
+                        agent: "claude_code",
+                        baseBranch: "main",
+                        createdAt: 1,
+                        diff: "diff --git a/x b/x",
+                        log: "",
+                        openPr: false,
+                        prompt: "Fix it",
+                        repoUrl: "https://github.com/a/b.git",
+                        status: "succeeded",
+                        updatedAt: 1,
+                        userId: USER,
+                        ...extra,
+                    }),
+            );
+        const first = await make({});
+        const claim = await harness.run(async (ctx: any) => await ctx.runMutation(beginPullRequest, { followUp: false, runId: first, userId: USER }));
+
+        expect("staleSandboxId" in claim).toBe(false);
+        harness.close();
     });
 });
 
