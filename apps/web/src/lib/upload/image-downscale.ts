@@ -193,7 +193,10 @@ export const webpIsAnimatedOrTransparent = (head: Uint8Array): boolean => {
 /** The most pixels (width × height) that are decoded; a heavier image is left as it is, since decoding it could exhaust the browser's memory. */
 export const MAX_DECODE_PIXELS = 50_000_000;
 
-const MAX_JPEG_SEGMENTS = 64;
+/** How far into a JPEG the frame header is looked for, and a cap on reads for a header made of tiny segments. Payloads are skipped by their length. */
+const MAX_JPEG_SCAN_BYTES = 1024 * 1024;
+const MAX_JPEG_SCAN_STEPS = 8192;
+const JPEG_WINDOW_BYTES = 16;
 const JPEG_SOF_HEADER_BYTES = 9;
 
 export interface ImageSize {
@@ -248,13 +251,45 @@ const jpegSize = async (file: Blob): Promise<ImageSize | undefined> => {
     let offset = 2;
     let orientation: number | undefined;
 
-    for (let segments = 0; segments < MAX_JPEG_SEGMENTS; segments += 1) {
-        const segment = await readBytes(file, offset, offset + JPEG_SOF_HEADER_BYTES);
-        const marker = segment[1];
+    for (let steps = 0; offset < MAX_JPEG_SCAN_BYTES && steps < MAX_JPEG_SCAN_STEPS; steps += 1) {
+        const window = await readBytes(file, offset, offset + JPEG_WINDOW_BYTES);
+        let fill = 0;
 
-        if (segment.length < 4 || segment[0] !== 0xff || marker === undefined) {
+        // Any number of 0xFF fill bytes may come before a marker's code byte.
+        while (window[fill] === 0xff) {
+            fill += 1;
+        }
+
+        if (fill === 0 || window.length < 2) {
             return undefined;
         }
+
+        const marker = window[fill];
+
+        if (marker === undefined) {
+            // Nothing but fill in this window: read on from its last 0xFF.
+            offset += window.length - 1;
+            continue;
+        }
+
+        // Standalone markers carry no length: TEM (01), RST0-7 (D0-D7), SOI (D8).
+        if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) {
+            offset += fill + 1;
+            continue;
+        }
+
+        // A 0xFF 0x00 pair is byte stuffing inside entropy-coded data, never a marker here.
+        if ([0x00, 0xd9, 0xda].includes(marker)) {
+            return undefined;
+        }
+
+        // Re-read from the last fill byte so the segment starts at its own 0xFF.
+        if (fill > 1) {
+            offset += fill - 1;
+            continue;
+        }
+
+        const segment = window.length >= JPEG_SOF_HEADER_BYTES ? window : await readBytes(file, offset, offset + JPEG_SOF_HEADER_BYTES);
 
         // SOF0-SOF15 except DHT (C4), JPG (C8) and DAC (CC) hold the frame size.
         if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
@@ -267,8 +302,7 @@ const jpegSize = async (file: Blob): Promise<ImageSize | undefined> => {
             return { height: view.getUint16(5), ...(orientation !== undefined && { orientation }), width: view.getUint16(7) };
         }
 
-        // Start of scan or end of image before any frame header: not a layout we can read.
-        if (marker === 0xda || marker === 0xd9) {
+        if (segment.length < 4) {
             return undefined;
         }
 

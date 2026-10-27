@@ -306,6 +306,50 @@ describe(readImageSize, () => {
         expect(await sizeOf([jpegHead(4000, 3000, 60)], "image/jpeg")).toStrictEqual({ height: 3000, width: 4000 });
     });
 
+    it("finds the frame header after more than 64 metadata segments", async () => {
+        const segments = new Uint8Array(200 * 18);
+
+        for (let index = 0; index < 200; index += 1) {
+            segments.set([0xff, 0xe0, 0, 16], index * 18);
+        }
+
+        const bytes = new Blob([new Uint8Array([0xff, 0xd8]), segments, new Uint8Array([0xff, 0xc0, 0, 17, 8, 0x0b, 0xb8, 0x0f, 0xa0, ...zeros(10)])]);
+
+        expect(await sizeOf([bytes], "image/jpeg")).toStrictEqual({ height: 3000, width: 4000 });
+    });
+
+    it("skips 0xFF fill bytes before a marker, and standalone markers that have no length", async () => {
+        const bytes = new Uint8Array([
+            0xff,
+            0xd8,
+            0xff,
+            0xff,
+            0xff,
+            0xe0,
+            0,
+            4,
+            0,
+            0,
+            0xff,
+            0x01,
+            0xff,
+            0xd0,
+            0xff,
+            0xff,
+            0xc0,
+            0,
+            17,
+            8,
+            0x0b,
+            0xb8,
+            0x0f,
+            0xa0,
+            ...zeros(10),
+        ]);
+
+        expect(await sizeOf([bytes], "image/jpeg")).toStrictEqual({ height: 3000, width: 4000 });
+    });
+
     it("reads a BMP and an extended WebP", async () => {
         expect(await sizeOf([bmpHead(24)], "image/bmp")).toStrictEqual({ height: 3000, width: 4000 });
 
