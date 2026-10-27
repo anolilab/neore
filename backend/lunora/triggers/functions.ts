@@ -17,12 +17,14 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
-import { releaseClaim } from "../lib/claim-once";
+import { CLAIM_PREFIX_BATCH, releaseClaim, releaseClaimsWithPrefix, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
 import { assertValidFilters, evaluateFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH, MAX_WEBHOOK_BODY_BYTES } from "./filters";
 import { resolveTimeZone } from "../memory/reflection-logic";
+import type { WebhookPreset } from "./presets";
+import { compileWebhookPreset } from "./presets";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
 import { noteShardDue } from "../lib/shard-housekeeping";
@@ -30,12 +32,39 @@ import { notifyQuietly } from "../notifications/notify";
 import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
+import type { WebhookSignatureScheme } from "./validators";
+import { vWebhookSignatureScheme } from "./validators";
 
 // "event" stays in the union because existing rows carry it; removing a member is a breaking schema change.
 const triggerTypeSchema = v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event"));
 
-/** How a webhook delivery is signed; see `triggers/http.ts`. Absent on a row means "timestamped". */
-const vSignatureScheme = v.union(v.literal("timestamped"), v.literal("native"));
+/**
+ * A provider and one of its events: one object per provider, so a mismatched pair cannot be sent.
+ * Written out because codegen reads the literals, not a table; the check below fails to compile when
+ * this and `WEBHOOK_PRESETS` (`presets.ts`) drift apart.
+ */
+const vWebhookPreset = v.union(
+    v.object({
+        event: v.union(
+            v.literal("pull_request_opened"),
+            v.literal("pull_request_merged"),
+            v.literal("pull_request_review_requested"),
+            v.literal("issue_assigned"),
+        ),
+        provider: v.literal("github"),
+    }),
+    v.object({
+        event: v.union(v.literal("merge_request_opened"), v.literal("merge_request_merged")),
+        provider: v.literal("gitlab"),
+    }),
+);
+
+type Equal<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+const presetValidatorMatchesTable: Equal<Infer<typeof vWebhookPreset>, WebhookPreset> = true;
+
+// eslint-disable-next-line sonarjs/void-use -- type-level assertion; `void` only marks the binding as used.
+void presetValidatorMatchesTable;
 
 /** Nothing dispatches an event trigger, so one can be neither created nor edited. Existing rows stay readable and deletable. */
 const assertTriggerTypeSupported = (type: "event" | "schedule" | "webhook"): void => {
@@ -86,6 +115,46 @@ const checkedFilters = (filters: PayloadFilter[] | undefined, type: Doc<"trigger
     assertValidFilters(filters);
 
     return filters;
+};
+
+/**
+ * The filters and signature scheme a new trigger is stored with, after every check
+ * that belongs to the webhook-only arguments. A provider preset supplies both, so it
+ * may not come with `filters`, and an explicit scheme must be the provider's: a
+ * mismatch would verify the sender with the wrong credential. A webhook without a
+ * preset is "timestamped" unless it names a scheme; other types store neither.
+ */
+const webhookSetup = (
+    args: { filters?: PayloadFilter[]; webhookPreset?: WebhookPreset; webhookSignatureScheme?: WebhookSignatureScheme },
+    type: Doc<"triggers">["type"],
+): { filters: PayloadFilter[] | undefined; webhookSignatureScheme: WebhookSignatureScheme | undefined } => {
+    if (type !== "webhook") {
+        if (args.webhookSignatureScheme !== undefined) {
+            throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has a signature scheme.");
+        }
+
+        if (args.webhookPreset) {
+            throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has a provider preset.");
+        }
+
+        return { filters: checkedFilters(args.filters, type), webhookSignatureScheme: undefined };
+    }
+
+    if (!args.webhookPreset) {
+        return { filters: checkedFilters(args.filters, type), webhookSignatureScheme: args.webhookSignatureScheme ?? "timestamped" };
+    }
+
+    if (args.filters && args.filters.length > 0) {
+        throw new LunoraError("INVALID_ARGUMENT", "A provider preset sets its own filters. Leave the filters out.");
+    }
+
+    const compiled = compileWebhookPreset(args.webhookPreset);
+
+    if (args.webhookSignatureScheme !== undefined && args.webhookSignatureScheme !== compiled.scheme) {
+        throw new LunoraError("INVALID_ARGUMENT", "The signature scheme does not match the provider.");
+    }
+
+    return { filters: compiled.filters, webhookSignatureScheme: compiled.scheme };
 };
 
 /**
@@ -147,7 +216,7 @@ const vGetTriggersOutput = v.array(
         triggerCount: v.number(),
         type: v.string(),
         updatedAt: v.number(),
-        webhookSignatureScheme: v.union(v.literal("timestamped"), v.literal("native"), v.null()),
+        webhookSignatureScheme: v.union(vWebhookSignatureScheme, v.null()),
     }),
 );
 
@@ -224,8 +293,10 @@ export const createTrigger = authMutation
         systemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
         timezone: v.optional(v.string().max(MAX_LENGTH.short)),
         type: v.from(triggerTypeSchema),
+        // Webhook triggers only. Compiles to the event's filters and the provider's scheme; takes no `filters`.
+        webhookPreset: v.optional(vWebhookPreset),
         // Webhook triggers only; unset means "timestamped". Fixed at creation, with the secret.
-        webhookSignatureScheme: v.optional(vSignatureScheme),
+        webhookSignatureScheme: v.optional(vWebhookSignatureScheme),
     })
     .output(v.object({ triggerId: v.string(), webhookSecret: v.optional(v.string()) }))
     .mutation(async ({ args, ctx: context }) => {
@@ -255,11 +326,7 @@ export const createTrigger = authMutation
 
         assertComputerRoutine({ botComputer: args.botComputer === true, botId: args.botId, type: triggerType });
 
-        if (args.webhookSignatureScheme !== undefined && triggerType !== "webhook") {
-            throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has a signature scheme.");
-        }
-
-        const filters = checkedFilters(args.filters, triggerType);
+        const { filters, webhookSignatureScheme } = webhookSetup(args, triggerType);
 
         const inserted = await context.db.insert("triggers", {
             botComputer: args.botComputer === true ? true : undefined,
@@ -280,7 +347,7 @@ export const createTrigger = authMutation
             updatedAt: now,
             userId,
             webhookSecret,
-            webhookSignatureScheme: triggerType === "webhook" ? (args.webhookSignatureScheme ?? "timestamped") : undefined,
+            webhookSignatureScheme,
         });
 
         // A webhook names only the trigger; this is how it finds the shard.
@@ -502,11 +569,19 @@ export const deleteTrigger = authMutation
             .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", args.triggerId as Id<"triggers">))
             .collect();
 
-        // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes.
+        // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes, except a
+        // `gitlab-token` trigger's delivery claims, which last for years: one batch is cleared here, the rest on the scheduler.
         await Promise.allSettled(executions.map((row) => context.db.delete(row._id)));
 
         // Delete the trigger
         await context.db.delete(args.triggerId as Id<"triggers">);
+
+        const deliveryPrefix = `${args.triggerId}:`;
+
+        if (await releaseClaimsWithPrefix(context, TRIGGER_DELIVERY_SCOPE, deliveryPrefix, CLAIM_PREFIX_BATCH)) {
+            await context.scheduler.runAfter(0, internal.lib.claim_once.purgeClaimsWithPrefix, { prefix: deliveryPrefix, scope: TRIGGER_DELIVERY_SCOPE });
+        }
+
         await deleteShardRoute(context, "trigger", args.triggerId);
 
         context.log.event("triggers.delete_trigger", { executionsDeleted: executions.length });
@@ -685,6 +760,28 @@ const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reaso
 };
 
 /**
+ * Gives a delivery's replay claim back. A short-lived claim left behind only makes a redelivery read as a replay
+ * until its TTL, so a failure is logged and the refusal stands. A `permanent` one lasts for years: a failed
+ * release throws, undoing this admission, so `executeTrigger` retries the release durably instead of losing it.
+ */
+const giveBackClaim = async (
+    ctx: MutationCtx,
+    claim: { claimedAt: number; key: string; scope: string },
+    triggerId: Id<"triggers">,
+    permanent: boolean,
+): Promise<void> => {
+    try {
+        await releaseClaim(ctx, claim.scope, claim.key, claim.claimedAt);
+    } catch (error) {
+        if (permanent) {
+            throw error;
+        }
+
+        console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}:`, error);
+    }
+};
+
+/**
  * Charges one run before the paid call. A trigger draws on the same daily
  * task-run quota and model allowlist as a task round (`tasks/internal.ts`), so a
  * schedule cannot run more agent turns than a task can. Returns the refusal
@@ -703,14 +800,23 @@ export const admitTriggerRun = internalMutation
         claim: v.optional(v.object({ claimedAt: v.number(), key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
         executionId: v.optional(v.id("triggerExecutions")),
         filterPayload: v.optional(v.string().max(MAX_WEBHOOK_BODY_BYTES)),
+        // The claim is permanent (`gitlab-token`), so ANY refusal gives it back, not only a filter miss: a delivery that never ran may be redelivered.
+        releaseUnlessRun: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
     })
     .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() })))
-    .mutation(async ({ args: { claim, executionId, filterPayload, triggerId }, ctx }) => {
+    .mutation(async ({ args: { claim, executionId, filterPayload, releaseUnlessRun, triggerId }, ctx }) => {
+        const refused = async (reason: string): Promise<string> => {
+            if (claim && releaseUnlessRun) {
+                await giveBackClaim(ctx, claim, triggerId, true);
+            }
+
+            return reason;
+        };
         const trigger = await ctx.db.get(triggerId);
 
         if (!trigger) {
-            return "Trigger not found";
+            return await refused("Trigger not found");
         }
 
         if (filterPayload !== undefined) {
@@ -728,12 +834,7 @@ export const admitTriggerRun = internalMutation
                 }
 
                 if (claim) {
-                    try {
-                        await releaseClaim(ctx, claim.scope, claim.key, claim.claimedAt);
-                    } catch (error) {
-                        // The refusal stands; a claim left behind only makes a redelivery read as a replay until its TTL.
-                        console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}:`, error);
-                    }
+                    await giveBackClaim(ctx, claim, triggerId, releaseUnlessRun === true);
                 }
 
                 return { filtered: reason };
@@ -744,7 +845,7 @@ export const admitTriggerRun = internalMutation
         const problem = taskAccessProblem(account);
 
         if (problem || !account) {
-            return problem ?? "Your account no longer exists.";
+            return await refused(problem ?? "Your account no longer exists.");
         }
 
         const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
@@ -753,11 +854,11 @@ export const admitTriggerRun = internalMutation
         const model = bot?.model || trigger.model || DEFAULT_CHAT_MODEL;
 
         if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
-            return `The model '${model}' is no longer available for triggers. Pick another model and enable the trigger again.`;
+            return await refused(`The model '${model}' is no longer available for triggers. Pick another model and enable the trigger again.`);
         }
 
         if (!(await chargeRound(ctx, trigger.userId, account))) {
-            return DAILY_LIMIT_MESSAGE;
+            return await refused(DAILY_LIMIT_MESSAGE);
         }
 
         return null;

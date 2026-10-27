@@ -63,6 +63,12 @@ export interface HeadlessRunOptions {
     /** Retrieve memories before, and extract them after. */
     memory: boolean;
     model: string;
+    /**
+     * Called right before the model is asked, after the model, keys, tools and thread are ready: the
+     * point from which a failure means the run reached the model (and may have been billed). A caller
+     * that must give something back when a run never started tells the two apart with it.
+     */
+    onGenerationStart?: () => Promise<void> | void;
     /** Called with the new thread's id before generation starts, so a failure can still point at it. */
     onThread?: (threadId: string) => Promise<void> | void;
     /** Whether the user's personalization reaches the prompt — `"none"` when someone else reads the reply. */
@@ -195,6 +201,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
             threadId = existingThreadId;
             ({ thread } = await agent.continueThread(ctx, { threadId, userId }));
         }
+
+        await options.onGenerationStart?.();
 
         const result = await thread.generateText(generateArgs as never);
         const text = result.text ?? "";
