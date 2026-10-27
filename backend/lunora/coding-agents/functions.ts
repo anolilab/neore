@@ -671,6 +671,7 @@ export const beginPullRequest = internalMutation
         }
 
         await patchById(ctx.db, run._id, { prFollowUp: args.followUp, prSandboxId: undefined, prStartedAt: now, prStatus: "pending", updatedAt: now });
+
         // A reclaimed attempt's reaper may never have run, and its sandbox id is cleared above:
         // schedule the kill in this transaction so the claim and the cleanup commit together.
         // A failed kill leaves the sandbox to its own E2B lifetime (PR_SANDBOX_TIMEOUT_MS).

@@ -66,8 +66,9 @@ export const purgeFinishedStreams = internalMutation
                     .withIndex("by_streamId_seq", (q) => q.eq("streamId", stream._id))
                     .take(remaining + 1);
                 const drained = batch.length <= remaining;
+                const toDelete = drained ? batch : batch.slice(0, remaining);
 
-                for (const chunk of drained ? batch : batch.slice(0, remaining)) {
+                for (const chunk of toDelete) {
                     await ctx.db.delete(chunk._id);
                     chunks += 1;
                 }
