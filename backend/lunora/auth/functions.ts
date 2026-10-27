@@ -12,7 +12,7 @@ import { getAuth, getSession } from "../auth";
 import { ENVIRONMENT } from "../env";
 import type { SessionUser } from "../lib/auth-types";
 import { asyncMap } from "../lib/collections";
-import { authMutation } from "../lib/crpc";
+import { authMutation, authQuery } from "../lib/crpc";
 import { getSessionUserForQuery, getSessionUserForQueryLite, validateAuthUser as validateAuthUserHelper } from "../lib/crpc-auth-helpers";
 import { decryptKey, encryptKey, type KeyPurpose } from "../lib/encryption";
 import { throwUnauthorized } from "../lib/error-helpers";
@@ -1306,6 +1306,17 @@ const readUserRunPlan = async (context: QueryContext, userId: string): Promise<{
         plan: resolveUserPlan(user, organizations),
     };
 };
+
+/**
+ * Whether the caller's plan opens paid-plan models: the rule `settingsUpsert` enforces on a backup model,
+ * read from the same place (the user's and their organizations' tier), so a picker can offer what a save accepts.
+ * A key of their own opens a provider's models on top of this; the client reads those from the preferences.
+ */
+export const getPaidModelAccess = authQuery.output(v.object({ canRunPaidModels: v.boolean() })).query(async ({ ctx: context }) => {
+    const { isAdmin, plan } = await readUserRunPlan(context, context.user.userId);
+
+    return { canRunPaidModels: isAdmin || plan === "premium" };
+});
 
 /**
  * The plan for a run with no session to read an active organization from —

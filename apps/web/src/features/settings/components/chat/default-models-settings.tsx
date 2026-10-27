@@ -15,7 +15,6 @@ import {
     DEFAULT_VIDEO_TO_VIDEO_MODEL,
 } from "@neore/ai/constants";
 import type { GatewayModel } from "@neore/ai/models";
-import { requiresPaidPlan } from "@neore/ai/models";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Label } from "@neore/ui/components/label";
@@ -27,7 +26,7 @@ import { useId } from "react";
 import { toast } from "sonner";
 
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { offerableBackupModels } from "@/features/settings/lib/backup-model-options";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -145,12 +144,10 @@ const BackupModelSetting: FC<{ disabled?: boolean; models: GatewayModel[]; provi
     providersWithKey,
 }) => {
     const { t } = useLingui();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
-    const user = sessionData?.user as { plan?: string; role?: string } | undefined;
-    const isPro = user?.plan === "premium" || user?.role === "admin";
-    // The run's own paid-model rule: a Pro plan, or the user's own key for the model's provider. Offering more would save a backup the run drops.
-    const models = allModels.filter((m) => !requiresPaidPlan(m) || isPro || providersWithKey.has(m.provider ?? ""));
+    const crpc = useCRPC();
+    const { data: access } = useQuery(crpc.auth.functions.getPaidModelAccess.queryOptions({}, { live: false }));
+    // The backend's own answer, not a client-side guess; the save re-checks it.
+    const models = offerableBackupModels(allModels, access?.canRunPaidModels === true, providersWithKey);
     const { data: userSettings } = useUserSettings();
     const { isPending, updateLatest } = useUpdateUserSettings();
 

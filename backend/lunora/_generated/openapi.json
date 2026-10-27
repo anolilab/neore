@@ -5578,6 +5578,69 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#auth_functions:getPaidModelAccess": {
+      "post": {
+        "description": "Invoke the `query` `auth_functions:getPaidModelAccess` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "auth_functions:getPaidModelAccess",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "auth_functions:getPaidModelAccess",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "canRunPaidModels": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "canRunPaidModels"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: auth_functions:getPaidModelAccess",
+        "tags": [
+          "auth"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#auth_functions:getSessionUserQuery": {
       "post": {
         "description": "Invoke the `query` `auth_functions:getSessionUserQuery` over the Lunora RPC envelope (POST /_lunora/rpc).",

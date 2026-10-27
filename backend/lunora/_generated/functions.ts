@@ -470,6 +470,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "auth_functions:getDecryptedProviderKeysQuery": lunora_auth_functions_25.getDecryptedProviderKeysQuery as unknown as RegisteredLunoraFunction,
     "auth_functions:getDecryptedToolKeysQuery": lunora_auth_functions_25.getDecryptedToolKeysQuery as unknown as RegisteredLunoraFunction,
     "auth_functions:getMCPServersQuery": lunora_auth_functions_25.getMCPServersQuery as unknown as RegisteredLunoraFunction,
+    "auth_functions:getPaidModelAccess": lunora_auth_functions_25.getPaidModelAccess as unknown as RegisteredLunoraFunction,
     "auth_functions:getSearchDomainBlocklistQuery": lunora_auth_functions_25.getSearchDomainBlocklistQuery as unknown as RegisteredLunoraFunction,
     "auth_functions:getSessionUserQuery": lunora_auth_functions_25.getSessionUserQuery as unknown as RegisteredLunoraFunction,
     "auth_functions:getUserAuthFlagsQuery": lunora_auth_functions_25.getUserAuthFlagsQuery as unknown as RegisteredLunoraFunction,
@@ -8196,6 +8197,7 @@ export interface Caller {
             getDecryptedProviderKeysQuery: (args: { userId: string }) => Promise<Record<string, string>>;
             getDecryptedToolKeysQuery: (args: { userId: string }) => Promise<Record<string, string>>;
             getMCPServersQuery: (args: { userId: string }) => Promise<Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>>;
+            getPaidModelAccess: (args?: {}) => Promise<{ canRunPaidModels: boolean }>;
             getSearchDomainBlocklistQuery: (args: { userId: string }) => Promise<Array<string>>;
             getSessionUserQuery: (args?: {}) => Promise<null | import("../lib/auth-types.js").SessionUser>;
             getUserAuthFlagsQuery: (args: { sessionId?: string; userId: string }) => Promise<{ isAnonymous: boolean; plan: "premium" | null; role: string | null }>;
@@ -9838,6 +9840,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             getDecryptedProviderKeysQuery: (args) => callRegistered(context, "auth_functions:getDecryptedProviderKeysQuery", args),
             getDecryptedToolKeysQuery: (args) => callRegistered(context, "auth_functions:getDecryptedToolKeysQuery", args),
             getMCPServersQuery: (args) => callRegistered(context, "auth_functions:getMCPServersQuery", args),
+            getPaidModelAccess: (args) => callRegistered(context, "auth_functions:getPaidModelAccess", args),
             getSearchDomainBlocklistQuery: (args) => callRegistered(context, "auth_functions:getSearchDomainBlocklistQuery", args),
             getSessionUserQuery: (args) => callRegistered(context, "auth_functions:getSessionUserQuery", args),
             getUserAuthFlagsQuery: (args) => callRegistered(context, "auth_functions:getUserAuthFlagsQuery", args),

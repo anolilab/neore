@@ -112,6 +112,7 @@ export interface ApiTypes {
         functions: {
             getAIUserPreferences: FunctionReference<"query", {}, import("./dataModel.js").Doc_aiUserPreferences | null>;
             getCurrentUser: FunctionReference<"query", {}, ({ activeOrganization?: ({ slug?: string | null | undefined; } & { id: string; name: string; role: string; }) | null | undefined; image?: string | null | undefined; impersonatedBy?: string | null | undefined; isAnonymous?: boolean | undefined; role?: string | null | undefined; username?: string | null | undefined; } & { _id: string; email: string; name: string | null; }) | null>;
+            getPaidModelAccess: FunctionReference<"query", {}, { canRunPaidModels: boolean }>;
             getSessionUserQuery: FunctionReference<"query", {}, null | import("../lib/auth-types.js").SessionUser>;
             getUserSettings: FunctionReference<"query", {}, import("./dataModel.js").Doc_userSettings | null>;
             hasPassword: FunctionReference<"query", {}, boolean>;
@@ -861,6 +862,7 @@ export const api: ApiTypes = {
         functions: {
             getAIUserPreferences: { __lunoraRef: "auth_functions:getAIUserPreferences" },
             getCurrentUser: { __lunoraRef: "auth_functions:getCurrentUser" },
+            getPaidModelAccess: { __lunoraRef: "auth_functions:getPaidModelAccess" },
             getSessionUserQuery: { __lunoraRef: "auth_functions:getSessionUserQuery" },
             getUserSettings: { __lunoraRef: "auth_functions:getUserSettings" },
             hasPassword: { __lunoraRef: "auth_functions:hasPassword" },

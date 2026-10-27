@@ -5,7 +5,7 @@ import { lunoraTest } from "@lunora/testing";
 import { MODEL_REGISTRY, requiresPaidPlan } from "@neore/ai/models";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getUserSettings, updateUserSettings } from "./functions";
+import { getPaidModelAccess, getUserSettings, updateUserSettings } from "./functions";
 import { schemaWithShardedTables } from "../lib/test-schema";
 
 const USER = "user-backup-model";
@@ -75,6 +75,14 @@ beforeEach(() => {
 
 afterEach(() => {
     harness.close();
+});
+
+describe("getPaidModelAccess", () => {
+    it("is false for a user whose plan opens no paid model", async () => {
+        const access = await asUser().query(getPaidModelAccess as never, {} as never);
+
+        expect(access).toEqual({ canRunPaidModels: false });
+    });
 });
 
 describe("saved backup model", () => {
