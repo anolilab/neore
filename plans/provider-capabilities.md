@@ -90,7 +90,7 @@ a stored report reads as `unknown`.
 | --- | --- | --- |
 | Cloud interactive (`runStreamingAgent`) | static declaration in code: cancel, steer, text, reasoning, tool parts, tool approval, synthetic fork | no; computed |
 | Cloud headless (sub-agent and worker runs) | static: cancel, follow-up `queue`, no steer | no; computed |
-| Local browser model (`backend/lunora/chat/local-models.ts`) | static: text only, cancel, follow-up none, no tools | no; computed |
+| Local browser model (`backend/lunora/chat/local-models.ts`) | static: text only, cancel, follow-up queue, no tools | no; computed |
 | ACP agent on a host | mapped from what the agent advertises at `initialize` and session open (ACP S1 reads the spec for the names) | yes, on the ACP session row |
 
 The mapping from ACP advertisement to `CapabilityReport` is one pure function in

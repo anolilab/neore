@@ -14,6 +14,10 @@
             "types": "./dist/constants.d.ts",
             "default": "./dist/constants.js"
         },
+        "./capabilities": {
+            "types": "./dist/capabilities/index.d.ts",
+            "default": "./dist/capabilities/index.js"
+        },
         "./design": {
             "types": "./dist/design/index.d.ts",
             "default": "./dist/design/index.js"
