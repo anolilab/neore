@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::fs as stdfs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -66,6 +67,9 @@ pub struct DeviceState {
     mcp_tools: Mutex<HashMap<String, McpToolRef>>,
     /// Held across every read-change-save of the settings, so two writers cannot each save the other's stale copy.
     save_lock: Mutex<()>,
+    /// Bumped by every `settings_update`, under the save lock. A call remembers the value it was planned under, so
+    /// anything the owner changed since (folders, shell policy, servers, rules) is seen as one number.
+    generation: AtomicU64,
     nonces: Mutex<NonceSet>,
     prompts: Prompts,
     settings: Mutex<Settings>,
@@ -86,6 +90,7 @@ impl DeviceState {
             mcp: McpManager::default(),
             mcp_tools: Mutex::default(),
             save_lock: Mutex::default(),
+            generation: AtomicU64::new(0),
             nonces: Mutex::new(NonceSet::persisted(
                 &data_dir.join("device-nonces.json"),
                 now_ms(),
@@ -259,8 +264,18 @@ impl DeviceState {
         }
     }
 
+    /// Whether no `settings_update` has run since `generation` was read. Takes the save lock, so an update that is
+    /// in flight has finished (and bumped) before this answers.
+    fn settings_unchanged(&self, generation: u64) -> bool {
+        let _guard = self.save_lock.lock().unwrap();
+
+        self.generation.load(Ordering::SeqCst) == generation
+    }
+
     pub fn settings_update(&self, update: SettingsUpdate) -> Result<SettingsView, String> {
         self.change_settings(|settings| {
+            self.generation.fetch_add(1, Ordering::SeqCst);
+
             if let Some(roots) = update.roots {
                 settings.roots = validate_roots(&roots)?;
             }
@@ -318,6 +333,8 @@ impl DeviceState {
 
     /// Verifies, asks, runs and signs one call the page relayed.
     pub fn execute(&self, signed: &Signed) -> Result<Signed, String> {
+        // Read before the settings, so an update in between only ever makes the call look stale.
+        let generation = self.generation.load(Ordering::SeqCst);
         let settings = self.settings();
         let pairing = usable_pairing(&settings)?;
         let call = envelope::verify_call(
@@ -379,21 +396,15 @@ impl DeviceState {
                 };
 
                 // The settings can change while the prompt is open (a folder unshared, shell network off, a
-                // server replaced). Plan again from what is saved NOW: the approval covers the call that was
-                // shown, so anything that plans differently is refused rather than run under the old settings.
-                let current = self.settings();
-                let approved = matches!(answer, Answer::Once | Answer::Always);
-                let unchanged = !approved
-                    || plan(
-                        &call.tool,
-                        &call.input,
-                        &current,
-                        &self.mcp_tools.lock().unwrap(),
-                    )
-                    .is_ok_and(|again| again == action);
-
-                if answer == Answer::Always && offer_always && unchanged {
+                // server replaced, a rule removed). The rule is saved only if nothing changed since the call was
+                // planned, checked under the save lock, so a replaced server never inherits it; the dispatch below
+                // checks again, so the call never starts under a policy the owner has since changed.
+                if answer == Answer::Always && offer_always {
                     let _ = self.change_settings(|next| {
+                        if self.generation.load(Ordering::SeqCst) != generation {
+                            return Err("the settings changed while waiting".to_owned());
+                        }
+
                         if !next.allow_rules.contains(&call.tool) {
                             next.allow_rules.push(call.tool.clone());
                         }
@@ -404,7 +415,8 @@ impl DeviceState {
 
                 let remaining = call.expires_at.saturating_sub(now_ms());
 
-                let still_paired = current
+                let still_paired = self
+                    .settings()
                     .pairing
                     .is_some_and(|current| current.device_id == pairing.device_id);
 
@@ -413,7 +425,7 @@ impl DeviceState {
                     _ if !still_paired => {
                         Outcome::failed(decision, "the computer was unpaired while waiting")
                     }
-                    _ if !unchanged => Outcome::failed(
+                    _ if !self.settings_unchanged(generation) => Outcome::failed(
                         decision,
                         "the shared folders, shell settings or MCP server changed while waiting",
                     ),
@@ -622,7 +634,6 @@ fn builtin_tools(roots: &[PathBuf]) -> Vec<Value> {
 
 /// One call, planned and checked before the user is asked, so the prompt shows
 /// exactly what will run (resolved paths, the command, the folder).
-#[derive(PartialEq)]
 enum Action {
     List(PathBuf),
     Read(PathBuf),
@@ -1664,6 +1675,110 @@ mod tests {
         assert_eq!(parsed["status"], "failed");
         assert!(parsed.get("output").is_none());
         assert!(state.settings().allow_rules.is_empty());
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// A replaced server must not pick up the rule an answer to the OLD server was about to save.
+    #[test]
+    fn an_always_answer_is_not_saved_for_a_server_replaced_while_asking() {
+        use std::sync::mpsc::channel;
+        use std::sync::Arc;
+
+        crate::store::test_keychain::install();
+
+        let dir = std::env::temp_dir().join(format!("neore-device-race-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+
+        let secret = "0123456789abcdef".repeat(4);
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                pairing: Some(Pairing {
+                    account_label: "me".into(),
+                    device_id: "dev1".into(),
+                    secret: secret.clone(),
+                }),
+                mcp_servers: vec![server("git", "git-mcp")],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let (events, received) = channel();
+        let state = Arc::new(DeviceState::new(
+            &dir,
+            Box::new(move |event| {
+                let _ = events.send(event);
+            }),
+        ));
+        state.mcp_tools.lock().unwrap().insert(
+            "mcp__git__status".to_owned(),
+            McpToolRef {
+                server: "git".to_owned(),
+                tool: "status".to_owned(),
+                read_only: true,
+            },
+        );
+        let signed = envelope::sign_value(
+            &secret,
+            Domain::Call,
+            &json!({
+                "v": 1, "kind": "call", "callId": "c1", "deviceId": "dev1", "tool": "mcp__git__status",
+                "input": {}, "threadTitle": "T", "taintedBy": [],
+                "issuedAt": now_ms(), "expiresAt": now_ms() + 60_000, "nonce": "n1",
+            }),
+        );
+        let worker = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || state.execute(&signed))
+        };
+        let prompt = loop {
+            if let Event::Prompt { prompt } = received.recv().unwrap() {
+                break prompt;
+            }
+        };
+
+        state
+            .settings_update(
+                serde_json::from_str(r#"{"mcpServers":[{"name":"git","command":"evil"}]}"#)
+                    .unwrap(),
+            )
+            .unwrap();
+        state.prompt_answer(prompt.id, "always").unwrap();
+
+        let result = worker.join().unwrap().unwrap();
+        let parsed: Value = serde_json::from_str(&result.payload).unwrap();
+
+        assert_eq!(parsed["status"], "failed");
+        assert!(state.settings().allow_rules.is_empty());
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// Any settings change after a call was planned (a removed rule, a shell policy) is seen right before dispatch.
+    #[test]
+    fn a_settings_update_invalidates_the_generation_a_call_was_planned_under() {
+        let dir = std::env::temp_dir().join(format!("neore-device-gen-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+        let planned = state.generation.load(Ordering::SeqCst);
+
+        assert!(state.settings_unchanged(planned));
+
+        state
+            .settings_update(serde_json::from_str(r#"{"allowShellNetwork":true}"#).unwrap())
+            .unwrap();
+        assert!(!state.settings_unchanged(planned));
+
+        let planned = state.generation.load(Ordering::SeqCst);
+        state
+            .settings_update(serde_json::from_str(r#"{"allowRules":[]}"#).unwrap())
+            .unwrap();
+        assert!(!state.settings_unchanged(planned));
 
         let _ = stdfs::remove_dir_all(&dir);
     }
