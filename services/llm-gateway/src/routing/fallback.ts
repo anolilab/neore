@@ -165,16 +165,31 @@ export const selectFallback = async (
     }
 };
 
+/** The provider status an error carries, under either field name. */
+const readStatus = (error: unknown): number | undefined => {
+    if (!error || typeof error !== "object") {
+        return undefined;
+    }
+
+    const { status, statusCode } = error as { status?: unknown; statusCode?: unknown };
+
+    if (typeof statusCode === "number") {
+        return statusCode;
+    }
+
+    return typeof status === "number" ? status : undefined;
+};
+
 /**
  * Extract HTTP status code and body from an AI SDK / provider error.
  * Returns defaults (500, "") when the error doesn't expose them.
  */
 export const extractProviderErrorInfo = (error: unknown): { body: string; statusCode: number } => {
     if (error && typeof error === "object") {
-        const record = error as { message?: unknown; responseBody?: unknown; statusCode?: unknown };
+        const record = error as { message?: unknown; responseBody?: unknown };
 
-        // AI SDK APICallError exposes statusCode and responseBody
-        const statusCode = typeof record["statusCode"] === "number" ? record["statusCode"] : 500;
+        // AI SDK APICallError exposes statusCode and responseBody; some SDKs name the status `status`
+        const statusCode = readStatus(error) ?? 500;
 
         let body = "";
 
@@ -190,7 +205,8 @@ export const extractProviderErrorInfo = (error: unknown): { body: string; status
     return { body: "", statusCode: 500 };
 };
 
-const TRANSIENT_NETWORK_PATTERN = /timeout|timed out|econnreset|econnrefused|network|fetch failed|socket hang up/i;
+const TRANSIENT_NETWORK_PATTERN =
+    /timeout|timed out|econnreset|econnrefused|network|fetch failed|socket hang up|overloaded|unavailable|rate.?limit|too many requests|at capacity/i;
 
 /**
  * The fallback reason to report to a caller that may retry on another model.
@@ -207,9 +223,9 @@ export const classifyProviderFailure = (error: unknown, promptTokens: number, co
         return reason;
     }
 
-    const record = error && typeof error === "object" ? (error as { message?: unknown; name?: unknown; statusCode?: unknown }) : undefined;
+    const record = error && typeof error === "object" ? (error as { message?: unknown; name?: unknown }) : undefined;
 
-    if (typeof record?.statusCode === "number") {
+    if (readStatus(error) !== undefined) {
         return statusCode === 429 || statusCode === 408 || statusCode >= 500 ? "infra" : undefined;
     }
 

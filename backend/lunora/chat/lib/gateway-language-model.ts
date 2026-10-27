@@ -229,6 +229,17 @@ const deserializeFromWire = <T>(object: T): T => {
  * classification of a provider failure (`infra`, `content_policy`,
  * `context_overflow`); absent on errors the gateway did not classify.
  */
+/** The message of a stream error event: the gateway sends a string, a provider's own error part may carry an object. */
+const streamErrorMessage = (error: unknown): string => {
+    if (typeof error === "string") {
+        return error;
+    }
+
+    const message = (error as { message?: unknown } | null | undefined)?.message;
+
+    return typeof message === "string" ? message : "Unknown stream error from gateway";
+};
+
 export type GatewayError = Error & { fallbackReason?: string; statusCode?: number };
 
 // ── GatewayLanguageModel ─────────────────────────────────────────────────────
@@ -380,7 +391,7 @@ export class GatewayLanguageModel implements LanguageModelV3 {
 
                             // Gateway sends error events when the provider stream fails
                             if (parsed.type === "error") {
-                                const streamError: GatewayError = new Error(parsed.error ?? "Unknown stream error from gateway");
+                                const streamError: GatewayError = new Error(streamErrorMessage(parsed.error));
 
                                 if (typeof parsed.fallbackReason === "string") {
                                     streamError.fallbackReason = parsed.fallbackReason;

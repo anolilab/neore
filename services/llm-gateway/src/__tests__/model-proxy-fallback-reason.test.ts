@@ -69,6 +69,85 @@ describe("POST /internal/model/proxy tags a provider failure with its fallback r
         expect(body.error.fallbackReason).toBe("infra");
     });
 
+    it("a rate limit that carries its status as `status` is infra", async () => {
+        const error = Object.assign(new Error("slow down"), { status: 429 });
+        const { body } = await proxy("generate", error);
+
+        expect(body.error.fallbackReason).toBe("infra");
+    });
+
+    describe("an error part sent in-band by the provider", () => {
+        const streamOf = async (parts: unknown[]) => {
+            vi.mocked(createProviderModelForEnv).mockResolvedValueOnce({
+                doStream: async () => {
+                    return {
+                        stream: new ReadableStream({
+                            start(controller) {
+                                for (const part of parts) controller.enqueue(part);
+
+                                controller.close();
+                            },
+                        }),
+                    };
+                },
+            } as never);
+
+            const response = await fetchApp(
+                new Request("http://localhost/internal/model/proxy", {
+                    body: JSON.stringify({
+                        action: "stream",
+                        callOptions: { prompt: [{ content: [{ text: "hi", type: "text" }], role: "user" }] },
+                        modelApiId: "gemini-2.5-flash",
+                        modelId: "gemini-2.5-flash",
+                        provider: "google",
+                        requestId: "req-inband-1",
+                        userId: "user-1",
+                    }),
+                    headers: { "Content-Type": "application/json" },
+                    method: "POST",
+                }),
+                bindingEnv(createMockEnv()),
+            );
+
+            const text = await response.text();
+
+            return text
+                .split("\n\n")
+                .filter((line) => line.startsWith("data: "))
+                .map((line) => JSON.parse(line.slice(6)) as { fallbackReason?: string; type: string });
+        };
+
+        it("before any content is classified like a thrown error", async () => {
+            const events = await streamOf([
+                { type: "stream-start", warnings: [] },
+                { error: providerError(529, "overloaded"), type: "error" },
+            ]);
+
+            expect(events.find((event) => event.type === "error")?.fallbackReason).toBe("infra");
+        });
+
+        it("after content has gone out is left unclassified", async () => {
+            const events = await streamOf([
+                { delta: "hi", id: "1", type: "text-delta" },
+                { error: providerError(503, "unavailable"), type: "error" },
+            ]);
+
+            expect(events.find((event) => event.type === "error")?.fallbackReason).toBeUndefined();
+        });
+
+        it("before any content is not retryable when the provider rejected the request", async () => {
+            const events = await streamOf([{ error: providerError(401, "bad key"), type: "error" }]);
+
+            expect(events.find((event) => event.type === "error")?.fallbackReason).toBeUndefined();
+        });
+    });
+
+    it("a 401 that carries its status as `status` is not retryable", async () => {
+        const { body } = await proxy("generate", Object.assign(new Error("bad key"), { status: 401 }));
+
+        expect(body.error.fallbackReason).toBeUndefined();
+    });
+
     it("an error with no status (a timeout, a dropped connection) is infra", async () => {
         const { body } = await proxy("generate", providerError(undefined, "fetch failed"));
 

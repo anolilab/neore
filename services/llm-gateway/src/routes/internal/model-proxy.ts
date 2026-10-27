@@ -341,6 +341,8 @@ modelProxyRouter.openapi(
 
                     try {
                         let isErrored = false;
+                        // Until a part beyond the preamble goes out, the caller can still retry the call elsewhere.
+                        let hasContent = false;
 
                         while (true) {
                             const { done, value } = await reader.read();
@@ -397,7 +399,14 @@ modelProxyRouter.openapi(
                             // Serialize the stream part (handle Uint8Array in file parts)
                             const serialized = serializeForWire(value);
 
-                            send(`data: ${JSON.stringify(serialized)}\n\n`);
+                            // An in-band provider error before any content is classified like a thrown one.
+                            const fallbackReason = !hasContent && value.type === "error" ? failureReason(value.error) : undefined;
+
+                            if (value.type !== "stream-start" && value.type !== "response-metadata") {
+                                hasContent = true;
+                            }
+
+                            send(`data: ${JSON.stringify(fallbackReason ? { ...serialized, fallbackReason } : serialized)}\n\n`);
                         }
 
                         // Record usage even when the client cancelled: the provider already produced these tokens.

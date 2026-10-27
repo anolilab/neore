@@ -50,6 +50,15 @@ export class FallbackLanguageModel implements LanguageModelV3 {
         this.supportedUrls = primary.supportedUrls;
     }
 
+    /** The model the call is first made on, whichever one served the latest call. */
+    get primaryModelId(): string {
+        return this.primary.modelId;
+    }
+
+    get backupModelId(): string {
+        return this.backup.modelId;
+    }
+
     get provider(): string {
         return this.active.provider;
     }
@@ -105,7 +114,7 @@ export class FallbackLanguageModel implements LanguageModelV3 {
 
                 head.push(value);
 
-                if (value.type !== "stream-start") {
+                if (value.type !== "stream-start" && value.type !== "response-metadata") {
                     break;
                 }
             }
