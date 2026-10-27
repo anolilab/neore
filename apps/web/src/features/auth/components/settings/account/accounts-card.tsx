@@ -38,7 +38,13 @@ const AccountsCard = ({ className, classNames }: AccountsCardProperties) => {
             {(deviceSessions?.length ?? 0) > 0 && (
                 <CardContent className={cn("grid gap-4", classNames?.content)}>
                     {deviceSessions?.map((deviceSession) => (
-                        <AccountCell classNames={classNames} deviceSession={deviceSession} key={deviceSession.session.id} refetch={refetch} />
+                        <AccountCell
+                            classNames={classNames}
+                            deviceSession={deviceSession}
+                            deviceSessions={deviceSessions}
+                            key={deviceSession.session.id}
+                            refetch={refetch}
+                        />
                     ))}
                 </CardContent>
             )}

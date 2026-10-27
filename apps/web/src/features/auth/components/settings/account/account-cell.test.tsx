@@ -69,7 +69,7 @@ describe("AccountCell revoke", () => {
             tags: [],
             temporaryThreads: { page: [] },
             threadOrders: [],
-            threads: { page: [{ _id: "t1", title: "Bob" }] },
+            threads: { page: [{ _id: "t1", createdAt: 1, status: "active", title: "Bob" }] },
         };
 
         writeThreadListCache("bob", list);
@@ -99,7 +99,7 @@ describe("AccountCell revoke", () => {
             tags: [],
             temporaryThreads: { page: [] },
             threadOrders: [],
-            threads: { page: [{ _id: "t1", title: "Bob" }] },
+            threads: { page: [{ _id: "t1", createdAt: 1, status: "active", title: "Bob" }] },
         };
 
         auth.revoke.mockRejectedValueOnce(new Error("nope"));
@@ -110,5 +110,38 @@ describe("AccountCell revoke", () => {
         });
         writeThreadListCache("bob", list);
         expect(readThreadListCache("bob")).toBeDefined();
+    });
+
+    it("leaves the list intact and writable when another session of the same account remains", async () => {
+        const other = { session: { id: "other-2", token: "tok2" }, user: { id: "bob" } } as never;
+
+        auth.revoke.mockResolvedValueOnce(undefined);
+        render(<AccountCell deviceSession={deviceSession} deviceSessions={[deviceSession, other]} />);
+        fireEvent.click(screen.getByText("Revoke"));
+        await vi.waitFor(() => {
+            expect(auth.revoke).toHaveBeenCalled();
+        });
+        await Promise.resolve();
+
+        expect(readThreadListCache("bob")).toBeDefined();
+        writeThreadListCache("bob", {
+            pinnedThreads: [],
+            relationships: [],
+            tags: [],
+            temporaryThreads: { page: [] },
+            threadOrders: [],
+            threads: { page: [{ _id: "t2", createdAt: 1, status: "active", title: "New" }] },
+        });
+        expect(readThreadListCache("bob")?.threads.map((row) => row._id)).toEqual(["t2"]);
+    });
+
+    it("clears the list when the revoked session was the account's only one", async () => {
+        auth.revoke.mockResolvedValueOnce(undefined);
+        render(<AccountCell deviceSession={deviceSession} deviceSessions={[deviceSession]} />);
+        fireEvent.click(screen.getByText("Revoke"));
+
+        await vi.waitFor(() => {
+            expect(readThreadListCache("bob")).toBeUndefined();
+        });
     });
 });
