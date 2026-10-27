@@ -7,7 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../../../schema";
-import { PURGE_CHUNK_BATCH, PURGE_STREAM_BATCH, purgeFinishedStreams, STREAM_RETENTION_MS } from "./purge";
+import { PURGE_CHUNK_BATCH, PURGE_LARGE_STREAMS_PER_RUN, PURGE_SCAN_PAGES, PURGE_STREAM_BATCH, purgeFinishedStreams, STREAM_RETENTION_MS } from "./purge";
 
 const OWNER = "user-owner";
 const HOUR = 60 * 60 * 1000;
@@ -55,13 +55,14 @@ const exists = async (id: string): Promise<boolean> =>
 
 describe("purgeFinishedStreams", () => {
     it("removes old finished streams and their chunks across batches", async () => {
-        const total = PURGE_STREAM_BATCH + 10;
+        const run = PURGE_STREAM_BATCH * PURGE_SCAN_PAGES;
+        const total = run + 10;
 
         for (let index = 0; index < total; index += 1) {
             await insertStream(["done", "error", "timeout"][index % 3]!, OLD());
         }
 
-        await expect(purge()).resolves.toStrictEqual({ chunks: PURGE_STREAM_BATCH * 2, streams: PURGE_STREAM_BATCH });
+        await expect(purge()).resolves.toStrictEqual({ chunks: run * 2, streams: run });
         expect(await count("persistentStreams")).toBe(10);
 
         await expect(purge()).resolves.toStrictEqual({ chunks: 20, streams: 10 });
@@ -95,5 +96,19 @@ describe("purgeFinishedStreams", () => {
         await expect(purge()).resolves.toStrictEqual({ chunks: 5, streams: 1 });
         expect(await exists(big)).toBe(false);
         expect(await count("persistentChunks")).toBe(0);
+    });
+
+    it("reaches a small expired stream queued behind a page of big ones", async () => {
+        for (let index = 0; index < PURGE_STREAM_BATCH; index += 1) {
+            await insertStream("done", OLD(), PURGE_CHUNK_BATCH * 3);
+        }
+
+        const small = await insertStream("done", OLD());
+
+        await purge();
+
+        expect(await exists(small)).toBe(false);
+        // Only a few big streams are worked on per run.
+        expect(await count("persistentChunks")).toBe(PURGE_STREAM_BATCH * PURGE_CHUNK_BATCH * 3 - PURGE_LARGE_STREAMS_PER_RUN * PURGE_CHUNK_BATCH);
     });
 });
