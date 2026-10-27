@@ -378,7 +378,21 @@ impl DeviceState {
                     (false, Answer::Timeout) => "timeout",
                 };
 
-                if answer == Answer::Always && offer_always {
+                // The settings can change while the prompt is open (a folder unshared, shell network off, a
+                // server replaced). Plan again from what is saved NOW: the approval covers the call that was
+                // shown, so anything that plans differently is refused rather than run under the old settings.
+                let current = self.settings();
+                let approved = matches!(answer, Answer::Once | Answer::Always);
+                let unchanged = !approved
+                    || plan(
+                        &call.tool,
+                        &call.input,
+                        &current,
+                        &self.mcp_tools.lock().unwrap(),
+                    )
+                    .is_ok_and(|again| again == action);
+
+                if answer == Answer::Always && offer_always && unchanged {
                     let _ = self.change_settings(|next| {
                         if !next.allow_rules.contains(&call.tool) {
                             next.allow_rules.push(call.tool.clone());
@@ -390,8 +404,7 @@ impl DeviceState {
 
                 let remaining = call.expires_at.saturating_sub(now_ms());
 
-                let still_paired = self
-                    .settings()
+                let still_paired = current
                     .pairing
                     .is_some_and(|current| current.device_id == pairing.device_id);
 
@@ -400,6 +413,10 @@ impl DeviceState {
                     _ if !still_paired => {
                         Outcome::failed(decision, "the computer was unpaired while waiting")
                     }
+                    _ if !unchanged => Outcome::failed(
+                        decision,
+                        "the shared folders, shell settings or MCP server changed while waiting",
+                    ),
                     _ if remaining == 0 => {
                         Outcome::failed(decision, "approved after the request expired")
                     }
@@ -605,6 +622,7 @@ fn builtin_tools(roots: &[PathBuf]) -> Vec<Value> {
 
 /// One call, planned and checked before the user is asked, so the prompt shows
 /// exactly what will run (resolved paths, the command, the folder).
+#[derive(PartialEq)]
 enum Action {
     List(PathBuf),
     Read(PathBuf),
@@ -1574,6 +1592,77 @@ mod tests {
                 assert_eq!(parsed["output"], "hello");
             }
         }
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// Approving must not run a call under folders the owner withdrew while the prompt was open.
+    #[test]
+    fn an_approval_is_refused_when_the_shared_folder_was_removed_while_asking() {
+        use std::sync::mpsc::channel;
+        use std::sync::Arc;
+
+        crate::store::test_keychain::install();
+
+        let dir = std::env::temp_dir().join(format!("neore-device-revoke-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+        stdfs::write(dir.join("a.txt"), "hello").unwrap();
+
+        let secret = "0123456789abcdef".repeat(4);
+        let root = dir.canonicalize().unwrap();
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                pairing: Some(Pairing {
+                    account_label: "me".into(),
+                    device_id: "dev1".into(),
+                    secret: secret.clone(),
+                }),
+                roots: vec![root.to_string_lossy().into_owned()],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let (events, received) = channel();
+        let state = Arc::new(DeviceState::new(
+            &dir,
+            Box::new(move |event| {
+                let _ = events.send(event);
+            }),
+        ));
+        let signed = envelope::sign_value(
+            &secret,
+            Domain::Call,
+            &json!({
+                "v": 1, "kind": "call", "callId": "c1", "deviceId": "dev1", "tool": "fs_read",
+                "input": { "path": "a.txt" }, "threadTitle": "T", "taintedBy": [],
+                "issuedAt": now_ms(), "expiresAt": now_ms() + 60_000, "nonce": "n1",
+            }),
+        );
+        let worker = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || state.execute(&signed))
+        };
+        let prompt = loop {
+            if let Event::Prompt { prompt } = received.recv().unwrap() {
+                break prompt;
+            }
+        };
+
+        state
+            .settings_update(serde_json::from_str(r#"{"roots":[]}"#).unwrap())
+            .unwrap();
+        state.prompt_answer(prompt.id, "always").unwrap();
+
+        let result = worker.join().unwrap().unwrap();
+        let parsed: Value = serde_json::from_str(&result.payload).unwrap();
+
+        assert_eq!(parsed["status"], "failed");
+        assert!(parsed.get("output").is_none());
+        assert!(state.settings().allow_rules.is_empty());
 
         let _ = stdfs::remove_dir_all(&dir);
     }
