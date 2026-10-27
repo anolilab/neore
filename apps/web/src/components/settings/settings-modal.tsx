@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { AlertTriangle, Lock, RefreshCw, Settings } from "lucide-react";
 import type { FC, ReactNode } from "react";
-import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { ErrorBoundary } from "@/components/error-boundary";
 import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from "@/components/settings/settings-search";
@@ -193,10 +193,12 @@ export const SettingsModal: FC = () => {
         setHasOpened(true);
     }
 
-    const navigationGroups = useMemo(
-        () => resolveSettingsNavigation({ activeOrganization: Boolean(activeOrganization), apiKey: Boolean(apiKey), organization: Boolean(organization) }, t),
-        [t, apiKey, organization, activeOrganization],
-    );
+    // The flags are built before the call: the Lingui macro reads `fn({ … }, t)` as a call to `t` itself and compiles the whole call away.
+    const navigationGroups = useMemo(() => {
+        const flags = { activeOrganization: Boolean(activeOrganization), apiKey: Boolean(apiKey), organization: Boolean(organization) };
+
+        return resolveSettingsNavigation(flags, t);
+    }, [t, apiKey, organization, activeOrganization]);
     const {
         groups: searchGroups,
         isSearching,
@@ -204,7 +206,6 @@ export const SettingsModal: FC = () => {
         resultCount: searchResultCount,
         setQuery: setSearchQuery,
     } = useSettingsSearch(navigationGroups);
-    const searchResultsId = useId();
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     // The modal stays mounted, so a query left in the field would greet the next opening.
@@ -425,11 +426,24 @@ export const SettingsModal: FC = () => {
                         isSearching={isSearching}
                         query={searchQuery}
                         resultCount={searchResultCount}
-                        resultsId={searchResultsId}
                         setQuery={setSearchQuery}
                     />
-                    <ScrollArea className="flex-1">
-                        <SettingsSearchResults groups={searchGroups} id={searchResultsId} isSearching={isSearching} onSelect={handleSearchSelect} />
+                    {/* Keyed on the mode: the results are a new list, so they start at the top instead of at the navigation's scroll offset. */}
+                    <ScrollArea className="flex-1" key={isSearching ? "search" : "navigation"}>
+                        <SettingsSearchResults
+                            groups={searchGroups}
+                            isSearching={isSearching}
+                            onPreview={(tab) => {
+                                // A tab the navigation locks for a guest loads nothing ahead.
+                                if (isAnonymous && navigationGroups.some((group) => group.items.some((item) => item.tab === tab && item.requiresAuth))) {
+                                    return;
+                                }
+
+                                preloadTab[tab]?.();
+                                prefetchTabData(tab);
+                            }}
+                            onSelect={handleSearchSelect}
+                        />
                         {!isSearching && (
                             <nav className="flex flex-col gap-1 p-2">
                                 {navigationGroups.map((group) => (

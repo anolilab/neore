@@ -24,12 +24,11 @@ export const useSettingsSearch = (navigation: ReadonlyArray<SettingsNavGroup>) =
 
 type SettingsSearchState = ReturnType<typeof useSettingsSearch>;
 
-/** The field is a combobox over the results list; it also owns the live region that announces how many there are. */
+/** A search field; it also owns the live region that announces how many results there are. */
 export const SettingsSearchField: FC<
-    Pick<SettingsSearchState, "isSearching" | "query" | "resultCount" | "setQuery"> & { inputRef?: Ref<HTMLInputElement>; resultsId: string }
-> = ({ inputRef, isSearching, query, resultCount, resultsId, setQuery }) => {
+    Pick<SettingsSearchState, "isSearching" | "query" | "resultCount" | "setQuery"> & { inputRef?: Ref<HTMLInputElement> }
+> = ({ inputRef, isSearching, query, resultCount, setQuery }) => {
     const { t } = useLingui();
-    const isExpanded = isSearching && resultCount > 0;
     // Inside `t`: a bare `plural()` compiles to the global i18n, which this app never activates.
     // eslint-disable-next-line no-restricted-syntax -- the macro compiles this to a message, not a string conversion
     const resultSummary = t`${plural(resultCount, { one: "# result", other: "# results" })}`;
@@ -40,15 +39,11 @@ export const SettingsSearchField: FC<
             <div className="relative">
                 <Search aria-hidden className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
                 <Input
-                    aria-autocomplete="list"
-                    aria-controls={isExpanded ? resultsId : undefined}
-                    aria-expanded={isExpanded}
                     aria-label={t`Search settings`}
                     className="pl-9"
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder={t`Search settings...`}
                     ref={inputRef}
-                    role="combobox"
                     type="search"
                     value={query}
                 />
@@ -60,12 +55,10 @@ export const SettingsSearchField: FC<
     );
 };
 
-export const SettingsSearchResults: FC<Pick<SettingsSearchState, "groups" | "isSearching"> & { id: string; onSelect: (tab: SettingsTab) => void }> = ({
-    groups,
-    id,
-    isSearching,
-    onSelect,
-}) => {
+/** The matches as buttons in tab order: the field is a plain search input, so arrow keys are not promised. */
+export const SettingsSearchResults: FC<
+    Pick<SettingsSearchState, "groups" | "isSearching"> & { onPreview: (tab: SettingsTab) => void; onSelect: (tab: SettingsTab) => void }
+> = ({ groups, isSearching, onPreview, onSelect }) => {
     const { t } = useLingui();
 
     if (!isSearching) {
@@ -77,16 +70,16 @@ export const SettingsSearchResults: FC<Pick<SettingsSearchState, "groups" | "isS
     }
 
     return (
-        <div aria-label={t`Settings search results`} className="flex flex-col gap-1 p-2" id={id} role="listbox">
+        <nav aria-label={t`Settings search results`} className="flex flex-col gap-1 p-2">
             {groups.map((group) => (
                 <div aria-label={group.entries[0]?.tabLabel} key={group.tab} role="group">
                     {group.entries.map((entry) => (
                         <button
-                            aria-selected={false}
                             className="text-muted-foreground hover:bg-muted hover:text-foreground flex w-full flex-col rounded-md px-3 py-2 text-left text-sm transition-colors"
                             key={`${entry.tab}-${entry.section ?? ""}-${entry.label}`}
                             onClick={() => onSelect(entry.tab)}
-                            role="option"
+                            onFocus={() => onPreview(entry.tab)}
+                            onMouseEnter={() => onPreview(entry.tab)}
                             type="button"
                         >
                             <span className="text-foreground">{entry.label}</span>
@@ -95,6 +88,6 @@ export const SettingsSearchResults: FC<Pick<SettingsSearchState, "groups" | "isS
                     ))}
                 </div>
             ))}
-        </div>
+        </nav>
     );
 };

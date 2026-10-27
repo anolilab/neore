@@ -15,8 +15,8 @@ Decisions:
 - **Translated text.** Labels are translated at render time, so the index is built
   from the translated strings the user sees, and a search works in every locale.
 - **Two levels.** Tabs are searchable from the navigation data. Individual settings
-  inside a tab are searchable from a keyword list each tab declares next to its
-  component.
+  inside a tab are searchable from a keyword list the tab declares in the central
+  registry (see section 3), outside the lazy tab chunks.
 
 ## 2. Current state (checked)
 
