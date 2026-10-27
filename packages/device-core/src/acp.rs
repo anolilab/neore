@@ -336,32 +336,37 @@ fn probe_folder() -> Result<PathBuf, String> {
     Ok(folder)
 }
 
-/// Variables that decide which code a program runs besides the ones it names: its own libraries, modules and
-/// start-up scripts.
-const CODE_LOADING_VARS: [&str; 12] = [
+/// Names of variables that decide which code a program runs besides the ones it names: where it is found, its
+/// loader, start-up scripts and runtime options. Families (`LD_*`, `NODE_*`, …) are `CODE_LOADING_PREFIXES`.
+const CODE_LOADING_NAMES: [&str; 14] = [
     "BASH_ENV",
-    "ENV",
-    "NODE_PATH",
-    "PERL5LIB",
-    "PERL5OPT",
-    "PYTHONHOME",
-    "PYTHONPATH",
-    "PYTHONSTARTUP",
-    "RUBYLIB",
-    "RUBYOPT",
-    "GEM_PATH",
     "CLASSPATH",
+    "COMSPEC",
+    "ELECTRON_RUN_AS_NODE",
+    "ENV",
+    "GCONV_PATH",
+    "IFS",
+    "JDK_JAVA_OPTIONS",
+    "PATH",
+    "PATHEXT",
+    "PROMPT_COMMAND",
+    "RUBYGEMS_GEMDEPS",
+    "_JAVA_OPTIONS",
+    "ZDOTDIR",
+];
+const CODE_LOADING_PREFIXES: [&str; 11] = [
+    "BUNDLE_", "DYLD_", "GEM_", "GIT_", "JAVA", "LD_", "NODE_", "NPM_", "PERL", "PYTHON", "RUBY",
 ];
 
-/// Whether `name` changes which program (or which code in it) runs: the variable agents find their programs by
-/// and the loader and interpreter variables that inject or redirect code. Case-insensitive: Windows names are.
+/// Whether `name` changes which program (or which code in it) runs. Case-insensitive: Windows names are. A name
+/// this misses keeps the approvals, so the list errs wide.
 fn changes_program(name: &str) -> bool {
     let upper = name.to_ascii_uppercase();
 
-    upper == "PATH"
-        || upper.starts_with("LD_")
-        || upper.starts_with("DYLD_")
-        || CODE_LOADING_VARS.contains(&upper.as_str())
+    CODE_LOADING_NAMES.contains(&upper.as_str())
+        || CODE_LOADING_PREFIXES
+            .iter()
+            .any(|prefix| upper.starts_with(prefix))
 }
 
 /// The full environment of one agent: built, then the global variables, then the agent's own.
@@ -1003,7 +1008,11 @@ mod tests {
             "LD_PRELOAD",
             "dyld_insert_libraries",
             "NODE_PATH",
+            "NODE_EXTRA_CA_CERTS",
             "PYTHONPATH",
+            "JAVA_TOOL_OPTIONS",
+            "GIT_SSH_COMMAND",
+            "ZDOTDIR",
         ] {
             grant(&state, "alpha", &work);
             set_env(&state, Some("alpha"), name, "/tmp/x").unwrap();
