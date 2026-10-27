@@ -196,7 +196,17 @@ const handleOnShard = async (
 
         const url = new URL(request.url);
         const idempotencyKey = route.method === "post" ? parseIdempotencyKey(request.headers.get(IDEMPOTENCY_HEADER)) : undefined;
+
+        if (idempotencyKey && route.noIdempotency === true) {
+            throw new PublicApiError("invalid_request", `\`${IDEMPOTENCY_HEADER}\` is not accepted on this route.`);
+        }
+
         const body = route.method === "get" ? { parsed: undefined, raw: "" } : await readBody(route, request);
+
+        if (idempotencyKey && typeof route.noIdempotency === "function" && route.noIdempotency(body.parsed)) {
+            throw new PublicApiError("invalid_request", `\`${IDEMPOTENCY_HEADER}\` is not accepted for this request.`);
+        }
+
         const run = async (): Promise<Response> =>
             toResponse(
                 route,

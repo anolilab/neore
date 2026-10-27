@@ -12,7 +12,7 @@
  * job that only posts) from exfiltrating anything.
  */
 
-export const API_RESOURCES = ["chat", "threads", "skills", "tasks", "knowledge", "memories", "models"] as const;
+export const API_RESOURCES = ["chat", "threads", "skills", "tasks", "knowledge", "memories", "models", "triggers"] as const;
 
 export type ApiResource = (typeof API_RESOURCES)[number];
 
@@ -24,11 +24,19 @@ export type ApiAction = (typeof API_ACTIONS)[number];
 export type ApiScopes = Partial<Record<ApiResource, ApiAction[]>>;
 
 /**
- * What a key gets when it is created without scopes (the plugin's
- * `defaultPermissions`): read-only on everything. Never write — a key minted by
- * a client that predates scopes must not be able to delete data.
+ * The resources a key created without scopes can read. Spelled out rather than
+ * derived from `API_RESOURCES`: a new resource would otherwise be granted to every
+ * key a client that predates scopes mints, and `triggers` schedules paid agent
+ * runs, so it is granted only when a key asks for it by name.
  */
-export const DEFAULT_API_SCOPES: ApiScopes = Object.fromEntries(API_RESOURCES.map((resource) => [resource, ["read"]])) as ApiScopes;
+const DEFAULT_READ_RESOURCES = ["chat", "threads", "skills", "tasks", "knowledge", "memories", "models"] as const satisfies ReadonlyArray<ApiResource>;
+
+/**
+ * What a key gets when it is created without scopes (the plugin's
+ * `defaultPermissions`): read-only on `DEFAULT_READ_RESOURCES`. Never write — a key
+ * minted by a client that predates scopes must not be able to delete data.
+ */
+export const DEFAULT_API_SCOPES: ApiScopes = Object.fromEntries(DEFAULT_READ_RESOURCES.map((resource) => [resource, ["read"]])) as ApiScopes;
 
 const isResource = (value: string): value is ApiResource => (API_RESOURCES as ReadonlyArray<string>).includes(value);
 

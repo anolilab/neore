@@ -1,4 +1,4 @@
-import { MODEL_LOOKUP } from "@neore/ai/models";
+import { MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import type { Infer } from "lunorash/server";
 
 /**
@@ -68,6 +68,15 @@ const presetValidatorMatchesTable: Equal<Infer<typeof vWebhookPreset>, WebhookPr
 
 // eslint-disable-next-line sonarjs/void-use -- type-level assertion; `void` only marks the binding as used.
 void presetValidatorMatchesTable;
+
+/** A `custom:<provider>/<model>` names one of the caller's own endpoints; a missing, disabled or browser-only one would fail every run. */
+const assertCustomModelRunnable = async (context: Pick<MutationCtx, "runQuery">, model: string, userId: string): Promise<void> => {
+    const custom = parseCustomModelId(model);
+
+    if (custom && !(await context.runQuery(internal.chat.custom_providers.isCustomProviderRunnable, { providerId: custom.providerId, userId }))) {
+        throw new LunoraError("INVALID_ARGUMENT", "That custom endpoint is missing, disabled or only reachable from your browser.");
+    }
+};
 
 /** Nothing dispatches an event trigger, so one can be neither created nor edited. Existing rows stay readable and deletable. */
 const assertTriggerTypeSupported = (type: "event" | "schedule" | "webhook"): void => {
@@ -331,6 +340,8 @@ export const createTrigger = authMutation
 
         assertTriggerTypeSupported(triggerType);
 
+        await assertCustomModelRunnable(context, args.model, userId);
+
         const timezone = args.timezone?.trim() || undefined;
 
         if (timezone !== undefined) assertTimeZone(timezone);
@@ -345,9 +356,14 @@ export const createTrigger = authMutation
         const webhookSecret = plaintextSecret ? await encryptKey(plaintextSecret, "tool-keys") : undefined;
 
         // A routine can only name a bot the caller owns; a foreign id is a refusal, not a silent plain routine.
-        if (args.botId && !(await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }))) {
+        const createBot = args.botId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }) : null;
+
+        if (args.botId && !createBot) {
             throw new LunoraError("NOT_FOUND", "Bot not found");
         }
+
+        // The bot's model is the one the run uses, so it is checked like the trigger's own.
+        if (createBot) await assertCustomModelRunnable(context, createBot.model, userId);
 
         assertBotRoutineOptions({ botComputer: args.botComputer === true, botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true, type: triggerType });
 
@@ -403,7 +419,8 @@ export const updateTrigger = authMutation
         // `null` clears the bot; `undefined` leaves it as it is.
         botId: v.optional(v.union(v.string().max(MAX_LENGTH.id), v.null())),
         cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
-        description: v.optional(v.string().max(MAX_LENGTH.long)),
+        // `null` clears the description; `undefined` leaves it as it is.
+        description: v.optional(v.union(v.string().max(MAX_LENGTH.long), v.null())),
         // Webhook triggers only. The whole set replaces the stored one; an empty array clears it.
         // At most MAX_FILTERS entries; `assertValidFilters` checks the rest of the grammar.
         filters: v.optional(
@@ -428,6 +445,8 @@ export const updateTrigger = authMutation
         model: v.optional(v.string().max(MAX_LENGTH.short)),
         name: v.optional(v.string().max(MAX_LENGTH.short)),
         quietWhenEmpty: v.optional(v.boolean()),
+        // Set by callers that must not edit a live trigger (the public API): refused inside this transaction when the row is enabled.
+        requireDisabled: v.optional(v.boolean()),
         searchMode: v.optional(v.string().max(MAX_LENGTH.short)),
         systemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
         timezone: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -443,6 +462,14 @@ export const updateTrigger = authMutation
 
         assertTriggerTypeSupported(trigger.type);
 
+        if (args.requireDisabled === true && trigger.enabled === true) {
+            throw new LunoraError("CONFLICT", "The trigger is enabled. Disable it in the app before changing it.");
+        }
+
+        if (args.model !== undefined && args.model !== trigger.model) {
+            await assertCustomModelRunnable(context, args.model, userId);
+        }
+
         const patch: {
             cronExpression?: string;
             description?: string;
@@ -457,7 +484,7 @@ export const updateTrigger = authMutation
 
         if (args.name !== undefined) patch.name = args.name;
 
-        if (args.description !== undefined) patch.description = args.description;
+        if (args.description !== undefined && args.description !== null) patch.description = args.description;
 
         if (args.model !== undefined) patch.model = args.model;
 
@@ -521,9 +548,14 @@ export const updateTrigger = authMutation
         const nextQuiet = botCleared ? undefined : (args.quietWhenEmpty ?? keptQuiet);
 
         // An unchanged bot is not re-checked, so a routine whose bot was deleted stays editable.
-        if (args.botId && args.botId !== trigger.botId && !(await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }))) {
+        const newBot =
+            args.botId && args.botId !== trigger.botId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }) : null;
+
+        if (args.botId && args.botId !== trigger.botId && !newBot) {
             throw new LunoraError("NOT_FOUND", "Bot not found");
         }
+
+        if (newBot) await assertCustomModelRunnable(context, newBot.model, userId);
 
         assertBotRoutineOptions({ botComputer: nextComputer === true, botId: nextBotId, quietWhenEmpty: nextQuiet === true, type: trigger.type });
 
@@ -532,6 +564,8 @@ export const updateTrigger = authMutation
         // `patchRow` removes a field set to `undefined`, which a plain patch cannot do.
         await patchRow(context.db, trigger, {
             ...withoutUndefined(patch),
+            // `null` removes the description.
+            ...(args.description === null && { description: undefined }),
             // `undefined` removes a stale time; enabling recomputes it (`firstRunOf`).
             // Also clears a time a non-schedule trigger stored before this check existed.
             ...((args.cronExpression !== undefined || zoneChanged || !isSchedule) && { nextTriggerAt }),

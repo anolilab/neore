@@ -562,6 +562,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_composite:getThreadWithData": lunora_chat_composite_45.getThreadWithData as unknown as RegisteredLunoraFunction,
     "chat_custom_providers:deleteCustomProvider": lunora_chat_custom_providers_46.deleteCustomProvider as unknown as RegisteredLunoraFunction,
     "chat_custom_providers:getDecryptedCustomProvider": lunora_chat_custom_providers_46.getDecryptedCustomProvider as unknown as RegisteredLunoraFunction,
+    "chat_custom_providers:isCustomProviderRunnable": lunora_chat_custom_providers_46.isCustomProviderRunnable as unknown as RegisteredLunoraFunction,
     "chat_custom_providers:listCustomProviders": lunora_chat_custom_providers_46.listCustomProviders as unknown as RegisteredLunoraFunction,
     "chat_custom_providers:probeCustomProvider": lunora_chat_custom_providers_46.probeCustomProvider as unknown as RegisteredLunoraFunction,
     "chat_custom_providers:saveCustomProvider": lunora_chat_custom_providers_46.saveCustomProvider as unknown as RegisteredLunoraFunction,
@@ -2954,6 +2955,13 @@ if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_chat_custom_providers_46.getDecryptedCustomProvider.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["providerId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "providerId": source["providerId"], "userId": source["userId"] };
+});
+installCompiledValidatorMap(lunora_chat_custom_providers_46.isCustomProviderRunnable.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["providerId"] !== "string") return DEFER;
@@ -8325,6 +8333,7 @@ export interface Caller {
         custom_providers: {
             deleteCustomProvider: (args: { id: string }) => Promise<null>;
             getDecryptedCustomProvider: (args: { providerId: string; userId: string }) => Promise<{ accessKeyId?: string; apiKey: string; apiVersion?: string; baseUrl: string; id: string; models: Array<{ id: string; name?: string }>; region?: string; supportsTools: boolean; type: "openai" | "anthropic" | "local-browser" | "google" | "azure" | "bedrock" | "mistral" } | null>;
+            isCustomProviderRunnable: (args: { providerId: string; userId: string }) => Promise<boolean>;
             listCustomProviders: (args?: {}) => Promise<Array<{ accessKeyId?: string; apiVersion?: string; baseUrl: string; enabled: boolean; hasApiKey: boolean; id: string; last4?: string; models: Array<{ id: string; name?: string }>; name: string; region?: string; supportsTools: boolean; type: "openai" | "anthropic" | "local-browser" | "google" | "azure" | "bedrock" | "mistral" }>>;
             probeCustomProvider: (args: { apiKey?: string; apiVersion?: string; baseUrl: string; id?: string; type: "openai" | "anthropic" | "local-browser" | "google" | "azure" | "bedrock" | "mistral" }) => Promise<{ latencyMs: number; models: Array<{ id: string; name?: string }>; ok: true } | { error: string; ok: false }>;
             saveCustomProvider: (args: { accessKeyId?: string; apiKey?: string; apiVersion?: string; baseUrl: string; enabled: boolean; id?: string; models: Array<{ id: string; name?: string }>; name: string; region?: string; supportsTools: boolean; type: "openai" | "anthropic" | "local-browser" | "google" | "azure" | "bedrock" | "mistral" }) => Promise<{ id: string }>;
@@ -9419,7 +9428,7 @@ export interface Caller {
             setTriggerEnabledInternal: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<null>;
             testRunTrigger: (args: { testPayload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
             updateExecution: (args: { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string; userFixable?: boolean }) => Promise<null>;
-            updateTrigger: (args: { botComputer?: boolean; botId?: string | null; cronExpression?: string; description?: string; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model?: string; name?: string; quietWhenEmpty?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; triggerId: Id<"triggers"> }) => Promise<void>;
+            updateTrigger: (args: { botComputer?: boolean; botId?: string | null; cronExpression?: string; description?: string | null; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model?: string; name?: string; quietWhenEmpty?: boolean; requireDisabled?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; triggerId: Id<"triggers"> }) => Promise<void>;
             updateTriggerStats: (args: { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }) => Promise<null>;
         };
         quiet_inputs: {
@@ -9967,6 +9976,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
         custom_providers: {
             deleteCustomProvider: (args) => callRegistered(context, "chat_custom_providers:deleteCustomProvider", args),
             getDecryptedCustomProvider: (args) => callRegistered(context, "chat_custom_providers:getDecryptedCustomProvider", args),
+            isCustomProviderRunnable: (args) => callRegistered(context, "chat_custom_providers:isCustomProviderRunnable", args),
             listCustomProviders: (args) => callRegistered(context, "chat_custom_providers:listCustomProviders", args),
             probeCustomProvider: (args) => callRegistered(context, "chat_custom_providers:probeCustomProvider", args),
             saveCustomProvider: (args) => callRegistered(context, "chat_custom_providers:saveCustomProvider", args),

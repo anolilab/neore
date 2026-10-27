@@ -26,9 +26,24 @@ describe("scopes", () => {
         expect(hasScope(scopes, "threads", "read")).toBe(false);
     });
 
-    it("defaults to read-only everywhere", () => {
+    it("defaults to read-only on the original resources, and not on triggers", () => {
         expect(Object.values(DEFAULT_API_SCOPES).flat()).not.toContain("write");
         expect(hasScope(DEFAULT_API_SCOPES, "memories", "read")).toBe(true);
+        expect(hasScope(DEFAULT_API_SCOPES, "triggers", "read")).toBe(false);
+        // A new resource is not granted to default keys by being added: extend this list on purpose.
+        expect(DEFAULT_API_SCOPES).toEqual({
+            chat: ["read"],
+            knowledge: ["read"],
+            memories: ["read"],
+            models: ["read"],
+            skills: ["read"],
+            tasks: ["read"],
+            threads: ["read"],
+        });
+    });
+
+    it("lets a key ask for triggers by name", () => {
+        expect(scopesFromStrings(["triggers:read", "triggers:write"])).toEqual({ triggers: ["read", "write"] });
     });
 
     it("round-trips scope strings and rejects typos", () => {
@@ -50,6 +65,13 @@ describe("errors", () => {
         expect(mapped.status).toBe(400);
         expect(mapped.message).toBe("You can have at most 50 tasks");
         expect(fromProcedureError(Object.assign(new Error("x"), { code: "TOO_MANY_REQUESTS" })).status).toBe(429);
+        expect(
+            fromProcedureError(Object.assign(new Error("Only a scheduled routine can use the bot's computer."), { code: "INVALID_ARGUMENT" })),
+        ).toMatchObject({
+            code: "invalid_request",
+            message: "Only a scheduled routine can use the bot's computer.",
+            status: 400,
+        });
     });
 
     it("hides unknown failures behind internal_error", () => {
