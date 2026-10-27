@@ -238,7 +238,6 @@ const zTriggerFields = {
         .optional()
         .meta({ description: "Scheduled triggers with a bot only: lets the bot use its computer. Takes effect once the trigger is enabled in the app." }),
     cronExpression: z.string().max(200).optional().meta({ description: "Five-field cron expression (UTC) that runs at most hourly. Required for a schedule." }),
-    description: z.string().max(10_000).optional(),
     filters: z
         .array(zTriggerFilterRequestSchema)
         .max(10)
@@ -255,21 +254,34 @@ const zTriggerFields = {
     timezone: z.string().max(200).optional(),
 };
 
+const zWebhookPresetSchema = z.discriminatedUnion("provider", [
+    z.object({
+        event: z.enum(["pull_request_opened", "pull_request_merged", "pull_request_review_requested", "issue_assigned"]),
+        provider: z.literal("github"),
+    }),
+    z.object({ event: z.enum(["merge_request_opened", "merge_request_merged"]), provider: z.literal("gitlab") }),
+]);
+
 export const zTriggerCreateRequestSchema = z.object({
     ...zTriggerFields,
     botId: zIdSchema.optional(),
+    description: z.string().max(10_000).optional(),
     model: z.string().min(1).max(200),
     name: z.string().min(1).max(200),
     type: z.enum(["schedule", "webhook"]),
-    webhookSignatureScheme: z
-        .enum(["timestamped", "native"])
+    webhookPreset: zWebhookPresetSchema
         .optional()
-        .meta({ description: "Webhook triggers only; fixed at creation. Defaults to `timestamped`." }),
+        .meta({ description: "Webhook triggers only. A provider and one of its events; sets the filters and the signature scheme, so send no `filters`." }),
+    webhookSignatureScheme: z
+        .enum(["timestamped", "native", "gitlab-token"])
+        .optional()
+        .meta({ description: "Webhook triggers only; fixed at creation. Defaults to `timestamped`; a `webhookPreset` fixes it to the provider's." }),
 });
 
 export const zTriggerUpdateRequestSchema = z.object({
     ...zTriggerFields,
     botId: zIdSchema.nullable().optional().meta({ description: "`null` clears the bot." }),
+    description: z.string().max(10_000).nullable().optional().meta({ description: "`null` clears the description." }),
     model: z.string().min(1).max(200).optional(),
     name: z.string().min(1).max(200).optional(),
 });

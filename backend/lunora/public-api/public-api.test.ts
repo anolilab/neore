@@ -65,6 +65,13 @@ describe("errors", () => {
         expect(mapped.status).toBe(400);
         expect(mapped.message).toBe("You can have at most 50 tasks");
         expect(fromProcedureError(Object.assign(new Error("x"), { code: "TOO_MANY_REQUESTS" })).status).toBe(429);
+        expect(
+            fromProcedureError(Object.assign(new Error("Only a scheduled routine can use the bot's computer."), { code: "INVALID_ARGUMENT" })),
+        ).toMatchObject({
+            code: "invalid_request",
+            message: "Only a scheduled routine can use the bot's computer.",
+            status: 400,
+        });
     });
 
     it("hides unknown failures behind internal_error", () => {

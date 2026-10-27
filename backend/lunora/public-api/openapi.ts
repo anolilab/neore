@@ -62,9 +62,11 @@ const operation = (route: RouteDefinition) => {
     const scopeNote = scopes.length > 0 ? `Requires: ${scopeList}.` : "Any valid key.";
     const parameters = [...pathParameters(route.path), ...queryParameters(route)];
 
-    if (route.method === "post" && !route.noIdempotency) {
+    if (route.method === "post" && route.noIdempotency !== true) {
         parameters.push({
-            description: "Makes the POST safe to retry: the same key with the same body replays the first response for 24 hours.",
+            description: `Makes the POST safe to retry: the same key with the same body replays the first response for 24 hours.${
+                typeof route.noIdempotency === "function" ? " A request whose reply carries a one-time secret (a webhook trigger) refuses the header." : ""
+            }`,
             in: "header",
             name: IDEMPOTENCY_HEADER,
             required: false,
@@ -89,7 +91,11 @@ const operation = (route: RouteDefinition) => {
             404: errorResponse("`not_found`"),
             [status]: { content: successContent, description: "Success" },
             ...(route.method === "post" &&
-                !route.noIdempotency && { 409: errorResponse("`conflict` or `idempotency_in_progress`"), 422: errorResponse("`idempotency_conflict`") }),
+                route.noIdempotency !== true && {
+                    409: errorResponse("`conflict` or `idempotency_in_progress`"),
+                    422: errorResponse("`idempotency_conflict`"),
+                }),
+            ...(route.mayConflict && route.method !== "post" && { 409: errorResponse("`conflict`") }),
             429: errorResponse("`rate_limited` (per key) or `daily_limit_reached`; honour `Retry-After`"),
             500: errorResponse("`internal_error`"),
         },

@@ -401,7 +401,8 @@ export const updateTrigger = authMutation
         // `null` clears the bot; `undefined` leaves it as it is.
         botId: v.optional(v.union(v.string().max(MAX_LENGTH.id), v.null())),
         cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
-        description: v.optional(v.string().max(MAX_LENGTH.long)),
+        // `null` clears the description; `undefined` leaves it as it is.
+        description: v.optional(v.union(v.string().max(MAX_LENGTH.long), v.null())),
         // Webhook triggers only. The whole set replaces the stored one; an empty array clears it.
         // At most MAX_FILTERS entries; `assertValidFilters` checks the rest of the grammar.
         filters: v.optional(
@@ -426,6 +427,8 @@ export const updateTrigger = authMutation
         model: v.optional(v.string().max(MAX_LENGTH.short)),
         name: v.optional(v.string().max(MAX_LENGTH.short)),
         quietWhenEmpty: v.optional(v.boolean()),
+        // Set by callers that must not edit a live trigger (the public API): refused inside this transaction when the row is enabled.
+        requireDisabled: v.optional(v.boolean()),
         searchMode: v.optional(v.string().max(MAX_LENGTH.short)),
         systemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
         timezone: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -441,6 +444,10 @@ export const updateTrigger = authMutation
 
         assertTriggerTypeSupported(trigger.type);
 
+        if (args.requireDisabled === true && trigger.enabled === true) {
+            throw new LunoraError("CONFLICT", "The trigger is enabled. Disable it in the app before changing it.");
+        }
+
         const patch: {
             cronExpression?: string;
             description?: string;
@@ -455,7 +462,7 @@ export const updateTrigger = authMutation
 
         if (args.name !== undefined) patch.name = args.name;
 
-        if (args.description !== undefined) patch.description = args.description;
+        if (args.description !== undefined && args.description !== null) patch.description = args.description;
 
         if (args.model !== undefined) patch.model = args.model;
 
@@ -530,6 +537,8 @@ export const updateTrigger = authMutation
         // `patchRow` removes a field set to `undefined`, which a plain patch cannot do.
         await patchRow(context.db, trigger, {
             ...withoutUndefined(patch),
+            // `null` removes the description.
+            ...(args.description === null && { description: undefined }),
             // `undefined` removes a stale time; enabling recomputes it (`firstRunOf`).
             // Also clears a time a non-schedule trigger stored before this check existed.
             ...((args.cronExpression !== undefined || zoneChanged || !isSchedule) && { nextTriggerAt }),

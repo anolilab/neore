@@ -98,10 +98,15 @@ describe("OpenAPI document", () => {
         expect(JSON.stringify(document["components"])).toContain("triggers:read");
     });
 
-    it("does not advertise Idempotency-Key where the reply carries a one-time secret", () => {
-        const names = ((paths["/triggers"]!["post"]!["parameters"] as { name: string }[] | undefined) ?? []).map((parameter) => parameter.name);
+    it("advertises Idempotency-Key on trigger create, noting that a webhook create refuses it", () => {
+        const parameters = (paths["/triggers"]!["post"]!["parameters"] as { description: string; name: string }[] | undefined) ?? [];
+        const key = parameters.find((parameter) => parameter.name === "Idempotency-Key");
 
-        expect(names).not.toContain("Idempotency-Key");
+        expect(key?.description).toContain("webhook");
+    });
+
+    it("documents 409 on the trigger update only among PATCH routes", () => {
+        expect(Object.keys(paths["/triggers/{triggerId}"]!["patch"]!["responses"] as object)).toContain("409");
     });
 
     it("renders escaped docs HTML", () => {

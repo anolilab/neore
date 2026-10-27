@@ -78,9 +78,14 @@ export interface RouteDefinition {
     body?: z.ZodType;
     description?: string;
     handler: (input: RouteInput) => Promise<RouteResult>;
+    /** The route can answer 409 `conflict` (documented in the OpenAPI output). */
+    mayConflict?: boolean;
     method: "delete" | "get" | "patch" | "post";
-    /** Refuse an `Idempotency-Key`: the reply carries a secret shown once, and a replay would store it. */
-    noIdempotency?: boolean;
+    /**
+     * Refuse an `Idempotency-Key`: the reply carries a secret shown once, and a replay would store it.
+     * A function decides per request, from the parsed body.
+     */
+    noIdempotency?: boolean | ((body: unknown) => boolean);
     operationId: string;
     /** OpenAPI-style path below `/api/v1`, e.g. `/threads/{threadId}`. */
     path: string;
@@ -884,7 +889,7 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
     {
         body: zTriggerCreateRequestSchema,
         description:
-            "Creates the trigger disabled; enable it in the app. A webhook trigger answers with its `webhookSecret`, shown once and never again. For that reason this route does not accept an `Idempotency-Key`.",
+            "Creates the trigger disabled; enable it in the app. A webhook trigger answers with its `webhookSecret`, shown once and never again. For that reason a webhook create does not accept an `Idempotency-Key`; a schedule create does.",
         handler: async ({ body, ctx }) => {
             const request = body as z.infer<typeof zTriggerCreateRequestSchema>;
 
@@ -897,7 +902,8 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
             return { data: { id: created.triggerId, ...(created.webhookSecret && { webhookSecret: created.webhookSecret }) }, status: 201 };
         },
         method: "post",
-        noIdempotency: true,
+        // Only a webhook create answers with a one-time secret; a schedule create replays safely.
+        noIdempotency: (body) => (body as { type?: string }).type === "webhook",
         operationId: "createTrigger",
         path: "/triggers",
         response: z.object({ id: z.string(), webhookSecret: z.string().optional() }),
@@ -946,21 +952,20 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
             const request = input.body as z.infer<typeof zTriggerUpdateRequestSchema>;
             const trigger = await findOwnTrigger(input.ctx, triggerId);
 
-            if (trigger.enabled) {
-                throw new PublicApiError("conflict", "The trigger is enabled. Disable it in the app before changing it.");
-            }
-
             if (trigger.type === "webhook" && request.inputTemplate !== undefined) {
                 throw new PublicApiError("invalid_request", WEBHOOK_TEMPLATE_MESSAGE);
             }
 
             await input.ctx.runMutation(api.triggers.functions.updateTrigger, {
                 ...request,
+                // Checked inside the mutation, so a trigger enabled after the read above is still refused.
+                requireDisabled: true,
                 triggerId: triggerId as Id<"triggers">,
             });
 
             return { data: { id: triggerId, updated: true } };
         },
+        mayConflict: true,
         method: "patch",
         operationId: "updateTrigger",
         path: "/triggers/{triggerId}",

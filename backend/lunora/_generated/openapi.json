@@ -39652,7 +39652,14 @@
                         "type": "string"
                       },
                       "description": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       },
                       "filters": {
                         "items": {
@@ -39710,6 +39717,9 @@
                         "type": "string"
                       },
                       "quietWhenEmpty": {
+                        "type": "boolean"
+                      },
+                      "requireDisabled": {
                         "type": "boolean"
                       },
                       "searchMode": {

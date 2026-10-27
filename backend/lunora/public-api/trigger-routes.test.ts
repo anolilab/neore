@@ -178,7 +178,11 @@ describe("trigger routes", () => {
         const deleted = await request("/triggers/trg1", { method: "DELETE" });
 
         expect([updated.status, deleted.status]).toEqual([200, 200]);
-        expect(calls.find((entry) => entry.name === "triggers_functions:updateTrigger")?.args).toEqual({ name: "Renamed", triggerId: "trg1" });
+        expect(calls.find((entry) => entry.name === "triggers_functions:updateTrigger")?.args).toEqual({
+            name: "Renamed",
+            requireDisabled: true,
+            triggerId: "trg1",
+        });
         expect(calls.find((entry) => entry.name === "triggers_functions:deleteTrigger")?.args).toEqual({ triggerId: "trg1" });
     });
 
@@ -207,12 +211,52 @@ describe("trigger routes", () => {
         ).toBe(false);
     });
 
-    it("refuses to change an enabled trigger, so a write key cannot rewrite a live run", async () => {
-        const { calls, request } = call({ triggers: ["write"] }, { ...stored, enabled: true });
-        const response = await request("/triggers/trg1", json("PATCH", { systemPrompt: "do something else" }));
+    it("asks updateTrigger to refuse an enabled row inside its own transaction", async () => {
+        const { calls, request } = call({ triggers: ["write"] });
 
-        expect(response.status).toBe(409);
-        expect(calls.some((entry) => entry.name === "triggers_functions:updateTrigger")).toBe(false);
+        await request("/triggers/trg1", json("PATCH", { systemPrompt: "x" }));
+
+        expect(calls.find((entry) => entry.name === "triggers_functions:updateTrigger")?.args).toMatchObject({ requireDisabled: true });
+    });
+
+    it("accepts an Idempotency-Key on a schedule create and refuses it on a webhook create", async () => {
+        const { request } = call({ triggers: ["write"] });
+        const schedule = await request(
+            "/triggers",
+            json("POST", { cronExpression: "0 9 * * 1", model: "m", name: "n", type: "schedule" }, { "Idempotency-Key": "abc" }),
+        );
+        const webhook = await request("/triggers", json("POST", { model: "m", name: "n", type: "webhook" }, { "Idempotency-Key": "abc" }));
+
+        expect(schedule.status).not.toBe(400);
+        expect(webhook.status).toBe(400);
+    });
+
+    it("passes a GitLab preset and the gitlab-token scheme through create", async () => {
+        const { calls, request } = call({ triggers: ["write"] });
+        const preset = { event: "merge_request_opened", provider: "gitlab" };
+        const response = await request(
+            "/triggers",
+            json("POST", { model: "m", name: "n", type: "webhook", webhookPreset: preset, webhookSignatureScheme: "gitlab-token" }),
+        );
+        const bad = await request(
+            "/triggers",
+            json("POST", { model: "m", name: "n", type: "webhook", webhookPreset: { event: "pull_request_opened", provider: "gitlab" } }),
+        );
+
+        expect(response.status).toBe(201);
+        expect(calls.find((entry) => entry.name === "triggers_functions:createTrigger")?.args).toMatchObject({
+            webhookPreset: preset,
+            webhookSignatureScheme: "gitlab-token",
+        });
+        expect(bad.status).toBe(400);
+    });
+
+    it("passes a null description through update so it can be cleared", async () => {
+        const { calls, request } = call({ triggers: ["write"] });
+
+        await request("/triggers/trg1", json("PATCH", { description: null }));
+
+        expect(calls.find((entry) => entry.name === "triggers_functions:updateTrigger")?.args).toMatchObject({ description: null });
     });
 
     it("404s an update of an unknown trigger without calling the mutation", async () => {

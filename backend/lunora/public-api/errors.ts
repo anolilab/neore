@@ -61,6 +61,7 @@ const PROCEDURE_CODE_MAP: Record<string, ApiErrorCode> = {
     BAD_REQUEST: "invalid_request",
     CONFLICT: "conflict",
     FORBIDDEN: "forbidden",
+    INVALID_ARGUMENT: "invalid_request",
     INVALID_INPUT: "invalid_request",
     NOT_FOUND: "not_found",
     PAYLOAD_TOO_LARGE: "payload_too_large",
