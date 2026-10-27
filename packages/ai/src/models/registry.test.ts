@@ -120,10 +120,12 @@ describe("MODEL_REGISTRY", () => {
 
     it("never repeats a filter capability or leaves the list empty", () => {
         for (const model of MODEL_REGISTRY) {
-            if (model.filterCapabilities) {
-                expect(model.filterCapabilities.length, model.id).toBeGreaterThan(0);
-                expect(new Set(model.filterCapabilities).size, model.id).toBe(model.filterCapabilities.length);
+            if (!model.filterCapabilities) {
+                continue;
             }
+
+            expect(model.filterCapabilities.length, model.id).toBeGreaterThan(0);
+            expect(new Set(model.filterCapabilities).size, model.id).toBe(model.filterCapabilities.length);
         }
     });
 });
