@@ -7,7 +7,7 @@ import type { Dispatch, RefObject, SetStateAction } from "react";
 import type useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
-import { AppError } from "@/lib/errors";
+import { AppError, TimeoutError } from "@/lib/errors";
 import { providerLogger } from "@/lib/logger";
 import type { useCRPC } from "@/lib/lunora/crpc";
 
@@ -441,9 +441,13 @@ export const runSendMessage = async (env: SendMessageEnv, text: string, attachme
             model,
         });
 
-        // The composer was cleared before the request; hand the draft back unless a new one is there.
-        useChatUIStore.getState().restoreComposer({ attachedReferences, composerAttachments: attachments ?? [], composerText: text });
-        restoreSettings();
+        // The composer was cleared before the request. After a deadline the gateway may still have saved the
+        // prompt (and created the thread), so handing the draft back would invite a duplicate send: the error
+        // says to check the thread first. Any other failure never reached the backend, so the draft returns.
+        if (!(error_ instanceof TimeoutError)) {
+            useChatUIStore.getState().restoreComposer({ attachedReferences, composerAttachments: attachments ?? [], composerText: text });
+            restoreSettings();
+        }
 
         handleError(error_);
 

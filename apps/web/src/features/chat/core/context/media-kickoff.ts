@@ -1,7 +1,7 @@
 import { withUnlockProofBody } from "@neore/client-runtime";
 
 import env from "@/lib/env";
-import { NetworkError } from "@/lib/errors";
+import { NetworkError, TimeoutError } from "@/lib/errors";
 import { providerLogger } from "@/lib/logger";
 
 import type { MediaGenerationFailure } from "../lib/start-media-generation";
@@ -22,13 +22,17 @@ export interface MediaKickOff {
 export type KickOffMedia = (media: MediaKickOff, onRefused?: () => void) => Promise<void>;
 
 /** The error for a media kick-off that failed: the server's own words for a refusal (the daily limit reads as it does from `/v1/chat`), a connection error otherwise. */
-const mediaGenerationError = (failure: MediaGenerationFailure, networkMessage: string): Error =>
-    failure.kind === "network"
-        ? new NetworkError(networkMessage)
-        : gatewayError(failure.status, {
-              error: failure.retryAfter === undefined ? failure.code : { code: failure.code, message: failure.message, retryAfter: failure.retryAfter },
-              message: failure.message,
-          });
+const mediaGenerationError = (failure: MediaGenerationFailure, networkMessage: string): Error => {
+    if (failure.kind === "network") {
+        // A deadline keeps its own wording: the gateway may still be generating, so "check your connection" would mislead.
+        return failure.cause instanceof TimeoutError ? failure.cause : new NetworkError(networkMessage);
+    }
+
+    return gatewayError(failure.status, {
+        error: failure.retryAfter === undefined ? failure.code : { code: failure.code, message: failure.message, retryAfter: failure.retryAfter },
+        message: failure.message,
+    });
+};
 
 /**
  * Posts the media kick-off for a reply `/v1/chat` created. A refusal (the daily limit, a 401, a 404) or a
