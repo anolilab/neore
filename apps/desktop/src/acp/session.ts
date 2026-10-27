@@ -23,7 +23,7 @@ import { Turn } from "./turn";
 import type { SessionSnapshot, SessionStatus, SessionSummary, StopReason, ToolState, ToolStatus } from "./types";
 
 /** Prompts waiting behind a running turn. A full queue refuses the next one; it never drops one silently. */
-export const MAX_QUEUED_PROMPTS = 8;
+const MAX_QUEUED_PROMPTS = 8;
 const MAX_PROMPT_LENGTH = 100_000;
 /** After a cancel, how long the agent has to answer its prompt before the process is ended. */
 const DEFAULT_CANCEL_GRACE_MS = 5000;

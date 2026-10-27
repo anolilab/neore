@@ -41,7 +41,7 @@ export const offeredOptions = (params: Record<string, unknown>): { kind: string;
 };
 
 /** What the core needs to show a request and to answer it. */
-export interface DescribedRequest {
+interface DescribedRequest {
     agentLabel: string;
     command?: string;
     details: string;
@@ -110,7 +110,7 @@ export const describePermission = (request: PermissionRequest): DescribedRequest
 };
 
 /** The core, as far as the gate needs it. */
-export interface PermissionCore {
+interface PermissionCore {
     acpPermissionAsk: (request: string) => Promise<string>;
     acpPermissionCancelSession: (sessionId: string) => void;
 }
