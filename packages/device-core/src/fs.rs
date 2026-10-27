@@ -9,8 +9,8 @@
 //! path can change while the prompt is open. The operations therefore re-confine
 //! at USE time: on Unix every component below the shared root is opened with
 //! `O_NOFOLLOW` (see `confined`), so a symlink swapped in since planning fails
-//! instead of being followed. Windows has no equivalent here: it re-resolves
-//! the path just before opening, which narrows that window without closing it.
+//! instead of being followed. Windows opens the target first and then checks
+//! the real path of the open handle against the roots.
 
 use std::fs;
 use std::io::{self, Read, Write};
@@ -254,48 +254,128 @@ mod confined {
     }
 }
 
-#[cfg(not(unix))]
+/// Windows has no `openat`, so the check is bound to the HANDLE instead: the target is opened first (reparse points
+/// opened as themselves, never followed, and without sharing delete/rename so the folders above it cannot be moved
+/// while it is open), then `GetFinalPathNameByHandleW` names what was really opened and it must lie inside a root.
+/// A parent swapped for a link after planning therefore resolves outside and is refused. A write that creates a new
+/// file can still create it at a swapped-in place before the check; the file is then removed again.
+#[cfg(windows)]
 mod confined {
     use super::{outside_roots, within_roots, Listing, Open};
+    use std::ffi::OsString;
     use std::fs::{self, File, OpenOptions};
     use std::io;
+    use std::os::windows::ffi::OsStringExt;
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::os::windows::io::AsRawHandle;
     use std::path::{Path, PathBuf};
 
-    /// Re-resolves the path right before opening it; the window between that and the open is not closed.
-    pub fn open_dir(roots: &[PathBuf], path: &Path) -> io::Result<PathBuf> {
-        let real = fs::canonicalize(path)?;
+    use windows_sys::Win32::Storage::FileSystem::GetFinalPathNameByHandleW;
 
-        within_roots(&real, roots)
-            .then_some(real)
-            .ok_or_else(outside_roots)
+    const FILE_SHARE_READ: u32 = 0x1;
+    const FILE_SHARE_WRITE: u32 = 0x2;
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+
+    /// The real path of an open handle (`\\?\C:\...`, the same form `canonicalize` gives the roots).
+    fn final_path(file: &File) -> io::Result<PathBuf> {
+        let mut buffer = vec![0u16; 1024];
+
+        loop {
+            // SAFETY: the handle is open for the duration of the call and the buffer length is passed with it.
+            let length = unsafe {
+                GetFinalPathNameByHandleW(
+                    file.as_raw_handle(),
+                    buffer.as_mut_ptr(),
+                    buffer.len() as u32,
+                    0,
+                )
+            } as usize;
+
+            if length == 0 {
+                return Err(io::Error::last_os_error());
+            }
+
+            if length < buffer.len() {
+                return Ok(PathBuf::from(OsString::from_wide(&buffer[..length])));
+            }
+
+            buffer.resize(length + 1, 0);
+        }
     }
 
-    pub fn open_file(roots: &[PathBuf], path: &Path, how: Open) -> io::Result<File> {
-        let (parent, name) = path
-            .parent()
-            .zip(path.file_name())
-            .ok_or_else(outside_roots)?;
-        let target = open_dir(roots, parent)?.join(name);
-        let mut options = OpenOptions::new();
+    /// The real path of `file` if it is inside a root and not itself a link.
+    fn confirm(file: &File, roots: &[PathBuf]) -> io::Result<PathBuf> {
+        let real = final_path(file)?;
 
-        match how {
-            Open::Read => options.read(true),
-            Open::Create => options.write(true).create_new(true),
-            Open::Overwrite => options.write(true).create(true).truncate(true),
-        };
-
-        if fs::symlink_metadata(&target).is_ok_and(|meta| meta.file_type().is_symlink()) {
+        if !within_roots(&real, roots) || file.metadata()?.file_type().is_symlink() {
             return Err(outside_roots());
         }
 
-        options.open(target)
+        Ok(real)
+    }
+
+    fn options(write: bool) -> OpenOptions {
+        let mut options = OpenOptions::new();
+
+        options
+            .read(!write)
+            .write(write)
+            .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS);
+
+        options
+    }
+
+    pub fn open_file(roots: &[PathBuf], path: &Path, how: Open) -> io::Result<File> {
+        match how {
+            Open::Read => {
+                let file = options(false).open(path)?;
+
+                confirm(&file, roots).map(|_| file)
+            }
+            Open::Create => create(roots, path),
+            Open::Overwrite => match options(true).open(path) {
+                Ok(file) => {
+                    // Truncate only once the handle is known to be inside a root.
+                    confirm(&file, roots)?;
+                    file.set_len(0)?;
+
+                    Ok(file)
+                }
+                Err(error) if error.kind() == io::ErrorKind::NotFound => create(roots, path),
+                Err(error) => Err(error),
+            },
+        }
+    }
+
+    fn create(roots: &[PathBuf], path: &Path) -> io::Result<File> {
+        let file = options(true).create_new(true).open(path)?;
+
+        match confirm(&file, roots) {
+            Ok(_) => Ok(file),
+            Err(error) => {
+                let real = final_path(&file);
+
+                drop(file);
+
+                if let Ok(real) = real {
+                    let _ = fs::remove_file(real);
+                }
+
+                Err(error)
+            }
+        }
     }
 
     pub fn entries(roots: &[PathBuf], path: &Path, max: usize) -> io::Result<Listing> {
+        // Held open (no delete/rename sharing) while the folder is read, so it cannot be moved meanwhile.
+        let dir = options(false).open(path)?;
+        let real = confirm(&dir, roots)?;
         let mut listed = Vec::new();
         let mut truncated = false;
 
-        for entry in fs::read_dir(open_dir(roots, path)?)?.flatten() {
+        for entry in fs::read_dir(real)?.flatten() {
             if listed.len() >= max {
                 truncated = true;
                 break;
@@ -311,6 +391,8 @@ mod confined {
 
             listed.push((entry.file_name().to_string_lossy().into_owned(), kind, size));
         }
+
+        drop(dir);
 
         Ok((listed, truncated))
     }
