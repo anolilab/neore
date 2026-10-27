@@ -138,10 +138,15 @@ results and calls, and approval would have to move to a machine with no window.
   in the local window. Each forwarded action carries the folder set, and
   `neore-host` enforces it for `fs_*` and as the `shell_run` write set. The remote
   side keeps no configuration of its own.
-- **Sandbox.** `shell_run` uses Landlock on Linux and `sandbox-exec` on macOS.
-  Where neither is available (Windows, or a kernel without Landlock), the
-  desktop's "Require sandbox for shell commands" rule refuses the call, as it
-  does locally.
+- **Sandbox.** `shell_run` uses Landlock on Linux and `sandbox-exec` on macOS. The
+  remote executor checks its own sandbox support, because the desktop's check
+  describes the desktop, not the host. Each forwarded `shell_run` carries the
+  "Require sandbox for shell commands" setting from the desktop store, and
+  `neore-host` refuses before it spawns anything when the setting requires a sandbox
+  and the host has none (Windows, or a kernel without Landlock). The host reports its
+  sandbox support in its handshake, so the approval prompt can say that the command
+  will be refused, or will run unsandboxed because the user turned the requirement
+  off.
 - **Approval prompts** name the host ("on build-box: run `make test`") so the
   user can tell a remote action from a local one.
 - **Taint** (`backend/lunora/devices/lib/taint.ts`) is unchanged. It is signed by

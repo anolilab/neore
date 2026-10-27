@@ -43,8 +43,12 @@ pattern. Writes into host-run threads are refused server-side, in
   `handleOnShard`.
 - `backend/lunora/public-api/idempotency.ts`: the `Idempotency-Key` header on
   POST routes replays the first response, scoped by API key id, for 24 h.
-- Locked threads answer as not found through every public route
-  (`thread-lock.test.ts`).
+- The thread read routes (detail, messages, list) answer not found for a locked
+  thread (`thread-lock.test.ts`). `DELETE /threads/{threadId}` does not: its handler
+  calls `deleteThread`, which checks ownership only. Open item before any thread
+  route gets an `mcp` tag: make the DELETE handler load the thread through
+  `notFoundIfLocked` first. No thread route gets a tag until every one of them
+  refuses a locked thread.
 - Key creation UI with a scope picker exists:
   `apps/web/src/features/auth/components/settings/api-key/create-api-key-dialog.tsx`,
   `api-key-scope-picker.tsx`.
@@ -80,7 +84,8 @@ pattern. Writes into host-run threads are refused server-side, in
 | Tool | Route | Scope | Slice |
 | --- | --- | --- | --- |
 | `list_threads` | `GET /threads` | `threads:read` | S1 |
-| `read_thread` | `GET /threads/{threadId}` and `/messages` | `threads:read` | S1 |
+| `get_thread` | `GET /threads/{threadId}` | `threads:read` | S1 |
+| `read_messages` | `GET /threads/{threadId}/messages` | `threads:read` | S1 |
 | `search_knowledge` | `GET /knowledge/search` | `knowledge:read` | S1 |
 | `list_tasks`, `get_task` | `GET /tasks`, `GET /tasks/{taskId}` | `tasks:read` | S1 |
 | `create_thread` | `POST /chat` without `threadId` | `chat:write` | S2 |
@@ -89,7 +94,7 @@ pattern. Writes into host-run threads are refused server-side, in
 - `send_message` and `create_thread` call `POST /chat` with `stream: false` and
   return the final reply text with its `threadId` and `messageId`. If the reply
   outlasts the client's tool timeout, the client reads it later with
-  `read_thread`.
+  `read_messages`.
 - Thread search is not in v1, because no route exists. Adding one is its own
   public-API change first, with its own OpenAPI entry, and then an `mcp` tag.
 
@@ -159,7 +164,7 @@ pattern. Writes into host-run threads are refused server-side, in
 - Acceptance: a read-scoped key lists and reads a thread from an MCP client
   config; `tools/list` for a read key contains no write tool; a forced
   `tools/call` of `send_message` with a read key answers `insufficient_scope`; a
-  locked thread is not found through `read_thread`; MCP calls consume the same
+  locked thread is not found through `get_thread` or `read_messages`; MCP calls consume the same
   `publicApi/read` limit as REST.
 
 **S2 — Write tools.** `create_thread`, `send_message`, `idempotencyKey`.

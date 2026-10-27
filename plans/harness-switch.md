@@ -50,12 +50,16 @@ context.
 - The switch writes one message part, kind `agentSwitch`, carrying the previous
   agent, the new agent, the handoff mode and the message id where the handoff
   starts. The transcript renders it as a divider.
-- The thread row gets one optional field, `activeAgent`, the agent for the next
-  turn. The part is the record; the field is the pointer. Regenerate uses the agent
-  that was active when the regenerated message was written, so history stays
-  reproducible.
-- A switch applies to the active branch only. Sibling branches keep their own
-  agents.
+- The agent for the next turn is derived from the active branch: the `to` of the
+  last `agentSwitch` part on the active path, or the thread's creation model when the
+  path has none. Moving to a sibling branch therefore restores that branch's agent
+  with no extra write. `threads.activeAgent` is only a cache of the active path's value
+  for the thread list and the composer's first paint. It is rewritten when a switch
+  lands or the active leaf changes, and the derived value wins if they differ.
+  Regenerate uses the agent recorded on the regenerated message's path, so history
+  stays reproducible.
+- A switch applies to the active branch only, because its part sits on that path.
+  Sibling branches keep their own agents.
 
 ### Handoff modes
 
@@ -98,7 +102,7 @@ Rules:
 
 ### Data
 
-- `threads.activeAgent`: optional. Shape `{ kind: "model", model }` or
+- `threads.activeAgent`: optional cache of the active path's agent. Shape `{ kind: "model", model }` or
   `{ kind: "host", hostId, agentKey, folderId }`.
 - Message part `agentSwitch`: `{ from, to, mode, startMessageId, fallbackReason? }`.
   The `parts` column is `v.array(v.any())` (`backend/lunora/schema.ts`), so the
@@ -112,7 +116,7 @@ Rules:
 ## 4. Touchpoints
 
 - `backend/lunora/chat/http.ts` (`ChatStartBody`): the `model` field stays. A send
-  with no model uses `activeAgent`.
+  with no model uses the active path's agent.
 - `backend/lunora/agent/table-writes.ts`: writes the `agentSwitch` part and the
   pointer, through the thread write surface.
 - `backend/lunora/chat/execute.ts`: builds the handoff context before the first
@@ -127,11 +131,11 @@ Rules:
 
 ## 5. Slices
 
-**S1 — Explicit switch for cloud models.** `activeAgent`, the `agentSwitch` part
+**S1 — Explicit switch for cloud models.** The path-derived agent and its `activeAgent` cache, the `agentSwitch` part
 and the divider. No handoff yet: the new model sees the same history it always
 did.
 - Acceptance: a switch is recorded and rendered; the next turn uses the new
-  model; a regenerate of an older message uses the model recorded on it; a double
+  model; switching to a sibling branch and back restores each branch's agent; a regenerate of an older message uses the model recorded on it; a double
   `clientId` switches once; a switch during a stream is refused.
 
 **S2 — Portable handoff for cloud models.** Summary of older turns plus the

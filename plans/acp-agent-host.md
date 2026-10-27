@@ -212,8 +212,9 @@ dropped by `seq`, so the stored `seq` outlives every replay that could pass.
 - **Every other reader** (a reload, a second browser, a turn started in the local
   window, a phone that did not send) uses `getActiveStreamForThread` and
   `getStreamBody`, the live queries cloud turns already use. A host stream is an
-  ordinary `persistentStreams` row, so both find it with no new read path and no
-  new token mint.
+  ordinary `persistentStreams` row, so both find it with no new token mint. Their output validators (`vStreamBody` and the
+  active-stream result in `chat/streaming/index.ts`) do not carry `hostState` today, so S3
+  adds it to both, and a test reads each state back after a reload.
 
 - **Host states, shown to every client.** A host turn moves through four states,
   stored as `persistentStreams.hostState`: `accepted` (the backend stored the
