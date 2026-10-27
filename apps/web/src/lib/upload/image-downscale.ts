@@ -198,8 +198,45 @@ const JPEG_SOF_HEADER_BYTES = 9;
 
 export interface ImageSize {
     height: number;
+    /** EXIF orientation 1-8 of a JPEG; 0 when it has an EXIF block whose orientation cannot be read. Absent means upright. */
+    orientation?: number;
     width: number;
 }
+
+const EXIF_READ_BYTES = 2048;
+const EXIF_ORIENTATION_TAG = 0x01_12;
+const MAX_EXIF_ENTRIES = 64;
+
+/** The orientation in an APP1 payload (`Exif\0\0`, a TIFF header, IFD0), 0 when it is not there within the bytes read. */
+const exifOrientation = (payload: Uint8Array): number => {
+    if (ascii(payload, 0, 4) !== "Exif" || payload.length < 14) {
+        return 0;
+    }
+
+    const view = new DataView(payload.buffer);
+    const little = payload[6] === 0x49;
+    const entries = 6 + view.getUint32(10, little);
+
+    if (entries + 2 > payload.length) {
+        return 0;
+    }
+
+    const count = Math.min(view.getUint16(entries, little), MAX_EXIF_ENTRIES);
+
+    for (let index = 0; index < count; index += 1) {
+        const entry = entries + 2 + index * 12;
+
+        if (entry + 10 > payload.length) {
+            return 0;
+        }
+
+        if (view.getUint16(entry, little) === EXIF_ORIENTATION_TAG) {
+            return view.getUint16(entry + 8, little);
+        }
+    }
+
+    return 0;
+};
 
 const jpegSize = async (file: Blob): Promise<ImageSize | undefined> => {
     const soi = await readBytes(file, 0, 2);
@@ -209,6 +246,7 @@ const jpegSize = async (file: Blob): Promise<ImageSize | undefined> => {
     }
 
     let offset = 2;
+    let orientation: number | undefined;
 
     for (let segments = 0; segments < MAX_JPEG_SEGMENTS; segments += 1) {
         const segment = await readBytes(file, offset, offset + JPEG_SOF_HEADER_BYTES);
@@ -226,7 +264,7 @@ const jpegSize = async (file: Blob): Promise<ImageSize | undefined> => {
 
             const view = new DataView(segment.buffer);
 
-            return { height: view.getUint16(5), width: view.getUint16(7) };
+            return { height: view.getUint16(5), ...(orientation !== undefined && { orientation }), width: view.getUint16(7) };
         }
 
         // Start of scan or end of image before any frame header: not a layout we can read.
@@ -234,7 +272,17 @@ const jpegSize = async (file: Blob): Promise<ImageSize | undefined> => {
             return undefined;
         }
 
-        offset += 2 + new DataView(segment.buffer).getUint16(2);
+        const length = new DataView(segment.buffer).getUint16(2);
+
+        if (marker === 0xe1 && orientation === undefined) {
+            const payload = await readBytes(file, offset + 4, offset + 2 + Math.min(length, EXIF_READ_BYTES));
+
+            if (ascii(payload, 0, 4) === "Exif") {
+                orientation = exifOrientation(payload);
+            }
+        }
+
+        offset += 2 + length;
     }
 
     return undefined;
@@ -313,7 +361,10 @@ export const readImageSize = async (file: Blob & { type: string }): Promise<Imag
 
 /** Decodes straight at the target size where `createImageBitmap` can resize, so no full-size bitmap is allocated; a browser that cannot decodes it whole (the pixel budget bounds that). */
 const decoded = async (file: File, target: EncodeAttempt, size: ImageSize): Promise<ImageBitmap> => {
-    if (target.width < size.width) {
+    // Whether resizeWidth/resizeHeight apply before or after the EXIF rotation differs between browsers: a sideways photo is decoded whole (the pixel budget bounds that) and sized from the real bitmap.
+    const sideways = size.orientation === 0 || (size.orientation ?? 1) >= 5;
+
+    if (!sideways && target.width < size.width) {
         try {
             return await createImageBitmap(file, {
                 imageOrientation: "from-image",

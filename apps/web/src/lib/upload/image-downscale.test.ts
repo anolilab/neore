@@ -135,13 +135,24 @@ const pngOfSize = (width: number, height: number): Uint8Array<ArrayBuffer> => {
 };
 
 /** A JPEG head: SOI, an APP1 segment with `appBytes` of payload, then SOF0 declaring `width` × `height`. */
-const jpegHead = (width: number, height: number, appBytes = 20): Uint8Array<ArrayBuffer> => {
+const jpegHead = (width: number, height: number, appBytes = 20, orientation?: number): Uint8Array<ArrayBuffer> => {
     const sof = appBytes + 6;
     const bytes = new Uint8Array(sof + 19);
     const view = new DataView(bytes.buffer);
 
     bytes.set([0xff, 0xd8, 0xff, 0xe1]);
     view.setUint16(4, appBytes + 2);
+
+    if (orientation !== undefined) {
+        // "Exif\0\0", a big-endian TIFF header, then an IFD0 of one entry: the orientation tag (type SHORT, count 1).
+        bytes.set([0x45, 0x78, 0x69, 0x66, 0, 0, 0x4d, 0x4d, 0, 0x2a, 0, 0, 0, 8], 6);
+        view.setUint16(20, 1);
+        view.setUint16(22, 0x01_12);
+        view.setUint16(24, 3);
+        view.setUint32(26, 1);
+        view.setUint16(30, orientation);
+    }
+
     bytes.set([0xff, 0xc0], sof);
     view.setUint16(sof + 2, 17);
     bytes[sof + 4] = 8;
@@ -290,6 +301,11 @@ describe(readImageSize, () => {
         expect(await sizeOf([jpegHead(5000, 3000, 40_000)], "image/jpeg")).toStrictEqual({ height: 3000, width: 5000 });
     });
 
+    it("reads a JPEG's EXIF orientation, and leaves it out when there is no EXIF block", async () => {
+        expect(await sizeOf([jpegHead(4000, 3000, 60, 6)], "image/jpeg")).toStrictEqual({ height: 3000, orientation: 6, width: 4000 });
+        expect(await sizeOf([jpegHead(4000, 3000, 60)], "image/jpeg")).toStrictEqual({ height: 3000, width: 4000 });
+    });
+
     it("reads a BMP and an extended WebP", async () => {
         expect(await sizeOf([bmpHead(24)], "image/bmp")).toStrictEqual({ height: 3000, width: 4000 });
 
@@ -391,6 +407,24 @@ describe(downscaleOversizedImage, () => {
             await downscaleOversizedImage(file);
 
             expect(create).toHaveBeenCalledWith(file, { imageOrientation: "from-image", resizeHeight: 1536, resizeQuality: "high", resizeWidth: 2048 });
+        });
+
+        it("decodes a sideways photo (EXIF orientation 6) whole, without the resize options", async () => {
+            const create = stubBrowser(() => TARGET_IMAGE_BYTES - 1);
+            const file = new File([jpegHead(4000, 3000, 60, 6), new Uint8Array(TARGET_IMAGE_BYTES * 2)], "portrait.jpg", { type: "image/jpeg" });
+
+            await downscaleOversizedImage(file);
+
+            expect(create).toHaveBeenCalledExactlyOnceWith(file, { imageOrientation: "from-image" });
+        });
+
+        it("keeps the resize options for an upright photo (EXIF orientation 1)", async () => {
+            const create = stubBrowser(() => TARGET_IMAGE_BYTES - 1);
+            const file = new File([jpegHead(4000, 3000, 60, 1), new Uint8Array(TARGET_IMAGE_BYTES * 2)], "upright.jpg", { type: "image/jpeg" });
+
+            await downscaleOversizedImage(file);
+
+            expect(create).toHaveBeenCalledWith(file, expect.objectContaining({ resizeWidth: 2048 }));
         });
 
         it("decodes whole when the browser refuses the resize options", async () => {
