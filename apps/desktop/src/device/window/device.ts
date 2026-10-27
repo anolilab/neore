@@ -7,6 +7,7 @@
  * with textContent only — never as HTML.
  */
 import type { Prompt, SettingsView } from "../types";
+import { initAcp } from "./acp-page";
 
 /** Buttons stay disabled this long after a prompt appears, so a click meant for another window cannot land on "Allow". */
 const CLICK_THROUGH_GUARD_MS = 800;
@@ -48,6 +49,8 @@ const renderPrompt = (prompt: Prompt | null): void => {
     state.current = prompt;
     setHidden("prompt", !prompt);
     setHidden("settings", Boolean(prompt));
+    // A device approval takes the whole window; the agents come back when it is answered.
+    setHidden("acp", Boolean(prompt));
     setText("prompt-error", "");
     clearInterval(state.expiryTimer);
 
@@ -392,3 +395,4 @@ globalThis.neoreDevice.onPromptQueued(() => refreshPrompt());
 window.addEventListener("focus", () => refreshPrompt());
 // eslint-disable-next-line unicorn/prefer-top-level-await -- the page builds as an IIFE, where top-level await does not parse
 refreshPrompt();
+initAcp();

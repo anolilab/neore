@@ -102,12 +102,12 @@ impl DeviceState {
         }
     }
 
-    fn settings(&self) -> Settings {
+    pub(crate) fn settings(&self) -> Settings {
         self.settings.lock().unwrap().clone()
     }
 
     /// Changes the settings under the save lock: each writer reads what the last one saved, then saves its own change.
-    fn change_settings<T>(
+    pub(crate) fn change_settings<T>(
         &self,
         change: impl FnOnce(&mut Settings) -> Result<T, String>,
     ) -> Result<T, String> {
@@ -143,8 +143,13 @@ impl DeviceState {
         Ok(())
     }
 
-    fn emit(&self, event: Event) {
+    pub(crate) fn emit(&self, event: Event) {
         (self.sink)(event);
+    }
+
+    /// The app data directory (`device.json`, the audit log).
+    pub(crate) fn data_dir(&self) -> &Path {
+        self.settings_path.parent().unwrap_or(Path::new("."))
     }
 
     pub fn reap_idle_servers(&self) {
@@ -155,7 +160,7 @@ impl DeviceState {
         self.mcp.stop_all();
     }
 
-    fn audit(&self, entry: Value) {
+    pub(crate) fn audit(&self, entry: Value) {
         if stdfs::metadata(&self.audit_path)
             .map(|meta| meta.len() > AUDIT_MAX_BYTES)
             .unwrap_or(false)

@@ -1639,6 +1639,9 @@ importers:
         specifier: 6.8.9
         version: 6.8.9(supports-color@10.2.2)
     devDependencies:
+      '@agentclientprotocol/sdk':
+        specifier: 2.0.2
+        version: 2.0.2(zod@4.6.7)
       '@anolilab/eslint-config':
         specifier: catalog:lint
         version: 30.0.7(22a3156cd91b6902513d38d6b5dd85bc)
@@ -1669,6 +1672,9 @@ importers:
       vitest:
         specifier: catalog:test
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/browser-playwright@5.0.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0)(canvas@3.2.3))(msw@3.0.3(@types/node@26.6.5)(graphql@16.11.0)(supports-color@10.2.2)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+      zod:
+        specifier: catalog:utils
+        version: 4.6.7
 
   apps/mobile:
     dependencies:
@@ -3374,6 +3380,11 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  '@agentclientprotocol/sdk@2.0.2':
+    resolution: {integrity: sha512-jLywRB42hZMRMc4aUgt0uRjkY9FQnMdybv4XgLl+ddi75QuJn8Vbl0+CHcVHJDC0+WDfi1KQXRWtHaR5vp6gHw==}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.0.0
 
   '@ai-sdk/amazon-bedrock@5.0.113':
     resolution: {integrity: sha512-1AEyfBYJJkYqFaNSCceDx3ZeZduyosfF6hxjCwON2rPYFLLFIrDr5qo/XwBxeJN9uuKQomnL8SxJrShAc2P3lw==}
@@ -24215,6 +24226,10 @@ snapshots:
   2g@1.0.1(typescript@6.0.3):
     optionalDependencies:
       typescript: 6.0.3
+
+  '@agentclientprotocol/sdk@2.0.2(zod@4.6.7)':
+    dependencies:
+      zod: 4.6.7
 
   '@ai-sdk/amazon-bedrock@5.0.113(zod@4.6.7)':
     dependencies:

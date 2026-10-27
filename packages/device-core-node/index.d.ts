@@ -33,6 +33,15 @@ export declare class DeviceCore {
   settingsGet(): string
   /** Applies a `SettingsUpdate` (JSON). Validation is in Rust. */
   settingsUpdate(update: string): string
+  /** The registered coding agents and the names of their environment variables, never the values (JSON). */
+  acpView(): string
+  /** Applies an `AcpUpdate` (JSON): save or remove an agent, set or remove a variable. Validation is in Rust. */
+  acpUpdate(update: string): string
+  /**
+   * What to spawn for an agent (JSON): command, arguments, folder and environment. `folder` absent is a
+   * version probe. The environment holds secrets: it goes to the main process and nowhere else.
+   */
+  acpSpawnPlan(agentKey: string, folder?: string | undefined | null): string
   /** The most recent audit lines, newest first (each a JSON object). */
   auditTail(): Array<string>
   /** Stops local MCP servers idle for ten minutes. Call about once a minute. */

@@ -13,6 +13,7 @@
 
 use std::sync::Arc;
 
+use device_core::acp::AcpUpdate;
 use device_core::engine::SettingsUpdate;
 use device_core::envelope::Signed;
 use device_core::{DeviceState, Event};
@@ -175,6 +176,35 @@ impl DeviceCore {
             .map_err(Error::from_reason)?;
 
         to_json(&view)
+    }
+
+    /// The registered coding agents and the names of their environment variables, never the values (JSON).
+    #[napi]
+    pub fn acp_view(&self) -> Result<String> {
+        to_json(&self.state.acp_view())
+    }
+
+    /// Applies an `AcpUpdate` (JSON): save or remove an agent, set or remove a variable. Validation is in Rust.
+    #[napi]
+    pub fn acp_update(&self, update: String) -> Result<String> {
+        // The update can carry a variable's value; a parse error must not quote it.
+        let update: AcpUpdate = serde_json::from_str(&update)
+            .map_err(|_| Error::from_reason("invalid agent update"))?;
+        let view = self.state.acp_update(update).map_err(Error::from_reason)?;
+
+        to_json(&view)
+    }
+
+    /// What to spawn for an agent (JSON): command, arguments, folder and environment. `folder` absent is a
+    /// version probe. The environment holds secrets: it goes to the main process and nowhere else.
+    #[napi]
+    pub fn acp_spawn_plan(&self, agent_key: String, folder: Option<String>) -> Result<String> {
+        let plan = self
+            .state
+            .acp_spawn_plan(&agent_key, folder.as_deref())
+            .map_err(Error::from_reason)?;
+
+        to_json(&plan)
     }
 
     /// The most recent audit lines, newest first (each a JSON object).

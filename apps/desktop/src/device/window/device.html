@@ -81,6 +81,61 @@
 
                 <p id="settings-status" role="status" aria-live="polite"></p>
             </section>
+
+            <section id="acp" aria-labelledby="acp-heading">
+                <h1 id="acp-heading">Coding agents</h1>
+                <p class="muted">
+                    Agents that speak the Agent Client Protocol run on this computer with your rights, outside the shell sandbox. Each one signs in with its own tool;
+                    Neore stores no login for it. macOS and Linux only for now.
+                </p>
+                <ul id="acp-agents" aria-labelledby="acp-heading"></ul>
+                <form id="acp-agent-form" novalidate>
+                    <label for="acp-name">Name</label>
+                    <input id="acp-name" type="text" maxlength="60" required autocomplete="off" />
+                    <label for="acp-command">Command</label>
+                    <input id="acp-command" type="text" required autocomplete="off" spellcheck="false" placeholder="npx" />
+                    <label for="acp-args">Arguments, one per line</label>
+                    <textarea id="acp-args" rows="3" spellcheck="false"></textarea>
+                    <button type="submit">Add agent</button>
+                </form>
+                <p class="muted">An app opened from the Dock or Finder has a short PATH. If the command is not found, give its full path or set PATH for the agent below.</p>
+
+                <h2 id="acp-env-heading">Environment variables</h2>
+                <p class="muted">
+                    Agents start with a minimal environment (PATH, HOME, locale), not a copy of this app's. Add proxy or endpoint settings here. Values are secrets: they stay on this
+                    computer, are never sent to Neore, and are shown masked. NEORE_*, ELECTRON_* and NODE_OPTIONS are refused.
+                </p>
+                <ul id="acp-env" aria-labelledby="acp-env-heading"></ul>
+                <form id="acp-env-form" novalidate>
+                    <label for="acp-env-scope">For</label>
+                    <select id="acp-env-scope"></select>
+                    <label for="acp-env-name">Name</label>
+                    <input id="acp-env-name" type="text" required autocomplete="off" spellcheck="false" placeholder="HTTPS_PROXY" />
+                    <label for="acp-env-value">Value</label>
+                    <input id="acp-env-value" type="password" required autocomplete="off" spellcheck="false" />
+                    <button type="submit">Set variable</button>
+                </form>
+
+                <h2 id="acp-sessions-heading">Sessions</h2>
+                <ul id="acp-sessions" aria-labelledby="acp-sessions-heading"></ul>
+                <div id="acp-session" hidden>
+                    <h2 id="acp-session-title"></h2>
+                    <p id="acp-session-status" class="muted" role="status" aria-live="polite"></p>
+                    <div id="acp-transcript" tabindex="0" aria-label="Conversation with the agent" role="log" aria-live="polite"></div>
+                    <ul id="acp-queued" aria-label="Messages waiting for the agent"></ul>
+                    <form id="acp-prompt-form" novalidate>
+                        <label for="acp-prompt">Message</label>
+                        <textarea id="acp-prompt" rows="3"></textarea>
+                        <div class="row">
+                            <button type="submit" class="primary" id="acp-send">Send</button>
+                            <button type="button" id="acp-stop">Stop</button>
+                            <button type="button" id="acp-end">End session</button>
+                        </div>
+                    </form>
+                </div>
+                <p id="acp-notice" class="muted" role="status" aria-live="polite"></p>
+                <p id="acp-error" class="error" role="alert"></p>
+            </section>
         </main>
     </body>
 </html>

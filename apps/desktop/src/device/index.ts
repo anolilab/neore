@@ -15,10 +15,13 @@ import { pathToFileURL } from "node:url";
 import type { BrowserWindow as BrowserWindowInstance, IpcMainInvokeEvent, WebContents } from "electron";
 import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 
+import { AcpManager } from "../acp/manager";
+import { spawnAgent } from "../acp/process";
+import type { AcpView, SpawnPlan } from "../acp/types";
 import { loadDeviceCore } from "./addon";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
 import type { CoreEvent, DeviceCore, Prompt, Signed } from "./types";
-import { readPairing, readPromptAnswer, readSettingsUpdate, readSigned } from "./validate";
+import { readAcpUpdate, readAgentKey, readFolder, readPairing, readPrompt, readPromptAnswer, readSessionId, readSettingsUpdate, readSigned } from "./validate";
 
 /** Stopping idle MCP servers runs once a minute. */
 const REAP_INTERVAL_MS = 60_000;
@@ -32,6 +35,7 @@ const LOCAL_PRELOAD = path.join(WINDOW_DIR, "preload.cjs");
  */
 export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     const state: {
+        acp?: AcpManager;
         core?: DeviceCore;
         coreError?: unknown;
         local?: BrowserWindowInstance;
@@ -200,6 +204,20 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         console.error("[neore-desktop] device execution unavailable", error);
     }
 
+    const requireAcp = (): AcpManager => {
+        const core = requireCore();
+
+        // The core decides what may start: it refuses an unregistered agent and a folder that is not allowed.
+        state.acp ??= new AcpManager({
+            appVersion: app.getVersion(),
+            onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
+            plan: (agentKey, folder) => JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan,
+            spawn: spawnAgent,
+        });
+
+        return state.acp;
+    };
+
     const reap = setInterval(() => {
         state.core?.reapIdleServers();
     }, REAP_INTERVAL_MS);
@@ -207,6 +225,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     reap.unref();
     app.on("will-quit", () => {
         clearInterval(reap);
+        // Synchronous: `will-quit` cannot await, and an agent left behind would outlive the app.
+        state.acp?.killAll();
         state.core?.stop();
     });
 
@@ -274,6 +294,37 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     });
 
     local(LOCAL_CHANNEL.auditTail, () => requireCore().auditTail());
+
+    // ─── Coding agents (ACP): registered, started and driven from this window only ─────
+
+    local(LOCAL_CHANNEL.acpView, () => JSON.parse(requireCore().acpView()) as AcpView);
+
+    local(LOCAL_CHANNEL.acpUpdate, (update) => JSON.parse(requireCore().acpUpdate(readAcpUpdate(update))) as AcpView);
+
+    local(LOCAL_CHANNEL.acpProbe, (agentKey) => requireAcp().probe(readAgentKey(agentKey)));
+
+    local(LOCAL_CHANNEL.acpStart, async (agentKey, folder) => {
+        const key = readAgentKey(agentKey);
+        const agent = (JSON.parse(requireCore().acpView()) as AcpView).agents.find((candidate) => candidate.key === key);
+
+        if (agent === undefined) {
+            throw new Error("that agent is not registered");
+        }
+
+        return requireAcp().startSession(key, agent.label, readFolder(folder));
+    });
+
+    local(LOCAL_CHANNEL.acpSessions, () => requireAcp().summaries());
+
+    local(LOCAL_CHANNEL.acpSession, (id) => requireAcp().snapshot(readSessionId(id)));
+
+    local(LOCAL_CHANNEL.acpSend, (id, prompt) => requireAcp().send(readSessionId(id), readPrompt(prompt)));
+
+    local(LOCAL_CHANNEL.acpCancel, (id) => requireAcp().cancel(readSessionId(id)));
+
+    local(LOCAL_CHANNEL.acpClose, (id) => requireAcp().close(readSessionId(id)));
+
+    local(LOCAL_CHANNEL.acpForget, (id) => requireAcp().remove(readSessionId(id)));
 
     return state.core !== undefined;
 };

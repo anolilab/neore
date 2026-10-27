@@ -44,6 +44,10 @@ export type CoreEvent = { prompt: Prompt; type: "prompt" } | { callId: string; p
 
 /** The surface of the native `DeviceCore` class. */
 export interface DeviceCore {
+    /** Coding agents (ACP): JSON strings, parsed by `acp/`. The spawn plan holds secrets and never leaves the main process. */
+    acpSpawnPlan: (agentKey: string, folder: string | null) => string;
+    acpUpdate: (update: string) => string;
+    acpView: () => string;
     auditTail: () => string[];
     denyPrompts: () => void;
     execute: (envelope: string, signature: string) => Promise<string>;

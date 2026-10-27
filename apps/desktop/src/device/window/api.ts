@@ -1,4 +1,5 @@
 /** What the local device window's preload exposes as `window.neoreDevice`. */
+import type { AcpUpdate, AcpView, ProbeResult, SessionSnapshot, SessionSummary } from "../../acp/types";
 import type { Prompt, SettingsView } from "../types";
 
 declare global {
@@ -8,8 +9,19 @@ declare global {
 }
 
 export interface DeviceWindowApi {
+    acpCancel: (sessionId: string) => Promise<void>;
+    acpClose: (sessionId: string) => Promise<void>;
+    acpForget: (sessionId: string) => Promise<void>;
+    acpProbe: (agentKey: string) => Promise<ProbeResult>;
+    acpSend: (sessionId: string, prompt: string) => Promise<{ position?: number; status: "queued" | "started" }>;
+    acpSession: (sessionId: string) => Promise<SessionSnapshot>;
+    acpSessions: () => Promise<SessionSummary[]>;
+    acpStart: (agentKey: string, folder: string) => Promise<string>;
+    acpUpdate: (update: AcpUpdate) => Promise<AcpView>;
+    acpView: () => Promise<AcpView>;
     auditTail: () => Promise<string[]>;
     confirm: (message: string) => Promise<boolean>;
+    onAcpChanged: (handler: () => void) => () => void;
     onPromptQueued: (handler: () => void) => () => void;
     pickFolder: () => Promise<string | null>;
     promptAnswer: (id: number, answer: "always" | "deny" | "once") => Promise<void>;

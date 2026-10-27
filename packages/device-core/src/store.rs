@@ -15,6 +15,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use super::acp::{AcpAgent, EnvVars};
 use super::mcp::McpServerConfig;
 
 const KEYCHAIN_SERVICE: &str = "dev.neore.device";
@@ -32,6 +33,12 @@ pub struct Pairing {
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+    /// Coding agents (ACP) the user registered in the local window.
+    #[serde(default)]
+    pub acp_agents: Vec<AcpAgent>,
+    /// Environment variables every agent gets, on top of the built environment. Values are secrets.
+    #[serde(default)]
+    pub acp_env: EnvVars,
     /// Tool names the user chose "Always allow" for. Cleared on every (re)pairing.
     #[serde(default)]
     pub allow_rules: Vec<String>,
@@ -60,8 +67,16 @@ fn read_file(path: &Path) -> Option<Settings> {
     match fs::read_to_string(path) {
         Ok(text) => match serde_json::from_str(&text) {
             Ok(settings) => Some(settings),
+            // Line and column only: serde's message can quote a stored value, and the file holds secrets.
             Err(error) => {
-                move_aside(path, &error.to_string());
+                move_aside(
+                    path,
+                    &format!(
+                        "parse error at line {} column {}",
+                        error.line(),
+                        error.column()
+                    ),
+                );
                 None
             }
         },

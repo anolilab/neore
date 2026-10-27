@@ -1,5 +1,8 @@
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { ElectronApplication, Page } from "@playwright/test";
@@ -271,5 +274,74 @@ test("the device window opens from the site's relay, with its own bridge and not
         expect(await local.evaluate(() => typeof (globalThis as PageGlobal).neoreNative)).toBe("undefined");
     } finally {
         await app.close();
+    }
+});
+
+test("a coding agent is registered, started in a folder and prompted from the device window", async () => {
+    const userData = mkdtempSync(path.join(tmpdir(), "neore-e2e-userdata-"));
+    const work = mkdtempSync(path.join(tmpdir(), "neore-e2e-work-"));
+    const fakeAgent = path.join(appDirectory, "src/acp/testing/fake-agent.mjs");
+    // The app's own environment holds a Neore variable; the agent must not see it.
+    const app = await electron.launch({
+        args: [".", `--user-data-dir=${userData}`],
+        cwd: appDirectory,
+        env: { ...process.env, NEORE_E2E_PROBE: "leak" } as Record<string, string>,
+    });
+
+    try {
+        const win = await siteWindow(app);
+
+        expect(await app.evaluate(() => (globalThis as { neoreShell?: { device: boolean } }).neoreShell?.device === true), "device-core-node must be built").toBe(true);
+
+        // The native confirmation and the folder picker answer for the user.
+        await app.evaluate(({ dialog }, folder) => {
+            Object.assign(dialog, {
+                showMessageBox: async () => {
+                    return { checkboxChecked: false, response: 1 };
+                },
+                showOpenDialog: async () => {
+                    return { canceled: false, filePaths: [folder] };
+                },
+            });
+        }, work);
+        await win.evaluate(() => (globalThis as PageGlobal).neoreNative?.device?.openSettings());
+
+        const local = await findPage(app, (url) => url.endsWith("/device-window/device.html"));
+
+        await local.fill("#acp-name", "Fake agent");
+        await local.fill("#acp-command", process.execPath);
+        await local.fill("#acp-args", fakeAgent);
+        await local.click("#acp-agent-form button[type=submit]");
+        await expect(local.locator("#acp-agents li")).toContainText("Fake agent");
+
+        await local.selectOption("#acp-env-scope", "fake-agent");
+        await local.fill("#acp-env-name", "ONLY_ME");
+        await local.fill("#acp-env-value", "value-xyz-123");
+        await local.click("#acp-env-form button[type=submit]");
+        await expect(local.locator("#acp-env")).toContainText("ONLY_ME");
+        // Masked in the window: the value is not in the page.
+        expect(await local.locator("#acp-env").textContent()).not.toContain("value-xyz-123");
+
+        await local.click("button[aria-label='Start Fake agent in a folder']");
+        await expect(local.locator("#acp-session-status")).toHaveText("Ready");
+
+        await local.fill("#acp-prompt", "hello");
+        await local.click("#acp-send");
+        await expect(local.locator("#acp-transcript")).toContainText("Hello world");
+
+        await local.fill("#acp-prompt", "env");
+        await local.click("#acp-send");
+        await expect(local.locator("#acp-transcript")).toContainText("ONLY_ME");
+
+        const transcript = await local.locator("#acp-transcript").textContent();
+
+        expect(transcript).toContain("value-xyz-123");
+        expect(transcript).not.toContain("NEORE_E2E_PROBE");
+        // The site's page never gets a coding-agent bridge.
+        expect(await win.evaluate(() => typeof (globalThis as PageGlobal).neoreDevice)).toBe("undefined");
+    } finally {
+        await app.close();
+        rmSync(userData, { force: true, recursive: true });
+        rmSync(work, { force: true, recursive: true });
     }
 });

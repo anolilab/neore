@@ -6,6 +6,7 @@
 //! signatures, approval rules, root confinement, the shell sandbox, output caps
 //! and the audit log.
 
+pub mod acp;
 pub mod approval;
 pub mod engine;
 pub mod envelope;

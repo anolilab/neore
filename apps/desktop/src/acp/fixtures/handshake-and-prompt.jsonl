@@ -1,0 +1,10 @@
+# Hand-written from the ACP v1 spec (initialization, session setup, prompt turn), not recorded from a real agent.
+{"out":{"id":"$1","method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false},"clientInfo":{"name":"neore-desktop","title":"Neore","version":"9.9.9"}}}}
+{"in":{"id":"$1","result":{"protocolVersion":1,"agentCapabilities":{"loadSession":false,"promptCapabilities":{"image":false,"audio":false,"embeddedContext":false}},"agentInfo":{"name":"example-agent","version":"0.4.1"},"authMethods":[]}}}
+{"out":{"id":"$2","method":"session/new","params":{"cwd":"/work","mcpServers":[]}}}
+{"in":{"id":"$2","result":{"sessionId":"sess_1"}}}
+{"out":{"id":"$3","method":"session/prompt","params":{"sessionId":"sess_1","prompt":[{"type":"text","text":"say hi"}]}}}
+{"in":{"method":"session/update","params":{"sessionId":"sess_1","update":{"sessionUpdate":"agent_thought_chunk","content":{"type":"text","text":"thinking"}}}}}
+{"in":{"method":"session/update","params":{"sessionId":"sess_1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Hi"}}}}}
+{"in":{"method":"session/update","params":{"sessionId":"sess_1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":" there"}}}}}
+{"in":{"id":"$3","result":{"stopReason":"end_turn"}}}

@@ -192,3 +192,51 @@ li {
     clip: rect(0 0 0 0);
     white-space: nowrap;
 }
+
+select {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+#acp {
+    margin-top: 28px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+#acp-transcript {
+    max-height: 280px;
+    overflow: auto;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+#acp-transcript .user {
+    font-weight: 600;
+    margin: 8px 0 2px;
+}
+
+#acp-transcript pre {
+    margin: 2px 0;
+    max-height: none;
+}
+
+#acp-transcript .tools {
+    margin: 2px 0;
+    font-size: 12.5px;
+}
+
+#acp-transcript .tools li {
+    border: 0;
+    justify-content: flex-start;
+    padding: 1px 0;
+}
+
+#acp-prompt {
+    resize: vertical;
+}
