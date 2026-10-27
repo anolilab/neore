@@ -230,6 +230,7 @@ const bmpHead = (bitsPerPixel: number): Uint8Array<ArrayBuffer> => {
     const head = new Uint8Array(54);
 
     head.set([0x42, 0x4d]);
+    new DataView(head.buffer).setUint32(14, 40, true);
     new DataView(head.buffer).setInt32(18, 4000, true);
     new DataView(head.buffer).setInt32(22, 3000, true);
     new DataView(head.buffer).setUint16(28, bitsPerPixel, true);
@@ -242,6 +243,22 @@ describe(bmpHasAlpha, () => {
         expect(bmpHasAlpha(bmpHead(32))).toBe(true);
         expect(bmpHasAlpha(bmpHead(24))).toBe(false);
         expect(bmpHasAlpha(bmpHead(8))).toBe(false);
+    });
+
+    it("is false for an OS/2 core header, which has no alpha channel", () => {
+        const os2 = bmpHead(24);
+
+        new DataView(os2.buffer).setUint32(14, 12, true);
+
+        expect(bmpHasAlpha(os2)).toBe(false);
+    });
+
+    it("is true for an unknown DIB header size", () => {
+        const odd = bmpHead(24);
+
+        new DataView(odd.buffer).setUint32(14, 20, true);
+
+        expect(bmpHasAlpha(odd)).toBe(true);
     });
 
     it("is true for bytes that are not a BMP", () => {
@@ -348,6 +365,32 @@ describe(readImageSize, () => {
         ]);
 
         expect(await sizeOf([bytes], "image/jpeg")).toStrictEqual({ height: 3000, width: 4000 });
+    });
+
+    it("reads an OS/2 BMP's 16-bit sizes and a top-down Windows BMP's negative height", async () => {
+        const os2 = new Uint8Array(54);
+        const view = new DataView(os2.buffer);
+
+        os2.set([0x42, 0x4d]);
+        view.setUint32(14, 12, true);
+        view.setUint16(18, 640, true);
+        view.setUint16(20, 480, true);
+
+        expect(await sizeOf([os2], "image/bmp")).toStrictEqual({ height: 480, width: 640 });
+
+        const topDown = bmpHead(24);
+
+        new DataView(topDown.buffer).setInt32(22, -3000, true);
+
+        expect(await sizeOf([topDown], "image/bmp")).toStrictEqual({ height: 3000, width: 4000 });
+    });
+
+    it("answers undefined for a BMP header of an unknown size", async () => {
+        const odd = bmpHead(24);
+
+        new DataView(odd.buffer).setUint32(14, 20, true);
+
+        expect(await sizeOf([odd], "image/bmp")).toBeUndefined();
     });
 
     it("reads a BMP and an extended WebP", async () => {

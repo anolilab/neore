@@ -139,6 +139,9 @@ export const pngHasAlpha = async (file: Blob): Promise<boolean> => {
     return true;
 };
 
+const BMP_DIB_SIZE_OFFSET = 14;
+const BMP_CORE_HEADER_BYTES = 12;
+const BMP_INFO_HEADER_BYTES = 40;
 const BMP_BITS_PER_PIXEL_OFFSET = 28;
 const BMP_HEADER_BYTES = 30;
 const BMP_ALPHA_BITS_PER_PIXEL = 32;
@@ -153,7 +156,17 @@ export const bmpHasAlpha = (head: Uint8Array): boolean => {
         return true;
     }
 
-    return new DataView(head.buffer, head.byteOffset, head.byteLength).getUint16(BMP_BITS_PER_PIXEL_OFFSET, true) === BMP_ALPHA_BITS_PER_PIXEL;
+    const headerSize = new DataView(head.buffer, head.byteOffset, head.byteLength).getUint32(BMP_DIB_SIZE_OFFSET, true);
+
+    // The OS/2 core header has no alpha; a Windows one (40 bytes or more) says in its bit count.
+    if (headerSize === BMP_CORE_HEADER_BYTES) {
+        return false;
+    }
+
+    return (
+        headerSize < BMP_INFO_HEADER_BYTES ||
+        new DataView(head.buffer, head.byteOffset, head.byteLength).getUint16(BMP_BITS_PER_PIXEL_OFFSET, true) === BMP_ALPHA_BITS_PER_PIXEL
+    );
 };
 
 /* eslint-disable no-bitwise -- WebP flags are bits of one byte */
@@ -366,13 +379,23 @@ const pngSize = async (file: Blob): Promise<ImageSize | undefined> => {
 const bmpSize = async (file: Blob): Promise<ImageSize | undefined> => {
     const head = await readBytes(file, 0, BMP_HEADER_BYTES);
 
-    if (head.length < BMP_HEADER_BYTES) {
+    if (head.length < BMP_HEADER_BYTES || head[0] !== 0x42 || head[1] !== 0x4d) {
         return undefined;
     }
 
     const view = new DataView(head.buffer);
+    const headerSize = view.getUint32(BMP_DIB_SIZE_OFFSET, true);
 
-    // A negative height is a top-down bitmap.
+    // OS/2 core header: unsigned 16-bit sizes.
+    if (headerSize === BMP_CORE_HEADER_BYTES) {
+        return { height: view.getUint16(20, true), width: view.getUint16(18, true) };
+    }
+
+    if (headerSize < BMP_INFO_HEADER_BYTES) {
+        return undefined;
+    }
+
+    // Signed 32-bit sizes; a negative height is a top-down bitmap.
     return { height: Math.abs(view.getInt32(22, true)), width: Math.abs(view.getInt32(18, true)) };
 };
 
