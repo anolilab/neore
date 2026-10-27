@@ -118,8 +118,7 @@ runner: v.optional(v.union(
 ### Dispatch
 
 - From the lead: a new tool `messageWorker({ worker, message })`, default mode
-  `ask`. It dedupes by `toolCallId` (`by_user_and_toolCallId`), as delegation
-  does.
+  `ask`. It claims `(userId, toolCallId)` under the `worker-dispatch` claim-once scope before the rate limit, the charge and the insert, and a redelivery returns the existing run's receipt. Delegation admission today stores the tool call id but never checks it, so this guard is new for workers; the same gap in plain delegation is a separate follow-up.
 - Creating a host worker (`delegateToSubAgent` with `persistent: true` and a host
   runner) is forced to `ask` as `messageWorker` is. Delegate consent carries down
   through `headlessApproved`, so without this a trigger run could start a host agent
@@ -303,7 +302,7 @@ thread composer calls `dispatchToWorker`, and archive goes through the existing
 thread archive. `listActiveWorkerRuns` (the caller's live runs, for the mobile
 running rail in M5) is built here too.
 - Acceptance: one message starts exactly one run; the same `clientId` twice
-  starts one run; an archived worker refuses dispatch with a clear error; a
+  starts one run; a redelivered `messageWorker` call returns the same run and charges once, with the claim taken before the rate limit; an archived worker refuses dispatch with a clear error; a
   stranger cannot list or dispatch (RLS and owner check); `/chat/start`, `send_message` and `POST /api/v1/chat` refuse a worker thread, because a worker turn runs only through `dispatchToWorker`.
 
 **S3 — Queue and steer.** Busy-worker queueing, ordered start in `finishRun`,

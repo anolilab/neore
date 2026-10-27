@@ -65,7 +65,7 @@ context.
 
 | Mode | When | What the new agent receives |
 | --- | --- | --- |
-| `native` | the same host agent, and its capability report says it can load a saved session | nothing extra. It reattaches to its own session id |
+| `native` | the same host agent, the same folder and the same host as the saved session, and its capability report says it can load a saved session | nothing extra. It reattaches to its own session id |
 | `portable` | any other switch | a handoff prompt: a summary of older turns, plus the last turns verbatim up to a budget |
 | `delta` | switching back to an agent that already saw part of the thread | only the messages after the last message that agent saw, recorded on its previous `agentSwitch` part |
 | `none` | the user chooses a fresh start | nothing. Labelled as a new conversation |
@@ -157,8 +157,8 @@ thread ([acp-agent-host.md](acp-agent-host.md) §5.1). Needs ACP S4.
   unchanged after the switch).
 
 **S4 — Native reattach.** Same host agent, `native` mode, when its capability
-report says it can load a saved session. Needs ACP S6 (saved session ids).
-- Acceptance: the reattach uses the saved native session id; when the load fails,
+report says it can load a saved session, and only when agent, folder and host all match the saved session (otherwise the switch is `portable`). Needs ACP S6 (saved session ids).
+- Acceptance: a switch to the same agent in a different offered folder, or on another host, uses `portable` and never reattaches the old session; the reattach uses the saved native session id; when the load fails,
   the transcript shows the fallback reason and the turn runs in `portable` mode.
 
 ## 6. Invariants crossed
