@@ -289,9 +289,7 @@ export const ATTACHMENT_ACCEPT = `image/*,text/plain,text/markdown,text/html,tex
  */
 export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentAdapter => {
     const add = async (state: ProgressState): Promise<PendingAttachment> => {
-        // Before the size check: a 12 MB photo is shrunk to fit the provider, not refused for its weight.
-        const file = await downscaleOversizedImage(state.file);
-        const contentType = attachmentContentType(file);
+        const contentType = attachmentContentType(state.file);
         const isImage = contentType.startsWith("image/");
         const isVideo = contentType.startsWith("video/");
         const isAudio = contentType.startsWith("audio/");
@@ -300,17 +298,21 @@ export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentA
         const isDocx = contentType === DOCX_TYPE;
 
         if (!isImage && !isText && !isPdf && !isVideo && !isAudio && !isDocx) {
-            throw new AttachmentUploadError(file.name, "unsupported");
+            throw new AttachmentUploadError(state.file.name, "unsupported");
         }
 
-        const limit = attachmentSizeLimit(file);
+        const limit = attachmentSizeLimit(state.file);
 
-        if (file.size > limit.maxBytes) {
-            throw new AttachmentTooLargeError(file.name, limit);
+        // Before any decode: a file over the cap is refused without being opened as an image.
+        if (state.file.size > limit.maxBytes) {
+            throw new AttachmentTooLargeError(state.file.name, limit);
         }
+
+        // A 12 MB photo is shrunk to fit the provider, not refused for its weight; the result is never larger than the original.
+        const file = await downscaleOversizedImage(state.file);
 
         return {
-            contentType,
+            contentType: attachmentContentType(file),
             file,
             id: crypto.randomUUID(),
             name: file.name,

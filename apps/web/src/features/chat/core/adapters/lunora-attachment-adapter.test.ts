@@ -15,8 +15,12 @@ import {
     uploadedAttachment,
 } from "./lunora-attachment-adapter";
 
-const { uploadFile } = vi.hoisted(() => {
-    return { uploadFile: vi.fn() };
+const { downscaleOversizedImage, uploadFile } = vi.hoisted(() => {
+    return { downscaleOversizedImage: vi.fn(async (file: File) => file), uploadFile: vi.fn() };
+});
+
+vi.mock(import("@/lib/upload/image-downscale"), async (importOriginal) => {
+    return { ...(await importOriginal()), downscaleOversizedImage };
 });
 
 vi.mock(import("@/lib/upload/upload-file"), () => {
@@ -148,6 +152,25 @@ describe(createLunoraAttachmentAdapter, () => {
         await expect(adapter.upload({ file })).rejects.toBeInstanceOf(AttachmentTooLargeError);
         expect(uploadFile).not.toHaveBeenCalled();
         expect(action).not.toHaveBeenCalled();
+    });
+
+    it("refuses an image over the cap before it is decoded", async () => {
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const file = new File(["x"], "huge.png", { type: "image/png" });
+
+        Object.defineProperty(file, "size", { value: 25 * MB });
+
+        await expect(adapter.upload({ file })).rejects.toBeInstanceOf(AttachmentTooLargeError);
+        expect(downscaleOversizedImage).not.toHaveBeenCalled();
+    });
+
+    it("hands an image within the cap to the downscaler", async () => {
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const file = new File(["x"], "photo.jpg", { type: "image/jpeg" });
+
+        await adapter.upload({ file });
+
+        expect(downscaleOversizedImage).toHaveBeenCalledWith(file);
     });
 
     it("offers the text-preview suffixes in the accept list the composer's file picker uses", () => {

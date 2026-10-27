@@ -190,6 +190,145 @@ export const webpIsAnimatedOrTransparent = (head: Uint8Array): boolean => {
 };
 /* eslint-enable no-bitwise */
 
+/** The most pixels (width × height) that are decoded; a heavier image is left as it is, since decoding it could exhaust the browser's memory. */
+export const MAX_DECODE_PIXELS = 50_000_000;
+
+const MAX_JPEG_SEGMENTS = 64;
+const JPEG_SOF_HEADER_BYTES = 9;
+
+export interface ImageSize {
+    height: number;
+    width: number;
+}
+
+const jpegSize = async (file: Blob): Promise<ImageSize | undefined> => {
+    const soi = await readBytes(file, 0, 2);
+
+    if (soi[0] !== 0xff || soi[1] !== 0xd8) {
+        return undefined;
+    }
+
+    let offset = 2;
+
+    for (let segments = 0; segments < MAX_JPEG_SEGMENTS; segments += 1) {
+        const segment = await readBytes(file, offset, offset + JPEG_SOF_HEADER_BYTES);
+        const marker = segment[1];
+
+        if (segment.length < 4 || segment[0] !== 0xff || marker === undefined) {
+            return undefined;
+        }
+
+        // SOF0-SOF15 except DHT (C4), JPG (C8) and DAC (CC) hold the frame size.
+        if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+            if (segment.length < JPEG_SOF_HEADER_BYTES) {
+                return undefined;
+            }
+
+            const view = new DataView(segment.buffer);
+
+            return { height: view.getUint16(5), width: view.getUint16(7) };
+        }
+
+        // Start of scan or end of image before any frame header: not a layout we can read.
+        if (marker === 0xda || marker === 0xd9) {
+            return undefined;
+        }
+
+        offset += 2 + new DataView(segment.buffer).getUint16(2);
+    }
+
+    return undefined;
+};
+
+/* eslint-disable no-bitwise -- WebP sizes are packed bit fields */
+const webpSize = async (file: Blob): Promise<ImageSize | undefined> => {
+    const head = await readBytes(file, 0, 30);
+
+    if (head.length < 30 || ascii(head, 0, 4) !== "RIFF" || ascii(head, 8, 4) !== "WEBP") {
+        return undefined;
+    }
+
+    const view = new DataView(head.buffer);
+
+    switch (ascii(head, 12, 4)) {
+        case "VP8 ": {
+            return { height: view.getUint16(28, true) & 0x3f_ff, width: view.getUint16(26, true) & 0x3f_ff };
+        }
+        case "VP8L": {
+            const bits = view.getUint32(21, true);
+
+            return { height: ((bits >>> 14) & 0x3f_ff) + 1, width: (bits & 0x3f_ff) + 1 };
+        }
+        case "VP8X": {
+            return { height: 1 + (view.getUint16(27, true) | ((head[29] ?? 0) << 16)), width: 1 + (view.getUint16(24, true) | ((head[26] ?? 0) << 16)) };
+        }
+        default: {
+            return undefined;
+        }
+    }
+};
+/* eslint-enable no-bitwise */
+
+const pngSize = async (file: Blob): Promise<ImageSize | undefined> => {
+    const head = await readBytes(file, 0, IHDR_END_OFFSET);
+
+    if (head.length < IHDR_END_OFFSET) {
+        return undefined;
+    }
+
+    const view = new DataView(head.buffer);
+
+    return { height: view.getUint32(20), width: view.getUint32(16) };
+};
+
+const bmpSize = async (file: Blob): Promise<ImageSize | undefined> => {
+    const head = await readBytes(file, 0, BMP_HEADER_BYTES);
+
+    if (head.length < BMP_HEADER_BYTES) {
+        return undefined;
+    }
+
+    const view = new DataView(head.buffer);
+
+    // A negative height is a top-down bitmap.
+    return { height: Math.abs(view.getInt32(22, true)), width: Math.abs(view.getInt32(18, true)) };
+};
+
+const SIZE_READERS: Readonly<Record<string, ((file: Blob) => Promise<ImageSize | undefined>) | undefined>> = {
+    "image/bmp": bmpSize,
+    "image/jpeg": jpegSize,
+    "image/png": pngSize,
+    "image/webp": webpSize,
+};
+
+/**
+ * The pixel size an image declares in its header, read with a few small slices
+ * and without decoding it. `undefined` when the header cannot be read.
+ */
+export const readImageSize = async (file: Blob & { type: string }): Promise<ImageSize | undefined> => {
+    const size = await SIZE_READERS[file.type]?.(file);
+
+    return size && size.width > 0 && size.height > 0 ? size : undefined;
+};
+
+/** Decodes straight at the target size where `createImageBitmap` can resize, so no full-size bitmap is allocated; a browser that cannot decodes it whole (the pixel budget bounds that). */
+const decoded = async (file: File, target: EncodeAttempt, size: ImageSize): Promise<ImageBitmap> => {
+    if (target.width < size.width) {
+        try {
+            return await createImageBitmap(file, {
+                imageOrientation: "from-image",
+                resizeHeight: target.height,
+                resizeQuality: "high",
+                resizeWidth: target.width,
+            });
+        } catch {
+            // fall through to the plain decode
+        }
+    }
+
+    return await createImageBitmap(file, { imageOrientation: "from-image" });
+};
+
 const drawn = (bitmap: ImageBitmap, { height, width }: EncodeAttempt): HTMLCanvasElement => {
     const canvas = document.createElement("canvas");
 
@@ -247,7 +386,14 @@ export const downscaleOversizedImage = async (file: File): Promise<File> => {
             return file;
         }
 
-        const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+        // Decoding allocates the full intrinsic size, so the header is read first: an unreadable one or too many pixels keeps the original.
+        const size = await readImageSize(file);
+
+        if (!size || size.width * size.height > MAX_DECODE_PIXELS) {
+            return file;
+        }
+
+        const bitmap = await decoded(file, firstAttempt(size.width, size.height), size);
 
         try {
             let attempt: EncodeAttempt | undefined = firstAttempt(bitmap.width, bitmap.height);

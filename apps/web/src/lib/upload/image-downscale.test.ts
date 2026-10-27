@@ -9,6 +9,7 @@ import {
     MAX_IMAGE_EDGE,
     nextAttempt,
     pngHasAlpha,
+    readImageSize,
     TARGET_IMAGE_BYTES,
     webpIsAnimatedOrTransparent,
 } from "./image-downscale";
@@ -123,6 +124,33 @@ const pngWithProfile = (profileBytes: number): Blob =>
         pngHead(2, [["IDAT", 8]]).subarray(33),
     ]);
 
+/** `pngHead`, declaring a `width` × `height` image. */
+const pngOfSize = (width: number, height: number): Uint8Array<ArrayBuffer> => {
+    const head = pngHead(2);
+
+    new DataView(head.buffer).setUint32(16, width);
+    new DataView(head.buffer).setUint32(20, height);
+
+    return head;
+};
+
+/** A JPEG head: SOI, an APP1 segment with `appBytes` of payload, then SOF0 declaring `width` × `height`. */
+const jpegHead = (width: number, height: number, appBytes = 20): Uint8Array<ArrayBuffer> => {
+    const sof = appBytes + 6;
+    const bytes = new Uint8Array(sof + 19);
+    const view = new DataView(bytes.buffer);
+
+    bytes.set([0xff, 0xd8, 0xff, 0xe1]);
+    view.setUint16(4, appBytes + 2);
+    bytes.set([0xff, 0xc0], sof);
+    view.setUint16(sof + 2, 17);
+    bytes[sof + 4] = 8;
+    view.setUint16(sof + 5, height);
+    view.setUint16(sof + 7, width);
+
+    return bytes;
+};
+
 const pngHasAlphaOf = async (bytes: Uint8Array<ArrayBuffer>): Promise<boolean> => await pngHasAlpha(new Blob([bytes]));
 
 describe(pngHasAlpha, () => {
@@ -191,6 +219,8 @@ const bmpHead = (bitsPerPixel: number): Uint8Array<ArrayBuffer> => {
     const head = new Uint8Array(54);
 
     head.set([0x42, 0x4d]);
+    new DataView(head.buffer).setInt32(18, 4000, true);
+    new DataView(head.buffer).setInt32(22, 3000, true);
     new DataView(head.buffer).setUint16(28, bitsPerPixel, true);
 
     return head;
@@ -212,7 +242,7 @@ describe(bmpHasAlpha, () => {
 });
 
 /** A WebP head: RIFF header, then a first chunk of `type` whose payload starts with `payload`. */
-const webpHead = (type: string, payload: number[]): Uint8Array =>
+const webpHead = (type: string, payload: number[]): Uint8Array<ArrayBuffer> =>
     new Uint8Array([
         ...[..."RIFF"].map((c) => c.codePointAt(0) ?? 0),
         ...zeros(4),
@@ -246,6 +276,30 @@ describe(webpIsAnimatedOrTransparent, () => {
 
         expect(webpIsAnimatedOrTransparent(jpeg)).toBe(true);
         expect(webpIsAnimatedOrTransparent(new Uint8Array(4))).toBe(true);
+    });
+});
+
+const sizeOf = async (parts: BlobPart[], type: string) => await readImageSize(new File(parts, "a", { type }));
+
+describe(readImageSize, () => {
+    it("reads a PNG's IHDR", async () => {
+        expect(await sizeOf([pngOfSize(640, 480)], "image/png")).toStrictEqual({ height: 480, width: 640 });
+    });
+
+    it("finds a JPEG's frame header past a large APP segment", async () => {
+        expect(await sizeOf([jpegHead(5000, 3000, 40_000)], "image/jpeg")).toStrictEqual({ height: 3000, width: 5000 });
+    });
+
+    it("reads a BMP and an extended WebP", async () => {
+        expect(await sizeOf([bmpHead(24)], "image/bmp")).toStrictEqual({ height: 3000, width: 4000 });
+
+        // 24-bit little-endian canvas width - 1 and height - 1 follow the 4 flag bytes.
+        expect(await sizeOf([webpHead("VP8X", [0, 0, 0, 0, 0x0f, 0x01, 0, 0xc7, 0, 0])], "image/webp")).toStrictEqual({ height: 200, width: 272 });
+    });
+
+    it("answers undefined for bytes it cannot read", async () => {
+        expect(await sizeOf([new Uint8Array(40)], "image/jpeg")).toBeUndefined();
+        expect(await sizeOf([new Uint8Array(40)], "image/png")).toBeUndefined();
     });
 });
 
@@ -308,10 +362,47 @@ describe(downscaleOversizedImage, () => {
             // Size follows the width: too big at 2048 px, so the quality steps and one shrink are not enough.
             stubBrowser((width) => width * 3000);
 
-            const file = new File([new Uint8Array(TARGET_IMAGE_BYTES * 8)], "photo.jpg", { type: "image/jpeg" });
+            const file = new File([jpegHead(4000, 3000), new Uint8Array(TARGET_IMAGE_BYTES * 8)], "photo.jpg", { type: "image/jpeg" });
             const result = await downscaleOversizedImage(file);
 
             expect(result.size).toBeLessThanOrEqual(TARGET_IMAGE_BYTES);
+        });
+
+        it("declines a 20000 × 20000 image without decoding it", async () => {
+            const create = stubBrowser(() => 10);
+            const file = new File([pngOfSize(20_000, 20_000), new Uint8Array(TARGET_IMAGE_BYTES + 1)], "huge.png", { type: "image/png" });
+
+            expect(await downscaleOversizedImage(file)).toBe(file);
+            expect(create).not.toHaveBeenCalled();
+        });
+
+        it("keeps an image whose header cannot be read, without decoding it", async () => {
+            const create = stubBrowser(() => 10);
+            const file = new File([new Uint8Array(TARGET_IMAGE_BYTES + 1)], "odd.jpg", { type: "image/jpeg" });
+
+            expect(await downscaleOversizedImage(file)).toBe(file);
+            expect(create).not.toHaveBeenCalled();
+        });
+
+        it("asks the decoder for the target size, so no full-size bitmap is allocated", async () => {
+            const create = stubBrowser(() => TARGET_IMAGE_BYTES - 1);
+            const file = new File([jpegHead(4000, 3000), new Uint8Array(TARGET_IMAGE_BYTES * 2)], "photo.jpg", { type: "image/jpeg" });
+
+            await downscaleOversizedImage(file);
+
+            expect(create).toHaveBeenCalledWith(file, { imageOrientation: "from-image", resizeHeight: 1536, resizeQuality: "high", resizeWidth: 2048 });
+        });
+
+        it("decodes whole when the browser refuses the resize options", async () => {
+            const create = stubBrowser(() => TARGET_IMAGE_BYTES - 1);
+
+            create.mockRejectedValueOnce(new Error("unsupported"));
+
+            const file = new File([jpegHead(4000, 3000), new Uint8Array(TARGET_IMAGE_BYTES * 2)], "photo.jpg", { type: "image/jpeg" });
+            const result = await downscaleOversizedImage(file);
+
+            expect(create).toHaveBeenLastCalledWith(file, { imageOrientation: "from-image" });
+            expect(result.name).toBe("photo.jpg");
         });
 
         it("leaves a 32-bit BMP alone, because a JPEG would flatten its alpha", async () => {
