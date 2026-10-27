@@ -336,9 +336,32 @@ fn probe_folder() -> Result<PathBuf, String> {
     Ok(folder)
 }
 
-/// Whether `name` is the variable agents find their programs by (case-insensitive: Windows names are).
-fn is_path_var(name: &str) -> bool {
-    name.eq_ignore_ascii_case("PATH")
+/// Variables that decide which code a program runs besides the ones it names: its own libraries, modules and
+/// start-up scripts.
+const CODE_LOADING_VARS: [&str; 12] = [
+    "BASH_ENV",
+    "ENV",
+    "NODE_PATH",
+    "PERL5LIB",
+    "PERL5OPT",
+    "PYTHONHOME",
+    "PYTHONPATH",
+    "PYTHONSTARTUP",
+    "RUBYLIB",
+    "RUBYOPT",
+    "GEM_PATH",
+    "CLASSPATH",
+];
+
+/// Whether `name` changes which program (or which code in it) runs: the variable agents find their programs by
+/// and the loader and interpreter variables that inject or redirect code. Case-insensitive: Windows names are.
+fn changes_program(name: &str) -> bool {
+    let upper = name.to_ascii_uppercase();
+
+    upper == "PATH"
+        || upper.starts_with("LD_")
+        || upper.starts_with("DYLD_")
+        || CODE_LOADING_VARS.contains(&upper.as_str())
 }
 
 /// The full environment of one agent: built, then the global variables, then the agent's own.
@@ -376,8 +399,8 @@ fn scope_env<'a>(
     }
 }
 
-/// `PATH` decides which program a bare command name starts, so a different one is not the program the user
-/// approved for these folders: the approvals of the agent it was set for (or of all agents, for the global one)
+/// `PATH` decides which program a bare command name starts, and the loader and interpreter variables decide what
+/// code it loads, so a different value is not the program the user approved for these folders: the approvals of the agent it was set for (or of all agents, for the global one)
 /// are dropped.
 fn drop_path_consents(settings: &mut crate::store::Settings, agent_key: Option<&str>) {
     settings
@@ -501,7 +524,7 @@ impl DeviceState {
                         return Err(format!("at most {MAX_ENV_VARS} variables"));
                     }
 
-                    let moved = is_path_var(&name) && scope.0.get(&name) != Some(&value);
+                    let moved = changes_program(&name) && scope.0.get(&name) != Some(&value);
 
                     scope.0.insert(name, value);
 
@@ -515,7 +538,7 @@ impl DeviceState {
                         .remove(&name)
                         .is_some();
 
-                    if removed && is_path_var(&name) {
+                    if removed && changes_program(&name) {
                         drop_path_consents(settings, agent_key.as_deref());
                     }
                 }
@@ -974,6 +997,21 @@ mod tests {
         grant(&state, "alpha", &work);
         set_env(&state, None, "PATH", "/opt/global").unwrap();
         assert!(state.acp_view().consents.is_empty());
+
+        // So is a variable that loads other code into the program.
+        for name in [
+            "LD_PRELOAD",
+            "dyld_insert_libraries",
+            "NODE_PATH",
+            "PYTHONPATH",
+        ] {
+            grant(&state, "alpha", &work);
+            set_env(&state, Some("alpha"), name, "/tmp/x").unwrap();
+            assert!(
+                state.acp_view().consents.is_empty(),
+                "{name} keeps an approval"
+            );
+        }
 
         let _ = fs::remove_dir_all(&dir);
     }
