@@ -436,7 +436,8 @@ export class AgentSession {
             throw new RpcError(INVALID_PARAMS, "invalid permission request");
         }
 
-        if (this.cancelRequested || this.status === "ended") {
+        // Only while a turn the user started is running: a request between turns has nothing to authorize.
+        if (this.cancelRequested || this.status !== "busy" || this.current === undefined) {
             return { outcome: { outcome: "cancelled" } };
         }
 

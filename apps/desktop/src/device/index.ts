@@ -313,8 +313,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     // A native dialog, so the page cannot draw a confirmation that looks like one.
     local(LOCAL_CHANNEL.confirm, async (message) => {
-        const text = typeof message === "string" && message.length <= 1000 ? message : "";
-        const dialogOptions = { buttons: ["Cancel", "OK"], cancelId: 0, defaultId: 1, message: text, type: "question" as const };
+        // A message that is not shown whole is not confirmed: an empty dialog with OK as the default would approve nothing readable.
+        if (typeof message !== "string" || message.length > 1000) {
+            return false;
+        }
+
+        const dialogOptions = { buttons: ["Cancel", "OK"], cancelId: 0, defaultId: 1, message, type: "question" as const };
         const parent = liveLocal();
         const result = parent === undefined ? await dialog.showMessageBox(dialogOptions) : await dialog.showMessageBox(parent, dialogOptions);
 

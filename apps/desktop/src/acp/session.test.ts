@@ -212,6 +212,25 @@ describe("a request the user declined", () => {
         };
     };
 
+    it("answers a request made while no turn is running 'cancelled', without asking the user", async () => {
+        const asked: unknown[] = [];
+        const gate: PermissionGate = {
+            ask: async (request) => {
+                asked.push(request);
+
+                return { optionId: "allow", outcome: "selected" };
+            },
+            cancelSession: () => {},
+        };
+        const { agent } = await setup(gate);
+
+        agent.say(ask(5, "c9"));
+        await expect.poll(() => agent.written.length).toBe(3);
+
+        expect(agent.written[2]).toMatchObject({ id: 5, result: { outcome: { outcome: "cancelled" } } });
+        expect(asked).toEqual([]);
+    });
+
     it("ends the call as declined on this side, even when the agent says nothing more, and sends the agent its reject option", async () => {
         const { agent, session } = await setup(declineGate);
 

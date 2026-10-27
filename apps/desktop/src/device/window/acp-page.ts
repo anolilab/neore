@@ -439,6 +439,9 @@ const selectedId = (): string => {
     return state.selected;
 };
 
+/** What the native confirmation shows whole; it refuses anything longer. */
+const MAX_CONFIRM_CHARS = 1000;
+
 export const initAcp = async (): Promise<void> => {
     $("acp-agent-form").addEventListener("submit", (event) => {
         event.preventDefault();
@@ -456,7 +459,13 @@ export const initAcp = async (): Promise<void> => {
                 .filter(Boolean);
 
             // The exact command line, confirmed once more: it will run as you.
-            if (!await globalThis.neoreDevice.confirm(`Add “${label}”? This computer will run:\n\n${[command, ...args].join(" ")}`)) {
+            const question = `Add “${label}”? This computer will run:\n\n${[command, ...args].join(" ")}`;
+
+            if (question.length > MAX_CONFIRM_CHARS) {
+                throw new Error("The command line is too long to confirm. Shorten the name, command or arguments.");
+            }
+
+            if (!await globalThis.neoreDevice.confirm(question)) {
                 return;
             }
 
