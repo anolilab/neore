@@ -69,7 +69,7 @@ export type VaultRowToCopy = Infer<typeof vVaultRowToCopy>;
  * with no check status, or one that passed. A pending, checking, blocked or failed
  * image is not copied, so its reference is stripped from the fork: a copy would
  * keep the status it had, and the verdict never reaches the copy. Runs on the OWNER's shard, where their
- * `files` rows live (docs/plans/per-user-sharding.md). One read for the whole set.
+ * `files` rows live. One read for the whole set.
  */
 export const findOwnedVaultRows = async (db: QueryCtx["db"], ownerId: string, keys: Iterable<string>): Promise<VaultRowToCopy[]> => {
     const uniqueKeys = [...new Set(keys)];

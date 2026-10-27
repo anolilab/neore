@@ -1,8 +1,8 @@
 /**
  * Which backend shard a call about a SHARED object goes to.
  *
- * Every row lives on the shard of the user who owns the object it belongs to
- * (docs/plans/per-user-sharding.md). The backend sends a call that names no
+ * Every row lives on the shard of the user who owns the object it belongs to.
+ * The backend sends a call that names no
  * shard to the caller's own, which is right for everything the caller owns. A
  * thread or page someone else shared lives on THEIR shard, so calls about it
  * must name it — and the call's arguments are what say which object it is about.

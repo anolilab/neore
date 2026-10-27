@@ -232,7 +232,7 @@ written here is what is not.
       nsfw-checker declare `ai` in `env.production` / `env.preview` only; Alchemy
       binds `AI` itself.
     - **document-parser is a RUST Worker** (workers-rs + xberg;
-      docs/plans/document-parser.md). Its `wrangler.jsonc` `build.command` is
+      plans/document-parser.md). Its `wrangler.jsonc` `build.command` is
       `pnpm --filter document-parser run build:worker`, never `./build.sh` or
       `node scripts/build.mjs`: plain wrangler runs a build command in the
       CALLER's cwd and does not resolve `build.cwd` against the config. `lunora
@@ -554,7 +554,7 @@ written here is what is not.
   at `/api/auth/client-grant/cookie`, which sets the normal session cookie — do
   not add a second grant system. See its README.
   **Device execution** (`packages/device-core/src/{shell,sandbox}.rs`, `backend/lunora/devices/`,
-  `features/devices`, docs/plans/device-execution.md) is remote code execution
+  `features/devices`, plans/device-execution.md) is remote code execution
   on the user's machine, so the page is a RELAY only: the backend signs each
   call (HMAC, domain-prefixed payload STRING — no canonical JSON) with a
   per-device secret, Rust verifies signature/device/expiry/nonce, asks in the
@@ -1218,7 +1218,7 @@ first real request. They were found by driving the app in a browser
 ### Sharding and concurrency
 
 - **Per-user sharding: a row lives on the shard of the user who OWNS the
-  object it belongs to** (docs/plans/per-user-sharding.md). `ctx.db` never
+  object it belongs to** (plans/per-user-sharding.md). `ctx.db` never
   routes by a table's `.shardBy()` field — a row lands in whichever Durable
   Object executed the write — so what decides placement is which shard each
   REQUEST lands on:

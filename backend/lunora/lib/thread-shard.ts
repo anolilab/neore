@@ -1,5 +1,5 @@
 /**
- * The shard a thread's work runs on: its OWNER's (docs/plans/per-user-sharding.md).
+ * The shard a thread's work runs on: its OWNER's.
  *
  * For the owner that is their own shard; for a collaborator it is the owner who
  * granted them the thread, read from their `.global()` grant. No grant (or an

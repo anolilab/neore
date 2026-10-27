@@ -43,7 +43,7 @@ describe("sharing API exports", () => {
         // inspecting the builder, because a registration carries no runtime marker
         // for its visibility.
         // `getPublicThreadOwner` / `readPublicThread` are `getPublicThread`'s two
-        // halves (docs/plans/per-user-sharding.md), `readThreadShareToken`
+        // halves, `readThreadShareToken`
         // `getThreadShareToken`'s owner-shard read.
         const INTERNAL_ONLY = new Set(["checkThreadAccess", "checkThreadAccessWithData", "getPublicThreadOwner", "readPublicThread", "readThreadShareToken"]);
         const registered = Object.keys(sharing).filter((name) => !INTERNAL_ONLY.has(name));

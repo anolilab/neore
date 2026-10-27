@@ -372,7 +372,7 @@ export const schema = defineSchema({
         // `.global()`: content-addressed (`agent-files/<sha256>`), so identical
         // bytes stored by two users share ONE R2 object. Its refcount must see
         // every user's references — per-shard copies would each reap the object
-        // the other still uses (docs/plans/per-user-sharding.md).
+        // the other still uses.
         .global()
         .index("hash_filename", ["hash", "filename"])
         .index("refcount", ["refcount"]),
@@ -1536,8 +1536,7 @@ export const schema = defineSchema({
         title: v.optional(v.string()),
         userId: v.string(),
     })
-        // `.global()`, not `.shardBy("userId")`: read across users — see
-        // docs/plans/per-user-sharding.md.
+        // `.global()`, not `.shardBy("userId")`: read across users.
         .global()
         .index("by_page_and_user", ["pageId", "userId"])
         .index("by_user_and_owner", ["userId", "ownerId"]),
@@ -1587,8 +1586,7 @@ export const schema = defineSchema({
         tokenHash: v.string(),
         userId: v.string(),
     })
-        // `.global()`, not `.shardBy("userId")`: read across users — see
-        // docs/plans/per-user-sharding.md.
+        // `.global()`, not `.shardBy("userId")`: read across users.
         .global()
         .index("by_tokenHash", ["tokenHash"])
         .index("by_page", ["pageId"]),
@@ -1827,8 +1825,7 @@ export const schema = defineSchema({
             }),
         ),
     })
-        // `.global()`, not `.shardBy("userId")`: read across users — see
-        // docs/plans/per-user-sharding.md.
+        // `.global()`, not `.shardBy("userId")`: read across users.
         .global()
         .index("by_user_and_pinned", ["userId", "pinnedAt"])
         .index("by_user_and_type", ["userId", "projectType"])
@@ -1864,8 +1861,7 @@ export const schema = defineSchema({
         ),
         version: v.number(),
     })
-        // `.global()`, not `.shardBy("userId")`: read across users — see
-        // docs/plans/per-user-sharding.md.
+        // `.global()`, not `.shardBy("userId")`: read across users.
         .global()
         .index("by_prompt_version", ["promptId", "version"])
         .relations((r) => {
@@ -1896,8 +1892,7 @@ export const schema = defineSchema({
             ),
         ),
     })
-        // `.global()`, not `.shardBy("userId")`: read across users — see
-        // docs/plans/per-user-sharding.md.
+        // `.global()`, not `.shardBy("userId")`: read across users.
         .global()
         .index("by_user_and_favorite", ["userId", "isFavorite"])
         .index("by_organization_and_favorite", ["organizationId", "isFavorite"])
@@ -2036,8 +2031,8 @@ export const schema = defineSchema({
         .index("by_nextDueAt", ["nextDueAt"]),
 
     /**
-     * Lookup from a key known BEFORE the owner is to the owner's shard
-     * (docs/plans/per-user-sharding.md): a public share token, a messenger
+     * Lookup from a key known BEFORE the owner is to the owner's shard:
+     * a public share token, a messenger
      * connection id, a trigger id. The rows they name live on the owner's shard,
      * so a webhook or anonymous public view finds the shard here first.
      *
@@ -2454,8 +2449,7 @@ export const schema = defineSchema({
         threadId: v.id("threads"),
         userId: v.string(),
     })
-        // `.global()`, not `.shardBy("userId")`: read across users — see
-        // docs/plans/per-user-sharding.md.
+        // `.global()`, not `.shardBy("userId")`: read across users.
         .global()
         .index("by_thread_and_user", ["threadId", "userId"])
         .index("by_user_and_owner", ["userId", "ownerId"])
@@ -2478,8 +2472,7 @@ export const schema = defineSchema({
         status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("expired"), v.literal("revoked")),
         threadId: v.id("threads"),
     })
-        // `.global()`, not `.shardBy("userId")`: read across users — see
-        // docs/plans/per-user-sharding.md.
+        // `.global()`, not `.shardBy("userId")`: read across users.
         .global()
         .index("by_thread", ["threadId"])
         .index("by_invite_token", ["inviteToken"])
@@ -3018,8 +3011,7 @@ export const schema = defineSchema({
         userId: v.string(),
         variables: v.array(v.object({ name: v.string(), value: v.string() })),
     })
-        // `.global()`, not `.shardBy("userId")`: read across users — see
-        // docs/plans/per-user-sharding.md.
+        // `.global()`, not `.shardBy("userId")`: read across users.
         .global()
         .index("by_organization", ["organizationId"])
         .index("by_user_and_organization", ["userId", "organizationId"]),

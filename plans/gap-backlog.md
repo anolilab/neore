@@ -6,8 +6,9 @@
 Capabilities of chat, gateway, workflow and voice/document handling that this
 tree does not have, or has only in part. Each item says what is missing, the
 smallest design that fits our architecture, and why it is not built yet. Three
-items have their own plans: `knowledge-retrieval-quality.md`,
-`gateway-responses-api.md`, `workflow-canvas-a11y.md`.
+earlier items are built (knowledge retrieval quality, the gateway `/v1/responses`
+route, workflow canvas accessibility); their plans were removed and live on in git
+history.
 
 Already covered, so not gaps: hands-free voice already runs on ElevenLabs
 Scribe realtime with a Web Speech fallback (`voice-mode/listen.ts`), the gateway
@@ -66,7 +67,7 @@ product decision on retention, consent and pricing first.
 
 ## OCR for scanned documents
 
-`docs/plans/document-parser.md` already says OCR needs the container route; the
+`plans/document-parser.md` already says OCR needs the container route; the
 Rust Worker has no OCR. A vision-model fallback (`vision-analysis.ts`) per page
 is possible for small files. **Not built:** waits on the container decision.
 
@@ -126,7 +127,9 @@ Checked against the code. "Decision" means a product call is needed first.
   deliberate decision. Progress notifications are not possible with
   `@ai-sdk/mcp` 2.0.73 (`RequestOptions` has no `onprogress`, so no
   `progressToken` is sent).
-- **A2A / ACP: absent.** Speculative; no plan.
+- **ACP: planned, not built.** See `plans/agent-host-roadmap.md` (ACP host,
+  SSH hosts, orchestrator, outside-agent MCP, mobile control). **A2A: absent.**
+  Speculative; no plan.
 - **Observability backends.** Langfuse reads `gen_ai.request.model` /
   `gen_ai.response.model` and `gen_ai.usage.*`, needs
   `x-langfuse-ingestion-version=4` (otherwise data can lag up to ten minutes) and

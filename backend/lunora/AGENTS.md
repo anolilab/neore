@@ -29,7 +29,7 @@ anyone editing handlers here:
   `patchById`: `undefined` removes a field; `withoutUndefined`: `undefined` leaves
   it unchanged).
 - **Per-user sharding** (root `CLAUDE.md` → "Sharding and concurrency",
-  docs/plans/per-user-sharding.md): requests land on the owner's shard. Code in
+  plans/per-user-sharding.md): requests land on the owner's shard. Code in
   a shard reads its shard from `lib/shard-context.ts` (`currentShard`,
   `shardOf`); an HTTP action wraps its handler with `lib/http-shard.ts`
   (`onCallerShard`, `inShard`, `onRoutedShard`); reaching another user's shard is

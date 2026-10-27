@@ -15,7 +15,7 @@ import { deleteUserPages } from "./gdpr";
 import { acceptPageInvite, createPageInvite, getPublicPage, removePageGrant, setPagePublic } from "./sharing";
 
 // `acceptPageInvite` / `getPublicPage` are actions that resolve their owner
-// through `ctx.runQuery(internal.pages.sharing.…)` (docs/plans/per-user-sharding.md).
+// through `ctx.runQuery(internal.pages.sharing.…)`.
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));

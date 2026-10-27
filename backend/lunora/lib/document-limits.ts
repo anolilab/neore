@@ -17,7 +17,7 @@
  *
  * TODO: To support documents above 25 MB, move extraction to a Cloudflare
  * Container (xberg native server / Docker image) — a Worker isolate has 128 MB
- * and PDF parsing needs ~3× the file size. See docs/plans/document-parser.md.
+ * and PDF parsing needs ~3× the file size.
  */
 export const MAX_EXTRACTION_DOCUMENT_BYTES = 25 * 1024 * 1024;
 
