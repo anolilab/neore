@@ -52,6 +52,8 @@ export interface McpDependencies {
     callTool: (tool: McpTool, args: Record<string, unknown>) => Promise<Response>;
     /** Whether the calling key holds the route's scopes: it only narrows `tools/list`. */
     canUse: (route: RouteDefinition) => boolean;
+    /** Charges the key's read limit for a request that is not a tool call (a tool call is charged by its route). Throws when over. */
+    chargeProtocolCall: () => Promise<void>;
     request: Request;
     tools: ReadonlyArray<McpTool>;
 }
@@ -188,7 +190,18 @@ const resolveEra = (message: RpcMessage, headers: Headers): { modern: boolean } 
         rpcError(message.id, UNSUPPORTED_VERSION, "Unsupported protocol version", { data: { requested, supported: SUPPORTED_VERSIONS }, status: 400 });
 
     if (typeof declared !== "string") {
-        return header && !SUPPORTED_VERSIONS.includes(header) ? { refusal: unsupported(header) } : { modern: false };
+        if (header && !SUPPORTED_VERSIONS.includes(header)) {
+            return { refusal: unsupported(header) };
+        }
+
+        // A modern header over a body that does not declare the version is a mismatch, not a legacy call.
+        return (MODERN_VERSIONS as ReadonlyArray<string>).includes(header ?? "")
+            ? {
+                  refusal: rpcError(message.id, HEADER_MISMATCH, "Header mismatch: MCP-Protocol-Version must match the version in the body's _meta.", {
+                      status: 400,
+                  }),
+              }
+            : { modern: false };
     }
 
     if (!(MODERN_VERSIONS as ReadonlyArray<string>).includes(declared)) {
@@ -235,6 +248,10 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
         return era.refusal;
     }
 
+    if (message.method !== "tools/call") {
+        await dependencies.chargeProtocolCall();
+    }
+
     // A notification (`notifications/initialized`) has no answer.
     if (message.id === undefined) {
         return new Response(null, { status: 202 });
@@ -248,6 +265,11 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
 
     switch (method) {
         case "initialize": {
+            // A modern client discovers instead of negotiating.
+            if (era.modern) {
+                return rpcError(id, METHOD_NOT_FOUND, "Method not found: initialize (use server/discover)", { status: 404 });
+            }
+
             const requested = params?.["protocolVersion"];
             const protocolVersion = (LEGACY_VERSIONS as ReadonlyArray<unknown>).includes(requested) ? requested : LEGACY_VERSIONS[0];
 

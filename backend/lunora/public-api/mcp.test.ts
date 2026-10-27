@@ -164,6 +164,20 @@ describe("MCP framing", () => {
         expect(await jsonOf(post(rpc("resources/list")))).toMatchObject({ error: { code: -32_601 }, id: 1 });
     });
 
+    it("draws on the key's read limit for protocol calls, and answers 429 when it is spent", async () => {
+        const ok = setup();
+
+        await ok.post(rpc("ping"));
+        await ok.post(rpc("tools/list"));
+
+        expect(rateLimitCalls(ok.calls)).toHaveLength(2);
+
+        const spent = setup({ limit: { ok: false, retryAfter: 2000 } });
+        const response = await spent.post(rpc("ping"));
+
+        expect(response.status).toBe(429);
+    });
+
     it("refuses bad JSON, a batch and a non-JSON-RPC body with 400", async () => {
         const { post } = setup();
 
@@ -217,6 +231,19 @@ describe("MCP modern protocol", () => {
         );
 
         expect(((await called.json()) as { result: ToolResult }).result).toMatchObject({ isError: false, resultType: "complete" });
+    });
+
+    it("refuses a modern initialize, and a modern header over a body without the version", async () => {
+        const { post } = setup();
+        const initialize = await post(rpc("initialize", { _meta: meta, protocolVersion: "2026-07-28" }), headers("initialize"));
+
+        expect(initialize.status).toBe(404);
+        expect(await initialize.json()).toMatchObject({ error: { code: -32_601 } });
+
+        const missing = await post(rpc("tools/list"), headers("tools/list"));
+
+        expect(missing.status).toBe(400);
+        expect(await missing.json()).toMatchObject({ error: { code: -32_020 } });
     });
 
     it("rejects a header that disagrees with the body, and a version it does not serve", async () => {
