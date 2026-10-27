@@ -126,8 +126,11 @@ any pair not in its store even with a valid signature.
 ### 3.7 Pull requests
 
 - A list of the pull requests opened by the user's host turns and cloud coding
-  runs. It is a query over runs that recorded a PR URL. A run does not store check status or
-  review state, so each row shows title and branch from the run, and check status and review
+  runs. It is a query over a new `pullRequests` table (owner, URL, title, branch,
+  `threadId`, source: host turn or coding run), written when a host turn's tool
+  result or a coding run records a PR URL. Host turns have no coding-agent run row,
+  so the list does not read runs. The table does not store check status or
+  review state, so each row shows title and branch from the record, and check status and review
   state from `refreshPullRequestStatus` (below), labelled with the age of the answer.
 - **Merge is an outward action.** The control opens a confirmation that names the
   PR title and the target branch. A swipe only opens that confirmation; a merge
@@ -206,7 +209,7 @@ Mobile:
   empties as they finish; the start picker lists only offered pairs; a start for
   a pair revoked on the desktop is refused.
 
-**M6 — Pull requests: list and merge.** Needs the new GitHub merge scope. Each procedure gets an authz-matrix row: `listPullRequests` (authQuery over runs with a recorded PR URL); `refreshPullRequestStatus` (authAction: reads check and review state from GitHub with the user's connector token, under `fetchWithDeadline`, cached for a short TTL in the action cache); `mergePullRequest` (authMutation: checks ownership, takes the claim-once `pr-merge` on the request id, writes a pending merge-request row and schedules the action below). The merge runs in an internal action that rereads the required checks and review state immediately before calling GitHub (also under a deadline), then settles the row as `merged` or `failed` with the reason through an internal mutation. Before calling GitHub the action claims the row in a mutation (pending to merging), so two deliveries cannot both write. A delivery that finds the row already merging, after a crash, reads the pull request from GitHub first: if it is merged it settles `merged`, never `failed`. A merge that failed is retried by a new request. The merge-request row is a new table, owned by the module that records PR URLs, with its erasure step. The phone reads the row's status. A host turn's PR URL is recorded from the `gh pr create` output in its tool result, so the list can show it.
+**M6 — Pull requests: list and merge.** Needs the new GitHub merge scope. Each procedure gets an authz-matrix row: `listPullRequests` (authQuery over the `pullRequests` table, which host turns and coding runs both write); `refreshPullRequestStatus` (authAction: reads check and review state from GitHub with the user's connector token, under `fetchWithDeadline`, cached for a short TTL in the action cache); `mergePullRequest` (authMutation: checks ownership, takes the claim-once `pr-merge` on the request id, writes a pending merge-request row and schedules the action below). The merge runs in an internal action that rereads the required checks and review state immediately before calling GitHub (also under a deadline), then settles the row as `merged` or `failed` with the reason through an internal mutation. Before calling GitHub the action claims the row in a mutation (pending to merging), so two deliveries cannot both write. A delivery that finds the row already merging, after a crash, reads the pull request from GitHub first: if it is merged it settles `merged`, never `failed`. A merge that failed is retried by a new request. The `pullRequests` and merge-request rows are new tables, owned by the module that records PR URLs, each with an erasure step. The phone reads the row's status. A host turn's PR URL is extracted from the `gh pr create` output in its tool result and inserted into `pullRequests` with the turn's thread, so the list can show it.
 - Acceptance: a PR opened by a host turn lists with its checks; no merge happens
   without the confirmation (UI test); a PR with a failing required check refuses
   the merge and shows why; a merge request id merges once.

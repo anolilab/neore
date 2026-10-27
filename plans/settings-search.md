@@ -42,9 +42,12 @@ Decisions:
   `t` strings. A test fails when a tab in the navigation data has no keyword list.
 - **Matching.** Case-insensitive, accent-insensitive substring match over label and
   keywords. Results are grouped by tab, in navigation order.
-- **Opening a result.** Sets `settingsTab`, scrolls the section into view, and
-  highlights the row for two seconds. The search does not add or keep its own URL
-  parameter.
+- **Opening a result.** Switches the modal's own tab state (`currentTab` in
+  `settings-modal.tsx`, which reads `settingsTab` from the URL only once, on
+  mount), then scrolls the section into view after the destination tab has
+  rendered and highlights the row for two seconds. `settingsTab` stays an initial
+  deep-link value; changing it does not switch an open modal. The search does not
+  add or keep its own URL parameter.
 - **Shortcut.** A search shortcut is registered in `features/keyboard/`, and it
   works only while the modal is open.
 - **Accessibility.** The field follows the ARIA combobox pattern. The result count

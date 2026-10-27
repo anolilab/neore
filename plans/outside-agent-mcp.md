@@ -67,8 +67,11 @@ pattern. Writes into host-run threads are refused server-side, in
 
 ### Tools generated from routes
 
-- `RouteDefinition` gains an optional `mcp: { tool: string; description: string }`.
-  Only routes that carry it become tools. The tool's input schema is the route's
+- `RouteDefinition` gains an optional `mcp`: a list of
+  `{ tool: string; description: string; when?: "threadId" | "no-threadId" }`.
+  Only routes that carry it become tools. One route may list several tools that
+  share its handler, scope and limits; `when` narrows the input schema (the
+  `threadId` field required or absent), so `POST /chat` yields both chat tools. The tool's input schema is the route's
   path parameters, query and body schemas, taken from what the OpenAPI builder
   already reads.
 - `tools/list` returns only the tools whose route scopes the calling key holds,
