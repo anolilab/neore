@@ -100,6 +100,15 @@ Rules:
   web pages or tool output. Permission prompts on the host still apply to every
   action. The handoff text is not a permission.
 
+### Offered after a usage limit
+
+- When a host agent stops on its account's usage limit
+  ([acp-agent-host.md](acp-agent-host.md) §6.1), the reply offers a switch to
+  another offered agent or to a cloud model. Taking it is an ordinary switch by
+  the user, with the same rules; nothing switches on its own, because the target
+  bills a different account. A cloud backup model for cloud turns already exists
+  and is separate.
+
 ### Data
 
 - `threads.activeAgent`: optional cache of the active path's agent. Shape `{ kind: "model", model }` or
