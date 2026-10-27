@@ -1,7 +1,7 @@
 import { v } from "lunorash/server";
 
 /**
- * Device execution (`docs/plans/device-execution.md`): validators shared by the
+ * Device execution: validators shared by the
  * schema, the procedures and the chat tool proxy.
  */
 

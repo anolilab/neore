@@ -1,5 +1,9 @@
 import type { BranchNode, GroupType, ThreadGroup } from "./types";
 
+/** Whether `id` is a thread inside a placeholder group, which must not be dragged, reordered or dropped on. */
+export const isInPlaceholderGroup = (groups: ThreadGroup[], id: unknown): boolean =>
+    groups.some((group) => group.isPlaceholder === true && group.threads.some((thread) => thread.threadId === id));
+
 /**
  * Determines the group type based on the thread group properties.
  */
@@ -109,3 +113,10 @@ export const selectThreadIdsByDate = (
         })
         .map((thread) => thread.threadId);
 };
+
+/**
+ * Whether a drag must be ignored: nothing is reordered or moved while the list is the stored placeholder rather than live data,
+ * and nothing is dragged from or onto a stand-in group even then.
+ */
+export const isDragBlocked = (groups: ThreadGroup[], isPlaceholderData: boolean, activeId: unknown, overId: unknown): boolean =>
+    isPlaceholderData || isInPlaceholderGroup(groups, activeId) || isInPlaceholderGroup(groups, overId);

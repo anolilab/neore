@@ -2,7 +2,7 @@
  * `/chat/<id>` of someone else's PUBLIC thread sends a signed-in viewer to its
  * share page. The thread lives on its owner's shard, not the viewer's, so the
  * token comes from `getThreadShareToken`, which follows the `thread-share`
- * route that `toggleThreadVisibility` keeps (docs/plans/per-user-sharding.md).
+ * route that `toggleThreadVisibility` keeps.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";

@@ -68,7 +68,7 @@ export const useFeaturedWorkflows = () => {
 export const usePublicWorkflow = (token: string | undefined) => {
     const client = useLunora();
 
-    // An action: the workflow's media is signed on its author's shard (docs/plans/per-user-sharding.md).
+    // An action: the workflow's media is signed on its author's shard.
     const { data, isLoading } = useQuery({
         ...createLunoraActionQueryOptions(client, api.workflow.gallery.getPublicWorkflow, { publicAccessToken: token ?? "" }),
         enabled: token !== undefined,

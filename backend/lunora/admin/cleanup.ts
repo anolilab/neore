@@ -143,7 +143,7 @@ export const executeCleanup = adminAction
                     const userId = user._id as string;
 
                     // The user's threads and settings live on THEIR shard, not the
-                    // admin's this action runs on (docs/plans/per-user-sharding.md).
+                    // admin's this action runs on.
                     const onUserShard = { shardKey: userId };
                     const threads = await callOnShard(internal.admin.cleanup.getUserThreads, { userId }, onUserShard);
 

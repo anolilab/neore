@@ -7,6 +7,8 @@
  */
 import { v } from "lunorash/server";
 
+import { parseCustomModelId } from "@neore/ai/models";
+
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { SANDBOX_TOOLS } from "../chat/lib/tool-builder";
@@ -327,7 +329,8 @@ export const executeTrigger = internalAction
             const userFixable = isUserFixableRunError(error);
             // The owner reads this in the trigger history; the raw error is logged only.
             // A run's own refusal carries a message written for the owner, which says what to fix.
-            const errorMessage = userFixable ? error.message : toUserFacingError(error);
+            // A custom model's other failures are the owner's endpoint to fix, so they are worded that way.
+            const errorMessage = userFixable ? error.message : toUserFacingError(error, { customEndpoint: parseCustomModelId(model) !== null });
 
             console.error(`[Triggers] Trigger ${trigger.name} failed:`, error);
 

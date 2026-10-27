@@ -1,6 +1,6 @@
 /**
- * Device execution — the procedures the web app calls
- * (`docs/plans/device-execution.md`). A device is one paired install of the
+ * Device execution — the procedures the web app calls.
+ * A device is one paired install of the
  * desktop shell; every procedure here is its OWNER's alone, and every
  * `deviceId` from arguments is compared against the caller.
  *

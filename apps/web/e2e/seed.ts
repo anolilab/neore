@@ -225,7 +225,7 @@ export const queryBackend = async <T>(sql: string, ...values: unknown[]): Promis
 };
 
 /**
- * The local SQLite file of `userId`'s own shard (docs/plans/per-user-sharding.md)
+ * The local SQLite file of `userId`'s own shard
  * — found by its `userSettings` row, which sign-up seeds there. `undefined` when
  * none holds one yet. Miniflare names the files by object id, not by name.
  */

@@ -77,7 +77,7 @@ in one commit.
 ### Shards: a shared thread or page lives on its OWNER's shard
 
 The backend routes a call that names no shard to the CALLER's own
-(docs/plans/per-user-sharding.md). A call about someone else's thread or page
+(plans/per-user-sharding.md). A call about someone else's thread or page
 must name the owner's shard — and no call site does that by hand:
 `packages/client-runtime/src/shard-routing.ts` keeps `threadId`/`chatId`/`pageId`/`streamId` →
 owner, and `crpc` (queries, mutations, actions), the live-query manager,

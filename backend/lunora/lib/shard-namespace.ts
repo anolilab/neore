@@ -1,6 +1,6 @@
 /**
  * The `SHARD` Durable Object namespace, with a DEV-ONLY switch that sends every
- * shard key to `__root__` (docs/plans/per-user-sharding.md, "Measurements").
+ * shard key to `__root__`.
  *
  * `SHARD_ROUTING=off` in `backend/.dev.vars` makes the stack behave as it did
  * before per-user sharding — one Durable Object for everything — while running

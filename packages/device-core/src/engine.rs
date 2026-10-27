@@ -1,5 +1,5 @@
 //! The device engine: pairing, the signed relay, approvals, the sandboxed shell and local
-//! MCP servers. Windows, notifications and dialogs belong to the host (`docs/plans/device-execution.md`).
+//! MCP servers. Windows, notifications and dialogs belong to the host.
 //!
 //! The host (the Electron shell through `device-core-node`, or any other
 //! embedder) owns the windows. It hands the engine an event sink and calls the

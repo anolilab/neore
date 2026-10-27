@@ -238,6 +238,9 @@ phones.
 | onboarding    | —                            | N      |                                                                |
 | changelog     | —                            | N      | small                                                          |
 | devices       | **device execution (Rust)**  | N      | list/revoke only; pairing and approval stay on the desktop     |
+| agent hosts   | **ACP agents, SSH hosts**    | N      | control only: send, approvals, offline cache. [Plan](mobile-acp-and-remote-control.md) |
+| workers       | orchestrator lead/worker     | N      | running rail once worker slices ship. [Plan](agent-orchestrator.md) |
+| outside agents | MCP key in settings         | —      | web only. [Plan](outside-agent-mcp.md)                         |
 | canvas        | —                            | D      | Fabric.js design + artifacts                                   |
 | pages         | —                            | D      | tiptap; read view native later                                 |
 | slides        | —                            | D      | viewer first                                                   |
@@ -257,6 +260,8 @@ and polish. Each ships behind a feature flag per row.
 
 - **Client runtime on Hermes** unverified (§6). Gate Phase 4 on it.
 - **Streaming markdown on RN** unsolved (§7). Biggest UX risk for the chat row.
+  Decided 2026-10-26: stay on Expo. The slice 2 frame-time measurement in
+  `mobile-phase-4-slices.md` is the gate.
 - **Live-query load.** The web client holds ≤32 subscriptions and throttles
   seeds to 3 (`CLAUDE.md`). A phone resuming from background re-subscribes
   everything; the mobile client needs a smaller first-paint budget.

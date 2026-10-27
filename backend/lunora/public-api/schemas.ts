@@ -135,6 +135,49 @@ export const zMemorySchema = z.object({
     updatedAt: z.number().nullable(),
 });
 
+const zTriggerFilterOpSchema = z.enum(["equals", "not_equals", "contains", "starts_with", "exists", "not_exists"]);
+
+const zTriggerFilterSchema = z.object({ op: zTriggerFilterOpSchema, path: z.string(), value: z.string().nullable() });
+
+const zTriggerFilterRequestSchema = z.object({
+    op: zTriggerFilterOpSchema,
+    path: z.string().min(1).max(200),
+    value: z.string().max(500).nullable().optional().meta({ description: "Omit or send `null` for `exists` and `not_exists`, as a read returns it." }),
+});
+
+export const zTriggerSchema = z.object({
+    botComputer: z.boolean(),
+    botId: z.string().nullable(),
+    createdAt: z.number(),
+    cronExpression: z.string().nullable(),
+    description: z.string().nullable(),
+    enabled: z.boolean(),
+    filters: z.array(zTriggerFilterSchema),
+    id: z.string(),
+    inputTemplate: z.string().nullable(),
+    lastError: z.string().nullable(),
+    lastTriggeredAt: z.number().nullable(),
+    model: z.string(),
+    name: z.string(),
+    nextTriggerAt: z.number().nullable(),
+    quietWhenEmpty: z.boolean(),
+    systemPrompt: z.string().nullable(),
+    timezone: z.string().nullable(),
+    triggerCount: z.number(),
+    type: z.string().meta({ description: "schedule | webhook" }),
+    updatedAt: z.number(),
+    webhookSignatureScheme: z.string().nullable().meta({ description: "timestamped | native | gitlab-token, for a webhook trigger." }),
+});
+
+export const zTriggerExecutionSchema = z.object({
+    completedAt: z.number().nullable(),
+    error: z.string().nullable(),
+    id: z.string(),
+    startedAt: z.number(),
+    status: z.string(),
+    threadId: z.string().nullable(),
+});
+
 // ─── Requests ───────────────────────────────────────────────────────────────
 
 export const zChatRequestSchema = z.object({
@@ -190,6 +233,59 @@ export const zTaskCreateRequestSchema = z.object({
     skillId: zIdSchema.optional(),
     successCriteria: z.string().max(5000).optional(),
     title: z.string().min(1).max(200),
+});
+
+const zTriggerFields = {
+    botComputer: z
+        .boolean()
+        .optional()
+        .meta({ description: "Scheduled triggers with a bot only: lets the bot use its computer. Takes effect once the trigger is enabled in the app." }),
+    cronExpression: z.string().max(200).optional().meta({ description: "Five-field cron expression (UTC) that runs at most hourly. Required for a schedule." }),
+    filters: z
+        .array(zTriggerFilterRequestSchema)
+        .max(10)
+        .optional()
+        .meta({ description: "Webhook triggers only. Replaces the stored set; an empty array clears it." }),
+    inputTemplate: z
+        .string()
+        .max(100_000)
+        .optional()
+        .meta({ description: "Schedule triggers only: the message each run starts with. A webhook trigger is refused this field." }),
+    quietWhenEmpty: z.boolean().optional().meta({ description: "Scheduled triggers with a bot only: skip a run that has nothing to report." }),
+    systemPrompt: z.string().max(100_000).optional(),
+    timezone: z.string().max(200).optional(),
+};
+
+const zWebhookPresetSchema = z.discriminatedUnion("provider", [
+    z.object({
+        event: z.enum(["pull_request_opened", "pull_request_merged", "pull_request_review_requested", "issue_assigned"]),
+        provider: z.literal("github"),
+    }),
+    z.object({ event: z.enum(["merge_request_opened", "merge_request_merged"]), provider: z.literal("gitlab") }),
+]);
+
+export const zTriggerCreateRequestSchema = z.object({
+    ...zTriggerFields,
+    botId: zIdSchema.optional(),
+    description: z.string().max(10_000).optional(),
+    model: z.string().min(1).max(200),
+    name: z.string().min(1).max(200),
+    type: z.enum(["schedule", "webhook"]),
+    webhookPreset: zWebhookPresetSchema
+        .optional()
+        .meta({ description: "Webhook triggers only. A provider and one of its events; sets the filters and the signature scheme, so send no `filters`." }),
+    webhookSignatureScheme: z
+        .enum(["timestamped", "native", "gitlab-token"])
+        .optional()
+        .meta({ description: "Webhook triggers only; fixed at creation. Defaults to `timestamped`; a `webhookPreset` fixes it to the provider's." }),
+});
+
+export const zTriggerUpdateRequestSchema = z.object({
+    ...zTriggerFields,
+    botId: zIdSchema.nullable().optional().meta({ description: "`null` clears the bot." }),
+    description: z.string().max(10_000).nullable().optional().meta({ description: "`null` clears the description." }),
+    model: z.string().min(1).max(200).optional(),
+    name: z.string().min(1).max(200).optional(),
 });
 
 export const zKnowledgeFileCreateRequestSchema = z.object({

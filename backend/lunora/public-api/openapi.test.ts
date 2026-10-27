@@ -80,6 +80,35 @@ describe("OpenAPI document", () => {
         expect(hasHeader(paths["/tasks"]!["get"]!)).toBe(false);
     });
 
+    it("documents the trigger routes with their scopes", () => {
+        const operations = {
+            createTrigger: paths["/triggers"]!["post"]!,
+            deleteTrigger: paths["/triggers/{triggerId}"]!["delete"]!,
+            getTrigger: paths["/triggers/{triggerId}"]!["get"]!,
+            listTriggers: paths["/triggers"]!["get"]!,
+            updateTrigger: paths["/triggers/{triggerId}"]!["patch"]!,
+        };
+
+        expect(Object.entries(operations).map(([id, operation]) => [id, operation["operationId"]])).toEqual(Object.keys(operations).map((id) => [id, id]));
+        expect(operations.listTriggers["x-required-scopes"]).toEqual(["triggers:read"]);
+        expect(operations.getTrigger["x-required-scopes"]).toEqual(["triggers:read"]);
+        expect(operations.createTrigger["x-required-scopes"]).toEqual(["triggers:write"]);
+        expect(operations.updateTrigger["x-required-scopes"]).toEqual(["triggers:write"]);
+        expect(operations.deleteTrigger["x-required-scopes"]).toEqual(["triggers:write"]);
+        expect(JSON.stringify(document["components"])).toContain("triggers:read");
+    });
+
+    it("advertises Idempotency-Key on trigger create, noting that a webhook create refuses it", () => {
+        const parameters = (paths["/triggers"]!["post"]!["parameters"] as { description: string; name: string }[] | undefined) ?? [];
+        const key = parameters.find((parameter) => parameter.name === "Idempotency-Key");
+
+        expect(key?.description).toContain("webhook");
+    });
+
+    it("documents 409 on the trigger update only among PATCH routes", () => {
+        expect(Object.keys(paths["/triggers/{triggerId}"]!["patch"]!["responses"] as object)).toContain("409");
+    });
+
     it("renders escaped docs HTML", () => {
         const html = renderDocsHtml(document);
 

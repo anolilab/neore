@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { clearThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
 import { resetAnalyticsIdentity, trackEvent } from "@/lib/analytics";
 import { setNativeBadge } from "@/lib/native/bridge";
@@ -23,6 +24,9 @@ const SignOut = () => {
 
         trackEvent("signed_out", {});
 
+        // Before the sign-out call, so the error branch (an account the server already dropped) leaves none of this user's list behind either.
+        clearThreadListCache();
+
         // A full load of sign-in, not a reload: reloading `/auth/sign-out` would
         // mount this view again and sign out in a loop. A full load (rather than
         // a router navigation) also drops every client cache of the old session.
@@ -34,6 +38,10 @@ const SignOut = () => {
         void releasePush().then(() =>
             authClient.signOut({
                 fetchOptions: {
+                    onResponse: () => {
+                        // Settled either way: drop anything a push stored while the request ran (writes stay held until the next sign-in).
+                        clearThreadListCache();
+                    },
                     onError: () => {
                         // The session may still be active: keep the analytics identity.
                         globalThis.location.replace(signInPath);

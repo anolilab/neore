@@ -28,6 +28,8 @@ export interface BranchNode {
 export interface ThreadGroup {
     groupType?: GroupType;
     isCollapsed?: boolean;
+    /** A stand-in group (stored project chats before the project list answers): read-only, nothing in it may be reordered or moved. */
+    isPlaceholder?: boolean;
     projectColor?: string;
     projectIcon?: string;
     projectId?: string;

@@ -7,7 +7,7 @@
 //!
 //! PRIVATE: no workers.dev URL and no route, so the backend's
 //! `SERVICE_DOCUMENT_PARSER` service binding is the only way in, and there is no
-//! auth here. See docs/plans/document-parser.md for the limits and the design.
+//! auth here.
 
 mod shape;
 
