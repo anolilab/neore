@@ -2737,8 +2737,6 @@ export const schema = defineSchema({
         botId: v.optional(v.id("bots")),
         createdAt: v.number(),
         cronExpression: v.optional(v.string()),
-        // `true` when the cron is read in `timezone`. Absent = UTC, as for every schedule saved before zones existed; those rows may carry a stray browser zone.
-        cronInZone: v.optional(v.boolean()),
         description: v.optional(v.string()),
         enabled: v.boolean(),
         eventConnectionId: v.optional(v.string()),

@@ -98,7 +98,6 @@ interface TriggerRow {
     botId: string | null;
     createdAt: number;
     cronExpression: string | null;
-    cronInZone: boolean;
     description: string | null;
     enabled: boolean;
     filters: { op: FilterOp; path: string; value: string | null }[];
@@ -636,8 +635,8 @@ const TriggerSettings: FC = () => {
     );
 
     const startEditing = useCallback((trigger: TriggerRow) => {
-        // A schedule not stored with a zone runs in UTC, whatever zone a row from before zones carries: the field stays empty, not the browser's zone.
-        const zone = trigger.cronInZone ? (trigger.timezone ?? "") : "";
+        // A schedule stored without a zone runs in UTC: the field stays empty, not the browser's zone.
+        const zone = trigger.timezone ?? "";
 
         setEditingTriggerId(trigger._id);
         setEditStartZone(zone);
@@ -794,7 +793,7 @@ const TriggerSettings: FC = () => {
                                                         <span className="flex items-center gap-1">
                                                             <Clock aria-hidden="true" className="size-3" />
                                                             {trigger.cronExpression}
-                                                            {trigger.cronInZone && trigger.timezone && ` (${trigger.timezone})`}
+                                                            {trigger.timezone && ` (${trigger.timezone})`}
                                                         </span>
                                                     )}
                                                     <span>

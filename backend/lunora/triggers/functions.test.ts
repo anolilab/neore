@@ -245,17 +245,15 @@ describe("trigger schedules", () => {
         const trigger = await readTrigger(triggerId);
 
         expect(trigger.timezone).toBeUndefined();
-        expect(trigger.cronInZone).toBeUndefined();
     });
 
-    it("stores a valid time zone trimmed and marks the cron as read in it", async () => {
+    it("stores a valid time zone trimmed", async () => {
         const { triggerId } = (await as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), timezone: "  Europe/Berlin " } as never)) as {
             triggerId: string;
         };
         const trigger = await readTrigger(triggerId);
 
         expect(trigger.timezone).toBe("Europe/Berlin");
-        expect(trigger.cronInZone).toBe(true);
     });
 
     it("accepts an absent or blank zone as UTC", async () => {
@@ -264,7 +262,6 @@ describe("trigger schedules", () => {
             const trigger = await readTrigger(triggerId);
 
             expect(trigger.timezone).toBeUndefined();
-            expect(trigger.cronInZone).toBeUndefined();
         }
     });
 
@@ -563,7 +560,7 @@ const createWebhook = async (args: Record<string, unknown> = {}): Promise<{ row:
 describe("updateTrigger and the trigger's time zone", () => {
     const NOW = Date.parse("2026-07-01T00:00:00Z");
 
-    const insertSchedule = async (timezone: string | undefined, cronInZone = timezone !== undefined): Promise<string> =>
+    const insertSchedule = async (timezone: string | undefined): Promise<string> =>
         await harness.run(
             async (ctx: any) =>
                 await ctx.db.insert("triggers", {
@@ -572,12 +569,11 @@ describe("updateTrigger and the trigger's time zone", () => {
                     enabled: true,
                     model: "m",
                     name: "Daily",
-                    nextTriggerAt: findNextCronTime("0 9 * * *", NOW, cronInZone ? timezone : undefined),
+                    nextTriggerAt: findNextCronTime("0 9 * * *", NOW, timezone),
                     triggerCount: 0,
                     type: "schedule",
                     updatedAt: NOW,
                     userId: "user-a",
-                    ...(cronInZone && { cronInZone }),
                     ...(timezone !== undefined && { timezone }),
                 }),
         );
@@ -599,7 +595,6 @@ describe("updateTrigger and the trigger's time zone", () => {
         const updated = await readTrigger(triggerId);
 
         expect(updated.timezone).toBe("America/New_York");
-        expect(updated.cronInZone).toBe(true);
         expect(updated.nextTriggerAt).toBe(Date.parse("2026-07-01T13:00:00Z"));
     });
 
@@ -613,7 +608,6 @@ describe("updateTrigger and the trigger's time zone", () => {
         const row = await readTrigger(triggerId);
 
         expect(row.nextTriggerAt).toBe(due);
-        expect(row.cronInZone).toBe(true);
         expect(row.timezone).toBe("America/New_York");
     });
 
@@ -627,7 +621,6 @@ describe("updateTrigger and the trigger's time zone", () => {
         const row = await readTrigger(triggerId);
 
         expect(row.nextTriggerAt).toBe(due);
-        expect(row.cronInZone).toBe(true);
         expect(row.timezone).toBe("America/New_York");
     });
 
@@ -643,10 +636,9 @@ describe("updateTrigger and the trigger's time zone", () => {
         expect(row.name).toBe("Renamed");
         expect(row.nextTriggerAt).toBe(due);
         expect(row.timezone).toBeUndefined();
-        expect(row.cronInZone).toBeUndefined();
     });
 
-    it("moves a zone-aware schedule back to UTC and keeps it zone-aware", async () => {
+    it("moves a zone-aware schedule back to UTC", async () => {
         const triggerId = await insertSchedule("America/New_York");
 
         await asOwner().mutation(updateTrigger as never, { timezone: "UTC", triggerId } as never);
@@ -654,37 +646,18 @@ describe("updateTrigger and the trigger's time zone", () => {
         const row = await readTrigger(triggerId);
 
         expect(row.timezone).toBe("UTC");
-        expect(row.cronInZone).toBe(true);
         expect(row.nextTriggerAt).toBe(Date.parse("2026-07-01T09:00:00Z"));
     });
 
-    it("keeps a stray stored zone out of the cron until a zone is chosen", async () => {
-        const triggerId = await insertSchedule("America/New_York", false);
-
-        await asOwner().mutation(updateTrigger as never, { name: "Renamed", triggerId } as never);
-
-        const renamed = await readTrigger(triggerId);
-
-        expect(renamed.cronInZone).toBeUndefined();
-        expect(renamed.nextTriggerAt).toBe(Date.parse("2026-07-01T09:00:00Z"));
-
-        await asOwner().mutation(updateTrigger as never, { timezone: "America/New_York", triggerId } as never);
-
-        const chosen = await readTrigger(triggerId);
-
-        expect(chosen.cronInZone).toBe(true);
-        expect(chosen.nextTriggerAt).toBe(Date.parse("2026-07-01T13:00:00Z"));
-    });
-
-    it("arms a schedule that is not marked in UTC even when a zone string is stored", async () => {
-        const triggerId = await insertSchedule("Asia/Tokyo", false);
+    it("arms a schedule with a stored zone in that zone, with no marker", async () => {
+        const triggerId = await insertSchedule("Asia/Tokyo");
 
         await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { enabled: false, nextTriggerAt: NOW - 1 }));
         await asOwner().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
 
         const row = await readTrigger(triggerId);
 
-        expect(row.nextTriggerAt).toBe(Date.parse("2026-07-01T09:00:00Z"));
+        expect(row.nextTriggerAt).toBe(Date.parse("2026-07-02T00:00:00Z"));
     });
 
     it("moves the next run when the expression and the zone are saved together", async () => {

@@ -26,7 +26,7 @@ import type { WebhookPreset } from "./presets";
 import { compileWebhookPreset } from "./presets";
 import { canBeQuiet } from "./quiet";
 import { resolveTimeZone } from "../memory/reflection-logic";
-import { cronZoneOf, findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
+import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { notifyQuietly } from "../notifications/notify";
@@ -107,7 +107,7 @@ const assertTimeZone = (timeZone: string): void => {
  */
 const firstRunOf = (trigger: Doc<"triggers">, now: number): number | undefined =>
     trigger.type === "schedule" && trigger.cronExpression && (trigger.nextTriggerAt === undefined || (trigger.enabled !== true && trigger.nextTriggerAt < now))
-        ? findNextCronTime(trigger.cronExpression, now, cronZoneOf(trigger))
+        ? findNextCronTime(trigger.cronExpression, now, trigger.timezone)
         : undefined;
 
 /**
@@ -203,7 +203,6 @@ const vGetTriggersOutput = v.array(
         botId: v.union(v.string(), v.null()),
         createdAt: v.number(),
         cronExpression: v.union(v.string(), v.null()),
-        cronInZone: v.boolean(),
         description: v.union(v.string(), v.null()),
         enabled: v.boolean(),
         filters: v.array(
@@ -253,7 +252,6 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
             botId: t.botId ?? null,
             createdAt: t.createdAt,
             cronExpression: t.cronExpression ?? null,
-            cronInZone: t.cronInZone === true,
             description: t.description ?? null,
             enabled: t.enabled === true,
             filters: (t.filters ?? []).map((filter) => {
@@ -358,7 +356,6 @@ export const createTrigger = authMutation
             botId: args.botId as Id<"bots"> | undefined,
             createdAt: now,
             cronExpression: args.cronExpression,
-            cronInZone: triggerType === "schedule" && timezone ? true : undefined,
             description: args.description,
             enabled: false, // Start disabled — user must explicitly enable
             filters,
@@ -446,7 +443,6 @@ export const updateTrigger = authMutation
 
         const patch: {
             cronExpression?: string;
-            cronInZone?: boolean;
             description?: string;
             inputTemplate?: string;
             model?: string;
@@ -470,10 +466,10 @@ export const updateTrigger = authMutation
         // Only a schedule has a next run. A new schedule, or a new time zone, moves it; the old time would fire once more on the old schedule.
         // A disabled schedule may store one too: enabling replaces it if it has passed (`firstRunOf`).
         // Re-saving the same expression and zone keeps a pending due time, so a run the tick has not taken yet still fires.
-        // Zones are compared as the scheduler reads them (`resolveTimeZone`), against the zone the row's cron is read in (`cronZoneOf`): a row not marked `cronInZone` reads as UTC whatever it stores.
-        // An absent or empty zone is no change, and a changed one marks the row `cronInZone`.
+        // Zones are compared as the scheduler reads them (`resolveTimeZone`).
+        // An absent or empty zone is no change.
         const isSchedule = trigger.type === "schedule";
-        const storedZone = cronZoneOf(trigger);
+        const storedZone = trigger.timezone;
         const requestedZone = args.timezone?.trim() || undefined;
 
         if (requestedZone !== undefined) assertTimeZone(requestedZone);
@@ -505,7 +501,6 @@ export const updateTrigger = authMutation
 
         if (zoneChanged) {
             patch.timezone = requestedZone;
-            patch.cronInZone = true;
         }
 
         if (args.inputTemplate !== undefined) patch.inputTemplate = args.inputTemplate;

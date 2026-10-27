@@ -19,10 +19,6 @@ const TRIGGER_BATCH_SIZE = 25;
 
 const HOUR_MS = 3_600_000;
 
-/** The zone a stored schedule's cron is read in: only one saved with an explicit zone has one, every other reads as UTC. */
-export const cronZoneOf = (trigger: { cronInZone?: boolean; timezone?: string }): string | undefined =>
-    trigger.cronInZone === true ? trigger.timezone : undefined;
-
 const SWITCHED_OFF_REASON = "Schedule must run at most hourly and fire at least once in the next 28 years. It was switched off.";
 
 /**
@@ -66,7 +62,7 @@ export const checkDueTriggers = internalMutation
 
         for (const trigger of batch) {
             const triggerId = trigger._id;
-            const step = dueScheduleStep(trigger.cronExpression, now, cronZoneOf(trigger));
+            const step = dueScheduleStep(trigger.cronExpression, now, trigger.timezone);
 
             if (step.kind === "switchOff") {
                 await ctx.db.patch(triggerId, { enabled: false, lastError: step.reason, updatedAt: now });

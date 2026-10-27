@@ -15403,12 +15403,6 @@
           "optional": true,
           "unique": false
         },
-        "cronInZone": {
-          "kind": "boolean",
-          "nullable": false,
-          "optional": true,
-          "unique": false
-        },
         "description": {
           "kind": "string",
           "nullable": false,

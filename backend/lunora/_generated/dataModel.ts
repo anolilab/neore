@@ -1741,7 +1741,6 @@ export interface Doc_triggers {
     botId?: Id<"bots">;
     createdAt: number;
     cronExpression?: string;
-    cronInZone?: boolean;
     description?: string;
     enabled: boolean;
     eventConnectionId?: string;
@@ -4475,7 +4474,6 @@ export interface Insert_triggers {
     botId?: Id<"bots">;
     createdAt: number;
     cronExpression?: string;
-    cronInZone?: boolean;
     description?: string;
     enabled: boolean;
     eventConnectionId?: string;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cronZoneOf, dueScheduleStep, findNextCronTime, getNextCronTime, isHourlyOrSlowerCronExpression, isValidCronExpression } from "./schedule";
+import { dueScheduleStep, findNextCronTime, getNextCronTime, isHourlyOrSlowerCronExpression, isValidCronExpression } from "./schedule";
 
 describe("getNextCronTime", () => {
     // Use a fixed reference: 2026-03-12 10:30:00 UTC (Thursday, dow=4)
@@ -273,19 +273,10 @@ describe("dueScheduleStep with a zone", () => {
     });
 });
 
-describe(cronZoneOf, () => {
-    it("reads a schedule in UTC unless it is marked as zone-aware, whatever zone string it stores", () => {
-        expect(cronZoneOf({ timezone: "America/New_York" })).toBeUndefined();
-        expect(cronZoneOf({ cronInZone: false, timezone: "America/New_York" })).toBeUndefined();
-        expect(cronZoneOf({ cronInZone: true, timezone: "America/New_York" })).toBe("America/New_York");
-    });
-
-    it("computes the next run in UTC for a stored zone that is not marked", () => {
+describe("a stored schedule's time zone", () => {
+    it("reads a schedule with a stored zone in that zone, with no marker", () => {
         const now = Date.parse("2026-07-01T00:00:00Z");
 
-        expect(dueScheduleStep("0 9 * * *", now, cronZoneOf({ timezone: "America/New_York" }))).toEqual({
-            kind: "run",
-            nextTime: Date.parse("2026-07-01T09:00:00Z"),
-        });
+        expect(dueScheduleStep("0 9 * * *", now, "America/New_York")).toEqual({ kind: "run", nextTime: Date.parse("2026-07-01T13:00:00Z") });
     });
 });
