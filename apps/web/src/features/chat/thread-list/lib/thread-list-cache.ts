@@ -14,6 +14,9 @@
 const CACHE_PREFIX = "neore-thread-list:";
 const CACHE_VERSION = 1;
 
+/** Keyed by the signed-in user, so one account's list is never read for another. */
+const cacheKey = (userId: string): string => `${CACHE_PREFIX}v${CACHE_VERSION}:${userId}`;
+
 const clears = { count: 0 };
 
 /** Bumped by every clear; a write scheduled before a clear compares it to drop itself. */
@@ -36,9 +39,6 @@ export const subscribeToForeignThreadListClears = (userId: string, listener: () 
         globalThis.removeEventListener("storage", onStorage);
     };
 };
-
-/** Keyed by the signed-in user, so one account's list is never read for another. */
-const cacheKey = (userId: string): string => `${CACHE_PREFIX}v${CACHE_VERSION}:${userId}`;
 
 type Primitive = boolean | number | string;
 type PersistedRecord = Record<string, Primitive | string[]>;

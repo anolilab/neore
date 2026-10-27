@@ -60,7 +60,7 @@ export const usePersistThreadList = (data: unknown, isPlaceholderData: boolean):
     // A removal that was not a sign-out leaves the session alive, so the next token for it lifts the hold.
     useEffect(() => {
         if (!userId) {
-            return;
+            return undefined;
         }
 
         const unsubscribeClears = subscribeToForeignThreadListClears(userId, () => {
