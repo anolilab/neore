@@ -102,9 +102,21 @@ pattern. Writes into host-run threads are refused server-side, in
   public-API change first, with its own OpenAPI entry, and then an `mcp` tag.
 
 - If a run pauses for a person (an `ask` tool), the call returns
-  `waiting_on_person` with the pending request, not an empty result. Messages from an
-  outside agent are recorded as such, and a run it starts never gets more than `ask`
-  for its tools.
+  `waiting_on_person` with the pending request, not an empty result. Today
+  `collectStream` (`public-api/stream.ts`) knows only the terminal statuses
+  (`done`, `error`, `timeout`), so a paused run would poll to its deadline and answer
+  `relay_timeout`. S2 changes the shared route, not just the MCP layer: the stream
+  source's read also reports a pending `toolApprovalRuns` row for the stream, and
+  `collectStream` returns at once with `status: "waiting_on_person"` and a
+  `pendingRequest` (`toolCallId`, tool name, and the question text for an ask-user
+  call). `POST /chat` with `stream: false` carries both fields in its response and
+  declares the new status in OpenAPI, so the CLI and the MCP tool see the same
+  contract. The pending request is read-only to the outside agent: answering stays
+  a person's action in the app. Acceptance: a `send_message` whose run reaches an
+  `ask` tool answers `waiting_on_person` within one poll, not after the deadline;
+  a later `read_messages` shows the reply once the person has answered.
+  Messages from an outside agent are recorded as such, and a run it starts never
+  gets more than `ask` for its tools.
 
 ### What an outside agent may not do
 
@@ -156,6 +168,7 @@ pattern. Writes into host-run threads are refused server-side, in
   `tools/call`.
 - `backend/lunora/public-api/openapi.ts`: documents `/mcp` and the tool tags.
 - `backend/lunora/public-api/errors.ts`: `host_thread_read_only`.
+- `backend/lunora/public-api/stream.ts`: `waiting_on_person` exit in `collectStream`.
 - `backend/lunora/chat/http.ts` (`runChatStart`): the host-thread refusal,
   landed by ACP S3.
 - `apps/web/src/features/auth/components/settings/api-key/`: a copyable MCP
