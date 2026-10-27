@@ -396,8 +396,12 @@ jobs:
               shell: "bash"
               run: "cargo fmt --manifest-path packages/device-core/Cargo.toml -- --check && cargo fmt --manifest-path packages/device-core-node/Cargo.toml -- --check"
 
+            # Linux and macOS have a shell sandbox, so the sandboxed vectors must run there instead of
+            # being skipped when the runner loses it.
             - name: "Run cargo test"
               shell: "bash"
+              env:
+                  NEORE_REQUIRE_SANDBOX: "${{ matrix.os != 'windows-latest' && '1' || '' }}"
               run: "cargo test --manifest-path packages/device-core/Cargo.toml"
 
             # `neore-host` is built without the `keychain` feature. This runs the host's own tests
@@ -405,6 +409,8 @@ jobs:
             # builds and passes without the paired side.
             - name: "Run cargo test without the keychain feature"
               shell: "bash"
+              env:
+                  NEORE_REQUIRE_SANDBOX: "${{ matrix.os != 'windows-latest' && '1' || '' }}"
               run: "cargo test --manifest-path packages/device-core/Cargo.toml --no-default-features"
 
             # The host holds no pairing, so it must not link the keyring (or libdbus, which the
@@ -416,7 +422,10 @@ jobs:
               run: |
                   set -euo pipefail
                   manifest=packages/device-core/Cargo.toml
-                  if cargo tree --manifest-path "$manifest" --no-default-features --target all -e normal,build | grep -q keyring; then
+                  # `cargo tree -i` exits 0 when the package is in the tree and non-zero when it is not,
+                  # so the default build is the control that the command can find it at all.
+                  cargo tree --manifest-path "$manifest" --target all -e normal,build -i keyring > /dev/null
+                  if cargo tree --manifest-path "$manifest" --no-default-features --target all -e normal,build -i keyring; then
                       echo "keyring is in the neore-host dependency tree" >&2
                       exit 1
                   fi

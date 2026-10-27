@@ -68,13 +68,15 @@ pub enum Sandbox {
 }
 
 /// Asks the planner what a `shell_run` would get here, so a runner without Landlock (or without the seccomp
-/// filter) skips the sandboxed vectors instead of failing them.
+/// filter) skips the sandboxed vectors instead of failing them. With `NEORE_REQUIRE_SANDBOX` non-empty (CI, on the
+/// systems that have a sandbox) anything but a confining one panics, so a runner that lost its sandbox cannot
+/// pass by skipping.
 pub fn sandbox() -> Sandbox {
     use device_core::sandbox::{self, Support};
 
     let support = sandbox::support();
 
-    match (
+    let found = match (
         &support,
         sandbox::policy_for_call(&support, false, false, &[], None),
     ) {
@@ -85,7 +87,16 @@ pub fn sandbox() -> Sandbox {
 
             Sandbox::Partial
         }
-    }
+    };
+
+    let required = std::env::var("NEORE_REQUIRE_SANDBOX").is_ok_and(|value| !value.is_empty());
+
+    assert!(
+        found == Sandbox::Confines || !required,
+        "NEORE_REQUIRE_SANDBOX is set, and this machine's shell sandbox is {found:?}: {support:?}"
+    );
+
+    found
 }
 
 /// A fresh fixture: `<scratch>/<name>/root` holds the files, and its parent is where an escape would land.
@@ -120,48 +131,75 @@ pub fn assert_nothing_escaped(root: &Path) {
     );
 }
 
-/// The observation with the shared folder's path replaced, for comparing two runs that used two folders.
+/// The observation with the shared folder's path replaced, for comparing two runs that used two folders. The
+/// path appears as is and, inside `fs_list`'s JSON text, escaped (a Windows `\\?\C:\…` doubles its backslashes);
+/// what follows it is written with `/` whatever the platform. A folder's own size is the file system's
+/// business (0 on NTFS, 96 on APFS, 4096 on ext4), so a listing reports it as 0.
 pub fn normalised(observed: &Observed, root: &Path) -> Observed {
-    let normalise = |text: &String| text.replace(&*root.to_string_lossy(), "{root}");
+    let plain = root.to_string_lossy().into_owned();
+    let escaped = serde_json::to_string(&plain).unwrap();
+    let escaped = escaped.trim_matches('"');
+    let normalise = |text: &String| {
+        text.replace(escaped, "{root}")
+            .replace(&plain, "{root}")
+            .replace("{root}\\\\", "{root}/")
+            .replace("{root}\\", "{root}/")
+    };
 
     Observed {
         error: observed.error.as_ref().map(normalise),
         exit_code: observed.exit_code,
-        output: observed.output.as_ref().map(normalise),
+        output: observed
+            .output
+            .as_ref()
+            .map(|text| normalise(&with_folder_sizes_zeroed(text))),
         status: observed.status.clone(),
     }
 }
 
+fn with_folder_sizes_zeroed(output: &str) -> String {
+    let Ok(mut listing) = serde_json::from_str::<Value>(output) else {
+        return output.to_owned();
+    };
+    let Some(entries) = listing["entries"].as_array_mut() else {
+        return output.to_owned();
+    };
+
+    for entry in entries {
+        if entry["type"] == "dir" {
+            entry["size"] = 0.into();
+        }
+    }
+
+    serde_json::to_string_pretty(&listing).unwrap()
+}
+
+/// Checks one observation against the complete expectation. `output` and `error` are exact when the vector
+/// names them and must be absent when it does not; `outputContains` / `errorContains` stand in for text that
+/// differs by platform.
 pub fn assert_observed(vector: &Vector, root: &Path, observed: &Observed) {
     let at = format!("vector \"{}\": {observed:?}", vector.name);
     let expect = &vector.expect;
     let observed = &normalised(observed, root);
 
     assert_eq!(observed.status, expect["status"].as_str().unwrap(), "{at}");
+    assert_eq!(observed.exit_code, expect["exitCode"].as_i64(), "{at}");
 
-    if let Some(output) = expect["output"].as_str() {
-        assert_eq!(observed.output.as_deref(), Some(output), "{at}");
-    }
-
-    if let Some(error) = expect["error"].as_str() {
-        assert_eq!(observed.error.as_deref(), Some(error), "{at}");
-    }
-
-    for (key, seen) in [
-        ("outputContains", &observed.output),
-        ("errorContains", &observed.error),
+    for (key, contains, seen) in [
+        ("output", "outputContains", &observed.output),
+        ("error", "errorContains", &observed.error),
     ] {
-        for needle in expect[key].as_array().into_iter().flatten() {
+        if expect[contains].is_array() {
             let seen = seen.as_deref().unwrap_or_default();
 
-            assert!(
-                seen.contains(needle.as_str().unwrap()),
-                "{at}: missing {needle}"
-            );
+            for needle in expect[contains].as_array().unwrap() {
+                assert!(
+                    seen.contains(needle.as_str().unwrap()),
+                    "{at}: missing {needle}"
+                );
+            }
+        } else {
+            assert_eq!(seen.as_deref(), expect[key].as_str(), "{at}");
         }
-    }
-
-    if let Some(code) = expect["exitCode"].as_i64() {
-        assert_eq!(observed.exit_code, Some(code), "{at}");
     }
 }

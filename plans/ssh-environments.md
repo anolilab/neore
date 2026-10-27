@@ -202,7 +202,9 @@ pin keys, ask for passphrases through the helper, and add `transport` and
   (test: sign a result with the wrong secret); revoking the desktop revokes its
   hosts.
 
-**S4 — Install and upgrade.** §8.
+**S4 — Install and upgrade.** §8. The release build of `neore-host` must pass
+`--no-default-features`: a plain `cargo build` links the keyring (the binary logs an error at
+startup when it does), so the packaging step is where that is enforced.
 - Acceptance: a wrong checksum and a killed upload both leave no executable at
   the final path; an architecture mismatch is refused before upload; an upgrade
   with an active session is refused.

@@ -53,7 +53,9 @@ pub enum Outgoing {
     },
 }
 
-/// Whether `shell_run` can be sandboxed on this machine, and by what or why not.
+/// Whether `shell_run` can be sandboxed on this machine, and by what or why not. `available` is what a
+/// default request (sandbox required, network blocked) gets, so a machine with Landlock but no seccomp
+/// filter reports why it would refuse.
 #[derive(Serialize)]
 pub struct SandboxReport {
     pub available: bool,
@@ -62,14 +64,23 @@ pub struct SandboxReport {
 
 impl SandboxReport {
     pub fn probe() -> Self {
-        match sandbox::support() {
-            Support::Available(detail) => SandboxReport {
+        let support = sandbox::support();
+
+        match (
+            &support,
+            sandbox::policy_for_call(&support, false, false, &[], None),
+        ) {
+            (Support::Available(detail), Ok(_)) => SandboxReport {
                 available: true,
-                detail,
+                detail: detail.clone(),
             },
-            Support::Unavailable(detail) => SandboxReport {
+            (Support::Available(_), Err(reason)) => SandboxReport {
                 available: false,
-                detail,
+                detail: reason,
+            },
+            (Support::Unavailable(detail), _) => SandboxReport {
+                available: false,
+                detail: detail.clone(),
             },
         }
     }
@@ -180,8 +191,9 @@ impl Drop for Slot {
 
 /// Sends the handshake, then serves requests until `reader` ends. Each request runs on its own thread, so a
 /// long command does not hold up a file read. `Ok` is the stream ending between frames; an error is a
-/// broken stream or a request that is not a request, and the caller ends the connection on it. Requests
-/// still running when it returns are abandoned.
+/// broken stream or a request that is not a request, and the caller ends the connection on it. Either way
+/// it returns only once the requests still running have finished: each run's own timeout is what stops a
+/// command, so a host that went away first would leave the shell unsupervised.
 pub fn serve<R, W>(mut reader: R, writer: W) -> io::Result<()>
 where
     R: Read,
@@ -189,9 +201,29 @@ where
 {
     let writer = Arc::new(Mutex::new(writer));
     let in_flight = Arc::new(AtomicUsize::new(0));
+    let mut running = Vec::new();
 
+    let served = serve_requests(&mut reader, &writer, &in_flight, &mut running);
+
+    for request in running {
+        let _ = request.join();
+    }
+
+    served
+}
+
+fn serve_requests<R, W>(
+    reader: &mut R,
+    writer: &Arc<Mutex<W>>,
+    in_flight: &Arc<AtomicUsize>,
+    running: &mut Vec<thread::JoinHandle<()>>,
+) -> io::Result<()>
+where
+    R: Read,
+    W: Write + Send + 'static,
+{
     send(
-        &writer,
+        writer,
         &Outgoing::Hello {
             platform: actions::platform(),
             protocol: PROTOCOL_VERSION,
@@ -200,26 +232,27 @@ where
         },
     )?;
 
-    while let Some(bytes) = read_frame(&mut reader)? {
+    while let Some(bytes) = read_frame(reader)? {
         let Incoming::Request { id, op, params } = serde_json::from_slice(&bytes)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
 
         if in_flight.fetch_add(1, Ordering::SeqCst) >= MAX_IN_FLIGHT {
             in_flight.fetch_sub(1, Ordering::SeqCst);
-            send(&writer, &refuse(id, "too many requests in flight"))?;
+            send(writer, &refuse(id, "too many requests in flight"))?;
 
             continue;
         }
 
-        let slot = Slot(Arc::clone(&in_flight));
-        let writer = Arc::clone(&writer);
+        let slot = Slot(Arc::clone(in_flight));
+        let writer = Arc::clone(writer);
 
-        thread::spawn(move || {
+        running.retain(|request| !request.is_finished());
+        running.push(thread::spawn(move || {
             let _slot = slot;
 
             // A writer that fails means the desktop is gone; the reader ends the loop on its own EOF.
             let _ = send(&writer, &serve_request(&op, params, id));
-        });
+        }));
     }
 
     Ok(())

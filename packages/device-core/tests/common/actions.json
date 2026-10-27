@@ -5,7 +5,7 @@
             "name": "list the shared folder",
             "tool": "fs_list",
             "input": {},
-            "expect": { "status": "completed", "outputContains": ["\"a.txt\"", "\"sub\"", "\"truncated\": false"] }
+            "expect": { "status": "completed", "output": "{\n  \"entries\": [\n    {\n      \"name\": \"a.txt\",\n      \"size\": 5,\n      \"type\": \"file\"\n    },\n    {\n      \"name\": \"sub\",\n      \"size\": 0,\n      \"type\": \"dir\"\n    }\n  ],\n  \"path\": \"{root}\",\n  \"truncated\": false\n}" }
         },
         {
             "name": "read a file",
@@ -29,19 +29,19 @@
             "name": "read a file that does not exist",
             "tool": "fs_read",
             "input": { "path": "missing.txt" },
-            "expect": { "status": "failed" }
+            "expect": { "status": "failed", "error": "missing.txt: not found" }
         },
         {
             "name": "read outside the shared folders",
             "tool": "fs_read",
             "input": { "path": "../outside.txt" },
-            "expect": { "status": "failed" }
+            "expect": { "status": "failed", "error": "../outside.txt: not found" }
         },
         {
             "name": "write a new file",
             "tool": "fs_write",
             "input": { "path": "new.txt", "content": "fresh" },
-            "expect": { "status": "completed", "outputContains": ["wrote 5 bytes to"] }
+            "expect": { "status": "completed", "output": "wrote 5 bytes to {root}/new.txt" }
         },
         {
             "name": "read back what was written",
@@ -59,7 +59,7 @@
             "name": "write replaces a file when asked",
             "tool": "fs_write",
             "input": { "path": "a.txt", "content": "replaced", "overwrite": true },
-            "expect": { "status": "completed", "outputContains": ["wrote 8 bytes to"] }
+            "expect": { "status": "completed", "output": "wrote 8 bytes to {root}/a.txt" }
         },
         {
             "name": "write needs content",

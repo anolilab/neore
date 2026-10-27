@@ -132,8 +132,9 @@ fn the_host_says_what_it_can_sandbox_before_anything_else() {
     );
 }
 
-/// The same vectors through the function the engine's action path shares and through the binary: every
-/// observation matches the pinned expectation, and the two agree with each other.
+/// The same vectors through the function the engine's action path shares and through the binary: each
+/// observation meets the one complete expectation in `actions.json` (the engine's own test checks the same
+/// list against it), and the two agree with each other.
 #[test]
 fn the_vectors_give_the_same_results_in_process_and_over_stdio() {
     let sandbox = vectors::sandbox();
@@ -250,6 +251,41 @@ fn a_long_command_does_not_hold_up_a_file_read() {
     assert_eq!(second["result"]["output"], "late\n");
 }
 
+/// The run's own timeout is what stops a command, so the host must outlive it when stdin closes first.
+#[cfg(unix)]
+#[test]
+fn a_command_in_flight_is_still_stopped_by_its_timeout_after_stdin_closes() {
+    let root = vectors::fixture("eof-in-flight");
+    let mut host = Host::start();
+
+    host.next();
+    host.run(
+        1,
+        json!({
+            "tool": "shell_run",
+            "input": { "command": "sleep 4; touch late-marker", "timeoutSeconds": 1 },
+            "roots": [root],
+            "remainingMs": 60_000,
+            "allowUnsandboxedShell": true,
+        }),
+    );
+    host.close_stdin();
+
+    let response = host.next();
+
+    assert_eq!(response["id"], 1);
+    assert_eq!(response["result"]["status"], "failed", "{response}");
+    assert_eq!(host.exit_code(), Some(0));
+
+    // Past the point where an unsupervised `sleep 4` would have written its marker.
+    thread::sleep(Duration::from_secs(4));
+
+    assert!(
+        !root.join("late-marker").exists(),
+        "the command outlived the host"
+    );
+}
+
 #[test]
 fn a_request_the_host_cannot_serve_is_answered_not_run() {
     let mut host = Host::start();
@@ -336,16 +372,23 @@ fn the_host_holds_no_socket() {
 
     #[cfg(target_os = "macos")]
     {
-        // `-i` lists network sockets; with none open lsof prints nothing and exits 1.
+        // `-i` lists network sockets and `-U` unix ones. lsof exits 1 with nothing on stderr when it
+        // found no match, which tells that apart from a lsof that failed to run.
         let listing = Command::new("lsof")
-            .args(["-nP", "-a", "-p", &pid.to_string(), "-i"])
+            .args(["-nP", "-a", "-p", &pid.to_string(), "-i", "-U"])
             .output()
             .unwrap();
 
-        assert!(
-            listing.stdout.is_empty(),
-            "{}",
-            String::from_utf8_lossy(&listing.stdout)
+        assert_eq!(
+            (
+                listing.status.code(),
+                listing.stdout.is_empty(),
+                listing.stderr.is_empty()
+            ),
+            (Some(1), true, true),
+            "{}{}",
+            String::from_utf8_lossy(&listing.stdout),
+            String::from_utf8_lossy(&listing.stderr)
         );
     }
 }

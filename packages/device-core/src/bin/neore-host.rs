@@ -13,6 +13,11 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
 
+    // The host holds no pairing, so a build that links the keyring was packaged wrong (`--no-default-features`).
+    if cfg!(feature = "keychain") {
+        eprintln!("neore-host: built with the `keychain` feature; it must be built with --no-default-features");
+    }
+
     match device_core::host::serve(io::stdin().lock(), io::stdout()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
