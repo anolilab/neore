@@ -58,22 +58,29 @@ vi.mock("../../user-view", () => {
 
 const deviceSession = { session: { id: "other", token: "tok" }, user: { id: "bob" } } as never;
 
+// A row the reader accepts: it needs a status and a creation time, or the stored list reads as corrupt and every "defined" check would be moot.
+const listWith = (id: string, title: string) => {
+    return {
+        pinnedThreads: [],
+        relationships: [],
+        tags: [],
+        temporaryThreads: { page: [] },
+        threadOrders: [],
+        threads: { page: [{ _id: id, createdAt: 1, status: "active", title }] },
+    };
+};
+
 describe("AccountCell revoke", () => {
     beforeEach(() => {
         localStorage.clear();
         releaseThreadListWrites();
 
-        const list = {
-            pinnedThreads: [],
-            relationships: [],
-            tags: [],
-            temporaryThreads: { page: [] },
-            threadOrders: [],
-            threads: { page: [{ _id: "t1", createdAt: 1, status: "active", title: "Bob" }] },
-        };
+        writeThreadListCache("bob", listWith("t1", "Bob"));
+        writeThreadListCache("alice", listWith("t1", "Alice"));
 
-        writeThreadListCache("bob", list);
-        writeThreadListCache("alice", list);
+        // The fixtures must really be readable, or the assertions below could not tell kept from rejected.
+        expect(readThreadListCache("bob")?.threads.map((row) => row._id)).toEqual(["t1"]);
+        expect(readThreadListCache("alice")?.threads.map((row) => row._id)).toEqual(["t1"]);
     });
 
     it.each(["resolves", "rejects"] as const)("clears the revoked account's stored list when the request %s", async (outcome) => {
@@ -89,49 +96,34 @@ describe("AccountCell revoke", () => {
         await vi.waitFor(() => {
             expect(readThreadListCache("bob")).toBeUndefined();
         });
-        expect(readThreadListCache("alice")).toBeDefined();
+        expect(readThreadListCache("alice")?.threads[0]?.title).toBe("Alice");
     });
 
-    it("lets that account be saved again when the revoke fails, not when it succeeds", async () => {
-        const list = {
-            pinnedThreads: [],
-            relationships: [],
-            tags: [],
-            temporaryThreads: { page: [] },
-            threadOrders: [],
-            threads: { page: [{ _id: "t1", createdAt: 1, status: "active", title: "Bob" }] },
-        };
-
+    it("lets that account be saved again when the revoke fails", async () => {
         auth.revoke.mockRejectedValueOnce(new Error("nope"));
         render(<AccountCell deviceSession={deviceSession} />);
         fireEvent.click(screen.getByText("Revoke"));
         await vi.waitFor(() => {
             expect(readThreadListCache("bob")).toBeUndefined();
         });
-        writeThreadListCache("bob", list);
-        expect(readThreadListCache("bob")).toBeDefined();
+        writeThreadListCache("bob", listWith("t9", "Saved again"));
+        expect(readThreadListCache("bob")?.threads.map((row) => row._id)).toEqual(["t9"]);
     });
 
     it("leaves the list intact and writable when another session of the same account remains", async () => {
         const other = { session: { id: "other-2", token: "tok2" }, user: { id: "bob" } } as never;
+        const refetch = vi.fn();
 
         auth.revoke.mockResolvedValueOnce(undefined);
-        render(<AccountCell deviceSession={deviceSession} deviceSessions={[deviceSession, other]} />);
+        render(<AccountCell deviceSession={deviceSession} deviceSessions={[deviceSession, other]} refetch={refetch} />);
         fireEvent.click(screen.getByText("Revoke"));
+        // refetch runs right before the handler's finally block, so once it has been called the clear decision has been made.
         await vi.waitFor(() => {
-            expect(auth.revoke).toHaveBeenCalled();
+            expect(refetch).toHaveBeenCalled();
         });
-        await Promise.resolve();
 
-        expect(readThreadListCache("bob")).toBeDefined();
-        writeThreadListCache("bob", {
-            pinnedThreads: [],
-            relationships: [],
-            tags: [],
-            temporaryThreads: { page: [] },
-            threadOrders: [],
-            threads: { page: [{ _id: "t2", createdAt: 1, status: "active", title: "New" }] },
-        });
+        expect(readThreadListCache("bob")?.threads.map((row) => row._id)).toEqual(["t1"]);
+        writeThreadListCache("bob", listWith("t2", "New"));
         expect(readThreadListCache("bob")?.threads.map((row) => row._id)).toEqual(["t2"]);
     });
 
