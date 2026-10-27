@@ -172,7 +172,11 @@ impl AcpPermissions {
             details_complete: request.details_complete && request.details.len() <= MAX_DETAILS,
             details: limited(request.details, MAX_DETAILS),
             folder: limited(request.folder, MAX_TEXT),
-            options: distinct_options(request.options.into_iter().take(MAX_OPTIONS).collect()),
+            // Checked on everything the agent sent, then cut: an id repeated past the cap would otherwise hide.
+            options: distinct_options(request.options)
+                .into_iter()
+                .take(MAX_OPTIONS)
+                .collect(),
             session_id: request.session_id,
             target: request.target.map(|text| limited(text, MAX_TEXT)),
             tool: limited(request.tool, MAX_TEXT),
@@ -710,6 +714,26 @@ mod tests {
         assert!(view[0].options.is_empty() && !view[0].batchable);
         assert!(permissions.answer(id, "x").is_err());
         assert!(permissions.answer_batch(&[id]).is_err());
+
+        permissions.decline(id).unwrap();
+        assert_eq!(waiting.join().unwrap(), Outcome::Cancelled);
+    }
+
+    #[test]
+    fn an_id_repeated_past_the_option_cap_still_leaves_nothing_to_approve() {
+        let permissions = Arc::new(AcpPermissions::default());
+        let mut clash = request("s1", "clash");
+
+        clash.options = vec![option("x", ALLOW_ONCE)];
+        clash
+            .options
+            .extend((0..MAX_OPTIONS).map(|n| option(&format!("filler-{n}"), "reject_always")));
+        clash.options.push(option("x", "allow_always"));
+
+        let (id, waiting) = queue(&permissions, clash);
+
+        assert!(permissions.view()[0].options.is_empty());
+        assert!(permissions.answer(id, "x").is_err());
 
         permissions.decline(id).unwrap();
         assert_eq!(waiting.join().unwrap(), Outcome::Cancelled);
