@@ -7,7 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../../../schema";
-import { PURGE_CHUNK_BATCH, PURGE_LARGE_STREAMS_PER_RUN, PURGE_SCAN_PAGES, PURGE_STREAM_BATCH, purgeFinishedStreams, STREAM_RETENTION_MS } from "./purge";
+import { PURGE_CHUNK_BUDGET, PURGE_SCAN_PAGES, PURGE_STREAM_BATCH, purgeFinishedStreams, STREAM_RETENTION_MS } from "./purge";
 
 const OWNER = "user-owner";
 const HOUR = 60 * 60 * 1000;
@@ -88,9 +88,9 @@ describe("purgeFinishedStreams", () => {
     });
 
     it("finishes a stream with more chunks than one run deletes on a later run", async () => {
-        const big = await insertStream("done", OLD(), PURGE_CHUNK_BATCH + 5);
+        const big = await insertStream("done", OLD(), PURGE_CHUNK_BUDGET + 5);
 
-        await expect(purge()).resolves.toStrictEqual({ chunks: PURGE_CHUNK_BATCH, streams: 0 });
+        await expect(purge()).resolves.toStrictEqual({ chunks: PURGE_CHUNK_BUDGET, streams: 0 });
         expect(await exists(big)).toBe(true);
 
         await expect(purge()).resolves.toStrictEqual({ chunks: 5, streams: 1 });
@@ -98,17 +98,23 @@ describe("purgeFinishedStreams", () => {
         expect(await count("persistentChunks")).toBe(0);
     });
 
-    it("reaches a small expired stream queued behind a page of big ones", async () => {
-        for (let index = 0; index < PURGE_STREAM_BATCH; index += 1) {
-            await insertStream("done", OLD(), PURGE_CHUNK_BATCH * 3);
+    it("clears a backlog of more large streams than one run scans, and the small stream behind them, in ceil(chunks / budget) runs", async () => {
+        const largeStreams = PURGE_STREAM_BATCH * PURGE_SCAN_PAGES * 2 + 25;
+        const perStream = 101;
+
+        for (let index = 0; index < largeStreams; index += 1) {
+            await insertStream("done", OLD(), perStream);
         }
 
         const small = await insertStream("done", OLD());
+        const runs = Math.ceil((largeStreams * perStream + 2) / PURGE_CHUNK_BUDGET);
 
-        await purge();
+        for (let run = 0; run < runs; run += 1) {
+            await purge();
+        }
 
         expect(await exists(small)).toBe(false);
-        // Only a few big streams are worked on per run.
-        expect(await count("persistentChunks")).toBe(PURGE_STREAM_BATCH * PURGE_CHUNK_BATCH * 3 - PURGE_LARGE_STREAMS_PER_RUN * PURGE_CHUNK_BATCH);
-    });
+        expect(await count("persistentStreams")).toBe(0);
+        expect(await count("persistentChunks")).toBe(0);
+    }, 120_000);
 });

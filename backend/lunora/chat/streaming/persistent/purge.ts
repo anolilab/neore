@@ -25,16 +25,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const STREAM_RETENTION_MS = Math.max(7 * DAY_MS, PENDING_APPROVAL_TTL_MS);
 /** Streams read per page. */
 export const PURGE_STREAM_BATCH = 25;
-/** Pages read per run, so a stream behind a page of big ones is still reached. */
+/** Pages read per run; only reached when the earlier streams are emptied within the budget. */
 export const PURGE_SCAN_PAGES = 4;
-/** Chunks deleted per stream per run; a longer stream is finished by a later run. */
-export const PURGE_CHUNK_BATCH = 100;
 /**
- * Streams with more chunks than one batch that are worked on per run. The rest
- * wait, so a page full of big streams cannot use up the run and starve the small
- * expired streams queued behind them.
+ * Chunks deleted per run, spread over however many streams that takes. Every run
+ * deletes this many while any remain, whatever their size or order, so a backlog
+ * of M chunks is gone after ceil(M / budget) runs and a drained stream never
+ * blocks the ones behind it. An idle shard is swept daily for 30 days
+ * (`HOUSEKEEPING_HORIZON_MS`): at least 30 * 2500 = 75,000 chunks.
  */
-export const PURGE_LARGE_STREAMS_PER_RUN = 5;
+export const PURGE_CHUNK_BUDGET = 2500;
 
 /** Statuses that never change again (`streamStatusValidator` minus the live two). */
 const TERMINAL_STATUSES = ["done", "error", "timeout"];
@@ -45,7 +45,6 @@ export const purgeFinishedStreams = internalMutation
     .mutation(async ({ ctx }) => {
         let chunks = 0;
         let streams = 0;
-        let largeLeft = PURGE_LARGE_STREAMS_PER_RUN;
         let cursor: string | undefined;
 
         for (let pageNumber = 0; pageNumber < PURGE_SCAN_PAGES; pageNumber += 1) {
@@ -56,28 +55,25 @@ export const purgeFinishedStreams = internalMutation
             });
 
             for (const stream of page.page) {
+                const remaining = PURGE_CHUNK_BUDGET - chunks;
+
+                if (remaining <= 0) {
+                    return { chunks, streams };
+                }
+
                 const batch = await ctx.db
                     .query("persistentChunks")
                     .withIndex("by_streamId_seq", (q) => q.eq("streamId", stream._id))
-                    .take(PURGE_CHUNK_BATCH);
-                // A full batch may have left chunks behind: the stream goes once none are left.
-                const complete = batch.length < PURGE_CHUNK_BATCH;
+                    .take(remaining + 1);
+                const drained = batch.length <= remaining;
 
-                if (!complete) {
-                    if (largeLeft === 0) {
-                        continue;
-                    }
-
-                    largeLeft -= 1;
-                }
-
-                for (const chunk of batch) {
+                for (const chunk of drained ? batch : batch.slice(0, remaining)) {
                     await ctx.db.delete(chunk._id);
+                    chunks += 1;
                 }
 
-                chunks += batch.length;
-
-                if (complete) {
+                // The stream goes once none of its chunks are left; otherwise it resumes next run.
+                if (drained) {
                     await ctx.db.delete(stream._id);
                     streams += 1;
                 }
