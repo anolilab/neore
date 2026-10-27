@@ -280,10 +280,36 @@ impl DeviceState {
 
     /// Whether no `settings_update` has run since `generation` was read. Takes the save lock, so an update that is
     /// in flight has finished (and bumped) before this answers.
+    #[cfg(test)]
     fn settings_unchanged(&self, generation: u64) -> bool {
         let _guard = self.save_lock.lock().unwrap();
 
         self.generation.load(Ordering::SeqCst) == generation
+    }
+
+    /// Whether the approval still covers the call right before it starts, under the save lock (an update in flight has
+    /// finished first; the lock is not held while the action runs). Settings untouched since planning: yes. Changed
+    /// meanwhile: the call is planned again from what is saved now and must come out as the very same action, so an
+    /// unrelated change (another folder shared) lets it run while a removed folder, a shell policy or a replaced
+    /// server does not. A call that skipped its prompt on an allow rule also needs that rule to still be there.
+    fn approval_holds(
+        &self,
+        generation: u64,
+        (tool, input, tainted): (&str, &Value, bool),
+        action: &Action,
+        rule_approved: bool,
+    ) -> bool {
+        let _guard = self.save_lock.lock().unwrap();
+
+        if self.generation.load(Ordering::SeqCst) == generation {
+            return true;
+        }
+
+        let current = self.settings();
+
+        plan(tool, input, &current, &self.mcp_tools.lock().unwrap())
+            .is_ok_and(|again| again == *action)
+            && (!rule_approved || decide(tool, tainted, action.read_only(), &current.allow_rules).0)
     }
 
     pub fn settings_update(&self, update: SettingsUpdate) -> Result<SettingsView, String> {
@@ -413,7 +439,17 @@ impl DeviceState {
                 // checks again, so the call never starts under a policy the owner has since changed.
                 if answer == Answer::Always && offer_always {
                     let _ = self.change_settings(|next| {
-                        if self.generation.load(Ordering::SeqCst) != generation {
+                        // Under the save lock, so nothing changes meanwhile: the tool must still plan to the very
+                        // action that was approved (same server config included), or the rule is not saved.
+                        if self.generation.load(Ordering::SeqCst) != generation
+                            && !plan(
+                                &call.tool,
+                                &call.input,
+                                next,
+                                &self.mcp_tools.lock().unwrap(),
+                            )
+                            .is_ok_and(|again| again == action)
+                        {
                             return Err("the settings changed while waiting".to_owned());
                         }
 
@@ -437,10 +473,18 @@ impl DeviceState {
                     _ if !still_paired => {
                         Outcome::failed(decision, "the computer was unpaired while waiting")
                     }
-                    _ if !self.settings_unchanged(generation) => Outcome::failed(
+                    _ if !self.approval_holds(
+                        generation,
+                        (&call.tool, &call.input, tainted),
+                        &action,
+                        skip_prompt,
+                    ) =>
+                    {
+                        Outcome::failed(
                         decision,
-                        "the shared folders, shell settings or MCP server changed while waiting",
-                    ),
+                            "the shared folders, shell settings, MCP server or allow rule changed while waiting",
+                        )
+                    }
                     _ if remaining == 0 => {
                         Outcome::failed(decision, "approved after the request expired")
                     }
@@ -647,6 +691,7 @@ fn builtin_tools(roots: &[PathBuf]) -> Vec<Value> {
 
 /// One call, planned and checked before the user is asked, so the prompt shows
 /// exactly what will run (resolved paths, the command, the folder).
+#[derive(PartialEq)]
 enum Action {
     List(PathBuf),
     Read(PathBuf),
@@ -1859,5 +1904,169 @@ mod tests {
         assert!(
             validate_servers(&[server("a", "x"), server("ab", "y"), server("a_b", "z")]).is_ok()
         );
+    }
+
+    /// A paired device with one shared folder, a call to `tool` waiting in its prompt, and the way to answer it.
+    fn open_prompt(
+        name: &str,
+        tool: &str,
+        input: Value,
+        settings: impl FnOnce(&mut Settings, &Path),
+    ) -> (
+        std::sync::Arc<DeviceState>,
+        std::thread::JoinHandle<Result<Signed, String>>,
+        u64,
+        PathBuf,
+    ) {
+        use std::sync::mpsc::channel;
+        use std::sync::Arc;
+
+        crate::store::test_keychain::install();
+
+        let dir = std::env::temp_dir().join(format!("neore-device-{name}-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(dir.join("extra")).unwrap();
+        stdfs::write(dir.join("a.txt"), "hello").unwrap();
+
+        let secret = "0123456789abcdef".repeat(4);
+        let root = dir.canonicalize().unwrap();
+        let mut saved = Settings {
+            pairing: Some(Pairing {
+                account_label: "me".into(),
+                device_id: "dev1".into(),
+                secret: secret.clone(),
+            }),
+            roots: vec![root.to_string_lossy().into_owned()],
+            ..Settings::default()
+        };
+        settings(&mut saved, &root);
+        store::save(&dir.join("device.json"), &saved).unwrap();
+
+        let (events, received) = channel();
+        let state = Arc::new(DeviceState::new(
+            &dir,
+            Box::new(move |event| {
+                let _ = events.send(event);
+            }),
+        ));
+        let signed = envelope::sign_value(
+            &secret,
+            Domain::Call,
+            &json!({
+                "v": 1, "kind": "call", "callId": "c1", "deviceId": "dev1", "tool": tool,
+                "input": input, "threadTitle": "T", "taintedBy": [],
+                "issuedAt": now_ms(), "expiresAt": now_ms() + 60_000, "nonce": "n1",
+            }),
+        );
+        let worker = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || state.execute(&signed))
+        };
+        let prompt = loop {
+            if let Event::Prompt { prompt } = received.recv().unwrap() {
+                break prompt;
+            }
+        };
+
+        (state, worker, prompt.id, dir)
+    }
+
+    fn finish(
+        state: &DeviceState,
+        worker: std::thread::JoinHandle<Result<Signed, String>>,
+        prompt: u64,
+    ) -> Value {
+        state.prompt_answer(prompt, "once").unwrap();
+
+        serde_json::from_str(&worker.join().unwrap().unwrap().payload).unwrap()
+    }
+
+    #[test]
+    fn an_unrelated_settings_change_while_asking_does_not_cancel_the_call() {
+        let (state, worker, prompt, dir) = open_prompt(
+            "unrelated",
+            "fs_read",
+            json!({ "path": "a.txt" }),
+            |_, _| {},
+        );
+        let root = dir.canonicalize().unwrap();
+
+        // Another folder is shared while the prompt is open.
+        state
+            .settings_update(
+                serde_json::from_value(json!({ "roots": [root, root.join("extra")] })).unwrap(),
+            )
+            .unwrap();
+
+        let parsed = finish(&state, worker, prompt);
+
+        assert_eq!(parsed["status"], "completed");
+        assert_eq!(parsed["output"], "hello");
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn turning_the_shell_network_off_while_asking_refuses_the_call() {
+        if matches!(sandbox::support(), sandbox::Support::Unavailable(_)) {
+            return;
+        }
+
+        let (state, worker, prompt, dir) = open_prompt(
+            "netoff",
+            "shell_run",
+            json!({ "command": "echo hi" }),
+            |settings, _| settings.allow_shell_network = true,
+        );
+
+        state
+            .settings_update(serde_json::from_str(r#"{"allowShellNetwork":false}"#).unwrap())
+            .unwrap();
+
+        let parsed = finish(&state, worker, prompt);
+
+        assert_eq!(parsed["status"], "failed");
+        assert!(parsed.get("output").is_none());
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_removed_allow_rule_stops_a_call_that_skipped_its_prompt() {
+        let dir = std::env::temp_dir().join(format!("neore-device-rule-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+        stdfs::write(dir.join("a.txt"), "hello").unwrap();
+        let root = dir.canonicalize().unwrap();
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                allow_rules: vec!["fs_read".to_owned()],
+                roots: vec![root.to_string_lossy().into_owned()],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+        let input = json!({ "path": "a.txt" });
+        let settings = state.settings();
+        let action = plan("fs_read", &input, &settings, &HashMap::new()).unwrap();
+        let (skip, _) = decide("fs_read", false, action.read_only(), &settings.allow_rules);
+        let planned = state.generation.load(Ordering::SeqCst);
+
+        assert!(skip);
+        assert!(state.approval_holds(planned, ("fs_read", &input, false), &action, true));
+
+        state
+            .settings_update(serde_json::from_str(r#"{"allowRules":[]}"#).unwrap())
+            .unwrap();
+
+        assert!(!state.approval_holds(planned, ("fs_read", &input, false), &action, true));
+        // The same change does not matter to a call a person approved in a prompt.
+        assert!(state.approval_holds(planned, ("fs_read", &input, false), &action, false));
+
+        let _ = stdfs::remove_dir_all(&dir);
     }
 }
