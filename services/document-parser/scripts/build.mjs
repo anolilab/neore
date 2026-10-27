@@ -16,7 +16,7 @@
  * `lunora dev` calls this on every start, and even a no-op `worker-build`
  * re-runs wasm-bindgen and wasm-opt over the whole module. `--force` rebuilds.
  *
- * Toolchain (plans/document-parser.md has the details):
+ * Toolchain:
  *   rustup target add wasm32-unknown-unknown
  *   cargo install worker-build --version 0.8.7 --locked
  * worker-build downloads wasm-bindgen (matching Cargo.lock), wasm-opt and

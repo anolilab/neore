@@ -7,7 +7,7 @@
     "implicitDependencies": [],
     "targets": {
         "build:worker": {
-            "//": "The Rust Worker (worker-build --release + a name-section strip). Needs the Rust toolchain: see plans/document-parser.md. Cached on the Rust sources, so `test` only rebuilds after a change.",
+            "//": "The Rust Worker (worker-build --release + a name-section strip). Needs the Rust toolchain. Cached on the Rust sources, so `test` only rebuilds after a change.",
             "command": "node scripts/build.mjs",
             "inputs": [
                 "{projectRoot}/src/**/*.rs",

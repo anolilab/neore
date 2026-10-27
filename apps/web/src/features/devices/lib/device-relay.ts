@@ -1,5 +1,5 @@
 /**
- * The page's half of device execution (plans/device-execution.md): a
+ * The page's half of device execution: a
  * RELAY between the backend's pending calls and the desktop shell. It claims a
  * call (claim-once, so a second window never runs it twice), hands the signed
  * envelope to the shell and sends the shell's signed result back. It decides

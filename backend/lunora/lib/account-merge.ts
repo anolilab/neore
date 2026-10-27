@@ -3,7 +3,7 @@
  *
  * better-auth converts an anonymous user by creating a NEW user and linking the
  * anonymous one afterwards (`anonymous({ onLinkAccount })`, `auth.ts`). Every
- * row lives on its owner's shard (plans/per-user-sharding.md), so the
+ * row lives on its owner's shard, so the
  * guest's threads, messages, files, memories… sit on the GUEST's shard, keyed
  * by the guest's id — where the new account never looks. This moves them:
  *

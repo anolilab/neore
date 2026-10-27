@@ -26,7 +26,7 @@ const { sessionFrom } = vi.hoisted(() => {
 });
 
 // `getPublicWorkflow` is an action that resolves the author through
-// `ctx.runQuery(internal.workflow.gallery.…)` (plans/per-user-sharding.md).
+// `ctx.runQuery(internal.workflow.gallery.…)`.
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));

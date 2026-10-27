@@ -4,8 +4,8 @@
  * Call {@link notify} from a mutation, or `internal.notifications.functions.createNotification`
  * from an action — both land here. It:
  *
- * - writes on the RECIPIENT's shard. A notification belongs to its user
- *   (plans/per-user-sharding.md), and a writer is not always there — a
+ * - writes on the RECIPIENT's shard. A notification belongs to its user,
+ *   and a writer is not always there — a
  *   grantee's run pauses on the thread OWNER's shard. Off it, the write is
  *   scheduled onto the recipient's shard instead of landing where their inbox
  *   never looks.

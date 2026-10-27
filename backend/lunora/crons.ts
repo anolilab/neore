@@ -229,7 +229,7 @@ const EVERY_MINUTE_JOBS: ReadonlyArray<CronJob> = [
     { name: "reapLapsedClaims", ref: internal.lib.claim_once.reapLapsedClaims },
     // Every job above sweeps `__root__` only. The same sweeps on each USER shard,
     // where those rows now live, are fanned out through the `.global()` census
-    // (`lib/shard-housekeeping.ts`, plans/per-user-sharding.md).
+    // (`lib/shard-housekeeping.ts`).
     { name: "dispatchDueShards", ref: internal.lib.shard_housekeeping.dispatchDueShards },
 ];
 

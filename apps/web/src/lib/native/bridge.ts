@@ -6,7 +6,7 @@
  * it lists in `capabilities` what this build can do. Anything not listed here
  * (sign-in in the system browser, device execution) is inert: device calls
  * reach the shell only when it advertises `device`, and `device` is the relay
- * in `apps/desktop/src/preload.ts`. See `plans/desktop-and-mobile-apps.md` §4.
+ * in `apps/desktop/src/preload.ts`.
  */
 
 type UnlistenFunction = () => void;

@@ -9,7 +9,7 @@ export const docs = defineDocs({
         // title/description frontmatter), `.md` = internal engineering notes
         // (`docs/analyze/`) which have no frontmatter and must not ship to the
         // public docs site. Internal engineering notes that are not product docs
-        // live at the repo root instead (`AGENTS.md`, `plans/`).
+        // live at the repo root instead (`AGENTS.md`).
         //
         // Negation patterns ("!analyze/**") do NOT work here: fumadocs-mdx's Vite
         // codegen maps every pattern through normalizeViteGlobPath, which prepends

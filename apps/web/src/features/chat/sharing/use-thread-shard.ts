@@ -13,8 +13,8 @@ const isListedThread = (queryClient: QueryClient, threadId: string): boolean =>
         .some(([, data]) => data?.threads?.page?.some((thread) => thread._id === threadId) ?? false);
 
 /**
- * Settle which shard `threadId` lives on before anything queries it
- * (plans/per-user-sharding.md): the caller's own, or — for a thread shared
+ * Settle which shard `threadId` lives on before anything queries it:
+ * the caller's own, or — for a thread shared
  * with them — its owner's, which `crpc` then names on every call about it.
  * Returns `true` once the thread's calls can go out.
  *

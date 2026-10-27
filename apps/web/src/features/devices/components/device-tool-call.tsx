@@ -2,7 +2,7 @@
 
 /**
  * The chat row of a tool call that runs on the user's own computer through the
- * desktop shell (plans/device-execution.md): the device, the tool, and a
+ * desktop shell: the device, the tool, and a
  * live status line — "Waiting for approval on …", "Running on …", "Denied on …".
  *
  * The approval happens in the shell's own window, not here, so while the call

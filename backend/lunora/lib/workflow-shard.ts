@@ -3,7 +3,7 @@
  *
  * A workflow step's `context.run` dispatches through the Worker to the
  * DEFAULT shard (`__root__`) unless it names one, and a user's rows live on
- * their own (plans/per-user-sharding.md). Every workflow here works on one
+ * their own. Every workflow here works on one
  * user's data, so the handler rebinds its context once and every step inherits
  * the shard.
  */

@@ -219,8 +219,8 @@ export const revokePageInvite = authMutation
  * Accept a page invite.
  *
  * The invitee runs this on their OWN shard, while the page — and the check that
- * its inviter may still share it — lives on the owner's
- * (plans/per-user-sharding.md). So the token is resolved here (invites are
+ * its inviter may still share it — lives on the owner's.
+ * So the token is resolved here (invites are
  * `.global()`) and the redeem runs on the owner's shard as the system,
  * re-checking everything from the token.
  */

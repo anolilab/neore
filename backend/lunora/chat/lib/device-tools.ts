@@ -1,6 +1,6 @@
 /**
  * Device tools: the agent-side proxy for tools that run on the user's own
- * computer through the desktop shell (`plans/device-execution.md`).
+ * computer through the desktop shell.
  *
  * One AI SDK tool per entry of each online device's verified manifest. Calling
  * one creates a signed `deviceCalls` row (`devices/internal.ts`), which the

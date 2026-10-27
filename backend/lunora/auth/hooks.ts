@@ -16,8 +16,7 @@
  * both because `.global()` tables are routed to D1 from inside ANY shard.
  *
  * **These run on the user's own shard** (`forShard(userId)` in `auth.ts`), which
- * is where every request of theirs lands (`src/shard-routing.ts`,
- * plans/per-user-sharding.md). They ran on `__root__` while nothing named a
+ * is where every request of theirs lands (`src/shard-routing.ts`). They ran on `__root__` while nothing named a
  * shard; the two move together.
  */
 import { v } from "lunorash/server";

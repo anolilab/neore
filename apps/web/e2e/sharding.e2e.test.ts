@@ -1,5 +1,5 @@
 /**
- * Per-user sharding (plans/per-user-sharding.md), end to end: a guest's
+ * Per-user sharding, end to end: a guest's
  * rows follow them into the account they convert to, and a caller cannot
  * address a shard that is not theirs.
  */

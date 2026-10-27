@@ -5,8 +5,7 @@
  * and SIGNED into the envelope, so the page cannot strip it.
  *
  * A non-empty list makes the device's approval prompt warn and refuse "Always
- * allow", and an existing allow rule does not skip the prompt
- * (`plans/device-execution.md` §3.8).
+ * allow", and an existing allow rule does not skip the prompt.
  *
  * Fail closed: a tool result is untrusted unless the tool is on the short list
  * of built-ins whose output is our own.
