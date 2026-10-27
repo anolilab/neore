@@ -665,16 +665,31 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
     {
         body: zKnowledgeFileCreateRequestSchema,
         description:
-            "Upload the file first over TUS (https://tus.io) to POST /api/v1/uploads with the same API key (`knowledge:write`); the upload id is the last segment of the returned `Location`. Then call this to register the file and start indexing. Poll GET /knowledge/files for `status: indexed`.",
-        handler: async ({ body, ctx }) => {
+            "Upload the file first over TUS (https://tus.io) to POST /api/v1/uploads with the same API key (`knowledge:write`); the upload id is the last segment of the returned `Location`. Then call this to register the file and start indexing. Poll GET /knowledge/files for `status: indexed`. A refused request (for example over the knowledge quota) still uses up the upload id, so upload the file again before retrying.",
+        handler: async ({ body, ctx, identity }) => {
             const request = body as z.infer<typeof zKnowledgeFileCreateRequestSchema>;
             const vaultFile = await ctx.runAction(api.vault.functions.saveVaultFile, { fileName: request.name, uploadId: request.uploadId });
-            const knowledgeFileId = await ctx.runMutation(api.knowledge.functions.addFile, {
-                mimeType: vaultFile.fileType,
-                name: request.name,
-                size: vaultFile.fileSize,
-                vaultFileId: vaultFile.fileId,
-            });
+            let knowledgeFileId: string;
+
+            try {
+                knowledgeFileId = await ctx.runMutation(api.knowledge.functions.addFile, {
+                    mimeType: vaultFile.fileType,
+                    name: request.name,
+                    size: vaultFile.fileSize,
+                    vaultFileId: vaultFile.fileId,
+                });
+            } catch (error) {
+                // Refused (quota, rate limit): the staged upload is already spent, so
+                // the vault row and object it became would be reachable by no one.
+                // The original refusal is what the client sees, whatever the cleanup does.
+                await ctx
+                    .runMutation(internal.vault.functions.discardUnfiledVaultFile, { fileId: vaultFile.fileId, userId: identity.userId })
+                    .catch((cleanupError: unknown) => {
+                        console.error("[public-api] Failed to drop the vault file of a refused knowledge file:", cleanupError);
+                    });
+
+                throw error;
+            }
 
             return { data: { id: knowledgeFileId as string, status: "pending" }, status: 201 };
         },

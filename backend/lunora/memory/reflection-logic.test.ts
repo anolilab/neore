@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
     buildReflectionPrompt,
@@ -14,6 +14,7 @@ import {
     findPromotionCandidates,
     isInReflectionWindow,
     localDayOf,
+    localParts,
     mergeToOps,
     nextReflectionRunAt,
     planActivityUpdate,
@@ -23,6 +24,7 @@ import {
     reflectionJitterMinutes,
     REFLECTION_LIMITS,
     type ReflectionMemory,
+    resolveTimeZone,
     revisionToOps,
     selectReflectionInputs,
     similarity,
@@ -402,5 +404,31 @@ describe("activity tracking", () => {
 
     it("reschedules once the pending run has passed", () => {
         expect(planActivityUpdate({ lastActiveAt: NOW - 60_000, scheduledFor: NOW - 1 }, NOW)).toEqual({ recordActivity: true, schedule: true });
+    });
+});
+
+describe("zone formatters", () => {
+    it("builds one Intl.DateTimeFormat per zone however often the zone is read", () => {
+        // A zone no other test reads, so its first use is inside the spy.
+        const zone = "Pacific/Chatham";
+        const construct = vi.spyOn(Intl, "DateTimeFormat");
+
+        try {
+            for (let index = 0; index < 50; index += 1) {
+                localParts(NOW + index * 60_000, zone);
+                resolveTimeZone(zone);
+            }
+
+            expect(construct).toHaveBeenCalledTimes(1);
+            // Unchanged result: Chatham is UTC+12:45 until NZ summer time starts on 27 September.
+            expect(localParts(NOW, zone)).toStrictEqual({ day: 23, hour: 13, minute: 45, month: 9, year: 2026 });
+        } finally {
+            construct.mockRestore();
+        }
+    });
+
+    it("reads an unknown zone as UTC", () => {
+        expect(resolveTimeZone("Not/AZone")).toBe("UTC");
+        expect(localParts(NOW, "Not/AZone")).toStrictEqual({ day: 23, hour: 1, minute: 0, month: 9, year: 2026 });
     });
 });

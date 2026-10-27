@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createLineSplitter, formatBytes, isValidOllamaModelName, parsePullProgress } from "./ollama-pull";
+import { createLineSplitter, isValidOllamaModelName, parsePullProgress } from "./ollama-pull";
 
 describe(parsePullProgress, () => {
     it("reads a status-only line", () => {
@@ -71,15 +71,5 @@ describe(isValidOllamaModelName, () => {
     it.each(["", "llama 3", "https://evil.example/model", "a:b:c", "x".repeat(201)])("refuses %j", (name) => {
         expect.assertions(1);
         expect(isValidOllamaModelName(name)).toBe(false);
-    });
-});
-
-describe(formatBytes, () => {
-    it("uses binary units like the Ollama CLI", () => {
-        expect.assertions(4);
-        expect(formatBytes(0)).toBe("0 B");
-        expect(formatBytes(512)).toBe("512 B");
-        expect(formatBytes(2_019_377_376)).toBe("1.9 GB");
-        expect(formatBytes(42 * 1024 ** 3)).toBe("42 GB");
     });
 });

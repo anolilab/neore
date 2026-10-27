@@ -96,18 +96,32 @@ const showNotification = (title: string, body?: string): void => {
     notification.show();
 };
 
-const isTrusted = (event: IpcMainInvokeEvent): boolean => isTrustedUrl(origin, event.senderFrame?.url);
+/**
+ * The call came from the TOP frame of the contents it names. A same-origin iframe inside a trusted
+ * window shares the site's URL and would otherwise pass every origin check below.
+ */
+const isTopFrame = (event: IpcMainInvokeEvent, contents: { mainFrame: unknown } | undefined): boolean =>
+    contents !== undefined && event.senderFrame != null && event.senderFrame === contents.mainFrame;
+
+const isTrusted = (event: IpcMainInvokeEvent): boolean =>
+    isTrustedUrl(origin, event.senderFrame?.url) && isTopFrame(event, event.sender);
 
 /**
  * The hand-offs (dropped files, compose text, the sign-in code) are sent to the main window only, so
  * only the main window may take them. A thread window that drained one would keep it from the page.
  */
 const isMainWindow = (event: IpcMainInvokeEvent): boolean =>
-    isTrusted(event) && state.mainWindow !== undefined && event.sender.id === state.mainWindow.webContents.id;
+    isTrusted(event)
+    && state.mainWindow !== undefined
+    && event.sender.id === state.mainWindow.webContents.id
+    && isTopFrame(event, state.mainWindow.webContents);
 
 /** Only the Quick Composer's own page, from its own window: not the site, not another local page. */
 const isFromComposer = (event: IpcMainInvokeEvent): boolean =>
-    isLocalPage(composerPage, event.senderFrame?.url) && state.composer !== undefined && event.sender.id === state.composer.webContents.id;
+    isLocalPage(composerPage, event.senderFrame?.url)
+    && state.composer !== undefined
+    && event.sender.id === state.composer.webContents.id
+    && isTopFrame(event, state.composer.webContents);
 
 /** Closing hides the window instead, so the tray and the shortcut keep the app alive. A desktop with no tray support closes for real. */
 const canHideOnClose = (): boolean => process.platform === "darwin" || state.tray !== undefined;
@@ -664,10 +678,12 @@ const registerIpc = (): void => {
         showNotification(clampedTitle, clampedBody || undefined);
     });
 
+    // Main window only: a thread window's bell shows the same count, but two windows publishing in turn
+    // could leave an older count on the dock.
     ipcMain.handle(
         CHANNEL.setBadge,
         createSetBadgeHandler({
-            isTrusted,
+            isTrusted: isMainWindow,
             platform: process.platform,
             setBadgeCount: (count) => app.setBadgeCount(count),
         }),

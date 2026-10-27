@@ -1,38 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatFileSize, getFileIcon } from "./utilities";
-
-describe("formatFileSize", () => {
-    it("should format 0 bytes", () => {
-        expect(formatFileSize(0)).toBe("0 Bytes");
-    });
-
-    it("should format bytes", () => {
-        expect(formatFileSize(500)).toBe("500 Bytes");
-    });
-
-    it("should format kilobytes", () => {
-        expect(formatFileSize(1024)).toBe("1 KB");
-        expect(formatFileSize(1536)).toBe("1.5 KB");
-    });
-
-    it("should format megabytes", () => {
-        expect(formatFileSize(1_048_576)).toBe("1 MB");
-        expect(formatFileSize(5_242_880)).toBe("5 MB");
-    });
-
-    it("should format gigabytes", () => {
-        expect(formatFileSize(1_073_741_824)).toBe("1 GB");
-    });
-
-    it("should format terabytes", () => {
-        expect(formatFileSize(1_099_511_627_776)).toBe("1 TB");
-    });
-
-    it("should format with decimal precision", () => {
-        expect(formatFileSize(1_500_000)).toBe("1.43 MB");
-    });
-});
+import { getFileIcon } from "./utilities";
 
 describe("getFileIcon", () => {
     it("should return image icon for image types", () => {

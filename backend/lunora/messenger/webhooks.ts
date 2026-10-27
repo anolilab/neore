@@ -18,11 +18,14 @@
  *    request, not that the sender may spend the owner's key.
  * 4. **Rate limits** — per connection and per sender, on the owner's tier.
  *
- * Unknown connections and bad signatures get the same 401, so the response code
- * is no oracle for which connection ids exist. Rejections AFTER authentication
- * (stale, duplicate, rate-limited, foreign sender) answer 200: these platforms
- * retry non-2xx for hours or days and some disable endpoints that keep failing,
- * while the dedupe claim already makes a retry pointless.
+ * Unknown and disconnected connections and bad signatures get the same 401, so
+ * the response code is no oracle for which connection ids exist. Rejections AFTER
+ * authentication (stale, duplicate, rate-limited, foreign sender, and a PAUSED
+ * connection) answer 200: these platforms retry non-2xx for hours or days and
+ * some (Slack, Meta) disable endpoints that keep failing, so a paused connection
+ * would otherwise never receive messages again once resumed. A paused
+ * connection still verifies its signature and still answers the platform
+ * handshakes; it then drops the message with no claim, pairing or reply.
  */
 import type { HttpActionCtx } from "lunorash/server";
 
@@ -70,9 +73,11 @@ interface AcceptOptions {
 }
 
 /**
- * Look up an active connection of `platform` and decrypt the owner's messenger
- * keys. `null` when the connection is unknown, inactive, of another platform,
- * or missing any required key — callers answer all of these with the same 401.
+ * Look up an active or paused connection of `platform` and decrypt the owner's
+ * messenger keys. `null` when the connection is unknown, disconnected, of another
+ * platform, or missing any required key — callers answer all of these with the
+ * same 401. A paused connection resolves with `isPaused: true`: the caller
+ * verifies the signature as usual and then drops the message with a 200.
  */
 export const resolveConnectionAndKeys = async <Key extends string>(
     context: HttpActionCtx,
@@ -81,6 +86,7 @@ export const resolveConnectionAndKeys = async <Key extends string>(
     requiredKeys: ReadonlyArray<Key>,
 ): Promise<{
     connection: Doc<"messengerConnections">;
+    isPaused: boolean;
     // `Record<Key, string>`: the loop below returns null unless every required
     // key is present, so a signature check is never handed an undefined secret.
     keys: Record<Key, string>;
@@ -93,7 +99,7 @@ export const resolveConnectionAndKeys = async <Key extends string>(
         connectionId: connectionId as Id<"messengerConnections">,
     });
 
-    if (!connection || connection.status !== "active" || connection.platform !== platform) {
+    if (!connection || (connection.status !== "active" && connection.status !== "paused") || connection.platform !== platform) {
         return null;
     }
 
@@ -105,7 +111,7 @@ export const resolveConnectionAndKeys = async <Key extends string>(
         }
     }
 
-    return { connection, keys: keys as Record<Key, string> };
+    return { connection, isPaused: connection.status === "paused", keys: keys as Record<Key, string> };
 };
 
 /**
@@ -224,6 +230,10 @@ export const handleTelegramWebhook = async (context: HttpActionCtx, request: Req
         return unauthorized();
     }
 
+    if (resolved.isPaused) {
+        return Response.json({ ok: true });
+    }
+
     // Bot and service messages parse to null and are acknowledged silently.
     const message = parseTelegramUpdate(readJson(await request.text()));
 
@@ -255,7 +265,7 @@ export const handleSlackWebhook = async (context: HttpActionCtx, request: Reques
         return Response.json({ challenge: parsed.challenge });
     }
 
-    if (parsed) {
+    if (parsed && !resolved.isPaused) {
         const { message } = parsed;
 
         logOutcome(
@@ -291,7 +301,7 @@ export const handleDiscordWebhook = async (context: HttpActionCtx, request: Requ
         return Response.json({ type: 1 });
     }
 
-    if (parsed) {
+    if (parsed && !resolved.isPaused) {
         // The request's own signature window is the replay window.
         logOutcome("discord", await acceptInbound(context, resolved.connection, parsed.message, { maxAgeMs: SIGNED_REQUEST_WINDOW_MS, platform: "discord" }));
     }
@@ -327,6 +337,10 @@ export const handleWhatsAppWebhook = async (context: HttpActionCtx, request: Req
         return unauthorized();
     }
 
+    if (resolved.isPaused) {
+        return Response.json({ ok: true });
+    }
+
     const messages = parseWhatsAppWebhook(readJson(rawBody), resolved.keys.whatsapp_phone_number_id);
 
     for (const message of messages) {
@@ -347,6 +361,10 @@ export const handleLineWebhook = async (context: HttpActionCtx, request: Request
 
     if (!resolved || !(await validateLineSignature(request.headers.get("x-line-signature"), rawBody, resolved.keys.line_channel_secret))) {
         return unauthorized();
+    }
+
+    if (resolved.isPaused) {
+        return Response.json({ ok: true });
     }
 
     // The console's "Verify" posts an empty batch; it falls through to the 200.
@@ -414,7 +432,7 @@ export const handleFeishuWebhook = async (context: HttpActionCtx, request: Reque
         return unauthorized();
     }
 
-    if (parsed.kind === "message") {
+    if (parsed.kind === "message" && !resolved.isPaused) {
         logOutcome("feishu", await acceptInbound(context, connection, parsed.message, { maxAgeMs: FEISHU_MESSAGE_MAX_AGE_MS, platform: "feishu" }));
     }
 
@@ -440,7 +458,7 @@ export const handleTeamsWebhook = async (context: HttpActionCtx, request: Reques
 
     const message = parseTeamsActivity(activity);
 
-    if (message) {
+    if (message && !resolved.isPaused) {
         logOutcome(
             "teams",
             await acceptInbound(context, resolved.connection, message, {
@@ -519,7 +537,7 @@ export const handleWeChatWebhook = async (context: HttpActionCtx, request: Reque
 
     const message = parseWeChatMessage(xml);
 
-    if (message) {
+    if (message && !resolved.isPaused) {
         logOutcome("wechat", await acceptInbound(context, connection, message, { maxAgeMs: WECHAT_MESSAGE_MAX_AGE_MS, platform: "wechat" }));
     }
 

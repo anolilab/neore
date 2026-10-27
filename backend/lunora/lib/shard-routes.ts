@@ -55,6 +55,32 @@ export const deleteShardRoute = async (context: Pick<MutationCtx, "db">, kind: S
     }
 };
 
+/**
+ * Drops the routes a deleted thread's public share left behind: its token's
+ * (`thread-public`) and its own id's (`thread-share`). A thread that was never
+ * published costs no read. A route write never fails the delete, so a failure
+ * is logged and the thread is gone regardless.
+ */
+export const deleteThreadShardRoutes = async (
+    context: Pick<MutationCtx, "db">,
+    thread: { isPublic?: boolean | null; publicAccessToken?: string | null },
+    threadId: string,
+): Promise<void> => {
+    if (!thread.publicAccessToken && thread.isPublic !== true) {
+        return;
+    }
+
+    try {
+        if (thread.publicAccessToken) {
+            await deleteShardRoute(context, "thread-public", thread.publicAccessToken);
+        }
+
+        await deleteShardRoute(context, "thread-share", threadId);
+    } catch (error) {
+        console.error("[shard-routes] Failed to drop the share routes of a deleted thread:", error);
+    }
+};
+
 /** Every route to `ownerId`'s shard, and its housekeeping census row — for account deletion. */
 export const deleteShardRoutesOf = async (context: Pick<MutationCtx, "db">, ownerId: string): Promise<void> => {
     const [{ page: routes }, { page: census }] = await Promise.all([
