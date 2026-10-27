@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createProviderModelForEnv } from "../providers/factory.js";
 import { ProviderHealthService } from "../providers/health.js";
+import { UsageReporter } from "../usage/reporter.js";
 import { UsageTracker } from "../usage/tracker.js";
 import { bindingEnv } from "./helpers/internal.js";
 import { createMockEnv } from "./helpers/mock-env.js";
@@ -25,15 +26,22 @@ const fetchApp = useTrackedAppFetch();
 const recordSpy = vi.spyOn(UsageTracker.prototype, "record");
 const failureSpy = vi.spyOn(ProviderHealthService.prototype, "recordFailure");
 const successSpy = vi.spyOn(ProviderHealthService.prototype, "recordSuccess");
+const reportSpy = vi.spyOn(UsageReporter.prototype, "report");
 
 /** A provider stream that has sent `parts` and then stays open, as a live provider connection does. */
-const openStream = async (parts: unknown[], prompt: unknown = [{ content: [{ text: "hello there", type: "text" }], role: "user" }]) => {
+const openStream = async (
+    parts: unknown[],
+    { closes = false }: { closes?: boolean } = {},
+    prompt: unknown = [{ content: [{ text: "hello there", type: "text" }], role: "user" }],
+) => {
     vi.mocked(createProviderModelForEnv).mockResolvedValueOnce({
         doStream: async () => {
             return {
                 stream: new ReadableStream({
                     start(controller) {
                         for (const part of parts) controller.enqueue(part);
+
+                        if (closes) controller.close();
                     },
                 }),
             };
@@ -81,24 +89,58 @@ afterEach(() => {
     recordSpy.mockClear();
     failureSpy.mockClear();
     successSpy.mockClear();
+    reportSpy.mockClear();
     vi.mocked(createProviderModelForEnv).mockReset();
 });
 
 describe("a client closing a proxied stream", () => {
-    it("is a provider failure, not a stop, when it follows an error event", async () => {
+    const PROMPT_TOKENS = Math.ceil("hello there".length / 4);
+
+    it("is a provider failure, not a stop, when it follows an error event, and bills what the provider consumed", async () => {
         const response = await openStream([
             { delta: "partial", id: "t1", type: "text-delta" },
             { error: Object.assign(new Error("overloaded"), { statusCode: 529 }), type: "error" },
         ]);
 
         await closeAfter(response, "error");
-        await vi.waitFor(() => expect(recordSpy).toHaveBeenCalled());
+        await vi.waitFor(() => expect(reportSpy).toHaveBeenCalled());
 
+        // The status and health stay an error's: no "cancelled", one failure recorded.
         expect(firstEntry()?.errorCode).toBe("PROVIDER_ERROR");
         expect(firstEntry()?.finishReason).not.toBe("cancelled");
-        expect(firstEntry()?.promptTokens).toBe(0);
         expect(failureSpy).toHaveBeenCalledTimes(1);
         expect(successSpy).not.toHaveBeenCalled();
+        // Usage is the estimate a cancelled stream gets, recorded and billed alike: the prompt and the 7 characters sent.
+        expect(firstEntry()).toMatchObject({ completionTokens: Math.ceil("partial".length / 4), promptTokens: PROMPT_TOKENS });
+        expect(reportSpy.mock.calls[0]?.[0]).toMatchObject({ completionTokens: Math.ceil("partial".length / 4), promptTokens: PROMPT_TOKENS });
+    });
+
+    it("bills the prompt when the error comes before any output", async () => {
+        const response = await openStream([{ error: Object.assign(new Error("overloaded"), { statusCode: 529 }), type: "error" }]);
+
+        await closeAfter(response, "error");
+        await vi.waitFor(() => expect(reportSpy).toHaveBeenCalled());
+
+        expect(firstEntry()).toMatchObject({ completionTokens: 0, errorCode: "PROVIDER_ERROR", promptTokens: PROMPT_TOKENS });
+        expect(firstEntry()?.finishReason).not.toBe("cancelled");
+        expect(reportSpy.mock.calls[0]?.[0]).toMatchObject({ completionTokens: 0, promptTokens: PROMPT_TOKENS });
+        expect(failureSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("records no usage, as before, for an errored stream nobody cancelled and that sent no usage", async () => {
+        const response = await openStream(
+            [
+                { delta: "partial", id: "t1", type: "text-delta" },
+                { error: Object.assign(new Error("overloaded"), { statusCode: 529 }), type: "error" },
+            ],
+            { closes: true },
+        );
+
+        await response.text();
+        await vi.waitFor(() => expect(reportSpy).toHaveBeenCalled());
+
+        expect(firstEntry()).toMatchObject({ completionTokens: 0, errorCode: "PROVIDER_ERROR", promptTokens: 0 });
+        expect(failureSpy).toHaveBeenCalledTimes(1);
     });
 
     it("is still a stop, billed from the estimate, when the user cancels a healthy stream", async () => {

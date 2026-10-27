@@ -320,7 +320,8 @@ modelProxyRouter.openapi(
             const reader = streamResult.stream.getReader();
             let isCancelled = false;
             // Set once the provider's own stream reported an error. The backend closes its end on such an event, which
-            // arrives here as a cancel: that must not turn a failed call into a user stop (billed as an estimate, no health failure).
+            // arrives here as a cancel: that must not turn a failed call into a user stop (no health failure, no "cancelled" status).
+            // Usage still follows the cancel rule: tokens the provider consumed before the close are estimated, not recorded as zero.
             let isErrored = false;
             // Registered before the Response is returned: a cancelled relay finishes after the response has
             // ended, and the pricing read it awaits first would otherwise be cancelled with the request.
@@ -418,7 +419,7 @@ modelProxyRouter.openapi(
                         // A cancel before the `finish` part leaves no usage, so it is estimated from what was sent.
                         // A cancelled stream is not a successful one, so it does not count toward health.
                         const latencyMs = Date.now() - startTime;
-                        const isEstimated = lastUsage === undefined && isCancelled && !isErrored;
+                        const isEstimated = lastUsage === undefined && isCancelled;
                         const tokens =
                             lastUsage ??
                             (isEstimated
@@ -452,7 +453,8 @@ modelProxyRouter.openapi(
                                     costMicrodollars,
                                     // A provider error inside the stream is a failed call, so its GenAI span must not export as OK.
                                     ...(isErrored && { errorCode: "PROVIDER_ERROR" }),
-                                    finishReason: isEstimated ? "cancelled" : lastFinishReason,
+                                    // An errored stream stays an error, not a stop, though its usage is estimated the same way.
+                                    finishReason: isEstimated && !isErrored ? "cancelled" : lastFinishReason,
                                     isStreaming: true,
                                     latencyMs,
                                     operation: "chat",
