@@ -169,12 +169,14 @@ modelProxyRouter.openapi(
         });
         const policy = resolveProviderPolicy(c.env, body.provider, body.modelApiId, billingMode);
         const byokFeeRate = resolveByokFeeRate(c.env.BYOK_FEE_RATE);
-        const failureReason = (error: unknown) =>
-            classifyProviderFailure(
-                error,
-                Math.ceil(countPromptTextChars((body.callOptions.prompt as { content: unknown }[] | undefined) ?? []) / 4),
-                MODEL_MAP.get(body.modelId)?.contextWindow,
-            );
+        // Classification runs on the error path, so it must never throw there: no reason is a safe answer.
+        const failureReason = (error: unknown) => {
+            try {
+                return classifyProviderFailure(error, Math.ceil(countPromptTextChars(body.callOptions.prompt) / 4), MODEL_MAP.get(body.modelId)?.contextWindow);
+            } catch {
+                return undefined;
+            }
+        };
 
         // Validate model against filter rules before proceeding
         const filterRules = body.modelFilterRules as ModelFilterRules | undefined;
@@ -316,6 +318,9 @@ modelProxyRouter.openapi(
 
             const reader = streamResult.stream.getReader();
             let isCancelled = false;
+            // Set once the provider's own stream reported an error. The backend closes its end on such an event, which
+            // arrives here as a cancel: that must not turn a failed call into a user stop (billed as an estimate, no health failure).
+            let isErrored = false;
             // Registered before the Response is returned: a cancelled relay finishes after the response has
             // ended, and the pricing read it awaits first would otherwise be cancelled with the request.
             const settleBackground = deferWaitUntil(execContext);
@@ -340,7 +345,6 @@ modelProxyRouter.openapi(
                     let reasoningChars = 0;
 
                     try {
-                        let isErrored = false;
                         // Until a part the user would see goes out, the caller can still retry the call elsewhere.
                         let hasContent = false;
 
@@ -413,7 +417,7 @@ modelProxyRouter.openapi(
                         // A cancel before the `finish` part leaves no usage, so it is estimated from what was sent.
                         // A cancelled stream is not a successful one, so it does not count toward health.
                         const latencyMs = Date.now() - startTime;
-                        const isEstimated = lastUsage === undefined && isCancelled;
+                        const isEstimated = lastUsage === undefined && isCancelled && !isErrored;
                         const tokens =
                             lastUsage ??
                             (isEstimated
@@ -457,7 +461,7 @@ modelProxyRouter.openapi(
                                 c.var.telemetry,
                             ),
                             ...(isCancelled || isErrored ? [] : [policy.recordHealth.success(latencyMs)]),
-                            ...(isErrored && !isCancelled ? [policy.recordHealth.failure()] : []),
+                            ...(isErrored ? [policy.recordHealth.failure()] : []),
                             usageReporter.report({
                                 billingMode,
                                 byokFeeRate,

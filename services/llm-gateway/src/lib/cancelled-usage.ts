@@ -17,10 +17,20 @@
 const toTokens = (chars: number): number => Math.ceil(chars / 4);
 
 /** Characters of text in a prompt: string contents and the `text` of each part. */
-export const countPromptTextChars = (messages: { content: unknown }[], system?: string): number => {
+export const countPromptTextChars = (messages: unknown, system?: string): number => {
     let total = system?.length ?? 0;
 
-    for (const { content } of messages) {
+    if (!Array.isArray(messages)) {
+        return total;
+    }
+
+    for (const message of messages as unknown[]) {
+        if (message === null || typeof message !== "object") {
+            continue;
+        }
+
+        const { content } = message as { content?: unknown };
+
         if (typeof content === "string") {
             total += content.length;
         } else if (Array.isArray(content)) {
