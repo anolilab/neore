@@ -305,11 +305,16 @@ export const executeTrigger = internalAction
             });
 
             // 6. Update trigger stats
-            // A run that took the window already moved it to this start, and must not move it again past a give-back.
-            await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
-                lastTriggeredAt: takesWindow ? undefined : runStartedAt,
-                triggerId,
-            });
+            // The run is already settled and the owner told: a bookkeeping failure here must not relabel it as failed.
+            try {
+                // A run that took the window already moved it to this start, and must not move it again past a give-back.
+                await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
+                    lastTriggeredAt: takesWindow ? undefined : runStartedAt,
+                    triggerId,
+                });
+            } catch (statsError) {
+                console.error(`[Triggers] Trigger ${trigger.name} completed, but its stats were not updated:`, statsError);
+            }
 
             console.info(`[Triggers] Trigger ${trigger.name} executed successfully. Thread: ${threadId}, Response length: ${responseText.length}`);
         } catch (error) {

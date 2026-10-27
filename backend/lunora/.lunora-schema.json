@@ -15293,6 +15293,12 @@
           "optional": true,
           "unique": false
         },
+        "pausedTrigger": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "payload": {
           "kind": "string",
           "nullable": false,

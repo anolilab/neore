@@ -1045,36 +1045,58 @@ export const updateExecution = internalMutation
     .output(v.null())
     .mutation(async ({ args: { error, executionId, status, threadId, userFixable }, ctx }) => {
         const execution = await ctx.db.get(executionId);
-        const settling = execution?.status === "running";
 
-        await ctx.db.patch(executionId, {
-            status,
-            ...(threadId && { threadId }),
-            ...(error && { error }),
-            completedAt: ctx.now,
-        });
+        if (!execution) {
+            return null;
+        }
 
-        // A settle for a run that is no longer `running` is a redelivery, and the first one already told the owner.
-        if (settling && (status === "completed" || status === "failed")) {
-            const trigger = execution ? await ctx.db.get(execution.triggerId) : null;
+        // Only the first settlement writes: a redelivery (or a catch path that settles again) must not relabel the row.
+        const settling = execution.status === "running";
+        const settled = settling ? { error, status, threadId } : { error: execution.error, status: execution.status, threadId: execution.threadId };
 
-            if (trigger) {
-                const paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(status, userFixable));
+        if (settling) {
+            await ctx.db.patch(executionId, {
+                status,
+                ...(threadId && { threadId }),
+                ...(error && { error }),
+                completedAt: ctx.now,
+            });
+        }
 
-                await notifyQuietly(ctx, {
-                    // One pause per streak: the execution that tipped it names the episode, so a redelivery or a later
-                    // run of the same (already paused) trigger cannot send a second one.
-                    dedupeKey: paused ? `trigger-paused:${trigger._id}:${executionId}` : `trigger:${executionId}`,
-                    emailOutcome: Boolean(threadId),
-                    link: threadId ? `/chat/${threadId}` : "/dashboard/settings/chat/triggers",
-                    outcome: status === "completed" ? "success" : "failure",
-                    title: trigger.name,
-                    type: "trigger",
-                    userId: trigger.userId,
-                    ...(paused ? { body: pausedNoticeBody(error) } : error && { body: error }),
-                });
+        if (settled.status !== "completed" && settled.status !== "failed") {
+            return null;
+        }
+
+        const trigger = await ctx.db.get(execution.triggerId);
+
+        if (!trigger) {
+            return null;
+        }
+
+        // The streak moves on the first settlement only; `pausedTrigger` remembers it so a redelivery can say the same thing.
+        let paused = execution.pausedTrigger === true;
+
+        if (settling) {
+            paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(settled.status, userFixable));
+
+            if (paused) {
+                await ctx.db.patch(executionId, { pausedTrigger: true });
             }
         }
+
+        // Sent again on a redelivery: `notify` is idempotent on the key, so this only restores a notice that was lost.
+        await notifyQuietly(ctx, {
+            // One pause per streak: the execution that tipped it names the episode, so a later run of the same
+            // (already paused) trigger cannot send a second one.
+            dedupeKey: paused ? `trigger-paused:${trigger._id}:${executionId}` : `trigger:${executionId}`,
+            emailOutcome: Boolean(settled.threadId),
+            link: settled.threadId ? `/chat/${settled.threadId}` : "/dashboard/settings/chat/triggers",
+            outcome: settled.status === "completed" ? "success" : "failure",
+            title: trigger.name,
+            type: "trigger",
+            userId: trigger.userId,
+            ...(paused ? { body: pausedNoticeBody(settled.error) } : settled.error && { body: settled.error }),
+        });
 
         return null;
     });

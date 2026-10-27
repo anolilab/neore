@@ -1727,6 +1727,7 @@ export interface Doc_triggerExecutions {
     _creationTime: number;
     completedAt?: number;
     error?: string;
+    pausedTrigger?: boolean;
     payload?: string;
     startedAt: number;
     status: "running" | "completed" | "failed" | "filtered";
@@ -4462,6 +4463,7 @@ export interface Insert_triggerExecutions {
     _creationTime?: number;
     completedAt?: number;
     error?: string;
+    pausedTrigger?: boolean;
     payload?: string;
     startedAt: number;
     status: "running" | "completed" | "failed" | "filtered";

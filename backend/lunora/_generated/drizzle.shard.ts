@@ -1478,6 +1478,7 @@ export const triggerExecutions = sqliteTable("triggerExecutions", {
     _creationTime: integer("_creationTime").notNull(),
     completedAt: real("completedAt"),
     error: text("error"),
+    pausedTrigger: integer("pausedTrigger", { mode: "boolean" }),
     payload: text("payload"),
     startedAt: real("startedAt").notNull(),
     status: text("status", { mode: "json" }).$type<"running" | "completed" | "failed" | "filtered">().notNull(),

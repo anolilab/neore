@@ -281,4 +281,45 @@ describe("pausing a trigger after repeated user-fixable failures", () => {
             vi.useRealTimers();
         }
     });
+
+    it("leaves a settled execution unchanged when a later settlement disagrees", async () => {
+        const triggerId = await insertTrigger();
+        const executionId = await run(triggerId, "completed");
+
+        await settle(executionId, "failed", true);
+
+        const row = await harness.run(async (ctx: any) => await ctx.db.get(executionId));
+
+        expect(row).toMatchObject({ status: "completed" });
+        expect(row.error).toBeUndefined();
+        expect((await fieldOf(triggerId, "failureStreak")) ?? 0).toBe(0);
+        expect(await noticesKeyed(`trigger:${executionId}`)).toHaveLength(1);
+        expect(await noticesKeyed(`trigger:${executionId}`).then((rows) => rows[0]?.outcome)).toBe("success");
+    });
+
+    it("re-sends a lost pause notice, as the pause notice, when the settlement is delivered again", async () => {
+        const triggerId = await insertTrigger();
+        let pausingRun = "";
+
+        for (let index = 0; index < TRIGGER_PAUSE_AFTER_FAILURES; index += 1) {
+            pausingRun = await failFixable(triggerId);
+        }
+
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("notifications").collect();
+
+            for (const row of rows) {
+                await ctx.db.delete(row._id);
+            }
+        });
+
+        await settle(pausingRun, "failed", true);
+
+        const paused = await noticesKeyed("trigger-paused:");
+
+        expect(paused).toHaveLength(1);
+        expect(paused[0]?.dedupeKey).toBe(`trigger-paused:${triggerId}:${pausingRun}`);
+        expect(await noticesKeyed(`trigger:${pausingRun}`)).toHaveLength(0);
+        expect(await fieldOf(triggerId, "failureStreak")).toBe(TRIGGER_PAUSE_AFTER_FAILURES);
+    });
 });

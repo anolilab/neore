@@ -2718,6 +2718,8 @@ export const schema = defineSchema({
     triggerExecutions: defineTable({
         completedAt: v.optional(v.number()),
         error: v.optional(v.string()),
+        // Set on the run whose failure paused its trigger, so a redelivered settlement re-sends the pause notice rather than the plain one.
+        pausedTrigger: v.optional(v.boolean()),
         payload: v.optional(v.string()),
         startedAt: v.number(),
         // "filtered": a run that was skipped and ran nothing: a verified delivery whose payload failed the
