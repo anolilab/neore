@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@neore/ui/components/separator";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
+import { useId } from "react";
 import { toast } from "sonner";
 
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
@@ -71,6 +72,7 @@ const ModelSelect = <Field extends string>({
     value,
 }: ModelSelectProps<Field>) => {
     const { t } = useLingui();
+    const labelId = useId();
     const selectedModel = models.find((m) => m.id === value);
     const allModels = useFeatureFlaggedModels();
     const systemDefaultModel = systemDefaultId ? allModels.find((m) => m.id === systemDefaultId) : undefined;
@@ -80,11 +82,13 @@ const ModelSelect = <Field extends string>({
     return (
         <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1 space-y-0.5">
-                <Label className="text-sm font-medium">{label}</Label>
+                <Label className="text-sm font-medium" id={labelId}>
+                    {label}
+                </Label>
                 <p className="text-muted-foreground text-xs">{description}</p>
             </div>
             <Select<string> disabled={disabled || models.length === 0} onValueChange={(v) => onChange(field, v)} value={value ?? null}>
-                <SelectTrigger className="w-48 shrink-0">
+                <SelectTrigger aria-labelledby={labelId} className="w-48 shrink-0">
                     <SelectValue placeholder={models.length === 0 ? t`No models available` : systemDefaultLabel}>
                         {selectedModel && (
                             <span className="flex items-center gap-1.5 truncate">
