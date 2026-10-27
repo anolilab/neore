@@ -89,6 +89,16 @@ const assertCronExpression = (cronExpression: string): void => {
 };
 
 /**
+ * A zone the scheduler would read as UTC (`resolveTimeZone`) is a typo here, not UTC:
+ * the row would show the typed name beside a cron that runs in UTC.
+ */
+const assertTimeZone = (timeZone: string): void => {
+    if (resolveTimeZone(timeZone) !== timeZone) {
+        throw new LunoraError("BAD_REQUEST", "Unknown time zone");
+    }
+};
+
+/**
  * The next run to arm when a schedule trigger is enabled. Nothing else sets `nextTriggerAt` before the
  * first run, and the due query only matches a set value, so an enabled trigger without one never fired.
  * A stored time already in the past is stale on the way from disabled to enabled: a disabled trigger keeps
@@ -321,6 +331,10 @@ export const createTrigger = authMutation
 
         assertTriggerTypeSupported(triggerType);
 
+        const timezone = args.timezone?.trim() || undefined;
+
+        if (timezone !== undefined) assertTimeZone(timezone);
+
         if (args.cronExpression !== undefined || triggerType === "schedule") {
             assertCronExpression(args.cronExpression ?? "");
         }
@@ -344,7 +358,7 @@ export const createTrigger = authMutation
             botId: args.botId as Id<"bots"> | undefined,
             createdAt: now,
             cronExpression: args.cronExpression,
-            cronInZone: triggerType === "schedule" && args.timezone ? true : undefined,
+            cronInZone: triggerType === "schedule" && timezone ? true : undefined,
             description: args.description,
             enabled: false, // Start disabled — user must explicitly enable
             filters,
@@ -354,7 +368,7 @@ export const createTrigger = authMutation
             quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
             searchMode: args.searchMode,
             systemPrompt: args.systemPrompt,
-            timezone: args.timezone,
+            timezone,
             triggerCount: 0,
             type: triggerType,
             updatedAt: now,
@@ -460,7 +474,10 @@ export const updateTrigger = authMutation
         // An absent or empty zone is no change, and a changed one marks the row `cronInZone`.
         const isSchedule = trigger.type === "schedule";
         const storedZone = cronZoneOf(trigger);
-        const requestedZone = args.timezone?.trim() ? args.timezone : undefined;
+        const requestedZone = args.timezone?.trim() || undefined;
+
+        if (requestedZone !== undefined) assertTimeZone(requestedZone);
+
         const zoneChanged = requestedZone !== undefined && resolveTimeZone(requestedZone) !== resolveTimeZone(storedZone);
         const nextZone = zoneChanged ? requestedZone : storedZone;
         const nextCron = args.cronExpression ?? trigger.cronExpression;

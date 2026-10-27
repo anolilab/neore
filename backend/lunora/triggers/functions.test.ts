@@ -233,6 +233,39 @@ describe("trigger schedules", () => {
         expect(trigger.cronExpression).toBe("0 9 * * 1");
     });
 
+    it("refuses an unknown time zone on create and on update, storing nothing", async () => {
+        await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), timezone: "Europe/Berln" } as never)).rejects.toThrow("Unknown time zone");
+
+        const { triggerId } = (await as().mutation(createTrigger as never, schedule("0 9 * * 1") as never)) as { triggerId: string };
+
+        await expect(as().mutation(updateTrigger as never, { timezone: "Europe/Berln", triggerId } as never)).rejects.toThrow("Unknown time zone");
+
+        const trigger = await readTrigger(triggerId);
+
+        expect(trigger.timezone).toBeUndefined();
+        expect(trigger.cronInZone).toBeUndefined();
+    });
+
+    it("stores a valid time zone trimmed and marks the cron as read in it", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), timezone: "  Europe/Berlin " } as never)) as {
+            triggerId: string;
+        };
+        const trigger = await readTrigger(triggerId);
+
+        expect(trigger.timezone).toBe("Europe/Berlin");
+        expect(trigger.cronInZone).toBe(true);
+    });
+
+    it("accepts an absent or blank zone as UTC", async () => {
+        for (const timezone of [undefined, "", "  "]) {
+            const { triggerId } = (await as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), timezone } as never)) as { triggerId: string };
+            const trigger = await readTrigger(triggerId);
+
+            expect(trigger.timezone).toBeUndefined();
+            expect(trigger.cronInZone).toBeUndefined();
+        }
+    });
+
     it("does not ask a webhook trigger for a schedule", async () => {
         await expect(as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)).resolves.toMatchObject({
             triggerId: expect.any(String),
