@@ -14,7 +14,6 @@ import type { BrowserWindow as BrowserWindowInstance, IpcMainInvokeEvent, Sessio
 import { app, BrowserWindow, clipboard, dialog, ipcMain, session as electronSession, utilityProcess } from "electron";
 
 import { TERMINAL_CHANNEL, TERMINAL_EVENT } from "./channels";
-import { descendantsOf } from "./kill-session";
 import type { HostEvent, HostRequest } from "./protocol";
 import type { HostHandle, TerminalSession } from "./session";
 import { startSession } from "./session";
@@ -358,11 +357,6 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
             }
 
             quitPids.add(session.pid);
-
-            // Foreground jobs, taken before the hangup: one that ignores it outlives the shell.
-            for (const job of descendantsOf(session.pid)) {
-                quitPids.add(job);
-            }
 
             session.killNow();
         }

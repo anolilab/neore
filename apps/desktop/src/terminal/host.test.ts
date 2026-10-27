@@ -4,7 +4,7 @@
  * macOS and Linux only; Windows has no terminal yet.
  */
 import { fork } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -169,25 +169,6 @@ describe.skipIf(!supported)("terminal host (real pty)", { timeout: 60_000 }, () 
         run.session.kill();
         await waitFor(() => !isAlive(shellPid), "the shell to end");
         expect(run.exits).toHaveLength(1);
-    });
-
-    it("ends a foreground job that ignores the hangup along with the shell", async () => {
-        const run = await open(tmpdir(), []);
-        const jobDirectory = mkdtempSync(path.join(tmpdir(), "neore-job-"));
-        const pidFile = path.join(jobDirectory, "job.pid");
-
-        // `exec` keeps the ignored hangup: the job outlives anything that only signals the shell.
-        run.session.write(`sh -c 'trap "" HUP; echo $$ > ${pidFile}; exec sleep 1000'\n`);
-        const recorded = (): string => existsSync(pidFile) ? readFileSync(pidFile, "utf8").trim() : "";
-
-        await waitFor(() => recorded() !== "", "the job to start");
-
-        const jobPid = Number(recorded());
-
-        expect(isAlive(jobPid)).toBe(true);
-        run.session.kill();
-        await waitFor(() => !isAlive(jobPid), "the job to end", 15_000);
-        rmSync(jobDirectory, { force: true, recursive: true });
     });
 
     it("ends the shell at once when the app quits (killNow)", async () => {
