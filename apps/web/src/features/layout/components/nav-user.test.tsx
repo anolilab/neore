@@ -133,6 +133,28 @@ describe("NavUser sign-out", () => {
         expect(localStorage).toHaveLength(0);
     });
 
+    it("lets the list be saved again when the sign-out fails", async () => {
+        auth.signOut.mockImplementation(async ({ fetchOptions }: { fetchOptions: { onError: () => void } }) => {
+            fetchOptions.onError();
+        });
+        render(<NavUser />);
+
+        fireEvent.click(screen.getByText("Log out"));
+
+        await vi.waitFor(() => {
+            expect(auth.signOut).toHaveBeenCalled();
+        });
+        writeThreadListCache("alice", {
+            pinnedThreads: [],
+            relationships: [],
+            tags: [],
+            temporaryThreads: { page: [] },
+            threadOrders: [],
+            threads: { page: [{ _id: "t1", title: "Still signed in" }] },
+        });
+        expect(localStorage).toHaveLength(1);
+    });
+
     it("clears it before the request is made", async () => {
         let storedAtRequest = -1;
 

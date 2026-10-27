@@ -26,7 +26,7 @@ import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import useCheckout from "@/features/billing/hooks/use-checkout";
-import { clearThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
+import { clearThreadListCache, releaseThreadListWrites } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
 import updateLocale, { isSupportedLocale } from "@/functions/update-locale";
@@ -285,6 +285,8 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                                 clearThreadListCache();
                             },
                             onError: () => {
+                                // The session is still active, so its list may be saved again.
+                                releaseThreadListWrites();
                                 // The session may still be active, so keep the identity and say so.
                                 toast({
                                     message: t`Sign-out failed. Please try again.`,

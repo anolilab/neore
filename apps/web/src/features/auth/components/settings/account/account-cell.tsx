@@ -12,7 +12,7 @@ import { useState } from "react";
 import type { SettingsCardClassNames } from "@/components/settings/settings-card";
 import { useSession } from "@/features/auth/hooks/session-user-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
-import { clearThreadListCacheFor } from "@/features/chat/thread-list/lib/thread-list-cache";
+import { clearThreadListCacheFor, releaseThreadListWrites } from "@/features/chat/thread-list/lib/thread-list-cache";
 
 import { getLocalizedError } from "../../../lib/utilities";
 import type { Refetch } from "../../../types/hook-integration-types";
@@ -41,6 +41,8 @@ const AccountCell = ({ className, classNames, deviceSession, refetch }: AccountC
     const [isLoading, setIsLoading] = useState(false);
 
     const handleRevoke = async () => {
+        let failed = false;
+
         setIsLoading(true);
 
         try {
@@ -55,9 +57,15 @@ const AccountCell = ({ className, classNames, deviceSession, refetch }: AccountC
                 message: getLocalizedError({ error, t }),
                 variant: "error",
             });
+            // Still signed in on this browser, so its list may be saved again once the stored copy is gone.
+            failed = true;
         } finally {
             // Success or not, this account may be gone from the browser; its stored chat titles go with it.
             clearThreadListCacheFor(deviceSession.user.id);
+
+            if (failed) {
+                releaseThreadListWrites(deviceSession.user.id);
+            }
         }
     };
 

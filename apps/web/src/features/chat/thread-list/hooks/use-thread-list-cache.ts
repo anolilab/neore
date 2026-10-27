@@ -5,8 +5,8 @@ import { useCRPCClient } from "@/lib/lunora/crpc";
 
 import {
     getThreadListClearGeneration,
+    observeThreadListUser,
     readThreadListCache,
-    releaseThreadListWrites,
     subscribeToForeignThreadListClears,
     toThreadListData,
     writeThreadListCache,
@@ -81,12 +81,10 @@ export const usePersistThreadList = (data: unknown, isPlaceholderData: boolean):
     }, [client, userId]);
 
     useEffect(() => {
-        if (owner.current.userId !== userId) {
-            // A different signed-in user is a new sign-in: the hold from the last sign-out no longer applies.
-            if (userId) {
-                releaseThreadListWrites(userId);
-            }
+        // Every effect run, not only a change: the module compares with what it saw before, so a remount lifts nothing.
+        observeThreadListUser(userId);
 
+        if (owner.current.userId !== userId) {
             owner.current = { baseline: owner.current.seen ? data : undefined, seen: true, userId };
         }
 

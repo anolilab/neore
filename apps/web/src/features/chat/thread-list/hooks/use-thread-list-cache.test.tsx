@@ -173,6 +173,22 @@ describe("thread list cache hooks", () => {
         expect(localStorage).toHaveLength(1);
     });
 
+    it("keeps refusing writes when the sidebar remounts during a sign-out", () => {
+        vi.useFakeTimers();
+        auth.token = jwtFor("alice");
+
+        const { unmount } = renderHook(() => usePersistThreadList(list("alice", "T"), false));
+
+        clearThreadListCache();
+        unmount();
+
+        renderHook(() => usePersistThreadList(list("alice", "After remount"), false));
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        expect(localStorage).toHaveLength(0);
+    });
+
     it("resumes persisting when a removal in another tab was not a sign-out", () => {
         vi.useFakeTimers();
         auth.token = jwtFor("alice");

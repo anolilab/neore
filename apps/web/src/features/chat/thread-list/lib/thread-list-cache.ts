@@ -21,20 +21,46 @@ const clears = { count: 0 };
 
 /**
  * Writes are refused from the moment a sign-out (or an account removal) starts. The sidebar stays mounted until the page
- * reloads, so a push in that window would otherwise store the list again. Lifted for a user when they become the signed-in
- * user (the next sign-in); a reload starts clean.
+ * reloads, so a push in that window would otherwise store the list again. Only an actual change of identity lifts the
+ * sign-out hold (`observeThreadListUser`), never a mount: a remounted sidebar sees the same user it saw before. A failed
+ * sign-out lifts it explicitly, since that session is still alive. A reload starts clean.
  */
-const writeHold = { blockedUsers: new Set<string>(), signingOut: false };
+const writeHold = { blockedUsers: new Set<string>(), sawNoUser: false, signingOut: false, subject: undefined as string | undefined };
 
-/** Lifts the holds that a sign-in as `userId` ends (the sign-out hold, and any hold on that account); with no user, every hold. */
+/** The user the module last saw signed in, kept here (not in a hook) so a remount does not read as a new identity. */
+const observed: { user: string | undefined } = { user: undefined };
+
+/** Told by the sidebar which user is signed in; lifts a hold only when the identity really changed. */
+export const observeThreadListUser = (userId: string | undefined): void => {
+    const previous = observed.user;
+
+    observed.user = userId;
+
+    if (!userId) {
+        writeHold.sawNoUser = true;
+
+        return;
+    }
+
+    if (writeHold.signingOut && (writeHold.sawNoUser || userId !== writeHold.subject)) {
+        writeHold.signingOut = false;
+    }
+
+    if (previous !== userId) {
+        writeHold.blockedUsers.delete(userId);
+    }
+};
+
+/** Lifts the hold on `userId` (a failed account removal); with no user, every hold (a failed sign-out, or a test reset). */
 export const releaseThreadListWrites = (userId?: string): void => {
-    writeHold.signingOut = false;
-
     if (userId) {
         writeHold.blockedUsers.delete(userId);
-    } else {
-        writeHold.blockedUsers.clear();
+
+        return;
     }
+
+    writeHold.signingOut = false;
+    writeHold.blockedUsers.clear();
 };
 
 /** Bumped by every clear; a write scheduled before a clear compares it to drop itself. */
@@ -276,6 +302,8 @@ export const writeThreadListCache = (userId: string | undefined, data: unknown, 
 export const clearThreadListCache = (storage: Storage | undefined = getThreadListStorage()): void => {
     clears.count += 1;
     writeHold.signingOut = true;
+    writeHold.subject = observed.user;
+    writeHold.sawNoUser = observed.user === undefined;
 
     if (!storage) {
         return;

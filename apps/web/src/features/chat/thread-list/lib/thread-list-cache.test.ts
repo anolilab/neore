@@ -4,6 +4,7 @@ import {
     clearThreadListCache,
     clearThreadListCacheFor,
     getThreadListStorage,
+    observeThreadListUser,
     projectThreadList,
     readThreadListCache,
     releaseThreadListWrites,
@@ -121,14 +122,35 @@ describe("thread list cache", () => {
     });
 
     describe("write hold", () => {
-        it("refuses every write from a sign-out until a sign-in lifts it", () => {
+        it("refuses every write from a sign-out until the identity changes, never on a mere remount", () => {
+            observeThreadListUser("alice");
             clearThreadListCache();
             writeThreadListCache("alice", listFor("alice"));
             expect(localStorage).toHaveLength(0);
 
-            releaseThreadListWrites("alice");
+            // A remounted sidebar sees the same user again.
+            observeThreadListUser("alice");
+            writeThreadListCache("alice", listFor("alice"));
+            expect(localStorage).toHaveLength(0);
+
+            // Signed out, then in again.
+            observeThreadListUser(undefined);
+            observeThreadListUser("alice");
             writeThreadListCache("alice", listFor("alice"));
             expect(localStorage).toHaveLength(1);
+        });
+
+        it("is lifted by a different user signing in, or explicitly after a failed sign-out", () => {
+            observeThreadListUser("alice");
+            clearThreadListCache();
+            observeThreadListUser("bob");
+            writeThreadListCache("bob", listFor("bob"));
+            expect(readThreadListCache("bob")).toBeDefined();
+
+            clearThreadListCache();
+            releaseThreadListWrites();
+            writeThreadListCache("bob", listFor("bob"));
+            expect(readThreadListCache("bob")).toBeDefined();
         });
 
         it("refuses writes for a removed account only", () => {
@@ -138,6 +160,10 @@ describe("thread list cache", () => {
 
             expect(readThreadListCache("bob")).toBeUndefined();
             expect(readThreadListCache("alice")).toBeDefined();
+
+            releaseThreadListWrites("bob");
+            writeThreadListCache("bob", listFor("bob"));
+            expect(readThreadListCache("bob")).toBeDefined();
         });
     });
 

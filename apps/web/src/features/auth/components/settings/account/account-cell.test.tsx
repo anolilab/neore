@@ -91,4 +91,24 @@ describe("AccountCell revoke", () => {
         });
         expect(readThreadListCache("alice")).toBeDefined();
     });
+
+    it("lets that account be saved again when the revoke fails, not when it succeeds", async () => {
+        const list = {
+            pinnedThreads: [],
+            relationships: [],
+            tags: [],
+            temporaryThreads: { page: [] },
+            threadOrders: [],
+            threads: { page: [{ _id: "t1", title: "Bob" }] },
+        };
+
+        auth.revoke.mockRejectedValueOnce(new Error("nope"));
+        render(<AccountCell deviceSession={deviceSession} />);
+        fireEvent.click(screen.getByText("Revoke"));
+        await vi.waitFor(() => {
+            expect(readThreadListCache("bob")).toBeUndefined();
+        });
+        writeThreadListCache("bob", list);
+        expect(readThreadListCache("bob")).toBeDefined();
+    });
 });
