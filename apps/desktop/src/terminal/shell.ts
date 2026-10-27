@@ -1,4 +1,4 @@
-import { accessSync, constants, statSync } from "node:fs";
+import { accessSync, constants, realpathSync, statSync } from "node:fs";
 import { userInfo } from "node:os";
 import path from "node:path";
 
@@ -56,29 +56,35 @@ export const shellEnvironment = (env: NodeJS.ProcessEnv = process.env): Record<s
         }
     }
 
+    // Electron on Linux rewrites the desktop name for itself and keeps the user's in this one.
+    if (env.ORIGINAL_XDG_CURRENT_DESKTOP !== undefined) {
+        result.XDG_CURRENT_DESKTOP = env.ORIGINAL_XDG_CURRENT_DESKTOP;
+    }
+
     result.TERM = "xterm-256color";
     result.COLORTERM = "truecolor";
 
     return result;
 };
 
-const isDirectory = (file: string): boolean => {
-    try {
-        return statSync(file).isDirectory();
-    } catch {
-        return false;
-    }
-};
-
-/** The folder a terminal opens in: an absolute path to an existing directory. */
+/**
+ * The folder a terminal opens in: an absolute path to an existing directory, with symlinks and `..` resolved, so
+ * `/w`, `/w/` and `/a/link/..` name one folder (and one window) and the shell starts where the title says.
+ */
 export const readFolder = (value: unknown): string => {
     if (typeof value !== "string" || value.length === 0 || value.length > 4096 || !path.isAbsolute(value)) {
         throw new Error("terminal: the folder is invalid");
     }
 
-    if (!isDirectory(value)) {
-        throw new Error("terminal: the folder does not exist");
+    try {
+        const resolved = realpathSync(value);
+
+        if (statSync(resolved).isDirectory()) {
+            return resolved;
+        }
+    } catch {
+        // Missing, unreadable or a dangling link: reported below.
     }
 
-    return path.normalize(value);
+    throw new Error("terminal: the folder does not exist");
 };

@@ -26,6 +26,21 @@ describe("makeSpawnHelperExecutable", () => {
         expect(modeOf(other)).toBe(0o644);
     });
 
+    it("does not touch a packaged app, whose signature a changed file would break", () => {
+        const root = mkdtempSync(path.join(tmpdir(), "neore-pty-"));
+        const packaged = path.join(root, "app.asar.unpacked", "node_modules", "node-pty");
+        const helper = path.join(packaged, "prebuilds", "darwin-arm64", "spawn-helper");
+
+        mkdirSync(path.dirname(helper), { recursive: true });
+        writeFileSync(helper, "binary");
+        chmodSync(helper, 0o644);
+
+        makeSpawnHelperExecutable(path.join(root, "app.asar", "node_modules", "node-pty"), "darwin", "arm64");
+        makeSpawnHelperExecutable(packaged, "darwin", "arm64");
+
+        expect(modeOf(helper)).toBe(0o644);
+    });
+
     it("leaves an executable file alone and tolerates a missing one", () => {
         const root = mkdtempSync(path.join(tmpdir(), "neore-pty-"));
         const built = path.join(root, "build", "Release", "spawn-helper");

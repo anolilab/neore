@@ -8,6 +8,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 
 import { SCROLLBACK_LINES } from "../scrollback";
+import { MAX_INPUT_CHARS } from "../validate";
 import type { TerminalExit } from "./api";
 
 const $ = (id: string): HTMLElement => {
@@ -53,12 +54,27 @@ const createView = (): { fit: FitAddon; term: Terminal } => {
 
 const { fit, term } = createView();
 // Page-wide state, kept on one object so the functions below assign properties rather than module bindings.
-const state = { running: false };
+const state: { notice?: ReturnType<typeof setTimeout>; running: boolean } = { running: false };
+
+const NOTICE_MS = 5000;
+const showNotice = (text: string): void => {
+    const notice = $("notice");
+
+    notice.textContent = text;
+    notice.hidden = false;
+    clearTimeout(state.notice);
+    state.notice = setTimeout(() => {
+        notice.hidden = true;
+    }, NOTICE_MS);
+};
 
 const pasteFromClipboard = async (): Promise<void> => {
     const text = await api.paste();
 
-    if (text.length > 0) {
+    if (text.length > MAX_INPUT_CHARS) {
+        // The main process refuses a write this large; saying so beats a paste that does nothing.
+        showNotice("The text on the clipboard is over 1 MiB, so it was not pasted.");
+    } else if (text.length > 0) {
         term.paste(text);
     }
 };

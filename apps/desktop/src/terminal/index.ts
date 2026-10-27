@@ -31,6 +31,8 @@ const PARTITION = "neore-terminal";
 interface Entry {
     closed: boolean;
     cwd: string;
+    /** Counts the page loads this window has had; a shell belongs to the load it was started for. */
+    epoch: number;
     session?: TerminalSession;
     starting: boolean;
     window: BrowserWindowInstance;
@@ -52,6 +54,17 @@ export interface TerminalOptions {
     /** Starts a host process. The default is an Electron utility process; tests pass a fake. */
     startHost?: () => HostHandle;
 }
+
+/** Sends the signal and says whether the process was there to receive it (`0` only checks). */
+const signalled = (pid: number, signal: 0 | "SIGKILL"): boolean => {
+    try {
+        process.kill(pid, signal);
+
+        return true;
+    } catch {
+        return false;
+    }
+};
 
 const forkHost = (): HostHandle => {
     const child = utilityProcess.fork(HOST_PATH, [], { serviceName: "Neore terminal host", stdio: "ignore" });
@@ -86,13 +99,37 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
     const startHost = options.startHost ?? forkHost;
     const entries = new Map<WebContents, Entry>();
     const byFolder = new Map<string, Entry>();
+    /** Every host not yet gone, so one still starting its shell is ended at quit as well. */
+    const hosts = new Set<HostHandle>();
+    /** The shells hung up at quit, checked once more at the very end. */
+    const quitPids = new Set<number>();
     const pageUrl = pathToFileURL(TERMINAL_PAGE).href;
     let lockedDown = false;
+    let quitting = false;
+
+    const trackedHost = (): HostHandle => {
+        const host = startHost();
+
+        hosts.add(host);
+        host.onExit(() => hosts.delete(host));
+
+        return host;
+    };
 
     const send = (target: WebContents, channel: string, payload?: unknown): void => {
         if (!target.isDestroyed()) {
             target.send(channel, payload);
         }
+    };
+
+    /** The page went away (a reload, a crash): its shell goes with it, and nothing it prints reaches the next page. */
+    const endShell = (entry: Entry): void => {
+        /* eslint-disable no-param-reassign -- an entry is this window's mutable record */
+        entry.epoch += 1;
+        entry.starting = false;
+        entry.session?.kill();
+        entry.session = undefined;
+        /* eslint-enable no-param-reassign */
     };
 
     const openWindow = (cwd: string): void => {
@@ -133,7 +170,7 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
             width: 780,
         });
         const { webContents } = window;
-        const entry: Entry = { closed: false, cwd, starting: false, window };
+        const entry: Entry = { closed: false, cwd, epoch: 0, starting: false, window };
 
         entries.set(webContents, entry);
         byFolder.set(cwd, entry);
@@ -146,11 +183,13 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
         webContents.on("will-redirect", (event) => event.preventDefault());
         webContents.on("will-attach-webview", (event) => event.preventDefault());
         window.on("page-title-updated", (event) => event.preventDefault());
+        // A reload (the default menu has one) does not pass through `will-navigate`, and the new page knows nothing of the old shell.
+        webContents.on("did-start-loading", () => endShell(entry));
+        webContents.on("render-process-gone", () => endShell(entry));
         window.on("closed", () => {
             // Closing the window ends its shell and drops everything it held.
             entry.closed = true;
-            entry.session?.kill();
-            entry.session = undefined;
+            endShell(entry);
             entries.delete(webContents);
 
             if (byFolder.get(cwd) === entry) {
@@ -216,22 +255,35 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
             throw new Error("terminal: a shell is already running");
         }
 
+        const { epoch } = entry;
+
         entry.starting = true;
 
         try {
             const shell = resolveShell();
             const target = entry.window.webContents;
             const started = await startSession({
-                onData: (data) => send(target, TERMINAL_EVENT.data, data),
+                onData: (data) => {
+                    if (entry.epoch === epoch) {
+                        send(target, TERMINAL_EVENT.data, data);
+                    }
+                },
                 onExit: (info) => {
+                    if (entry.epoch !== epoch) {
+                        return;
+                    }
+
                     entry.session = undefined;
                     send(target, TERMINAL_EVENT.exit, info);
                 },
                 spawn: { args: shell.args, cols, cwd: entry.cwd, env: shellEnvironment(), file: shell.file, rows },
-                startHost,
+                startHost: trackedHost,
             });
 
-            if (entry.closed) {
+            if (quitting) {
+                quitPids.add(started.pid);
+                started.killNow();
+            } else if (entry.closed || entry.epoch !== epoch) {
                 started.kill();
             } else {
                 entry.session = started;
@@ -239,7 +291,9 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
 
             return { cwd: entry.cwd, shell: path.basename(shell.file) };
         } finally {
-            entry.starting = false;
+            if (entry.epoch === epoch) {
+                entry.starting = false;
+            }
         }
     });
     /* eslint-enable no-param-reassign */
@@ -260,15 +314,38 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
     handle(TERMINAL_CHANNEL.paste, () => clipboard.readText());
 
     // Quitting ends every shell the app started, before the app is gone. Electron closes the windows between
-    // `before-quit` and `will-quit`, and a closing window forgets its entry, so the signal goes out at `before-quit`.
-    const killAll = (): void => {
-        for (const entry of entries.values()) {
-            entry.session?.killNow();
+    // `before-quit` and `will-quit`, and a closing window forgets its entry, so the hangup goes out at `before-quit`.
+    const hangUpAll = (): void => {
+        quitting = true;
+
+        for (const { session } of entries.values()) {
+            if (session === undefined) {
+                continue;
+            }
+
+            quitPids.add(session.pid);
+            session.killNow();
+        }
+
+        // A host still starting its shell has no session yet.
+        for (const host of hosts) {
+            host.kill();
         }
     };
 
-    app.on("before-quit", killAll);
-    app.on("will-quit", killAll);
+    // A shell can ignore the hangup (`trap '' HUP`) and would outlive the app, so what is left at the end is killed.
+    const finishQuit = (): void => {
+        hangUpAll();
+
+        for (const pid of quitPids) {
+            if (signalled(pid, 0)) {
+                signalled(pid, "SIGKILL");
+            }
+        }
+    };
+
+    app.on("before-quit", hangUpAll);
+    app.on("will-quit", finishQuit);
 
     return {
         availability,

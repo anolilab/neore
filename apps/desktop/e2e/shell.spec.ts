@@ -290,6 +290,8 @@ test("the device window opens from the site's relay, with its own bridge and not
     }
 });
 
+/** A login shell reads the user's profile before it answers, which on a busy machine takes longer than an assertion's default. */
+const SHELL_TIMEOUT = 20_000;
 const TERMINAL_PAGE = /\/terminal-window\/terminal\.html$/u;
 const isAlive = (pid: number): boolean => {
     try {
@@ -316,6 +318,17 @@ test("the site's bridge has no terminal, and the terminal's bridge never reaches
     }
 });
 
+type TerminalProbe = { openTerminal: (folder: string) => Promise<void>; terminalPids: () => number[] };
+
+const terminalPids = (app: ElectronApplication): Promise<number[]> =>
+    app.evaluate(() => (globalThis as { neoreShell?: TerminalProbe }).neoreShell?.terminalPids() ?? []);
+
+const terminalCount = async (app: ElectronApplication): Promise<number> => {
+    const pids = await terminalPids(app);
+
+    return pids.length;
+};
+
 test.describe("the local terminal", () => {
     test.skip(process.platform === "win32", "the terminal is not offered on Windows"); // The Windows terminal is a separate slice.
 
@@ -325,14 +338,9 @@ test.describe("the local terminal", () => {
         let shells: number[] = [];
 
         try {
-            const win = await siteWindow(app);
-
-            // The device window opens from the site's relay and needs the built addon (see the device test above).
-            await win.evaluate(() => (globalThis as PageGlobal).neoreNative?.device?.openSettings());
-
-            const device = await findPage(app, (url) => url.endsWith("/device-window/device.html"));
-
-            await device.evaluate((folder) => (globalThis as PageGlobal).neoreDevice?.openTerminal(folder), appDirectory);
+            await siteWindow(app);
+            // The probe opens it directly, so this needs neither the device window nor the built device addon.
+            await app.evaluate((_electron, folder) => (globalThis as { neoreShell?: TerminalProbe }).neoreShell?.openTerminal(folder), appDirectory);
 
             const terminal = await findPage(app, (url) => TERMINAL_PAGE.test(url));
             const requests: string[] = [];
@@ -346,18 +354,31 @@ test.describe("the local terminal", () => {
             expect(await terminal.evaluate(() => typeof (globalThis as PageGlobal).neoreNative)).toBe("undefined");
             expect(await terminal.evaluate(() => typeof (globalThis as PageGlobal).neoreDevice)).toBe("undefined");
 
-            await expect.poll(() => app.evaluate(() => (globalThis as { neoreShell?: { terminalPids: () => number[] } }).neoreShell?.terminalPids().length)).toBe(1);
-            shells = await app.evaluate(() => (globalThis as { neoreShell?: { terminalPids: () => number[] } }).neoreShell?.terminalPids() ?? []);
+            await expect.poll(() => terminalCount(app)).toBe(1);
+            shells = await terminalPids(app);
 
             await terminal.locator(".xterm-helper-textarea").focus();
             await terminal.keyboard.type(`echo ${marker.slice(0, 7)}$((6*7))${marker.slice(7)}`);
             await terminal.keyboard.press("Enter");
 
-            await expect(terminal.locator(".xterm-rows")).toContainText(`${marker.slice(0, 7)}42${marker.slice(7)}`);
+            await expect(terminal.locator(".xterm-rows")).toContainText(`${marker.slice(0, 7)}42${marker.slice(7)}`, { timeout: SHELL_TIMEOUT });
 
+            // The page itself cannot reach a server either: its session cancels everything but its own files.
+            const reachedSite = await terminal.evaluate(async (url) => {
+                try {
+                    // eslint-disable-next-line n/no-unsupported-features/node-builtins -- runs in the terminal page, a browser
+                    await fetch(url);
+
+                    return true;
+                } catch {
+                    return false;
+                }
+            }, `${SITE}/from-terminal-${marker}`);
+
+            expect(reachedSite).toBe(false);
             // Everything the page asked for was one of its own files.
             expect(requests.filter((url) => !url.startsWith("file://"))).toStrictEqual([]);
-            // And no server, ours or foreign, ever saw what was typed or printed.
+            // And no server, ours or foreign, ever saw the page's request, or what was typed or printed.
             expect(received.filter((entry) => entry.includes(marker.slice(7)))).toStrictEqual([]);
             expect(shells.every((pid) => isAlive(pid))).toBe(true);
         } finally {
@@ -366,5 +387,36 @@ test.describe("the local terminal", () => {
 
         expect(shells).toHaveLength(1);
         await expect.poll(() => shells.some((pid) => isAlive(pid)), { timeout: 10_000 }).toBe(false);
+    });
+
+    test("a reload of the page ends its shell and starts a fresh one that works", async () => {
+        const app = await launch();
+
+        try {
+            await siteWindow(app);
+            await app.evaluate((_electron, folder) => (globalThis as { neoreShell?: TerminalProbe }).neoreShell?.openTerminal(folder), appDirectory);
+
+            const terminal = await findPage(app, (url) => TERMINAL_PAGE.test(url));
+
+            await expect.poll(() => terminalCount(app)).toBe(1);
+
+            const [before] = await terminalPids(app);
+
+            await terminal.reload();
+
+            await expect.poll(async () => {
+                const pids = await terminalPids(app);
+
+                return pids.filter((pid) => pid !== before);
+            }).toHaveLength(1);
+            await expect.poll(() => isAlive(before as number), { timeout: 10_000 }).toBe(false);
+
+            await terminal.locator(".xterm-helper-textarea").focus();
+            await terminal.keyboard.type("echo after-$((1+2))-reload");
+            await terminal.keyboard.press("Enter");
+            await expect(terminal.locator(".xterm-rows")).toContainText("after-3-reload", { timeout: SHELL_TIMEOUT });
+        } finally {
+            await app.close();
+        }
     });
 });

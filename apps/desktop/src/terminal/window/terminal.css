@@ -25,6 +25,16 @@ body {
     padding: 6px 0 0 8px;
 }
 
+#notice {
+    padding: 6px 12px;
+    border-top: 1px solid #333333;
+    background: #252525;
+}
+
+#notice[hidden] {
+    display: none;
+}
+
 #ended {
     display: flex;
     align-items: center;

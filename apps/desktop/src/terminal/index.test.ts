@@ -3,6 +3,7 @@
  * The cases are the security decisions: nothing but a terminal window's own page can drive a shell, the
  * site origin has no way in, a window's shell dies with it, and no terminal text goes anywhere but the window.
  */
+import { realpathSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { setFlagsFromString } from "node:v8";
@@ -130,7 +131,7 @@ const startHost = (): HostHandle => {
     return handle;
 };
 
-const folder = path.resolve(__dirname);
+const folder = realpathSync(path.resolve(__dirname));
 const invoke = (channel: string, event: IpcEvent, ...args: unknown[]): unknown => {
     const handler = fake.handlers.get(channel);
 
@@ -298,14 +299,16 @@ describe("a session", () => {
         expect(() => invoke(TERMINAL_CHANNEL.resize, pageEvent(), { cols: 0, rows: 1 })).toThrow("cols is invalid");
     });
 
-    it("sends the shell's output to its own window and nowhere else", async () => {
-        const fetchSpy = vi.spyOn(globalThis, "fetch");
+    it("sends the shell's output to its own window, not to another terminal or the clipboard", async () => {
+        const first = lastWindow();
 
-        await startShell();
+        await terminals.open(path.dirname(folder));
+        await startShell(first);
         hosts[0]?.emit({ data: "secret-token-123", type: "data" });
 
-        expect(lastWindow().webContents.send).toHaveBeenCalledWith(TERMINAL_EVENT.data, "secret-token-123");
-        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(first.webContents.send).toHaveBeenCalledWith(TERMINAL_EVENT.data, "secret-token-123");
+        expect(lastWindow().webContents.send).not.toHaveBeenCalled();
+        expect(fake.copied).toEqual([]);
     });
 
     it("tells the window when the shell exits, and lets it start a new one", async () => {
@@ -324,6 +327,63 @@ describe("a session", () => {
 
         expect(fake.copied).toEqual(["selected text"]);
         expect(await invoke(TERMINAL_CHANNEL.paste, pageEvent())).toBe("from-clipboard");
+    });
+});
+
+const loadEvent = (win: FakeWindow, event: string): void => {
+    const call = win.webContents.on.mock.calls.find(([name]) => name === event);
+
+    (call?.[1] as () => void)();
+};
+
+describe("a page that goes away", () => {
+    beforeEach(async () => {
+        await terminals.open(folder);
+    });
+
+    it("ends its shell on a reload, so the new page starts a fresh one", async () => {
+        await startShell();
+        loadEvent(lastWindow(), "did-start-loading");
+
+        expect(hosts[0]?.posted).toContainEqual({ type: "kill" });
+        expect(terminals.pids()).toEqual([]);
+
+        await startShell();
+        expect(hosts).toHaveLength(2);
+        expect(terminals.pids()).toEqual([9001]);
+    });
+
+    it("ends its shell when the renderer crashes", async () => {
+        await startShell();
+        loadEvent(lastWindow(), "render-process-gone");
+
+        expect(hosts[0]?.posted).toContainEqual({ type: "kill" });
+        expect(terminals.pids()).toEqual([]);
+    });
+
+    it("hears nothing from the old shell once the new page has its own", async () => {
+        await startShell();
+        loadEvent(lastWindow(), "did-start-loading");
+        await startShell();
+        lastWindow().webContents.send.mockClear();
+
+        hosts[0]?.emit({ data: "old output", type: "data" });
+        hosts[0]?.emit({ exitCode: 0, signal: 0, type: "exit" });
+
+        expect(lastWindow().webContents.send).not.toHaveBeenCalled();
+        expect(terminals.pids()).toEqual([9001]);
+    });
+
+    it("ends a shell that was still starting when the page reloaded", async () => {
+        const starting = startShell();
+
+        loadEvent(lastWindow(), "did-start-loading");
+        await starting;
+
+        expect(hosts[0]?.posted).toContainEqual({ type: "kill" });
+        expect(terminals.pids()).toEqual([]);
+        await startShell();
+        expect(terminals.pids()).toEqual([9001]);
     });
 });
 
@@ -373,6 +433,52 @@ describe("ending a terminal", () => {
         }
 
         expect(() => fake.appListeners.get("will-quit")?.()).not.toThrow();
+    });
+
+    it("kills a shell that ignored the hangup, and leaves one that is gone", async () => {
+        const alive = new Set([9000, 9001]);
+        const signal = vi.spyOn(process, "kill").mockImplementation((pid, sig) => {
+            if (!alive.has(pid)) {
+                throw new Error("ESRCH");
+            }
+
+            if (sig === "SIGKILL") {
+                alive.delete(pid);
+            }
+
+            return true;
+        });
+
+        await terminals.open(folder);
+        await startShell();
+        await terminals.open(path.dirname(folder));
+        await startShell();
+
+        fake.appListeners.get("before-quit")?.();
+        // The first shell exits on the hangup; the second one traps it.
+        alive.delete(9000);
+
+        for (const window of fake.windows as FakeWindow[]) {
+            window.close();
+        }
+
+        fake.appListeners.get("will-quit")?.();
+
+        expect(signal).toHaveBeenCalledWith(9001, "SIGKILL");
+        expect(signal).not.toHaveBeenCalledWith(9000, "SIGKILL");
+    });
+
+    it("ends the host of a shell that is still starting", async () => {
+        await terminals.open(folder);
+
+        const starting = startShell();
+
+        fake.appListeners.get("before-quit")?.();
+
+        // No session exists yet, so only the host itself can be ended.
+        expect(hosts[0]?.handle.kill).toHaveBeenCalled();
+
+        await starting;
     });
 
     it("keeps nothing of the output after the window closes", async () => {

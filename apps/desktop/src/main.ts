@@ -85,7 +85,13 @@ const pendingDeepLinks: string[] = [];
  * What the e2e suite (`e2e/shell.spec.ts`) reads through `app.evaluate`: Electron
  * has no API to list trays, so the shell reports what it created.
  */
-const shellProbe = { device: false, quickComposer: false, terminalPids: (): number[] => [], tray: false };
+const shellProbe = {
+    device: false,
+    openTerminal: async (_folder: string): Promise<void> => {},
+    quickComposer: false,
+    terminalPids: (): number[] => [],
+    tray: false,
+};
 
 Object.assign(globalThis, { neoreShell: shellProbe });
 
@@ -804,6 +810,7 @@ const registerIpc = (): void => {
     // The terminal has no site-facing channel at all: it is opened from the device window or the tray menu.
     state.terminals = registerTerminalIpc();
     shellProbe.terminalPids = () => state.terminals?.pids() ?? [];
+    shellProbe.openTerminal = (folder) => state.terminals?.open(folder) ?? Promise.reject(new Error("no terminal"));
     state.deviceReady = registerDeviceIpc({ isTrusted: isMainWindow, terminal: state.terminals });
 };
 

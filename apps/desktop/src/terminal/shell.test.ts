@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -57,13 +57,35 @@ describe("shellEnvironment", () => {
 
         expect(env).toEqual({ COLORTERM: "truecolor", HOME: "/home/me", PATH: "/usr/bin", TERM: "xterm-256color" });
     });
+
+    it("gives the shell the user's own desktop name back", () => {
+        const env = shellEnvironment({ ORIGINAL_XDG_CURRENT_DESKTOP: "GNOME", XDG_CURRENT_DESKTOP: "Unity" });
+
+        expect(env.XDG_CURRENT_DESKTOP).toBe("GNOME");
+        expect(env).not.toHaveProperty("ORIGINAL_XDG_CURRENT_DESKTOP");
+        expect(shellEnvironment({ XDG_CURRENT_DESKTOP: "KDE" }).XDG_CURRENT_DESKTOP).toBe("KDE");
+    });
 });
 
 describe("readFolder", () => {
-    const directory = mkdtempSync(path.join(tmpdir(), "neore-folder-"));
+    // The temporary directory is itself behind a link on macOS (`/var` → `/private/var`).
+    const created = mkdtempSync(path.join(tmpdir(), "neore-folder-"));
+    const directory = realpathSync(created);
 
     it("accepts an existing directory", () => {
         expect(readFolder(directory)).toBe(directory);
+    });
+
+    it("names one folder however it is spelled: a trailing slash, a link, a `..` through a link", () => {
+        const target = path.join(directory, "real");
+        const link = path.join(directory, "link");
+
+        mkdirSync(target);
+        symlinkSync(target, link);
+
+        expect(readFolder(`${target}/`)).toBe(target);
+        expect(readFolder(link)).toBe(target);
+        expect(readFolder(path.join(link, ".."))).toBe(directory);
     });
 
     it("refuses a missing path, a file, a relative path and a non-string", () => {
