@@ -157,23 +157,56 @@ mod confined {
         Ok(unsafe { OwnedFd::from_raw_fd(fd) })
     }
 
+    /// How a component that is only passed through is opened: search permission is enough to traverse a folder, so a
+    /// shared folder under a `0711` parent still works. Linux has `O_PATH`, macOS `O_SEARCH`; elsewhere a plain read.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    const SEARCH: libc::c_int = libc::O_PATH | libc::O_DIRECTORY;
+    #[cfg(target_vendor = "apple")]
+    const SEARCH: libc::c_int = libc::O_SEARCH;
+    #[cfg(not(any(target_os = "linux", target_os = "android", target_vendor = "apple")))]
+    const SEARCH: libc::c_int = libc::O_RDONLY | libc::O_DIRECTORY;
+
+    fn traverse(dir: libc::c_int, name: &OsStr, flags: libc::c_int) -> io::Result<OwnedFd> {
+        openat(dir, name, flags).or_else(|error| {
+            // An older kernel that does not know the search-only flag: a plain read still follows no link.
+            if flags == SEARCH && error.raw_os_error() == Some(libc::EINVAL) {
+                openat(dir, name, libc::O_RDONLY | libc::O_DIRECTORY)
+            } else {
+                Err(error)
+            }
+        })
+    }
+
     /// Opens `path` (canonical, inside one of `roots`) by walking down from `/` one component at a time, never
     /// following a symlink: `O_NOFOLLOW` only guards the last component of a path, so the root's own ancestors are
     /// walked the same way. One swapped for a link since the path was resolved fails with `ELOOP`.
-    pub fn open_dir(roots: &[PathBuf], path: &Path) -> io::Result<OwnedFd> {
+    ///
+    /// Every component is opened search-only except the last when `readable` (a folder to list), which needs read.
+    pub fn open_dir(roots: &[PathBuf], path: &Path, readable: bool) -> io::Result<OwnedFd> {
         if !roots.iter().any(|root| path.starts_with(root)) {
             return Err(outside_roots());
         }
 
-        let directory = libc::O_RDONLY | libc::O_DIRECTORY;
-        let mut dir = openat(libc::AT_FDCWD, OsStr::new("/"), directory)?;
+        let mut names = Vec::new();
 
         for component in path.components() {
             match component {
                 Component::RootDir | Component::CurDir => {}
-                Component::Normal(name) => dir = openat(dir.as_raw_fd(), name, directory)?,
+                Component::Normal(name) => names.push(name),
                 _ => return Err(outside_roots()),
             }
+        }
+
+        let mut dir = traverse(libc::AT_FDCWD, OsStr::new("/"), SEARCH)?;
+
+        for (index, name) in names.iter().enumerate() {
+            let flags = if readable && index + 1 == names.len() {
+                libc::O_RDONLY | libc::O_DIRECTORY
+            } else {
+                SEARCH
+            };
+
+            dir = traverse(dir.as_raw_fd(), name, flags)?;
         }
 
         Ok(dir)
@@ -184,7 +217,7 @@ mod confined {
             .parent()
             .zip(path.file_name())
             .ok_or_else(outside_roots)?;
-        let dir = open_dir(roots, parent)?;
+        let dir = open_dir(roots, parent, false)?;
         let flags = match how {
             // Non-blocking so a FIFO swapped in cannot hang the open.
             Open::Read => libc::O_RDONLY | libc::O_NONBLOCK,
@@ -198,7 +231,7 @@ mod confined {
     /// `(name, kind, size)` of up to `max` entries of a directory, read through the descriptor that
     /// `open_dir` confined. The `bool` says whether there were more.
     pub fn entries(roots: &[PathBuf], path: &Path, max: usize) -> io::Result<Listing> {
-        let dir = open_dir(roots, path)?;
+        let dir = open_dir(roots, path, true)?;
         let fd = dir.as_raw_fd();
         // SAFETY: `fdopendir` takes over `fd`, so the owner is forgotten and `closedir` closes it below.
         let stream = unsafe { libc::fdopendir(fd) };
@@ -639,5 +672,38 @@ mod tests {
             fs::read_to_string(outside.join("inner/a.txt")).unwrap(),
             "outside"
         );
+    }
+
+    /// Traversal needs search permission only: a shared folder under a `0711` parent must stay usable.
+    #[cfg(unix)]
+    #[test]
+    fn a_folder_under_a_search_only_ancestor_is_usable() {
+        use std::os::unix::fs::PermissionsExt;
+
+        // Root ignores permission bits, so there is nothing to show.
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+
+        let dir = scratch("search-only");
+        let ancestor = dir.join("acc");
+        fs::create_dir_all(ancestor.join("root")).unwrap();
+        fs::write(ancestor.join("root/a.txt"), "hello").unwrap();
+        fs::set_permissions(&ancestor, fs::Permissions::from_mode(0o711)).unwrap();
+
+        let roots = canonical_roots(&[ancestor.join("root").to_string_lossy().into_owned()]);
+        let file = resolve_existing("a.txt", &roots).unwrap();
+        let target = resolve_for_write("b.txt", &roots).unwrap();
+        let outcome = (
+            read(&roots, &file),
+            write(&roots, &target, "x", false),
+            list(&roots, &roots[0]).map(|listing| listing["entries"].as_array().unwrap().len()),
+        );
+
+        fs::set_permissions(&ancestor, fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert_eq!(outcome.0.unwrap(), "hello");
+        assert!(outcome.1.is_ok());
+        assert_eq!(outcome.2.unwrap(), 2);
     }
 }
