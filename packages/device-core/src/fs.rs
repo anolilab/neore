@@ -301,20 +301,21 @@ mod confined {
     use std::io;
     use std::os::windows::ffi::OsStringExt;
     use std::os::windows::fs::OpenOptionsExt;
-    use std::os::windows::io::AsRawHandle;
+    use std::os::windows::io::{AsRawHandle, FromRawHandle};
     use std::path::{Path, PathBuf};
 
+    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
     use windows_sys::Win32::Storage::FileSystem::{
         FileDispositionInfo, FileIdBothDirectoryInfo, FileIdBothDirectoryRestartInfo,
-        GetFileInformationByHandleEx, GetFinalPathNameByHandleW, SetFileInformationByHandle,
-        FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT, FILE_DISPOSITION_INFO,
-        FILE_ID_BOTH_DIR_INFO,
+        GetFileInformationByHandleEx, GetFinalPathNameByHandleW, ReOpenFile,
+        SetFileInformationByHandle, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT,
+        FILE_DISPOSITION_INFO, FILE_ID_BOTH_DIR_INFO,
     };
 
     const DELETE: u32 = 0x0001_0000;
-    const GENERIC_WRITE: u32 = 0x4000_0000;
     const FILE_SHARE_READ: u32 = 0x1;
     const FILE_SHARE_WRITE: u32 = 0x2;
+    const FILE_SHARE_DELETE: u32 = 0x4;
     const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
     const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
 
@@ -391,30 +392,58 @@ mod confined {
     }
 
     fn create(roots: &[PathBuf], path: &Path) -> io::Result<File> {
-        // DELETE access so a file that turns out to be outside can be removed through this very handle.
+        // No DELETE access: a folder that lets a user write but not delete must keep working. Sharing delete lets
+        // the cleanup below reopen THIS file object with DELETE should the check fail.
         let file = options(true)
-            .access_mode(GENERIC_WRITE | DELETE)
+            .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
             .create_new(true)
             .open(path)?;
 
         match confirm(&file, roots) {
             Ok(_) => Ok(file),
             Err(error) => {
-                // Marked for deletion on this handle, not removed by path: a path could name another file by now.
-                let disposition = FILE_DISPOSITION_INFO { DeleteFile: true };
-
-                // SAFETY: the handle is open and the buffer is a `FILE_DISPOSITION_INFO` of the size passed.
-                unsafe {
-                    SetFileInformationByHandle(
-                        file.as_raw_handle(),
-                        FileDispositionInfo,
-                        std::ptr::from_ref(&disposition).cast(),
-                        std::mem::size_of::<FILE_DISPOSITION_INFO>() as u32,
-                    );
-                }
+                remove_through_handle(&file);
 
                 Err(error)
             }
+        }
+    }
+
+    /// Deletes the file `file` is open on, through a delete-capable reopen of that same file object, never by path
+    /// (a path could name another file by now). If the reopen is refused the empty file is left behind and logged;
+    /// the call is refused either way.
+    fn remove_through_handle(file: &File) {
+        // SAFETY: the handle is open; the result is checked before use and owned by the `File` made from it.
+        let reopened = unsafe {
+            ReOpenFile(
+                file.as_raw_handle(),
+                DELETE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                FILE_FLAG_OPEN_REPARSE_POINT,
+            )
+        };
+
+        if reopened == INVALID_HANDLE_VALUE {
+            eprintln!(
+                "[device-core] could not remove a file created outside the shared folders: {}",
+                io::Error::last_os_error()
+            );
+
+            return;
+        }
+
+        // SAFETY: `reopened` is a valid handle nothing else owns; dropping the `File` closes it after the mark below.
+        let reopened = unsafe { File::from_raw_handle(reopened) };
+        let disposition = FILE_DISPOSITION_INFO { DeleteFile: true };
+
+        // SAFETY: the handle is open and the buffer is a `FILE_DISPOSITION_INFO` of the size passed.
+        unsafe {
+            SetFileInformationByHandle(
+                reopened.as_raw_handle(),
+                FileDispositionInfo,
+                std::ptr::from_ref(&disposition).cast(),
+                std::mem::size_of::<FILE_DISPOSITION_INFO>() as u32,
+            );
         }
     }
 
