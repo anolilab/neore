@@ -179,7 +179,7 @@ describe("POST /internal/model/proxy tags a provider failure with its fallback r
 
     it("a 400 on a prompt past the model's context window is context_overflow", async () => {
         // gemini-2.5-flash has a 1M-token window; 4M characters estimate to 1M tokens.
-        const { body } = await proxy("generate", providerError(400, "invalid argument: input is too long"), "x".repeat(4_000_000));
+        const { body } = await proxy("generate", providerError(400, "invalid argument: bad request"), "x".repeat(4_000_000));
 
         expect(body.error.fallbackReason).toBe("context_overflow");
     });

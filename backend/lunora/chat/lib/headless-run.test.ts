@@ -20,6 +20,7 @@ const seen = vi.hoisted(() => {
         buildOptions: [] as unknown[],
         created: [] as unknown[],
         failAt: undefined as "generate" | "keys" | "thread" | undefined,
+        filterRules: undefined as Record<string, string[]> | undefined,
         prepareSteps: [] as unknown[],
         system: [] as string[],
         tools: [] as string[][],
@@ -109,6 +110,10 @@ const fakeCtx = () =>
         runQuery: vi.fn(async (reference: string) => {
             if (reference === "auth_functions:getUserPreferencesQuery") {
                 return PREFS;
+            }
+
+            if (reference === "auth_functions:getAgentModulePreferencesQuery") {
+                return { modelFilterRules: seen.filterRules };
             }
 
             if (reference === "auth_functions:getDecryptedProviderKeysQuery") {
@@ -205,6 +210,18 @@ describe("runHeadlessAgent backup model", () => {
         await run(ctxWith(BACKUP));
 
         expect(seen.backups).toEqual([BACKUP]);
+    });
+
+    it("gives none when the user's stored model filters exclude it, though the caller passes no rules", async () => {
+        seen.filterRules = { blockedModels: [BACKUP] };
+
+        try {
+            await run(ctxWith(BACKUP));
+        } finally {
+            seen.filterRules = undefined;
+        }
+
+        expect(seen.backups).toEqual([undefined]);
     });
 
     it("gives none when the user set none", async () => {

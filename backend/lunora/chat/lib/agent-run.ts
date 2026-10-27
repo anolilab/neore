@@ -145,6 +145,13 @@ const assertModelAllowed = async (ctx: Pick<ActionCtx, "runQuery">, model: strin
     throw new AgentRunError("plan-required", paidModelRefusal(definition.name ?? definition.id, byokPaysFor(definition)));
 };
 
+/** The user's model filters, for a run that was not handed them. */
+const readStoredFilterRules = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<ModelFilterRules | undefined> => {
+    const preferences = await ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId });
+
+    return preferences.modelFilterRules;
+};
+
 /**
  * The user's backup model for a run on `model` (`FallbackLanguageModel`), or `undefined`: none set, a stale id,
  * the run's own model, or one the user's plan cannot run — a backup must not open a paid model the run's own
@@ -159,7 +166,15 @@ export const resolveBackupModelId = async (
 ): Promise<string | undefined> => {
     const definition = supportsBackupFallback(model) ? eligibleBackupModel(backupModel, model) : undefined;
 
-    if (!definition || backupFilterRejection(definition, filterRules) !== null) {
+    if (!definition) {
+        return undefined;
+    }
+
+    // The caller may already hold the rules (the interactive run reads them for the gateway); every other path loads them here,
+    // since the filters can encode privacy rules (regions, providers) that a backup must honour as much as the chosen model.
+    const rules = filterRules ?? (await readStoredFilterRules(ctx, userId));
+
+    if (backupFilterRejection(definition, rules) !== null) {
         return undefined;
     }
 
