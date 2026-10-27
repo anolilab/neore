@@ -22,9 +22,10 @@ import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
 import { assertValidFilters, evaluateFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH, MAX_WEBHOOK_BODY_BYTES } from "./filters";
-import { resolveTimeZone } from "../memory/reflection-logic";
 import type { WebhookPreset } from "./presets";
 import { compileWebhookPreset } from "./presets";
+import { canBeQuiet } from "./quiet";
+import { resolveTimeZone } from "../memory/reflection-logic";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
 import { noteShardDue } from "../lib/shard-housekeeping";
@@ -32,6 +33,8 @@ import { notifyQuietly } from "../notifications/notify";
 import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
+import { advanceStreak, modelUnavailableMessage, pausedNoticeBody, runOutcome } from "./failure-streak";
+import type { RunOutcome } from "./failure-streak";
 import type { WebhookSignatureScheme } from "./validators";
 import { vWebhookSignatureScheme } from "./validators";
 
@@ -84,6 +87,16 @@ const assertCronExpression = (cronExpression: string): void => {
             "BAD_REQUEST",
             'Schedule must be a 5-field cron expression (read in the trigger time zone, UTC by default) that runs at most hourly, e.g. "0 9 * * 1"',
         );
+    }
+};
+
+/**
+ * A zone the scheduler would read as UTC (`resolveTimeZone`) is a typo here, not UTC:
+ * the row would show the typed name beside a cron that runs in UTC.
+ */
+const assertTimeZone = (timeZone: string): void => {
+    if (resolveTimeZone(timeZone) !== timeZone) {
+        throw new LunoraError("BAD_REQUEST", "Unknown time zone");
     }
 };
 
@@ -158,20 +171,24 @@ const webhookSetup = (
 };
 
 /**
- * A routine may use its bot's computer only when it has a bot and runs on a
- * schedule. A webhook payload is untrusted input, so it never drives a shell.
+ * The options only a scheduled bot routine can have, checked on the state the
+ * routine ends up in: its computer, and posting only when there is something to
+ * report. A webhook payload is untrusted input, so it never drives a shell and
+ * is never skipped. Both flags share one eligibility rule (`canBeQuiet`).
  */
-export const assertComputerRoutine = (routine: { botComputer: boolean; botId: string | undefined; type: Doc<"triggers">["type"] }): void => {
-    if (!routine.botComputer) {
-        return;
-    }
-
-    if (!routine.botId) {
-        throw new LunoraError("INVALID_ARGUMENT", "Only a routine with a bot can use the bot's computer.");
-    }
-
-    if (routine.type !== "schedule") {
-        throw new LunoraError("INVALID_ARGUMENT", "Only a scheduled routine can use the bot's computer.");
+export const assertBotRoutineOptions = (routine: {
+    botComputer: boolean;
+    botId: string | undefined;
+    quietWhenEmpty: boolean;
+    type: Doc<"triggers">["type"];
+}): void => {
+    for (const [requested, ability] of [
+        [routine.botComputer, "use the bot's computer"],
+        [routine.quietWhenEmpty, "be quiet when it has nothing to report"],
+    ] as const) {
+        if (requested && !canBeQuiet(routine)) {
+            throw new LunoraError("INVALID_ARGUMENT", routine.botId ? `Only a scheduled routine can ${ability}.` : `Only a routine with a bot can ${ability}.`);
+        }
     }
 };
 
@@ -210,6 +227,7 @@ const vGetTriggersOutput = v.array(
         model: v.string(),
         name: v.string(),
         nextTriggerAt: v.union(v.number(), v.null()),
+        quietWhenEmpty: v.boolean(),
         searchMode: v.union(v.string(), v.null()),
         systemPrompt: v.union(v.string(), v.null()),
         timezone: v.union(v.string(), v.null()),
@@ -247,6 +265,7 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
             model: t.model,
             name: t.name,
             nextTriggerAt: t.nextTriggerAt ?? null,
+            quietWhenEmpty: t.quietWhenEmpty === true,
             searchMode: t.searchMode ?? null,
             systemPrompt: t.systemPrompt ?? null,
             timezone: t.timezone ?? null,
@@ -289,6 +308,8 @@ export const createTrigger = authMutation
         inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
         model: v.string().max(MAX_LENGTH.short),
         name: v.string().max(MAX_LENGTH.short),
+        // Bot routines only. Skips a run that has nothing to report (`triggers/quiet.ts`); unset means off.
+        quietWhenEmpty: v.optional(v.boolean()),
         searchMode: v.optional(v.string().max(MAX_LENGTH.short)),
         systemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
         timezone: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -310,6 +331,10 @@ export const createTrigger = authMutation
 
         assertTriggerTypeSupported(triggerType);
 
+        const timezone = args.timezone?.trim() || undefined;
+
+        if (timezone !== undefined) assertTimeZone(timezone);
+
         if (args.cronExpression !== undefined || triggerType === "schedule") {
             assertCronExpression(args.cronExpression ?? "");
         }
@@ -324,7 +349,7 @@ export const createTrigger = authMutation
             throw new LunoraError("NOT_FOUND", "Bot not found");
         }
 
-        assertComputerRoutine({ botComputer: args.botComputer === true, botId: args.botId, type: triggerType });
+        assertBotRoutineOptions({ botComputer: args.botComputer === true, botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true, type: triggerType });
 
         const { filters, webhookSignatureScheme } = webhookSetup(args, triggerType);
 
@@ -339,9 +364,10 @@ export const createTrigger = authMutation
             inputTemplate: args.inputTemplate,
             model: args.model,
             name: args.name,
+            quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
             searchMode: args.searchMode,
             systemPrompt: args.systemPrompt,
-            timezone: args.timezone,
+            timezone,
             triggerCount: 0,
             type: triggerType,
             updatedAt: now,
@@ -401,6 +427,7 @@ export const updateTrigger = authMutation
         inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
         model: v.optional(v.string().max(MAX_LENGTH.short)),
         name: v.optional(v.string().max(MAX_LENGTH.short)),
+        quietWhenEmpty: v.optional(v.boolean()),
         searchMode: v.optional(v.string().max(MAX_LENGTH.short)),
         systemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
         timezone: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -441,12 +468,18 @@ export const updateTrigger = authMutation
         // Only a schedule has a next run. A new schedule, or a new time zone, moves it; the old time would fire once more on the old schedule.
         // A disabled schedule may store one too: enabling replaces it if it has passed (`firstRunOf`).
         // Re-saving the same expression and zone keeps a pending due time, so a run the tick has not taken yet still fires.
-        // Zones are compared as the scheduler reads them (`resolveTimeZone`): the settings form sends one on every save.
+        // Zones are compared as the scheduler reads them (`resolveTimeZone`).
+        // An absent or empty zone is no change.
         const isSchedule = trigger.type === "schedule";
-        const nextZone = args.timezone ?? trigger.timezone;
+        const storedZone = trigger.timezone;
+        const requestedZone = args.timezone?.trim() || undefined;
+
+        if (requestedZone !== undefined) assertTimeZone(requestedZone);
+
+        const zoneChanged = requestedZone !== undefined && resolveTimeZone(requestedZone) !== resolveTimeZone(storedZone);
+        const nextZone = zoneChanged ? requestedZone : storedZone;
         const nextCron = args.cronExpression ?? trigger.cronExpression;
         const cronChanged = args.cronExpression !== undefined && args.cronExpression !== trigger.cronExpression;
-        const zoneChanged = args.timezone !== undefined && resolveTimeZone(args.timezone) !== resolveTimeZone(trigger.timezone);
         let nextTriggerAt: number | undefined;
 
         if (isSchedule) {
@@ -468,23 +501,31 @@ export const updateTrigger = authMutation
             }
         }
 
-        if (args.timezone !== undefined) patch.timezone = args.timezone;
+        if (zoneChanged) {
+            patch.timezone = requestedZone;
+        }
 
         if (args.inputTemplate !== undefined) patch.inputTemplate = args.inputTemplate;
 
-        // Clearing the bot clears its computer flag too: a routine without a bot has no computer.
+        // Clearing the bot clears its computer and quiet flags too: a routine without a bot has neither.
+        const botCleared = args.botId === null;
         const nextBotId = args.botId === undefined ? trigger.botId : (args.botId ?? undefined);
         // A different bot starts without the computer permission the previous bot had: the owner grants it again.
         const botChanged = args.botId !== undefined && args.botId !== trigger.botId;
-        const keptComputer = botChanged ? undefined : trigger.botComputer;
-        const nextComputer = nextBotId === undefined ? undefined : (args.botComputer ?? keptComputer);
+        // A routine that cannot have the flags (a webhook, or no bot) drops ones it still stores from before the rule, so an update that does not ask for them is never refused over them.
+        // Only a request for `true` is refused (`assertBotRoutineOptions`); `false` always clears.
+        const cannotHaveFlags = !canBeQuiet({ botId: nextBotId, type: trigger.type });
+        const keptComputer = botChanged || cannotHaveFlags ? undefined : trigger.botComputer;
+        const keptQuiet = cannotHaveFlags ? undefined : trigger.quietWhenEmpty;
+        const nextComputer = botCleared ? undefined : (args.botComputer ?? keptComputer);
+        const nextQuiet = botCleared ? undefined : (args.quietWhenEmpty ?? keptQuiet);
 
         // An unchanged bot is not re-checked, so a routine whose bot was deleted stays editable.
         if (args.botId && args.botId !== trigger.botId && !(await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }))) {
             throw new LunoraError("NOT_FOUND", "Bot not found");
         }
 
-        assertComputerRoutine({ botComputer: nextComputer === true, botId: nextBotId, type: trigger.type });
+        assertBotRoutineOptions({ botComputer: nextComputer === true, botId: nextBotId, quietWhenEmpty: nextQuiet === true, type: trigger.type });
 
         const filters = checkedFilters(args.filters, trigger.type);
 
@@ -497,7 +538,10 @@ export const updateTrigger = authMutation
             ...(args.botId !== undefined && { botId: nextBotId }),
             // An empty array removes the filters; leaving the argument out leaves them as they are.
             ...(args.filters !== undefined && { filters }),
-            ...((args.botId !== undefined || args.botComputer !== undefined) && { botComputer: nextComputer === true ? true : undefined }),
+            ...((args.botId !== undefined || args.botComputer !== undefined || cannotHaveFlags) && { botComputer: nextComputer === true ? true : undefined }),
+            ...((args.botId !== undefined || args.quietWhenEmpty !== undefined || cannotHaveFlags) && {
+                quietWhenEmpty: nextQuiet === true ? true : undefined,
+            }),
         });
 
         if (trigger.enabled === true && nextTriggerAt !== undefined) {
@@ -538,6 +582,8 @@ export const setTriggerEnabled = authMutation
         await context.db.patch(args.triggerId as Id<"triggers">, {
             enabled: args.enabled,
             updatedAt: context.now,
+            // Turning a disabled trigger back on is the owner saying the cause is fixed: the streak starts over. Enabling one that is already on changes nothing.
+            ...(args.enabled && trigger.enabled !== true && { enabledAt: context.now, failureStreak: 0 }),
             ...(firstRun !== undefined && { nextTriggerAt: firstRun }),
         });
 
@@ -619,7 +665,7 @@ export const getTriggerExecutions = authQuery
             .query("triggerExecutions")
             .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", args.triggerId as Id<"triggers">))
             .order("desc")
-            // One row over the limit: a trigger keeps one filtered row, so the extra one only covers a racing duplicate.
+            // One row over the limit: a trigger keeps one filtered (skipped) row, so the extra one only covers a racing duplicate.
             .take((args.limit ?? 20) + 1);
 
         // At most one filtered row is shown (the newest), so misses never push real runs out of the list.
@@ -672,8 +718,10 @@ export const testRunTrigger = authAction
         const payload = trigger.type === "schedule" ? args.testPayload : args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
 
         // The run reads the trigger only when it starts, after this action has returned, so it is told to run a disabled one.
+        // `manual`: a quiet routine posts a run the user asked for, whatever the workspace holds.
         await context.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
             ignoreDisabled: true,
+            manual: true,
             payload,
             triggerId: args.triggerId as Id<"triggers">,
         });
@@ -711,7 +759,8 @@ export const getDueScheduleTriggers = internalQuery
 export const updateTriggerStats = internalMutation
     .input({
         error: v.optional(v.string()),
-        lastTriggeredAt: v.number(),
+        // When the run began its agent; a quiet routine omits it for a run that never created a thread (`quiet.ts`).
+        lastTriggeredAt: v.optional(v.number()),
         nextTriggerAt: v.optional(v.number()),
         triggerId: v.id("triggers"),
     })
@@ -726,20 +775,63 @@ export const updateTriggerStats = internalMutation
         // `lastError: undefined` REMOVES the field — a success clears the last
         // failure. A plain patch cannot express that: it refuses `undefined`,
         // and a `null` would fail every read through `getTriggers`' output.
+        // `lastTriggeredAt` only moves forward: a run that started earlier but finishes last (a long manual
+        // "Run now" over a scheduled run) must not pull a quiet routine's window back over what was already reported.
+        const advancesWindow = lastTriggeredAt !== undefined && lastTriggeredAt > (trigger.lastTriggeredAt ?? -Infinity);
+
         await patchRow(ctx.db, trigger, {
             lastError: error,
-            lastTriggeredAt,
             triggerCount: (trigger.triggerCount ?? 0) + 1,
             updatedAt: ctx.now,
-            ...withoutUndefined({ nextTriggerAt }),
+            ...withoutUndefined({ lastTriggeredAt: advancesWindow ? lastTriggeredAt : undefined, nextTriggerAt }),
         });
 
         return null;
     });
 
-/** The write behind {@link recordFilteredExecution}: the trigger's ONE filtered row, created or moved to the front. */
+/**
+ * Takes a quiet run's window: moves `lastTriggeredAt` from the value the run read (`expected`) to `windowStart`, and
+ * says whether it did. Two overlapping runs read the same window, so only the first can move it; the other is
+ * refused, instead of posting a second thread for the activity the first reports. A run that then posts nothing
+ * gives it back with {@link releaseQuietWindow}.
+ */
+export const reserveQuietWindow = internalMutation
+    .input({ expected: v.optional(v.number()), triggerId: v.id("triggers"), windowStart: v.number() })
+    .output(v.boolean())
+    .mutation(async ({ args: { expected, triggerId, windowStart }, ctx }) => {
+        const trigger = await ctx.db.get(triggerId);
+
+        if (!trigger || trigger.lastTriggeredAt !== expected) {
+            return false;
+        }
+
+        await patchRow(ctx.db, trigger, { lastTriggeredAt: windowStart });
+
+        return true;
+    });
+
+/**
+ * Gives {@link reserveQuietWindow} back: moves the window to `expected` unless it is already earlier. A later run may
+ * have moved it on in the meantime, and the activity this run did not post must still be in the next window; the
+ * activity that run reported is then read twice, which is harmless where a missed one is not. Idempotent, so a retry
+ * after a failed release is safe.
+ */
+export const releaseQuietWindow = internalMutation
+    .input({ expected: v.optional(v.number()), triggerId: v.id("triggers") })
+    .output(v.null())
+    .mutation(async ({ args: { expected, triggerId }, ctx }) => {
+        const trigger = await ctx.db.get(triggerId);
+
+        if (trigger?.lastTriggeredAt !== undefined && (expected === undefined || expected < trigger.lastTriggeredAt)) {
+            await patchRow(ctx.db, trigger, { lastTriggeredAt: expected });
+        }
+
+        return null;
+    });
+
+/** The write behind {@link recordFilteredExecution}: the trigger's ONE filtered (skipped) row, created or moved to the front. */
 const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reason: string): Promise<void> => {
-    // The trigger may have been deleted after the webhook read it. Its
+    // The trigger may have been deleted after the run read it. Its
     // deletion cleared the history, so a row written now would outlive it.
     if (!(await ctx.db.get(triggerId))) {
         return;
@@ -802,10 +894,12 @@ export const admitTriggerRun = internalMutation
         filterPayload: v.optional(v.string().max(MAX_WEBHOOK_BODY_BYTES)),
         // The claim is permanent (`gitlab-token`), so ANY refusal gives it back, not only a filter miss: a delivery that never ran may be redelivered.
         releaseUnlessRun: v.optional(v.boolean()),
+        // An automatic run: re-checked here, in the transaction that charges it, because another run may have paused the trigger since the caller looked.
+        requireEnabled: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
     })
-    .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() })))
-    .mutation(async ({ args: { claim, executionId, filterPayload, releaseUnlessRun, triggerId }, ctx }) => {
+    .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() }), v.object({ skipped: v.literal("disabled") })))
+    .mutation(async ({ args: { claim, executionId, filterPayload, releaseUnlessRun, requireEnabled, triggerId }, ctx }) => {
         const refused = async (reason: string): Promise<string> => {
             if (claim && releaseUnlessRun) {
                 await giveBackClaim(ctx, claim, triggerId, true);
@@ -817,6 +911,22 @@ export const admitTriggerRun = internalMutation
 
         if (!trigger) {
             return await refused("Trigger not found");
+        }
+
+        if (requireEnabled === true && trigger.enabled !== true) {
+            // Paused by another run since the caller looked: nothing ran and the pause already told the owner, so the
+            // running row goes (as for a filter miss) rather than being settled as a failure with a second notice.
+            const running = executionId ? await ctx.db.get(executionId) : null;
+
+            if (running && running.triggerId === triggerId && running.status === "running") {
+                await ctx.db.delete(running._id);
+            }
+
+            if (claim) {
+                await giveBackClaim(ctx, claim, triggerId, releaseUnlessRun === true);
+            }
+
+            return { skipped: "disabled" as const };
         }
 
         if (filterPayload !== undefined) {
@@ -854,7 +964,7 @@ export const admitTriggerRun = internalMutation
         const model = bot?.model || trigger.model || DEFAULT_CHAT_MODEL;
 
         if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
-            return await refused(`The model '${model}' is no longer available for triggers. Pick another model and enable the trigger again.`);
+            return await refused(modelUnavailableMessage(model));
         }
 
         if (!(await chargeRound(ctx, trigger.userId, account))) {
@@ -882,14 +992,16 @@ export const createExecution = internalMutation
     });
 
 /**
- * Record a verified delivery that failed the trigger's payload filters. It ran
- * nothing: no `admitTriggerRun` charge, no `triggerCount` / `lastTriggeredAt`
- * change, no notification (`updateExecution` would send one). The payload is
- * NOT stored: it is untrusted, up to 1 MB, and can be replayed at the delivery
- * limit. A trigger keeps ONE filtered row, found by `by_triggerId_status` however
- * many runs followed it and moved to the front by each miss, so a sender
- * whose events miss the filters (even alternating with runs) cannot fill the
- * history or push the real runs out of the list.
+ * Record a run that was skipped: a verified delivery that failed the trigger's
+ * payload filters, or a quiet routine's scheduled run with nothing to report
+ * (`quiet.ts`). It ran nothing: no `admitTriggerRun` charge, no `triggerCount` /
+ * `lastTriggeredAt` change, no notification (`updateExecution` would send one).
+ * The payload is NOT stored: it is untrusted, up to 1 MB, and can be replayed at
+ * the delivery limit. A trigger keeps ONE filtered row, found by
+ * `by_triggerId_status` however many runs followed it and moved to the front by
+ * each skip, so a sender whose events miss the filters (even alternating with
+ * runs) cannot fill the history or push the real runs out of the list. The
+ * status is "filtered" for both causes; `error` holds the reason.
  */
 export const recordFilteredExecution = internalMutation
     .input({
@@ -903,39 +1015,108 @@ export const recordFilteredExecution = internalMutation
         return null;
     });
 
+/**
+ * Settles one run's effect on its trigger's failure streak. Only an ENABLED trigger is
+ * counted: a paused one (or a disabled one a manual "Run now" fired) has nothing left to
+ * pause, so its runs can neither re-pause it nor notify again. Returns whether this run
+ * paused the trigger.
+ */
+const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, startedAt: number, outcome: RunOutcome): Promise<boolean> => {
+    // A run that began before the owner last turned the trigger on belongs to the episode they just closed.
+    // Outcomes settle in completion order, so a run that began before the latest success is stale too: it must not
+    // count toward a streak that success already cleared.
+    if (
+        trigger.enabled !== true ||
+        (trigger.enabledAt !== undefined && startedAt < trigger.enabledAt) ||
+        (trigger.lastSuccessStartedAt !== undefined && startedAt < trigger.lastSuccessStartedAt)
+    ) {
+        return false;
+    }
+
+    const current = trigger.failureStreak ?? 0;
+    const { pause, streak } = advanceStreak(current, outcome);
+
+    if (pause) {
+        await patchRow(ctx.db, trigger, { enabled: false, failureStreak: streak, updatedAt: ctx.now });
+        console.info(`[Triggers] Trigger ${trigger._id} paused after ${streak} consecutive failures its owner can fix`);
+    } else if (outcome === "success") {
+        await patchRow(ctx.db, trigger, { failureStreak: streak, lastSuccessStartedAt: startedAt });
+    } else if (streak !== current) {
+        await patchRow(ctx.db, trigger, { failureStreak: streak });
+    }
+
+    return pause;
+};
+
+/**
+ * Closes an execution and tells the owner. A run is counted toward the trigger's failure
+ * streak once, on the `running` to settled transition of its own execution row: a
+ * redelivered call finds it already settled. `userFixable` marks a failure only the owner
+ * can cure; any other failure leaves the streak where it was.
+ */
 export const updateExecution = internalMutation
     .input({
         error: v.optional(v.string()),
         executionId: v.id("triggerExecutions"),
         status: v.string(),
         threadId: v.optional(v.string()),
+        userFixable: v.optional(v.boolean()),
     })
     .output(v.null())
-    .mutation(async ({ args: { error, executionId, status, threadId }, ctx }) => {
-        await ctx.db.patch(executionId, {
-            status,
-            ...(threadId && { threadId }),
-            ...(error && { error }),
-            completedAt: ctx.now,
-        });
+    .mutation(async ({ args: { error, executionId, status, threadId, userFixable }, ctx }) => {
+        const execution = await ctx.db.get(executionId);
 
-        if (status === "completed" || status === "failed") {
-            const execution = await ctx.db.get(executionId);
-            const trigger = execution ? await ctx.db.get(execution.triggerId) : null;
+        if (!execution) {
+            return null;
+        }
 
-            if (trigger) {
-                await notifyQuietly(ctx, {
-                    dedupeKey: `trigger:${executionId}`,
-                    emailOutcome: Boolean(threadId),
-                    link: threadId ? `/chat/${threadId}` : "/dashboard/settings/chat/triggers",
-                    outcome: status === "completed" ? "success" : "failure",
-                    title: trigger.name,
-                    type: "trigger",
-                    userId: trigger.userId,
-                    ...(error && { body: error }),
-                });
+        // Only the first settlement writes: a redelivery (or a catch path that settles again) must not relabel the row.
+        const settling = execution.status === "running";
+        const settled = settling ? { error, status, threadId } : { error: execution.error, status: execution.status, threadId: execution.threadId };
+
+        if (settling) {
+            await ctx.db.patch(executionId, {
+                status,
+                ...(threadId && { threadId }),
+                ...(error && { error }),
+                completedAt: ctx.now,
+            });
+        }
+
+        if (settled.status !== "completed" && settled.status !== "failed") {
+            return null;
+        }
+
+        const trigger = await ctx.db.get(execution.triggerId);
+
+        if (!trigger) {
+            return null;
+        }
+
+        // The streak moves on the first settlement only; `pausedTrigger` remembers it so a redelivery can say the same thing.
+        let paused = execution.pausedTrigger === true;
+
+        if (settling) {
+            paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(settled.status, userFixable));
+
+            if (paused) {
+                await ctx.db.patch(executionId, { pausedTrigger: true });
             }
         }
+
+        // Sent again on a redelivery: `notify` is idempotent on the key, so this only restores a notice that was lost.
+        await notifyQuietly(ctx, {
+            // One pause per streak: the execution that tipped it names the episode, so a later run of the same
+            // (already paused) trigger cannot send a second one.
+            dedupeKey: paused ? `trigger-paused:${trigger._id}:${executionId}` : `trigger:${executionId}`,
+            emailOutcome: Boolean(settled.threadId),
+            link: settled.threadId ? `/chat/${settled.threadId}` : "/dashboard/settings/chat/triggers",
+            outcome: settled.status === "completed" ? "success" : "failure",
+            title: trigger.name,
+            type: "trigger",
+            userId: trigger.userId,
+            ...(paused ? { body: pausedNoticeBody(settled.error) } : settled.error && { body: settled.error }),
+        });
 
         return null;
     });
@@ -950,7 +1131,12 @@ export const setTriggerEnabledInternal = internalMutation
         const trigger = await ctx.db.get(triggerId);
         const firstRun = enabled && trigger ? firstRunOf(trigger, ctx.now) : undefined;
 
-        await ctx.db.patch(triggerId, { enabled, updatedAt: ctx.now, ...(firstRun !== undefined && { nextTriggerAt: firstRun }) });
+        await ctx.db.patch(triggerId, {
+            enabled,
+            updatedAt: ctx.now,
+            ...(enabled && trigger && trigger.enabled !== true && { enabledAt: ctx.now, failureStreak: 0 }),
+            ...(firstRun !== undefined && { nextTriggerAt: firstRun }),
+        });
 
         if (enabled && trigger) {
             await noteShardDue(ctx, firstRun ?? trigger.nextTriggerAt ?? ctx.now, trigger.userId);

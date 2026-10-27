@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::fs as stdfs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -66,6 +67,9 @@ pub struct DeviceState {
     mcp_tools: Mutex<HashMap<String, McpToolRef>>,
     /// Held across every read-change-save of the settings, so two writers cannot each save the other's stale copy.
     save_lock: Mutex<()>,
+    /// Bumped by every `settings_update` that is saved, under the save lock. A call remembers the value it was planned under, so
+    /// anything the owner changed since (folders, shell policy, servers, rules) is seen as one number.
+    generation: AtomicU64,
     nonces: Mutex<NonceSet>,
     prompts: Prompts,
     settings: Mutex<Settings>,
@@ -86,6 +90,7 @@ impl DeviceState {
             mcp: McpManager::default(),
             mcp_tools: Mutex::default(),
             save_lock: Mutex::default(),
+            generation: AtomicU64::new(0),
             nonces: Mutex::new(NonceSet::persisted(
                 &data_dir.join("device-nonces.json"),
                 now_ms(),
@@ -106,11 +111,25 @@ impl DeviceState {
         &self,
         change: impl FnOnce(&mut Settings) -> Result<T, String>,
     ) -> Result<T, String> {
+        self.change_settings_counted(false, change)
+    }
+
+    /// [`Self::change_settings`], bumping the generation once the change is validated AND saved, still under the
+    /// lock: a failed update leaves the calls waiting on the old settings valid.
+    fn change_settings_counted<T>(
+        &self,
+        bump: bool,
+        change: impl FnOnce(&mut Settings) -> Result<T, String>,
+    ) -> Result<T, String> {
         let _guard = self.save_lock.lock().unwrap();
         let mut settings = self.settings();
         let value = change(&mut settings)?;
 
         self.save(settings)?;
+
+        if bump {
+            self.generation.fetch_add(1, Ordering::SeqCst);
+        }
 
         Ok(value)
     }
@@ -223,7 +242,8 @@ impl DeviceState {
             return Ok(false);
         }
 
-        self.change_settings(|settings| {
+        // Counted: a call approved under the previous pairing must not run under this one.
+        self.change_settings_counted(true, |settings| {
             settings.pairing = Some(Pairing {
                 account_label,
                 device_id: device_id.to_owned(),
@@ -259,18 +279,68 @@ impl DeviceState {
         }
     }
 
+    /// Whether no `settings_update` has run since `generation` was read. Takes the save lock, so an update that is
+    /// in flight has finished (and bumped) before this answers.
+    #[cfg(test)]
+    fn settings_unchanged(&self, generation: u64) -> bool {
+        let _guard = self.save_lock.lock().unwrap();
+
+        self.generation.load(Ordering::SeqCst) == generation
+    }
+
+    /// Whether the approval still covers the call right before it starts, under the save lock (an update in flight has
+    /// finished first; the lock is not held while the action runs). Settings untouched since planning: yes. Changed
+    /// meanwhile: the call is planned again from what is saved now and must come out as the very same action, so an
+    /// unrelated change (another folder shared) lets it run while a removed folder, a shell policy or a replaced
+    /// server does not. A call that skipped its prompt on an allow rule also needs that rule to still be there.
+    fn approval_holds(
+        &self,
+        generation: u64,
+        (tool, input, tainted): (&str, &Value, bool),
+        action: &Action,
+        rule_approved: bool,
+        pairing: &Pairing,
+    ) -> bool {
+        let _guard = self.save_lock.lock().unwrap();
+        let current = self.settings();
+
+        // The call was verified and approved under one pairing; another (a re-pair, even of the same device) is
+        // another secret, and nothing approved before it carries over.
+        if current.pairing.as_ref() != Some(pairing) {
+            return false;
+        }
+
+        if self.generation.load(Ordering::SeqCst) == generation {
+            return true;
+        }
+
+        plan(tool, input, &current, &self.mcp_tools.lock().unwrap())
+            .is_ok_and(|again| again == *action)
+            && (!rule_approved || decide(tool, tainted, action.read_only(), &current.allow_rules).0)
+    }
+
     pub fn settings_update(&self, update: SettingsUpdate) -> Result<SettingsView, String> {
-        self.change_settings(|settings| {
+        self.change_settings_counted(true, |settings| {
             if let Some(roots) = update.roots {
                 settings.roots = validate_roots(&roots)?;
             }
 
             if let Some(servers) = update.mcp_servers {
                 validate_servers(&servers)?;
+                let changed = changed_server_names(&settings.mcp_servers, &servers);
+                drop_rules_of_changed_servers(
+                    &settings.mcp_servers,
+                    &servers,
+                    &mut settings.allow_rules,
+                );
                 settings.mcp_servers = servers;
-                // The cached `readOnly` flags describe the old servers. Dropping them makes every MCP call
-                // fail closed until the next manifest, so none can skip its prompt on stale metadata.
-                self.mcp_tools.lock().unwrap().clear();
+                // The cached `readOnly` flags of a removed or changed server describe the old one. Dropping them
+                // makes its MCP calls fail closed until the next manifest, so none can skip its prompt on stale
+                // metadata; the tools of servers that did not change stay, so a call to one is not cancelled.
+                self.mcp_tools
+                    .lock()
+                    .unwrap()
+                    .retain(|_, tool| !changed.contains(&tool.server));
             }
 
             if let Some(required) = update.require_shell_sandbox {
@@ -313,6 +383,8 @@ impl DeviceState {
 
     /// Verifies, asks, runs and signs one call the page relayed.
     pub fn execute(&self, signed: &Signed) -> Result<Signed, String> {
+        // Read before the settings, so an update in between only ever makes the call look stale.
+        let generation = self.generation.load(Ordering::SeqCst);
         let settings = self.settings();
         let pairing = usable_pairing(&settings)?;
         let call = envelope::verify_call(
@@ -373,8 +445,30 @@ impl DeviceState {
                     (false, Answer::Timeout) => "timeout",
                 };
 
+                // The settings can change while the prompt is open (a folder unshared, shell network off, a
+                // server replaced, a rule removed). The rule is saved only if nothing changed since the call was
+                // planned, checked under the save lock, so a replaced server never inherits it; the dispatch below
+                // checks again, so the call never starts under a policy the owner has since changed.
                 if answer == Answer::Always && offer_always {
                     let _ = self.change_settings(|next| {
+                        if next.pairing.as_ref() != Some(&pairing) {
+                            return Err("the pairing changed while waiting".to_owned());
+                        }
+
+                        // Under the save lock, so nothing changes meanwhile: the tool must still plan to the very
+                        // action that was approved (same server config included), or the rule is not saved.
+                        if self.generation.load(Ordering::SeqCst) != generation
+                            && !plan(
+                                &call.tool,
+                                &call.input,
+                                next,
+                                &self.mcp_tools.lock().unwrap(),
+                            )
+                            .is_ok_and(|again| again == action)
+                        {
+                            return Err("the settings changed while waiting".to_owned());
+                        }
+
                         if !next.allow_rules.contains(&call.tool) {
                             next.allow_rules.push(call.tool.clone());
                         }
@@ -394,6 +488,19 @@ impl DeviceState {
                     Answer::Deny | Answer::Timeout => Outcome::denied(decision),
                     _ if !still_paired => {
                         Outcome::failed(decision, "the computer was unpaired while waiting")
+                    }
+                    _ if !self.approval_holds(
+                        generation,
+                        (&call.tool, &call.input, tainted),
+                        &action,
+                        skip_prompt,
+                        &pairing,
+                    ) =>
+                    {
+                        Outcome::failed(
+                        decision,
+                            "the shared folders, shell settings, MCP server or allow rule changed while waiting",
+                        )
                     }
                     _ if remaining == 0 => {
                         Outcome::failed(decision, "approved after the request expired")
@@ -532,6 +639,31 @@ pub fn cap_utf8(text: &str, max: usize) -> (String, bool) {
     (text[..end].to_owned(), true)
 }
 
+/// Names of the servers that were removed, changed or added.
+fn changed_server_names(old: &[McpServerConfig], new: &[McpServerConfig]) -> Vec<String> {
+    old.iter()
+        .filter(|server| !new.contains(server))
+        .chain(new.iter().filter(|server| !old.contains(server)))
+        .map(|server| server.name.clone())
+        .collect()
+}
+
+/// Forgets the "Always allow" rules of every MCP server that was removed, replaced or added. A rule is keyed on the
+/// tool's manifest name, which only carries the server's NAME, so a different program under the same name would
+/// otherwise inherit the approval the user gave the old one. `validate_servers` refuses names whose tool-name
+/// prefixes overlap, so the server's exact prefix owns its rules and no other server's.
+fn drop_rules_of_changed_servers(
+    old: &[McpServerConfig],
+    new: &[McpServerConfig],
+    rules: &mut Vec<String>,
+) {
+    for name in changed_server_names(old, new) {
+        let prefix = mcp::tool_name(&name, "");
+
+        rules.retain(|rule| !rule.starts_with(&prefix));
+    }
+}
+
 /// Tools that may never skip the prompt: they change things irreversibly.
 pub fn can_always_allow(tool: &str) -> bool {
     !matches!(tool, "shell_run" | "fs_write")
@@ -580,6 +712,7 @@ fn builtin_tools(roots: &[PathBuf]) -> Vec<Value> {
 
 /// One call, planned and checked before the user is asked, so the prompt shows
 /// exactly what will run (resolved paths, the command, the folder).
+#[derive(PartialEq)]
 enum Action {
     List(PathBuf),
     Read(PathBuf),
@@ -823,6 +956,7 @@ fn run_action(
     remaining: Duration,
     decision: &'static str,
 ) -> Outcome {
+    let roots = shareable_roots(&state.settings().roots);
     let completed = |output: String| Outcome {
         decision,
         error: None,
@@ -833,18 +967,18 @@ fn run_action(
     };
 
     match action {
-        Action::List(path) => match fs::list(&path) {
+        Action::List(path) => match fs::list(&roots, &path) {
             Ok(listing) => completed(serde_json::to_string_pretty(&listing).unwrap_or_default()),
             Err(error) => Outcome::failed(decision, error),
         },
         Action::Read(path) => {
-            fs::read(&path).map_or_else(|error| Outcome::failed(decision, error), completed)
+            fs::read(&roots, &path).map_or_else(|error| Outcome::failed(decision, error), completed)
         }
         Action::Write {
             content,
             overwrite,
             path,
-        } => fs::write(&path, &content, overwrite)
+        } => fs::write(&roots, &path, &content, overwrite)
             .map_or_else(|error| Outcome::failed(decision, error), completed),
         Action::Shell {
             command,
@@ -1054,16 +1188,34 @@ pub fn validate_roots(roots: &[String]) -> Result<Vec<String>, String> {
     Ok(valid)
 }
 
+/// Whether two server names could produce the same tool name: a tool name is `mcp__<server>__<tool>` over the
+/// sanitised names, so `a` and `a__x` (or `a` and `a_`) both reach `mcp__a__x__t` and could not be told apart.
+fn names_overlap(a: &str, b: &str) -> bool {
+    let (a, b) = (
+        format!("{}__", mcp::sanitize(a)),
+        format!("{}__", mcp::sanitize(b)),
+    );
+
+    a.starts_with(&b) || b.starts_with(&a)
+}
+
 pub fn validate_servers(servers: &[McpServerConfig]) -> Result<(), String> {
     if servers.len() > MAX_MCP_SERVERS {
         return Err(format!("at most {MAX_MCP_SERVERS} servers"));
     }
 
     for (index, server) in servers.iter().enumerate() {
-        let name_ok = (1..=40).contains(&server.name.chars().count())
-            && !servers[..index]
-                .iter()
-                .any(|other| other.name == server.name);
+        let name_ok = (1..=40).contains(&server.name.chars().count());
+
+        if let Some(other) = servers[..index]
+            .iter()
+            .find(|other| names_overlap(&other.name, &server.name))
+        {
+            return Err(format!(
+                "servers \"{}\" and \"{}\" would share tool names; rename one",
+                other.name, server.name
+            ));
+        }
 
         if !name_ok
             || server.command.trim().is_empty()
@@ -1135,6 +1287,14 @@ mod tests {
         let dir =
             std::env::temp_dir().join(format!("neore-device-mcp-cache-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                mcp_servers: vec![server("docs", "docs-mcp")],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
         let state = DeviceState::new(&dir, Box::new(|_| {}));
 
         state.mcp_tools.lock().unwrap().insert(
@@ -1154,6 +1314,75 @@ mod tests {
         let replaced: SettingsUpdate = serde_json::from_str(r#"{"mcpServers":[]}"#).unwrap();
         state.settings_update(replaced).unwrap();
         assert!(state.mcp_tools.lock().unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn server(name: &str, command: &str) -> McpServerConfig {
+        McpServerConfig {
+            args: Vec::new(),
+            command: command.to_owned(),
+            env: Default::default(),
+            name: name.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_replaced_or_removed_mcp_server_loses_its_allow_rules() {
+        let old = vec![server("git", "git-mcp"), server("docs", "docs-mcp")];
+        let rules = || {
+            vec![
+                "fs_read".to_owned(),
+                "mcp__git__status".to_owned(),
+                "mcp__docs__search".to_owned(),
+            ]
+        };
+
+        // Unchanged servers keep their rules.
+        let mut kept = rules();
+        drop_rules_of_changed_servers(&old, &old, &mut kept);
+        assert_eq!(kept, rules());
+
+        // Same name, different program: the rule goes, the other server's stays.
+        let mut replaced = rules();
+        let swapped = vec![server("git", "evil"), server("docs", "docs-mcp")];
+        drop_rules_of_changed_servers(&old, &swapped, &mut replaced);
+        assert_eq!(replaced, vec!["fs_read", "mcp__docs__search"]);
+
+        // Removed outright.
+        let mut removed = rules();
+        drop_rules_of_changed_servers(&old, &old[1..], &mut removed);
+        assert_eq!(removed, vec!["fs_read", "mcp__docs__search"]);
+    }
+
+    #[test]
+    fn replacing_a_server_through_settings_update_drops_its_saved_rule() {
+        let dir =
+            std::env::temp_dir().join(format!("neore-device-mcp-rules-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                allow_rules: vec!["mcp__git__status".to_owned()],
+                mcp_servers: vec![server("git", "git-mcp")],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+        let same: SettingsUpdate =
+            serde_json::from_str(r#"{"mcpServers":[{"name":"git","command":"git-mcp"}]}"#).unwrap();
+        assert_eq!(state.settings_update(same).unwrap().allow_rules.len(), 1);
+
+        let swapped: SettingsUpdate =
+            serde_json::from_str(r#"{"mcpServers":[{"name":"git","command":"evil"}]}"#).unwrap();
+        assert!(state
+            .settings_update(swapped)
+            .unwrap()
+            .allow_rules
+            .is_empty());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1480,6 +1709,542 @@ mod tests {
                 assert_eq!(parsed["output"], "hello");
             }
         }
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// Approving must not run a call under folders the owner withdrew while the prompt was open.
+    #[test]
+    fn an_approval_is_refused_when_the_shared_folder_was_removed_while_asking() {
+        use std::sync::mpsc::channel;
+        use std::sync::Arc;
+
+        crate::store::test_keychain::install();
+
+        let dir = std::env::temp_dir().join(format!("neore-device-revoke-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+        stdfs::write(dir.join("a.txt"), "hello").unwrap();
+
+        let secret = "0123456789abcdef".repeat(4);
+        let root = dir.canonicalize().unwrap();
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                pairing: Some(Pairing {
+                    account_label: "me".into(),
+                    device_id: "dev1".into(),
+                    secret: secret.clone(),
+                }),
+                roots: vec![root.to_string_lossy().into_owned()],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let (events, received) = channel();
+        let state = Arc::new(DeviceState::new(
+            &dir,
+            Box::new(move |event| {
+                let _ = events.send(event);
+            }),
+        ));
+        let signed = envelope::sign_value(
+            &secret,
+            Domain::Call,
+            &json!({
+                "v": 1, "kind": "call", "callId": "c1", "deviceId": "dev1", "tool": "fs_read",
+                "input": { "path": "a.txt" }, "threadTitle": "T", "taintedBy": [],
+                "issuedAt": now_ms(), "expiresAt": now_ms() + 60_000, "nonce": "n1",
+            }),
+        );
+        let worker = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || state.execute(&signed))
+        };
+        let prompt = loop {
+            if let Event::Prompt { prompt } = received.recv().unwrap() {
+                break prompt;
+            }
+        };
+
+        state
+            .settings_update(serde_json::from_str(r#"{"roots":[]}"#).unwrap())
+            .unwrap();
+        state.prompt_answer(prompt.id, "always").unwrap();
+
+        let result = worker.join().unwrap().unwrap();
+        let parsed: Value = serde_json::from_str(&result.payload).unwrap();
+
+        assert_eq!(parsed["status"], "failed");
+        assert!(parsed.get("output").is_none());
+        assert!(state.settings().allow_rules.is_empty());
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// A replaced server must not pick up the rule an answer to the OLD server was about to save.
+    #[test]
+    fn an_always_answer_is_not_saved_for_a_server_replaced_while_asking() {
+        use std::sync::mpsc::channel;
+        use std::sync::Arc;
+
+        crate::store::test_keychain::install();
+
+        let dir = std::env::temp_dir().join(format!("neore-device-race-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+
+        let secret = "0123456789abcdef".repeat(4);
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                pairing: Some(Pairing {
+                    account_label: "me".into(),
+                    device_id: "dev1".into(),
+                    secret: secret.clone(),
+                }),
+                mcp_servers: vec![server("git", "git-mcp")],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let (events, received) = channel();
+        let state = Arc::new(DeviceState::new(
+            &dir,
+            Box::new(move |event| {
+                let _ = events.send(event);
+            }),
+        ));
+        state.mcp_tools.lock().unwrap().insert(
+            "mcp__git__status".to_owned(),
+            McpToolRef {
+                server: "git".to_owned(),
+                tool: "status".to_owned(),
+                read_only: true,
+            },
+        );
+        let signed = envelope::sign_value(
+            &secret,
+            Domain::Call,
+            &json!({
+                "v": 1, "kind": "call", "callId": "c1", "deviceId": "dev1", "tool": "mcp__git__status",
+                "input": {}, "threadTitle": "T", "taintedBy": [],
+                "issuedAt": now_ms(), "expiresAt": now_ms() + 60_000, "nonce": "n1",
+            }),
+        );
+        let worker = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || state.execute(&signed))
+        };
+        let prompt = loop {
+            if let Event::Prompt { prompt } = received.recv().unwrap() {
+                break prompt;
+            }
+        };
+
+        state
+            .settings_update(
+                serde_json::from_str(r#"{"mcpServers":[{"name":"git","command":"evil"}]}"#)
+                    .unwrap(),
+            )
+            .unwrap();
+        state.prompt_answer(prompt.id, "always").unwrap();
+
+        let result = worker.join().unwrap().unwrap();
+        let parsed: Value = serde_json::from_str(&result.payload).unwrap();
+
+        assert_eq!(parsed["status"], "failed");
+        assert!(state.settings().allow_rules.is_empty());
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// Any settings change after a call was planned (a removed rule, a shell policy) is seen right before dispatch.
+    #[test]
+    fn a_settings_update_invalidates_the_generation_a_call_was_planned_under() {
+        let dir = std::env::temp_dir().join(format!("neore-device-gen-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+        let planned = state.generation.load(Ordering::SeqCst);
+
+        assert!(state.settings_unchanged(planned));
+
+        state
+            .settings_update(serde_json::from_str(r#"{"allowShellNetwork":true}"#).unwrap())
+            .unwrap();
+        assert!(!state.settings_unchanged(planned));
+
+        let planned = state.generation.load(Ordering::SeqCst);
+        state
+            .settings_update(serde_json::from_str(r#"{"allowRules":[]}"#).unwrap())
+            .unwrap();
+        assert!(!state.settings_unchanged(planned));
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_rejected_settings_update_leaves_waiting_calls_valid() {
+        let dir = std::env::temp_dir().join(format!("neore-device-badgen-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+        let planned = state.generation.load(Ordering::SeqCst);
+
+        let invalid: SettingsUpdate =
+            serde_json::from_str(r#"{"mcpServers":[{"name":"","command":"x"}]}"#).unwrap();
+
+        assert!(state.settings_update(invalid).is_err());
+        assert!(state.settings_unchanged(planned));
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn changing_a_server_keeps_the_rules_of_an_unrelated_server() {
+        let old = vec![server("a", "one"), server("ab", "two")];
+        let new = vec![server("a", "changed"), server("ab", "two")];
+        let mut rules = vec!["mcp__a__q".to_owned(), "mcp__ab__t".to_owned()];
+
+        drop_rules_of_changed_servers(&old, &new, &mut rules);
+
+        assert_eq!(rules, vec!["mcp__ab__t"]);
+    }
+
+    #[test]
+    fn server_names_whose_tool_names_could_collide_are_refused() {
+        for (a, b) in [
+            ("my-server", "my_server"),
+            ("a", "a__x"),
+            ("a__x", "a"),
+            ("a", "a_"),
+        ] {
+            assert!(
+                validate_servers(&[server(a, "x"), server(b, "y")]).is_err(),
+                "{a} {b}"
+            );
+        }
+
+        assert!(
+            validate_servers(&[server("a", "x"), server("ab", "y"), server("a_b", "z")]).is_ok()
+        );
+    }
+
+    /// A paired device with one shared folder, a call to `tool` waiting in its prompt, and the way to answer it.
+    fn open_prompt(
+        name: &str,
+        tool: &str,
+        input: Value,
+        settings: impl FnOnce(&mut Settings, &Path),
+    ) -> (
+        std::sync::Arc<DeviceState>,
+        std::thread::JoinHandle<Result<Signed, String>>,
+        u64,
+        PathBuf,
+    ) {
+        use std::sync::mpsc::channel;
+        use std::sync::Arc;
+
+        crate::store::test_keychain::install();
+
+        let dir = std::env::temp_dir().join(format!("neore-device-{name}-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(dir.join("extra")).unwrap();
+        stdfs::write(dir.join("a.txt"), "hello").unwrap();
+
+        let secret = "0123456789abcdef".repeat(4);
+        let root = dir.canonicalize().unwrap();
+        let mut saved = Settings {
+            pairing: Some(Pairing {
+                account_label: "me".into(),
+                device_id: "dev1".into(),
+                secret: secret.clone(),
+            }),
+            roots: vec![root.to_string_lossy().into_owned()],
+            ..Settings::default()
+        };
+        settings(&mut saved, &root);
+        store::save(&dir.join("device.json"), &saved).unwrap();
+
+        let (events, received) = channel();
+        let state = Arc::new(DeviceState::new(
+            &dir,
+            Box::new(move |event| {
+                let _ = events.send(event);
+            }),
+        ));
+        let signed = envelope::sign_value(
+            &secret,
+            Domain::Call,
+            &json!({
+                "v": 1, "kind": "call", "callId": "c1", "deviceId": "dev1", "tool": tool,
+                "input": input, "threadTitle": "T", "taintedBy": [],
+                "issuedAt": now_ms(), "expiresAt": now_ms() + 60_000, "nonce": "n1",
+            }),
+        );
+        let worker = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || state.execute(&signed))
+        };
+        let prompt = loop {
+            if let Event::Prompt { prompt } = received.recv().unwrap() {
+                break prompt;
+            }
+        };
+
+        (state, worker, prompt.id, dir)
+    }
+
+    fn finish(
+        state: &DeviceState,
+        worker: std::thread::JoinHandle<Result<Signed, String>>,
+        prompt: u64,
+    ) -> Value {
+        state.prompt_answer(prompt, "once").unwrap();
+
+        serde_json::from_str(&worker.join().unwrap().unwrap().payload).unwrap()
+    }
+
+    #[test]
+    fn an_unrelated_settings_change_while_asking_does_not_cancel_the_call() {
+        let (state, worker, prompt, dir) = open_prompt(
+            "unrelated",
+            "fs_read",
+            json!({ "path": "a.txt" }),
+            |_, _| {},
+        );
+        let root = dir.canonicalize().unwrap();
+
+        // Another folder is shared while the prompt is open.
+        state
+            .settings_update(
+                serde_json::from_value(json!({ "roots": [root, root.join("extra")] })).unwrap(),
+            )
+            .unwrap();
+
+        let parsed = finish(&state, worker, prompt);
+
+        assert_eq!(parsed["status"], "completed");
+        assert_eq!(parsed["output"], "hello");
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn turning_the_shell_network_off_while_asking_refuses_the_call() {
+        if matches!(sandbox::support(), sandbox::Support::Unavailable(_)) {
+            return;
+        }
+
+        let (state, worker, prompt, dir) = open_prompt(
+            "netoff",
+            "shell_run",
+            json!({ "command": "echo hi" }),
+            |settings, _| settings.allow_shell_network = true,
+        );
+
+        state
+            .settings_update(serde_json::from_str(r#"{"allowShellNetwork":false}"#).unwrap())
+            .unwrap();
+
+        let parsed = finish(&state, worker, prompt);
+
+        assert_eq!(parsed["status"], "failed");
+        assert!(parsed.get("output").is_none());
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_removed_allow_rule_stops_a_call_that_skipped_its_prompt() {
+        crate::store::test_keychain::install();
+        let dir = std::env::temp_dir().join(format!("neore-device-rule-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+        stdfs::write(dir.join("a.txt"), "hello").unwrap();
+        let root = dir.canonicalize().unwrap();
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                allow_rules: vec!["fs_read".to_owned()],
+                pairing: Some(Pairing {
+                    account_label: "me".into(),
+                    device_id: "dev-rule".into(),
+                    secret: "s".repeat(64),
+                }),
+                roots: vec![root.to_string_lossy().into_owned()],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+        let input = json!({ "path": "a.txt" });
+        let settings = state.settings();
+        let action = plan("fs_read", &input, &settings, &HashMap::new()).unwrap();
+        let (skip, _) = decide("fs_read", false, action.read_only(), &settings.allow_rules);
+        let pairing = settings.pairing.clone().unwrap();
+        let planned = state.generation.load(Ordering::SeqCst);
+
+        assert!(skip);
+        assert!(state.approval_holds(planned, ("fs_read", &input, false), &action, true, &pairing));
+
+        state
+            .settings_update(serde_json::from_str(r#"{"allowRules":[]}"#).unwrap())
+            .unwrap();
+
+        assert!(!state.approval_holds(
+            planned,
+            ("fs_read", &input, false),
+            &action,
+            true,
+            &pairing
+        ));
+        // The same change does not matter to a call a person approved in a prompt.
+        assert!(state.approval_holds(
+            planned,
+            ("fs_read", &input, false),
+            &action,
+            false,
+            &pairing
+        ));
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// A call verified under one pairing must not run, nor save a rule, after the device was paired again.
+    #[test]
+    fn a_repair_of_the_same_device_cancels_calls_approved_before_it() {
+        use std::sync::mpsc::channel;
+        use std::sync::Arc;
+
+        crate::store::test_keychain::install();
+
+        let dir = std::env::temp_dir().join(format!("neore-device-repair-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+        stdfs::write(dir.join("a.txt"), "hello").unwrap();
+        let root = dir.canonicalize().unwrap();
+        let old = Pairing {
+            account_label: "me".into(),
+            device_id: "dev-repair".into(),
+            secret: "a".repeat(64),
+        };
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                allow_rules: vec!["fs_read".to_owned()],
+                pairing: Some(old.clone()),
+                roots: vec![root.to_string_lossy().into_owned()],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let (events, received) = channel();
+        let state = Arc::new(DeviceState::new(
+            &dir,
+            Box::new(move |event| {
+                let _ = events.send(event);
+            }),
+        ));
+        let input = json!({ "path": "a.txt" });
+        let settings = state.settings();
+        let old = settings.pairing.clone().unwrap();
+        let action = plan("fs_read", &input, &settings, &HashMap::new()).unwrap();
+        let planned = state.generation.load(Ordering::SeqCst);
+
+        assert!(state.approval_holds(planned, ("fs_read", &input, false), &action, true, &old));
+
+        // The same device is paired again, with a new secret (the person confirms it in the window).
+        let worker = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || state.pair("dev-repair", &"b".repeat(64), "me"))
+        };
+        let prompt = loop {
+            if let Event::Prompt { prompt } = received.recv().unwrap() {
+                break prompt;
+            }
+        };
+        state.prompt_answer(prompt.id, "once").unwrap();
+        assert!(worker.join().unwrap().unwrap());
+
+        // Prompted and rule-approved calls both stop, and the new pairing starts without rules.
+        assert_ne!(state.generation.load(Ordering::SeqCst), planned);
+        assert!(!state.approval_holds(planned, ("fs_read", &input, false), &action, false, &old));
+        assert!(!state.approval_holds(planned, ("fs_read", &input, false), &action, true, &old));
+        assert!(state.settings().allow_rules.is_empty());
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// Adding a server must not cancel a pending call to another one: only the changed servers lose their tools.
+    #[test]
+    fn adding_a_server_keeps_a_pending_call_to_another_server_valid() {
+        let dir = std::env::temp_dir().join(format!("neore-device-addsrv-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                mcp_servers: vec![server("x", "x-mcp")],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+        state.mcp_tools.lock().unwrap().insert(
+            "mcp__x__t".to_owned(),
+            McpToolRef {
+                server: "x".to_owned(),
+                tool: "t".to_owned(),
+                read_only: false,
+            },
+        );
+        let input = json!({});
+        let action = plan(
+            "mcp__x__t",
+            &input,
+            &state.settings(),
+            &state.mcp_tools.lock().unwrap(),
+        )
+        .unwrap();
+        let planned = state.generation.load(Ordering::SeqCst);
+
+        state
+            .settings_update(
+                serde_json::from_str(
+                    r#"{"mcpServers":[{"name":"x","command":"x-mcp"},{"name":"y","command":"y-mcp"}]}"#,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+
+        assert_ne!(state.generation.load(Ordering::SeqCst), planned);
+        assert!(state.mcp_tools.lock().unwrap().contains_key("mcp__x__t"));
+        assert!(plan(
+            "mcp__x__t",
+            &input,
+            &state.settings(),
+            &state.mcp_tools.lock().unwrap()
+        )
+        .is_ok_and(|again| again == action));
+
+        // Replacing x itself still refuses it.
+        state
+            .settings_update(
+                serde_json::from_str(r#"{"mcpServers":[{"name":"x","command":"evil"}]}"#).unwrap(),
+            )
+            .unwrap();
+        assert!(!state.mcp_tools.lock().unwrap().contains_key("mcp__x__t"));
 
         let _ = stdfs::remove_dir_all(&dir);
     }

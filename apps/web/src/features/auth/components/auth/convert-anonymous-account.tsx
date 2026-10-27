@@ -20,6 +20,7 @@ import { withInviteToken } from "@/features/auth/lib/invite-token";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import type { PasswordValidation } from "@/features/auth/types/form-validation-types";
 import emailSchema from "@/features/auth/validators/email-schema";
+import { clearThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { trackEvent } from "@/lib/analytics";
 
 export interface ConvertAnonymousAccountProperties {
@@ -110,6 +111,7 @@ const ConvertAnonymousAccount = ({ className, classNames, onSuccess, passwordVal
                 );
 
                 trackEvent("anonymous_converted", { provider: "email" });
+                clearThreadListCache();
 
                 toast({
                     message: t`Account converted successfully! Please check your email to verify your account.`,

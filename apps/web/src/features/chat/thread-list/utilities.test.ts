@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GroupType, ThreadGroup } from "./types";
-import { buildMatchSnippet, getGroupType, isGroupFullySelected, selectThreadIdsByDate } from "./utilities";
+import { buildMatchSnippet, getGroupType, isDragBlocked, isGroupFullySelected, isInPlaceholderGroup, selectThreadIdsByDate } from "./utilities";
 
 describe("getGroupType", () => {
     it("should return groupType when available", () => {
@@ -150,5 +150,35 @@ describe("selectThreadIdsByDate", () => {
         const threads = [thread("a", at(2026, 10, 1))];
 
         expect(selectThreadIdsByDate(threads, { from: "", to: "" })).toEqual([]);
+    });
+});
+
+describe("isInPlaceholderGroup", () => {
+    const groups = [
+        { isPlaceholder: true, threads: [{ threadId: "held" }], title: "Projects" },
+        { threads: [{ threadId: "free" }], title: "Today" },
+    ] as unknown as ThreadGroup[];
+
+    it("flags threads of a placeholder group only, so a drag from or onto them is ignored", () => {
+        expect(isInPlaceholderGroup(groups, "held")).toBe(true);
+        expect(isInPlaceholderGroup(groups, "free")).toBe(false);
+        expect(isInPlaceholderGroup(groups, "project-p1")).toBe(false);
+    });
+});
+
+describe("isDragBlocked", () => {
+    const groups = [
+        { isPlaceholder: true, threads: [{ threadId: "held" }], title: "Projects" },
+        { threads: [{ threadId: "a" }, { threadId: "b" }], title: "Today" },
+    ] as unknown as ThreadGroup[];
+
+    it("blocks every drag while the list is the stored placeholder, so no order is sent", () => {
+        expect(isDragBlocked(groups, true, "a", "b")).toBe(true);
+    });
+
+    it("lets live data be reordered, except in or onto a stand-in group", () => {
+        expect(isDragBlocked(groups, false, "a", "b")).toBe(false);
+        expect(isDragBlocked(groups, false, "held", "b")).toBe(true);
+        expect(isDragBlocked(groups, false, "a", "held")).toBe(true);
     });
 });

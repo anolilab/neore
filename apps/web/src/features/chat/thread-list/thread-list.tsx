@@ -14,6 +14,7 @@ import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 import { DateBoundariesProvider } from "./contexts/date-boundaries-context";
 import HierarchicalThreadList from "./hierarchical-thread-list";
 import usePersistedCollapseState from "./hooks/use-persisted-collapse-state";
+import { useThreadListPlaceholder } from "./hooks/use-thread-list-cache";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 import type { GroupType, LoadingStates } from "./types";
 
@@ -113,8 +114,11 @@ const ThreadList: FC = () => {
     const currentThreadId = location.pathname.match(CHAT_THREAD_PATH_RE)?.[1];
 
     // Use composite query for relationships (shares cache with useThreadGroups, eliminates standalone subscription)
+    // The stored copy answers here too, so a reload on a child thread expands its ancestors before the first answer.
+    const storedThreadList = useThreadListPlaceholder();
     const { data: threadRelationships } = useQuery({
         ...crpc.chat.composite.getThreadListData.queryOptions(isAuthReady ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS } : skipToken),
+        placeholderData: storedThreadList as never,
         select: (data) => data?.relationships ?? [],
     });
 

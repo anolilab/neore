@@ -11737,6 +11737,9 @@
                         ],
                         "type": "object"
                       },
+                      "lastUserMessageAt": {
+                        "type": "number"
+                      },
                       "lockedAt": {
                         "type": "number"
                       },
@@ -12198,6 +12201,9 @@
                       },
                       "isPublic": {
                         "type": "boolean"
+                      },
+                      "lastUserMessageAt": {
+                        "type": "number"
                       },
                       "lockedAt": {
                         "type": "number"
@@ -39154,6 +39160,9 @@
                       "name": {
                         "type": "string"
                       },
+                      "quietWhenEmpty": {
+                        "type": "boolean"
+                      },
                       "searchMode": {
                         "type": "string"
                       },
@@ -39699,6 +39708,9 @@
                       },
                       "name": {
                         "type": "string"
+                      },
+                      "quietWhenEmpty": {
+                        "type": "boolean"
                       },
                       "searchMode": {
                         "type": "string"

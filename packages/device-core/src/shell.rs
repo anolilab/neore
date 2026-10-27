@@ -114,7 +114,13 @@ impl TempDir {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_or(0, |elapsed| elapsed.as_nanos());
-        let path = std::env::temp_dir().join(format!("neore-shell-{}-{nanos}", std::process::id()));
+        // The clock alone can repeat (coarse on macOS) when two runs start together, so a counter makes it unique.
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let count = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "neore-shell-{}-{nanos}-{count}",
+            std::process::id()
+        ));
         #[cfg(unix)]
         let builder = {
             use std::os::unix::fs::DirBuilderExt;

@@ -13,10 +13,12 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { CLAIM_PREFIX_BATCH, purgeClaimsWithPrefix, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import {
-    assertComputerRoutine,
+    assertBotRoutineOptions,
     createTrigger,
     deleteTrigger,
     getTriggerExecutions,
+    releaseQuietWindow,
+    reserveQuietWindow,
     setTriggerEnabled,
     testRunTrigger,
     updateTrigger,
@@ -68,6 +70,24 @@ const record = async (args: Record<string, unknown>): Promise<void> => {
 
 const readTrigger = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(id));
 
+/** A disabled weekly schedule owned by user-a; `insert` drops `undefined` keys, so an override can remove a default. */
+const insertTrigger = async (overrides: Record<string, unknown> = {}): Promise<string> =>
+    (await harness.run(
+        async (ctx: any) =>
+            await ctx.db.insert("triggers", {
+                createdAt: 1,
+                cronExpression: "0 9 * * 1",
+                enabled: false,
+                model: "m",
+                name: "Daily",
+                triggerCount: 0,
+                type: "schedule",
+                updatedAt: 1,
+                userId: "user-a",
+                ...overrides,
+            }),
+    )) as string;
+
 beforeEach(() => {
     harness = lunoraTest(schema as never);
 });
@@ -110,6 +130,88 @@ describe("updateTriggerStats", () => {
     });
 });
 
+describe("updateTriggerStats window", () => {
+    it("keeps the newer lastTriggeredAt when an earlier-started run finishes last", async () => {
+        const triggerId = await insertTrigger({ lastTriggeredAt: 100 });
+
+        await record({ lastTriggeredAt: 300, triggerId });
+        await record({ lastTriggeredAt: 200, triggerId });
+
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 300, triggerCount: 2 });
+
+        await record({ lastTriggeredAt: 400, triggerId });
+
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 400 });
+    });
+
+    it("records the error and the count without moving lastTriggeredAt when none is given", async () => {
+        const triggerId = await insertTrigger({ lastTriggeredAt: 100 });
+
+        await record({ error: "boom", triggerId });
+
+        expect(await readTrigger(triggerId)).toMatchObject({ lastError: "boom", lastTriggeredAt: 100, triggerCount: 1 });
+    });
+
+    it("sets lastTriggeredAt on a trigger that never had one", async () => {
+        const triggerId = await insertTrigger();
+
+        await record({ lastTriggeredAt: 50, triggerId });
+
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 50 });
+    });
+});
+
+describe("the quiet window reservation", () => {
+    const reserve = async (args: Record<string, unknown>): Promise<boolean> =>
+        await harness.run(async (ctx: any) => await ctx.runMutation(reserveQuietWindow, args));
+    const release = async (args: Record<string, unknown>): Promise<void> => {
+        await harness.run(async (ctx: any) => await ctx.runMutation(releaseQuietWindow, args));
+    };
+
+    it("lets only one of two runs that read the same window take it", async () => {
+        const triggerId = await insertTrigger({ lastTriggeredAt: 100 });
+
+        expect(await reserve({ expected: 100, triggerId, windowStart: 200 })).toBe(true);
+        expect(await reserve({ expected: 100, triggerId, windowStart: 210 })).toBe(false);
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 200 });
+    });
+
+    it("takes the window of a routine that never ran, and gives it back to unset", async () => {
+        const triggerId = await insertTrigger();
+
+        expect(await reserve({ triggerId, windowStart: 200 })).toBe(true);
+        expect(await reserve({ triggerId, windowStart: 210 })).toBe(false);
+
+        await release({ triggerId });
+
+        const stored = await readTrigger(triggerId);
+
+        expect(stored.lastTriggeredAt).toBeUndefined();
+        expect(await reserve({ triggerId, windowStart: 220 })).toBe(true);
+    });
+
+    it("moves the window back for a run that fails after a later run took the window on", async () => {
+        const triggerId = await insertTrigger({ lastTriggeredAt: 100 });
+
+        await reserve({ expected: 100, triggerId, windowStart: 200 });
+        await reserve({ expected: 200, triggerId, windowStart: 300 });
+        await release({ expected: 100, triggerId });
+
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 100 });
+    });
+
+    it("never moves the window forward, so a repeated or late give-back is harmless", async () => {
+        const triggerId = await insertTrigger({ lastTriggeredAt: 100 });
+
+        await reserve({ expected: 100, triggerId, windowStart: 200 });
+        await release({ expected: 100, triggerId });
+        await release({ expected: 150, triggerId });
+        await release({ expected: 100, triggerId });
+
+        expect(await readTrigger(triggerId)).toMatchObject({ lastTriggeredAt: 100 });
+    });
+});
+
 describe("trigger schedules", () => {
     const as = () => harness.withIdentity({ userId: "user-a" } as never);
     const schedule = (cronExpression?: string) => {
@@ -129,6 +231,38 @@ describe("trigger schedules", () => {
         const trigger = await readTrigger(triggerId);
 
         expect(trigger.cronExpression).toBe("0 9 * * 1");
+    });
+
+    it("refuses an unknown time zone on create and on update, storing nothing", async () => {
+        await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), timezone: "Europe/Berln" } as never)).rejects.toThrow(
+            "Unknown time zone",
+        );
+
+        const { triggerId } = (await as().mutation(createTrigger as never, schedule("0 9 * * 1") as never)) as { triggerId: string };
+
+        await expect(as().mutation(updateTrigger as never, { timezone: "Europe/Berln", triggerId } as never)).rejects.toThrow("Unknown time zone");
+
+        const trigger = await readTrigger(triggerId);
+
+        expect(trigger.timezone).toBeUndefined();
+    });
+
+    it("stores a valid time zone trimmed", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), timezone: "  Europe/Berlin " } as never)) as {
+            triggerId: string;
+        };
+        const trigger = await readTrigger(triggerId);
+
+        expect(trigger.timezone).toBe("Europe/Berlin");
+    });
+
+    it("accepts an absent or blank zone as UTC", async () => {
+        for (const timezone of [undefined, "", "  "]) {
+            const { triggerId } = (await as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), timezone } as never)) as { triggerId: string };
+            const trigger = await readTrigger(triggerId);
+
+            expect(trigger.timezone).toBeUndefined();
+        }
     });
 
     it("does not ask a webhook trigger for a schedule", async () => {
@@ -160,38 +294,125 @@ describe("trigger schedules", () => {
         expect(trigger.nextTriggerAt).toBeGreaterThan(Date.now());
     });
 });
-describe("a routine's bot computer", () => {
-    it("needs a bot and a schedule", () => {
-        expect(() => assertComputerRoutine({ botComputer: true, botId: undefined, type: "schedule" })).toThrow("Only a routine with a bot");
-        expect(() => assertComputerRoutine({ botComputer: true, botId: "bot-a", type: "webhook" })).toThrow("Only a scheduled routine");
-        expect(() => assertComputerRoutine({ botComputer: true, botId: "bot-a", type: "schedule" })).not.toThrow();
-        expect(() => assertComputerRoutine({ botComputer: false, botId: undefined, type: "webhook" })).not.toThrow();
+describe("a routine's bot options", () => {
+    const options = (patch: Partial<Parameters<typeof assertBotRoutineOptions>[0]>) =>
+        assertBotRoutineOptions({ botComputer: false, botId: "bot-a", quietWhenEmpty: false, type: "schedule", ...patch });
+
+    it.each([
+        ["botComputer", "use the bot's computer"],
+        ["quietWhenEmpty", "be quiet when it has nothing to report"],
+    ] as const)("%s needs a bot and a schedule", (flag, ability) => {
+        expect(() => options({ botId: undefined, [flag]: true })).toThrow(`Only a routine with a bot can ${ability}`);
+        expect(() => options({ [flag]: true, type: "webhook" })).toThrow(`Only a scheduled routine can ${ability}`);
+        expect(() => options({ [flag]: true })).not.toThrow();
+        expect(() => options({ botId: undefined, [flag]: false, type: "webhook" })).not.toThrow();
     });
 
-    it("is cleared with the bot, so a routine with no bot has no computer", async () => {
-        const triggerId = (await harness.run(
-            async (ctx: any) =>
-                await ctx.db.insert("triggers", {
-                    botComputer: true,
-                    botId: "bot-a",
-                    createdAt: 1,
-                    cronExpression: "0 9 * * 1",
-                    enabled: false,
-                    model: "m",
-                    name: "Daily",
-                    triggerCount: 0,
-                    type: "schedule",
-                    updatedAt: 1,
-                    userId: "user-a",
-                }),
-        )) as string;
+    it("are cleared with the bot, so a routine with no bot has neither, whichever flag the same request sets", async () => {
+        const triggerId = await insertTrigger({ botComputer: true, botId: "bot-a", quietWhenEmpty: true });
+        const identity = harness.withIdentity({ userId: "user-a" } as never);
 
-        await harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { botId: null, triggerId } as never);
+        await identity.mutation(updateTrigger as never, { botComputer: true, botId: null, quietWhenEmpty: true, triggerId } as never);
 
         const cleared = await readTrigger(triggerId);
 
         expect(cleared.botId).toBeUndefined();
         expect(cleared.botComputer).toBeUndefined();
+        expect(cleared.quietWhenEmpty).toBeUndefined();
+    });
+
+    it.each(["botComputer", "quietWhenEmpty"])("refuses %s on a routine that never had a bot", async (flag) => {
+        const triggerId = await insertTrigger();
+
+        await expect(
+            harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { [flag]: true, triggerId } as never),
+        ).rejects.toThrow("Only a routine with a bot");
+    });
+});
+
+describe("a routine's quiet flag", () => {
+    it("refuses the flag on an existing webhook routine, and accepts it on a schedule", async () => {
+        const webhookId = await insertTrigger({ botId: "bot-a", cronExpression: undefined, name: "Hook", type: "webhook" });
+        const scheduleId = await insertTrigger({ botId: "bot-a" });
+        const identity = harness.withIdentity({ userId: "user-a" } as never);
+
+        await expect(identity.mutation(updateTrigger as never, { quietWhenEmpty: true, triggerId: webhookId } as never)).rejects.toThrow(
+            "Only a scheduled routine",
+        );
+        const hook = await readTrigger(webhookId);
+
+        expect(hook.quietWhenEmpty).toBeUndefined();
+
+        await identity.mutation(updateTrigger as never, { quietWhenEmpty: true, triggerId: scheduleId } as never);
+
+        const daily = await readTrigger(scheduleId);
+
+        expect(daily.quietWhenEmpty).toBe(true);
+    });
+
+    it("clears a flag a webhook routine still stores when the update sends false", async () => {
+        const triggerId = await insertTrigger({
+            botComputer: true,
+            botId: "bot-a",
+            cronExpression: undefined,
+            name: "Hook",
+            quietWhenEmpty: true,
+            type: "webhook",
+        });
+        const identity = harness.withIdentity({ userId: "user-a" } as never);
+
+        await identity.mutation(updateTrigger as never, { botComputer: false, name: "Hook 2", quietWhenEmpty: false, triggerId } as never);
+
+        const hook = await readTrigger(triggerId);
+
+        expect(hook.name).toBe("Hook 2");
+        expect(hook.quietWhenEmpty).toBeUndefined();
+        expect(hook.botComputer).toBeUndefined();
+    });
+
+    it("lets a webhook routine that still stores the flag be renamed without mentioning it, and drops the flag", async () => {
+        const triggerId = await insertTrigger({ botId: "bot-a", cronExpression: undefined, name: "Hook", quietWhenEmpty: true, type: "webhook" });
+        const identity = harness.withIdentity({ userId: "user-a" } as never);
+
+        await identity.mutation(updateTrigger as never, { name: "Renamed", triggerId } as never);
+
+        const hook = await readTrigger(triggerId);
+
+        expect(hook.name).toBe("Renamed");
+        expect(hook.quietWhenEmpty).toBeUndefined();
+    });
+
+    it("still refuses a request to turn the flag on for a webhook routine that stores it", async () => {
+        const triggerId = await insertTrigger({ botId: "bot-a", cronExpression: undefined, name: "Hook", quietWhenEmpty: true, type: "webhook" });
+
+        await expect(
+            harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { quietWhenEmpty: true, triggerId } as never),
+        ).rejects.toThrow("Only a scheduled routine");
+    });
+
+    it("is refused on create without a bot", async () => {
+        await expect(
+            harness
+                .withIdentity({ userId: "user-a" } as never)
+                .mutation(createTrigger as never, { cronExpression: "0 9 * * 1", model: "m", name: "Daily", quietWhenEmpty: true, type: "schedule" } as never),
+        ).rejects.toThrow("Only a routine with a bot");
+    });
+
+    it("is stored only when on", async () => {
+        const triggerId = await insertTrigger({ botId: "bot-a", quietWhenEmpty: true });
+        const identity = harness.withIdentity({ userId: "user-a" } as never);
+
+        await identity.mutation(updateTrigger as never, { quietWhenEmpty: false, triggerId } as never);
+
+        const off = await readTrigger(triggerId);
+
+        expect(off.quietWhenEmpty).toBeUndefined();
+
+        await identity.mutation(updateTrigger as never, { quietWhenEmpty: true, triggerId } as never);
+
+        const on = await readTrigger(triggerId);
+
+        expect(on.quietWhenEmpty).toBe(true);
     });
 });
 
@@ -240,7 +461,7 @@ describe("testRunTrigger", () => {
         await as.action(testRunTrigger as never, { triggerId } as never);
 
         // No payload: the run uses the schedule's own input, not the generic test text a webhook gets.
-        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ ignoreDisabled: true, triggerId }]);
+        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ ignoreDisabled: true, manual: true, triggerId }]);
 
         const after = await readTrigger(triggerId);
 
@@ -259,7 +480,7 @@ describe("testRunTrigger", () => {
 
         await as.action(testRunTrigger as never, { testPayload: "summarise the inbox", triggerId } as never);
 
-        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ ignoreDisabled: true, payload: "summarise the inbox", triggerId }]);
+        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ ignoreDisabled: true, manual: true, payload: "summarise the inbox", triggerId }]);
     });
 });
 
@@ -375,6 +596,68 @@ describe("updateTrigger and the trigger's time zone", () => {
 
         expect(updated.timezone).toBe("America/New_York");
         expect(updated.nextTriggerAt).toBe(Date.parse("2026-07-01T13:00:00Z"));
+    });
+
+    it("leaves the next run and the marker alone when an edit re-sends the same zone", async () => {
+        const due = NOW - 60_000;
+        const triggerId = await insertSchedule("America/New_York");
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await asOwner().mutation(updateTrigger as never, { name: "Renamed", timezone: "America/New_York", triggerId } as never);
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.nextTriggerAt).toBe(due);
+        expect(row.timezone).toBe("America/New_York");
+    });
+
+    it("does not treat an empty zone as a change", async () => {
+        const due = NOW - 60_000;
+        const triggerId = await insertSchedule("America/New_York");
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await asOwner().mutation(updateTrigger as never, { timezone: "", triggerId } as never);
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.nextTriggerAt).toBe(due);
+        expect(row.timezone).toBe("America/New_York");
+    });
+
+    it("keeps the run time of a schedule stored without a zone when it is renamed", async () => {
+        const due = NOW - 60_000;
+        const triggerId = await insertSchedule(undefined);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await asOwner().mutation(updateTrigger as never, { name: "Renamed", triggerId } as never);
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.name).toBe("Renamed");
+        expect(row.nextTriggerAt).toBe(due);
+        expect(row.timezone).toBeUndefined();
+    });
+
+    it("moves a zone-aware schedule back to UTC", async () => {
+        const triggerId = await insertSchedule("America/New_York");
+
+        await asOwner().mutation(updateTrigger as never, { timezone: "UTC", triggerId } as never);
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.timezone).toBe("UTC");
+        expect(row.nextTriggerAt).toBe(Date.parse("2026-07-01T09:00:00Z"));
+    });
+
+    it("arms a schedule with a stored zone in that zone, with no marker", async () => {
+        const triggerId = await insertSchedule("Asia/Tokyo");
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { enabled: false, nextTriggerAt: NOW - 1 }));
+        await asOwner().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
+
+        const row = await readTrigger(triggerId);
+
+        expect(row.nextTriggerAt).toBe(Date.parse("2026-07-02T00:00:00Z"));
     });
 
     it("moves the next run when the expression and the zone are saved together", async () => {

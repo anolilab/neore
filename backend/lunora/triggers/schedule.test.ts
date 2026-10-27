@@ -272,3 +272,11 @@ describe("dueScheduleStep with a zone", () => {
         expect(dueScheduleStep("0 9 * * *", now, "Not/AZone")).toEqual({ kind: "run", nextTime: Date.parse("2026-07-01T09:00:00Z") });
     });
 });
+
+describe("a stored schedule's time zone", () => {
+    it("reads a schedule with a stored zone in that zone, with no marker", () => {
+        const now = Date.parse("2026-07-01T00:00:00Z");
+
+        expect(dueScheduleStep("0 9 * * *", now, "America/New_York")).toEqual({ kind: "run", nextTime: Date.parse("2026-07-01T13:00:00Z") });
+    });
+});

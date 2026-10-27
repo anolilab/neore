@@ -2581,6 +2581,9 @@ export const schema = defineSchema({
         isTemporary: v.optional(v.boolean()),
         language: v.optional(v.string()),
         lastCompressionStartedAt: v.optional(v.number()),
+        // When the user last saved a reply in the thread (not the prompt a routine run opens it with).
+        // Written by `agent/messages.ts#addMessagesHandler`; the routines' quiet check reads it.
+        lastUserMessageAt: v.optional(v.number()),
         // Set while the thread has a passcode (locked). Content is refused
         // without a proof; `lib/thread-lock.ts`. The hash lives in `threadPasscodes`.
         lockedAt: v.optional(v.number()),
@@ -2708,9 +2711,12 @@ export const schema = defineSchema({
     triggerExecutions: defineTable({
         completedAt: v.optional(v.number()),
         error: v.optional(v.string()),
+        // Set on the run whose failure paused its trigger, so a redelivered settlement re-sends the pause notice rather than the plain one.
+        pausedTrigger: v.optional(v.boolean()),
         payload: v.optional(v.string()),
         startedAt: v.number(),
-        // "filtered": a verified delivery whose payload failed the trigger's filters; it ran nothing.
+        // "filtered": a run that was skipped and ran nothing: a verified delivery whose payload failed the
+        // trigger's filters, or a quiet routine's scheduled run with nothing to report. `error` holds the reason.
         status: v.union(v.literal("running"), v.literal("completed"), v.literal("failed"), v.literal("filtered")),
         threadId: v.optional(v.string()),
         triggerId: v.id("triggers"),
@@ -2728,10 +2734,14 @@ export const schema = defineSchema({
         cronExpression: v.optional(v.string()),
         description: v.optional(v.string()),
         enabled: v.boolean(),
+        // When the owner last turned the trigger on from off; a run that started earlier is not counted toward the failure streak.
+        enabledAt: v.optional(v.number()),
         eventConnectionId: v.optional(v.string()),
         eventFilter: v.optional(v.string()),
         eventProvider: v.optional(v.string()),
         eventType: v.optional(v.string()),
+        // Consecutive runs that failed for a reason the owner can fix; absent = 0. Enough of them pause the trigger (`triggers/failure-streak.ts`).
+        failureStreak: v.optional(v.number()),
         // Webhook triggers: every filter must match the JSON body for a delivery to run (`triggers/filters.ts`).
         filters: v.optional(
             v.array(
@@ -2751,12 +2761,16 @@ export const schema = defineSchema({
         ),
         inputTemplate: v.optional(v.string()),
         lastError: v.optional(v.string()),
+        // Start time of the latest run that succeeded; a run that began earlier no longer counts toward the failure streak.
+        lastSuccessStartedAt: v.optional(v.number()),
         lastTriggeredAt: v.optional(v.number()),
         model: v.string(),
         name: v.string(),
         nextTriggerAt: v.optional(v.number()),
         organizationId: v.optional(v.string()),
         payloadTemplate: v.optional(v.string()),
+        // A bot routine that only posts when there is something to report (`triggers/quiet.ts`). Absent = off. Only with a botId.
+        quietWhenEmpty: v.optional(v.boolean()),
         searchMode: v.optional(v.string()),
         systemPrompt: v.optional(v.string()),
         timezone: v.optional(v.string()),

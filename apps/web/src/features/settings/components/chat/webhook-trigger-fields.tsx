@@ -109,7 +109,7 @@ const PayloadFiltersEditor: FC<{ filters: PayloadFilterRow[]; onChange: (filters
         <div aria-labelledby={labelId} className="space-y-2" role="group">
             <Label id={labelId}>{t`Payload filters (optional)`}</Label>
             <p className="text-muted-foreground text-xs">
-                {t`Only run when every filter matches the JSON body. Use dotted paths such as pull_request.user.login or labels.0.name. A delivery that does not match is accepted, shown as Filtered in the history, and does not run or count against your quota.`}
+                {t`Only run when every filter matches the JSON body. Use dotted paths such as pull_request.user.login or labels.0.name. A delivery that does not match is accepted, shown as Skipped in the history, and does not run or count against your quota.`}
             </p>
             {filters.map((filter, index) => (
                 // The rows have no identity of their own; they are only ever added at the end or removed.

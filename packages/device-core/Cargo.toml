@@ -32,4 +32,4 @@ keyring = { version = "3", features = ["apple-native"] }
 [target.'cfg(windows)'.dependencies]
 # The pairing secret (`store.rs`) in the Windows credential store.
 keyring = { version = "3", features = ["windows-native"] }
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_System_Threading"] }

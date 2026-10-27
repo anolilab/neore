@@ -26,6 +26,7 @@ import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import useCheckout from "@/features/billing/hooks/use-checkout";
+import { clearThreadListCache, releaseThreadListWrites } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
 import updateLocale, { isSupportedLocale } from "@/functions/update-locale";
@@ -273,11 +274,19 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
             <DropdownMenuSeparator />
             <DropdownMenuItem
                 onClick={async () => {
+                    // Before the request, and it holds writes until the page reloads or the next sign-in: the sidebar stays mounted meanwhile.
+                    clearThreadListCache();
                     // Push first, while the session still authenticates the server call.
                     await releasePush();
                     await authClient.signOut({
                         fetchOptions: {
+                            onResponse: () => {
+                                // Settled either way: drop anything a push stored while the request ran.
+                                clearThreadListCache();
+                            },
                             onError: () => {
+                                // The session is still active, so its list may be saved again.
+                                releaseThreadListWrites();
                                 // The session may still be active, so keep the identity and say so.
                                 toast({
                                     message: t`Sign-out failed. Please try again.`,
