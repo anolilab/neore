@@ -23,6 +23,7 @@ interface FakeWindow {
         handlers: Map<string, Listener>;
         id: number;
         loadURL: (url: string) => Promise<void>;
+        mainFrame: { url: string };
         on: (event: string, listener: Listener) => void;
         send: (channel: string) => void;
         setWindowOpenHandler: (listener: (details: { url: string }) => { action: string }) => void;
@@ -101,6 +102,7 @@ vi.mock("electron", () => {
 
                     return Promise.resolve();
                 },
+                mainFrame: { url: "" },
                 on: (event: string, listener: Listener) => {
                     webHandlers.set(event, listener);
                 },
@@ -208,19 +210,23 @@ const SITE_HTML_PATTERN = /^file:\/\/.*quick-composer\/index\.html$/u;
 const TITLE_200 = "t".repeat(200);
 const BLANK = " ".repeat(3);
 const sender = (url: string) => {
-    return { senderFrame: { url } };
+    const mainFrame = { url };
+
+    return { sender: { id: -1, mainFrame }, senderFrame: mainFrame };
+};
+/** A sender whose frame is on `url` and is the top frame of `window`. */
+const topFrameOf = (window: FakeWindow, url: string) => {
+    Object.assign(window.webContents.mainFrame, { url });
+
+    return { sender: window.webContents, senderFrame: window.webContents.mainFrame };
 };
 /** The main window is the only window the hand-offs are sent to, so only its frame may take them. */
-const siteSender = () => {
-    return { sender: { id: mainWindow().webContents.id }, senderFrame: { url: `${SITE}/chat` } };
-};
+const siteSender = () => topFrameOf(mainWindow(), `${SITE}/chat`);
 const mainWindow = (): FakeWindow => fake().windows[0];
 const composer = (): FakeWindow => fake().windows[1];
 
 /** The composer's own sender: its window's webContents, on its own file URL. */
-const composerSender = () => {
-    return { sender: { id: composer().webContents.id }, senderFrame: { url: composer().loaded[0] } };
-};
+const composerSender = () => topFrameOf(composer(), composer().loaded[0]);
 
 const guardOf = (window: FakeWindow, event: string) => window.webContents.handlers.get(event);
 const takeSignIn = () => fake().ipc.get("neore:take-pending-sign-in")?.(siteSender());
@@ -335,7 +341,7 @@ describe("tray and Quick Composer", () => {
 
     it("refuses quick-compose from the site, from another local page, and from an empty text", () => {
         const quickCompose = fake().ipc.get("neore:quick-compose");
-        const otherPage = { sender: { id: composer().webContents.id }, senderFrame: { url: "file:///elsewhere/index.html" } };
+        const otherPage = topFrameOf(composer(), "file:///elsewhere/index.html");
 
         expect(() => quickCompose?.(siteSender(), "hi")).toThrow("untrusted");
         expect(() => quickCompose?.(otherPage, "hi")).toThrow("untrusted");
@@ -429,11 +435,24 @@ describe("IPC", () => {
         expect(fake().ipc.get("neore:take-pending-draft")?.(siteSender())).toBe("hello");
     });
 
+    it("refuses a same-origin subframe of the main window, and a call with no sender frame", () => {
+        fake().appHandlers.get("second-instance")?.({}, ["neore://new?text=hello"]);
+
+        const subframe = { ...siteSender(), senderFrame: { url: `${SITE}/chat` } };
+        const noFrame = { ...siteSender(), senderFrame: null };
+
+        expect(fake().ipc.get("neore:take-pending-draft")?.(subframe)).toBeUndefined();
+        expect(fake().ipc.get("neore:take-pending-draft")?.(noFrame)).toBeUndefined();
+        expect(() => fake().ipc.get("neore:notify")?.(subframe, { title: "hi" })).toThrow("untrusted");
+        expect(() => fake().ipc.get("neore:notify")?.(noFrame, { title: "hi" })).toThrow("untrusted");
+        expect(fake().ipc.get("neore:take-pending-draft")?.(siteSender())).toBe("hello");
+    });
+
     it("refuses a hand-off to a thread window, which is a site page but not the main window", () => {
         fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-1");
 
         const threadWindow = fake().windows.at(-1);
-        const threadSender = { sender: { id: threadWindow?.webContents.id }, senderFrame: { url: `${SITE}/chat/thread-1` } };
+        const threadSender = topFrameOf(threadWindow as FakeWindow, `${SITE}/chat/thread-1`);
 
         fake().appHandlers.get("second-instance")?.({}, ["neore://new?text=hello"]);
 

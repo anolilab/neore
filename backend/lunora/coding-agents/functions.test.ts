@@ -216,6 +216,9 @@ describe("pull request reaper", () => {
             error: "A pull request for this run is already being opened.",
         });
         expect(await mutate(beginPullRequest, { followUp: false, runId: stale, userId: USER })).toMatchObject({ baseBranch: "main" });
+        // The reclaimed attempt's sandbox is killed by a job scheduled in the claim's own transaction.
+        expect(JSON.stringify(harness.scheduler.list())).toContain("sbx-old");
+        expect(harness.scheduler.list()).toHaveLength(2);
 
         const run = await getRun(stale);
 

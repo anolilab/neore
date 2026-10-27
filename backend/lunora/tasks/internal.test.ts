@@ -241,6 +241,7 @@ describe("checkDueTasks", () => {
 
         expect(busyTask.status).toBe("needs_review");
         expect(busyTask.nextRunAt).toBeGreaterThan(Date.now());
+        expect(busyTask.updatedAt).toBe(1);
         expect(roundJobs().map((job) => job.args)).toStrictEqual([expect.objectContaining({ origin: "schedule", taskId: due })]);
     });
 
