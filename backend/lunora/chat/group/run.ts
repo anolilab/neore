@@ -44,6 +44,7 @@ import {
     afterRun,
     AgentRunError,
     buildRunStreamArgs,
+    resolveBackupModelId,
     endStoppedRun,
     finishRun,
     loadRunContext,
@@ -245,7 +246,9 @@ const runSpeaker = async (
 
         setResearchDepth(ctx, turn.researchDepth);
 
+        const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model);
         const agent = await getAgent(model, {
+            backupModelId,
             customProvider,
             gateway: gatewayFetch(ctx),
             language: turn.prefs.language,
@@ -296,7 +299,7 @@ const runSpeaker = async (
             threadEffort: turn.reasoningEffort.thread,
         });
         const streamTextArgs: Record<string, unknown> = {
-            ...buildRunStreamArgs({ model, reasoningEffort, shouldAutoContinue: turn.shouldAutoContinue }),
+            ...buildRunStreamArgs({ backupModelId, model, reasoningEffort, shouldAutoContinue: turn.shouldAutoContinue }),
             system,
             ...(isFirstSpeaker ? { promptMessageId: turn.promptMessageId } : { forceNewOrder: true, promptMessageId: position.continueFromMessageId }),
         };

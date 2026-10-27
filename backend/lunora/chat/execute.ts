@@ -268,9 +268,10 @@ export const runStreamingAgent = internalAction
             // Build agent
             const isAutoContinue = streamingConfig.shouldAutoContinue === true;
 
+            const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model);
             const agent = await getAgent(model, {
                 agentMode,
-                backupModelId: await resolveBackupModelId(ctx, userId, prefs.backupModel, model),
+                backupModelId,
                 customProvider,
                 enabledSkills: skillRun.enabledSkills.length > 0 ? skillRun.enabledSkills : undefined,
                 gateway: gatewayFetch(ctx),
@@ -308,7 +309,12 @@ export const runStreamingAgent = internalAction
             const threadStatelessMode = appThread?.statelessMode ?? statelessMode;
 
             // Reasoning provider options and, for auto-continue, step compression.
-            const streamTextArgs: any = buildRunStreamArgs({ model, reasoningEffort: threadReasoningEffort, shouldAutoContinue: isAutoContinue });
+            const streamTextArgs: any = buildRunStreamArgs({
+                backupModelId,
+                model,
+                reasoningEffort: threadReasoningEffort,
+                shouldAutoContinue: isAutoContinue,
+            });
 
             if (threadStatelessMode) {
                 streamTextArgs.prompt = prompt;

@@ -12,7 +12,7 @@
  * and flushes the stream, the post-run bookkeeping (`afterRun`), resuming an
  * approved run (`resumeApprovedRun`) and the error cleanup.
  */
-import { MODEL_LOOKUP, type ModelDefinition, parseCustomModelId, requiresPaidPlan } from "@neore/ai/models";
+import { MODEL_LOOKUP, type ModelDefinition, parseCustomModelId } from "@neore/ai/models";
 import type { UserPersonalization } from "@neore/ai/prompts";
 import { buildMemoryContext } from "@neore/ai/prompts";
 
@@ -26,8 +26,8 @@ import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
 import { eligibleBackupModel } from "./backup-model";
-import { byokPaysFor, paidModelRefusal } from "./paid-model";
-import { compressContextMessages, getMaxSteps, getModelContextWindow } from "./auto-continue";
+import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
+import { compressContextMessages, getFallbackContextWindow, getMaxSteps } from "./auto-continue";
 import { isLocalBrowserProvider, toGatewayFormat } from "./custom-providers";
 import type { GatewayCustomProviderConfig } from "./gateway-language-model";
 import { gatewayFetch } from "../../lib/services";
@@ -123,25 +123,16 @@ export const readRunPlan = async (ctx: Pick<ActionCtx, "runQuery">, userId: stri
  * A key exempts only where `byokPaysFor` says the user's key pays for the call. `plan` is the run's
  * pre-resolved plan (see `readRunPlan`).
  */
-export const canRunPaidModel = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, definition: ModelDefinition, plan?: RunPlan): Promise<boolean> => {
-    if (!requiresPaidPlan(definition)) {
-        return true;
-    }
+export const canRunPaidModel = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, definition: ModelDefinition, plan?: RunPlan): Promise<boolean> =>
+    await allowsPaidModel(
+        definition,
+        async () => plan ?? (await readRunPlan(ctx, userId)),
+        async () => {
+            const keys = await loadUserProviderKeys(ctx, userId);
 
-    const resolved = plan ?? (await readRunPlan(ctx, userId));
-
-    if (resolved.isAdmin || resolved.plan === "premium") {
-        return true;
-    }
-
-    if (!byokPaysFor(definition)) {
-        return false;
-    }
-
-    const userProviderKeys = await loadUserProviderKeys(ctx, userId);
-
-    return Boolean(userProviderKeys?.[definition.provider]);
-};
+            return Boolean(keys?.[definition.provider]);
+        },
+    );
 
 /** Refuses a paid-plan model for a run that cannot pay for it (`canRunPaidModel`). Every run resolves its model here. */
 const assertModelAllowed = async (ctx: Pick<ActionCtx, "runQuery">, model: string, userId: string): Promise<void> => {
@@ -630,8 +621,13 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
  * and, for auto-continue, context compression between steps. Callers add their
  * own prompt / system fields on top.
  */
-export const buildRunStreamArgs = (options: { model: string; reasoningEffort: number | undefined; shouldAutoContinue?: boolean }): Record<string, unknown> => {
-    const { model, reasoningEffort } = options;
+export const buildRunStreamArgs = (options: {
+    backupModelId?: string;
+    model: string;
+    reasoningEffort: number | undefined;
+    shouldAutoContinue?: boolean;
+}): Record<string, unknown> => {
+    const { backupModelId, model, reasoningEffort } = options;
     const modelDefinition = MODEL_LOOKUP.get(model);
     const supportsReasoningEffort =
         modelDefinition?.filterCapabilities?.includes("effort_control") || modelDefinition?.filterCapabilities?.includes("reasoning");
@@ -653,7 +649,7 @@ export const buildRunStreamArgs = (options: { model: string; reasoningEffort: nu
     // run's tool results pile up after the one-shot check in `applyLateCompression`.
     // `shouldAutoContinue` no longer changes this; it stays in the type so callers
     // need no edit.
-    const contextLimit = getModelContextWindow(model);
+    const contextLimit = getFallbackContextWindow(model, backupModelId);
 
     streamTextArgs.prepareStep = ({ messages }: { messages: unknown[] }) => {
         const compressed = compressContextMessages(messages as never, contextLimit);
@@ -942,8 +938,9 @@ export const resumeApprovedRun = async (
             toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer) as (typeof toolResult.tools)[string];
         }
 
+        const backupModelId = await resolveBackupModelId(ctx, userId, preferences.backupModel, config.model);
         const agent = await getAgent(config.model, {
-            backupModelId: await resolveBackupModelId(ctx, userId, preferences.backupModel, config.model),
+            backupModelId,
             customProvider,
             gateway: gatewayFetch(ctx),
             maxSteps: getMaxSteps(config.shouldAutoContinue),
@@ -970,6 +967,7 @@ export const resumeApprovedRun = async (
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({
+            backupModelId,
             model: config.model,
             reasoningEffort: config.reasoningEffort,
             shouldAutoContinue: config.shouldAutoContinue,

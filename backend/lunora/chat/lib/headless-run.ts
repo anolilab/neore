@@ -25,7 +25,15 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { sumMessageCosts } from "../../agent/message-cost";
 import type { SkillConfig } from "../../skills/validators";
-import { buildRunStreamArgs, loadUserProviderKeys, resolveRunModel, retrieveMemoryContext, setResearchDepth, toPersonalization } from "./agent-run";
+import {
+    buildRunStreamArgs,
+    loadUserProviderKeys,
+    resolveBackupModelId,
+    resolveRunModel,
+    retrieveMemoryContext,
+    setResearchDepth,
+    toPersonalization,
+} from "./agent-run";
 import { buildAgentTools } from "./agent-tools";
 import { getMaxSteps } from "./auto-continue";
 import { gatewayFetch } from "../../lib/services";
@@ -155,7 +163,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
 
         const existingThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
         const personal = options.personalization === "full";
+        const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model);
         const agent = await getAgent(model, {
+            backupModelId,
             customProvider,
             gateway: gatewayFetch(ctx),
             language: prefs.language,
@@ -173,7 +183,12 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
         const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId) : undefined;
         const extraParts = [options.system, memoryContext].filter((part): part is string => !!part);
         const generateArgs: Record<string, unknown> = {
-            ...buildRunStreamArgs({ model, reasoningEffort: skill?.config?.reasoningEffort, shouldAutoContinue: options.maxSteps === undefined }),
+            ...buildRunStreamArgs({
+                backupModelId,
+                model,
+                reasoningEffort: skill?.config?.reasoningEffort,
+                shouldAutoContinue: options.maxSteps === undefined,
+            }),
             ...(prompt !== undefined && { prompt }),
             ...(options.shouldStop && { stopWhen: [stepCountIs(options.maxSteps ?? getMaxSteps(true)), stopWhenRequested(options.shouldStop)] }),
             // Without extra parts the agent falls back to its own instructions.

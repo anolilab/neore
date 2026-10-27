@@ -280,6 +280,29 @@ describe("applyLateCompression", () => {
     });
 });
 
+describe("a backup model with a smaller window", () => {
+    // ~300k tokens: inside gemini's 1M window, over gpt-4o's 128k.
+    const big = thread(10, 2, "y".repeat(40_000));
+
+    it("applyLateCompression compresses to the smaller of the two windows", () => {
+        expect(applyLateCompression(big, "gemini-2.5-flash")).toBe(big);
+
+        const output = applyLateCompression(big, "gemini-2.5-flash", "gpt-4o");
+
+        expect(output).not.toBe(big);
+        expect(estimateTokens(output)).toBeLessThan(128_000 * 0.85);
+    });
+
+    it("buildRunStreamArgs compresses between steps to the smaller window", () => {
+        type Prepare = { prepareStep: (options: { messages: ModelMessage[] }) => { messages: ModelMessage[] } | undefined };
+        const alone = buildRunStreamArgs({ model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
+        const withBackup = buildRunStreamArgs({ backupModelId: "gpt-4o", model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
+
+        expect(alone.prepareStep({ messages: big })).toBeUndefined();
+        expect(withBackup.prepareStep({ messages: big })?.messages.length).toBeLessThan(big.length);
+    });
+});
+
 describe("buildRunStreamArgs", () => {
     it("installs compression for every run, not only auto-continue ones", () => {
         const { prepareStep } = buildRunStreamArgs({ model: "gpt-4o", reasoningEffort: undefined }) as {

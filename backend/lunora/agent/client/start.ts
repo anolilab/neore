@@ -13,6 +13,7 @@ import {
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { applyLateCompression } from "../../chat/lib/auto-continue";
+import { FallbackLanguageModel } from "../../chat/lib/fallback-language-model";
 import { toUserFacingError } from "../../chat/lib/user-facing-error";
 import { omit } from "../../lib/collections";
 import { assert } from "../../lib/error-helpers";
@@ -231,8 +232,10 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
     const tools = wrapTools(toolContext, args.tools) as Tools;
     // Late compression: prevent context-exceeded errors by compressing messages
     // that are close to the model's context window limit before sending to LLM.
-    const modelId = getModelName(model);
-    const messages = applyLateCompression(context.messages, modelId);
+    // A call that may fall back must fit the smaller of the two models' windows.
+    const fallback = model instanceof FallbackLanguageModel ? model : undefined;
+    const modelId = fallback ? fallback.primaryModelId : getModelName(model);
+    const messages = applyLateCompression(context.messages, modelId, fallback?.backupModelId);
 
     const aiArgs = {
         ...options.callSettings,

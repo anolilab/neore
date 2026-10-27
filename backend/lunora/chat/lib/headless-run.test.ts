@@ -4,6 +4,7 @@
  * exactly as `get-agent.ts` builds them, so the assertions are about the prompt
  * text a messenger sender's reply is generated from.
  */
+import { MODEL_REGISTRY, requiresPaidPlan } from "@neore/ai/models";
 import { getSystemPrompt } from "@neore/ai/prompts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +16,7 @@ vi.mock("../../_generated/internal", async (importOriginal) => mappedReferences(
 
 const seen = vi.hoisted(() => {
     return {
+        backups: [] as (string | undefined)[],
         buildOptions: [] as unknown[],
         created: [] as unknown[],
         failAt: undefined as "generate" | "keys" | "thread" | undefined,
@@ -28,6 +30,7 @@ vi.mock("./get-agent", () => {
         default: async (
             _model: string,
             options: {
+                backupModelId?: string;
                 language?: string;
                 location?: string;
                 personalization?: Parameters<typeof getSystemPrompt>[3];
@@ -36,6 +39,7 @@ vi.mock("./get-agent", () => {
             },
         ) => {
             seen.tools.push(Object.keys(options.tools ?? {}));
+            seen.backups.push(options.backupModelId);
 
             const instructions = getSystemPrompt(options.timezone, options.location, options.language, options.personalization);
             const thread = {
@@ -156,6 +160,50 @@ describe("runHeadlessAgent personalization", () => {
         for (const secret of SECRETS) {
             expect(seen.system[0]).toContain(secret);
         }
+    });
+});
+
+describe("runHeadlessAgent backup model", () => {
+    const BACKUP = MODEL_REGISTRY.find((m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text" && !requiresPaidPlan(m))!.id;
+
+    const ctxWith = (backupModel: string | undefined) => {
+        const ctx = fakeCtx() as unknown as { runQuery: ReturnType<typeof vi.fn> };
+        const base = ctx.runQuery.getMockImplementation() as (reference: string, args: unknown) => Promise<unknown>;
+
+        ctx.runQuery.mockImplementation(async (reference: string, args: unknown) => {
+            const result = await base(reference, args);
+
+            return reference === "auth_functions:getUserPreferencesQuery" ? { ...(result as object), backupModel } : result;
+        });
+
+        return ctx;
+    };
+
+    const run = async (ctx: unknown) =>
+        await runHeadlessAgent(ctx as never, {
+            memory: false,
+            model: "test-model",
+            personalization: "none",
+            prompt: "Do the thing",
+            thread: { threadId: "thread-1" },
+            tools: "none",
+            userId: "owner",
+        });
+
+    beforeEach(() => {
+        seen.backups = [];
+    });
+
+    it("gives the agent the user's backup model, so an unattended run survives an outage too", async () => {
+        await run(ctxWith(BACKUP));
+
+        expect(seen.backups).toEqual([BACKUP]);
+    });
+
+    it("gives none when the user set none", async () => {
+        await run(ctxWith(undefined));
+
+        expect(seen.backups).toEqual([undefined]);
     });
 });
 
