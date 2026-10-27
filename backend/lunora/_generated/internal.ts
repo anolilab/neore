@@ -281,6 +281,7 @@ export interface InternalApiTypes {
         };
         custom_providers: {
             getDecryptedCustomProvider: FunctionReference<"query", { providerId: string; userId: string }, { accessKeyId?: string; apiKey: string; apiVersion?: string; baseUrl: string; id: string; models: Array<{ id: string; name?: string }>; region?: string; supportsTools: boolean; type: "openai" | "anthropic" | "local-browser" | "google" | "azure" | "bedrock" | "mistral" } | null>;
+            isCustomProviderRunnable: FunctionReference<"query", { providerId: string; userId: string }, boolean>;
         };
         daily_charge: {
             chargeDailyUnit: FunctionReference<"mutation", { count?: number; kind: "Audio" | "Image" | "Text" | "Video"; organizationId?: string; requestId?: string; userId: string }, boolean>;
@@ -1311,6 +1312,7 @@ export const internal: InternalApiTypes = {
         },
         custom_providers: {
             getDecryptedCustomProvider: { __lunoraRef: "chat_custom_providers:getDecryptedCustomProvider" },
+            isCustomProviderRunnable: { __lunoraRef: "chat_custom_providers:isCustomProviderRunnable" },
         },
         daily_charge: {
             chargeDailyUnit: { __lunoraRef: "chat_daily_charge:chargeDailyUnit" },

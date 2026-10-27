@@ -1,4 +1,4 @@
-import { MODEL_LOOKUP } from "@neore/ai/models";
+import { MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import type { Infer } from "lunorash/server";
 
 /**
@@ -66,6 +66,15 @@ const presetValidatorMatchesTable: Equal<Infer<typeof vWebhookPreset>, WebhookPr
 
 // eslint-disable-next-line sonarjs/void-use -- type-level assertion; `void` only marks the binding as used.
 void presetValidatorMatchesTable;
+
+/** A `custom:<provider>/<model>` names one of the caller's own endpoints; a missing, disabled or browser-only one would fail every run. */
+const assertCustomModelRunnable = async (context: Pick<MutationCtx, "runQuery">, model: string, userId: string): Promise<void> => {
+    const custom = parseCustomModelId(model);
+
+    if (custom && !(await context.runQuery(internal.chat.custom_providers.isCustomProviderRunnable, { providerId: custom.providerId, userId }))) {
+        throw new LunoraError("INVALID_ARGUMENT", "That custom endpoint is missing, disabled or only reachable from your browser.");
+    }
+};
 
 /** Nothing dispatches an event trigger, so one can be neither created nor edited. Existing rows stay readable and deletable. */
 const assertTriggerTypeSupported = (type: "event" | "schedule" | "webhook"): void => {
@@ -329,6 +338,8 @@ export const createTrigger = authMutation
 
         assertTriggerTypeSupported(triggerType);
 
+        await assertCustomModelRunnable(context, args.model, userId);
+
         const timezone = args.timezone?.trim() || undefined;
 
         if (timezone !== undefined) assertTimeZone(timezone);
@@ -446,6 +457,10 @@ export const updateTrigger = authMutation
 
         if (args.requireDisabled === true && trigger.enabled === true) {
             throw new LunoraError("CONFLICT", "The trigger is enabled. Disable it in the app before changing it.");
+        }
+
+        if (args.model !== undefined && args.model !== trigger.model) {
+            await assertCustomModelRunnable(context, args.model, userId);
         }
 
         const patch: {

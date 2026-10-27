@@ -266,4 +266,32 @@ describe("trigger routes", () => {
         expect(response.status).toBe(404);
         expect(calls.some((entry) => entry.name === "triggers_functions:updateTrigger")).toBe(false);
     });
+
+    it("sends a filter read back with value null as an absent value", async () => {
+        const { calls, request } = call({ triggers: ["write"] });
+        const filters = [
+            { op: "exists", path: "event", value: null },
+            { op: "equals", path: "kind", value: "push" },
+        ];
+
+        const response = await request("/triggers/trg1", json("PATCH", { filters }));
+
+        expect(response.status).toBe(200);
+        expect(calls.find((entry) => entry.name === "triggers_functions:updateTrigger")?.args).toMatchObject({
+            filters: [
+                { op: "exists", path: "event" },
+                { op: "equals", path: "kind", value: "push" },
+            ],
+        });
+    });
+
+    it("refuses a cron expression on a webhook trigger, on create and on update", async () => {
+        const { calls, request } = call({ triggers: ["write"] }, { ...stored, type: "webhook" });
+
+        const created = await request("/triggers", json("POST", { cronExpression: "0 9 * * 1", model: "m", name: "Hook", type: "webhook" }));
+        const updated = await request("/triggers/trg1", json("PATCH", { cronExpression: "0 9 * * 1" }));
+
+        expect([created.status, updated.status]).toEqual([400, 400]);
+        expect(calls.some((entry) => entry.name === "triggers_functions:createTrigger" || entry.name === "triggers_functions:updateTrigger")).toBe(false);
+    });
 });

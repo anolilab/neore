@@ -42,6 +42,7 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 
 beforeAll(async () => {
     registerModule(registry, "triggers_functions", await import("./functions"));
+    registerModule(registry, "chat_custom_providers", await import("../chat/custom-providers"));
 });
 
 vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
@@ -217,6 +218,13 @@ describe("trigger schedules", () => {
     const schedule = (cronExpression?: string) => {
         return { cronExpression, model: "m", name: "Daily", type: "schedule" };
     };
+
+    it("refuses a custom model without a runnable endpoint", async () => {
+        await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), model: "custom:gone/model" } as never)).rejects.toThrow(
+            "custom endpoint is missing",
+        );
+        await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), model: "m" } as never)).resolves.toHaveProperty("triggerId");
+    });
 
     it("refuses an expression the parser would read as a wildcard, on create and on update", async () => {
         for (const garbage of ["every day", "0 9 * *", "60 * * * *", "1-5/2 * * * *"]) {

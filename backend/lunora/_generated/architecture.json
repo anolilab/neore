@@ -1456,6 +1456,11 @@
       "to": "table:aiUserPreferences"
     },
     {
+      "from": "function:chat_custom_providers:isCustomProviderRunnable",
+      "kind": "read",
+      "to": "table:aiUserPreferences"
+    },
+    {
       "from": "function:chat_custom_providers:listCustomProviders",
       "kind": "read",
       "to": "table:aiUserPreferences"
@@ -6452,6 +6457,11 @@
     },
     {
       "from": "function:triggers_functions:createTrigger",
+      "kind": "call",
+      "to": "function:chat_custom_providers:isCustomProviderRunnable"
+    },
+    {
+      "from": "function:triggers_functions:createTrigger",
       "kind": "write",
       "to": "table:triggers"
     },
@@ -6529,6 +6539,11 @@
       "from": "function:triggers_functions:updateTrigger",
       "kind": "call",
       "to": "function:bots_functions:getBotForRun"
+    },
+    {
+      "from": "function:triggers_functions:updateTrigger",
+      "kind": "call",
+      "to": "function:chat_custom_providers:isCustomProviderRunnable"
     },
     {
       "from": "function:triggers_schedule:checkDueTriggers",
@@ -9068,6 +9083,13 @@
       "id": "function:chat_custom_providers:getDecryptedCustomProvider",
       "kind": "function",
       "name": "chat.custom_providers.getDecryptedCustomProvider",
+      "module": "chat"
+    },
+    {
+      "detail": "query",
+      "id": "function:chat_custom_providers:isCustomProviderRunnable",
+      "kind": "function",
+      "name": "chat.custom_providers.isCustomProviderRunnable",
       "module": "chat"
     },
     {
@@ -19739,43 +19761,37 @@
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 170,
+      "line": 172,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 340,
+      "line": 342,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 381,
+      "line": 397,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 479,
+      "line": 495,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 509,
+      "line": 525,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 533,
-      "reason": "\"ROUTES\" is not a registered function"
-    },
-    {
-      "file": "public-api/routes",
-      "kind": "call",
-      "line": 554,
+      "line": 549,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
@@ -19787,43 +19803,37 @@
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 650,
+      "line": 586,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 668,
+      "line": 666,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 692,
+      "line": 684,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 693,
+      "line": 706,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 729,
+      "line": 707,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 748,
-      "reason": "\"ROUTES\" is not a registered function"
-    },
-    {
-      "file": "public-api/routes",
-      "kind": "call",
-      "line": 752,
+      "line": 743,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
@@ -19835,49 +19845,61 @@
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 784,
+      "line": 766,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 828,
+      "line": 776,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 843,
+      "line": 798,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 870,
+      "line": 842,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 900,
+      "line": 857,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 919,
+      "line": 884,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 959,
+      "line": 914,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 976,
+      "line": 933,
+      "reason": "\"ROUTES\" is not a registered function"
+    },
+    {
+      "file": "public-api/routes",
+      "kind": "call",
+      "line": 973,
+      "reason": "\"ROUTES\" is not a registered function"
+    },
+    {
+      "file": "public-api/routes",
+      "kind": "call",
+      "line": 993,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {

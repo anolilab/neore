@@ -139,7 +139,11 @@ const zTriggerFilterOpSchema = z.enum(["equals", "not_equals", "contains", "star
 
 const zTriggerFilterSchema = z.object({ op: zTriggerFilterOpSchema, path: z.string(), value: z.string().nullable() });
 
-const zTriggerFilterRequestSchema = z.object({ op: zTriggerFilterOpSchema, path: z.string().min(1).max(200), value: z.string().max(500).optional() });
+const zTriggerFilterRequestSchema = z.object({
+    op: zTriggerFilterOpSchema,
+    path: z.string().min(1).max(200),
+    value: z.string().max(500).nullable().optional().meta({ description: "Omit or send `null` for `exists` and `not_exists`, as a read returns it." }),
+});
 
 export const zTriggerSchema = z.object({
     botComputer: z.boolean(),
@@ -163,7 +167,7 @@ export const zTriggerSchema = z.object({
     triggerCount: z.number(),
     type: z.string().meta({ description: "schedule | webhook" }),
     updatedAt: z.number(),
-    webhookSignatureScheme: z.string().nullable().meta({ description: "timestamped | native, for a webhook trigger." }),
+    webhookSignatureScheme: z.string().nullable().meta({ description: "timestamped | native | gitlab-token, for a webhook trigger." }),
 });
 
 export const zTriggerExecutionSchema = z.object({

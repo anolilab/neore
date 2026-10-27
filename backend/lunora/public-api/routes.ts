@@ -349,6 +349,26 @@ const findOwnTrigger = async (ctx: HttpActionCtx, triggerId: string) => {
     return trigger;
 };
 
+/** A filter read back carries `value: null` for exists / not_exists; the procedure takes it absent. */
+type FilterOp = NonNullable<z.infer<typeof zTriggerCreateRequestSchema>["filters"]>[number]["op"];
+
+const withFilterValues = <T extends { filters?: { op: FilterOp; path: string; value?: string | null }[] }>(
+    request: T,
+): Omit<T, "filters"> & { filters?: { op: FilterOp; path: string; value?: string }[] } => {
+    const { filters, ...rest } = request;
+
+    return {
+        ...rest,
+        ...(filters && {
+            filters: filters.map(({ op, path, value }) => {
+                return { op, path, ...(value !== null && value !== undefined && { value }) };
+            }),
+        }),
+    };
+};
+
+const WEBHOOK_CRON_MESSAGE = "A webhook trigger has no schedule; `cronExpression` applies to schedule triggers only.";
+
 const WEBHOOK_TEMPLATE_MESSAGE = "A webhook trigger does not use `inputTemplate`; its payload is the input.";
 
 /** The public trigger shape: `getTriggers`' row under `id`. It never carries the webhook secret, which only `createTrigger` returns, once. */
@@ -897,7 +917,11 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
                 throw new PublicApiError("invalid_request", WEBHOOK_TEMPLATE_MESSAGE);
             }
 
-            const created = await ctx.runMutation(api.triggers.functions.createTrigger, request);
+            if (request.type === "webhook" && request.cronExpression !== undefined) {
+                throw new PublicApiError("invalid_request", WEBHOOK_CRON_MESSAGE);
+            }
+
+            const created = await ctx.runMutation(api.triggers.functions.createTrigger, withFilterValues(request));
 
             return { data: { id: created.triggerId, ...(created.webhookSecret && { webhookSecret: created.webhookSecret }) }, status: 201 };
         },
@@ -956,8 +980,12 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
                 throw new PublicApiError("invalid_request", WEBHOOK_TEMPLATE_MESSAGE);
             }
 
+            if (trigger.type === "webhook" && request.cronExpression !== undefined) {
+                throw new PublicApiError("invalid_request", WEBHOOK_CRON_MESSAGE);
+            }
+
             await input.ctx.runMutation(api.triggers.functions.updateTrigger, {
-                ...request,
+                ...withFilterValues(request),
                 // Checked inside the mutation, so a trigger enabled after the read above is still refused.
                 requireDisabled: true,
                 triggerId: triggerId as Id<"triggers">,

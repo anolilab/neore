@@ -387,6 +387,19 @@ export const getDecryptedCustomProvider = internalQuery
     });
 
 /**
+ * Whether a run can use the endpoint: it exists, is enabled and is reachable from the server.
+ * No key is decrypted, so a form that only needs to refuse a stale model can ask.
+ */
+export const isCustomProviderRunnable = internalQuery
+    .input({ providerId: v.string(), userId: v.string() })
+    .output(v.boolean())
+    .query(async ({ args: { providerId, userId }, ctx }) => {
+        const row = readProviders(await loadPreferences(ctx, userId))[providerId];
+
+        return row?.enabled === true && !isLocalBrowserProvider(row.type ?? "openai");
+    });
+
+/**
  * `GET {baseUrl}/models` against a user endpoint — backs both "Test
  * connection" and "Fetch models". An ACTION, because it is an outbound fetch:
  * bounded by `AbortSignal.timeout`, never follows a redirect (a 30x could point
