@@ -1497,6 +1497,7 @@ export const triggers = sqliteTable("triggers", {
     cronExpression: text("cronExpression"),
     description: text("description"),
     enabled: integer("enabled", { mode: "boolean" }).notNull(),
+    enabledAt: real("enabledAt"),
     eventConnectionId: text("eventConnectionId"),
     eventFilter: text("eventFilter"),
     eventProvider: text("eventProvider"),

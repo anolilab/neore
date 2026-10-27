@@ -582,8 +582,7 @@ export const setTriggerEnabled = authMutation
         await context.db.patch(args.triggerId as Id<"triggers">, {
             enabled: args.enabled,
             updatedAt: context.now,
-            // Turning it back on is the owner saying the cause is fixed: the streak starts over.
-            ...(args.enabled && { failureStreak: 0 }),
+            ...(args.enabled && restartedStreak(trigger, context.now)),
             ...(firstRun !== undefined && { nextTriggerAt: firstRun }),
         });
 
@@ -998,13 +997,21 @@ export const recordFilteredExecution = internalMutation
     });
 
 /**
+ * Turning a disabled trigger back on is the owner saying the cause is fixed: the streak starts over.
+ * Enabling one that is already on changes nothing, so it cannot erase failures it has collected.
+ */
+const restartedStreak = (trigger: Doc<"triggers">, now: number): { enabledAt?: number; failureStreak?: number } =>
+    trigger.enabled === true ? {} : { enabledAt: now, failureStreak: 0 };
+
+/**
  * Settles one run's effect on its trigger's failure streak. Only an ENABLED trigger is
  * counted: a paused one (or a disabled one a manual "Run now" fired) has nothing left to
  * pause, so its runs can neither re-pause it nor notify again. Returns whether this run
  * paused the trigger.
  */
-const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, outcome: RunOutcome): Promise<boolean> => {
-    if (trigger.enabled !== true) {
+const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, startedAt: number, outcome: RunOutcome): Promise<boolean> => {
+    // A run that began before the owner last turned the trigger on belongs to the episode they just closed.
+    if (trigger.enabled !== true || (trigger.enabledAt !== undefined && startedAt < trigger.enabledAt)) {
         return false;
     }
 
@@ -1013,6 +1020,7 @@ const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, o
 
     if (pause) {
         await patchRow(ctx.db, trigger, { enabled: false, failureStreak: streak, updatedAt: ctx.now });
+        console.info(`[Triggers] Trigger ${trigger._id} paused after ${streak} consecutive failures its owner can fix`);
     } else if (streak !== current) {
         await patchRow(ctx.db, trigger, { failureStreak: streak });
     }
@@ -1051,7 +1059,7 @@ export const updateExecution = internalMutation
             const trigger = execution ? await ctx.db.get(execution.triggerId) : null;
 
             if (trigger) {
-                const paused = await settleFailureStreak(ctx, trigger, runOutcome(status, userFixable));
+                const paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(status, userFixable));
 
                 await notifyQuietly(ctx, {
                     // One pause per streak: the execution that tipped it names the episode, so a redelivery or a later
@@ -1084,7 +1092,7 @@ export const setTriggerEnabledInternal = internalMutation
         await ctx.db.patch(triggerId, {
             enabled,
             updatedAt: ctx.now,
-            ...(enabled && { failureStreak: 0 }),
+            ...(enabled && trigger && restartedStreak(trigger, ctx.now)),
             ...(firstRun !== undefined && { nextTriggerAt: firstRun }),
         });
 

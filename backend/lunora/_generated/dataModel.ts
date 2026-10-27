@@ -1743,6 +1743,7 @@ export interface Doc_triggers {
     cronExpression?: string;
     description?: string;
     enabled: boolean;
+    enabledAt?: number;
     eventConnectionId?: string;
     eventFilter?: string;
     eventProvider?: string;
@@ -4477,6 +4478,7 @@ export interface Insert_triggers {
     cronExpression?: string;
     description?: string;
     enabled: boolean;
+    enabledAt?: number;
     eventConnectionId?: string;
     eventFilter?: string;
     eventProvider?: string;

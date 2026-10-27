@@ -15415,6 +15415,12 @@
           "optional": false,
           "unique": false
         },
+        "enabledAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "eventConnectionId": {
           "kind": "string",
           "nullable": false,

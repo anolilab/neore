@@ -4,7 +4,7 @@
  * a success starts over, and a settled run is never counted twice.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AgentRunError } from "../chat/lib/agent-run";
 import type { AgentRunErrorKind } from "../chat/lib/agent-run";
@@ -241,5 +241,44 @@ describe("pausing a trigger after repeated user-fixable failures", () => {
         }
 
         expect(await noticesKeyed("trigger-paused:")).toHaveLength(2);
+    });
+
+    it("leaves the streak alone when the trigger is enabled while already on", async () => {
+        const triggerId = await insertTrigger({ failureStreak: 2 });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(setTriggerEnabledInternal, { enabled: true, triggerId }));
+
+        expect(await readTrigger(triggerId)).toMatchObject({ enabled: true, failureStreak: 2 });
+    });
+
+    it("does not count a run that started before the owner turned the trigger back on", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+
+        try {
+            vi.setSystemTime(1000);
+
+            const triggerId = await insertTrigger({ enabled: false });
+            const stale: string[] = [];
+
+            for (let index = 0; index < TRIGGER_PAUSE_AFTER_FAILURES; index += 1) {
+                stale.push(await startRun(triggerId));
+            }
+
+            vi.setSystemTime(2000);
+            await harness.run(async (ctx: any) => await ctx.runMutation(setTriggerEnabledInternal, { enabled: true, triggerId }));
+
+            for (const executionId of stale) {
+                await settle(executionId, "failed", true);
+            }
+
+            expect(await readTrigger(triggerId)).toMatchObject({ enabled: true, failureStreak: 0 });
+
+            vi.setSystemTime(3000);
+            await failFixable(triggerId);
+
+            expect(await fieldOf(triggerId, "failureStreak")).toBe(1);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

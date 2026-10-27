@@ -2739,6 +2739,8 @@ export const schema = defineSchema({
         cronExpression: v.optional(v.string()),
         description: v.optional(v.string()),
         enabled: v.boolean(),
+        // When the owner last turned the trigger on from off; a run that started earlier is not counted toward the failure streak.
+        enabledAt: v.optional(v.number()),
         eventConnectionId: v.optional(v.string()),
         eventFilter: v.optional(v.string()),
         eventProvider: v.optional(v.string()),
