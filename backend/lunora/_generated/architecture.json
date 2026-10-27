@@ -16685,20 +16685,26 @@
     },
     {
       "file": "agent/messages",
-      "kind": "read",
-      "line": 426,
+      "kind": "write",
+      "line": 390,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 436,
+      "line": 432,
+      "reason": "\"addMessagesHandler\" is not a registered function"
+    },
+    {
+      "file": "agent/messages",
+      "kind": "read",
+      "line": 442,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 442,
+      "line": 448,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
