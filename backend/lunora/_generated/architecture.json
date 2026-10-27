@@ -3103,6 +3103,11 @@
     {
       "from": "function:coding_agents_functions:beginPullRequest",
       "kind": "schedule",
+      "to": "function:coding_agents_execute:killRunSandbox"
+    },
+    {
+      "from": "function:coding_agents_functions:beginPullRequest",
+      "kind": "schedule",
       "to": "function:coding_agents_execute:reapPullRequest"
     },
     {

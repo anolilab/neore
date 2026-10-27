@@ -7721,13 +7721,6 @@ if (typeof source["type"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "key": source["key"], "size": source["size"], "type": source["type"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_177.discardUnfiledVaultFile.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["fileId"] !== "string") return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "fileId": source["fileId"], "userId": source["userId"] };
-});
 installCompiledValidatorMap(lunora_vault_functions_177.getAttachment.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -9449,7 +9442,7 @@ export interface Caller {
         functions: {
             applyFileMetadata: (args: { key: string; size: number; type: string; userId: string }) => Promise<null>;
             deleteAttachments: (args: { attachmentIds: Array<string> }) => Promise<void>;
-            discardUnfiledVaultFile: (args: { fileId: string; userId: string }) => Promise<null>;
+            discardUnfiledVaultFile: (args: { fileId: Id<"files">; userId: string }) => Promise<null>;
             findAttachmentByKey: (args: { key: string }) => Promise<null | { _creationTime: number; _id: string; chatId?: string; fileName: string; fileSize: number; fileType: string; key?: string; name: string; organizationId?: string; size: number; type: string; url?: string; userId: string }>;
             getAttachment: (args: { attachmentId: Id<"files"> }) => Promise<{ chatId?: string | undefined; createdAt?: number | undefined; folderId?: import("lunorash/server").Id<"folders"> | undefined; isGenerated?: boolean | undefined; key?: string | undefined; nsfwScores?: ({} & { drawing: number; hentai: number; neutral: number; porn: number; sexy: number; }) | undefined; nsfwStatus?: "pending" | "failed" | "checking" | "safe" | "blocked" | undefined; organizationId?: string | undefined; projectId?: string | undefined; tags?: string[] | undefined; thumbnailStorageId?: string | undefined; totalChunks?: number | undefined; updatedAt?: number | undefined; url?: string | undefined; } & { fileName: string; fileSize: number; fileType: string; _creationTime: number; _id: import("lunorash/server").Id<"files">; name: string; size: number; type: string; userId: string; }>;
             getAttachmentsForChat: (args: { chatId: string }) => Promise<({ chatId?: string | undefined; createdAt?: number | undefined; folderId?: import("lunorash/server").Id<"folders"> | undefined; isGenerated?: boolean | undefined; key?: string | undefined; nsfwScores?: ({} & { drawing: number; hentai: number; neutral: number; porn: number; sexy: number; }) | undefined; nsfwStatus?: "pending" | "failed" | "checking" | "safe" | "blocked" | undefined; organizationId?: string | undefined; projectId?: string | undefined; tags?: string[] | undefined; thumbnailStorageId?: string | undefined; totalChunks?: number | undefined; updatedAt?: number | undefined; url?: string | undefined; } & { fileName: string; fileSize: number; fileType: string; _creationTime: number; _id: import("lunorash/server").Id<"files">; name: string; size: number; type: string; userId: string; })[]>;
