@@ -18,25 +18,33 @@ const PROJECT_LIST_PAGINATION_OPTS = {
 } as const;
 
 /**
- * Hook to get all projects for the current user.
- * Returns paginated projects.
+ * Projects for the current user, and whether the list has been answered. An unanswered list (pending,
+ * failed or skipped) reads as empty in `projects`, so a caller that must tell it from "no projects" reads `isAnswered`.
  * Automatically waits for Lunora authentication before making queries.
  * @param enabled If false, skips the query regardless of auth state
  */
-export const useProjects = (enabled: boolean = true) => {
+export const useProjectList = (enabled: boolean = true) => {
     const crpc = useCRPC();
     const { isAuthenticated, isLoading } = useLunoraAuth();
 
     // Only run query when authenticated and not loading
     const shouldQuery = enabled && isAuthenticated && !isLoading;
 
-    const { data: projects } = useQuery(
-        crpc.projects.functions.listProjects.queryOptions(shouldQuery ? { paginationOpts: PROJECT_LIST_PAGINATION_OPTS } : skipToken),
-    );
+    const { data } = useQuery(crpc.projects.functions.listProjects.queryOptions(shouldQuery ? { paginationOpts: PROJECT_LIST_PAGINATION_OPTS } : skipToken));
 
     // Memoize to ensure stable reference and consistency with useThreads pattern
-    return useMemo(() => projects?.page ?? [], [projects]);
+    const projects = useMemo(() => data?.page ?? [], [data]);
+
+    return { isAnswered: data !== undefined, projects };
 };
+
+/**
+ * Hook to get all projects for the current user.
+ * Returns paginated projects.
+ * Automatically waits for Lunora authentication before making queries.
+ * @param enabled If false, skips the query regardless of auth state
+ */
+export const useProjects = (enabled: boolean = true) => useProjectList(enabled).projects;
 
 /**
  * Hook to get pinned projects for the current user.

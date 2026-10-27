@@ -5,12 +5,13 @@ import { useCallback, useMemo } from "react";
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import { useOptimisticDeletions, useOptimisticPins, useOptimisticStatuses } from "@/features/chat/core/stores/thread-store-hooks";
 import { matchesThreadFilters, pruneSelectedTagIds, resolveThreadTags } from "@/features/chat/tags/thread-tag-logic";
-import { useProjects } from "@/features/projects/hooks/use-projects";
+import { useProjectList } from "@/features/projects/hooks/use-projects";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import { useDateBoundaries } from "../contexts/date-boundaries-context";
 import { selectSelectedTagIds, useThreadListUIStore } from "../stores/thread-list-ui-store";
 import type { BranchNode, GroupType, MinimalThreadRelationship, ThreadGroup } from "../types";
+import { usePersistThreadList, useThreadListPlaceholder } from "./use-thread-list-cache";
 
 /**
  * Sorts threads by custom order, then by creation time (newest first).
@@ -64,9 +65,15 @@ const useThreadGroups = (
 
     // Composite query for thread list data (threads + temporary + pinned + orders)
     // This replaces 4 separate queries with 1 query that fetches all in parallel server-side
-    const { data: compositeData } = useQuery(
-        crpc.chat.composite.getThreadListData.queryOptions(useCompositeQuery ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS } : skipToken),
-    );
+    // The stored copy paints the sidebar until the first answer; it is a placeholder, so it never enters the query cache.
+    const storedThreadList = useThreadListPlaceholder();
+    const { data: compositeData, isPlaceholderData } = useQuery({
+        ...crpc.chat.composite.getThreadListData.queryOptions(useCompositeQuery ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS } : skipToken),
+        // The stored rows carry only the sidebar's fields, so they do not satisfy the full result type.
+        placeholderData: storedThreadList as never,
+    });
+
+    usePersistThreadList(compositeData, isPlaceholderData);
 
     // Derive data from composite query
     const threadsData = compositeData?.threads;
@@ -80,8 +87,11 @@ const useThreadGroups = (
     const rawSelectedTagIds = useThreadListUIStore(selectSelectedTagIds);
     const selectedTagIds = useMemo(() => pruneSelectedTagIds(rawSelectedTagIds, compositeData?.tags), [rawSelectedTagIds, compositeData?.tags]);
 
-    const projects = useProjects();
+    const { isAnswered: projectsAnswered, projects } = useProjectList();
     const { t } = useLingui();
+
+    // The project list has no stored copy, so until it answers (not merely while it is empty or failed) the stored project chats wait in one stable group rather than landing in a date group and jumping.
+    const holdProjectThreads = isPlaceholderData && !projectsAnswered;
 
     // Get optimistic state for instant UI updates
     const optimisticPins = useOptimisticPins();
@@ -319,9 +329,12 @@ const useThreadGroups = (
         const projectsMap = new Map<string, any>((projects || []).map((p: any) => [p._id, p]));
         const map = new Map<string, BranchNode[]>();
         const threadsWithoutProject: BranchNode[] = [];
+        const heldProjectThreads: BranchNode[] = [];
 
         for (const thread of regularThreads) {
-            if (thread.projectId && projectsMap.has(thread.projectId)) {
+            if (thread.projectId && holdProjectThreads) {
+                heldProjectThreads.push(thread);
+            } else if (thread.projectId && projectsMap.has(thread.projectId)) {
                 const existing = map.get(thread.projectId);
 
                 if (existing) {
@@ -334,8 +347,8 @@ const useThreadGroups = (
             }
         }
 
-        return { map, threadsWithoutProject };
-    }, [hierarchyData, projects, searchQuery]);
+        return { heldProjectThreads, map, threadsWithoutProject };
+    }, [hierarchyData, holdProjectThreads, projects, searchQuery]);
 
     // Memoize search results separately - this is a common hot path
     const searchResultsGroup = useMemo(() => {
@@ -372,7 +385,7 @@ const useThreadGroups = (
         }
 
         const { statelessThreads, temporaryThreadsList } = hierarchyData;
-        const { threadsWithoutProject } = threadsByProject;
+        const { heldProjectThreads, threadsWithoutProject } = threadsByProject;
 
         // Group threads by time periods using context date boundaries
         const { sevenDaysAgo, thirtyDaysAgo, today: todayTimestamp } = dateBoundaries;
@@ -448,6 +461,28 @@ const useThreadGroups = (
             return b.createdAt - a.createdAt;
         });
 
+        // Project chats from the stored copy, until the project list answers and they regroup under their projects.
+        // Archived ones go to the archived list, as they would from a project group.
+        const activeHeldProjectThreads: BranchNode[] = [];
+
+        for (const thread of heldProjectThreads) {
+            if (thread.status === "archived") {
+                archivedThreads.push(thread);
+            } else {
+                activeHeldProjectThreads.push(thread);
+            }
+        }
+
+        if (activeHeldProjectThreads.length > 0) {
+            groups.push({
+                groupType: "project" as GroupType,
+                isCollapsed: collapsedGroups.has("project"),
+                isPlaceholder: true,
+                threads: sortThreadsInGroup(activeHeldProjectThreads),
+                title: t`Projects`,
+            });
+        }
+
         for (const project of sortedProjects) {
             const projectId = project._id;
             const projectThreads = threadsByProject.map.get(projectId) || [];
@@ -499,7 +534,7 @@ const useThreadGroups = (
         return groups;
     }, [searchResultsGroup, hierarchyData, threadsByProject, projects, collapsedGroups, collapsedProjects, dateBoundaries, t]);
 
-    return { threadGroups, threadsData };
+    return { isPlaceholderData, threadGroups, threadsData };
 };
 
 export default useThreadGroups;

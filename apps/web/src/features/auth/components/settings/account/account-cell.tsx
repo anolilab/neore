@@ -12,6 +12,7 @@ import { useState } from "react";
 import type { SettingsCardClassNames } from "@/components/settings/settings-card";
 import { useSession } from "@/features/auth/hooks/session-user-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { clearThreadListCacheFor, releaseThreadListWrites } from "@/features/chat/thread-list/lib/thread-list-cache";
 
 import { getLocalizedError } from "../../../lib/utilities";
 import type { Refetch } from "../../../types/hook-integration-types";
@@ -21,11 +22,13 @@ export interface AccountCellProperties {
     className?: string;
     classNames?: SettingsCardClassNames;
     deviceSession: { session: Session; user: User };
+    /** Every device session in this browser; without it the revoked one is taken to be its account's only session. */
+    deviceSessions?: { session: Session; user: User }[];
 
     refetch?: Refetch;
 }
 
-const AccountCell = ({ className, classNames, deviceSession, refetch }: AccountCellProperties) => {
+const AccountCell = ({ className, classNames, deviceSession, deviceSessions, refetch }: AccountCellProperties) => {
     const {
         authClient,
         basePath,
@@ -40,6 +43,10 @@ const AccountCell = ({ className, classNames, deviceSession, refetch }: AccountC
     const [isLoading, setIsLoading] = useState(false);
 
     const handleRevoke = async () => {
+        let failed = false;
+        // Another session of the same account stays signed in here, so its stored list is still in use.
+        const accountStays = (deviceSessions ?? []).some((other) => other.user.id === deviceSession.user.id && other.session.id !== deviceSession.session.id);
+
         setIsLoading(true);
 
         try {
@@ -54,6 +61,18 @@ const AccountCell = ({ className, classNames, deviceSession, refetch }: AccountC
                 message: getLocalizedError({ error, t }),
                 variant: "error",
             });
+            // Still signed in on this browser, so its list may be saved again once the stored copy is gone.
+            failed = true;
+        } finally {
+            // Success or not, the account may be gone from the browser, so its stored chat titles go with it, unless
+            // another session of it remains: that session keeps using (and refreshing) the list.
+            if (!accountStays) {
+                clearThreadListCacheFor(deviceSession.user.id);
+
+                if (failed) {
+                    releaseThreadListWrites(deviceSession.user.id);
+                }
+            }
         }
     };
 
