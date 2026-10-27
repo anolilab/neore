@@ -115,6 +115,11 @@ export class AgentSession {
         try {
             this.agent = await initialize(this.connection, this.options.appVersion, this.options.startupTimeoutMs);
             this.agentSessionId = await newSession(this.connection, this.options.folder, this.options.startupTimeoutMs);
+
+            // The agent can exit while the last answer is on its way; that session is over, not ready.
+            if (this.status === "ended") {
+                throw new Error(this.endReason ?? "the agent ended during startup");
+            }
         } catch (error) {
             await this.exitStatus();
 
@@ -402,7 +407,7 @@ export class AgentSession {
                 return;
             }
 
-            tool = { id, kind: "other", status: "pending", title: id };
+            tool = { id, kind: "other", status: "pending", title: this.options.process.scrub(id) };
             this.tools.set(id, tool);
             turn.tools.push(tool);
         }

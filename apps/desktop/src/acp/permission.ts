@@ -101,7 +101,8 @@ export const describePermission = (request: PermissionRequest): DescribedRequest
     return {
         agentLabel: request.agentLabel,
         command: shown(commandOf(rawInput)),
-        details: request.scrub(full.slice(0, MAX_DETAILS_SENT)),
+        // Masked before it is cut, so a value straddling the cut cannot leave its first half readable.
+        details: request.scrub(full).slice(0, MAX_DETAILS_SENT),
         detailsComplete: (rawInput !== undefined || hasContent) && full.length <= MAX_DETAILS_SENT,
         folder: request.folder,
         // Ids are the agent's to match and stay as sent; only the names the user reads are scrubbed.

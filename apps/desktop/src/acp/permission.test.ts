@@ -14,6 +14,14 @@ const request = (toolCall: Record<string, unknown>, options: unknown = OPTIONS):
 };
 
 describe("describing a request", () => {
+    it("masks a value before the details are cut, so a value at the cut is not left half readable", () => {
+        const secret = "sk-secret-value-123";
+        const padding = "p".repeat(64 * 1024 - 60);
+        const described = describePermission({ ...request({ rawInput: { note: `${padding}${secret}` }, title: "T" }), scrub: (text) => text.split(secret).join("***") });
+
+        expect(described.details).not.toContain("sk-secret");
+    });
+
     it("reads the tool, target and command, and keeps every detail the agent sent", () => {
         const described = describePermission(
             request({ kind: "execute", locations: [{ line: 3, path: "/work/a.ts" }], rawInput: { command: "npm test" }, title: "Run tests", toolCallId: "c1" }),

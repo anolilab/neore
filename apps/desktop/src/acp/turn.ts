@@ -25,13 +25,17 @@ export class Turn implements TurnState {
     ) {}
 
     public append(field: "text" | "thought", chunk: string): void {
-        const room = Math.max(0, MAX_TURN_TEXT - this[field].length);
+        const next = this[field] + chunk;
 
-        if (chunk.length > room) {
-            this.truncated = true;
+        if (next.length <= MAX_TURN_TEXT) {
+            this[field] = next;
+
+            return;
         }
 
-        this[field] += chunk.slice(0, room);
+        // Masked before it is cut: a value that straddles the cut would otherwise leave its first half readable.
+        this.truncated = true;
+        this[field] = this.scrub(next).slice(0, MAX_TURN_TEXT);
     }
 
     /** A copy the window can keep: later updates do not change it. */
