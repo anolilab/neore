@@ -380,7 +380,13 @@ export class GatewayLanguageModel implements LanguageModelV3 {
 
                             // Gateway sends error events when the provider stream fails
                             if (parsed.type === "error") {
-                                controller.error(new Error(parsed.error ?? "Unknown stream error from gateway"));
+                                const streamError: GatewayError = new Error(parsed.error ?? "Unknown stream error from gateway");
+
+                                if (typeof parsed.fallbackReason === "string") {
+                                    streamError.fallbackReason = parsed.fallbackReason;
+                                }
+
+                                controller.error(streamError);
 
                                 return;
                             }

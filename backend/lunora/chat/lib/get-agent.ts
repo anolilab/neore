@@ -264,7 +264,7 @@ const getAgent = async (model: AgentModel | string, options: GetAgentOptions): P
             const backup = eligibleBackupModel(options.backupModelId, effectiveModel);
 
             if (backup) {
-                chat = new FallbackLanguageModel(chat, gatewayModel(backup));
+                chat = new FallbackLanguageModel(chat, gatewayModel(backup), { backupSupportsTools: backup.supportsToolCalling !== false });
             }
         }
     }

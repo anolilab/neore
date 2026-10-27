@@ -17,7 +17,13 @@ const fakeModel = (id: string, failure?: Error) => {
     const doStream = vi.fn(async () => {
         if (failure) throw failure;
 
-        return { stream: new ReadableStream() };
+        return {
+            stream: new ReadableStream({
+                start(controller) {
+                    controller.close();
+                },
+            }),
+        };
     });
 
     return { doGenerate, doStream, modelId: id, provider: "gateway/test", specificationVersion: "v3", supportedUrls: {} } as unknown as LanguageModelV3 & {
@@ -90,13 +96,75 @@ describe("FallbackLanguageModel", () => {
         });
     });
 
-    it("presents itself as the primary model", () => {
+    it("retries a stream that errors before its first content part, and reports the backup as the model", async () => {
+        const streamFailure = gatewayError("infra");
+        const primary = fakeModel("primary");
+
+        primary.doStream.mockResolvedValue({
+            stream: new ReadableStream({
+                start(controller) {
+                    controller.enqueue({ type: "stream-start", warnings: [] });
+                    controller.error(streamFailure);
+                },
+            }),
+        });
+
+        const backup = fakeModel("backup");
+        const model = new FallbackLanguageModel(primary, backup);
+
+        await model.doStream(OPTIONS);
+
+        expect(backup.doStream).toHaveBeenCalledTimes(1);
+        expect(model.modelId).toBe("backup");
+    });
+
+    it("does not replay a stream that fails after content was handed on", async () => {
+        const primary = fakeModel("primary");
+
+        primary.doStream.mockResolvedValue({
+            stream: new ReadableStream({
+                pull(controller) {
+                    controller.enqueue({ delta: "hi", id: "1", type: "text-delta" });
+                },
+            }),
+        });
+
+        const backup = fakeModel("backup");
+        const result = await new FallbackLanguageModel(primary, backup).doStream(OPTIONS);
+        const reader = result.stream.getReader();
+
+        const first = await reader.read();
+
+        expect(first.value).toMatchObject({ type: "text-delta" });
+        expect(backup.doStream).not.toHaveBeenCalled();
+    });
+
+    it("does not send a call carrying tools to a backup that cannot call them", async () => {
+        const error = gatewayError("infra");
+        const primary = fakeModel("primary", error);
+        const backup = fakeModel("backup");
+        const model = new FallbackLanguageModel(primary, backup, { backupSupportsTools: false });
+
+        await expect(model.doGenerate({ ...OPTIONS, tools: [{ inputSchema: {}, name: "t", type: "function" }] })).rejects.toBe(error);
+        expect(backup.doGenerate).not.toHaveBeenCalled();
+
+        await model.doGenerate(OPTIONS);
+        expect(backup.doGenerate).toHaveBeenCalledTimes(1);
+    });
+
+    it("presents itself as the primary model until a call falls back", async () => {
         const primary = fakeModel("primary");
         const model = new FallbackLanguageModel(primary, fakeModel("backup"));
 
         expect(model.modelId).toBe("primary");
         expect(model.provider).toBe("gateway/test");
         expect(model.supportedUrls).toBe(primary.supportedUrls);
+
+        const failing = new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), fakeModel("backup"));
+
+        await failing.doGenerate(OPTIONS);
+
+        expect(failing.modelId).toBe("backup");
     });
 });
 
