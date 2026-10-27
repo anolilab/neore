@@ -213,7 +213,7 @@ export interface InternalApiTypes {
             getMCPServersQuery: FunctionReference<"query", { userId: string }, Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>>;
             getSearchDomainBlocklistQuery: FunctionReference<"query", { userId: string }, Array<string>>;
             getUserAuthFlagsQuery: FunctionReference<"query", { sessionId?: string; userId: string }, { isAnonymous: boolean; plan: "premium" | null; role: string | null }>;
-            getUserPreferencesQuery: FunctionReference<"query", { userId: string }, { aboutMe?: string; customInstructions?: string; dictationLanguage?: string; language?: string; location?: string; memoryEnabled: boolean; nickname?: string; profession?: string; threadTitleInstructions?: string; timezone?: string }>;
+            getUserPreferencesQuery: FunctionReference<"query", { userId: string }, { aboutMe?: string; backupModel?: string; customInstructions?: string; dictationLanguage?: string; language?: string; location?: string; memoryEnabled: boolean; nickname?: string; profession?: string; threadTitleInstructions?: string; timezone?: string }>;
             getUserRunPlanQuery: FunctionReference<"query", { userId: string }, { isAdmin: boolean; plan: "premium" | null }>;
             rotateKeys: FunctionReference<"action", {}, unknown>;
         };

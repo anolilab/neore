@@ -19,6 +19,7 @@ import { GATEWAY_MODELS } from "../models.js";
 import type { ProviderHealthService } from "../providers/health.js";
 import {
     classifyFailure,
+    classifyProviderFailure,
     CONTENT_POLICY_FALLBACK_MODELS,
     extractProviderErrorInfo,
     selectFallback,
@@ -62,6 +63,21 @@ describe("classifyFailure", () => {
 
         it("classifies network timeout (0 status) as infra", () => {
             expect(classifyFailure(0, "", 100, 128_000)).toBe("infra");
+        });
+    });
+
+    describe("context_overflow from the provider's wording", () => {
+        it.each([
+            ['{"error":{"code":"context_length_exceeded","message":"This model\'s maximum context length is 128000 tokens."}}'],
+            ['{"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long: 210000 tokens > 200000 maximum"}}'],
+            ["Input is too long for requested model"],
+            ["The input token count exceeds the context window of this model"],
+        ])("classifies a 400 saying %s as context_overflow even when the estimate is far below the window", (body) => {
+            expect(classifyFailure(400, body, 100, 128_000)).toBe("context_overflow");
+        });
+
+        it("does not read a 5xx with that wording as overflow", () => {
+            expect(classifyFailure(503, "context window service unavailable", 100, 128_000)).toBe("infra");
         });
     });
 
@@ -316,5 +332,39 @@ describe("extractProviderErrorInfo", () => {
         const result = extractProviderErrorInfo(error);
 
         expect(result.statusCode).toBe(500);
+    });
+});
+
+describe("classifyProviderFailure on errors that are not Error objects", () => {
+    it.each(["overloaded", "Service Unavailable", "rate limit exceeded", "fetch failed"])("treats the string %j as infra", (message) => {
+        expect(classifyProviderFailure(message, 10, 100_000)).toBe("infra");
+    });
+
+    it("treats a nested { error: { message } } like the error itself", () => {
+        expect(classifyProviderFailure({ error: { message: "Overloaded", type: "overloaded_error" }, type: "error" }, 10, 100_000)).toBe("infra");
+    });
+
+    it("reads the structured fields: a code, name or type that names a transient failure", () => {
+        expect(classifyProviderFailure({ code: "ECONNRESET", message: "read failed" }, 10, 100_000)).toBe("infra");
+        expect(classifyProviderFailure({ message: "x", name: "TimeoutError" }, 10, 100_000)).toBe("infra");
+        expect(classifyProviderFailure({ error: { type: "overloaded_error" }, type: "error" }, 10, 100_000)).toBe("infra");
+    });
+
+    it.each(["model unavailable in your region", "feature unavailable on your plan", "no network access for this tool"])(
+        "gives a permanent failure (%j) no reason",
+        (message) => {
+            expect(classifyProviderFailure(message, 10, 100_000)).toBeUndefined();
+            expect(classifyProviderFailure(new Error(message), 10, 100_000)).toBeUndefined();
+        },
+    );
+
+    it.each(["Service Unavailable", "temporarily unavailable, retry shortly", "network error", "overloaded"])("still treats %j as infra", (message) => {
+        expect(classifyProviderFailure(message, 10, 100_000)).toBe("infra");
+    });
+
+    it("gives a string or nested error that names no outage no reason", () => {
+        expect(classifyProviderFailure("invalid api key", 10, 100_000)).toBeUndefined();
+        expect(classifyProviderFailure({ error: { message: "bad schema" } }, 10, 100_000)).toBeUndefined();
+        expect(classifyProviderFailure(undefined, 10, 100_000)).toBeUndefined();
     });
 });

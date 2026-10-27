@@ -22,8 +22,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@neore/ui/components/separator";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
+import { useId } from "react";
 import { toast } from "sonner";
 
+import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { offerableBackupModels } from "@/features/settings/lib/backup-model-options";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -44,34 +47,49 @@ type DefaultModels = {
 
 type DefaultModelKey = keyof DefaultModels;
 
-interface ModelSelectProps {
+interface ModelSelectProps<Field extends string> {
     description: string;
     disabled?: boolean;
-    field: DefaultModelKey;
+    /** Shown for "no model" when there is no system default to name. */
+    emptyLabel?: string;
+    field: Field;
     label: string;
     models: GatewayModel[];
-    onChange: (field: DefaultModelKey, modelId: string | null) => void;
+    onChange: (field: Field, modelId: string | null) => void;
     /** The system fallback model ID shown in the "System default" option */
     systemDefaultId?: string;
     value: string | undefined;
 }
 
-const ModelSelect: FC<ModelSelectProps> = ({ description, disabled, field, label, models, onChange, systemDefaultId, value }) => {
+const ModelSelect = <Field extends string>({
+    description,
+    disabled,
+    emptyLabel,
+    field,
+    label,
+    models,
+    onChange,
+    systemDefaultId,
+    value,
+}: ModelSelectProps<Field>) => {
     const { t } = useLingui();
+    const labelId = useId();
     const selectedModel = models.find((m) => m.id === value);
     const allModels = useFeatureFlaggedModels();
     const systemDefaultModel = systemDefaultId ? allModels.find((m) => m.id === systemDefaultId) : undefined;
 
-    const systemDefaultLabel = systemDefaultModel ? systemDefaultModel.name : t`System default`;
+    const systemDefaultLabel = systemDefaultModel ? systemDefaultModel.name : (emptyLabel ?? t`System default`);
 
     return (
         <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1 space-y-0.5">
-                <Label className="text-sm font-medium">{label}</Label>
+                <Label className="text-sm font-medium" id={labelId}>
+                    {label}
+                </Label>
                 <p className="text-muted-foreground text-xs">{description}</p>
             </div>
             <Select<string> disabled={disabled || models.length === 0} onValueChange={(v) => onChange(field, v)} value={value ?? null}>
-                <SelectTrigger className="w-48 shrink-0">
+                <SelectTrigger aria-labelledby={labelId} className="w-48 shrink-0">
                     <SelectValue placeholder={models.length === 0 ? t`No models available` : systemDefaultLabel}>
                         {selectedModel && (
                             <span className="flex items-center gap-1.5 truncate">
@@ -98,7 +116,7 @@ const ModelSelect: FC<ModelSelectProps> = ({ description, disabled, field, label
                                 <span className="text-muted-foreground/60 text-xs">{t`(default)`}</span>
                             </span>
                         ) : (
-                            <span className="text-muted-foreground">{t`System default`}</span>
+                            <span className="text-muted-foreground">{emptyLabel ?? t`System default`}</span>
                         )}
                     </SelectItem>
                     {models.map((m) => (
@@ -119,6 +137,41 @@ const ModelSelect: FC<ModelSelectProps> = ({ description, disabled, field, label
     );
 };
 
+/** The model a reply is retried on, once, when the chosen model fails with an infrastructure error. */
+const BackupModelSetting: FC<{ disabled?: boolean; models: GatewayModel[]; providersWithKey: ReadonlySet<string> }> = ({
+    disabled,
+    models: allModels,
+    providersWithKey,
+}) => {
+    const { t } = useLingui();
+    const crpc = useCRPC();
+    const { data: access } = useQuery(crpc.auth.functions.getPaidModelAccess.queryOptions({}, { live: false }));
+    // The backend's own answer, not a client-side guess; the save re-checks it.
+    const models = offerableBackupModels(allModels, access?.canRunPaidModels === true, providersWithKey);
+    const { data: userSettings } = useUserSettings();
+    const { isPending, updateLatest } = useUpdateUserSettings();
+
+    const handleChange = (_field: "backupModel", modelId: string | null) => {
+        // "" clears it: a patch cannot carry an absent value.
+        updateLatest(() => {
+            return { backupModel: modelId ?? "" };
+        }).catch(() => toast.error(t`Failed to update backup model`));
+    };
+
+    return (
+        <ModelSelect
+            description={t`If your chosen model is unavailable, the reply is retried once on this model`}
+            disabled={disabled || isPending}
+            emptyLabel={t`None`}
+            field="backupModel"
+            label={t`Backup model`}
+            models={models}
+            onChange={handleChange}
+            value={userSettings?.backupModel || undefined}
+        />
+    );
+};
+
 const DefaultModelsSettings: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
@@ -133,6 +186,11 @@ const DefaultModelsSettings: FC = () => {
     }
 
     const defaults = (aiPreferences?.defaultModels ?? {}) as DefaultModels;
+    const providersWithKey = new Set(
+        Object.entries((aiPreferences?.providerApiKeys ?? {}) as Record<string, { enabled?: boolean; hasKey?: boolean }>)
+            .filter(([, entry]) => entry.enabled && entry.hasKey)
+            .map(([provider]) => provider),
+    );
 
     const flaggedIds = new Set(flaggedModels.map((m) => m.id));
     const ff = (list: GatewayModel[]) => list.filter((m) => flaggedIds.has(m.id));
@@ -213,6 +271,8 @@ const DefaultModelsSettings: FC = () => {
                         systemDefaultId={DEFAULT_VIDEO_TO_TEXT_MODEL}
                         value={defaults.videoToText}
                     />
+                    <Separator />
+                    <BackupModelSetting disabled={isPending} models={textModels} providersWithKey={providersWithKey} />
                 </CardContent>
             </Card>
 

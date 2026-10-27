@@ -5,9 +5,10 @@
  * survive, and media parts pass through untouched.
  */
 import type { ModelMessage } from "@ai-sdk/provider-utils";
+import { MODEL_REGISTRY } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
-import { applyLateCompression, compressContextMessages, estimateTokens } from "./auto-continue";
+import { applyLateCompression, compressContextMessages, estimateTokens, getModelContextWindow } from "./auto-continue";
 import { buildRunStreamArgs } from "./agent-run";
 
 /** Model context window used by the tests: small, so modest messages trip the threshold. */
@@ -277,6 +278,71 @@ describe("applyLateCompression", () => {
         expect(estimateTokens(output)).toBeLessThan(128_000 * 0.85);
         expect(output).toContain(latest);
         assertWellFormed(messages, output);
+    });
+});
+
+describe("a backup model with a smaller window", () => {
+    // ~300k tokens: inside gemini's 1M window, over gpt-4o's 128k.
+    const big = thread(10, 2, "y".repeat(40_000));
+
+    it("applyLateCompression compresses to the smaller of the two windows", () => {
+        expect(applyLateCompression(big, "gemini-2.5-flash")).toBe(big);
+
+        const output = applyLateCompression(big, "gemini-2.5-flash", "gpt-4o");
+
+        expect(output).not.toBe(big);
+        expect(estimateTokens(output)).toBeLessThan(128_000 * 0.85);
+    });
+
+    it("buildRunStreamArgs compresses between steps to the smaller window", () => {
+        type Prepare = { prepareStep: (options: { messages: ModelMessage[] }) => { messages: ModelMessage[] } | undefined };
+        const alone = buildRunStreamArgs({ model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
+        const withBackup = buildRunStreamArgs({ backupModelId: "gpt-4o", model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
+
+        expect(alone.prepareStep({ messages: big })).toBeUndefined();
+        expect(withBackup.prepareStep({ messages: big })?.messages.length).toBeLessThan(big.length);
+    });
+});
+
+describe("a backup that cannot call tools", () => {
+    type Prepare = { prepareStep: (options: { messages: ModelMessage[] }) => { messages: ModelMessage[] } | undefined };
+    const big = thread(10, 2, "y".repeat(40_000));
+    const args = (hasTools: boolean) =>
+        buildRunStreamArgs({ backupModelId: "kimi-k2-instruct", hasTools, model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
+
+    it("does not shrink the context of a call that carries tools, since the backup would be skipped", () => {
+        expect(args(true).prepareStep({ messages: big })).toBeUndefined();
+    });
+
+    it("still sizes a tool-less call for it", () => {
+        expect(args(false).prepareStep({ messages: big })?.messages.length).toBeLessThan(big.length);
+    });
+});
+
+// A text model with the default 128k window that has no vision.
+const BLIND_BACKUP = MODEL_REGISTRY.find(
+    (m) =>
+        m.enabled !== false &&
+        m.provider !== "external" &&
+        (m.mode ?? "text") === "text" &&
+        m.supportsImages !== true &&
+        !m.filterCapabilities?.includes("vision") &&
+        getModelContextWindow(m.id) === 128_000,
+)!.id;
+
+describe("a backup that cannot see images", () => {
+    type Prepare = { prepareStep: (options: { messages: ModelMessage[] }) => { messages: ModelMessage[] } | undefined };
+    const text = thread(10, 2, "y".repeat(40_000));
+    const withImage = [...text, { content: [{ image: "x", type: "image" }], role: "user" }] as unknown as ModelMessage[];
+    const args = () =>
+        buildRunStreamArgs({ backupModelId: BLIND_BACKUP, hasTools: false, model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
+
+    it("does not size a call carrying an image for it, since the backup would be skipped", () => {
+        expect(args().prepareStep({ messages: withImage })).toBeUndefined();
+    });
+
+    it("still sizes a text-only call for it", () => {
+        expect(args().prepareStep({ messages: text })?.messages.length).toBeLessThan(text.length);
     });
 });
 

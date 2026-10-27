@@ -4,6 +4,7 @@
  * exactly as `get-agent.ts` builds them, so the assertions are about the prompt
  * text a messenger sender's reply is generated from.
  */
+import { MODEL_REGISTRY, requiresPaidPlan } from "@neore/ai/models";
 import { getSystemPrompt } from "@neore/ai/prompts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,9 +16,13 @@ vi.mock("../../_generated/internal", async (importOriginal) => mappedReferences(
 
 const seen = vi.hoisted(() => {
     return {
+        backups: [] as (string | undefined)[],
         buildOptions: [] as unknown[],
         created: [] as unknown[],
         failAt: undefined as "generate" | "keys" | "thread" | undefined,
+        filterRules: undefined as Record<string, string[]> | undefined,
+        filters: [] as unknown[],
+        prepareSteps: [] as unknown[],
         system: [] as string[],
         tools: [] as string[][],
     };
@@ -28,18 +33,24 @@ vi.mock("./get-agent", () => {
         default: async (
             _model: string,
             options: {
+                backupModelId?: string;
                 language?: string;
                 location?: string;
+                modelFilterRules?: unknown;
                 personalization?: Parameters<typeof getSystemPrompt>[3];
                 timezone?: string;
                 tools?: Record<string, unknown>;
             },
         ) => {
             seen.tools.push(Object.keys(options.tools ?? {}));
+            seen.backups.push(options.backupModelId);
+            seen.filters.push(options.modelFilterRules);
 
             const instructions = getSystemPrompt(options.timezone, options.location, options.language, options.personalization);
             const thread = {
-                generateText: async (args: { system?: string }) => {
+                generateText: async (args: { prepareStep?: (options: { messages: unknown[] }) => unknown; system?: string }) => {
+                    seen.prepareSteps.push(args.prepareStep);
+
                     if (seen.failAt === "generate") {
                         throw new Error("model call failed");
                     }
@@ -104,6 +115,10 @@ const fakeCtx = () =>
                 return PREFS;
             }
 
+            if (reference === "auth_functions:getAgentModulePreferencesQuery") {
+                return { modelFilterRules: seen.filterRules };
+            }
+
             if (reference === "auth_functions:getDecryptedProviderKeysQuery") {
                 if (seen.failAt === "keys") {
                     throw new Error("provider keys unavailable");
@@ -156,6 +171,134 @@ describe("runHeadlessAgent personalization", () => {
         for (const secret of SECRETS) {
             expect(seen.system[0]).toContain(secret);
         }
+    });
+});
+
+describe("runHeadlessAgent backup model", () => {
+    const BACKUP = MODEL_REGISTRY.find((m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text" && !requiresPaidPlan(m))!.id;
+
+    const PRIMARY = MODEL_REGISTRY.find(
+        (m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text" && !requiresPaidPlan(m) && m.id !== BACKUP,
+    )!.id;
+
+    const ctxWith = (backupModel: string | undefined) => {
+        const ctx = fakeCtx() as unknown as { runQuery: ReturnType<typeof vi.fn> };
+        const base = ctx.runQuery.getMockImplementation() as (reference: string, args: unknown) => Promise<unknown>;
+
+        ctx.runQuery.mockImplementation(async (reference: string, args: unknown) => {
+            const result = await base(reference, args);
+
+            return reference === "auth_functions:getUserPreferencesQuery" ? { ...(result as object), backupModel } : result;
+        });
+
+        return ctx;
+    };
+
+    const run = async (ctx: unknown) =>
+        await runHeadlessAgent(ctx as never, {
+            memory: false,
+            model: PRIMARY,
+            personalization: "none",
+            prompt: "Do the thing",
+            thread: { threadId: "thread-1" },
+            tools: "none",
+            userId: "owner",
+        });
+
+    beforeEach(() => {
+        seen.backups = [];
+    });
+
+    it("gives the agent the user's backup model, so an unattended run survives an outage too", async () => {
+        await run(ctxWith(BACKUP));
+
+        expect(seen.backups).toEqual([BACKUP]);
+    });
+
+    it("hands the user's privacy routing rules to the agent that builds the primary and the backup gateway models", async () => {
+        seen.filterRules = { requireZDR: true } as never;
+        seen.filters = [];
+
+        try {
+            await run(ctxWith(BACKUP));
+        } finally {
+            seen.filterRules = undefined;
+        }
+
+        expect(seen.filters).toEqual([{ requireZDR: true }]);
+        expect(seen.backups).toEqual([BACKUP]);
+    });
+
+    it("gives none when the user's stored model filters exclude it, though the caller passes no rules", async () => {
+        seen.filterRules = { blockedModels: [BACKUP] };
+
+        try {
+            await run(ctxWith(BACKUP));
+        } finally {
+            seen.filterRules = undefined;
+        }
+
+        expect(seen.backups).toEqual([undefined]);
+    });
+
+    it("gives none when the user set none", async () => {
+        await run(ctxWith(undefined));
+
+        expect(seen.backups).toEqual([undefined]);
+    });
+});
+
+describe("runHeadlessAgent context sizing for a backup", () => {
+    // A 1M-window primary and a 128k backup that cannot call tools.
+    const PRIMARY = "google/gemini-2.5-flash";
+    const NO_TOOLS_BACKUP = MODEL_REGISTRY.find(
+        (m) => m.supportsToolCalling === false && m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text",
+    )!.id;
+    const big = Array.from({ length: 24 }, (_, index) => {
+        return { content: "y".repeat(40_000), role: index % 2 === 0 ? "user" : "assistant" };
+    });
+
+    beforeEach(() => {
+        seen.prepareSteps = [];
+    });
+
+    const sizedFor = async (toolAllowlist: string[]) => {
+        const ctx = fakeCtx() as unknown as { runQuery: ReturnType<typeof vi.fn> };
+        const base = ctx.runQuery.getMockImplementation() as (reference: string, args: unknown) => Promise<unknown>;
+
+        ctx.runQuery.mockImplementation(async (reference: string, args: unknown) => {
+            if (reference === "auth_functions:getUserRunPlanQuery") {
+                return { isAdmin: true, plan: null };
+            }
+
+            const result = await base(reference, args);
+
+            return reference === "auth_functions:getUserPreferencesQuery" ? { ...(result as object), backupModel: NO_TOOLS_BACKUP } : result;
+        });
+
+        await runHeadlessAgent(ctx as never, {
+            maxSteps: 5,
+            memory: false,
+            model: PRIMARY,
+            personalization: "none",
+            prompt: "go",
+            thread: { threadId: "thread-1" },
+            toolAllowlist,
+            tools: "headless",
+            userId: "owner",
+        });
+
+        const prepareStep = seen.prepareSteps[0] as (options: { messages: unknown[] }) => unknown;
+
+        return prepareStep({ messages: big });
+    };
+
+    it("sizes a run the allowlist strips of every tool for the backup, which then takes the call", async () => {
+        expect(await sizedFor(["no-such-tool"])).toBeDefined();
+    });
+
+    it("leaves a run that still carries tools sized for the primary, since the backup would be skipped", async () => {
+        expect(await sizedFor(["webSearch"])).toBeUndefined();
     });
 });
 

@@ -29,6 +29,17 @@ const CONTENT_POLICY_KEYWORDS = [
     "not allowed",
 ];
 
+/** Lowercase phrases a provider uses when it rejects a prompt for exceeding the model's context window. */
+const CONTEXT_OVERFLOW_KEYWORDS = [
+    "context_length_exceeded",
+    "context length",
+    "context window",
+    "prompt is too long",
+    "input is too long",
+    "too many tokens",
+    "maximum number of tokens",
+];
+
 /**
  * Model IDs (in priority order) to use for content-policy fallbacks.
  * These are permissive open-source models that are less likely to refuse.
@@ -56,6 +67,11 @@ export const classifyFailure = (statusCode: number, body: string, promptTokens: 
 
     if (statusCode === 400) {
         const lower = body.toLowerCase();
+
+        // The provider said so itself: the local token estimate misses tool schemas, images and tokenizer differences.
+        if (CONTEXT_OVERFLOW_KEYWORDS.some((k) => lower.includes(k))) {
+            return "context_overflow";
+        }
 
         // Content-policy refusal: 400 + refusal keywords
         if (CONTENT_POLICY_KEYWORDS.some((k) => lower.includes(k))) {
@@ -149,16 +165,31 @@ export const selectFallback = async (
     }
 };
 
+/** The provider status an error carries, under either field name. */
+const readStatus = (error: unknown): number | undefined => {
+    if (!error || typeof error !== "object") {
+        return undefined;
+    }
+
+    const { status, statusCode } = error as { status?: unknown; statusCode?: unknown };
+
+    if (typeof statusCode === "number") {
+        return statusCode;
+    }
+
+    return typeof status === "number" ? status : undefined;
+};
+
 /**
  * Extract HTTP status code and body from an AI SDK / provider error.
  * Returns defaults (500, "") when the error doesn't expose them.
  */
 export const extractProviderErrorInfo = (error: unknown): { body: string; statusCode: number } => {
     if (error && typeof error === "object") {
-        const record = error as { message?: unknown; responseBody?: unknown; statusCode?: unknown };
+        const record = error as { message?: unknown; responseBody?: unknown };
 
-        // AI SDK APICallError exposes statusCode and responseBody
-        const statusCode = typeof record["statusCode"] === "number" ? record["statusCode"] : 500;
+        // AI SDK APICallError exposes statusCode and responseBody; some SDKs name the status `status`
+        const statusCode = readStatus(error) ?? 500;
 
         let body = "";
 
@@ -172,4 +203,46 @@ export const extractProviderErrorInfo = (error: unknown): { body: string; status
     }
 
     return { body: "", statusCode: 500 };
+};
+
+/** The words of an error to match: the error itself when it is a string, else its name and message, looking through `{ error: ... }` nesting. */
+const errorText = (error: unknown, depth = 0): string => {
+    if (typeof error === "string") {
+        return error;
+    }
+
+    if (!error || typeof error !== "object" || depth > 2) {
+        return "";
+    }
+
+    const { code, error: nested, message, name, type } = error as { code?: unknown; error?: unknown; message?: unknown; name?: unknown; type?: unknown };
+    // The structured fields first (`overloaded_error`, `TimeoutError`, `ECONNRESET`): they name the failure, the message only describes it.
+    const own = [code, name, type, message].filter((part): part is string => typeof part === "string").join(" ");
+
+    return `${own} ${errorText(nested, depth + 1)}`;
+};
+
+const TRANSIENT_NETWORK_PATTERN =
+    /timeout|timed out|econnreset|econnrefused|network (?:error|failure)|fetch failed|socket hang up|overloaded|service unavailable|temporarily unavailable|rate.?limit|too many requests|at capacity/i;
+
+/**
+ * The fallback reason to report to a caller that may retry on another model.
+ * `classifyFailure` defaults to `infra` for anything it does not recognise;
+ * this narrows that to what another model can actually serve: a provider 5xx,
+ * 429 or 408, or a timeout / network error carrying no status. A 401, 403, 404,
+ * 422, an unrecognised 400 or an internal error (no provider status) gets none.
+ */
+export const classifyProviderFailure = (error: unknown, promptTokens: number, contextWindow: number | undefined): FallbackReason | undefined => {
+    const { body, statusCode } = extractProviderErrorInfo(error);
+    const reason = classifyFailure(statusCode, body, promptTokens, contextWindow);
+
+    if (reason !== "infra") {
+        return reason;
+    }
+
+    if (readStatus(error) !== undefined) {
+        return statusCode === 429 || statusCode === 408 || statusCode >= 500 ? "infra" : undefined;
+    }
+
+    return TRANSIENT_NETWORK_PATTERN.test(errorText(error)) ? "infra" : undefined;
 };

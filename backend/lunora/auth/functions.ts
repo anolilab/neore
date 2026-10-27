@@ -12,7 +12,7 @@ import { getAuth, getSession } from "../auth";
 import { ENVIRONMENT } from "../env";
 import type { SessionUser } from "../lib/auth-types";
 import { asyncMap } from "../lib/collections";
-import { authMutation } from "../lib/crpc";
+import { authMutation, authQuery } from "../lib/crpc";
 import { getSessionUserForQuery, getSessionUserForQueryLite, validateAuthUser as validateAuthUserHelper } from "../lib/crpc-auth-helpers";
 import { decryptKey, encryptKey, type KeyPurpose } from "../lib/encryption";
 import { throwUnauthorized } from "../lib/error-helpers";
@@ -28,6 +28,8 @@ import roleGuard from "./lib/role-guard";
 import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
+import { backupFilterRejection, eligibleBackupModel } from "../chat/lib/backup-model";
+import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
 import { normalizeModelNicknames } from "./lib/model-nicknames";
 import { isValidShortcut } from "./lib/shortcut";
 
@@ -205,6 +207,42 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
             toStore.searchDomainBlocklist = domains;
         }
 
+        // A backup model must be one a chat reply can run on; "" clears it.
+        if (typeof toStore.backupModel === "string" && toStore.backupModel !== "") {
+            const backup = eligibleBackupModel(toStore.backupModel, "");
+
+            if (!backup) {
+                throw new LunoraError("BAD_REQUEST", "Not a model that can be used as a backup");
+            }
+
+            const preferences = await context.db
+                .query("aiUserPreferences")
+                .withIndex("by_userId", (q) => q.eq("userId", userId))
+                .unique();
+
+            // The user's model filters as they stand: the gateway would answer MODEL_BLOCKED for a backup they exclude.
+            const excluded = backupFilterRejection(backup, preferences?.modelFilterRules ?? undefined);
+
+            if (excluded) {
+                throw new LunoraError("BAD_REQUEST", `Your model filters exclude this backup model: ${excluded}`);
+            }
+
+            // The run's own gate (`canRunPaidModel`): a backup the plan cannot run would be dropped at run time.
+            const allowed = await allowsPaidModel(
+                backup,
+                async () => await readUserRunPlan(context, userId),
+                async () => {
+                    const entry = (preferences?.providerApiKeys as Record<string, { enabled?: boolean; encryptedKey?: string }> | undefined)?.[backup.provider];
+
+                    return Boolean(entry?.enabled && entry.encryptedKey);
+                },
+            );
+
+            if (!allowed) {
+                throw new LunoraError("BAD_REQUEST", paidModelRefusal(backup.name ?? backup.id, byokPaysFor(backup)));
+            }
+        }
+
         if (toStore.modelNicknames && typeof toStore.modelNicknames === "object") {
             toStore.modelNicknames = normalizeModelNicknames(toStore.modelNicknames as Record<string, string>);
         }
@@ -227,7 +265,7 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
     }
 
     if (settings) {
-        await context.db.patch(settings._id, toStore);
+        await context.db.patch(settings._id, withoutUndefined(toStore));
     } else {
         await context.db.insert(tableName, {
             userId,
@@ -994,6 +1032,7 @@ export const getUserPreferencesQuery = internalQuery
     .output(
         v.object({
             aboutMe: v.optional(v.string()),
+            backupModel: v.optional(v.string()),
             customInstructions: v.optional(v.string()),
             dictationLanguage: v.optional(v.string()),
             language: v.optional(v.string()),
@@ -1014,6 +1053,7 @@ export const getUserPreferencesQuery = internalQuery
 
             return {
                 aboutMe: userSettings?.aboutMe ?? undefined,
+                backupModel: userSettings?.backupModel ?? undefined,
                 customInstructions: userSettings?.customInstructions ?? undefined,
                 dictationLanguage: userSettings?.dictationLanguage ?? undefined,
                 language: userSettings?.language ?? undefined,
@@ -1027,6 +1067,7 @@ export const getUserPreferencesQuery = internalQuery
         } catch {
             return {
                 aboutMe: undefined,
+                backupModel: undefined,
                 customInstructions: undefined,
                 dictationLanguage: undefined,
                 language: undefined,
@@ -1263,6 +1304,28 @@ export const getUserAuthFlagsQuery = internalQuery
         return { isAnonymous: user?.isAnonymous === true, plan, role: user?.role ?? null };
     });
 
+/** The plan behind `getUserRunPlanQuery`, readable from a mutation's db too. */
+const readUserRunPlan = async (context: QueryContext, userId: string): Promise<{ isAdmin: boolean; plan: "premium" | null }> => {
+    const [user, memberships] = await Promise.all([getUser(context, userId), getMembersByUserId(context, userId)]);
+    const organizations = await Promise.all(memberships.map(async (membership) => await getOrganization(context, membership.organizationId)));
+
+    return {
+        isAdmin: user?.role === "admin",
+        plan: resolveUserPlan(user, organizations),
+    };
+};
+
+/**
+ * Whether the caller's plan opens paid-plan models: the rule `settingsUpsert` enforces on a backup model,
+ * read from the same place (the user's and their organizations' tier), so a picker can offer what a save accepts.
+ * A key of their own opens a provider's models on top of this; the client reads those from the preferences.
+ */
+export const getPaidModelAccess = authQuery.output(v.object({ canRunPaidModels: v.boolean() })).query(async ({ ctx: context }) => {
+    const { isAdmin, plan } = await readUserRunPlan(context, context.user.userId);
+
+    return { canRunPaidModels: isAdmin || plan === "premium" };
+});
+
 /**
  * The plan for a run with no session to read an active organization from —
  * a trigger, a workflow step, a group turn. Premium when ANY organization the
@@ -1272,15 +1335,7 @@ export const getUserAuthFlagsQuery = internalQuery
 export const getUserRunPlanQuery = internalQuery
     .input({ userId: v.string() })
     .output(v.object({ isAdmin: v.boolean(), plan: v.union(v.literal("premium"), v.null()) }))
-    .query(async ({ args: { userId }, ctx: context }) => {
-        const [user, memberships] = await Promise.all([getUser(context, userId), getMembersByUserId(context, userId)]);
-        const organizations = await Promise.all(memberships.map(async (membership) => await getOrganization(context, membership.organizationId)));
-
-        return {
-            isAdmin: user?.role === "admin",
-            plan: resolveUserPlan(user, organizations),
-        };
-    });
+    .query(async ({ args: { userId }, ctx: context }) => await readUserRunPlan(context, userId));
 
 export const getActiveOrganizationQuery = internalQuery
     .input({ organizationId: v.string(), userId: v.string() })

@@ -42,6 +42,14 @@ describe(countPromptTextChars, () => {
     });
 });
 
+describe("countPromptTextChars on a malformed prompt", () => {
+    it("counts a non-array prompt as nothing and skips entries that are not objects", () => {
+        expect(countPromptTextChars(undefined)).toBe(0);
+        expect(countPromptTextChars("not an array", "sys")).toBe(3);
+        expect(countPromptTextChars([null, 3, "x", { content: "abc" }, { content: [null, { text: "de" }] }])).toBe(5);
+    });
+});
+
 describe(deferWaitUntil, () => {
     it("registers a pending promise at once and settles it with the handed work", async () => {
         const registered: Promise<unknown>[] = [];

@@ -13,6 +13,7 @@
 import type { LanguageModelV3, LanguageModelV3CallOptions } from "@ai-sdk/provider";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { CUSTOM_PROVIDER_FORMATS } from "@neore/ai/gateway";
+import { isVisiblePart } from "@neore/ai/models";
 import { z } from "zod";
 
 import type { AppEnv, HonoEnv } from "../../env.js";
@@ -26,6 +27,7 @@ import { createProviderModelForEnv, resolveApiKey } from "../../providers/factor
 import { ProviderHealthService } from "../../providers/health.js";
 import type { ModelPricing } from "../../providers/pricing.js";
 import { calculateCost, PricingService } from "../../providers/pricing.js";
+import { classifyProviderFailure } from "../../routing/fallback.js";
 import type { ModelFilterRules } from "../../routing/filters.js";
 import { getModelRejectionReason, hasActiveFilters } from "../../routing/filters.js";
 import type { BillingMode } from "../../usage/billing.js";
@@ -168,6 +170,14 @@ modelProxyRouter.openapi(
         });
         const policy = resolveProviderPolicy(c.env, body.provider, body.modelApiId, billingMode);
         const byokFeeRate = resolveByokFeeRate(c.env.BYOK_FEE_RATE);
+        // Classification runs on the error path, so it must never throw there: no reason is a safe answer.
+        const failureReason = (error: unknown) => {
+            try {
+                return classifyProviderFailure(error, Math.ceil(countPromptTextChars(body.callOptions.prompt) / 4), MODEL_MAP.get(body.modelId)?.contextWindow);
+            } catch {
+                return undefined;
+            }
+        };
 
         // Validate model against filter rules before proceeding
         const filterRules = body.modelFilterRules as ModelFilterRules | undefined;
@@ -309,6 +319,10 @@ modelProxyRouter.openapi(
 
             const reader = streamResult.stream.getReader();
             let isCancelled = false;
+            // Set once the provider's own stream reported an error. The backend closes its end on such an event, which
+            // arrives here as a cancel: that must not turn a failed call into a user stop (no health failure, no "cancelled" status).
+            // Usage still follows the cancel rule: tokens the provider consumed before the close are estimated, not recorded as zero.
+            let isErrored = false;
             // Registered before the Response is returned: a cancelled relay finishes after the response has
             // ended, and the pricing read it awaits first would otherwise be cancelled with the request.
             const settleBackground = deferWaitUntil(execContext);
@@ -332,9 +346,13 @@ modelProxyRouter.openapi(
                     let emittedChars = 0;
                     let reasoningChars = 0;
 
-                    try {
-                        let isErrored = false;
+                    // Until a part the user would see goes out, the caller can still retry the call elsewhere.
+                    let hasContent = false;
+                    // False once the provider's stream has ended: what follows (pricing, telemetry, usage reporting) is our own
+                    // bookkeeping, and a failure there says nothing about the provider, so it never carries a retry reason.
+                    let isReadingProvider = true;
 
+                    try {
                         while (true) {
                             const { done, value } = await reader.read();
 
@@ -390,8 +408,17 @@ modelProxyRouter.openapi(
                             // Serialize the stream part (handle Uint8Array in file parts)
                             const serialized = serializeForWire(value);
 
-                            send(`data: ${JSON.stringify(serialized)}\n\n`);
+                            // An in-band provider error before any content is classified like a thrown one.
+                            const fallbackReason = !hasContent && value.type === "error" ? failureReason(value.error) : undefined;
+
+                            if (isVisiblePart(value)) {
+                                hasContent = true;
+                            }
+
+                            send(`data: ${JSON.stringify(fallbackReason ? { ...serialized, fallbackReason } : serialized)}\n\n`);
                         }
+
+                        isReadingProvider = false;
 
                         // Record usage even when the client cancelled: the provider already produced these tokens.
                         // A cancel before the `finish` part leaves no usage, so it is estimated from what was sent.
@@ -431,7 +458,8 @@ modelProxyRouter.openapi(
                                     costMicrodollars,
                                     // A provider error inside the stream is a failed call, so its GenAI span must not export as OK.
                                     ...(isErrored && { errorCode: "PROVIDER_ERROR" }),
-                                    finishReason: isEstimated ? "cancelled" : lastFinishReason,
+                                    // An errored stream stays an error, not a stop, though its usage is estimated the same way.
+                                    finishReason: isEstimated && !isErrored ? "cancelled" : lastFinishReason,
                                     isStreaming: true,
                                     latencyMs,
                                     operation: "chat",
@@ -441,7 +469,7 @@ modelProxyRouter.openapi(
                                 c.var.telemetry,
                             ),
                             ...(isCancelled || isErrored ? [] : [policy.recordHealth.success(latencyMs)]),
-                            ...(isErrored && !isCancelled ? [policy.recordHealth.failure()] : []),
+                            ...(isErrored ? [policy.recordHealth.failure()] : []),
                             usageReporter.report({
                                 billingMode,
                                 byokFeeRate,
@@ -455,8 +483,12 @@ modelProxyRouter.openapi(
                             }),
                         ]);
                     } catch (error) {
+                        // Retryable only while the call has produced nothing the user saw (the rule of `isVisiblePart`).
+                        // Retryable only while the call has produced nothing the user saw (the rule of `isVisiblePart`).
+                        const fallbackReason = !hasContent && isReadingProvider ? failureReason(error) : undefined;
                         const errorChunk = {
                             error: error instanceof Error ? error.message : "Unknown stream error",
+                            ...(fallbackReason && { fallbackReason }),
                             type: "error",
                         };
 
@@ -490,10 +522,15 @@ modelProxyRouter.openapi(
                 return c.json(error.toJSON(), error.statusCode);
             }
 
+            // Tells the caller whether another model could serve this request:
+            // only an `infra` failure is worth retrying elsewhere.
+            const fallbackReason = failureReason(error);
+
             return c.json(
                 {
                     error: {
                         code: "PROVIDER_ERROR",
+                        ...(fallbackReason && { fallbackReason }),
                         message: error instanceof Error ? error.message : "Unknown provider error",
                     },
                 },

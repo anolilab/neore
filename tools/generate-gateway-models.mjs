@@ -12,52 +12,20 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const { MODEL_REGISTRY } = await import("../packages/ai/dist/models/index.js");
+const { deriveModelRegions: deriveRegions, MODEL_REGISTRY } = await import("../packages/ai/dist/models/index.js");
 
 // Include all modes, exclude external (marketing-only, no API)
 const allModels = MODEL_REGISTRY.filter((m) => m.provider !== "external");
 
-function deriveRegions(model) {
-    const { provider, modelApiId, id } = model;
-    // Direct providers
-    if (provider === "google") return ["US", "EU"];
-    if (provider === "groq") return ["US"];
-    if (provider === "xai") return ["US"];
-    if (provider === "fal") return ["US"]; // FAL runs on US infrastructure
-    if (provider === "openai") return ["US"];
-    if (provider === "klingai") return ["CN", "US"];
-    if (provider === "luma") return ["US"];
-    if (provider === "replicate") return ["US"];
-    if (provider === "fireworks") return ["US"];
-    if (provider === "bfl") return ["EU", "US"]; // Black Forest Labs (Germany)
-
-    // OpenRouter/Requesty: derive from underlying model provider
-    const apiPrefix = modelApiId.split("/")[0]?.toLowerCase() ?? "";
-    const prefixRegionMap = {
-        anthropic: ["US", "EU"],
-        openai: ["US"],
-        google: ["US", "EU"],
-        "meta-llama": ["US"],
-        mistralai: ["EU", "US"],
-        deepseek: ["CN", "US"],
-        qwen: ["CN", "US"],
-        "alibaba-cloud": ["CN", "US"],
-        microsoft: ["US"],
-        nvidia: ["US"],
-        cohere: ["US", "CA"],
-        nousresearch: ["US"],
-        moonshotai: ["CN", "US"],
-        "perplexity-ai": ["US"],
-        bytedance: ["CN", "US"],
-    };
-    if (prefixRegionMap[apiPrefix]) return prefixRegionMap[apiPrefix];
-    if (id.endsWith(":free")) return ["US"];
-    return ["US"];
+function quote(s) {
+    return JSON.stringify(s);
 }
-
-function quote(s) { return JSON.stringify(s); }
-function formatArray(arr) { return `[${arr.map(quote).join(", ")}]`; }
-function formatNumberArray(arr) { return `[${arr.join(", ")}]`; }
+function formatArray(arr) {
+    return `[${arr.map(quote).join(", ")}]`;
+}
+function formatNumberArray(arr) {
+    return `[${arr.join(", ")}]`;
+}
 
 const textCount = allModels.filter((m) => !m.mode || m.mode === "text").length;
 const imageCount = allModels.filter((m) => m.mode === "image").length;

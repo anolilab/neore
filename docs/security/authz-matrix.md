@@ -216,6 +216,7 @@ for a schema table that is neither policed nor listed:
 | `auth_functions.getAIUserPreferences` | query | query | — | identity (self-resolved); own row, ciphertext redacted | ok |
 | `auth_functions.getCurrentUser` | query | query | — | identity (self-resolved); self | ok |
 | `auth_functions.getSessionUserQuery` | query | query | — | identity (self-resolved); self | ok |
+| `auth_functions.getPaidModelAccess` | query | authQuery | user, member, organization | caller-scoped (ctx.user); a boolean about the caller's own plan | ok — new |
 | `auth_functions.getUserSettings` | query | query | — | identity (self-resolved); own row | ok |
 | `auth_functions.hasPassword` | query | query | account | session; self | ok |
 | `auth_functions.initializeUserSettings` | mutation | authMutation | userSettings | caller-scoped (ctx.user) | ok |

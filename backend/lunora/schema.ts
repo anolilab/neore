@@ -2933,6 +2933,8 @@ export const schema = defineSchema({
         autoArchiveAfterDays: v.optional(v.number()),
         // Opt-in: speak every finished reply aloud (`features/chat/voice-mode`). Absent = off.
         autoReadReplies: v.optional(v.boolean()),
+        // Model a reply is retried on once when the chosen model fails with an infrastructure error (`chat/lib/backup-model.ts`). Blank or absent = none.
+        backupModel: v.optional(v.string()),
         // Appearance: cap long chat code blocks (absent = on). Accepted values: `auth/fields.ts`.
         capLongCodeBlocks: v.optional(v.boolean()),
         codeFont: v.optional(v.string()),

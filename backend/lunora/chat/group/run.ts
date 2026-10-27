@@ -44,6 +44,8 @@ import {
     afterRun,
     AgentRunError,
     buildRunStreamArgs,
+    loadModelFilterRules,
+    resolveBackupModelId,
     endStoppedRun,
     finishRun,
     loadRunContext,
@@ -245,12 +247,16 @@ const runSpeaker = async (
 
         setResearchDepth(ctx, turn.researchDepth);
 
+        const modelFilterRules = await loadModelFilterRules(ctx, turn.userId);
+        const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
         const agent = await getAgent(model, {
+            backupModelId,
             customProvider,
             gateway: gatewayFetch(ctx),
             language: turn.prefs.language,
             location: turn.prefs.location,
             maxSteps: getMaxSteps(turn.shouldAutoContinue),
+            modelFilterRules,
             personalization: turn.prefs.personalization,
             searchMode,
             skillContext: { config: speaker.config, instructions: speaker.instructions },
@@ -296,7 +302,13 @@ const runSpeaker = async (
             threadEffort: turn.reasoningEffort.thread,
         });
         const streamTextArgs: Record<string, unknown> = {
-            ...buildRunStreamArgs({ model, reasoningEffort, shouldAutoContinue: turn.shouldAutoContinue }),
+            ...buildRunStreamArgs({
+                backupModelId,
+                hasTools: Object.keys(toolResult.tools).length > 0,
+                model,
+                reasoningEffort,
+                shouldAutoContinue: turn.shouldAutoContinue,
+            }),
             system,
             ...(isFirstSpeaker ? { promptMessageId: turn.promptMessageId } : { forceNewOrder: true, promptMessageId: position.continueFromMessageId }),
         };

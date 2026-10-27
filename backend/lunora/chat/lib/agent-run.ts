@@ -12,7 +12,7 @@
  * and flushes the stream, the post-run bookkeeping (`afterRun`), resuming an
  * approved run (`resumeApprovedRun`) and the error cleanup.
  */
-import { MODEL_LOOKUP, type ModelDefinition, parseCustomModelId, requiresPaidPlan } from "@neore/ai/models";
+import { MODEL_LOOKUP, type ModelDefinition, type ModelFilterRules, parseCustomModelId } from "@neore/ai/models";
 import type { UserPersonalization } from "@neore/ai/prompts";
 import { buildMemoryContext } from "@neore/ai/prompts";
 
@@ -25,8 +25,9 @@ import type { ResearchDepth } from "../../agent/client/create-tool";
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
-import { byokPaysFor, paidModelRefusal } from "./paid-model";
-import { compressContextMessages, getMaxSteps, getModelContextWindow } from "./auto-continue";
+import { backupCanServe, backupCapabilities, backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
+import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
+import { compressContextMessages, getFallbackContextWindow, getMaxSteps } from "./auto-continue";
 import { isLocalBrowserProvider, toGatewayFormat } from "./custom-providers";
 import type { GatewayCustomProviderConfig } from "./gateway-language-model";
 import { gatewayFetch } from "../../lib/services";
@@ -122,25 +123,16 @@ export const readRunPlan = async (ctx: Pick<ActionCtx, "runQuery">, userId: stri
  * A key exempts only where `byokPaysFor` says the user's key pays for the call. `plan` is the run's
  * pre-resolved plan (see `readRunPlan`).
  */
-export const canRunPaidModel = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, definition: ModelDefinition, plan?: RunPlan): Promise<boolean> => {
-    if (!requiresPaidPlan(definition)) {
-        return true;
-    }
+export const canRunPaidModel = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, definition: ModelDefinition, plan?: RunPlan): Promise<boolean> =>
+    await allowsPaidModel(
+        definition,
+        async () => plan ?? (await readRunPlan(ctx, userId)),
+        async () => {
+            const keys = await loadUserProviderKeys(ctx, userId);
 
-    const resolved = plan ?? (await readRunPlan(ctx, userId));
-
-    if (resolved.isAdmin || resolved.plan === "premium") {
-        return true;
-    }
-
-    if (!byokPaysFor(definition)) {
-        return false;
-    }
-
-    const userProviderKeys = await loadUserProviderKeys(ctx, userId);
-
-    return Boolean(userProviderKeys?.[definition.provider]);
-};
+            return Boolean(keys?.[definition.provider]);
+        },
+    );
 
 /** Refuses a paid-plan model for a run that cannot pay for it (`canRunPaidModel`). Every run resolves its model here. */
 const assertModelAllowed = async (ctx: Pick<ActionCtx, "runQuery">, model: string, userId: string): Promise<void> => {
@@ -151,6 +143,46 @@ const assertModelAllowed = async (ctx: Pick<ActionCtx, "runQuery">, model: strin
     }
 
     throw new AgentRunError("plan-required", paidModelRefusal(definition.name ?? definition.id, byokPaysFor(definition)));
+};
+
+/**
+ * The user's model filters (`{}` when they set none), for a run to read once and hand to both the gateway models
+ * (`getAgent({ modelFilterRules })`, which is where `requireZDR` / `denyDataCollection` reach the provider routing)
+ * and `resolveBackupModelId`. Every run path loads them here, so the chosen model and its backup are routed alike.
+ */
+export const loadModelFilterRules = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<ModelFilterRules> => {
+    const preferences = await ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId });
+
+    return preferences?.modelFilterRules ?? {};
+};
+
+/**
+ * The user's backup model for a run on `model` (`FallbackLanguageModel`), or `undefined`: none set, a stale id,
+ * the run's own model, or one the user's plan cannot run — a backup must not open a paid model the run's own
+ * gate (`canRunPaidModel`) would refuse.
+ */
+export const resolveBackupModelId = async (
+    ctx: Pick<ActionCtx, "runQuery">,
+    userId: string,
+    backupModel: string | undefined,
+    model: string,
+    filterRules?: ModelFilterRules,
+): Promise<string | undefined> => {
+    const definition = supportsBackupFallback(model) ? eligibleBackupModel(backupModel, model) : undefined;
+
+    if (!definition) {
+        return undefined;
+    }
+
+    // The caller may already hold the rules (the interactive run reads them for the gateway); every other path loads them here,
+    // since the filters can encode privacy rules (regions, providers) that a backup must honour as much as the chosen model.
+    const rules = filterRules ?? (await loadModelFilterRules(ctx, userId));
+
+    if (backupFilterRejection(definition, rules) !== null) {
+        return undefined;
+    }
+
+    return (await canRunPaidModel(ctx, userId, definition)) ? definition.id : undefined;
 };
 
 export const resolveRunModel = async (ctx: Pick<ActionCtx, "runQuery">, model: string, userId: string): Promise<RunModel> => {
@@ -405,6 +437,7 @@ export const loadRunContext = async (
         knowledgeSources: knowledgeContext?.sources ?? [],
         memoryEnabled: prefs.memoryEnabled,
         prefs: {
+            backupModel: prefs.backupModel,
             language: args.threadLanguage || prefs.language,
             location: prefs.location,
             personalization: toPersonalization(prefs),
@@ -612,8 +645,15 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
  * and, for auto-continue, context compression between steps. Callers add their
  * own prompt / system fields on top.
  */
-export const buildRunStreamArgs = (options: { model: string; reasoningEffort: number | undefined; shouldAutoContinue?: boolean }): Record<string, unknown> => {
-    const { model, reasoningEffort } = options;
+export const buildRunStreamArgs = (options: {
+    backupModelId?: string;
+    /** Whether the calls carry tools: a backup that cannot call them is skipped for such a call, so it does not size the prompt. */
+    hasTools?: boolean;
+    model: string;
+    reasoningEffort: number | undefined;
+    shouldAutoContinue?: boolean;
+}): Record<string, unknown> => {
+    const { backupModelId, hasTools, model, reasoningEffort } = options;
     const modelDefinition = MODEL_LOOKUP.get(model);
     const supportsReasoningEffort =
         modelDefinition?.filterCapabilities?.includes("effort_control") || modelDefinition?.filterCapabilities?.includes("reasoning");
@@ -635,10 +675,13 @@ export const buildRunStreamArgs = (options: { model: string; reasoningEffort: nu
     // run's tool results pile up after the one-shot check in `applyLateCompression`.
     // `shouldAutoContinue` no longer changes this; it stays in the type so callers
     // need no edit.
-    const contextLimit = getModelContextWindow(model);
+    const backupDefinition = backupModelId ? MODEL_LOOKUP.get(backupModelId) : undefined;
+    const backupTraits = backupDefinition ? backupCapabilities(backupDefinition) : undefined;
 
     streamTextArgs.prepareStep = ({ messages }: { messages: unknown[] }) => {
-        const compressed = compressContextMessages(messages as never, contextLimit);
+        // Sized for the backup only while it could take the call (same rule as the wrapper's switch).
+        const sizedFor = !backupTraits || backupCanServe(backupTraits, { hasTools: hasTools === true, messages }) ? backupModelId : undefined;
+        const compressed = compressContextMessages(messages as never, getFallbackContextWindow(model, sizedFor));
 
         return compressed === messages ? undefined : { messages: compressed };
     };
@@ -882,7 +925,7 @@ export const resumeApprovedRun = async (
 ): Promise<{ lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
     const { answer, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
-    const [toolResult, userProviderKeys] = await Promise.all([
+    const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
             ...(options.admittedRun && { admittedRun: true }),
             autoMediaEnrichment: config.autoMediaEnrichment,
@@ -894,6 +937,7 @@ export const resumeApprovedRun = async (
             userId,
         }),
         loadUserProviderKeys(ctx, userId),
+        ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
     ]);
 
     try {
@@ -923,10 +967,14 @@ export const resumeApprovedRun = async (
             toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer) as (typeof toolResult.tools)[string];
         }
 
+        const modelFilterRules = await loadModelFilterRules(ctx, userId);
+        const backupModelId = await resolveBackupModelId(ctx, userId, preferences.backupModel, config.model, modelFilterRules);
         const agent = await getAgent(config.model, {
+            backupModelId,
             customProvider,
             gateway: gatewayFetch(ctx),
             maxSteps: getMaxSteps(config.shouldAutoContinue),
+            modelFilterRules,
             threadId,
             tools: toolResult.tools,
             userId,
@@ -950,6 +998,8 @@ export const resumeApprovedRun = async (
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({
+            backupModelId,
+            hasTools: Object.keys(toolResult.tools).length > 0,
             model: config.model,
             reasoningEffort: config.reasoningEffort,
             shouldAutoContinue: config.shouldAutoContinue,
