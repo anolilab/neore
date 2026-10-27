@@ -215,7 +215,10 @@ describe("pull request reaper", () => {
         expect(await mutate(beginPullRequest, { followUp: false, runId: fresh, userId: USER })).toStrictEqual({
             error: "A pull request for this run is already being opened.",
         });
-        expect(await mutate(beginPullRequest, { followUp: false, runId: stale, userId: USER })).toMatchObject({ baseBranch: "main", staleSandboxId: "sbx-old" });
+        expect(await mutate(beginPullRequest, { followUp: false, runId: stale, userId: USER })).toMatchObject({
+            baseBranch: "main",
+            staleSandboxId: "sbx-old",
+        });
 
         const run = await getRun(stale);
 
