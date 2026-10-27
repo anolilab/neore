@@ -1,6 +1,6 @@
 # Desktop terminal: an interactive shell per folder
 
-Status: plan, 2026-10-26. Part of [agent-host-roadmap.md](agent-host-roadmap.md).
+Status: S1 and S2 built (macOS and Linux), 2026-10-27; S3 and S4 open. Part of [agent-host-roadmap.md](agent-host-roadmap.md).
 S3 needs the SSH transport ([ssh-environments.md](ssh-environments.md) S3).
 
 ## 1. Goal and decision
@@ -37,8 +37,12 @@ Decisions:
   killed when its tab closes and when the app quits.
 - **Rendering.** The terminal view is in the local window, with an xterm-compatible
   emulator (MIT licence to confirm in S1). The view has no network access.
-- **IPC.** Input and resize go from the local window to the main process over a
-  channel only the local window's preload exposes. The site origin cannot call
+- **IPC.** Input and resize go from the terminal window to the main process over a
+  channel only that window's preload exposes. As built, the terminal is its own local
+  window (one per folder, own page and preload), not a pane of the device window: the
+  device window is always on top and replaces its content while an approval is open,
+  and a terminal page should not hold the approval commands. It opens from a button
+  per shared folder in the device window, or from the tray menu. The site origin cannot call
   these channels. The main process checks the sender on every call.
 - **Persistence.** Scrollback lives in memory and is dropped when the tab closes.
   A reopened terminal starts a new shell. Nothing is written to the app data
@@ -94,5 +98,8 @@ input, resize, copy and paste, kill on close.
    mirror would be a new read path that must be designed on its own. Revisit only
    with a separate plan.
 2. **Persist scrollback.** Recommendation: no, for the reason in §5.
-3. **Rendering engine.** Recommendation: the xterm-compatible emulator in §3, if
-   its licence check passes in S1. Measure throughput on heavy output in S1.
+3. **Rendering engine.** Done in S1: `@xterm/xterm` 6.0.0 and `@xterm/addon-fit`
+   (MIT, checked in their `LICENSE` files), over `node-pty` 1.1.0 (MIT). Throughput is
+   bounded by the pty, not by the host: `yes` moves about 1 to 2 MB/s through
+   node-pty alone on macOS, and the host path matches it (`host.test.ts` measures
+   it). The shell is paused at 512 KiB of unconfirmed output and resumed at 64 KiB.

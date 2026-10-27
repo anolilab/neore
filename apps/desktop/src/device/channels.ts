@@ -20,11 +20,13 @@ export const DEVICE_CHANNEL = {
 export const LOCAL_CHANNEL = {
     auditTail: "neore:device-local:audit-tail",
     confirm: "neore:device-local:confirm",
+    openTerminal: "neore:device-local:open-terminal",
     pickFolder: "neore:device-local:pick-folder",
     promptAnswer: "neore:device-local:prompt-answer",
     promptCurrent: "neore:device-local:prompt-current",
     settingsGet: "neore:device-local:settings-get",
     settingsUpdate: "neore:device-local:settings-update",
+    terminalAvailability: "neore:device-local:terminal-availability",
 } as const;
 
 /** Main → device window: a prompt was queued, read `promptCurrent` again. */

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <!-- Strict: only the page's own bundled script and stylesheets, and no network. The terminal view
+             writes inline styles (cell sizes, theme colours), so styles alone allow 'unsafe-inline'. -->
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Neore — terminal</title>
+        <link rel="stylesheet" href="xterm.css" />
+        <link rel="stylesheet" href="terminal.css" />
+        <script src="terminal.js" defer></script>
+    </head>
+    <body>
+        <div id="terminal" role="application" aria-label="Terminal"></div>
+        <div id="ended" role="status" aria-live="polite" hidden>
+            <span id="ended-text"></span>
+            <button type="button" id="restart">New shell</button>
+        </div>
+    </body>
+</html>

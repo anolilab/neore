@@ -11,10 +11,15 @@ interface NeoreNativeForTests {
     device?: { openSettings: () => Promise<void> };
     takePendingCompose: () => Promise<string | undefined>;
     takePendingSignIn: () => Promise<{ code: string; codeVerifier: string; redirectUri: string } | undefined>;
+    terminal?: unknown;
 }
 
 /** The page-side globals the preloads expose; read inside `evaluate`, so typed by cast. */
-type PageGlobal = { neoreDevice?: unknown; neoreNative?: NeoreNativeForTests };
+type PageGlobal = {
+    neoreDevice?: { openTerminal: (folder: string | null) => Promise<void>; terminalAvailability: () => Promise<{ available: boolean }> };
+    neoreNative?: NeoreNativeForTests;
+    neoreTerminal?: unknown;
+};
 
 const appDirectory = fileURLToPath(new URL("..", import.meta.url));
 // The site origin is baked in at build time, so the fixture server must be up first.
@@ -27,9 +32,20 @@ const COMPOSER_FILE = /^file:\/\/.*\/quick-composer\/index\.html$/u;
 
 const htmlPage = (title: string) => `<!doctype html><title>${title}</title><body>${title}</body>`;
 
+/** Every request either fixture server received: method, URL, headers and body. The terminal test searches it. */
+const received: string[] = [];
+
 const serve = (port: number, origin: string) =>
     new Promise<http.Server>((resolve) => {
         const server = http.createServer((request, response) => {
+            const chunks: Buffer[] = [];
+
+            request.on("data", (chunk: Buffer) => {
+                chunks.push(chunk);
+            });
+            request.on("end", () => {
+                received.push(`${request.method ?? ""} ${request.url ?? ""} ${JSON.stringify(request.headers)} ${Buffer.concat(chunks).toString("utf8")}`);
+            });
             response.setHeader("content-type", "text/html");
             // The request path is echoed into HTML, so it is encoded first.
             response.end(htmlPage(`${origin} ${encodeURIComponent(request.url ?? "")}`));
@@ -272,4 +288,83 @@ test("the device window opens from the site's relay, with its own bridge and not
     } finally {
         await app.close();
     }
+});
+
+const TERMINAL_PAGE = /\/terminal-window\/terminal\.html$/u;
+const isAlive = (pid: number): boolean => {
+    try {
+        process.kill(pid, 0);
+
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+test("the site's bridge has no terminal, and the terminal's bridge never reaches the site", async () => {
+    const app = await launch();
+
+    try {
+        const win = await siteWindow(app);
+
+        expect(await win.evaluate(() => (globalThis as PageGlobal).neoreNative?.terminal)).toBeUndefined();
+        expect(await win.evaluate(() => typeof (globalThis as PageGlobal).neoreTerminal)).toBe("undefined");
+        // The device relay (the only thing the site can call about this computer) offers no way to open one either.
+        expect(await win.evaluate(() => Object.keys((globalThis as PageGlobal).neoreNative?.device ?? {}))).not.toContain("openTerminal");
+    } finally {
+        await app.close();
+    }
+});
+
+test.describe("the local terminal", () => {
+    test.skip(process.platform === "win32", "the terminal is not offered on Windows"); // The Windows terminal is a separate slice.
+
+    test("runs a shell in the folder, sends nothing to any server, and ends every shell when the app quits", async () => {
+        const marker = `marker-${String(Date.now())}`;
+        const app = await launch();
+        let shells: number[] = [];
+
+        try {
+            const win = await siteWindow(app);
+
+            // The device window opens from the site's relay and needs the built addon (see the device test above).
+            await win.evaluate(() => (globalThis as PageGlobal).neoreNative?.device?.openSettings());
+
+            const device = await findPage(app, (url) => url.endsWith("/device-window/device.html"));
+
+            await device.evaluate((folder) => (globalThis as PageGlobal).neoreDevice?.openTerminal(folder), appDirectory);
+
+            const terminal = await findPage(app, (url) => TERMINAL_PAGE.test(url));
+            const requests: string[] = [];
+
+            terminal.on("request", (request) => {
+                requests.push(request.url());
+            });
+
+            // Its own bridge, and nothing of the site's or the device window's.
+            expect(await terminal.evaluate(() => typeof (globalThis as PageGlobal).neoreTerminal)).toBe("object");
+            expect(await terminal.evaluate(() => typeof (globalThis as PageGlobal).neoreNative)).toBe("undefined");
+            expect(await terminal.evaluate(() => typeof (globalThis as PageGlobal).neoreDevice)).toBe("undefined");
+
+            await expect.poll(() => app.evaluate(() => (globalThis as { neoreShell?: { terminalPids: () => number[] } }).neoreShell?.terminalPids().length)).toBe(1);
+            shells = await app.evaluate(() => (globalThis as { neoreShell?: { terminalPids: () => number[] } }).neoreShell?.terminalPids() ?? []);
+
+            await terminal.locator(".xterm-helper-textarea").focus();
+            await terminal.keyboard.type(`echo ${marker.slice(0, 7)}$((6*7))${marker.slice(7)}`);
+            await terminal.keyboard.press("Enter");
+
+            await expect(terminal.locator(".xterm-rows")).toContainText(`${marker.slice(0, 7)}42${marker.slice(7)}`);
+
+            // Everything the page asked for was one of its own files.
+            expect(requests.filter((url) => !url.startsWith("file://"))).toStrictEqual([]);
+            // And no server, ours or foreign, ever saw what was typed or printed.
+            expect(received.filter((entry) => entry.includes(marker.slice(7)))).toStrictEqual([]);
+            expect(shells.every((pid) => isAlive(pid))).toBe(true);
+        } finally {
+            await app.close();
+        }
+
+        expect(shells).toHaveLength(1);
+        await expect.poll(() => shells.some((pid) => isAlive(pid)), { timeout: 10_000 }).toBe(false);
+    });
 });

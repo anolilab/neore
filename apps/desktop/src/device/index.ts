@@ -15,6 +15,7 @@ import { pathToFileURL } from "node:url";
 import type { BrowserWindow as BrowserWindowInstance, IpcMainInvokeEvent, WebContents } from "electron";
 import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 
+import type { TerminalOpener } from "../terminal/index";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
 import type { HostTransport } from "./transport";
 import { createLocalTransport } from "./transport";
@@ -268,10 +269,27 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     local(LOCAL_CHANNEL.auditTail, () => requireTransport().auditTail());
 
+    // The terminal is the user's own shell, opened by a click in this window. The folder is checked by the terminal module.
+    local(LOCAL_CHANNEL.terminalAvailability, () => options.terminal?.availability ?? { available: false, reason: "The terminal is not available." });
+
+    local(LOCAL_CHANNEL.openTerminal, async (folder) => {
+        if (options.terminal === undefined) {
+            throw new Error("The terminal is not available.");
+        }
+
+        if (folder !== null && typeof folder !== "string") {
+            throw new Error("device: folder is invalid");
+        }
+
+        await options.terminal.open(folder);
+    });
+
     return state.transport !== undefined;
 };
 
 export interface DeviceIpcOptions {
     /** True when the sender is the site's main window (see `trust.ts`). */
     isTrusted: (event: IpcMainInvokeEvent) => boolean;
+    /** Opens a terminal from the device window. Absent in tests that do not cover it. */
+    terminal?: TerminalOpener;
 }
