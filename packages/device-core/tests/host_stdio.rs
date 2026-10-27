@@ -4,8 +4,10 @@
 #[path = "common/vectors.rs"]
 mod vectors;
 
+use std::collections::BTreeSet;
+use std::ffi::OsString;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
@@ -18,6 +20,51 @@ use vectors::{Observed, Sandbox};
 
 const PATIENCE: Duration = Duration::from_secs(60);
 
+/// The binary under test: the one cargo built, or the one `NEORE_HOST_BIN` names (CI points it at the static
+/// musl build, so the same tests run against what ships).
+fn host_binary() -> PathBuf {
+    std::env::var_os("NEORE_HOST_BIN")
+        .map_or_else(|| env!("CARGO_BIN_EXE_neore-host").into(), PathBuf::from)
+}
+
+/// What the plan's launch (`env -i HOME=... PATH=/usr/bin:/bin LANG=C.UTF-8`) leaves a host: nothing is
+/// inherited from the process that starts it, so no agent socket, no app variable and no token reaches it.
+/// Windows has no `/usr/bin`; a process there needs `SystemRoot` and the home as `USERPROFILE`.
+fn clean_environment() -> Vec<(&'static str, OsString)> {
+    #[cfg(windows)]
+    {
+        let root = std::env::var_os("SystemRoot").expect("SystemRoot");
+        let home = std::env::var_os("USERPROFILE").expect("USERPROFILE");
+        let mut path = PathBuf::from(&root);
+
+        path.push("System32");
+
+        vec![
+            ("LANG", "C.UTF-8".into()),
+            ("PATH", path.into_os_string()),
+            ("SystemRoot", root),
+            ("USERPROFILE", home),
+        ]
+    }
+
+    #[cfg(not(windows))]
+    {
+        vec![
+            ("HOME", std::env::var_os("HOME").expect("HOME")),
+            ("LANG", "C.UTF-8".into()),
+            ("PATH", "/usr/bin:/bin".into()),
+        ]
+    }
+}
+
+/// `neore-host --stdio` with the clean environment and the pipes the tests drive.
+fn host_command() -> Command {
+    let mut command = Command::new(host_binary());
+
+    command.env_clear().envs(clean_environment());
+    command
+}
+
 /// A running `neore-host --stdio`. Frames are read on a thread so a hung host fails the test, not the run.
 struct Host {
     child: Child,
@@ -27,7 +74,7 @@ struct Host {
 
 impl Host {
     fn start() -> Host {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_neore-host"))
+        let mut child = host_command()
             .arg("--stdio")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -336,9 +383,7 @@ fn a_broken_stream_ends_the_connection_with_an_error() {
 
 #[test]
 fn the_host_refuses_to_start_without_stdio() {
-    let status = Command::new(env!("CARGO_BIN_EXE_neore-host"))
-        .status()
-        .unwrap();
+    let status = host_command().status().unwrap();
 
     assert_eq!(status.code(), Some(2));
 }
@@ -388,5 +433,61 @@ fn the_host_holds_no_socket() {
             String::from_utf8_lossy(&listing.stdout),
             String::from_utf8_lossy(&listing.stderr)
         );
+    }
+}
+
+/// The host's own environment is exactly the clean one. A shell command cannot show it (a sandboxed one
+/// is given its own allowlist), so it is read from the process: `/proc` on Linux, `ps` on macOS, where it
+/// can only be checked for the variables this test process holds.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[test]
+fn the_host_sees_only_the_clean_environment() {
+    let host = Host::start();
+    let pid = host.child.id();
+    let clean: BTreeSet<String> = clean_environment()
+        .into_iter()
+        .map(|(name, _)| name.to_owned())
+        .collect();
+    let ambient: BTreeSet<String> = std::env::vars().map(|(name, _)| name).collect();
+
+    // Cargo sets variables for every test, so a launch that inherited would show.
+    assert!(ambient.contains("CARGO_MANIFEST_DIR"));
+    host.next();
+
+    #[cfg(target_os = "linux")]
+    {
+        let environ = std::fs::read(format!("/proc/{pid}/environ")).unwrap();
+        let seen: BTreeSet<String> = environ
+            .split(|byte| *byte == 0)
+            .filter(|entry| !entry.is_empty())
+            .map(|entry| {
+                String::from_utf8_lossy(entry)
+                    .split('=')
+                    .next()
+                    .unwrap()
+                    .to_owned()
+            })
+            .collect();
+
+        assert_eq!(seen, clean);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let listing = Command::new("ps")
+            .args(["-Eww", "-o", "command=", "-p", &pid.to_string()])
+            .output()
+            .unwrap();
+        let text = String::from_utf8_lossy(&listing.stdout);
+
+        assert!(listing.status.success(), "ps failed: {text}");
+        assert!(text.contains("HOME="), "ps shows no environment: {text}");
+
+        for name in ambient.difference(&clean) {
+            assert!(
+                !text.contains(&format!(" {name}=")),
+                "the host inherited {name}"
+            );
+        }
     }
 }
