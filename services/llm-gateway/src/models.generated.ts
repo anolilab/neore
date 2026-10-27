@@ -5178,9 +5178,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
 /**
  * Map from model ID to gateway model definition.
  */
-export const MODEL_MAP = new Map<string, GatewayModelDefinition>(
-    GATEWAY_MODELS.map((m) => [m.id, m]),
-);
+export const MODEL_MAP = new Map<string, GatewayModelDefinition>(GATEWAY_MODELS.map((m) => [m.id, m]));
 
 /**
  * Version hash for cache invalidation. It covers every field of every model,
