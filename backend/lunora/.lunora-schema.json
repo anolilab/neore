@@ -14543,6 +14543,12 @@
           "optional": true,
           "unique": false
         },
+        "lastUserMessageAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "lockedAt": {
           "kind": "number",
           "nullable": false,
@@ -15433,6 +15439,12 @@
           "optional": true,
           "unique": false
         },
+        "failureStreak": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "filters": {
           "kind": "array",
           "nullable": false,
@@ -15557,6 +15569,12 @@
           "optional": true,
           "unique": false
         },
+        "quietWhenEmpty": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "searchMode": {
           "kind": "string",
           "nullable": false,
@@ -15634,6 +15652,13 @@
           "optional": true,
           "unique": false,
           "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"gitlab-token\""
+            },
             {
               "kind": "literal",
               "nullable": false,

@@ -15,7 +15,14 @@ import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { isModelUnavailableRefusal, USER_FIXABLE_RUN_ERRORS } from "./failure-streak";
+import { releaseRetryDelayMs } from "../lib/claim-once";
 import { filterTextOf } from "./filters";
+import { canBeQuiet, isQuietRunSkipped, TRIGGER_THREAD_TAG } from "./quiet";
+
+const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds.";
+
+const RELEASE_LOST_NOTE =
+    "Giving this delivery back failed and no retry could be scheduled; a redelivery is refused as a duplicate until it is released by hand.";
 
 /** A run error only the owner's settings can cure; it repeats until they do, so it counts toward pausing the trigger. */
 export const isUserFixableRunError = (error: unknown): error is AgentRunError => error instanceof AgentRunError && USER_FIXABLE_RUN_ERRORS.has(error.kind);
@@ -29,15 +36,81 @@ export const executeTrigger = internalAction
         ignoreDisabled: v.optional(v.boolean()),
         // The webhook body was not valid UTF-8, so `payload` is its lossy decode and filters see an empty body.
         invalidUtf8: v.optional(v.boolean()),
+        // A manual run ("Run now"): the user is waiting for a chat, so a quiet routine is not skipped.
+        manual: v.optional(v.boolean()),
         payload: v.optional(v.string()), // Webhook payload or scheduled input
+        // The claim is permanent (`gitlab-token`): every way this delivery ends without a run gives it back, so a redelivery can run.
+        releaseUnlessRun: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
     })
-    .action(async ({ args: { claim, ignoreDisabled, invalidUtf8, payload, triggerId }, ctx }) => {
+    .action(async ({ args: { claim, ignoreDisabled, invalidUtf8, manual, payload, releaseUnlessRun, triggerId }, ctx }) => {
+        /**
+         * Gives a permanent claim back (admission refusals do their own, inside their transaction). A release
+         * that fails is NOT dropped: the claim lasts years, so a lost release would refuse every redelivery of
+         * work that never ran. It is rescheduled with backoff (`retryReleaseKey`); if even that cannot be
+         * scheduled, the error escapes and fails the job. Returns a note for the execution log when a retry was needed.
+         */
+        const giveBack = async (): Promise<string | undefined> => {
+            if (!claim || !releaseUnlessRun) {
+                return undefined;
+            }
+
+            try {
+                await ctx.runMutation(internal.lib.claim_once.releaseKey, claim);
+
+                return undefined;
+            } catch (error) {
+                console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}; retrying:`, error);
+                await ctx.scheduler.runAfter(releaseRetryDelayMs(1), internal.lib.claim_once.retryReleaseKey, { ...claim, attempt: 1 });
+
+                return RELEASE_DEFERRED_NOTE;
+            }
+        };
+
+        // The quiet window this run took (see `windowStart`), and the `lastTriggeredAt` it replaced.
+        let reservedWindow: { expected: number | undefined } | undefined;
+
+        /**
+         * Gives the quiet window back: a run that posted nothing leaves its activity for the next one. A release that
+         * fails is not dropped, or the window stays moved past activity nobody reported: it is scheduled again, which is safe
+         * because the release is idempotent and only ever moves the window back.
+         */
+        const releaseWindow = async (): Promise<void> => {
+            if (!reservedWindow) {
+                return;
+            }
+
+            const window = { ...reservedWindow, triggerId };
+
+            reservedWindow = undefined;
+
+            await ctx.runMutation(internal.triggers.functions.releaseQuietWindow, window).catch(async (error: unknown) => {
+                console.error(`[Triggers] Could not give back the quiet window of trigger ${triggerId}; retrying:`, error);
+                await ctx.scheduler.runAfter(releaseRetryDelayMs(1), internal.triggers.functions.releaseQuietWindow, window);
+            });
+        };
+
+        /** A failure before the agent starts means the delivery never ran: give its claim back and let the failure surface. */
+        const beforeRun = async <T>(work: () => Promise<T>): Promise<T> => {
+            try {
+                return await work();
+            } catch (error) {
+                try {
+                    await releaseWindow();
+                } finally {
+                    await giveBack();
+                }
+
+                throw error;
+            }
+        };
+
         // 1. Fetch trigger config
-        const trigger = await ctx.runQuery(internal.triggers.functions.getTriggerInternal, { triggerId });
+        const trigger = await beforeRun(async () => await ctx.runQuery(internal.triggers.functions.getTriggerInternal, { triggerId }));
 
         if (!trigger) {
             console.error(`[Triggers] Trigger ${triggerId} not found`);
+            await giveBack();
 
             return;
         }
@@ -45,22 +118,91 @@ export const executeTrigger = internalAction
         if (trigger.enabled !== true && ignoreDisabled !== true) {
             console.warn(`[Triggers] Trigger ${triggerId} is disabled, skipping`);
 
+            const note = await giveBack();
+
+            // Nothing else records this delivery, so a release that needed a retry goes in the history.
+            if (note) {
+                const executionId = await ctx.runMutation(internal.triggers.functions.createExecution, { payload, triggerId });
+
+                await ctx.runMutation(internal.triggers.functions.updateExecution, {
+                    error: `Skipped: the trigger is disabled. ${note}`,
+                    executionId,
+                    status: "failed",
+                });
+            }
+
             return;
         }
 
         const { userId } = trigger;
-        const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
+
         // A bot routine runs on the bot's model, with the bot's instructions ahead of the routine's own.
-        const bot = trigger.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: trigger.botId, userId }) : null;
+        const { botId } = trigger;
+        const bot = botId ? await beforeRun(async () => await ctx.runQuery(internal.bots.functions.getBotForRun, { botId, userId })) : null;
+
+        // 1b. A quiet routine skips a run with nothing to report, before any row, thread or charge is written.
+        // The skip is recorded in the history (collapsed to one row, as a webhook filter miss is). A failed check posts as usual.
+        // The bot must still exist: a routine whose bot was deleted keeps its flag but runs as a plain one.
+        // Only a scheduled routine can be quiet, so the skip never holds a replay claim to give back.
+        // The next quiet window starts here, before the snapshot is read: anything after that read is not in this run's
+        // snapshot, so the window must reach back to it. Counting an event twice is harmless; missing one is not.
+        // A run that passes the check takes the window before it writes anything, so an overlapping run (the next slot
+        // starts while this one is still working) cannot post the same activity again.
+        const takesWindow = manual !== true && trigger.quietWhenEmpty === true && canBeQuiet({ botId: bot ? botId : undefined, type: trigger.type });
+        const windowStart = Date.now();
+        const skipped = await isQuietRunSkipped(
+            { ...trigger, botId: bot ? botId : undefined },
+            (since) => ctx.runQuery(internal.triggers.quiet_inputs.loadQuietSnapshot, { since, userId }),
+            { manual: manual === true },
+        ).catch((error: unknown) => {
+            console.error(`[Triggers] Quiet check failed for ${triggerId}, posting the run:`, error);
+
+            return false;
+        });
+
+        if (skipped) {
+            await ctx.runMutation(internal.triggers.functions.recordFilteredExecution, { reason: "Nothing to report", triggerId });
+
+            return;
+        }
+
+        const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
         const model = bot?.model || trigger.model || DEFAULT_CHAT_MODEL;
         const systemPrompt = [bot?.instructions, trigger.systemPrompt].filter(Boolean).join("\n\n") || undefined;
         const triggerType = trigger.type;
 
+        // The window boundary this run leaves behind: the time taken before its quiet snapshot was read (see `windowStart`).
+        let runStartedAt: number | undefined;
+
+        // Whether the run created its thread. Only then did it post anything, so only then does it move the window:
+        // a run refused at admission or failed before a thread existed leaves its activity for the next run to report.
+        // Assigned from a callback, which the compiler does not follow: without the widening it reads the flag as always false.
+        let threadCreated = false as boolean;
+
+        if (takesWindow) {
+            const expected = trigger.lastTriggeredAt;
+            const reserved = await beforeRun(
+                async () => await ctx.runMutation(internal.triggers.functions.reserveQuietWindow, { expected, triggerId, windowStart }),
+            );
+
+            if (!reserved) {
+                await ctx.runMutation(internal.triggers.functions.recordFilteredExecution, { reason: "Another run is reporting this activity", triggerId });
+
+                return;
+            }
+
+            reservedWindow = { expected };
+        }
+
         // 2. Create execution log entry
-        const executionId = await ctx.runMutation(internal.triggers.functions.createExecution, {
-            payload,
-            triggerId,
-        });
+        const executionId = await beforeRun(
+            async () =>
+                await ctx.runMutation(internal.triggers.functions.createExecution, {
+                    payload,
+                    triggerId,
+                }),
+        );
+        let started = false;
 
         try {
             // 2b. Charge the run before any paid call. A refused run is recorded as a
@@ -73,6 +215,7 @@ export const executeTrigger = internalAction
                 claim,
                 executionId,
                 filterPayload: triggerType === "webhook" && ignoreDisabled !== true ? filterTextOf(payload, invalidUtf8) : undefined,
+                releaseUnlessRun,
                 triggerId,
             });
 
@@ -80,6 +223,7 @@ export const executeTrigger = internalAction
                 // Recorded as filtered and not charged; the running row was replaced.
                 // The reason quotes the configured filter value (an address, a token), so it stays in the owner's execution history, not the log.
                 console.info(`[Triggers] Trigger ${triggerId} delivery no longer matches its filters, skipping`);
+                await releaseWindow();
 
                 return;
             }
@@ -91,6 +235,7 @@ export const executeTrigger = internalAction
                     status: "failed",
                     userFixable: isModelUnavailableRefusal(refusal),
                 });
+                await releaseWindow();
 
                 return;
             }
@@ -130,14 +275,23 @@ export const executeTrigger = internalAction
             // Headless runs drop `ask` tools, so each one still needs the owner's `auto` setting.
             // A bot with its computer off gets no computer here: the sandbox lookup would fall back to a throwaway one.
             const useComputer = bot?.computerEnabled === true && trigger.botComputer === true && trigger.type === "schedule";
+
+            runStartedAt = windowStart;
+
             const { text: responseText, threadId } = await runHeadlessAgent(ctx, {
                 botId: bot ? trigger.botId : undefined,
                 memory: true,
                 model,
+                onGenerationStart: () => {
+                    started = true;
+                },
+                onThread: () => {
+                    threadCreated = true;
+                },
                 personalization: "full",
                 prompt: inputMessage,
                 system: systemPrompt,
-                thread: { title: `Trigger: ${trigger.name}` },
+                thread: { tags: [TRIGGER_THREAD_TAG], title: `Trigger: ${trigger.name}` },
                 toolAllowlist: useComputer ? SANDBOX_TOOLS : undefined,
                 tools: useComputer ? "headless" : "none",
                 userId,
@@ -151,8 +305,9 @@ export const executeTrigger = internalAction
             });
 
             // 6. Update trigger stats
+            // A run that took the window already moved it to this start, and must not move it again past a give-back.
             await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
-                lastTriggeredAt: Date.now(),
+                lastTriggeredAt: takesWindow ? undefined : runStartedAt,
                 triggerId,
             });
 
@@ -165,20 +320,50 @@ export const executeTrigger = internalAction
 
             console.error(`[Triggers] Trigger ${trigger.name} failed:`, error);
 
+            // Admission or the setup before the model was asked threw: the delivery never ran.
+            let note: string | undefined;
+            let releaseError: unknown;
+
+            if (!started) {
+                try {
+                    note = await giveBack();
+                } catch (error_) {
+                    // The release failed AND no retry could be scheduled. The execution is still closed and shown to the
+                    // owner below; the error is then rethrown so the job fails loudly instead of leaving the claim silently.
+                    releaseError = error_;
+                    note = RELEASE_LOST_NOTE;
+                }
+            }
+
+            if (!threadCreated) {
+                try {
+                    await releaseWindow();
+                } catch (error_) {
+                    releaseError ??= error_;
+                }
+            }
+
             // Update execution as failed
             await ctx.runMutation(internal.triggers.functions.updateExecution, {
-                error: errorMessage.slice(0, 2000),
+                error: [errorMessage, note].filter(Boolean).join(" ").slice(0, 2000),
                 executionId,
                 status: "failed",
                 userFixable,
             });
 
-            // Update trigger stats with error
+            // Update trigger stats with error. Only a quiet routine reads `lastTriggeredAt` as its window, so only it keeps
+            // the old value when the run posted nothing; any other routine still shows when it last ran.
+            const windowRoutine = trigger.quietWhenEmpty === true && canBeQuiet({ botId: bot ? botId : undefined, type: triggerType });
+
             await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
                 error: errorMessage.slice(0, 500),
-                lastTriggeredAt: Date.now(),
+                ...(!takesWindow && (threadCreated || !windowRoutine) && { lastTriggeredAt: threadCreated ? runStartedAt : Date.now() }),
                 triggerId,
             });
+
+            if (releaseError !== undefined) {
+                throw releaseError;
+            }
         }
     });
 

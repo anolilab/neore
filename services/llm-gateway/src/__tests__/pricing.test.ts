@@ -80,6 +80,23 @@ describe("calculateCost", () => {
         expect(calculateCost(pricing, usage)).toBe(15_000_000);
     });
 
+    it("prices text (total - reasoning) at the output rate and reasoning at its own rate, once", () => {
+        const pricing: ModelPricing = {
+            inputPerMillion: 0,
+            outputPerMillion: 10,
+            reasoningOutputPerMillion: 40,
+        };
+        // AI SDK `outputTokens.total` includes reasoning: 600 text + 400 reasoning = 1000 total.
+        const usage: TokenUsage = {
+            completionTokens: 1000,
+            promptTokens: 0,
+            reasoningTokens: 400,
+        };
+
+        // Text: 600/1M * $10 = 6000µ. Reasoning: 400/1M * $40 = 16000µ. Pricing the whole 1000 as text too would give 26000µ.
+        expect(calculateCost(pricing, usage)).toBe(22_000);
+    });
+
     it("falls back to outputPerMillion for reasoning when reasoningOutputPerMillion not set", () => {
         const pricing: ModelPricing = {
             inputPerMillion: 3,

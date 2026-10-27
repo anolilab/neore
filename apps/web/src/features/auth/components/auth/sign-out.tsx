@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
 import { resetAnalyticsIdentity, trackEvent } from "@/lib/analytics";
+import { setNativeBadge } from "@/lib/native/bridge";
 
 const SignOut = () => {
     const signingOut = useRef(false);
@@ -37,8 +38,10 @@ const SignOut = () => {
                         // The session may still be active: keep the analytics identity.
                         globalThis.location.replace(signInPath);
                     },
-                    onSuccess: () => {
+                    onSuccess: async () => {
                         resetAnalyticsIdentity();
+                        // Only after the session ends: a failed sign-out keeps the badge.
+                        await setNativeBadge(0);
                         globalThis.location.replace(signInPath);
                     },
                 },

@@ -11,7 +11,7 @@ import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
-import { notifyNative } from "@/lib/native/bridge";
+import { notifyNative, setNativeBadge } from "@/lib/native/bridge";
 
 import useNotificationInbox from "../hooks/use-notification-inbox";
 import { findNewArrivals } from "../lib/new-arrivals";
@@ -37,6 +37,15 @@ const NotificationBell: FC<{ className?: string }> = ({ className }) => {
     const [open, setOpen] = useState(false);
     const [announcement, setAnnouncement] = useState("");
     const seen = useRef<Set<string> | undefined>(undefined);
+
+    // Publish only after the first snapshot: before it, `unreadCount` is a placeholder zero that would
+    // overwrite a real count. Sign-out clears the badge explicitly. Not on unmount: closing a thread
+    // window unmounts a bell too, and that must not zero the main window's count.
+    useEffect(() => {
+        if (loaded) {
+            void setNativeBadge(unreadCount);
+        }
+    }, [loaded, unreadCount]);
 
     useEffect(() => {
         if (!loaded) {

@@ -38,8 +38,13 @@ type Harness = ReturnType<typeof lunoraTest>;
 
 let harness: Harness;
 
-const charge = async (args: { count?: number; kind: "Audio" | "Text"; organizationId?: string; requestId?: string; userId: string }): Promise<boolean> =>
-    await harness.run(async (ctx: any) => await ctx.runMutation(chargeDailyUnit, args));
+const charge = async (args: {
+    count?: number;
+    kind: "Audio" | "Image" | "Text";
+    organizationId?: string;
+    requestId?: string;
+    userId: string;
+}): Promise<boolean> => await harness.run(async (ctx: any) => await ctx.runMutation(chargeDailyUnit, args));
 
 const remaining = async (key: string, userId: string): Promise<number> =>
     await harness.run(async (ctx: any) => {
@@ -134,5 +139,33 @@ describe("chargeDailyUnit", () => {
         );
 
         expect(claimedBefore).toBe(true);
+    });
+
+    it("charges a keyed multi-image request one unit per image, once, and a retry takes nothing more", async () => {
+        users.set("u1", {});
+
+        const before = await remaining("chat/dailyImage:free", "u1");
+
+        await expect(charge({ count: 3, kind: "Image", requestId: "run-1:node-1", userId: "u1" })).resolves.toBe(true);
+        expect(await remaining("chat/dailyImage:free", "u1")).toBe(before - 3);
+
+        await expect(charge({ count: 3, kind: "Image", requestId: "run-1:node-1", userId: "u1" })).resolves.toBe(true);
+        expect(await remaining("chat/dailyImage:free", "u1")).toBe(before - 3);
+    });
+
+    it("refuses a keyed image request that does not fit in what is left, charging nothing and keeping the claim free", async () => {
+        users.set("u1", {});
+
+        const before = await remaining("chat/dailyImage:free", "u1");
+
+        await expect(charge({ count: before - 1, kind: "Image", userId: "u1" })).resolves.toBe(true);
+        await expect(charge({ count: 3, kind: "Image", requestId: "run-2:node-1", userId: "u1" })).resolves.toBe(false);
+        expect(await remaining("chat/dailyImage:free", "u1")).toBe(1);
+
+        const claimable = await harness.run(
+            async (ctx: any) => await ctx.runMutation(claimKey, { key: "run-2:node-1", scope: DAILY_CHARGE_SCOPE, ttlMs: 60_000 }),
+        );
+
+        expect(claimable).toBe(true);
     });
 });
