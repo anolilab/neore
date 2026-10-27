@@ -189,7 +189,9 @@ dropped by `seq`, so the stored `seq` outlives every replay that could pass.
 - A stream with no event for the reaper window is set to `timeout` by
   `cleanupExpiredStreams`, the status the code already uses, and the thread's
   status is reset. The host is then sent `acp_cancel` for that turn. Events that
-  arrive after the timeout are dropped. Every ingest moves `expiresAt` forward.
+  arrive after the timeout are dropped. Every terminal path (the reaper timeout, cancel,
+  revoke, `turn_end`) sets `hostState: ended` in the same mutation that sets the stream
+  status, and the UI shows "Working" only while the stream is not terminal. Every ingest moves `expiresAt` forward.
   S3 sets the window.
 - Electron throttles timers in hidden windows. S3 measures relay claim latency
   and heartbeat gaps with the window hidden for an hour. If either misses its
@@ -288,9 +290,11 @@ the folder and refers to it in its reply. Rules:
   accepts a session bearer or an API key, never a device signature: the create is signed with the device
   secret, names the folder file, and is checked against the device's user. The
   chunked upload that follows is authenticated
-  the same way: every request (create, `HEAD`, `PATCH`) carries a device signature
-  header under a new `upload` signing domain, over the method, the upload id and an
-  issue time. The route resolves the device's user from the signature, builds its
+  the same way: every request carries a device signature header under a new `upload` signing
+  domain. The create has no upload id yet (the handler mints it), so it is signed over the
+  method, the path, the declared size and type, a nonce and the issue time; the nonce is
+  claim-once, so a replayed create is refused. `HEAD` and `PATCH` are signed over the
+  method, the server-issued upload id and the issue time. The route resolves the device's user from the signature, builds its
   handler for that user exactly as for a session caller, and answers another user's
   upload id as not found. No user session or API key is ever handed to the desktop,
   and none reaches the agent. The ingest carries only the resulting

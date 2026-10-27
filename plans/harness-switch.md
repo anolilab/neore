@@ -43,7 +43,7 @@ context.
   (host threads cannot be shared). `target` is a cloud model id, or an offered (agent, folder, host) pair from the
   ACP host's offer list. A host target on a cloud thread, or a cloud target on a
   host thread, returns `forked: <threadId>` and creates the linked thread instead.
-  `clientId` makes it claim-once (scope `switch`), so a double tap switches once.
+  `clientId` makes it claim-once (scope `switch`), so a double tap switches once. A cloud-model target is checked with the same enabled-model and paid-model rules a send uses (`requireEnabledModel`, `assertPaidModel`) before the switch is written or a fork is made; execution checks again, because entitlement can change.
 - Refused while a turn in the thread is streaming. The user waits, or stops the
   turn first. This is a hard rule, so a transcript never has two agents writing
   at once.
@@ -143,7 +143,7 @@ verbatim tail, and delta on switching back.
 - Acceptance: the context sent to the model contains the handoff inside the
   budget (test with a long thread); switching back sends only messages after the
   last one the earlier model saw; the summary call is charged once and a retry does
-  not charge again (claim-once on `switch:<clientId>` before `chargeRound`); a
+  not charge again (an action produces the summary first, uncharged; one mutation then takes the claim-once on `switch:<clientId>`, calls `chargeRound` and writes the switch, so a failed write rolls back the claim and the charge together and a retry is not refused); a
   handoff that cannot fit fails with a message and nothing is charged.
 
 **S3 — Host handoff.** Host to host, in the same thread, using the `portable` mode.
