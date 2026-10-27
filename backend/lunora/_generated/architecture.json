@@ -4571,6 +4571,11 @@
       "to": "table:idempotencyClaims"
     },
     {
+      "from": "function:lib_claim_once:purgeClaimsWithPrefix",
+      "kind": "schedule",
+      "to": "function:lib_claim_once:purgeClaimsWithPrefix"
+    },
+    {
       "from": "function:lib_claim_once:purgeExpiredClaims",
       "kind": "read",
       "to": "table:idempotencyClaims"
@@ -4589,6 +4594,11 @@
       "from": "function:lib_claim_once:reapLapsedClaims",
       "kind": "read",
       "to": "table:idempotencyClaims"
+    },
+    {
+      "from": "function:lib_claim_once:retryReleaseKey",
+      "kind": "schedule",
+      "to": "function:lib_claim_once:retryReleaseKey"
     },
     {
       "from": "function:lib_document_history:recordHistory",
@@ -6363,6 +6373,11 @@
     {
       "from": "function:triggers_execute:default",
       "kind": "call",
+      "to": "function:lib_claim_once:releaseKey"
+    },
+    {
+      "from": "function:triggers_execute:default",
+      "kind": "call",
       "to": "function:triggers_functions:admitTriggerRun"
     },
     {
@@ -6384,6 +6399,11 @@
       "from": "function:triggers_execute:default",
       "kind": "call",
       "to": "function:triggers_functions:updateTriggerStats"
+    },
+    {
+      "from": "function:triggers_execute:default",
+      "kind": "schedule",
+      "to": "function:lib_claim_once:retryReleaseKey"
     },
     {
       "from": "function:triggers_functions:admitTriggerRun",
@@ -6414,6 +6434,11 @@
       "from": "function:triggers_functions:deleteTrigger",
       "kind": "read",
       "to": "table:triggerExecutions"
+    },
+    {
+      "from": "function:triggers_functions:deleteTrigger",
+      "kind": "schedule",
+      "to": "function:lib_claim_once:purgeClaimsWithPrefix"
     },
     {
       "from": "function:triggers_functions:deleteTrigger",
@@ -12197,6 +12222,12 @@
     },
     {
       "detail": "mutation",
+      "id": "function:lib_claim_once:purgeClaimsWithPrefix",
+      "kind": "function",
+      "name": "lib.claim_once.purgeClaimsWithPrefix"
+    },
+    {
+      "detail": "mutation",
       "id": "function:lib_claim_once:purgeExpiredClaims",
       "kind": "function",
       "name": "lib.claim_once.purgeExpiredClaims"
@@ -12212,6 +12243,12 @@
       "id": "function:lib_claim_once:releaseKey",
       "kind": "function",
       "name": "lib.claim_once.releaseKey"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:lib_claim_once:retryReleaseKey",
+      "kind": "function",
+      "name": "lib.claim_once.retryReleaseKey"
     },
     {
       "detail": "query",
@@ -17640,25 +17677,25 @@
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 128,
+      "line": 134,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 190,
+      "line": 196,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 203,
+      "line": 211,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "schedule",
-      "line": 209,
+      "line": 217,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
@@ -19110,67 +19147,79 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 96,
+      "line": 109,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 96,
+      "line": 109,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 96,
+      "line": 109,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 96,
+      "line": 109,
       "reason": "\"hasClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 96,
+      "line": 109,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 115,
+      "line": 128,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 115,
+      "line": 128,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 118,
+      "line": 131,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 118,
+      "line": 131,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 172,
+      "line": 185,
       "reason": "\"releaseClaim\" is not a registered function"
+    },
+    {
+      "file": "lib/claim-once",
+      "kind": "read",
+      "line": 208,
+      "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
+    },
+    {
+      "file": "lib/claim-once",
+      "kind": "write",
+      "line": 213,
+      "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 239,
+      "line": 330,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -20076,37 +20125,25 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 83,
+      "line": 107,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 193,
+      "line": 244,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 224,
+      "line": 424,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 229,
-      "reason": "the default export is not a registered function"
-    },
-    {
-      "file": "triggers/http",
-      "kind": "call",
-      "line": 234,
-      "reason": "the default export is not a registered function"
-    },
-    {
-      "file": "triggers/http",
-      "kind": "call",
-      "line": 258,
+      "line": 439,
       "reason": "the default export is not a registered function"
     },
     {

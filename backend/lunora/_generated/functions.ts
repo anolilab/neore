@@ -1003,9 +1003,11 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "lib_claim_once:claimKey": lunora_lib_claim_once_116.claimKey as unknown as RegisteredLunoraFunction,
     "lib_claim_once:claimKeyFenced": lunora_lib_claim_once_116.claimKeyFenced as unknown as RegisteredLunoraFunction,
     "lib_claim_once:completeKey": lunora_lib_claim_once_116.completeKey as unknown as RegisteredLunoraFunction,
+    "lib_claim_once:purgeClaimsWithPrefix": lunora_lib_claim_once_116.purgeClaimsWithPrefix as unknown as RegisteredLunoraFunction,
     "lib_claim_once:purgeExpiredClaims": lunora_lib_claim_once_116.purgeExpiredClaims as unknown as RegisteredLunoraFunction,
     "lib_claim_once:reapLapsedClaims": lunora_lib_claim_once_116.reapLapsedClaims as unknown as RegisteredLunoraFunction,
     "lib_claim_once:releaseKey": lunora_lib_claim_once_116.releaseKey as unknown as RegisteredLunoraFunction,
+    "lib_claim_once:retryReleaseKey": lunora_lib_claim_once_116.retryReleaseKey as unknown as RegisteredLunoraFunction,
     "lib_document_history:getDocumentAtTime": lunora_lib_document_history_117.getDocumentAtTime as unknown as RegisteredLunoraFunction,
     "lib_document_history:listDocumentVersions": lunora_lib_document_history_117.listDocumentVersions as unknown as RegisteredLunoraFunction,
     "lib_document_history:listUserActivity": lunora_lib_document_history_117.listUserActivity as unknown as RegisteredLunoraFunction,
@@ -5759,6 +5761,15 @@ if (typeof source["key"] !== "string") return DEFER;
 if (typeof source["scope"] !== "string") return DEFER;
 return { "key": source["key"], "scope": source["scope"] };
 });
+installCompiledValidatorMap(lunora_lib_claim_once_116.purgeClaimsWithPrefix.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["prefix"] !== "string") return DEFER;
+if (source["prefix"].length > 200) return DEFER;
+if (typeof source["scope"] !== "string") return DEFER;
+if (source["scope"].length > 200) return DEFER;
+return { "prefix": source["prefix"], "scope": source["scope"] };
+});
 installCompiledValidatorMap(lunora_lib_claim_once_116.releaseKey.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -5772,6 +5783,23 @@ __has1 = true;
 if (typeof source["key"] !== "string") return DEFER;
 if (typeof source["scope"] !== "string") return DEFER;
 return { ...(__has1 ? { "claimedAt": __val1 } : {}), "key": source["key"], "scope": source["scope"] };
+});
+installCompiledValidatorMap(lunora_lib_claim_once_116.retryReleaseKey.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["attempt"] !== "number" || !Number.isFinite(source["attempt"])) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["claimedAt"] !== undefined) {
+if (typeof source["claimedAt"] !== "number" || !Number.isFinite(source["claimedAt"])) return DEFER;
+__val1 = source["claimedAt"];
+__has1 = true;
+}
+if (typeof source["key"] !== "string") return DEFER;
+if (source["key"].length > 1024) return DEFER;
+if (typeof source["scope"] !== "string") return DEFER;
+if (source["scope"].length > 200) return DEFER;
+return { "attempt": source["attempt"], ...(__has1 ? { "claimedAt": __val1 } : {}), "key": source["key"], "scope": source["scope"] };
 });
 installCompiledValidatorMap(lunora_lib_document_history_117.getDocumentAtTime.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8889,9 +8917,11 @@ export interface Caller {
             claimKey: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }) => Promise<boolean>;
             claimKeyFenced: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }) => Promise<null | number>;
             completeKey: (args: { key: string; scope: string }) => Promise<null>;
+            purgeClaimsWithPrefix: (args: { prefix: string; scope: string }) => Promise<null>;
             purgeExpiredClaims: (args?: {}) => Promise<number>;
             reapLapsedClaims: (args?: {}) => Promise<number>;
             releaseKey: (args: { claimedAt?: number; key: string; scope: string }) => Promise<null>;
+            retryReleaseKey: (args: { attempt: number; claimedAt?: number; key: string; scope: string }) => Promise<null>;
         };
         document_history: {
             getDocumentAtTime: (args: { documentId: string; tableName: string; timestamp: number }) => Promise<unknown | null>;
@@ -9326,18 +9356,18 @@ export interface Caller {
     };
     triggers: {
         execute: {
-            default: (args: { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
-            executeTrigger: (args: { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
+            default: (args: { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
+            executeTrigger: (args: { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
         };
         functions: {
-            admitTriggerRun: (args: { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }) => Promise<null | string | { filtered: string }>;
+            admitTriggerRun: (args: { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }) => Promise<null | string | { filtered: string }>;
             createExecution: (args: { payload?: string; triggerId: Id<"triggers"> }) => Promise<Id<"triggerExecutions">>;
-            createTrigger: (args: { botComputer?: boolean; botId?: string; cronExpression?: string; description?: string; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; type: "schedule" | "webhook" | "event"; webhookSignatureScheme?: "timestamped" | "native" }) => Promise<{ triggerId: string; webhookSecret?: string }>;
+            createTrigger: (args: { botComputer?: boolean; botId?: string; cronExpression?: string; description?: string; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; type: "schedule" | "webhook" | "event"; webhookPreset?: { event: "pull_request_opened" | "pull_request_merged" | "pull_request_review_requested" | "issue_assigned"; provider: "github" } | { event: "merge_request_opened" | "merge_request_merged"; provider: "gitlab" }; webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token" }) => Promise<{ triggerId: string; webhookSecret?: string }>;
             deleteTrigger: (args: { triggerId: Id<"triggers"> }) => Promise<void>;
             getDueScheduleTriggers: (args: { now: number }) => Promise<import("./dataModel.js").Doc_triggers[]>;
             getTriggerExecutions: (args: { limit?: number; triggerId: Id<"triggers"> }) => Promise<({} & { _id: string; completedAt: number | null; error: string | null; startedAt: number; status: string; threadId: string | null; })[]>;
             getTriggerInternal: (args: { triggerId: Id<"triggers"> }) => Promise<import("./dataModel.js").Doc_triggers | null>;
-            getTriggers: (args?: {}) => Promise<({} & { _creationTime: number; _id: string; botComputer: boolean; botId: string | null; createdAt: number; cronExpression: string | null; description: string | null; enabled: boolean; filters: ({} & { op: "contains" | "equals" | "not_equals" | "starts_with" | "exists" | "not_exists"; path: string; value: string | null; })[]; inputTemplate: string | null; lastError: string | null; lastTriggeredAt: number | null; model: string; name: string; nextTriggerAt: number | null; searchMode: string | null; systemPrompt: string | null; timezone: string | null; triggerCount: number; type: string; updatedAt: number; webhookSignatureScheme: "native" | "timestamped" | null; })[]>;
+            getTriggers: (args?: {}) => Promise<({} & { _creationTime: number; _id: string; botComputer: boolean; botId: string | null; createdAt: number; cronExpression: string | null; description: string | null; enabled: boolean; filters: ({} & { op: "contains" | "equals" | "not_equals" | "starts_with" | "exists" | "not_exists"; path: string; value: string | null; })[]; inputTemplate: string | null; lastError: string | null; lastTriggeredAt: number | null; model: string; name: string; nextTriggerAt: number | null; searchMode: string | null; systemPrompt: string | null; timezone: string | null; triggerCount: number; type: string; updatedAt: number; webhookSignatureScheme: "native" | "timestamped" | "gitlab-token" | null; })[]>;
             recordFilteredExecution: (args: { reason: string; triggerId: Id<"triggers"> }) => Promise<null>;
             setTriggerEnabled: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
             setTriggerEnabledInternal: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<null>;
@@ -10524,9 +10554,11 @@ export const createCaller = (context: CallerCtx): Caller => ({
             claimKey: (args) => callRegistered(context, "lib_claim_once:claimKey", args),
             claimKeyFenced: (args) => callRegistered(context, "lib_claim_once:claimKeyFenced", args),
             completeKey: (args) => callRegistered(context, "lib_claim_once:completeKey", args),
+            purgeClaimsWithPrefix: (args) => callRegistered(context, "lib_claim_once:purgeClaimsWithPrefix", args),
             purgeExpiredClaims: (args) => callRegistered(context, "lib_claim_once:purgeExpiredClaims", args),
             reapLapsedClaims: (args) => callRegistered(context, "lib_claim_once:reapLapsedClaims", args),
             releaseKey: (args) => callRegistered(context, "lib_claim_once:releaseKey", args),
+            retryReleaseKey: (args) => callRegistered(context, "lib_claim_once:retryReleaseKey", args),
         },
         document_history: {
             getDocumentAtTime: (args) => callRegistered(context, "lib_document_history:getDocumentAtTime", args),

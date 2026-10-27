@@ -14,7 +14,7 @@ vi.mock("../../_generated/api", async (importOriginal) => mappedReferences(await
 vi.mock("../../_generated/internal", async (importOriginal) => mappedReferences(await importOriginal(), (reference) => reference.__lunoraRef));
 
 const seen = vi.hoisted(() => {
-    return { buildOptions: [] as unknown[], system: [] as string[], tools: [] as string[][] };
+    return { buildOptions: [] as unknown[], failAt: undefined as "generate" | "keys" | "thread" | undefined, system: [] as string[], tools: [] as string[][] };
 });
 
 vi.mock("./get-agent", () => {
@@ -34,6 +34,10 @@ vi.mock("./get-agent", () => {
             const instructions = getSystemPrompt(options.timezone, options.location, options.language, options.personalization);
             const thread = {
                 generateText: async (args: { system?: string }) => {
+                    if (seen.failAt === "generate") {
+                        throw new Error("model call failed");
+                    }
+
                     seen.system.push(args.system ?? instructions);
 
                     return { text: "reply" };
@@ -45,6 +49,10 @@ vi.mock("./get-agent", () => {
                     return { thread };
                 },
                 createThread: async () => {
+                    if (seen.failAt === "thread") {
+                        throw new Error("thread creation failed");
+                    }
+
                     return { thread, threadId: "thread-new" };
                 },
                 options: { instructions },
@@ -89,6 +97,10 @@ const fakeCtx = () =>
             }
 
             if (reference === "auth_functions:getDecryptedProviderKeysQuery") {
+                if (seen.failAt === "keys") {
+                    throw new Error("provider keys unavailable");
+                }
+
                 return {};
             }
 
@@ -171,5 +183,55 @@ describe("runHeadlessAgent tool allowlist", () => {
         await run({ additionalTools: ["imageGeneration"], toolAllowlist: ["imageGeneration"] });
 
         expect(seen.buildOptions[0]).toMatchObject({ headless: true, skillTools: { additionalTools: ["imageGeneration"] } });
+    });
+});
+
+describe("runHeadlessAgent onGenerationStart", () => {
+    const run = async (onGenerationStart: () => void) =>
+        await runHeadlessAgent(fakeCtx(), {
+            memory: false,
+            model: "test-model",
+            onGenerationStart,
+            personalization: "full",
+            prompt: "Do the thing",
+            thread: { title: "Trigger: x" },
+            tools: "none",
+            userId: "owner",
+        });
+
+    beforeEach(() => {
+        seen.failAt = undefined;
+    });
+
+    it("is called once, right before the model is asked", async () => {
+        const started = vi.fn();
+
+        await run(started);
+
+        expect(started).toHaveBeenCalledTimes(1);
+    });
+
+    it("is not called when the provider keys fail to load", async () => {
+        const started = vi.fn();
+
+        seen.failAt = "keys";
+        await expect(run(started)).rejects.toThrow("provider keys unavailable");
+        expect(started).not.toHaveBeenCalled();
+    });
+
+    it("is not called when the thread cannot be created", async () => {
+        const started = vi.fn();
+
+        seen.failAt = "thread";
+        await expect(run(started)).rejects.toThrow("thread creation failed");
+        expect(started).not.toHaveBeenCalled();
+    });
+
+    it("is called when the model call itself fails", async () => {
+        const started = vi.fn();
+
+        seen.failAt = "generate";
+        await expect(run(started)).rejects.toThrow("model call failed");
+        expect(started).toHaveBeenCalledTimes(1);
     });
 });
