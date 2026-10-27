@@ -17,6 +17,7 @@ import { z } from "zod";
 
 import type { AppEnv, HonoEnv } from "../../env.js";
 import { countPromptTextChars, estimateCancelledUsage } from "../../lib/cancelled-usage.js";
+import { deferWaitUntil } from "../../lib/deferred-wait-until.js";
 import { GatewayError } from "../../lib/errors.js";
 import { deserializeFromWire, serializeForWire } from "../../lib/model-serialization.js";
 import { internalAuth } from "../../middleware/auth.js";
@@ -238,6 +239,7 @@ modelProxyRouter.openapi(
                 // Extract usage and calculate cost
                 const { usage } = result;
                 const promptTokens = usage?.inputTokens?.total ?? 0;
+                // `outputTokens.total` already includes reasoning (`calculateCost` subtracts it): do not add `reasoning` on top.
                 const completionTokens = usage?.outputTokens?.total ?? 0;
                 const cachedTokens = usage?.inputTokens?.cacheRead ?? 0;
                 const reasoningTokens = usage?.outputTokens?.reasoning ?? 0;
@@ -308,6 +310,10 @@ modelProxyRouter.openapi(
 
             const reader = streamResult.stream.getReader();
             let isCancelled = false;
+            // Registered before the Response is returned: a cancelled relay finishes after the response has
+            // ended, and the pricing read it awaits first would otherwise be cancelled with the request.
+            const settleBackground = deferWaitUntil(execContext);
+            let backgroundWork: Promise<unknown> = Promise.resolve();
 
             const stream = new ReadableStream({
                 async cancel(reason) {
@@ -412,45 +418,43 @@ modelProxyRouter.openapi(
 
                         send(`data: ${JSON.stringify(metaChunk)}\n\n`);
 
-                        execContext.waitUntil(
-                            Promise.allSettled([
-                                usageTracker.record(
-                                    {
-                                        modelApiId: body.modelApiId,
-                                        modelId: body.modelId,
-                                        orgId: body.orgId,
-                                        provider: body.provider,
-                                        requestId: body.requestId,
-                                        threadId: body.threadId,
-                                        userId: body.userId,
-                                        ...tokens,
-                                        costMicrodollars,
-                                        // A provider error inside the stream is a failed call, so its GenAI span must not export as OK.
-                                        ...(isErrored && { errorCode: "PROVIDER_ERROR" }),
-                                        finishReason: isEstimated ? "cancelled" : lastFinishReason,
-                                        isStreaming: true,
-                                        latencyMs,
-                                        operation: "chat",
-                                        source: "internal",
-                                        ttftMs,
-                                    },
-                                    c.var.telemetry,
-                                ),
-                                ...(isCancelled || isErrored ? [] : [policy.recordHealth.success(latencyMs)]),
-                                ...(isErrored && !isCancelled ? [policy.recordHealth.failure()] : []),
-                                usageReporter.report({
-                                    billingMode,
-                                    byokFeeRate,
-                                    completionTokens: tokens.completionTokens,
-                                    costMicrodollars,
+                        backgroundWork = Promise.allSettled([
+                            usageTracker.record(
+                                {
+                                    modelApiId: body.modelApiId,
                                     modelId: body.modelId,
                                     orgId: body.orgId,
-                                    promptTokens: tokens.promptTokens,
+                                    provider: body.provider,
                                     requestId: body.requestId,
+                                    threadId: body.threadId,
                                     userId: body.userId,
-                                }),
-                            ]),
-                        );
+                                    ...tokens,
+                                    costMicrodollars,
+                                    // A provider error inside the stream is a failed call, so its GenAI span must not export as OK.
+                                    ...(isErrored && { errorCode: "PROVIDER_ERROR" }),
+                                    finishReason: isEstimated ? "cancelled" : lastFinishReason,
+                                    isStreaming: true,
+                                    latencyMs,
+                                    operation: "chat",
+                                    source: "internal",
+                                    ttftMs,
+                                },
+                                c.var.telemetry,
+                            ),
+                            ...(isCancelled || isErrored ? [] : [policy.recordHealth.success(latencyMs)]),
+                            ...(isErrored && !isCancelled ? [policy.recordHealth.failure()] : []),
+                            usageReporter.report({
+                                billingMode,
+                                byokFeeRate,
+                                completionTokens: tokens.completionTokens,
+                                costMicrodollars,
+                                modelId: body.modelId,
+                                orgId: body.orgId,
+                                promptTokens: tokens.promptTokens,
+                                requestId: body.requestId,
+                                userId: body.userId,
+                            }),
+                        ]);
                     } catch (error) {
                         const errorChunk = {
                             error: error instanceof Error ? error.message : "Unknown stream error",
@@ -460,9 +464,11 @@ modelProxyRouter.openapi(
                         send(`data: ${JSON.stringify(errorChunk)}\n\n`);
 
                         if (!isCancelled) {
-                            execContext.waitUntil(policy.recordHealth.failure());
+                            backgroundWork = Promise.allSettled([policy.recordHealth.failure()]);
                         }
                     } finally {
+                        settleBackground(backgroundWork);
+
                         if (!isCancelled) {
                             controller.close();
                         }

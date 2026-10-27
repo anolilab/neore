@@ -1,7 +1,7 @@
 import { isRedirect } from "@tanstack/react-router";
 import { describe, expect, it } from "vitest";
 
-import { requireSession } from "./route-guard";
+import { isSignedOut, requireSession } from "./route-guard";
 
 type RedirectOptions = { search?: Record<string, unknown>; to: string };
 
@@ -34,5 +34,29 @@ describe("requireSession", () => {
     it("lets a signed-in visitor through, and a failed read is not a sign-out", () => {
         expect(redirectOf({ authStatus: "authenticated" }, { href: "/dashboard", pathname: "/dashboard" })).toBeUndefined();
         expect(redirectOf({ authStatus: "unknown" }, { href: "/dashboard", pathname: "/dashboard" })).toBeUndefined();
+    });
+});
+
+describe("requireSession on a context without authStatus", () => {
+    it("falls back to isAuthenticated, redirecting only when it is not set", () => {
+        expect(redirectOf({ isAuthenticated: false }, { href: "/dashboard", pathname: "/dashboard" })).toMatchObject({ to: "/auth/sign-in" });
+        expect(redirectOf({}, { href: "/dashboard", pathname: "/dashboard" })).toMatchObject({ to: "/auth/sign-in" });
+        expect(redirectOf({ isAuthenticated: true }, { href: "/dashboard", pathname: "/dashboard" })).toBeUndefined();
+    });
+
+    it("lets authStatus win over a contradicting isAuthenticated", () => {
+        // A failed token fetch leaves `isAuthenticated` false while the status is "unknown".
+        expect(redirectOf({ authStatus: "unknown", isAuthenticated: false }, { href: "/chat", pathname: "/chat" })).toBeUndefined();
+        expect(redirectOf({ authStatus: "unauthenticated", isAuthenticated: true }, { href: "/chat", pathname: "/chat" })).toMatchObject({
+            to: "/auth/sign-in",
+        });
+    });
+});
+
+describe("isSignedOut", () => {
+    it("is true only for an answered no-session", () => {
+        expect(isSignedOut({ authStatus: "unauthenticated" })).toBe(true);
+        expect(isSignedOut({ authStatus: "authenticated" })).toBe(false);
+        expect(isSignedOut({ authStatus: "unknown" })).toBe(false);
     });
 });

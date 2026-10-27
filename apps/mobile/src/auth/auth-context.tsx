@@ -7,7 +7,7 @@ import { getClient } from "../lib/lunora";
 import type { AuthStatus } from "./auth-state";
 import { AuthContext } from "./auth-state";
 import type { GrantUser } from "./grant";
-import { fetchAccessToken, signOutGrant } from "./grant";
+import { fetchAccessToken, readStoredUser, signOutGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
 import { signInWithBrowser } from "./sign-in";
 
@@ -64,13 +64,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             }
 
-            const stored = await secureGrantStore.get();
+            const storedUser = await readStoredUser(secureGrantStore);
 
             if (isStale()) {
                 return;
             }
 
-            setUser(stored?.user ?? null);
+            setUser(storedUser);
             setStatus("signed-in");
             timer = setTimeout(setRefreshTick, tokenRefreshDelayMs(jwt) ?? FALLBACK_REFRESH_MS, nextTick);
         };

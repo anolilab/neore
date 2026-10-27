@@ -94,22 +94,3 @@ export const parsePullProgress = (line: string): PullProgress | undefined => {
 const MODEL_NAME_RE = /^[\w.-]+(?:\/[\w.-]+)*(?::[\w.-]+)?$/u;
 
 export const isValidOllamaModelName = (name: string): boolean => name.length > 0 && name.length <= 200 && MODEL_NAME_RE.test(name);
-
-const UNITS = ["B", "KB", "MB", "GB", "TB"];
-
-/** `4920753328` → `4.6 GB`. Binary units, as Ollama's own CLI prints them. */
-export const formatBytes = (bytes: number): string => {
-    if (!Number.isFinite(bytes) || bytes <= 0) {
-        return "0 B";
-    }
-
-    let value = bytes;
-    let unit = 0;
-
-    while (value >= 1024 && unit < UNITS.length - 1) {
-        value /= 1024;
-        unit += 1;
-    }
-
-    return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${UNITS[unit]}`;
-};

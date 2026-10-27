@@ -69,7 +69,8 @@
         "lint:types": "vis run lint:types && pnpm run lint:types:deploy",
         "lint:types:deploy": "tsc -p tsconfig.deploy.json",
         "sort-package-json": "sort-package-json packages/**/package.json apps/*/package.json backend/package.json services/*/package.json tools/*/package.json ./package.json",
-        "test:e2e": "pnpm --filter=app test:e2e"
+        "test:e2e": "pnpm --filter=app test:e2e",
+        "verify": "pnpm run lint && pnpm run lint:types && vis run test"
     },
     "devDependencies": {
         "@anolilab/commitlint-config": "catalog:lint",

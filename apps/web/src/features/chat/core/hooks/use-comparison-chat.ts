@@ -268,7 +268,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                     children.map(async ({ model, threadId: childThreadId }) => {
                         const reasoningEffort = effortFor(model, pendingSettings?.reasoningEffort);
                         const response = await fetch(CHAT_STREAM_URL, {
-                            // Each child is its own thread: a locked one takes its own proof (`lib/lunora/unlock-proofs.ts`).
+                            // Each child is its own thread: a locked one takes its own proof (`packages/client-runtime/src/unlock-proofs.ts`).
                             body: JSON.stringify(
                                 withUnlockProofBody(
                                     {

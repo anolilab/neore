@@ -354,8 +354,8 @@ export const runStreamingAgent = internalAction
             let piped: PipedStream;
 
             // A sidebar stop during the run ends it here, with the reply it still owed saved (`endStoppedRun`).
-            const recordRun = (extra: Pick<Parameters<typeof afterRun>[1], "botId" | "extractMemory" | "firstTokenTime" | "prompt">) => {
-                afterRun(ctx, {
+            const recordRun = async (extra: Pick<Parameters<typeof afterRun>[1], "botId" | "extractMemory" | "firstTokenTime" | "prompt">) => {
+                await afterRun(ctx, {
                     knowledgeSources: runContext.knowledgeSources,
                     retrievedMemories: runContext.retrievedMemories,
                     savedMessages: result.savedMessages,
@@ -379,7 +379,7 @@ export const runStreamingAgent = internalAction
                 });
 
                 // The steps that finished before the stop are a reply like any other on the usage page; nothing is mined for memory.
-                recordRun({ extractMemory: false, firstTokenTime: undefined, prompt: "" });
+                await recordRun({ extractMemory: false, firstTokenTime: undefined, prompt: "" });
             };
 
             try {
@@ -436,7 +436,7 @@ export const runStreamingAgent = internalAction
             }
 
             // Post-stream work: timing and memory extraction, then follow-ups.
-            recordRun({
+            await recordRun({
                 botId: runContext.botId,
                 extractMemory,
                 firstTokenTime,

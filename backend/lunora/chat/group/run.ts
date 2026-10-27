@@ -333,8 +333,8 @@ const runSpeaker = async (
         };
         // Timing only: memory is not extracted from group turns — the exchange
         // is several participants' voices, not the user talking to one assistant.
-        const recordRun = (firstTokenTime: number | undefined) => {
-            afterRun(ctx, {
+        const recordRun = async (firstTokenTime: number | undefined) => {
+            await afterRun(ctx, {
                 extractMemory: false,
                 firstTokenTime,
                 prompt: "",
@@ -363,7 +363,7 @@ const runSpeaker = async (
             await markSpeaker([...stoppedIds, ...(result.savedMessages ?? []).map((m) => m._id as string)]);
 
             // What the speaker finished before the stop is a reply like any other on the usage page.
-            recordRun(undefined);
+            await recordRun(undefined);
 
             return { lastMessageId: undefined, paused: false, stopped: true };
         };
@@ -415,7 +415,7 @@ const runSpeaker = async (
             return await stoppedAt(error);
         }
 
-        recordRun(firstTokenTime);
+        await recordRun(firstTokenTime);
 
         return { lastMessageId: savedIds.at(-1), paused, stopped: false };
     } finally {

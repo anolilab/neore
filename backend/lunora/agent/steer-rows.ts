@@ -71,6 +71,7 @@ export const insertSteerRow = async (ctx: MutationCtx, args: SteerRowArgs): Prom
     }
 
     const { messages } = await addMessagesHandler(ctx, {
+        fromUser: true,
         messages: [{ message: { content: args.text, role: "user" } }],
         parentMessageId: parent._id,
         threadId,

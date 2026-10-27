@@ -14,8 +14,9 @@
  *
  * The run re-checks everything when it fires ({@link claimReflectionRun}):
  * memory still on (OPT-IN — `isMemoryEnabled`'s rule), active within 24h, inside
- * the local night window, and not already run for this local day. A late,
- * duplicated or stale job therefore does nothing.
+ * the local night window, and not already run for this local day. A duplicated
+ * or stale job therefore does nothing; one that lands outside the window books
+ * the next night's run.
  *
  * ## Cost
  *
@@ -149,7 +150,8 @@ export const noteMemoryActivity = internalMutation
 /**
  * Decides, when the job fires, whether this run happens — and if so claims the
  * local day so a duplicate cannot run too. The pending-job fields are cleared
- * either way, so the next activity schedules the next night.
+ * so the next activity schedules the next night — except for `outside_window`,
+ * which books the next night's run itself.
  */
 export const claimReflectionRun = internalMutation
     .input({ userId: v.string() })
@@ -177,10 +179,23 @@ export const claimReflectionRun = internalMutation
 
         // `undefined` REMOVES the pending-job fields (`lib/patch.ts`) — unless they
         // name a LATER job, which activity scheduled while this one was overdue.
-        const clearPending = state.scheduledFor !== undefined && state.scheduledFor > now ? {} : { scheduledFor: undefined, scheduledJobId: undefined };
+        const hasLaterJob = state.scheduledFor !== undefined && state.scheduledFor > now;
+        const clearPending = hasLaterJob ? {} : { scheduledFor: undefined, scheduledJobId: undefined };
 
         if (!eligibility.eligible) {
-            await patchRow(ctx.db, state, clearPending);
+            // A run that landed outside its window (late alarm, time-zone change,
+            // DST) books the next night instead of going quiet until the user chats
+            // again. `outside_window` is only reached with memory on and recent
+            // activity. `nextReflectionRunAt` is strictly later than `now`, so this
+            // cannot loop.
+            if (eligibility.reason === "outside_window" && !hasLaterJob) {
+                const scheduledFor = nextReflectionRunAt(now, timeZone, userId);
+                const scheduledJobId = await ctx.scheduler.runAt(scheduledFor, internal.memory.reflection.runMemoryReflection, { userId });
+
+                await patchRow(ctx.db, state, { scheduledFor, scheduledJobId });
+            } else {
+                await patchRow(ctx.db, state, clearPending);
+            }
 
             return { claimed: false as const, reason: eligibility.reason };
         }

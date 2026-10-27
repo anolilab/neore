@@ -21,8 +21,12 @@ export const BASIC_STREAMDOWN_PLUGINS: PluginConfig = { cjk, code };
 // Matches what `singleDollarTextMath` parses as math; a lone `$20` has no pair.
 const DOLLAR_PAIR_RE = /\$[^$\n]*\$/u;
 
+// A backtick fence of any length (three or more) opening a mermaid block on its own line, which may sit in a
+// bullet, numbered (`1.` or `1)`) list item, or quote. `toMermaidFence` lengthens the fence past any backtick run in the source.
+const MERMAID_FENCE_RE = /^(?:\d+[.)]|[ \t>*+-])*`{3,}mermaid/mu;
+
 export const needsHeavyStreamdownPlugins = (text: string): boolean =>
-    text.includes("```mermaid") || text.includes("$$") || DOLLAR_PAIR_RE.test(text) || text.includes(String.raw`\(`) || text.includes(String.raw`\[`);
+    MERMAID_FENCE_RE.test(text) || text.includes("$$") || DOLLAR_PAIR_RE.test(text) || text.includes(String.raw`\(`) || text.includes(String.raw`\[`);
 
 // Held on an object so the loader mutates a property rather than rebinding a
 // module-level `let` from inside a function.
