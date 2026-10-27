@@ -434,6 +434,30 @@ jobs:
                   ldd "$binary" | tee /dev/stderr | { ! grep -qi dbus; }
                   strings "$binary" | { ! grep -q "dev.neore.device"; }
 
+            # The binary that gets copied to a remote machine must not depend on that machine's libc.
+            # A static musl build runs on any Linux of the same architecture, so it is built, checked for
+            # dynamic dependencies, and put through the stdio tests (`NEORE_HOST_BIN` points them at it).
+            - name: "Build neore-host static (musl) and run the stdio tests against it"
+              if: "matrix.os == 'ubuntu-22.04'"
+              shell: "bash"
+              env:
+                  NEORE_REQUIRE_SANDBOX: "1"
+              run: |
+                  set -euo pipefail
+                  sudo apt-get install -y musl-tools
+                  rustup target add x86_64-unknown-linux-musl
+                  manifest=packages/device-core/Cargo.toml
+                  cargo build --manifest-path "$manifest" --release --no-default-features --bin neore-host --target x86_64-unknown-linux-musl
+                  binary="$PWD/packages/device-core/target/x86_64-unknown-linux-musl/release/neore-host"
+                  file "$binary"
+                  ldd "$binary" || true
+                  # A static binary names no interpreter and no shared library. (`set -e` ignores a bare `!`.)
+                  if readelf -l "$binary" | grep -q INTERP || readelf -d "$binary" | grep -q NEEDED; then
+                      echo "neore-host is dynamically linked" >&2
+                      exit 1
+                  fi
+                  NEORE_HOST_BIN="$binary" cargo test --manifest-path "$manifest" --no-default-features --test host_stdio
+
     # Packages the desktop shell without signing, so a packager break (the xmldom override,
     # a missing addon in the asar) shows on the PR instead of at the next `desktop-v*` tag.
     # Linux x64 only: it is the cheapest runner, and desktop.yml still builds every platform
