@@ -534,7 +534,7 @@ const useThreadGroups = (
         return groups;
     }, [searchResultsGroup, hierarchyData, threadsByProject, projects, collapsedGroups, collapsedProjects, dateBoundaries, t]);
 
-    return { threadGroups, threadsData };
+    return { isPlaceholderData, threadGroups, threadsData };
 };
 
 export default useThreadGroups;

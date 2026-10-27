@@ -113,3 +113,10 @@ export const selectThreadIdsByDate = (
         })
         .map((thread) => thread.threadId);
 };
+
+/**
+ * Whether a drag must be ignored: nothing is reordered or moved while the list is the stored placeholder rather than live data,
+ * and nothing is dragged from or onto a stand-in group even then.
+ */
+export const isDragBlocked = (groups: ThreadGroup[], isPlaceholderData: boolean, activeId: unknown, overId: unknown): boolean =>
+    isPlaceholderData || isInPlaceholderGroup(groups, activeId) || isInPlaceholderGroup(groups, overId);

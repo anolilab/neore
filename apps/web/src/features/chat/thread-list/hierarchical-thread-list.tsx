@@ -37,7 +37,7 @@ import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
 import SortableThreadItem from "./sortable-thread-item";
 import type { BranchNode, GroupType, HierarchicalThreadListProperties, MinimalThreadRelationship, ThreadGroup } from "./types";
 import type { ThreadDateRange } from "./utilities";
-import { getGroupType, isGroupFullySelected, isInPlaceholderGroup, selectThreadIdsByDate } from "./utilities";
+import { getGroupType, isDragBlocked, isGroupFullySelected, selectThreadIdsByDate } from "./utilities";
 
 // Lazy: it pulls `lucide-react/dynamic`'s import map of every icon (~190KB) for its icon picker.
 const ProjectFormDialog = lazy(() => import("@/features/projects/components/project-form-dialog"));
@@ -492,7 +492,7 @@ const HierarchicalThreadList: FC<
     const { handleBulkDeleteThreads, handleCreateBranch, handleDeleteThread, handleDownloadThread, handlePinThread, handleUnpinThread, updateThread } =
         useThreadHandlers(setLoadingStates, currentThreadId);
 
-    const { threadGroups, threadsData } = useThreadGroups(
+    const { isPlaceholderData, threadGroups, threadsData } = useThreadGroups(
         collapsedGroups,
         collapsedProjects,
         searchQuery,
@@ -822,8 +822,8 @@ const HierarchicalThreadList: FC<
                 return;
             }
 
-            // Stored project chats wait in one group with no project: dragging in or onto it would reorder across projects.
-            if (isInPlaceholderGroup(threadGroups, active.id) || isInPlaceholderGroup(threadGroups, over.id)) {
+            // While the list is the stored copy, orders built from it are stale (chats made elsewhere would sink, deleted ones linger), and its stand-in project group spans projects.
+            if (isDragBlocked(threadGroups, isPlaceholderData, active.id, over.id)) {
                 return;
             }
 
@@ -1067,7 +1067,7 @@ const HierarchicalThreadList: FC<
                 });
             }
         },
-        [setLoadingStates, updateThreadOrderMutation, updateProjectOrderMutation, threadGroups, moveThreadToProject, t],
+        [setLoadingStates, updateThreadOrderMutation, updateProjectOrderMutation, threadGroups, isPlaceholderData, moveThreadToProject, t],
     );
 
     // Keyboard shortcuts - extracted to dedicated hook
