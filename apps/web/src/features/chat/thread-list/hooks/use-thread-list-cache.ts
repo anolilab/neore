@@ -56,17 +56,26 @@ export const usePersistThreadList = (data: unknown, isPlaceholderData: boolean):
     const userId = useCacheUserId();
     const clearedElsewhere = useRef(false);
 
-    // Another tab signed out; this tab may not know yet, and until it has a fresh user id it must not put that user's list back.
+    // Another tab removed this user's list (its sign-out); until this tab sees a fresh token it must not put that list back.
+    // A removal that was not a sign-out leaves the session alive, so the next token for it lifts the hold.
     useEffect(() => {
-        const unsubscribe = subscribeToForeignThreadListClears(() => {
+        if (!userId) {
+            return;
+        }
+
+        const unsubscribeClears = subscribeToForeignThreadListClears(userId, () => {
             clearedElsewhere.current = true;
+        });
+        const unsubscribeToken = client.onAuthTokenChange(() => {
+            clearedElsewhere.current = false;
         });
 
         return () => {
-            unsubscribe();
+            unsubscribeClears();
+            unsubscribeToken();
             clearedElsewhere.current = false;
         };
-    }, [userId]);
+    }, [client, userId]);
 
     useEffect(() => {
         const generation = getThreadListClearGeneration();

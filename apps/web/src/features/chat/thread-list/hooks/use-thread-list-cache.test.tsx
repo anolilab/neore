@@ -128,7 +128,30 @@ describe("thread list cache hooks", () => {
         expect(localStorage).toHaveLength(1);
     });
 
-    it("ignores a storage event for an unrelated key or a write by another tab", () => {
+    it("resumes persisting when a removal in another tab was not a sign-out", () => {
+        vi.useFakeTimers();
+        auth.token = jwtFor("alice");
+
+        const { rerender } = renderHook(({ title }) => usePersistThreadList(list("alice", title), false), {
+            initialProps: { title: "T" },
+        });
+
+        act(() => {
+            globalThis.dispatchEvent(new StorageEvent("storage", { key: "neore-thread-list:v1:alice", newValue: null, oldValue: "{}" }));
+            // A full clear and another user's removal are not this user's sign-out.
+            globalThis.dispatchEvent(new StorageEvent("storage", { key: null, newValue: null }));
+            globalThis.dispatchEvent(new StorageEvent("storage", { key: "neore-thread-list:v1:bob", newValue: null }));
+        });
+        // The session lives on: a refreshed token for the same user lifts the hold.
+        setToken(jwtFor("alice"));
+        rerender({ title: "Later push" });
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        expect(localStorage).toHaveLength(1);
+    });
+
+    it("ignores a storage event for an unrelated key, another user's key or a write by another tab", () => {
         vi.useFakeTimers();
         auth.token = jwtFor("alice");
 

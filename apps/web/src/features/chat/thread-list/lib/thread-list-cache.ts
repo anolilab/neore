@@ -19,10 +19,13 @@ const clears = { count: 0 };
 /** Bumped by every clear; a write scheduled before a clear compares it to drop itself. */
 export const getThreadListClearGeneration = (): number => clears.count;
 
-/** Calls `listener` when another tab removes stored lists (its sign-out), the only moment `localStorage` fires `storage` for a key removal. */
-export const subscribeToForeignThreadListClears = (listener: () => void): (() => void) => {
+/**
+ * Calls `listener` when another tab removes `userId`'s stored list, which is what its sign-out does.
+ * A full `localStorage.clear()` or another user's key is not this user's sign-out, so neither counts.
+ */
+export const subscribeToForeignThreadListClears = (userId: string, listener: () => void): (() => void) => {
     const onStorage = (event: StorageEvent) => {
-        if (event.key === null || (event.key.startsWith(CACHE_PREFIX) && event.newValue === null)) {
+        if (event.key === cacheKey(userId) && event.newValue === null) {
             listener();
         }
     };
