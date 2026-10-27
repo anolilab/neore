@@ -4,7 +4,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Input } from "@neore/ui/components/input";
 import { Search } from "lucide-react";
-import type { FC } from "react";
+import type { FC, Ref } from "react";
 import { useMemo, useState } from "react";
 
 import { SETTINGS_KEYWORDS } from "@/features/settings/lib/settings-keywords";
@@ -25,13 +25,9 @@ export const useSettingsSearch = (navigation: ReadonlyArray<SettingsNavGroup>) =
 type SettingsSearchState = ReturnType<typeof useSettingsSearch>;
 
 /** The field is a combobox over the results list; it also owns the live region that announces how many there are. */
-export const SettingsSearchField: FC<Pick<SettingsSearchState, "isSearching" | "query" | "resultCount" | "setQuery"> & { resultsId: string }> = ({
-    isSearching,
-    query,
-    resultCount,
-    resultsId,
-    setQuery,
-}) => {
+export const SettingsSearchField: FC<
+    Pick<SettingsSearchState, "isSearching" | "query" | "resultCount" | "setQuery"> & { inputRef?: Ref<HTMLInputElement>; resultsId: string }
+> = ({ inputRef, isSearching, query, resultCount, resultsId, setQuery }) => {
     const { t } = useLingui();
     const isExpanded = isSearching && resultCount > 0;
     // Inside `t`: a bare `plural()` compiles to the global i18n, which this app never activates.
@@ -51,6 +47,7 @@ export const SettingsSearchField: FC<Pick<SettingsSearchState, "isSearching" | "
                     className="pl-9"
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder={t`Search settings...`}
+                    ref={inputRef}
                     role="combobox"
                     type="search"
                     value={query}
@@ -76,11 +73,7 @@ export const SettingsSearchResults: FC<Pick<SettingsSearchState, "groups" | "isS
     }
 
     if (groups.length === 0) {
-        return (
-            <p aria-hidden className="text-muted-foreground px-3 py-2 text-sm">
-                {t`No results`}
-            </p>
-        );
+        return <p className="text-muted-foreground px-3 py-2 text-sm">{t`No results`}</p>;
     }
 
     return (

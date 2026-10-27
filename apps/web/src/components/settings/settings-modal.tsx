@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { AlertTriangle, Lock, RefreshCw, Settings } from "lucide-react";
 import type { FC, ReactNode } from "react";
-import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useId, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState } from "react";
 
 import { ErrorBoundary } from "@/components/error-boundary";
 import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from "@/components/settings/settings-search";
@@ -205,6 +205,13 @@ export const SettingsModal: FC = () => {
         setQuery: setSearchQuery,
     } = useSettingsSearch(navigationGroups);
     const searchResultsId = useId();
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // The modal stays mounted, so a query left in the field would greet the next opening.
+    // Cleared on any close, including ones that bypass `handleClose`.
+    if (!isOpen && searchQuery !== "") {
+        setSearchQuery("");
+    }
 
     // Compute query options at render time — queryOptions() calls hooks internally
     // and cannot be invoked inside event handlers.
@@ -250,8 +257,6 @@ export const SettingsModal: FC = () => {
 
     const handleClose = () => {
         close(); // Instant via Zustand — no navigation delay
-        // The modal stays mounted, so a query left in the field would greet the next opening.
-        setSearchQuery("");
         // Clean up URL params in the background
         // The registered router type is the widened `createTanstackRouter` return (see the
         // `Register` declaration in `src/router.tsx`), which collapses the search-updater type to
@@ -275,6 +280,8 @@ export const SettingsModal: FC = () => {
     const handleSearchSelect = (tab: SettingsTab) => {
         handleTabChange(tab);
         setSearchQuery("");
+        // The chosen result unmounts with the list; keep focus in the dialog.
+        searchInputRef.current?.focus();
     };
 
     // Pre-compute the set of auth-required tabs for O(1) lock checks.
@@ -414,6 +421,7 @@ export const SettingsModal: FC = () => {
                         <DialogDescription className="sr-only">{t`Configure your application settings`}</DialogDescription>
                     </DialogHeader>
                     <SettingsSearchField
+                        inputRef={searchInputRef}
                         isSearching={isSearching}
                         query={searchQuery}
                         resultCount={searchResultCount}
