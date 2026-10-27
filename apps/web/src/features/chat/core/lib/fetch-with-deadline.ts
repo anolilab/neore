@@ -32,7 +32,10 @@ export const fetchWithDeadline = async (url: string, init: RequestInit, options:
         return new Response(body, { headers: response.headers, status: response.status, statusText: response.statusText });
     } catch (error) {
         if (deadline.signal.aborted && !options.signal?.aborted) {
-            throw new TimeoutError(timeoutMs, "The server took too long to respond. Your request may still go through, so check the conversation before trying again.");
+            throw new TimeoutError(
+                timeoutMs,
+                "The server took too long to respond. Your request may still go through, so check the conversation before trying again.",
+            );
         }
 
         throw error;

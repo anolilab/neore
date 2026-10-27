@@ -177,12 +177,13 @@ export const ErrorUtilities = {
             return error.message;
         }
 
-        if (error instanceof NetworkError) {
-            return msg`Connection error. Please check your internet connection and try again.`;
+        // Before `NetworkError`, which it extends: a deadline is not a lost connection.
+        if (error instanceof TimeoutError) {
+            return msg`The request timed out but may still complete. Check the conversation before trying again.`;
         }
 
-        if (error instanceof TimeoutError) {
-            return msg`Request timed out. Please try again.`;
+        if (error instanceof NetworkError) {
+            return msg`Connection error. Please check your internet connection and try again.`;
         }
 
         if (error instanceof ServerError) {

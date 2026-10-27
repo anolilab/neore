@@ -2,8 +2,8 @@
 
 /**
  * A gateway that never answers `/v1/chat` or `/v1/chat/edit` ends in the chat error handler instead of
- * hanging. After a deadline the backend may already have saved the work, so a send does NOT hand the draft
- * back (a resend would duplicate it); the other failures still do.
+ * hanging. After a deadline the backend may already have saved the work, so the draft returns to the composer
+ * (not resent) under a warning that the request may still complete.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -68,7 +68,7 @@ describe("gateway deadline in chat actions", () => {
         vi.unstubAllGlobals();
     });
 
-    it("send: reports the timeout, drops the optimistic message and keeps the cleared composer", async () => {
+    it("send: reports the timeout, drops the optimistic message and returns the draft to the composer without resending", async () => {
         const env = {
             ...base(),
             authGate: { isReady: () => true, set: vi.fn(), wait: vi.fn() },
@@ -101,12 +101,21 @@ describe("gateway deadline in chat actions", () => {
         expect(env.setIsRegenerating).toHaveBeenLastCalledWith(false);
         // added once, then removed by the updater passed second
         expect(env.setOptimisticMessages).toHaveBeenCalledTimes(2);
-        // The draft is not handed back: the prompt may already be saved.
-        expect(useChatUIStore.getState().composerText).toBe("");
+        // Handed back for a deliberate resend, never sent again by itself.
+        expect(useChatUIStore.getState().composerText).toBe("hello");
+        expect(fetch).toHaveBeenCalledTimes(1);
     });
 
     it("regenerate: reports the timeout and shows the hidden replies again", async () => {
-        const env = { ...base(), defaultLanguage: "en", getChangedSettings: () => null, kickOffMedia: vi.fn(), model: "m", setGatewayInfo: vi.fn(), turnRef: { current: 1 } };
+        const env = {
+            ...base(),
+            defaultLanguage: "en",
+            getChangedSettings: () => null,
+            kickOffMedia: vi.fn(),
+            model: "m",
+            setGatewayInfo: vi.fn(),
+            turnRef: { current: 1 },
+        };
 
         const pending = runReloadMessage(env as never, "a1");
 
