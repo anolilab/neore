@@ -67,7 +67,7 @@ pub struct DeviceState {
     mcp_tools: Mutex<HashMap<String, McpToolRef>>,
     /// Held across every read-change-save of the settings, so two writers cannot each save the other's stale copy.
     save_lock: Mutex<()>,
-    /// Bumped by every `settings_update`, under the save lock. A call remembers the value it was planned under, so
+    /// Bumped by every `settings_update` that is saved, under the save lock. A call remembers the value it was planned under, so
     /// anything the owner changed since (folders, shell policy, servers, rules) is seen as one number.
     generation: AtomicU64,
     nonces: Mutex<NonceSet>,
@@ -111,11 +111,25 @@ impl DeviceState {
         &self,
         change: impl FnOnce(&mut Settings) -> Result<T, String>,
     ) -> Result<T, String> {
+        self.change_settings_counted(false, change)
+    }
+
+    /// [`Self::change_settings`], bumping the generation once the change is validated AND saved, still under the
+    /// lock: a failed update leaves the calls waiting on the old settings valid.
+    fn change_settings_counted<T>(
+        &self,
+        bump: bool,
+        change: impl FnOnce(&mut Settings) -> Result<T, String>,
+    ) -> Result<T, String> {
         let _guard = self.save_lock.lock().unwrap();
         let mut settings = self.settings();
         let value = change(&mut settings)?;
 
         self.save(settings)?;
+
+        if bump {
+            self.generation.fetch_add(1, Ordering::SeqCst);
+        }
 
         Ok(value)
     }
@@ -273,9 +287,7 @@ impl DeviceState {
     }
 
     pub fn settings_update(&self, update: SettingsUpdate) -> Result<SettingsView, String> {
-        self.change_settings(|settings| {
-            self.generation.fetch_add(1, Ordering::SeqCst);
-
+        self.change_settings_counted(true, |settings| {
             if let Some(roots) = update.roots {
                 settings.roots = validate_roots(&roots)?;
             }
@@ -1779,6 +1791,23 @@ mod tests {
             .settings_update(serde_json::from_str(r#"{"allowRules":[]}"#).unwrap())
             .unwrap();
         assert!(!state.settings_unchanged(planned));
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_rejected_settings_update_leaves_waiting_calls_valid() {
+        let dir = std::env::temp_dir().join(format!("neore-device-badgen-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+        let planned = state.generation.load(Ordering::SeqCst);
+
+        let invalid: SettingsUpdate =
+            serde_json::from_str(r#"{"mcpServers":[{"name":"","command":"x"}]}"#).unwrap();
+
+        assert!(state.settings_update(invalid).is_err());
+        assert!(state.settings_unchanged(planned));
 
         let _ = stdfs::remove_dir_all(&dir);
     }
