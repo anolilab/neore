@@ -11,7 +11,10 @@ import type { CapabilityReport } from "./types";
 
 const NATIVE = { degradation: "none", supported: true } as const;
 
-/** `runStreamingAgent` and `continueAfterToolApproval`: a run with a persistent stream. */
+/**
+ * `runStreamingAgent` and `continueAfterToolApproval`: a run with a persistent stream.
+ * Forking (`branchThread`) is a thread action, not a runner capability, so §4 has no member for it.
+ */
 export const CLOUD_INTERACTIVE_CAPABILITIES: CapabilityReport = {
     groups: {
         streaming: { reasoning: NATIVE, text: NATIVE, toolParts: NATIVE },
@@ -25,8 +28,10 @@ export const CLOUD_INTERACTIVE_CAPABILITIES: CapabilityReport = {
 };
 
 /**
- * `runHeadlessAgent` (sub-agent and worker runs). No persistent stream, so nothing
- * can be steered into a run: a follow-up waits for it to end.
+ * `runHeadlessAgent` as `subAgentRuns` drive it (sub-agent and worker runs). No persistent
+ * stream, so nothing can be steered into a run: a follow-up waits for it to end. Not for
+ * the other headless callers (triggers, tasks, evals, messenger replies): they pass no
+ * `shouldStop`, so `cancel` would not hold for them.
  */
 export const CLOUD_HEADLESS_CAPABILITIES: CapabilityReport = {
     groups: {

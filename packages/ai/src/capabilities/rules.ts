@@ -27,8 +27,15 @@ export const UNKNOWN_CAPABILITY: Capability = { reason: "unknown", supported: fa
 
 export const isAvailable = (capability: Capability | null | undefined): boolean => capability?.supported === true;
 
-const isCapability = (value: unknown): value is Capability =>
-    typeof value === "object" && value !== null && (value as { supported?: unknown }).supported !== undefined;
+const isCapability = (value: unknown): value is Capability => {
+    if (typeof value !== "object" || value === null) {
+        return false;
+    }
+
+    const { supported } = value as { supported?: unknown };
+
+    return supported === true ? "degradation" in value : supported === false && "reason" in value;
+};
 
 /** The member, or `unknown` when the report does not carry it. */
 export const capabilityOf = (report: CapabilityReportInput | null | undefined, key: CapabilityKey): Capability => {

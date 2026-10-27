@@ -80,7 +80,11 @@ export const vCapabilityReport = v.object({
                         v.object({ reason: v.union(v.literal("not_offered"), v.literal("not_enforced"), v.literal("unknown")), supported: v.literal(false) }),
                     ),
                 ),
-                models: v.optional(v.array(v.object({ id: v.string().max(MAX_LENGTH.short), name: v.string().max(MAX_LENGTH.short) }))),
+                models: v.optional(
+                    v
+                        .array(v.object({ id: v.string().max(MAX_LENGTH.short), name: v.string().max(MAX_LENGTH.short) }))
+                        .check((value) => value.length <= 200, { message: "Too many models" }),
+                ),
                 reasoningEffort: v.optional(
                     v.union(
                         v.object({ degradation: v.literal("none"), supported: v.literal(true) }),
@@ -96,7 +100,7 @@ export const vCapabilityReport = v.object({
         ),
         permissions: v.optional(
             v.object({
-                modes: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
+                modes: v.optional(v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= 50, { message: "Too many modes" })),
             }),
         ),
         planning: v.optional(
