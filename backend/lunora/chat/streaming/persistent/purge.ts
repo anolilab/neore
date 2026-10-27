@@ -25,16 +25,20 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const STREAM_RETENTION_MS = Math.max(7 * DAY_MS, PENDING_APPROVAL_TTL_MS);
 /** Streams read per page. */
 export const PURGE_STREAM_BATCH = 25;
-/** Pages read per run; only reached when the earlier streams are emptied within the budget. */
-export const PURGE_SCAN_PAGES = 4;
 /**
- * Chunks deleted per run, spread over however many streams that takes. Every run
- * deletes this many while any remain, whatever their size or order, so a backlog
- * of M chunks is gone after ceil(M / budget) runs and a drained stream never
- * blocks the ones behind it. An idle shard is swept daily for 30 days
- * (`HOUSEKEEPING_HORIZON_MS`): at least 30 * 2500 = 75,000 chunks.
+ * Deletes (chunk rows and stream rows, one op each) per run, spread over however
+ * many streams that takes. Every run spends this many while any work remains,
+ * whatever the size or order of the streams, so a drained stream never blocks the
+ * ones behind it and a run's writes stay bounded. An idle shard is swept daily
+ * for 30 days (`HOUSEKEEPING_HORIZON_MS`), and a stream is first eligible 7 days
+ * after it expires, so about 23 daily runs remain for a given stream.
+ *
+ * - Large streams: M chunks clear in ceil((M + streams) / 2500) runs, so 23 runs
+ *   clear about 57,000 ops.
+ * - Small streams: a 2-chunk stream costs 3 ops, so one run clears 833 of them
+ *   (not the 100 a four-page scan allowed), and 2,500 of them take 3 runs.
  */
-export const PURGE_CHUNK_BUDGET = 2500;
+export const PURGE_OP_BUDGET = 2500;
 
 /** Statuses that never change again (`streamStatusValidator` minus the live two). */
 const TERMINAL_STATUSES = ["done", "error", "timeout"];
@@ -47,7 +51,7 @@ export const purgeFinishedStreams = internalMutation
         let streams = 0;
         let cursor: string | undefined;
 
-        for (let pageNumber = 0; pageNumber < PURGE_SCAN_PAGES; pageNumber += 1) {
+        do {
             const page = await ctx.db.persistentStreams.findMany({
                 cursor,
                 limit: PURGE_STREAM_BATCH,
@@ -55,7 +59,8 @@ export const purgeFinishedStreams = internalMutation
             });
 
             for (const stream of page.page) {
-                const remaining = PURGE_CHUNK_BUDGET - chunks;
+                // The stream row costs one op of its own, so it is only deleted when it fits.
+                const remaining = PURGE_OP_BUDGET - chunks - streams;
 
                 if (remaining <= 0) {
                     return { chunks, streams };
@@ -64,11 +69,10 @@ export const purgeFinishedStreams = internalMutation
                 const batch = await ctx.db
                     .query("persistentChunks")
                     .withIndex("by_streamId_seq", (q) => q.eq("streamId", stream._id))
-                    .take(remaining + 1);
-                const drained = batch.length <= remaining;
-                const toDelete = drained ? batch : batch.slice(0, remaining);
+                    .take(remaining);
+                const drained = batch.length < remaining;
 
-                for (const chunk of toDelete) {
+                for (const chunk of batch) {
                     await ctx.db.delete(chunk._id);
                     chunks += 1;
                 }
@@ -80,12 +84,8 @@ export const purgeFinishedStreams = internalMutation
                 }
             }
 
-            if (page.isDone || !page.continueCursor) {
-                break;
-            }
-
-            cursor = page.continueCursor;
-        }
+            cursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
+        } while (cursor);
 
         return { chunks, streams };
     });
