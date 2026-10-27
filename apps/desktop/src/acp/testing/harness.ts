@@ -34,13 +34,15 @@ export class Scratch {
         mkdirSync(this.work);
     }
 
-    /** A plan that runs the scripted agent; `env` is the whole environment besides what the agent logs to. */
+    /** A plan that runs the scripted agent; `env` is the variables the user "set" (the secrets), on top of `PATH` and the log. */
     public plan(env: Record<string, string> = {}, folder: string | null = this.work): SpawnPlan {
         return {
             args: [FAKE_AGENT],
             command: process.execPath,
             cwd: folder ?? this.dir,
             env: { FAKE_AGENT_LOG: this.logFile, PATH: process.env.PATH ?? "", ...env },
+            scratch: false,
+            secretNames: Object.keys(env),
         };
     }
 

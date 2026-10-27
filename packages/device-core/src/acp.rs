@@ -9,10 +9,12 @@
 //! reach the backend or the page (the view lists names only), and are not printed: [`EnvVars`] has a `Debug`
 //! that shows names, so a stray `{:?}` of the settings or a plan cannot leak a value.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsString;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -125,6 +127,11 @@ pub struct SpawnPlan {
     pub command: String,
     pub cwd: String,
     pub env: EnvVars,
+    /// `cwd` is a folder made for a version probe; whoever ran the probe removes it.
+    pub scratch: bool,
+    /// Names of the variables the user set. Only their values are secrets, so only those are scrubbed from
+    /// what the window shows; `HOME` and the like are not.
+    pub secret_names: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -300,6 +307,40 @@ pub fn built_env(vars: impl Iterator<Item = (String, String)>) -> BTreeMap<Strin
     .collect()
 }
 
+/// The app's own environment as text. A variable whose name or value is not UTF-8 is skipped: `env::vars`
+/// panics on one, and a panic here would take the Electron main process down with it.
+pub fn app_vars(
+    vars: impl Iterator<Item = (OsString, OsString)>,
+) -> impl Iterator<Item = (String, String)> {
+    vars.filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)))
+}
+
+/// An empty folder of its own for one version probe, so concurrent probes share nothing and nothing is left
+/// beside the settings. Private to the user where the platform has modes.
+fn probe_folder() -> Result<PathBuf, String> {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    let folder = std::env::temp_dir().join(format!(
+        "neore-acp-probe-{}-{}-{}",
+        std::process::id(),
+        now_ms(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    let mut builder = fs::DirBuilder::new();
+
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+
+    builder.create(&folder).map_err(|error| error.to_string())?;
+
+    Ok(folder)
+}
+
+/// Whether `name` is the variable agents find their programs by (case-insensitive: Windows names are).
+fn is_path_var(name: &str) -> bool {
+    name.eq_ignore_ascii_case("PATH")
+}
+
 /// The full environment of one agent: built, then the global variables, then the agent's own.
 /// Every user variable is validated again here, so a hand-edited `device.json` cannot slip a reserved name in.
 pub fn agent_env(
@@ -333,6 +374,15 @@ fn scope_env<'a>(
             .map(|agent| &mut agent.env)
             .ok_or_else(|| "that agent is not registered".to_owned()),
     }
+}
+
+/// `PATH` decides which program a bare command name starts, so a different one is not the program the user
+/// approved for these folders: the approvals of the agent it was set for (or of all agents, for the global one)
+/// are dropped.
+fn drop_path_consents(settings: &mut crate::store::Settings, agent_key: Option<&str>) {
+    settings
+        .acp_consents
+        .retain(|consent| agent_key.is_some_and(|key| consent.agent_key != key));
 }
 
 impl DeviceState {
@@ -451,10 +501,23 @@ impl DeviceState {
                         return Err(format!("at most {MAX_ENV_VARS} variables"));
                     }
 
+                    let moved = is_path_var(&name) && scope.0.get(&name) != Some(&value);
+
                     scope.0.insert(name, value);
+
+                    if moved {
+                        drop_path_consents(settings, agent_key.as_deref());
+                    }
                 }
                 AcpUpdate::RemoveEnv { agent_key, name } => {
-                    scope_env(settings, agent_key.as_deref())?.0.remove(&name);
+                    let removed = scope_env(settings, agent_key.as_deref())?
+                        .0
+                        .remove(&name)
+                        .is_some();
+
+                    if removed && is_path_var(&name) {
+                        drop_path_consents(settings, agent_key.as_deref());
+                    }
                 }
             }
 
@@ -497,14 +560,20 @@ impl DeviceState {
 
                 PathBuf::from(canonical)
             }
-            None => {
-                let scratch = self.data_dir().join("acp-probe");
-
-                fs::create_dir_all(&scratch).map_err(|error| error.to_string())?;
-                scratch
-            }
+            None => probe_folder()?,
         };
-        let env = agent_env(built_env(std::env::vars()), &settings.acp_env, &agent.env)?;
+        let env = agent_env(
+            built_env(app_vars(std::env::vars_os())),
+            &settings.acp_env,
+            &agent.env,
+        )?;
+        let secret_names: BTreeSet<String> = settings
+            .acp_env
+            .0
+            .keys()
+            .chain(agent.env.0.keys())
+            .cloned()
+            .collect();
 
         self.audit(json!({
             "at": now_ms(), "decision": "approved", "detail": format!("{} in {}", agent.label, cwd.display()),
@@ -516,6 +585,8 @@ impl DeviceState {
             command: agent.command.clone(),
             cwd: cwd.to_string_lossy().into_owned(),
             env,
+            scratch: folder.is_none(),
+            secret_names: secret_names.into_iter().collect(),
         })
     }
 }
@@ -781,7 +852,14 @@ mod tests {
         grant(&state, "alpha", &work);
 
         let probe = state.acp_spawn_plan("alpha", None).unwrap();
-        assert!(probe.cwd.ends_with("acp-probe"));
+        let again = state.acp_spawn_plan("alpha", None).unwrap();
+        assert!(probe.scratch && !probe.cwd.starts_with(dir.to_str().unwrap()));
+        assert!(Path::new(&probe.cwd).starts_with(std::env::temp_dir()));
+        assert!(fs::read_dir(&probe.cwd).unwrap().next().is_none());
+        assert_ne!(probe.cwd, again.cwd, "each probe has a folder of its own");
+        assert!(!dir.join("acp-probe").exists());
+        let _ = fs::remove_dir_all(&probe.cwd);
+        let _ = fs::remove_dir_all(&again.cwd);
 
         let session = state
             .acp_spawn_plan("alpha", Some(work.to_str().unwrap()))
@@ -790,6 +868,7 @@ mod tests {
             PathBuf::from(&session.cwd),
             fs::canonicalize(&work).unwrap()
         );
+        assert!(!session.scratch);
         assert_eq!(session.command, "/bin/alpha");
         assert_eq!(session.args, vec!["--acp".to_owned()]);
 
@@ -797,6 +876,98 @@ mod tests {
             .acp_spawn_plan("alpha", Some("/nonexistent/neore"))
             .is_err());
         assert!(state.acp_spawn_plan("nobody", None).is_err());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn only_the_variables_the_user_set_are_named_as_secrets() {
+        let (state, dir) = state("secrets");
+
+        save(&state, "alpha");
+        set_env(&state, Some("alpha"), "API_KEY", "k-1234").unwrap();
+        set_env(&state, None, "HTTPS_PROXY", "http://proxy").unwrap();
+
+        let plan = state.acp_spawn_plan("alpha", None).unwrap();
+
+        assert_eq!(plan.secret_names, vec!["API_KEY", "HTTPS_PROXY"]);
+        assert!(plan.env.0.contains_key("API_KEY"));
+
+        let _ = fs::remove_dir_all(&plan.cwd);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_variable_that_is_not_utf8_is_skipped_rather_than_aborting_the_app() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let vars = vec![
+            (OsString::from("PATH"), OsString::from("/usr/bin")),
+            (
+                OsString::from("HOME"),
+                OsString::from_vec(vec![b'/', 0xFF, 0xFE]),
+            ),
+            (OsString::from_vec(vec![0xFF, b'X']), OsString::from("v")),
+        ];
+        let env = built_env(app_vars(vars.into_iter()));
+
+        assert_eq!(env.len(), 1);
+        assert_eq!(env.get("PATH").map(String::as_str), Some("/usr/bin"));
+    }
+
+    #[test]
+    fn a_different_path_is_not_the_program_the_user_approved() {
+        let (state, dir) = state("path");
+        let work = dir.join("work");
+
+        fs::create_dir_all(&work).unwrap();
+        save(&state, "alpha");
+        save(&state, "beta");
+        grant(&state, "alpha", &work);
+        grant(&state, "beta", &work);
+
+        // Another variable changes nothing.
+        set_env(&state, Some("alpha"), "HTTPS_PROXY", "http://proxy").unwrap();
+        assert_eq!(state.acp_view().consents.len(), 2);
+
+        set_env(&state, Some("alpha"), "PATH", "/opt/one").unwrap();
+        assert_eq!(
+            state.acp_view().consents.len(),
+            1,
+            "alpha lost its approval; beta kept it"
+        );
+        assert_eq!(state.acp_view().consents[0].agent_key, "beta");
+
+        // Saving the same PATH again is not a change.
+        grant(&state, "alpha", &work);
+        set_env(&state, Some("alpha"), "PATH", "/opt/one").unwrap();
+        assert_eq!(state.acp_view().consents.len(), 2);
+
+        for change in [
+            |state: &DeviceState| set_env(state, Some("alpha"), "path", "/opt/two").map(|_| ()),
+            |state: &DeviceState| {
+                state
+                    .acp_update(AcpUpdate::RemoveEnv {
+                        agent_key: Some("alpha".into()),
+                        name: "path".into(),
+                    })
+                    .map(|_| ())
+            },
+        ] {
+            grant(&state, "alpha", &work);
+            change(&state).unwrap();
+            assert!(state
+                .acp_view()
+                .consents
+                .iter()
+                .all(|consent| consent.agent_key != "alpha"));
+        }
+
+        // The global one is every agent's.
+        grant(&state, "alpha", &work);
+        set_env(&state, None, "PATH", "/opt/global").unwrap();
+        assert!(state.acp_view().consents.is_empty());
 
         let _ = fs::remove_dir_all(&dir);
     }

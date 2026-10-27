@@ -10,7 +10,7 @@ const OPTIONS = [
 ];
 
 const request = (toolCall: Record<string, unknown>, options: unknown = OPTIONS): PermissionRequest => {
-    return { agentLabel: "Agent", folder: "/work", params: { options, sessionId: "agent-1", toolCall }, sessionId: "s1" };
+    return { agentLabel: "Agent", folder: "/work", params: { options, sessionId: "agent-1", toolCall }, scrub: (text) => text, sessionId: "s1" };
 };
 
 describe("describing a request", () => {
@@ -37,6 +37,22 @@ describe("describing a request", () => {
 
         expect(big.detailsComplete).toBe(false);
         expect(describePermission(request({ content: [{ path: "/work/a", type: "diff" }], title: "Edit" })).detailsComplete).toBe(true);
+    });
+});
+
+describe("an agent that puts a secret in a request", () => {
+    it("is scrubbed from every text the user reads, and the option ids stay as sent", () => {
+        const scrub = (text: string): string => text.replaceAll("s3cr3t-value", "***");
+        const described = describePermission({
+            ...request({ content: [{ text: "token s3cr3t-value", type: "content" }], locations: [{ path: "/work/s3cr3t-value" }], rawInput: { command: "curl -H s3cr3t-value" }, title: "Call s3cr3t-value" }, [
+                { kind: "allow_once", name: "Allow s3cr3t-value", optionId: "s3cr3t-value" },
+            ]),
+            scrub,
+        });
+
+        expect(JSON.stringify([described.command, described.details, described.target, described.tool, described.options.map((option) => option.name)])).not.toContain("s3cr3t-value");
+        expect(described.command).toBe("curl -H ***");
+        expect(described.options[0].optionId).toBe("s3cr3t-value");
     });
 });
 

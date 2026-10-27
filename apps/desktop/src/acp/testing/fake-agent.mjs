@@ -131,6 +131,16 @@ const behaviours = {
         await waitForCancel();
         reply(id, "cancelled");
     },
+    async pid(id, sessionId) {
+        chunk(sessionId, `agent:${process.pid}`);
+        reply(id, "end_turn");
+    },
+    async fail(id, sessionId) {
+        // Answers the prompt with an error and keeps running, as an agent that mishandles its own failure does.
+        chunk(sessionId, `agent:${process.pid}`);
+        state.promptRunning = false;
+        send({ id, error: { code: -32603, message: "the prompt failed" } });
+    },
     async env(id, sessionId) {
         chunk(sessionId, JSON.stringify(process.env));
         reply(id, "end_turn");

@@ -4,6 +4,8 @@
  *
  * Only the main process holds this: the window gets snapshots and sends commands through the local channels.
  */
+import { rm } from "node:fs/promises";
+
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate } from "./permission";
 import { declineGate } from "./permission";
@@ -12,7 +14,7 @@ import { acpSupported } from "./process";
 import { initialize } from "./protocol";
 import type { SendResult } from "./session";
 import { AgentSession } from "./session";
-import type { ProbeResult, SessionSnapshot, SessionSummary, SpawnPlan } from "./types";
+import type { AcpView, ProbeResult, SessionSnapshot, SessionSummary, SpawnPlan } from "./types";
 
 /** The window is told about changes at most this often; streamed text would otherwise re-render per chunk. */
 const CHANGE_INTERVAL_MS = 50;
@@ -21,6 +23,15 @@ const MAX_SESSIONS = 8;
 const requireSupported = (): void => {
     if (!acpSupported) {
         throw new Error("coding agents are not supported on Windows yet");
+    }
+};
+
+/** A leftover scratch folder is no reason to fail the probe that was already answered. */
+const removeQuietly = async (folder: string): Promise<void> => {
+    try {
+        await rm(folder, { force: true, recursive: true });
+    } catch {
+        // The OS clears its temp folder eventually.
     }
 };
 
@@ -52,7 +63,8 @@ export class AcpManager {
     public async probe(agentKey: string): Promise<ProbeResult> {
         requireSupported();
 
-        const child = this.spawn(this.options.plan(agentKey, null));
+        const plan = this.options.plan(agentKey, null);
+        const child = this.spawn(plan);
         const connection = new JsonRpcConnection(child.stdout, child.stdin, {
             notification: () => {},
             request: async () => {
@@ -72,6 +84,10 @@ export class AcpManager {
         } finally {
             connection.close(new Error("probe finished"));
             await child.stop();
+
+            if (plan.scratch) {
+                await removeQuietly(plan.cwd);
+            }
         }
     }
 
@@ -113,6 +129,28 @@ export class AcpManager {
 
     public async close(sessionId: string): Promise<void> {
         await this.require(sessionId).close();
+    }
+
+    /**
+     * Ends the sessions the user's approvals no longer cover: an agent that was removed, or a folder whose
+     * approval is gone (revoked, or dropped because the agent's command or `PATH` changed).
+     */
+    public async closeUnapproved(view: Pick<AcpView, "agents" | "consents">): Promise<void> {
+        const covered = (agentKey: string, folder: string): boolean =>
+            view.agents.some((agent) => agent.key === agentKey)
+            && view.consents.some((consent) => consent.agentKey === agentKey && consent.folderPath === folder);
+
+        const closing: Promise<void>[] = [];
+
+        for (const session of this.sessions.values()) {
+            const { agentKey, folder, status } = session.summary();
+
+            if (status !== "ended" && !covered(agentKey, folder)) {
+                closing.push(session.close());
+            }
+        }
+
+        await Promise.all(closing);
     }
 
     /** Forgets an ended session. */

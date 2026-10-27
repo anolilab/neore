@@ -327,7 +327,16 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     local(LOCAL_CHANNEL.acpView, () => JSON.parse(requireCore().acpView()) as AcpView);
 
-    local(LOCAL_CHANNEL.acpUpdate, (update) => JSON.parse(requireCore().acpUpdate(readAcpUpdate(update))) as AcpView);
+    const updateAcp = async (update: string): Promise<AcpView> => {
+        const view = JSON.parse(requireCore().acpUpdate(update)) as AcpView;
+
+        // A running agent was started under an approval this update may have taken away.
+        await state.acp?.closeUnapproved(view);
+
+        return view;
+    };
+
+    local(LOCAL_CHANNEL.acpUpdate, (update) => updateAcp(readAcpUpdate(update)));
 
     local(LOCAL_CHANNEL.acpProbe, (agentKey) => requireAcp().probe(readAgentKey(agentKey)));
 

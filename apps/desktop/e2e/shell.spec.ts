@@ -371,7 +371,9 @@ test("a coding agent runs only in an approved folder, with its environment built
 
         const transcript = await local.locator("#acp-transcript").textContent();
 
-        expect(transcript).toContain("value-xyz-123");
+        // The agent echoed its environment: the variable arrived, and its value is masked in the window.
+        expect(transcript).toContain("\"ONLY_ME\":\"***\"");
+        expect(transcript).not.toContain("value-xyz-123");
         expect(transcript).not.toContain("NEORE_E2E_PROBE");
         expect(transcript).not.toContain("NEORE_SNEAKY");
         // The site's page never gets a coding-agent bridge.
@@ -382,6 +384,8 @@ test("a coding agent runs only in an approved folder, with its environment built
         const afterRevoke = await startOutcome(local, work);
 
         expect(afterRevoke).toContain("not approved");
+        // And the agent already running under that approval was ended with it.
+        await expect(local.locator("#acp-session-status")).toContainText("Ended");
     } finally {
         await app.close();
 

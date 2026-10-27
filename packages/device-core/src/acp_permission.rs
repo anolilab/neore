@@ -8,6 +8,7 @@
 //! These requests are kept apart from the device prompts (`approval.rs`): a device tool call (`shell_run`,
 //! `fs_write`, anything tainted) is decided one call at a time and never joins a batch.
 
+use std::collections::HashSet;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -20,6 +21,9 @@ use crate::engine::cap_utf8;
 const WAIT: Duration = Duration::from_secs(30 * 60);
 const MAX_OPTIONS: usize = 16;
 const MAX_BATCH: usize = 50;
+/// Requests one session may have waiting. Each holds a worker thread for up to `WAIT` and brings the window to
+/// the front, so a looping agent must not be able to queue without end: past this it is answered `Cancelled`.
+const MAX_WAITING_PER_SESSION: usize = 16;
 const MAX_TEXT: usize = 1000;
 const MAX_DETAILS: usize = 16 * 1024;
 
@@ -106,6 +110,22 @@ pub struct AcpPermissions {
     queue: Mutex<Vec<Pending>>,
 }
 
+/// The options as offered, or none at all when two share an id: the answer names an option by its id, so the
+/// button the user pressed could be a different option from the one the agent receives. With none, a request
+/// can only be declined or cancelled.
+fn distinct_options(options: Vec<OfferedOption>) -> Vec<OfferedOption> {
+    let mut seen = HashSet::new();
+
+    if options
+        .iter()
+        .all(|option| seen.insert(option.option_id.as_str()))
+    {
+        options
+    } else {
+        Vec::new()
+    }
+}
+
 fn allow_option(request: &PermissionRequest) -> Option<&OfferedOption> {
     request
         .options
@@ -152,24 +172,35 @@ impl AcpPermissions {
             details_complete: request.details_complete && request.details.len() <= MAX_DETAILS,
             details: limited(request.details, MAX_DETAILS),
             folder: limited(request.folder, MAX_TEXT),
-            options: request.options.into_iter().take(MAX_OPTIONS).collect(),
+            options: distinct_options(request.options.into_iter().take(MAX_OPTIONS).collect()),
             session_id: request.session_id,
             target: request.target.map(|text| limited(text, MAX_TEXT)),
             tool: limited(request.tool, MAX_TEXT),
             tool_kind: limited(request.tool_kind, 40),
         };
+        let (sender, receiver) = channel();
         let id = {
+            let mut queue = self.queue.lock().unwrap();
+
+            if queue
+                .iter()
+                .filter(|pending| pending.request.session_id == request.session_id)
+                .count()
+                >= MAX_WAITING_PER_SESSION
+            {
+                return Outcome::Cancelled;
+            }
+
             let mut next = self.next_id.lock().unwrap();
             *next += 1;
+            queue.push(Pending {
+                id: *next,
+                request,
+                sender,
+            });
             *next
         };
-        let (sender, receiver) = channel();
 
-        self.queue.lock().unwrap().push(Pending {
-            id,
-            request,
-            sender,
-        });
         on_queued(id);
 
         receiver.recv_timeout(WAIT).unwrap_or_else(|_| {
@@ -631,6 +662,57 @@ mod tests {
         assert!(!view[0].details_complete && !view[0].batchable);
         permissions.cancel_session("s1");
         waiting.join().unwrap();
+    }
+
+    #[test]
+    fn a_session_cannot_queue_more_than_its_share_and_the_rest_make_no_noise() {
+        let permissions = Arc::new(AcpPermissions::default());
+        let waiting: Vec<_> = (0..MAX_WAITING_PER_SESSION)
+            .map(|n| queue(&permissions, request("s1", &format!("call {n}"))))
+            .collect();
+        let mut noisy = false;
+
+        // Answered at once, on this thread, with no event for the window.
+        let over = permissions.ask(request("s1", "one too many"), |_| noisy = true);
+
+        assert_eq!(over, Outcome::Cancelled);
+        assert!(!noisy);
+        assert_eq!(permissions.view().len(), MAX_WAITING_PER_SESSION);
+
+        // Another session is not affected, and answering frees a place.
+        let (_, other) = queue(&permissions, request("s2", "other"));
+
+        permissions.answer(waiting[0].0, "allow").unwrap();
+
+        let (_, again) = queue(&permissions, request("s1", "fits again"));
+
+        permissions.cancel_session("s1");
+        permissions.cancel_session("s2");
+        again.join().unwrap();
+        other.join().unwrap();
+        for (_, handle) in waiting {
+            handle.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn two_options_with_one_id_leave_nothing_to_approve() {
+        let permissions = Arc::new(AcpPermissions::default());
+        let mut clash = request("s1", "clash");
+        clash.options = vec![
+            option("x", ALLOW_ONCE),
+            option("x", "allow_always"),
+            option("reject", REJECT_ONCE),
+        ];
+        let (id, waiting) = queue(&permissions, clash);
+        let view = permissions.view();
+
+        assert!(view[0].options.is_empty() && !view[0].batchable);
+        assert!(permissions.answer(id, "x").is_err());
+        assert!(permissions.answer_batch(&[id]).is_err());
+
+        permissions.decline(id).unwrap();
+        assert_eq!(waiting.join().unwrap(), Outcome::Cancelled);
     }
 
     #[test]

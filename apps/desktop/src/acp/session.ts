@@ -82,6 +82,9 @@ export class AgentSession {
 
     private status: SessionStatus = "starting";
 
+    /** The process stop that `end` started; `close` and a failed start wait for it. */
+    private stopping: Promise<void> = Promise.resolve();
+
     private readonly queue: string[] = [];
 
     private readonly tools = new Map<string, ToolState>();
@@ -120,7 +123,7 @@ export class AgentSession {
             const message = this.endReason ?? `${(error as Error).message}${stderr === "" ? "" : `: ${stderr}`}`;
 
             this.end(message);
-            await this.options.process.stop();
+            await this.stopping;
 
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
             throw new Error(this.endReason ?? message);
@@ -186,7 +189,6 @@ export class AgentSession {
             }
 
             this.end("the agent did not stop after you cancelled, so it was ended");
-            this.options.process.stop();
         }, this.options.cancelGraceMs ?? DEFAULT_CANCEL_GRACE_MS);
         this.options.onChange();
     }
@@ -194,7 +196,7 @@ export class AgentSession {
     /** Ends the session and its process. */
     public async close(): Promise<void> {
         this.end("closed");
-        await this.options.process.stop();
+        await this.stopping;
     }
 
     public summary(): SessionSummary {
@@ -223,7 +225,7 @@ export class AgentSession {
     }
 
     private run(prompt: string): void {
-        const turn = new Turn(prompt);
+        const turn = new Turn(prompt, this.options.process.scrub);
 
         this.turns.push(turn);
         this.current = turn;
@@ -249,6 +251,14 @@ export class AgentSession {
                 await this.exitStatus();
                 this.end((error as Error).message);
             }
+        }
+    }
+
+    private async stopProcess(): Promise<void> {
+        try {
+            await this.options.process.stop();
+        } catch {
+            // A group that cannot be signalled is not this session's to fix; it is already over.
         }
     }
 
@@ -303,6 +313,9 @@ export class AgentSession {
         clearTimeout(this.cancelTimer);
         this.connection.close(new Error(said));
         this.options.gate.cancelSession(this.id);
+        // An ended session never leaves its process behind, whatever ended it (an error answer, a closed
+        // output, a cancel that went unanswered).
+        this.stopping = this.stopProcess();
 
         for (const tool of this.tools.values()) {
             if (tool.status === "pending" || tool.status === "in_progress") {
@@ -392,7 +405,7 @@ export class AgentSession {
         }
 
         if (typeof update.title === "string" && update.title !== "") {
-            tool.title = update.title;
+            tool.title = this.options.process.scrub(update.title);
         }
 
         if (typeof update.kind === "string") {
@@ -419,7 +432,13 @@ export class AgentSession {
             return { outcome: { outcome: "cancelled" } };
         }
 
-        const outcome = await this.options.gate.ask({ agentLabel: this.options.agentLabel, folder: this.options.folder, params, sessionId: this.id });
+        const outcome = await this.options.gate.ask({
+            agentLabel: this.options.agentLabel,
+            folder: this.options.folder,
+            params,
+            scrub: this.options.process.scrub,
+            sessionId: this.id,
+        });
 
         if (this.wasDeclined(params, outcome)) {
             this.markDeclined(params);

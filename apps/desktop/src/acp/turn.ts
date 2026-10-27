@@ -18,7 +18,11 @@ export class Turn implements TurnState {
 
     public truncated = false;
 
-    public constructor(public readonly user: string) {}
+    /** `scrub` runs over the agent's text when the window reads it, so a value split across two chunks is still caught. */
+    public constructor(
+        public readonly user: string,
+        private readonly scrub: (text: string) => string = (text) => text,
+    ) {}
 
     public append(field: "text" | "thought", chunk: string): void {
         const room = Math.max(0, MAX_TURN_TEXT - this[field].length);
@@ -35,8 +39,8 @@ export class Turn implements TurnState {
         return {
             id: this.id,
             stopReason: this.stopReason,
-            text: this.text,
-            thought: this.thought,
+            text: this.scrub(this.text),
+            thought: this.scrub(this.thought),
             tools: this.tools.map((tool) => { return { ...tool }; }),
             truncated: this.truncated,
             user: this.user,

@@ -9,6 +9,10 @@ export interface SpawnPlan {
     command: string;
     cwd: string;
     env: Record<string, string>;
+    /** `cwd` is a folder the core made for a version probe: removed once the probe is over. */
+    scratch: boolean;
+    /** Names of the variables the user set: the only values scrubbed from what the window shows. */
+    secretNames: string[];
 }
 
 /** `acpView` from the core: names only, never a variable's value. */

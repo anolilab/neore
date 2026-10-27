@@ -152,11 +152,6 @@ impl DeviceState {
         (self.sink)(event);
     }
 
-    /// The app data directory (`device.json`, the audit log).
-    pub(crate) fn data_dir(&self) -> &Path {
-        self.settings_path.parent().unwrap_or(Path::new("."))
-    }
-
     pub fn reap_idle_servers(&self) {
         self.mcp.reap(&self.settings().mcp_servers);
     }

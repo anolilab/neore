@@ -32,13 +32,20 @@ export class JsonRpcConnection {
 
     private closed: Error | undefined;
 
+    private readonly stopReading: () => void;
+
     public constructor(
         input: Readable,
         private readonly output: Writable,
         private readonly handlers: RpcHandlers,
     ) {
+        const onData = (chunk: string): void => this.onData(chunk);
+
         input.setEncoding("utf8");
-        input.on("data", (chunk: string) => this.onData(chunk));
+        input.on("data", onData);
+        this.stopReading = () => {
+            input.off("data", onData);
+        };
         input.on("end", () => this.close(new Error("the agent closed its output")));
         input.on("error", (error) => this.close(error));
         // A write to a dead child's stdin is an EPIPE: the exit is reported through `close`, not thrown here.
@@ -73,6 +80,9 @@ export class JsonRpcConnection {
         }
 
         this.closed = reason;
+        // Nothing the agent sends from now on is read, so a runaway line cannot keep growing in memory.
+        this.partial = "";
+        this.stopReading();
 
         for (const waiter of this.pending.values()) {
             waiter.reject(reason);
@@ -82,6 +92,10 @@ export class JsonRpcConnection {
     }
 
     private onData(chunk: string): void {
+        if (this.closed !== undefined) {
+            return;
+        }
+
         this.partial += chunk;
 
         if (this.partial.length > MAX_LINE_BYTES) {

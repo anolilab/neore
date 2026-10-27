@@ -35,5 +35,8 @@
         "typescript": "catalog:tsc",
         "vitest": "catalog:test",
         "zod": "catalog:utils"
+    },
+    "engines": {
+        "node": ">=22"
     }
 }

@@ -25,8 +25,7 @@ export interface AgentProcess {
     /** SIGKILL to the group, now and without waiting (the app is quitting). */
     killNow: () => void;
     readonly pid: number | undefined;
-    /** The tail of stderr with the plan's variable values replaced, safe to show in an error. */
-    /** The text with the plan's variable values replaced: safe to put in an error or show in the window. */
+    /** The text with the values of the variables the user set replaced: safe to put in an error or show in the window. */
     scrub: (text: string) => string;
     stderrTail: () => string;
     readonly stdin: Writable;
@@ -37,12 +36,17 @@ export interface AgentProcess {
 
 export type Spawner = (plan: SpawnPlan) => AgentProcess;
 
-/** Replaces every occurrence of a variable value in `text`. Agents sometimes echo their environment. */
-const scrub = (text: string, env: Record<string, string>): string => {
+/**
+ * Replaces every occurrence of a variable the user set. Agents sometimes echo their environment. The built
+ * variables (`HOME`, `PATH`, …) are not secrets and stay readable, or every path in a message would be garbled.
+ */
+const scrub = (text: string, plan: SpawnPlan): string => {
     let result = text;
 
-    for (const value of Object.values(env)) {
-        if (value.length >= MIN_SCRUBBED_LENGTH) {
+    for (const name of plan.secretNames) {
+        const value = plan.env[name];
+
+        if (value !== undefined && value.length >= MIN_SCRUBBED_LENGTH) {
             result = result.split(value).join("***");
         }
     }
@@ -80,7 +84,7 @@ export const spawnAgent: Spawner = (plan) => {
         // Node names the offending value in some argument errors; say what failed, not what it held. The error
         // itself is not kept as a cause for the same reason.
         // eslint-disable-next-line preserve-caught-error -- the cause can quote an environment value
-        throw new Error(`could not start ${plan.command}: ${scrub((error as Error).message, plan.env)}`);
+        throw new Error(`could not start ${plan.command}: ${scrub((error as Error).message, plan)}`);
     }
 
     let stderr = "";
@@ -123,7 +127,13 @@ export const spawnAgent: Spawner = (plan) => {
 
         signalGroup(pid, "SIGTERM");
 
-        const timer = setTimeout(signalGroup, TERM_GRACE_MS, pid, "SIGKILL");
+        const timer = setTimeout(() => {
+            try {
+                signalGroup(pid, "SIGKILL");
+            } catch {
+                // A group we may not signal cannot be helped from a timer; the exit below still ends the wait.
+            }
+        }, TERM_GRACE_MS);
 
         await exited;
         clearTimeout(timer);
@@ -139,8 +149,8 @@ export const spawnAgent: Spawner = (plan) => {
             }
         },
         pid: child.pid,
-        scrub: (text) => scrub(text, plan.env),
-        stderrTail: () => scrub(stderr, plan.env),
+        scrub: (text) => scrub(text, plan),
+        stderrTail: () => scrub(stderr, plan),
         stdin: child.stdin as Writable,
         stdout: child.stdout as Readable,
         stop,

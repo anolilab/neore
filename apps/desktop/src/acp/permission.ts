@@ -11,6 +11,8 @@ export interface PermissionRequest {
     folder: string;
     /** The request as the agent sent it: `sessionId`, `toolCall`, `options`. */
     params: Record<string, unknown>;
+    /** Replaces the user's variable values in what the window shows: an agent can put its environment in a command. */
+    scrub: (text: string) => string;
     /** Our session id, not the agent's. */
     sessionId: string;
 }
@@ -94,17 +96,19 @@ export const describePermission = (request: PermissionRequest): DescribedRequest
     const { content, rawInput } = toolCall;
     const hasContent = Array.isArray(content) && content.length > 0;
     const full = JSON.stringify({ content, kind: toolCall.kind, locations: toolCall.locations, rawInput, title: toolCall.title }, undefined, 2);
+    const shown = (text: string | undefined): string | undefined => text === undefined ? undefined : request.scrub(text);
 
     return {
         agentLabel: request.agentLabel,
-        command: commandOf(rawInput),
-        details: full.slice(0, MAX_DETAILS_SENT),
+        command: shown(commandOf(rawInput)),
+        details: request.scrub(full.slice(0, MAX_DETAILS_SENT)),
         detailsComplete: (rawInput !== undefined || hasContent) && full.length <= MAX_DETAILS_SENT,
         folder: request.folder,
-        options: offeredOptions(request.params),
+        // Ids are the agent's to match and stay as sent; only the names the user reads are scrubbed.
+        options: offeredOptions(request.params).map((option) => { return { ...option, name: request.scrub(option.name) }; }),
         sessionId: request.sessionId,
-        target: targetOf(toolCall),
-        tool: stringOf(toolCall.title) ?? "A tool call",
+        target: shown(targetOf(toolCall)),
+        tool: request.scrub(stringOf(toolCall.title) ?? "A tool call"),
         toolKind: stringOf(toolCall.kind) ?? "other",
     };
 };

@@ -3,6 +3,9 @@
  * host writes against the SDK's schema and the protocol's ordering and logs any violation. Each test ends by
  * asserting there were none.
  */
+import { existsSync, mkdirSync } from "node:fs";
+import path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AcpManager } from "./manager";
@@ -13,6 +16,7 @@ import type { SessionSnapshot, SpawnPlan } from "./types";
 const SENTINEL = "sentinel-secret-7f3a";
 const PID_PREFIX = /^pid:\d+/u;
 const PID = /pid:(\d+)/u;
+const AGENT_PID = /agent:(\d+)/u;
 const PID_AND_AGENT = /pid:(\d+) agent:(\d+)/u;
 const MISSING_COMMAND = /ENOENT|closed its output|exited/u;
 
@@ -184,6 +188,56 @@ describe("the end of a turn, with a real process", () => {
     });
 });
 
+describe("an agent that answers a prompt with an error", () => {
+    it("ends the session and its process, so nothing is left running behind a forgotten session", async () => {
+        const id = await start();
+
+        manager.send(id, "fail");
+        await expect.poll(() => snapshot(id).status, { timeout: 8000 }).toBe("ended");
+
+        const agentPid = Number(AGENT_PID.exec(snapshot(id).turns[0].text)?.[1]);
+
+        expect(snapshot(id).endReason).toContain("the prompt failed");
+        await expectGone(agentPid);
+        manager.remove(id);
+        expect(manager.list()).toEqual([]);
+    });
+});
+
+describe("an approval that is taken away", () => {
+    const view = (consents: { agentKey: string; folderPath: string }[], agents = ["fake"]) => {
+        return {
+            agents: agents.map((key) => { return { args: [], command: "x", envNames: [], key, label: key }; }),
+            consents: consents.map((consent) => { return { ...consent, folderId: "f", folderLabel: "work" }; }),
+        };
+    };
+
+    it.each([
+        ["a revoked folder", () => view([])],
+        ["a removed agent", () => view([{ agentKey: "fake", folderPath: "" }], [])],
+        ["another folder's approval only", () => view([{ agentKey: "fake", folderPath: "/elsewhere" }])],
+    ])("ends the running session and its process after %s", async (_name, next) => {
+        const id = await start();
+
+        manager.send(id, "pid");
+        await idle(id);
+
+        const agentPid = Number(AGENT_PID.exec(snapshot(id).turns[0].text)?.[1]);
+
+        expect(alive(agentPid)).toBe(true);
+        await manager.closeUnapproved(next());
+        expect(snapshot(id).status).toBe("ended");
+        await expectGone(agentPid);
+    });
+
+    it("leaves a session its approval still covers", async () => {
+        const id = await start();
+
+        await manager.closeUnapproved(view([{ agentKey: "fake", folderPath: scratch.work }]));
+        expect(snapshot(id).status).toBe("idle");
+    });
+});
+
 describe("a version probe", () => {
     it("reads the handshake and opens no session", async () => {
         const result = await manager.probe("fake");
@@ -194,6 +248,23 @@ describe("a version probe", () => {
         // The probe ran in the scratch folder, with no folder asked for.
         expect(plans[plans.length - 1]?.folder).toBeNull();
         expect(manager.list()).toEqual([]);
+    });
+
+    it("removes the scratch folder the core made for it, and only that", async () => {
+        const made = path.join(scratch.dir, "probe-folder");
+
+        mkdirSync(made);
+
+        const plan = (): SpawnPlan => {
+            return { ...scratch.plan({}, null), cwd: made, scratch: true };
+        };
+        const target = make({}, { plan });
+
+        await target.probe("fake");
+        expect(existsSync(made)).toBe(false);
+        // A plan that did not make its folder keeps it.
+        await manager.probe("fake");
+        expect(existsSync(scratch.dir)).toBe(true);
     });
 
     it.each([
@@ -310,6 +381,23 @@ describe("secrets in variables", () => {
     });
 });
 
+describe("an agent that echoes its environment in a reply", () => {
+    it("is scrubbed in the turn text, and the built variables stay readable", async () => {
+        const target = make({ API_KEY: SENTINEL });
+        const id = await start(target);
+
+        target.send(id, "env");
+        await idle(id, target);
+
+        const { text } = snapshot(id, target).turns[0];
+
+        expect(text).not.toContain(SENTINEL);
+        expect(text).toContain("\"API_KEY\":\"***\"");
+        expect(text).toContain(JSON.stringify(scratch.logFile).slice(1, -1));
+        target.killAll();
+    });
+});
+
 describe("an agent that quotes its environment in an error", () => {
     it("is scrubbed in the thrown message, the cause and the window's snapshot", async () => {
         const target = make({ API_KEY: SENTINEL, FAKE_AGENT_SESSION_ERROR: "1" });
@@ -336,7 +424,7 @@ describe("unsupported platforms and missing commands", () => {
             {},
             {
                 plan: () => {
-                    return { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" } };
+                    return { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
                 },
             },
         );
