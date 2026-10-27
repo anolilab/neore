@@ -26,7 +26,7 @@ import { createProviderModelForEnv, resolveApiKey } from "../../providers/factor
 import { ProviderHealthService } from "../../providers/health.js";
 import type { ModelPricing } from "../../providers/pricing.js";
 import { calculateCost, PricingService } from "../../providers/pricing.js";
-import { classifyFailure, extractProviderErrorInfo } from "../../routing/fallback.js";
+import { classifyProviderFailure } from "../../routing/fallback.js";
 import type { ModelFilterRules } from "../../routing/filters.js";
 import { getModelRejectionReason, hasActiveFilters } from "../../routing/filters.js";
 import type { BillingMode } from "../../usage/billing.js";
@@ -169,6 +169,12 @@ modelProxyRouter.openapi(
         });
         const policy = resolveProviderPolicy(c.env, body.provider, body.modelApiId, billingMode);
         const byokFeeRate = resolveByokFeeRate(c.env.BYOK_FEE_RATE);
+        const failureReason = (error: unknown) =>
+            classifyProviderFailure(
+                error,
+                Math.ceil(countPromptTextChars((body.callOptions.prompt as { content: unknown }[] | undefined) ?? []) / 4),
+                MODEL_MAP.get(body.modelId)?.contextWindow,
+            );
 
         // Validate model against filter rules before proceeding
         const filterRules = body.modelFilterRules as ModelFilterRules | undefined;
@@ -456,8 +462,10 @@ modelProxyRouter.openapi(
                             }),
                         ]);
                     } catch (error) {
+                        const fallbackReason = failureReason(error);
                         const errorChunk = {
                             error: error instanceof Error ? error.message : "Unknown stream error",
+                            ...(fallbackReason && { fallbackReason }),
                             type: "error",
                         };
 
@@ -493,19 +501,13 @@ modelProxyRouter.openapi(
 
             // Tells the caller whether another model could serve this request:
             // only an `infra` failure is worth retrying elsewhere.
-            const { body: errorBody, statusCode: errorStatus } = extractProviderErrorInfo(error);
-            const fallbackReason = classifyFailure(
-                errorStatus,
-                errorBody,
-                Math.ceil(countPromptTextChars((body.callOptions.prompt as { content: unknown }[] | undefined) ?? []) / 4),
-                MODEL_MAP.get(body.modelId)?.contextWindow,
-            );
+            const fallbackReason = failureReason(error);
 
             return c.json(
                 {
                     error: {
                         code: "PROVIDER_ERROR",
-                        fallbackReason,
+                        ...(fallbackReason && { fallbackReason }),
                         message: error instanceof Error ? error.message : "Unknown provider error",
                     },
                 },

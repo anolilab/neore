@@ -189,3 +189,31 @@ export const extractProviderErrorInfo = (error: unknown): { body: string; status
 
     return { body: "", statusCode: 500 };
 };
+
+const TRANSIENT_NETWORK_PATTERN = /timeout|timed out|econnreset|econnrefused|network|fetch failed|socket hang up/i;
+
+/**
+ * The fallback reason to report to a caller that may retry on another model.
+ * `classifyFailure` defaults to `infra` for anything it does not recognise;
+ * this narrows that to what another model can actually serve: a provider 5xx,
+ * 429 or 408, or a timeout / network error carrying no status. A 401, 403, 404,
+ * 422, an unrecognised 400 or an internal error (no provider status) gets none.
+ */
+export const classifyProviderFailure = (error: unknown, promptTokens: number, contextWindow: number | undefined): FallbackReason | undefined => {
+    const { body, statusCode } = extractProviderErrorInfo(error);
+    const reason = classifyFailure(statusCode, body, promptTokens, contextWindow);
+
+    if (reason !== "infra") {
+        return reason;
+    }
+
+    const record = error && typeof error === "object" ? (error as { message?: unknown; name?: unknown; statusCode?: unknown }) : undefined;
+
+    if (typeof record?.statusCode === "number") {
+        return statusCode === 429 || statusCode === 408 || statusCode >= 500 ? "infra" : undefined;
+    }
+
+    const text = `${typeof record?.name === "string" ? record.name : ""} ${typeof record?.message === "string" ? record.message : ""}`;
+
+    return TRANSIENT_NETWORK_PATTERN.test(text) ? "infra" : undefined;
+};

@@ -103,9 +103,21 @@ describe("POST /internal/model/proxy tags a provider failure with its fallback r
         expect(body.error.fallbackReason).toBe("context_overflow");
     });
 
-    it("a 400 on a prompt inside the window stays infra", async () => {
+    it("a 400 on a prompt inside the window is not retryable", async () => {
         const { body } = await proxy("generate", providerError(400, "invalid argument: bad schema"));
 
-        expect(body.error.fallbackReason).toBe("infra");
+        expect(body.error.fallbackReason).toBeUndefined();
+    });
+
+    it.each([401, 402, 403, 404, 422])("a %s is not retryable on another model", async (statusCode) => {
+        const { body } = await proxy("generate", providerError(statusCode, "rejected"));
+
+        expect(body.error.fallbackReason).toBeUndefined();
+    });
+
+    it("an internal error with no provider status is not retryable", async () => {
+        const { body } = await proxy("generate", providerError(undefined, "Cannot read properties of undefined"));
+
+        expect(body.error.fallbackReason).toBeUndefined();
     });
 });
