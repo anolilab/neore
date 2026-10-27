@@ -11,15 +11,18 @@
 
 use std::io::{self, Read, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::actions::{self, plan_builtin, shareable_roots, Outcome, ShellSettings, MAX_ROOTS};
+use crate::actions::{
+    self, cap_utf8, plan_builtin, shareable_roots, Outcome, ShellSettings, MAX_OUTPUT_BYTES,
+    MAX_ROOTS,
+};
 use crate::frame::{read_frame, write_frame};
 use crate::sandbox::{self, Support};
 
@@ -119,12 +122,27 @@ pub struct RunParams {
 /// Plans and runs one action on this machine. The desktop's engine does the same through
 /// [`actions::plan_builtin`] and [`actions::run`], after its own checks.
 pub fn run_request(params: RunParams) -> Outcome {
+    run_request_from(params, Instant::now())
+}
+
+/// [`run_request`] for a request that arrived at `received`: the time spent waiting for a worker counts
+/// against `remaining_ms`.
+fn run_request_from(params: RunParams, received: Instant) -> Outcome {
     if params.roots.len() > MAX_ROOTS {
         return Outcome::failed(format!("at most {MAX_ROOTS} folders"));
     }
 
-    if params.remaining_ms == 0 {
+    let remaining = Duration::from_millis(params.remaining_ms).saturating_sub(received.elapsed());
+
+    if remaining.is_zero() {
         return Outcome::failed("approved after the request expired");
+    }
+
+    // Without a home directory the home guard cannot be checked and a macOS sandbox would not hide it.
+    if actions::canonical_home().is_none() {
+        return Outcome::failed(
+            "this machine's home directory is unknown, so the shared folders cannot be checked",
+        );
     }
 
     let roots = shareable_roots(&params.roots);
@@ -136,13 +154,25 @@ pub fn run_request(params: RunParams) -> Outcome {
     match plan_builtin(&params.tool, &params.input, &roots, shell) {
         None => Outcome::failed(format!("{} is not a tool of this device", params.tool)),
         Some(Err(error)) => Outcome::failed(error),
-        Some(Ok(action)) => actions::run(
-            action,
-            &roots,
-            Duration::from_millis(params.remaining_ms),
-            None,
-        ),
+        Some(Ok(action)) => capped(actions::run(action, &roots, remaining, None)),
     }
+}
+
+/// The caps the desktop's engine puts on every result, so the same call reads the same either way.
+fn capped(mut outcome: Outcome) -> Outcome {
+    if let Some(output) = outcome.output.take() {
+        let (output, cut) = cap_utf8(&output, MAX_OUTPUT_BYTES);
+
+        outcome.truncated |= cut;
+        outcome.output = Some(output);
+    }
+
+    outcome.error = outcome
+        .error
+        .filter(|error| !error.is_empty())
+        .map(|error| cap_utf8(&error, 1000).0);
+
+    outcome
 }
 
 fn send<W: Write>(writer: &Mutex<W>, frame: &Outgoing) -> io::Result<()> {
@@ -160,7 +190,7 @@ fn refuse(id: u64, error: impl Into<String>) -> Outgoing {
     }
 }
 
-fn serve_request(op: &str, params: Value, id: u64) -> Outgoing {
+fn serve_request(op: &str, params: Value, id: u64, received: Instant) -> Outgoing {
     if op != "run" {
         return refuse(id, format!("unknown op {op}"));
     }
@@ -169,7 +199,7 @@ fn serve_request(op: &str, params: Value, id: u64) -> Outgoing {
         return refuse(id, "invalid run params");
     };
 
-    match catch_unwind(AssertUnwindSafe(|| run_request(params))) {
+    match catch_unwind(AssertUnwindSafe(|| run_request_from(params, received))) {
         Ok(outcome) => Outgoing::Response {
             id,
             ok: true,
@@ -201,9 +231,16 @@ where
 {
     let writer = Arc::new(Mutex::new(writer));
     let in_flight = Arc::new(AtomicUsize::new(0));
+    let reply_failed = Arc::new(AtomicBool::new(false));
     let mut running = Vec::new();
 
-    let served = serve_requests(&mut reader, &writer, &in_flight, &mut running);
+    let served = serve_requests(
+        &mut reader,
+        &writer,
+        &in_flight,
+        &reply_failed,
+        &mut running,
+    );
 
     for request in running {
         let _ = request.join();
@@ -216,6 +253,7 @@ fn serve_requests<R, W>(
     reader: &mut R,
     writer: &Arc<Mutex<W>>,
     in_flight: &Arc<AtomicUsize>,
+    reply_failed: &Arc<AtomicBool>,
     running: &mut Vec<thread::JoinHandle<()>>,
 ) -> io::Result<()>
 where
@@ -233,6 +271,16 @@ where
     )?;
 
     while let Some(bytes) = read_frame(reader)? {
+        let received = Instant::now();
+
+        // A reply that could not be written means nobody reads the answers: stop running what is asked.
+        if reply_failed.load(Ordering::SeqCst) {
+            return Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "a reply could not be written",
+            ));
+        }
+
         let Incoming::Request { id, op, params } = serde_json::from_slice(&bytes)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
 
@@ -245,15 +293,56 @@ where
 
         let slot = Slot(Arc::clone(in_flight));
         let writer = Arc::clone(writer);
+        let reply_failed = Arc::clone(reply_failed);
 
         running.retain(|request| !request.is_finished());
         running.push(thread::spawn(move || {
             let _slot = slot;
 
-            // A writer that fails means the desktop is gone; the reader ends the loop on its own EOF.
-            let _ = send(&writer, &serve_request(&op, params, id));
+            // The reader sees the flag on its next frame, or its own EOF if the desktop is gone.
+            if send(&writer, &serve_request(&op, params, id, received)).is_err() {
+                reply_failed.store(true, Ordering::SeqCst);
+            }
         }));
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_result_is_capped_like_the_desktops() {
+        let mut outcome = Outcome::completed("é".repeat(MAX_OUTPUT_BYTES));
+
+        outcome.error = Some("x".repeat(2000));
+
+        let outcome = capped(outcome);
+
+        assert!(outcome.truncated);
+        assert!(outcome.output.unwrap().len() <= MAX_OUTPUT_BYTES);
+        assert_eq!(outcome.error.unwrap().len(), 1000);
+    }
+
+    #[test]
+    fn a_request_that_waited_past_its_budget_is_not_run() {
+        let params = RunParams {
+            allow_unsandboxed_shell: false,
+            allow_shell_network: false,
+            input: serde_json::json!({}),
+            remaining_ms: 1,
+            roots: Vec::new(),
+            tool: "fs_list".to_owned(),
+        };
+        let received = Instant::now() - Duration::from_secs(1);
+        let outcome = run_request_from(params, received);
+
+        assert_eq!(outcome.status, "failed");
+        assert_eq!(
+            outcome.error.as_deref(),
+            Some("approved after the request expired")
+        );
+    }
 }
