@@ -5,6 +5,7 @@ import type useLocalModelTurn from "@/features/local-models/hooks/use-local-mode
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
 
+import { fetchWithDeadline } from "../lib/fetch-with-deadline";
 import { useModelStore } from "../stores/model-store";
 import type { ChangedSettings, ChatActionBase } from "./chat-action-shared";
 import { localModelError, unhiding, withoutMessage } from "./chat-action-shared";
@@ -160,7 +161,7 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
             Object.assign(requestBody, changedSettings);
         }
 
-        const response = await fetch(CHAT_STREAM_URL, {
+        const response = await fetchWithDeadline(CHAT_STREAM_URL, {
             body: JSON.stringify(withUnlockProofBody(requestBody, threadId)),
             headers: {
                 "Content-Type": "application/json",
@@ -326,7 +327,7 @@ export const runEditMessage = async (env: EditMessageEnv, messageId: string, new
             threadId,
         };
 
-        const response = await fetch(CHAT_EDIT_URL, {
+        const response = await fetchWithDeadline(CHAT_EDIT_URL, {
             body: JSON.stringify(withUnlockProofBody(requestBody, threadId)),
             headers: {
                 "Content-Type": "application/json",

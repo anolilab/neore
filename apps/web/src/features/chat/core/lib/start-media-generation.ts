@@ -5,6 +5,8 @@
  * for the caller to show. Nothing is retried here.
  */
 
+import { fetchWithDeadline } from "./fetch-with-deadline";
+
 /** The refusal body: most failures are `{ error, message }`, a rate limit nests them under `error`. */
 interface MediaRefusalBody {
     error?: string | { code?: string; message?: string; retryAfter?: number };
@@ -13,7 +15,7 @@ interface MediaRefusalBody {
 }
 
 export type MediaGenerationFailure =
-    /** The request never got an answer (offline, DNS, CORS, abort). */
+    /** The request never got an answer (offline, DNS, CORS, abort, deadline). */
     | { cause: unknown; kind: "network"; ok: false }
     /** The server answered with a non-2xx status. */
     | { code?: string; kind: "refused"; message?: string; ok: false; retryAfter?: number; status: number };
@@ -49,7 +51,7 @@ export const startMediaGeneration = async (request: StartMediaGenerationRequest)
     let response: Response;
 
     try {
-        response = await fetch(request.url, {
+        response = await fetchWithDeadline(request.url, {
             body: JSON.stringify(request.body),
             headers: { "Content-Type": "application/json", ...request.headers },
             method: "POST",
