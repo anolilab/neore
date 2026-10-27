@@ -15,6 +15,7 @@ import {
     DEFAULT_VIDEO_TO_VIDEO_MODEL,
 } from "@neore/ai/constants";
 import type { GatewayModel } from "@neore/ai/models";
+import { requiresPaidPlan } from "@neore/ai/models";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Label } from "@neore/ui/components/label";
@@ -26,6 +27,7 @@ import { useId } from "react";
 import { toast } from "sonner";
 
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -137,8 +139,18 @@ const ModelSelect = <Field extends string>({
 };
 
 /** The model a reply is retried on, once, when the chosen model fails with an infrastructure error. */
-const BackupModelSetting: FC<{ disabled?: boolean; models: GatewayModel[] }> = ({ disabled, models }) => {
+const BackupModelSetting: FC<{ disabled?: boolean; models: GatewayModel[]; providersWithKey: ReadonlySet<string> }> = ({
+    disabled,
+    models: allModels,
+    providersWithKey,
+}) => {
     const { t } = useLingui();
+    const { hooks } = useAuth();
+    const { data: sessionData } = hooks.useSession();
+    const user = sessionData?.user as { plan?: string; role?: string } | undefined;
+    const isPro = user?.plan === "premium" || user?.role === "admin";
+    // The run's own paid-model rule: a Pro plan, or the user's own key for the model's provider. Offering more would save a backup the run drops.
+    const models = allModels.filter((m) => !requiresPaidPlan(m) || isPro || providersWithKey.has(m.provider ?? ""));
     const { data: userSettings } = useUserSettings();
     const { isPending, updateLatest } = useUpdateUserSettings();
 
@@ -177,6 +189,11 @@ const DefaultModelsSettings: FC = () => {
     }
 
     const defaults = (aiPreferences?.defaultModels ?? {}) as DefaultModels;
+    const providersWithKey = new Set(
+        Object.entries((aiPreferences?.providerApiKeys ?? {}) as Record<string, { enabled?: boolean; hasKey?: boolean }>)
+            .filter(([, entry]) => entry.enabled && entry.hasKey)
+            .map(([provider]) => provider),
+    );
 
     const flaggedIds = new Set(flaggedModels.map((m) => m.id));
     const ff = (list: GatewayModel[]) => list.filter((m) => flaggedIds.has(m.id));
@@ -258,7 +275,7 @@ const DefaultModelsSettings: FC = () => {
                         value={defaults.videoToText}
                     />
                     <Separator />
-                    <BackupModelSetting disabled={isPending} models={textModels} />
+                    <BackupModelSetting disabled={isPending} models={textModels} providersWithKey={providersWithKey} />
                 </CardContent>
             </Card>
 

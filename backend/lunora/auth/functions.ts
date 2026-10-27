@@ -29,6 +29,7 @@ import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
 import { eligibleBackupModel } from "../chat/lib/backup-model";
+import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
 import { normalizeModelNicknames } from "./lib/model-nicknames";
 import { isValidShortcut } from "./lib/shortcut";
 
@@ -207,8 +208,31 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
         }
 
         // A backup model must be one a chat reply can run on; "" clears it.
-        if (typeof toStore.backupModel === "string" && toStore.backupModel !== "" && !eligibleBackupModel(toStore.backupModel, "")) {
-            throw new LunoraError("BAD_REQUEST", "Not a model that can be used as a backup");
+        if (typeof toStore.backupModel === "string" && toStore.backupModel !== "") {
+            const backup = eligibleBackupModel(toStore.backupModel, "");
+
+            if (!backup) {
+                throw new LunoraError("BAD_REQUEST", "Not a model that can be used as a backup");
+            }
+
+            // The run's own gate (`canRunPaidModel`): a backup the plan cannot run would be dropped at run time.
+            const allowed = await allowsPaidModel(
+                backup,
+                async () => await readUserRunPlan(context, userId),
+                async () => {
+                    const keys = await context.db
+                        .query("aiUserPreferences")
+                        .withIndex("by_userId", (q) => q.eq("userId", userId))
+                        .unique();
+                    const entry = (keys?.providerApiKeys as Record<string, { enabled?: boolean; encryptedKey?: string }> | undefined)?.[backup.provider];
+
+                    return Boolean(entry?.enabled && entry.encryptedKey);
+                },
+            );
+
+            if (!allowed) {
+                throw new LunoraError("BAD_REQUEST", paidModelRefusal(backup.name ?? backup.id, byokPaysFor(backup)));
+            }
         }
 
         if (toStore.modelNicknames && typeof toStore.modelNicknames === "object") {
@@ -1272,6 +1296,17 @@ export const getUserAuthFlagsQuery = internalQuery
         return { isAnonymous: user?.isAnonymous === true, plan, role: user?.role ?? null };
     });
 
+/** The plan behind `getUserRunPlanQuery`, readable from a mutation's db too. */
+const readUserRunPlan = async (context: QueryContext, userId: string): Promise<{ isAdmin: boolean; plan: "premium" | null }> => {
+    const [user, memberships] = await Promise.all([getUser(context, userId), getMembersByUserId(context, userId)]);
+    const organizations = await Promise.all(memberships.map(async (membership) => await getOrganization(context, membership.organizationId)));
+
+    return {
+        isAdmin: user?.role === "admin",
+        plan: resolveUserPlan(user, organizations),
+    };
+};
+
 /**
  * The plan for a run with no session to read an active organization from —
  * a trigger, a workflow step, a group turn. Premium when ANY organization the
@@ -1281,15 +1316,7 @@ export const getUserAuthFlagsQuery = internalQuery
 export const getUserRunPlanQuery = internalQuery
     .input({ userId: v.string() })
     .output(v.object({ isAdmin: v.boolean(), plan: v.union(v.literal("premium"), v.null()) }))
-    .query(async ({ args: { userId }, ctx: context }) => {
-        const [user, memberships] = await Promise.all([getUser(context, userId), getMembersByUserId(context, userId)]);
-        const organizations = await Promise.all(memberships.map(async (membership) => await getOrganization(context, membership.organizationId)));
-
-        return {
-            isAdmin: user?.role === "admin",
-            plan: resolveUserPlan(user, organizations),
-        };
-    });
+    .query(async ({ args: { userId }, ctx: context }) => await readUserRunPlan(context, userId));
 
 export const getActiveOrganizationQuery = internalQuery
     .input({ organizationId: v.string(), userId: v.string() })

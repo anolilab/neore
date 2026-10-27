@@ -2,7 +2,7 @@
  * The backup model is checked against the model registry when it is saved, and "" clears it.
  */
 import { lunoraTest } from "@lunora/testing";
-import { MODEL_REGISTRY } from "@neore/ai/models";
+import { MODEL_REGISTRY, requiresPaidPlan } from "@neore/ai/models";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getUserSettings, updateUserSettings } from "./functions";
@@ -67,7 +67,7 @@ const reload = async () => {
     return settings?.backupModel;
 };
 
-const BACKUP = MODEL_REGISTRY.find((m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text")!.id;
+const BACKUP = MODEL_REGISTRY.find((m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text" && !requiresPaidPlan(m))!.id;
 
 beforeEach(() => {
     harness = lunoraTest(schemaWithShardedTables([]) as never);
@@ -96,6 +96,16 @@ describe("saved backup model", () => {
         const image = MODEL_REGISTRY.find((m) => m.mode === "image" && m.enabled !== false)!;
 
         await expect(save(image.id)).rejects.toThrow("backup");
+    });
+
+    it("refuses a paid-plan model for a user who cannot run it, with the run gate's refusal", async () => {
+        const paid = MODEL_REGISTRY.find((m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text" && requiresPaidPlan(m))!;
+
+        await save(BACKUP);
+
+        await expect(save(paid.id)).rejects.toThrow("needs a Pro plan");
+
+        expect(await reload()).toBe(BACKUP);
     });
 
     it("is cleared by an empty string", async () => {
