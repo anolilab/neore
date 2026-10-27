@@ -102,6 +102,10 @@ pub fn resolve_for_write(raw: &str, roots: &[PathBuf]) -> Result<PathBuf, String
         if real.is_dir() {
             return Err(format!("{raw}: is a folder"));
         }
+
+        // A link inside the roots is written through: the plan (and so the prompt) carries the file it points to,
+        // like `resolve_existing` does for reads. The use-time walk follows no links, so it could not open the link.
+        return Ok(real);
     }
 
     Ok(target)
@@ -799,5 +803,24 @@ mod tests {
         assert_eq!(outcome.0.unwrap(), "hello");
         assert!(outcome.1.is_ok());
         assert_eq!(outcome.2.unwrap(), 2);
+    }
+
+    /// A read and a write through a link that stays inside the roots both resolve to the file it points to.
+    #[cfg(unix)]
+    #[test]
+    fn an_in_root_link_is_resolved_for_reads_and_writes_alike() {
+        let dir = scratch("inlink");
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+
+        std::os::unix::fs::symlink(roots[0].join("a.txt"), dir.join("root/link.txt")).unwrap();
+
+        let read_path = resolve_existing("link.txt", &roots).unwrap();
+        let write_path = resolve_for_write("link.txt", &roots).unwrap();
+
+        assert_eq!(read_path, roots[0].join("a.txt"));
+        assert_eq!(write_path, read_path);
+        assert_eq!(read(&roots, &read_path).unwrap(), "hello");
+        assert!(write(&roots, &write_path, "x", true).is_ok());
+        assert_eq!(fs::read_to_string(dir.join("root/a.txt")).unwrap(), "x");
     }
 }
