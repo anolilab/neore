@@ -437,12 +437,19 @@ mod confined {
         let disposition = FILE_DISPOSITION_INFO { DeleteFile: true };
 
         // SAFETY: the handle is open and the buffer is a `FILE_DISPOSITION_INFO` of the size passed.
-        unsafe {
+        let marked = unsafe {
             SetFileInformationByHandle(
                 reopened.as_raw_handle(),
                 FileDispositionInfo,
                 std::ptr::from_ref(&disposition).cast(),
                 std::mem::size_of::<FILE_DISPOSITION_INFO>() as u32,
+            )
+        };
+
+        if marked == 0 {
+            eprintln!(
+                "[device-core] could not mark a file created outside the shared folders for deletion: {}",
+                io::Error::last_os_error()
             );
         }
     }
