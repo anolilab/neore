@@ -115,7 +115,7 @@ export const getChunksHttpAction = async (context: HttpActionCtx, request: Reque
         return Response.json({ error: "Missing required parameters: streamId, afterIndex" }, { status: 400 });
     }
 
-    // The stream lives on its thread's shard (docs/plans/per-user-sharding.md).
+    // The stream lives on its thread's shard (plans/per-user-sharding.md).
     // A poll with no user (an older gateway) can only look on `__root__`.
     if (userId) {
         context = shardContext(context, await threadShardFor(context, userId, threadId));

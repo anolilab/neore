@@ -52,7 +52,7 @@ export const getThreadAccess = internalQuery
 /**
  * The owner of `threadId` when `userId` holds an unexpired grant on it — the
  * shard a grantee's thread-scoped work must run on
- * (docs/plans/per-user-sharding.md). `null` when there is no grant, which for
+ * (plans/per-user-sharding.md). `null` when there is no grant, which for
  * the owner themself is the normal answer.
  *
  * `threadAccess` is `.global()`, so this answers from any shard.

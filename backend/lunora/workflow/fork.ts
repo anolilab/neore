@@ -15,7 +15,7 @@ import { findOwnedVaultRows, insertVaultCopies, rewriteStorageKeys, scheduleVaul
 /**
  * Fork a public workflow into the user's own workspace.
  *
- * An action, because a fork spans two shards (docs/plans/per-user-sharding.md):
+ * An action, because a fork spans two shards (plans/per-user-sharding.md):
  * the author's vault rows are read on THEIR shard, and the copy is written on the
  * forker's. `projects` and the chat-file tables are `.global()`, so only the vault
  * needs the hop.

@@ -2,7 +2,7 @@
  * Call a function on ANOTHER user's shard, from server code.
  *
  * `ctx.run*` stays on the shard it was called on, and a row lives only on its
- * owner's shard (docs/plans/per-user-sharding.md). The few server paths that
+ * owner's shard (plans/per-user-sharding.md). The few server paths that
  * must read across users — an anonymous public share page, a gallery fork —
  * go through here: a system-privileged `createShardClient` call into the
  * owner's shard. Only from an ACTION or an HTTP action: it is an outbound

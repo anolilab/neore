@@ -140,7 +140,7 @@ const handle = async (route: RouteDefinition, c: Context<LunoraHttpEnv>): Promis
         }
 
         // Everything the key does runs on its owner's shard, where their rows
-        // live (docs/plans/per-user-sharding.md) — the per-key limit included.
+        // live (plans/per-user-sharding.md) — the per-key limit included.
         return await inShard(c.var.lunora, identity.userId, async (ctx) => await handleOnShard(route, c, ctx, identity, requestId));
     } catch (error) {
         return failure(route, error, requestId);

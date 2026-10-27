@@ -1,6 +1,6 @@
 /**
  * Brings `@lunora/testing`'s harness to production parity in two ways the
- * per-user-sharding change (docs/plans/per-user-sharding.md) depends on. (A
+ * per-user-sharding change (plans/per-user-sharding.md) depends on. (A
  * third, ORM facades on every `ctx.db`, went: the harness binds them itself
  * since `@lunora/testing@alpha.246`.)
  *

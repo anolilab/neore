@@ -7,7 +7,7 @@ use serde::Serialize;
 ///
 /// TODO: To support documents above 25 MB, move extraction to a Cloudflare
 /// Container (xberg native server / Docker image) — a Worker isolate has 128 MB
-/// and PDF parsing needs ~3× the file size. See docs/plans/document-parser.md.
+/// and PDF parsing needs ~3× the file size. See plans/document-parser.md.
 ///
 /// Measured on the xberg 1.3.2 spike: a PDF peaks at ~3.1× its size in linear
 /// memory plus ~6 MB, so a 40 MB PDF hit the 128 MB isolate limit and 25 MB

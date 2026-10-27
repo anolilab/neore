@@ -2,7 +2,7 @@
  * Which shard the running code is serving.
  *
  * `ctx.db` never routes by a table's `.shardBy()` field — a row lives in
- * whichever Durable Object executes the write (docs/plans/per-user-sharding.md).
+ * whichever Durable Object executes the write (plans/per-user-sharding.md).
  * So work a shard hands off (a `ctx.scheduler` job, a queue job) must name the
  * shard it came from, or it lands on `__root__`, where none of the user's rows
  * are. Nothing in the handler ctx says which shard that is, so `src/server.ts`

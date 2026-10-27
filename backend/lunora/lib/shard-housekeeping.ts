@@ -4,7 +4,7 @@
  * The cron tick runs on `__root__`, but the tables its sweeps scan — expired
  * temporary chats and streams, stale presence, lapsed claims, due triggers and
  * tasks, GDPR request timeouts — now live on each user's own shard
- * (docs/plans/per-user-sharding.md). So the tick FANS OUT: a `.global()` census
+ * (plans/per-user-sharding.md). So the tick FANS OUT: a `.global()` census
  * (`shardActivity`) says which user shards exist and what they need, and the
  * tick schedules the work onto each of them (`shardKey`), where it runs against
  * that shard's rows exactly as it used to run against root's.

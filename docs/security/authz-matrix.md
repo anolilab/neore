@@ -9,7 +9,7 @@ procedure cannot ship without someone having looked at its authorization.
 **Why it matters here more than usual.** A user's rows live on their own
 shard, which `authorizeShard` opens to them and to anyone they granted a thread
 or page — so a collaborator reaches EVERY procedure on the owner's shard, and
-`__root__` is open to all (docs/plans/per-user-sharding.md). The procedure's own
+`__root__` is open to all (plans/per-user-sharding.md). The procedure's own
 check below is therefore the PRIMARY control.
 Row-level security (next section) sits underneath it as defence in depth: it
 refuses a caller with no connection to a row at all, but does not know which
@@ -383,7 +383,7 @@ for a schema table that is neither policed nor listed:
 | `devices_functions.listDevices` | query | authQuery | devices | caller-scoped (ctx.user) | ok — new; never returns the secret |
 | `devices_functions.listPendingDeviceCalls` | query | authQuery | deviceCalls | caller-scoped (ctx.user) AND deviceId | ok — new; envelopes are signed for the device, which verifies them |
 | `devices_functions.reportDeviceCallProgress` | mutation | authMutation + RL | deviceCalls, devices | row.userId == caller AND row.deviceId == arg; HMAC of the device's secret over the report (domain `progress`) | ok — new; fresh, for that call, only a CLAIMED call and only forward (none → prompting → running); display only, cannot finish a call |
-| `devices_functions.registerDevice` | mutation | authMutation + RL | devices, user | caller-scoped (ctx.user); refuses guests, impersonation, deletion underway | ok — new; returns the pairing secret ONCE (see docs/plans/device-execution.md §3.2) |
+| `devices_functions.registerDevice` | mutation | authMutation + RL | devices, user | caller-scoped (ctx.user); refuses guests, impersonation, deletion underway | ok — new; returns the pairing secret ONCE (see plans/device-execution.md §3.2) |
 | `devices_functions.releaseDeviceCall` | mutation | authMutation + RL | deviceCalls | row.userId == caller AND row.deviceId == arg | ok — new; unsigned, but only moves the caller's own CLAIMED call to failed |
 | `devices_functions.renameDevice` | mutation | authMutation + RL | devices | row.userId == caller | ok — new |
 | `devices_functions.revokeDevice` | mutation | authMutation + RL | devices, deviceCalls | row.userId == caller | ok — new; deletes the row and its secret, expires open calls |

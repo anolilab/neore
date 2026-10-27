@@ -27,7 +27,7 @@
 # Those two secrets are passed to the packaging step only, and that step drops them when
 # they are empty: electron-builder treats an empty string as a set value and fails, instead
 # of skipping signing. macOS is still unsigned: it needs an Apple Developer ID and
-# notarization (docs/plans/desktop-and-mobile-apps.md §3). Unsigned macOS builds are blocked
+# notarization (plans/desktop-and-mobile-apps.md §3). Unsigned macOS builds are blocked
 # by Gatekeeper, and unsigned Windows installers trip SmartScreen, so the release is still
 # internal until both are in place. Drop the "unsigned" wording from the release notes then.
 #

@@ -6,7 +6,7 @@
  *
  * A non-empty list makes the device's approval prompt warn and refuse "Always
  * allow", and an existing allow rule does not skip the prompt
- * (`docs/plans/device-execution.md` §3.8).
+ * (`plans/device-execution.md` §3.8).
  *
  * Fail closed: a tool result is untrusted unless the tool is on the short list
  * of built-ins whose output is our own.

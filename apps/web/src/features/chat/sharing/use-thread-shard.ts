@@ -14,7 +14,7 @@ const isListedThread = (queryClient: QueryClient, threadId: string): boolean =>
 
 /**
  * Settle which shard `threadId` lives on before anything queries it
- * (docs/plans/per-user-sharding.md): the caller's own, or — for a thread shared
+ * (plans/per-user-sharding.md): the caller's own, or — for a thread shared
  * with them — its owner's, which `crpc` then names on every call about it.
  * Returns `true` once the thread's calls can go out.
  *

@@ -166,7 +166,7 @@ const DeviceActivity: FC = () => {
 
 /**
  * Settings → Chat → Devices: computers the agent may use through the desktop
- * app (docs/plans/device-execution.md). Pairing happens here; approving calls,
+ * app (plans/device-execution.md). Pairing happens here; approving calls,
  * shared folders and local MCP servers are managed in the desktop app's own
  * window, which the web page cannot reach.
  */

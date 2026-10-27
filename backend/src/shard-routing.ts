@@ -1,6 +1,6 @@
 /**
  * Worker-side shard routing: which Durable Object a client request lands on,
- * and who may land there (docs/plans/per-user-sharding.md).
+ * and who may land there (plans/per-user-sharding.md).
  *
  * - {@link withCallerShard}: an RPC, RPC batch entry or live-query socket that
  *   names no shard is sent to the CALLER's own shard. Done here rather than in

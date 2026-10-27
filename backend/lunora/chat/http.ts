@@ -424,7 +424,7 @@ export const runChatStart = async (context: HttpActionCtx, body: ChatStartBody, 
 
     // The thread's shard: the caller's own, or — in a thread shared with them —
     // its owner's, where the thread, its messages and this run's stream live
-    // (docs/plans/per-user-sharding.md). Everything below runs there.
+    // (plans/per-user-sharding.md). Everything below runs there.
     const shardKey = await threadShardFor(context, userId, body.threadId);
 
     return await inShard(context, shardKey, async (shardCtx) => await runChatStartOnShard(shardCtx, body, signingSecret, { pageContext, user, userId }));

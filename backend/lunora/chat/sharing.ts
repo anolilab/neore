@@ -185,7 +185,7 @@ export const getThreadAccess = authQuery
  * The shard a thread shared WITH the caller lives on — its owner's — or `null`
  * for a thread the caller owns, or cannot reach. The client routes every call
  * about the thread there (`apps/web/src/lib/lunora/shard-routing.ts`,
- * docs/plans/per-user-sharding.md). Reads only the caller's own `.global()`
+ * plans/per-user-sharding.md). Reads only the caller's own `.global()`
  * grant, so it answers from their own shard and reveals nothing about threads
  * they were not granted.
  */
@@ -348,7 +348,7 @@ export const acceptThreadInvite = authMutation
         inviteToken: v.string().max(MAX_LENGTH.short),
     })
     // `ownerId` is the shard the thread lives on — the client routes every call
-    // about this thread there (docs/plans/per-user-sharding.md).
+    // about this thread there (plans/per-user-sharding.md).
     .output(v.object({ ownerId: v.string(), permission: v.union(v.literal("read"), v.literal("write"), v.literal("admin")), threadId: v.string() }))
     .mutation(async ({ args: { inviteToken }, ctx: context }) => {
         const { userId } = context.user;

@@ -10,7 +10,7 @@ test.describe("Account deletion", () => {
         expect(row?.id, "the seeded user exists before deletion").toBeTruthy();
 
         const userId = row?.id ?? "";
-        // The user's own shard (docs/plans/per-user-sharding.md): the deletion
+        // The user's own shard (plans/per-user-sharding.md): the deletion
         // workflow must leave nothing of theirs in it.
         const shardFile = await findShardDatabase(userId);
 

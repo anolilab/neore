@@ -1,6 +1,6 @@
 /**
  * DEV-ONLY request timing, for finding where a request waits before its
- * handler starts (docs/plans/per-user-sharding.md, "Measurements").
+ * handler starts (plans/per-user-sharding.md, "Measurements").
  *
  * `SHARD_TIMING=on` in `backend/.dev.vars` logs one `[timing]` JSON line per
  * stage, each carrying the path and milliseconds:

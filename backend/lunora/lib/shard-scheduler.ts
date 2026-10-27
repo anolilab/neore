@@ -1,7 +1,7 @@
 /**
  * The `SchedulerDO` namespace, scoped to the calling shard.
  *
- * Two upstream gaps meet here (docs/plans/per-user-sharding.md, "Scheduler
+ * Two upstream gaps meet here (plans/per-user-sharding.md, "Scheduler
  * serialization"):
  *
  * 1. The generated app builds `createScheduler({ namespace })` with no

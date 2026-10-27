@@ -1,4 +1,4 @@
-//! Device execution for the Neore desktop shell (`docs/plans/device-execution.md`).
+//! Device execution for the Neore desktop shell (`plans/device-execution.md`).
 //!
 //! No UI: the host supplies an event sink (see [`engine::Sink`])
 //! and calls [`engine::DeviceState`]. The Electron shell reaches it through

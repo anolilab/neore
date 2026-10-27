@@ -1,6 +1,6 @@
 /**
  * `shardRoutes`: from a key known before the owner is, to the owner's shard
- * (docs/plans/per-user-sharding.md).
+ * (plans/per-user-sharding.md).
  *
  * A public share token, a messenger connection id or a trigger id arrives on a
  * request that names no user — an anonymous share page, a platform webhook —

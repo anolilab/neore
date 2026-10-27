@@ -4,7 +4,7 @@
  * An HTTP action runs in the Worker, not in a shard, so `ctx.runQuery` and
  * friends reach the DEFAULT shard (`__root__`) — which holds none of a user's
  * rows now that every request routes to its owner's shard
- * (docs/plans/per-user-sharding.md). {@link inShard} hands the handler a ctx
+ * (plans/per-user-sharding.md). {@link inShard} hands the handler a ctx
  * whose runners are `ctx.forShard(shardKey)`'s, and runs it inside that shard's
  * ALS context (`shard-context.ts`), so `ctx.scheduler` jobs and `enqueueJob`
  * default to the same shard without each call site naming it.

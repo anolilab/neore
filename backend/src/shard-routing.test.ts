@@ -1,5 +1,5 @@
 /**
- * Worker-side shard routing (docs/plans/per-user-sharding.md): where a request
+ * Worker-side shard routing (plans/per-user-sharding.md): where a request
  * that names no shard lands, and who `authorizeShard` lets onto a user's shard.
  */
 import { describe, expect, it, vi } from "vitest";

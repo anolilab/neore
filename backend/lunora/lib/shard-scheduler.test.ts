@@ -1,5 +1,5 @@
 /**
- * The scheduler namespace wrapper (docs/plans/per-user-sharding.md): a job
+ * The scheduler namespace wrapper (plans/per-user-sharding.md): a job
  * defaults to the shard that scheduled it, and runs on its TARGET shard's own
  * SchedulerDO lane (anolilab/lunora#793) instead of the one app-wide instance.
  */
