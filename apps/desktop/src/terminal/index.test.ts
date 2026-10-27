@@ -71,6 +71,8 @@ vi.mock("electron", async () => {
         return win;
     };
 
+    BrowserWindow.getFocusedWindow = () => null;
+
     return {
         app: { on: (event: string, listener: () => void) => fake.appListeners.set(event, listener) },
         BrowserWindow,
@@ -322,6 +324,18 @@ describe("a session", () => {
         expect(hosts).toHaveLength(2);
     });
 
+    it("keeps no session for a shell that exited while its start was being reported", async () => {
+        const starting = startShell();
+
+        queueMicrotask(() => hosts[0]?.emit({ exitCode: 0, signal: 0, type: "exit" }));
+        await starting;
+
+        expect(terminals.pids()).toEqual([]);
+
+        await startShell();
+        expect(hosts).toHaveLength(2);
+    });
+
     it("copies to and pastes from the clipboard for the window only", async () => {
         await invoke(TERMINAL_CHANNEL.copy, pageEvent(), "selected text");
 
@@ -466,6 +480,22 @@ describe("ending a terminal", () => {
 
         expect(signal).toHaveBeenCalledWith(9001, "SIGKILL");
         expect(signal).not.toHaveBeenCalledWith(9000, "SIGKILL");
+    });
+
+    it("lets shells start again when a quit was cancelled", async () => {
+        vi.useFakeTimers();
+        vi.spyOn(process, "kill").mockImplementation(() => true);
+
+        try {
+            await terminals.open(folder);
+            fake.appListeners.get("before-quit")?.();
+            vi.advanceTimersByTime(6000);
+            await startShell();
+
+            expect(terminals.pids()).toEqual([9000]);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("ends the host of a shell that is still starting", async () => {

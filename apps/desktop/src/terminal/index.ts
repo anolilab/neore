@@ -66,6 +66,22 @@ const signalled = (pid: number, signal: 0 | "SIGKILL"): boolean => {
     }
 };
 
+/** How long the shells get to act on the hangup (save their history) before what is left is killed. */
+const QUIT_GRACE_MS = 500;
+const QUIT_POLL_MS = 20;
+/** After this long without the process ending, a quit that began is taken to have been cancelled. */
+const QUIT_RESET_MS = 5000;
+
+/** Blocks, for at most the grace period, until none of the pids is alive. The app is on its way out. */
+const waitForHangups = (pids: ReadonlySet<number>): void => {
+    const pause = new Int32Array(new SharedArrayBuffer(4));
+    const deadline = Date.now() + QUIT_GRACE_MS;
+
+    while (Date.now() < deadline && [...pids].some((pid) => signalled(pid, 0))) {
+        Atomics.wait(pause, 0, 0, QUIT_POLL_MS);
+    }
+};
+
 const forkHost = (): HostHandle => {
     const child = utilityProcess.fork(HOST_PATH, [], { serviceName: "Neore terminal host", stdio: "ignore" });
 
@@ -106,6 +122,7 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
     const pageUrl = pathToFileURL(TERMINAL_PAGE).href;
     let lockedDown = false;
     let quitting = false;
+    let quitReset: ReturnType<typeof setTimeout> | undefined;
 
     const trackedHost = (): HostHandle => {
         const host = startHost();
@@ -159,6 +176,8 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
             // The path in the title says which folder this shell is in.
             title: `Terminal — ${cwd}`,
             webPreferences: {
+                // A minimized window still acknowledges output; throttled timers would leave a busy shell paused.
+                backgroundThrottling: false,
                 contextIsolation: true,
                 nodeIntegration: false,
                 partition: PARTITION,
@@ -210,7 +229,10 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
             return;
         }
 
-        const result = await dialog.showOpenDialog({ properties: ["openDirectory"] });
+        // Attached to the window the user clicked in: a parentless dialog can open behind an always-on-top one.
+        const parent = BrowserWindow.getFocusedWindow();
+        const pickerOptions = { properties: ["openDirectory" as const] };
+        const result = parent === null ? await dialog.showOpenDialog(pickerOptions) : await dialog.showOpenDialog(parent, pickerOptions);
         const [picked] = result.filePaths;
 
         if (picked !== undefined && !result.canceled) {
@@ -256,6 +278,7 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
         }
 
         const { epoch } = entry;
+        let exited = false;
 
         entry.starting = true;
 
@@ -273,6 +296,7 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
                         return;
                     }
 
+                    exited = true;
                     entry.session = undefined;
                     send(target, TERMINAL_EVENT.exit, info);
                 },
@@ -285,7 +309,8 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
                 started.killNow();
             } else if (entry.closed || entry.epoch !== epoch) {
                 started.kill();
-            } else {
+            } else if (!exited) {
+                // A shell that ended while the host was still reporting its start has already told the page.
                 entry.session = started;
             }
 
@@ -317,6 +342,13 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
     // `before-quit` and `will-quit`, and a closing window forgets its entry, so the hangup goes out at `before-quit`.
     const hangUpAll = (): void => {
         quitting = true;
+        // The page can still refuse to close (an unload guard), which cancels the quit without telling us:
+        // a quit that has not ended the process by now was cancelled, and shells may start again.
+        clearTimeout(quitReset);
+        quitReset = setTimeout(() => {
+            quitting = false;
+        }, QUIT_RESET_MS);
+        quitReset.unref();
 
         for (const { session } of entries.values()) {
             if (session === undefined) {
@@ -336,6 +368,7 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
     // A shell can ignore the hangup (`trap '' HUP`) and would outlive the app, so what is left at the end is killed.
     const finishQuit = (): void => {
         hangUpAll();
+        waitForHangups(quitPids);
 
         for (const pid of quitPids) {
             if (signalled(pid, 0)) {

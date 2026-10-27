@@ -54,7 +54,14 @@ const createView = (): { fit: FitAddon; term: Terminal } => {
 
 const { fit, term } = createView();
 // Page-wide state, kept on one object so the functions below assign properties rather than module bindings.
-const state: { notice?: ReturnType<typeof setTimeout>; running: boolean } = { running: false };
+// `generation` names the shell the page is on, so a reply that outlives its shell can be told apart; `ended` is
+// set when the current one has already exited, which can happen before its start request is answered.
+const state: { ended: boolean; generation: number; notice?: ReturnType<typeof setTimeout>; running: boolean; starting: boolean } = {
+    ended: false,
+    generation: 0,
+    running: false,
+    starting: false,
+};
 
 const NOTICE_MS = 5000;
 const showNotice = (text: string): void => {
@@ -69,7 +76,13 @@ const showNotice = (text: string): void => {
 };
 
 const pasteFromClipboard = async (): Promise<void> => {
+    const { generation } = state;
     const text = await api.paste();
+
+    // The shell the user pasted into is gone; its text does not belong in the next one.
+    if (generation !== state.generation) {
+        return;
+    }
 
     if (text.length > MAX_INPUT_CHARS) {
         // The main process refuses a write this large; saying so beats a paste that does nothing.
@@ -113,6 +126,14 @@ const showEnded = (text: string): void => {
 };
 
 const start = async (): Promise<void> => {
+    // A second request while one is pending would be refused by the main process and report a failure for a shell that started.
+    if (state.starting) {
+        return;
+    }
+
+    state.starting = true;
+    state.generation += 1;
+    state.ended = false;
     $("ended").hidden = true;
     // A new shell starts on an empty screen and an empty buffer.
     term.reset();
@@ -120,12 +141,17 @@ const start = async (): Promise<void> => {
 
     try {
         await api.start(term.cols, term.rows);
-        state.running = true;
-        // The window may have been resized while the shell was starting.
-        await quietly(api.resize(term.cols, term.rows));
-        term.focus();
+
+        if (!state.ended) {
+            state.running = true;
+            // The window may have been resized while the shell was starting.
+            await quietly(api.resize(term.cols, term.rows));
+            term.focus();
+        }
     } catch (error) {
         showEnded(`The shell could not start: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+        state.starting = false;
     }
 };
 
@@ -142,13 +168,19 @@ term.onResize(({ cols, rows }) => {
 });
 
 api.onData((data) => {
+    const { generation } = state;
+
     // The shell is told the text is on screen only once the view has taken it, so a flood is paused at the source.
+    // An acknowledgement that outlives its shell would count against the next one.
     term.write(data, () => {
-        quietly(api.ack(data.length));
+        if (generation === state.generation) {
+            quietly(api.ack(data.length));
+        }
     });
 });
 
 api.onExit((exit: TerminalExit) => {
+    state.ended = true;
     state.running = false;
     showEnded(exit.crashed ? "The shell stopped unexpectedly." : `The shell exited (code ${String(exit.exitCode)}).`);
 });
