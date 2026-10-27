@@ -8,7 +8,7 @@ import type { ToolSet } from "ai";
 import { api } from "../../_generated/api";
 import { Agent } from "../../agent/client";
 import type { ServiceFetch } from "../../lib/services.js";
-import { eligibleBackupModel, supportsBackupFallback } from "./backup-model.js";
+import { backupCapabilities, eligibleBackupModel, supportsBackupFallback } from "./backup-model.js";
 import { FallbackLanguageModel } from "./fallback-language-model.js";
 import { type GatewayCustomProviderConfig, GatewayLanguageModel } from "./gateway-language-model.js";
 
@@ -269,8 +269,10 @@ const getAgent = async (model: AgentModel | string, options: GetAgentOptions): P
             if (backup) {
                 chat = new FallbackLanguageModel(chat, gatewayModel(backup), {
                     backupProviderKey: backup.provider.replace(INTERNAL_PREFIX, ""),
+                    backupSupportsFiles: backupCapabilities(backup).files,
+                    backupSupportsImages: backupCapabilities(backup).images,
                     backupSupportsReasoning: Boolean(backup.filterCapabilities?.includes("effort_control") || backup.filterCapabilities?.includes("reasoning")),
-                    backupSupportsTools: backup.supportsToolCalling !== false,
+                    backupSupportsTools: backupCapabilities(backup).tools,
                 });
             }
         }

@@ -344,6 +344,24 @@ describe("classifyProviderFailure on errors that are not Error objects", () => {
         expect(classifyProviderFailure({ error: { message: "Overloaded", type: "overloaded_error" }, type: "error" }, 10, 100_000)).toBe("infra");
     });
 
+    it("reads the structured fields: a code, name or type that names a transient failure", () => {
+        expect(classifyProviderFailure({ code: "ECONNRESET", message: "read failed" }, 10, 100_000)).toBe("infra");
+        expect(classifyProviderFailure({ message: "x", name: "TimeoutError" }, 10, 100_000)).toBe("infra");
+        expect(classifyProviderFailure({ error: { type: "overloaded_error" }, type: "error" }, 10, 100_000)).toBe("infra");
+    });
+
+    it.each(["model unavailable in your region", "feature unavailable on your plan", "no network access for this tool"])(
+        "gives a permanent failure (%j) no reason",
+        (message) => {
+            expect(classifyProviderFailure(message, 10, 100_000)).toBeUndefined();
+            expect(classifyProviderFailure(new Error(message), 10, 100_000)).toBeUndefined();
+        },
+    );
+
+    it.each(["Service Unavailable", "temporarily unavailable, retry shortly", "network error", "overloaded"])("still treats %j as infra", (message) => {
+        expect(classifyProviderFailure(message, 10, 100_000)).toBe("infra");
+    });
+
     it("gives a string or nested error that names no outage no reason", () => {
         expect(classifyProviderFailure("invalid api key", 10, 100_000)).toBeUndefined();
         expect(classifyProviderFailure({ error: { message: "bad schema" } }, 10, 100_000)).toBeUndefined();

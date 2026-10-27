@@ -26,6 +26,7 @@ import type {
 import { isVisiblePart } from "@neore/ai/models";
 
 import { streamLogger } from "../../lib/logger";
+import { type BackupCapabilities, backupCanServe } from "./backup-model";
 
 /** Provider option keys that only a reasoning model accepts (sending one to another is a 400). */
 const REASONING_OPTION_KEYS: ReadonlySet<string> = new Set([
@@ -81,7 +82,7 @@ export class FallbackLanguageModel implements LanguageModelV3 {
 
     private readonly backup: LanguageModelV3;
 
-    private readonly backupSupportsTools: boolean;
+    private readonly backupCapabilities: BackupCapabilities;
 
     private active: LanguageModelV3;
 
@@ -92,14 +93,22 @@ export class FallbackLanguageModel implements LanguageModelV3 {
         backup: LanguageModelV3,
         {
             backupProviderKey,
+            backupSupportsFiles = true,
+            backupSupportsImages = true,
             backupSupportsReasoning,
             backupSupportsTools = true,
-        }: { backupProviderKey?: string; backupSupportsReasoning?: boolean; backupSupportsTools?: boolean } = {},
+        }: {
+            backupProviderKey?: string;
+            backupSupportsFiles?: boolean;
+            backupSupportsImages?: boolean;
+            backupSupportsReasoning?: boolean;
+            backupSupportsTools?: boolean;
+        } = {},
     ) {
         this.backupTraits = { providerKey: backupProviderKey, supportsReasoning: backupSupportsReasoning };
         this.primary = primary;
         this.backup = backup;
-        this.backupSupportsTools = backupSupportsTools;
+        this.backupCapabilities = { files: backupSupportsFiles, images: backupSupportsImages, tools: backupSupportsTools };
         this.active = primary;
         this.supportedUrls = primary.supportedUrls;
     }
@@ -109,8 +118,9 @@ export class FallbackLanguageModel implements LanguageModelV3 {
         return this.primary.modelId;
     }
 
-    get supportsToolsOnBackup(): boolean {
-        return this.backupSupportsTools;
+    /** Whether the backup could take a call carrying these tools and messages: the one rule for switching and for sizing the prompt. */
+    canServe(call: { hasTools: boolean; messages: unknown }): boolean {
+        return backupCanServe(this.backupCapabilities, call);
     }
 
     get backupModelId(): string {
@@ -218,7 +228,8 @@ export class FallbackLanguageModel implements LanguageModelV3 {
             return false;
         }
 
-        return this.backupSupportsTools || !options.tools?.length;
+        // A call the backup could not take (tools, images or documents it does not support) keeps the primary's own error.
+        return this.canServe({ hasTools: (options.tools?.length ?? 0) > 0, messages: options.prompt });
     }
 
     private optionsForBackup(options: LanguageModelV3CallOptions): LanguageModelV3CallOptions {

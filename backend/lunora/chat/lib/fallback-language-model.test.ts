@@ -240,6 +240,45 @@ describe("FallbackLanguageModel", () => {
         });
     });
 
+    describe("a call the backup cannot take", () => {
+        const withAttachment = (part: object) => ({ ...OPTIONS, prompt: [{ content: [part], role: "user" }] }) as unknown as LanguageModelV3CallOptions;
+        const image = withAttachment({ data: "x", mediaType: "image/png", type: "file" });
+        const pdf = withAttachment({ data: "x", mediaType: "application/pdf", type: "file" });
+
+        it.each(["doGenerate", "doStream"] as const)("%s: keeps the primary's error when the call has an image and the backup cannot see", async (method) => {
+            const error = gatewayError("infra");
+            const backup = fakeModel("backup");
+
+            await expect(new FallbackLanguageModel(fakeModel("primary", error), backup, { backupSupportsImages: false })[method](image)).rejects.toBe(error);
+
+            expect(backup[method]).not.toHaveBeenCalled();
+        });
+
+        it("keeps the primary's error when the call has a document and the backup cannot read it", async () => {
+            const error = gatewayError("infra");
+            const backup = fakeModel("backup");
+
+            await expect(new FallbackLanguageModel(fakeModel("primary", error), backup, { backupSupportsFiles: false }).doGenerate(pdf)).rejects.toBe(error);
+
+            expect(backup.doGenerate).not.toHaveBeenCalled();
+        });
+
+        it("still falls back for the same attachments when the backup supports them", async () => {
+            const backup = fakeModel("backup");
+
+            await new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), backup).doGenerate(image);
+
+            expect(backup.doGenerate).toHaveBeenCalledTimes(1);
+        });
+
+        it("canServe is the rule prompt sizing asks too", () => {
+            const model = new FallbackLanguageModel(fakeModel("primary"), fakeModel("backup"), { backupSupportsImages: false });
+
+            expect(model.canServe({ hasTools: false, messages: [{ content: [{ image: "x", type: "image" }], role: "user" }] })).toBe(false);
+            expect(model.canServe({ hasTools: false, messages: [{ content: "hi", role: "user" }] })).toBe(true);
+        });
+    });
+
     it("presents itself as the primary model until a call falls back", async () => {
         const primary = fakeModel("primary");
         const model = new FallbackLanguageModel(primary, fakeModel("backup"));

@@ -44,6 +44,7 @@ import {
     afterRun,
     AgentRunError,
     buildRunStreamArgs,
+    loadModelFilterRules,
     resolveBackupModelId,
     endStoppedRun,
     finishRun,
@@ -246,7 +247,8 @@ const runSpeaker = async (
 
         setResearchDepth(ctx, turn.researchDepth);
 
-        const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model);
+        const modelFilterRules = await loadModelFilterRules(ctx, turn.userId);
+        const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
         const agent = await getAgent(model, {
             backupModelId,
             customProvider,
@@ -254,6 +256,7 @@ const runSpeaker = async (
             language: turn.prefs.language,
             location: turn.prefs.location,
             maxSteps: getMaxSteps(turn.shouldAutoContinue),
+            modelFilterRules,
             personalization: turn.prefs.personalization,
             searchMode,
             skillContext: { config: speaker.config, instructions: speaker.instructions },

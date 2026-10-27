@@ -25,7 +25,7 @@ import type { ResearchDepth } from "../../agent/client/create-tool";
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
-import { backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
+import { backupCanServe, backupCapabilities, backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
 import { compressContextMessages, getFallbackContextWindow, getMaxSteps } from "./auto-continue";
 import { isLocalBrowserProvider, toGatewayFormat } from "./custom-providers";
@@ -145,11 +145,15 @@ const assertModelAllowed = async (ctx: Pick<ActionCtx, "runQuery">, model: strin
     throw new AgentRunError("plan-required", paidModelRefusal(definition.name ?? definition.id, byokPaysFor(definition)));
 };
 
-/** The user's model filters, for a run that was not handed them. */
-const readStoredFilterRules = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<ModelFilterRules | undefined> => {
+/**
+ * The user's model filters (`{}` when they set none), for a run to read once and hand to both the gateway models
+ * (`getAgent({ modelFilterRules })`, which is where `requireZDR` / `denyDataCollection` reach the provider routing)
+ * and `resolveBackupModelId`. Every run path loads them here, so the chosen model and its backup are routed alike.
+ */
+export const loadModelFilterRules = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<ModelFilterRules> => {
     const preferences = await ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId });
 
-    return preferences.modelFilterRules;
+    return preferences?.modelFilterRules ?? {};
 };
 
 /**
@@ -172,7 +176,7 @@ export const resolveBackupModelId = async (
 
     // The caller may already hold the rules (the interactive run reads them for the gateway); every other path loads them here,
     // since the filters can encode privacy rules (regions, providers) that a backup must honour as much as the chosen model.
-    const rules = filterRules ?? (await readStoredFilterRules(ctx, userId));
+    const rules = filterRules ?? (await loadModelFilterRules(ctx, userId));
 
     if (backupFilterRejection(definition, rules) !== null) {
         return undefined;
@@ -671,13 +675,13 @@ export const buildRunStreamArgs = (options: {
     // run's tool results pile up after the one-shot check in `applyLateCompression`.
     // `shouldAutoContinue` no longer changes this; it stays in the type so callers
     // need no edit.
-    const contextLimit = getFallbackContextWindow(
-        model,
-        hasTools && MODEL_LOOKUP.get(backupModelId ?? "")?.supportsToolCalling === false ? undefined : backupModelId,
-    );
+    const backupDefinition = backupModelId ? MODEL_LOOKUP.get(backupModelId) : undefined;
+    const backupTraits = backupDefinition ? backupCapabilities(backupDefinition) : undefined;
 
     streamTextArgs.prepareStep = ({ messages }: { messages: unknown[] }) => {
-        const compressed = compressContextMessages(messages as never, contextLimit);
+        // Sized for the backup only while it could take the call (same rule as the wrapper's switch).
+        const sizedFor = !backupTraits || backupCanServe(backupTraits, { hasTools: hasTools === true, messages }) ? backupModelId : undefined;
+        const compressed = compressContextMessages(messages as never, getFallbackContextWindow(model, sizedFor));
 
         return compressed === messages ? undefined : { messages: compressed };
     };
@@ -963,12 +967,14 @@ export const resumeApprovedRun = async (
             toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer) as (typeof toolResult.tools)[string];
         }
 
-        const backupModelId = await resolveBackupModelId(ctx, userId, preferences.backupModel, config.model);
+        const modelFilterRules = await loadModelFilterRules(ctx, userId);
+        const backupModelId = await resolveBackupModelId(ctx, userId, preferences.backupModel, config.model, modelFilterRules);
         const agent = await getAgent(config.model, {
             backupModelId,
             customProvider,
             gateway: gatewayFetch(ctx),
             maxSteps: getMaxSteps(config.shouldAutoContinue),
+            modelFilterRules,
             threadId,
             tools: toolResult.tools,
             userId,

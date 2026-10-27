@@ -1,7 +1,7 @@
 import { MODEL_REGISTRY } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
-import { eligibleBackupModel } from "./backup-model";
+import { backupCanServe, eligibleBackupModel } from "./backup-model";
 
 const textModels = MODEL_REGISTRY.filter((m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text");
 const [first, second] = textModels;
@@ -35,5 +35,28 @@ describe("eligibleBackupModel", () => {
                 expect(eligibleBackupModel(model.id, first!.id)).toBeUndefined();
             }
         }
+    });
+});
+
+describe("backupCanServe", () => {
+    const image = { content: [{ mediaType: "image/png", type: "file" }], role: "user" };
+    const aiSdkImage = { content: [{ image: "x", type: "image" }], role: "user" };
+    const pdf = { content: [{ mediaType: "application/pdf", type: "file" }], role: "user" };
+    const all = { files: true, images: true, tools: true };
+
+    it("takes any call when it supports everything", () => {
+        expect(backupCanServe(all, { hasTools: true, messages: [image, pdf] })).toBe(true);
+    });
+
+    it("refuses tools, images (as file parts or image parts) and documents it does not support", () => {
+        expect(backupCanServe({ ...all, tools: false }, { hasTools: true, messages: [] })).toBe(false);
+        expect(backupCanServe({ ...all, images: false }, { hasTools: false, messages: [image] })).toBe(false);
+        expect(backupCanServe({ ...all, images: false }, { hasTools: false, messages: [aiSdkImage] })).toBe(false);
+        expect(backupCanServe({ ...all, files: false }, { hasTools: false, messages: [pdf] })).toBe(false);
+    });
+
+    it("takes a plain-text, tool-free call whatever it supports", () => {
+        expect(backupCanServe({ files: false, images: false, tools: false }, { hasTools: false, messages: [{ content: "hi", role: "user" }] })).toBe(true);
+        expect(backupCanServe({ files: false, images: true, tools: true }, { hasTools: false, messages: [image] })).toBe(true);
     });
 });

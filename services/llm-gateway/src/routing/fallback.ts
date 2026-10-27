@@ -215,14 +215,15 @@ const errorText = (error: unknown, depth = 0): string => {
         return "";
     }
 
-    const { error: nested, message, name, type } = error as { error?: unknown; message?: unknown; name?: unknown; type?: unknown };
-    const own = [name, type, message].filter((part): part is string => typeof part === "string").join(" ");
+    const { code, error: nested, message, name, type } = error as { code?: unknown; error?: unknown; message?: unknown; name?: unknown; type?: unknown };
+    // The structured fields first (`overloaded_error`, `TimeoutError`, `ECONNRESET`): they name the failure, the message only describes it.
+    const own = [code, name, type, message].filter((part): part is string => typeof part === "string").join(" ");
 
     return `${own} ${errorText(nested, depth + 1)}`;
 };
 
 const TRANSIENT_NETWORK_PATTERN =
-    /timeout|timed out|econnreset|econnrefused|network|fetch failed|socket hang up|overloaded|unavailable|rate.?limit|too many requests|at capacity/i;
+    /timeout|timed out|econnreset|econnrefused|network (?:error|failure)|fetch failed|socket hang up|overloaded|service unavailable|temporarily unavailable|rate.?limit|too many requests|at capacity/i;
 
 /**
  * The fallback reason to report to a caller that may retry on another model.

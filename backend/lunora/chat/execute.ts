@@ -268,7 +268,7 @@ export const runStreamingAgent = internalAction
             // Build agent
             const isAutoContinue = streamingConfig.shouldAutoContinue === true;
 
-            const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, agentModulePrefs.modelFilterRules ?? undefined);
+            const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, agentModulePrefs.modelFilterRules ?? {});
             const agent = await getAgent(model, {
                 agentMode,
                 backupModelId,

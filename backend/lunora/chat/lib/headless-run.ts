@@ -27,6 +27,7 @@ import { sumMessageCosts } from "../../agent/message-cost";
 import type { SkillConfig } from "../../skills/validators";
 import {
     buildRunStreamArgs,
+    loadModelFilterRules,
     loadUserProviderKeys,
     resolveBackupModelId,
     resolveRunModel,
@@ -163,7 +164,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
 
         const existingThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
         const personal = options.personalization === "full";
-        const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model);
+        const modelFilterRules = await loadModelFilterRules(ctx, userId);
+        const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, modelFilterRules);
         // The tools the call carries: after the allowlist, so a run it strips bare is sized for a backup that cannot call tools.
         const runTools = applyToolAllowlist(toolResult.tools, toolAllowlist);
         const agent = await getAgent(model, {
@@ -173,6 +175,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
             language: prefs.language,
             location: personal ? prefs.location : undefined,
             maxSteps: options.maxSteps ?? getMaxSteps(true),
+            modelFilterRules,
             personalization: personal ? toPersonalization(prefs) : undefined,
             skillContext: skill ? { config: skill.config, instructions: skill.instructions } : undefined,
             threadId: existingThreadId,

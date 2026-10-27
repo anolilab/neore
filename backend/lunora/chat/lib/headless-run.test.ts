@@ -21,6 +21,7 @@ const seen = vi.hoisted(() => {
         created: [] as unknown[],
         failAt: undefined as "generate" | "keys" | "thread" | undefined,
         filterRules: undefined as Record<string, string[]> | undefined,
+        filters: [] as unknown[],
         prepareSteps: [] as unknown[],
         system: [] as string[],
         tools: [] as string[][],
@@ -35,6 +36,7 @@ vi.mock("./get-agent", () => {
                 backupModelId?: string;
                 language?: string;
                 location?: string;
+                modelFilterRules?: unknown;
                 personalization?: Parameters<typeof getSystemPrompt>[3];
                 timezone?: string;
                 tools?: Record<string, unknown>;
@@ -42,6 +44,7 @@ vi.mock("./get-agent", () => {
         ) => {
             seen.tools.push(Object.keys(options.tools ?? {}));
             seen.backups.push(options.backupModelId);
+            seen.filters.push(options.modelFilterRules);
 
             const instructions = getSystemPrompt(options.timezone, options.location, options.language, options.personalization);
             const thread = {
@@ -209,6 +212,20 @@ describe("runHeadlessAgent backup model", () => {
     it("gives the agent the user's backup model, so an unattended run survives an outage too", async () => {
         await run(ctxWith(BACKUP));
 
+        expect(seen.backups).toEqual([BACKUP]);
+    });
+
+    it("hands the user's privacy routing rules to the agent that builds the primary and the backup gateway models", async () => {
+        seen.filterRules = { requireZDR: true } as never;
+        seen.filters = [];
+
+        try {
+            await run(ctxWith(BACKUP));
+        } finally {
+            seen.filterRules = undefined;
+        }
+
+        expect(seen.filters).toEqual([{ requireZDR: true }]);
         expect(seen.backups).toEqual([BACKUP]);
     });
 

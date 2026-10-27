@@ -235,9 +235,9 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
     // A call that may fall back must fit the smaller of the two models' windows.
     const fallback = model instanceof FallbackLanguageModel ? model : undefined;
     const modelId = fallback ? fallback.primaryModelId : getModelName(model);
-    // A backup that cannot call tools is skipped for a call carrying them, so it does not size this prompt.
+    // A backup that would be skipped for this call (tools, images or documents it cannot take) does not size this prompt.
     const hasTools = Object.keys(args.tools ?? {}).length > 0;
-    const sizedForBackup = fallback && (fallback.supportsToolsOnBackup || !hasTools) ? fallback.backupModelId : undefined;
+    const sizedForBackup = fallback?.canServe({ hasTools, messages: context.messages }) ? fallback.backupModelId : undefined;
     const messages = applyLateCompression(context.messages, modelId, sizedForBackup);
 
     const aiArgs = {
