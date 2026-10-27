@@ -8,6 +8,7 @@ import { msg, plural } from "@lingui/core/macro";
 
 import { AppError } from "./app-error";
 import { AuthenticationError } from "./authentication-error";
+import { GatewayDeadlineError } from "./gateway-deadline-error";
 import { DEFAULT_MESSAGE_LIMIT_MESSAGE, MessageLimitError } from "./message-limit-error";
 import { NetworkError } from "./network-error";
 import { RateLimitError } from "./rate-limit-error";
@@ -18,6 +19,7 @@ import { ValidationError } from "./validation-error";
 export * from "./app-error";
 export * from "./authentication-error";
 export * from "./content-error";
+export * from "./gateway-deadline-error";
 export * from "./message-limit-error";
 export * from "./network-error";
 export * from "./prompt-improvement-error";
@@ -177,9 +179,13 @@ export const ErrorUtilities = {
             return error.message;
         }
 
-        // Before `NetworkError`, which it extends: a deadline is not a lost connection.
-        if (error instanceof TimeoutError) {
+        // Both before `NetworkError`, which they extend: a deadline is not a lost connection.
+        if (error instanceof GatewayDeadlineError) {
             return msg`The request timed out but may still complete. Check the conversation before trying again.`;
+        }
+
+        if (error instanceof TimeoutError) {
+            return msg`The request timed out. Please try again.`;
         }
 
         if (error instanceof NetworkError) {

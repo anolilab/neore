@@ -1,7 +1,7 @@
 import { withUnlockProofBody } from "@neore/client-runtime";
 
 import env from "@/lib/env";
-import { NetworkError, TimeoutError } from "@/lib/errors";
+import { GatewayDeadlineError, NetworkError } from "@/lib/errors";
 import { providerLogger } from "@/lib/logger";
 
 import type { MediaGenerationFailure } from "../lib/start-media-generation";
@@ -25,7 +25,7 @@ export type KickOffMedia = (media: MediaKickOff, onRefused?: () => void) => Prom
 const mediaGenerationError = (failure: MediaGenerationFailure, networkMessage: string): Error => {
     if (failure.kind === "network") {
         // A deadline keeps its own wording: the gateway may still be generating, so "check your connection" would mislead.
-        return failure.cause instanceof TimeoutError ? failure.cause : new NetworkError(networkMessage);
+        return failure.cause instanceof GatewayDeadlineError ? failure.cause : new NetworkError(networkMessage);
     }
 
     return gatewayError(failure.status, {

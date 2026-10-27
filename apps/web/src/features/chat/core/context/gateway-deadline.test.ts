@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UIMessage } from "@/lib/agent";
-import { TimeoutError } from "@/lib/errors";
+import { GatewayDeadlineError } from "@/lib/errors";
 
 import { useChatUIStore } from "../stores/chat-ui-store";
 import { runEditMessage, runReloadMessage } from "./branch-actions";
@@ -97,7 +97,7 @@ describe("gateway deadline in chat actions", () => {
         await vi.advanceTimersByTimeAsync(31_000);
         await pending;
 
-        expect(env.handleError).toHaveBeenCalledWith(expect.any(TimeoutError));
+        expect(env.handleError).toHaveBeenCalledWith(expect.any(GatewayDeadlineError));
         expect(env.setIsRegenerating).toHaveBeenLastCalledWith(false);
         // added once, then removed by the updater passed second
         expect(env.setOptimisticMessages).toHaveBeenCalledTimes(2);
@@ -122,7 +122,7 @@ describe("gateway deadline in chat actions", () => {
         await vi.advanceTimersByTimeAsync(31_000);
         await pending;
 
-        expect(env.handleError).toHaveBeenCalledWith(expect.any(TimeoutError));
+        expect(env.handleError).toHaveBeenCalledWith(expect.any(GatewayDeadlineError));
         expect(env.setIsRegenerating).toHaveBeenLastCalledWith(false);
         expect(env.setHiddenMessageIds).toHaveBeenCalledTimes(2);
     });
@@ -135,7 +135,7 @@ describe("gateway deadline in chat actions", () => {
         await vi.advanceTimersByTimeAsync(31_000);
         await pending;
 
-        expect(env.handleError).toHaveBeenCalledWith(expect.any(TimeoutError));
+        expect(env.handleError).toHaveBeenCalledWith(expect.any(GatewayDeadlineError));
         expect(env.setIsRegenerating).toHaveBeenLastCalledWith(false);
         expect(env.setHiddenMessageIds).toHaveBeenCalledTimes(2);
     });

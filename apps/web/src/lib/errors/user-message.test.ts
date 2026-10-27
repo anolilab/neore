@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ErrorUtilities, NetworkError, TimeoutError } from ".";
+import { ErrorUtilities, GatewayDeadlineError, NetworkError, TimeoutError } from ".";
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted); a descriptor carries its English source.
 vi.mock("@lingui/core/macro", () => {
@@ -15,8 +15,12 @@ vi.mock("@lingui/core/macro", () => {
 });
 
 describe("ErrorUtilities.getUserMessage", () => {
-    it("says a timed-out request may still complete, not that the connection failed", () => {
-        const message = ErrorUtilities.getUserMessage(new TimeoutError(30_000));
+    it("gives any other timeout the generic wording", () => {
+        expect(ErrorUtilities.getUserMessage(new TimeoutError(30_000))).toBe("The request timed out. Please try again.");
+    });
+
+    it("tells a chat gateway deadline to check the conversation, not that the connection failed", () => {
+        const message = ErrorUtilities.getUserMessage(new GatewayDeadlineError(30_000));
 
         expect(message).toContain("may still complete");
         expect(message).not.toContain("Connection error");

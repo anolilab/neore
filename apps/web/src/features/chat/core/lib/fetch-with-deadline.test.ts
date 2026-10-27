@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { TimeoutError } from "@/lib/errors";
+import { GatewayDeadlineError } from "@/lib/errors";
 
 import { fetchWithDeadline } from "./fetch-with-deadline";
 import { startMediaGeneration } from "./start-media-generation";
@@ -32,13 +32,13 @@ describe("fetchWithDeadline", () => {
         await expect(response.json()).resolves.toStrictEqual({ ok: 1 });
     });
 
-    it("rejects with a TimeoutError when the gateway never answers", async () => {
+    it("rejects with a GatewayDeadlineError when the gateway never answers", async () => {
         vi.stubGlobal("fetch", stalledFetch());
 
-        await expect(fetchWithDeadline("https://gateway.test/v1/chat", {}, { timeoutMs: 20 })).rejects.toBeInstanceOf(TimeoutError);
+        await expect(fetchWithDeadline("https://gateway.test/v1/chat", {}, { timeoutMs: 20 })).rejects.toBeInstanceOf(GatewayDeadlineError);
     });
 
-    it("rejects with a TimeoutError when the body stalls after the headers", async () => {
+    it("rejects with a GatewayDeadlineError when the body stalls after the headers", async () => {
         // Headers arrive, the body never does; aborting the request errors the stream, as in a browser.
         vi.stubGlobal(
             "fetch",
@@ -55,7 +55,7 @@ describe("fetchWithDeadline", () => {
             }),
         );
 
-        await expect(fetchWithDeadline("https://gateway.test/v1/chat", {}, { timeoutMs: 20 })).rejects.toBeInstanceOf(TimeoutError);
+        await expect(fetchWithDeadline("https://gateway.test/v1/chat", {}, { timeoutMs: 20 })).rejects.toBeInstanceOf(GatewayDeadlineError);
     });
 
     it("rethrows a caller abort unchanged instead of reporting a timeout", async () => {
@@ -68,7 +68,7 @@ describe("fetchWithDeadline", () => {
 
         const error = await pending.catch((error_: unknown) => error_);
 
-        expect(error).not.toBeInstanceOf(TimeoutError);
+        expect(error).not.toBeInstanceOf(GatewayDeadlineError);
         expect((error as DOMException).name).toBe("AbortError");
     });
 });
@@ -87,6 +87,6 @@ describe("startMediaGeneration deadline", () => {
 
         await vi.advanceTimersByTimeAsync(31_000);
 
-        await expect(pending).resolves.toMatchObject({ cause: expect.any(TimeoutError), kind: "network", ok: false });
+        await expect(pending).resolves.toMatchObject({ cause: expect.any(GatewayDeadlineError), kind: "network", ok: false });
     });
 });
