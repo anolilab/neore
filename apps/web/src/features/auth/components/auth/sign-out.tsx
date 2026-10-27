@@ -38,6 +38,10 @@ const SignOut = () => {
         void releasePush().then(() =>
             authClient.signOut({
                 fetchOptions: {
+                    onResponse: () => {
+                        // Settled either way: drop anything a push stored while the request ran (writes stay held until the next sign-in).
+                        clearThreadListCache();
+                    },
                     onError: () => {
                         // The session may still be active: keep the analytics identity.
                         globalThis.location.replace(signInPath);

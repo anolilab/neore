@@ -6,6 +6,7 @@ import {
     getThreadListStorage,
     projectThreadList,
     readThreadListCache,
+    releaseThreadListWrites,
     toThreadListData,
     writeThreadListCache,
 } from "./thread-list-cache";
@@ -49,6 +50,7 @@ const listFor = (userId: string, title = "First") => {
 describe("thread list cache", () => {
     beforeEach(() => {
         localStorage.clear();
+        releaseThreadListWrites();
     });
 
     afterEach(() => {
@@ -115,6 +117,27 @@ describe("thread list cache", () => {
             expect(readThreadListCache("bob")).toBeUndefined();
             expect(readThreadListCache("alice")).toBeDefined();
             expect(() => clearThreadListCacheFor("bob", undefined)).not.toThrow();
+        });
+    });
+
+    describe("write hold", () => {
+        it("refuses every write from a sign-out until a sign-in lifts it", () => {
+            clearThreadListCache();
+            writeThreadListCache("alice", listFor("alice"));
+            expect(localStorage).toHaveLength(0);
+
+            releaseThreadListWrites("alice");
+            writeThreadListCache("alice", listFor("alice"));
+            expect(localStorage).toHaveLength(1);
+        });
+
+        it("refuses writes for a removed account only", () => {
+            clearThreadListCacheFor("bob");
+            writeThreadListCache("bob", listFor("bob"));
+            writeThreadListCache("alice", listFor("alice"));
+
+            expect(readThreadListCache("bob")).toBeUndefined();
+            expect(readThreadListCache("alice")).toBeDefined();
         });
     });
 

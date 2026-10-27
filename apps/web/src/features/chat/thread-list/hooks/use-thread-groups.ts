@@ -462,11 +462,23 @@ const useThreadGroups = (
         });
 
         // Project chats from the stored copy, until the project list answers and they regroup under their projects.
-        if (heldProjectThreads.length > 0) {
+        // Archived ones go to the archived list, as they would from a project group.
+        const activeHeldProjectThreads: BranchNode[] = [];
+
+        for (const thread of heldProjectThreads) {
+            if (thread.status === "archived") {
+                archivedThreads.push(thread);
+            } else {
+                activeHeldProjectThreads.push(thread);
+            }
+        }
+
+        if (activeHeldProjectThreads.length > 0) {
             groups.push({
                 groupType: "project" as GroupType,
                 isCollapsed: collapsedGroups.has("project"),
-                threads: sortThreadsInGroup(heldProjectThreads.filter((candidate) => candidate.status !== "archived")),
+                isPlaceholder: true,
+                threads: sortThreadsInGroup(activeHeldProjectThreads),
                 title: t`Projects`,
             });
         }

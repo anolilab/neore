@@ -6,6 +6,7 @@ import { useCRPCClient } from "@/lib/lunora/crpc";
 import {
     getThreadListClearGeneration,
     readThreadListCache,
+    releaseThreadListWrites,
     subscribeToForeignThreadListClears,
     toThreadListData,
     writeThreadListCache,
@@ -81,6 +82,11 @@ export const usePersistThreadList = (data: unknown, isPlaceholderData: boolean):
 
     useEffect(() => {
         if (owner.current.userId !== userId) {
+            // A different signed-in user is a new sign-in: the hold from the last sign-out no longer applies.
+            if (userId) {
+                releaseThreadListWrites(userId);
+            }
+
             owner.current = { baseline: owner.current.seen ? data : undefined, seen: true, userId };
         }
 

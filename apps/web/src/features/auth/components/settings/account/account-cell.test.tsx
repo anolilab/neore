@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { readThreadListCache, writeThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
+import { readThreadListCache, releaseThreadListWrites, writeThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 
 import AccountCell from "./account-cell";
 
@@ -61,6 +61,7 @@ const deviceSession = { session: { id: "other", token: "tok" }, user: { id: "bob
 describe("AccountCell revoke", () => {
     beforeEach(() => {
         localStorage.clear();
+        releaseThreadListWrites();
 
         const list = {
             pinnedThreads: [],

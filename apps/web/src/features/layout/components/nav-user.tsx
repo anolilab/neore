@@ -274,12 +274,16 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
             <DropdownMenuSeparator />
             <DropdownMenuItem
                 onClick={async () => {
-                    // Before the request, so a failed or dropped sign-out leaves none of this user's list behind.
+                    // Before the request, and it holds writes until the page reloads or the next sign-in: the sidebar stays mounted meanwhile.
                     clearThreadListCache();
                     // Push first, while the session still authenticates the server call.
                     await releasePush();
                     await authClient.signOut({
                         fetchOptions: {
+                            onResponse: () => {
+                                // Settled either way: drop anything a push stored while the request ran.
+                                clearThreadListCache();
+                            },
                             onError: () => {
                                 // The session may still be active, so keep the identity and say so.
                                 toast({

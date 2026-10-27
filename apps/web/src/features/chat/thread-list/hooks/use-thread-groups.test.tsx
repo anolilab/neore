@@ -21,6 +21,7 @@ const composite = {
         page: [
             { _id: "t1", _creationTime: NOW, createdAt: NOW, projectId: "p1", status: "active", title: "In project" },
             { _id: "t2", _creationTime: NOW, createdAt: NOW, status: "active", title: "Loose" },
+            { _id: "t3", _creationTime: NOW, createdAt: NOW, projectId: "p1", status: "archived", title: "Old project chat" },
         ],
     },
 };
@@ -107,6 +108,14 @@ describe("project chats while the project list is unavailable", () => {
 
         expect(titles(view, "Projects")).toEqual(["In project"]);
         expect(titles(view, "Today")).toEqual(["Loose"]);
+    });
+
+    it("marks the stand-in group read-only and sends archived project chats to the archive", () => {
+        const view = groupsFor();
+
+        expect(view.find((group) => group.title === "Projects")?.isPlaceholder).toBe(true);
+        expect(titles(view, "Projects")).toEqual(["In project"]);
+        expect(titles(view, "Archived")).toEqual(["Old project chat"]);
     });
 
     it("regroups them under their project once the list answers", () => {

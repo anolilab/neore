@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GroupType, ThreadGroup } from "./types";
-import { buildMatchSnippet, getGroupType, isGroupFullySelected, selectThreadIdsByDate } from "./utilities";
+import { buildMatchSnippet, getGroupType, isGroupFullySelected, isInPlaceholderGroup, selectThreadIdsByDate } from "./utilities";
 
 describe("getGroupType", () => {
     it("should return groupType when available", () => {
@@ -150,5 +150,18 @@ describe("selectThreadIdsByDate", () => {
         const threads = [thread("a", at(2026, 10, 1))];
 
         expect(selectThreadIdsByDate(threads, { from: "", to: "" })).toEqual([]);
+    });
+});
+
+describe("isInPlaceholderGroup", () => {
+    const groups = [
+        { isPlaceholder: true, threads: [{ threadId: "held" }], title: "Projects" },
+        { threads: [{ threadId: "free" }], title: "Today" },
+    ] as unknown as ThreadGroup[];
+
+    it("flags threads of a placeholder group only, so a drag from or onto them is ignored", () => {
+        expect(isInPlaceholderGroup(groups, "held")).toBe(true);
+        expect(isInPlaceholderGroup(groups, "free")).toBe(false);
+        expect(isInPlaceholderGroup(groups, "project-p1")).toBe(false);
     });
 });

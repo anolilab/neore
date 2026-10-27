@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { writeThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
+import { releaseThreadListWrites, writeThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 
 import NavUser from "./nav-user";
 
@@ -107,6 +107,7 @@ vi.mock("@/lib/native/bridge", () => {
 describe("NavUser sign-out", () => {
     beforeEach(() => {
         localStorage.clear();
+        releaseThreadListWrites();
         writeThreadListCache("alice", {
             pinnedThreads: [],
             relationships: [],

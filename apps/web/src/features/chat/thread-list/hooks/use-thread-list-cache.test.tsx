@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { clearThreadListCache, writeThreadListCache } from "../lib/thread-list-cache";
+import { clearThreadListCache, releaseThreadListWrites, writeThreadListCache } from "../lib/thread-list-cache";
 import { usePersistThreadList, useThreadListPlaceholder } from "./use-thread-list-cache";
 
 const auth: { token: string | null } = { token: null };
@@ -42,6 +42,7 @@ const setToken = (next: string | null) => {
 
 describe("thread list cache hooks", () => {
     beforeEach(() => {
+        releaseThreadListWrites();
         localStorage.clear();
         auth.token = null;
         vi.useRealTimers();
@@ -147,6 +148,29 @@ describe("thread list cache hooks", () => {
             vi.advanceTimersByTime(2000);
         });
         expect(localStorage.getItem("neore-thread-list:v1:bob")).toContain("Bob chat");
+    });
+
+    it("stores nothing for a push that arrives while a sign-out is under way, until the next sign-in", () => {
+        vi.useFakeTimers();
+        auth.token = jwtFor("alice");
+
+        const { rerender } = renderHook(({ owner, title }) => usePersistThreadList(list(owner, title), false), {
+            initialProps: { owner: "alice", title: "T" },
+        });
+
+        clearThreadListCache();
+        rerender({ owner: "alice", title: "Streaming reply push" });
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        expect(localStorage).toHaveLength(0);
+
+        setToken(jwtFor("bob"));
+        rerender({ owner: "bob", title: "Bob push" });
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        expect(localStorage).toHaveLength(1);
     });
 
     it("resumes persisting when a removal in another tab was not a sign-out", () => {

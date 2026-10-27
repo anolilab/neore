@@ -19,6 +19,24 @@ const cacheKey = (userId: string): string => `${CACHE_PREFIX}v${CACHE_VERSION}:$
 
 const clears = { count: 0 };
 
+/**
+ * Writes are refused from the moment a sign-out (or an account removal) starts. The sidebar stays mounted until the page
+ * reloads, so a push in that window would otherwise store the list again. Lifted for a user when they become the signed-in
+ * user (the next sign-in); a reload starts clean.
+ */
+const writeHold = { blockedUsers: new Set<string>(), signingOut: false };
+
+/** Lifts the holds that a sign-in as `userId` ends (the sign-out hold, and any hold on that account); with no user, every hold. */
+export const releaseThreadListWrites = (userId?: string): void => {
+    writeHold.signingOut = false;
+
+    if (userId) {
+        writeHold.blockedUsers.delete(userId);
+    } else {
+        writeHold.blockedUsers.clear();
+    }
+};
+
 /** Bumped by every clear; a write scheduled before a clear compares it to drop itself. */
 export const getThreadListClearGeneration = (): number => clears.count;
 
@@ -239,7 +257,7 @@ export const readThreadListCache = (userId: string | undefined, storage: Storage
 
 /** Stores the projection of `data` for `userId`. Best effort: a full or unavailable store is ignored. */
 export const writeThreadListCache = (userId: string | undefined, data: unknown, storage: Storage | undefined = getThreadListStorage()): void => {
-    if (!userId || !storage) {
+    if (!userId || !storage || writeHold.signingOut || writeHold.blockedUsers.has(userId)) {
         return;
     }
 
@@ -257,6 +275,7 @@ export const writeThreadListCache = (userId: string | undefined, data: unknown, 
 /** Removes every user's stored list. For sign-out and anonymous-account conversion. */
 export const clearThreadListCache = (storage: Storage | undefined = getThreadListStorage()): void => {
     clears.count += 1;
+    writeHold.signingOut = true;
 
     if (!storage) {
         return;
@@ -284,6 +303,7 @@ export const clearThreadListCache = (storage: Storage | undefined = getThreadLis
 /** Drops one user's stored list, for an account that was removed from this browser without being the one signed in. */
 export const clearThreadListCacheFor = (userId: string, storage: Storage | undefined = getThreadListStorage()): void => {
     clears.count += 1;
+    writeHold.blockedUsers.add(userId);
 
     try {
         storage?.removeItem(cacheKey(userId));

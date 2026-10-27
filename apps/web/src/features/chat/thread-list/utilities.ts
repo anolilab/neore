@@ -1,5 +1,9 @@
 import type { BranchNode, GroupType, ThreadGroup } from "./types";
 
+/** Whether `id` is a thread inside a placeholder group, which must not be dragged, reordered or dropped on. */
+export const isInPlaceholderGroup = (groups: ThreadGroup[], id: unknown): boolean =>
+    groups.some((group) => group.isPlaceholder === true && group.threads.some((thread) => thread.threadId === id));
+
 /**
  * Determines the group type based on the thread group properties.
  */

@@ -37,7 +37,7 @@ import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
 import SortableThreadItem from "./sortable-thread-item";
 import type { BranchNode, GroupType, HierarchicalThreadListProperties, MinimalThreadRelationship, ThreadGroup } from "./types";
 import type { ThreadDateRange } from "./utilities";
-import { getGroupType, isGroupFullySelected, selectThreadIdsByDate } from "./utilities";
+import { getGroupType, isGroupFullySelected, isInPlaceholderGroup, selectThreadIdsByDate } from "./utilities";
 
 // Lazy: it pulls `lucide-react/dynamic`'s import map of every icon (~190KB) for its icon picker.
 const ProjectFormDialog = lazy(() => import("@/features/projects/components/project-form-dialog"));
@@ -819,6 +819,11 @@ const HierarchicalThreadList: FC<
             const { active, over } = event;
 
             if (!over || active.id === over.id) {
+                return;
+            }
+
+            // Stored project chats wait in one group with no project: dragging in or onto it would reorder across projects.
+            if (isInPlaceholderGroup(threadGroups, active.id) || isInPlaceholderGroup(threadGroups, over.id)) {
                 return;
             }
 

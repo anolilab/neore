@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { writeThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
+import { releaseThreadListWrites, writeThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 
 import SignOut from "./sign-out";
 
@@ -35,6 +35,7 @@ const list = {
 describe("SignOut", () => {
     beforeEach(() => {
         localStorage.clear();
+        releaseThreadListWrites();
         localStorage.setItem("neore-collapsed-groups", '["archived"]');
         writeThreadListCache("alice", list);
         auth.signOut.mockImplementation(async ({ fetchOptions }: { fetchOptions: { onError: () => void; onSuccess: () => void } }) => {
