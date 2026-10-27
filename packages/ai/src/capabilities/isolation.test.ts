@@ -9,7 +9,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const DIST = fileURLToPath(new URL("../../dist", import.meta.url));
+const PACKAGE_ROOT = fileURLToPath(new URL("../..", import.meta.url));
+const DIST = path.join(PACKAGE_ROOT, "dist");
 const FROM_RE = /\bfrom\s*["']([^"']+)["']/gu;
 const BARE_IMPORT_RE = /\bimport\s*\(?["']([^"']+)["']/gu;
 
@@ -44,6 +45,15 @@ const closureOf = (entry: string): { files: Set<string>; specifiers: string[] } 
     return { files, specifiers };
 };
 
+/** The built entry of every other subpath, read from `package.json#exports` so a new one is covered. */
+const otherEntries = (): string[] => {
+    const { exports } = JSON.parse(readFileSync(path.join(PACKAGE_ROOT, "package.json"), "utf8")) as { exports: Record<string, string | { default?: string }> };
+
+    return Object.entries(exports)
+        .filter(([subpath]) => subpath !== "./capabilities" && subpath !== "./package.json")
+        .map(([, target]) => path.resolve(PACKAGE_ROOT, typeof target === "string" ? target : (target.default ?? "")));
+};
+
 describe("@neore/ai/capabilities (built)", () => {
     const entry = path.join(DIST, "capabilities/index.js");
 
@@ -51,27 +61,24 @@ describe("@neore/ai/capabilities (built)", () => {
         expect(existsSync(entry), "run `pnpm build:packages` before this test").toBe(true);
     });
 
-    it("imports only relative files, none of the package's other code", () => {
-        const { files, specifiers } = closureOf(entry);
+    it("reads its own bundler chunks, so the checks below see something", () => {
+        expect(closureOf(entry).files.size).toBeGreaterThan(1);
+    });
 
-        expect(specifiers.filter((specifier) => !specifier.startsWith("."))).toEqual([]);
+    it("imports only relative files, and its types import nothing", () => {
+        expect(closureOf(entry).specifiers.filter((specifier) => !specifier.startsWith("."))).toEqual([]);
+        expect(specifiersOf(path.join(DIST, "capabilities/index.d.ts"))).toEqual([]);
+    });
 
-        // The bundler puts code in shared chunks; the closure must not reach a chunk that
-        // another entry also uses, or the subpath drags that entry's dependencies along.
-        const others = [
-            "index.js",
-            "models/index.js",
-            "providers/index.js",
-            "tools/index.js",
-            "prompts/index.js",
-            "design/index.js",
-            "utils/index.js",
-            "gateway.js",
-            "constants.js",
-        ];
+    it("shares no bundler chunk with another subpath", () => {
+        // A chunk another entry also uses would drag that entry's dependencies in.
+        const { files } = closureOf(entry);
+        const entries = otherEntries();
 
-        for (const other of others) {
-            const reached = closureOf(path.join(DIST, other)).files;
+        expect(entries.length).toBeGreaterThan(5);
+
+        for (const other of entries) {
+            const reached = closureOf(other).files;
 
             expect([...files].filter((file) => file !== entry && reached.has(file))).toEqual([]);
         }
