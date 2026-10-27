@@ -57,7 +57,7 @@ fn clean_environment() -> Vec<(&'static str, OsString)> {
     }
 }
 
-/// `neore-host --stdio` with the clean environment and the pipes the tests drive.
+/// The host binary with the clean environment and nothing inherited.
 fn host_command() -> Command {
     let mut command = Command::new(host_binary());
 
