@@ -47,6 +47,13 @@ Decisions:
 - **Recognition.** A recognizer runs in a helper process, so a crash cannot take
   down the app. The helper loads the model from the app data directory. It returns
   text segments and a final transcript.
+- **Microphone permission.** The desktop's permission handlers
+  (`setPermissionRequestHandler` and `setPermissionCheckHandler` in
+  `apps/desktop/src/main.ts`) grant `media` only to the trusted site origin, so the
+  dictation window would be denied before its own consent step. S2 updates both handlers to
+  allow microphone capture for the verified dictation window only, and keeps denying every
+  other local window and every untrusted origin. Test: capture works in the dictation
+  window, and the same request from another window is denied.
 - **Insert.** The final text goes to the composer through the existing draft
   channel, which opens a new chat with the text restored in the composer and sends
   nothing. If the main window cannot take it (it is closed, or on the sign-in

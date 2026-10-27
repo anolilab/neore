@@ -124,6 +124,12 @@ runner: v.optional(v.union(
   runner) is forced to `ask` as `messageWorker` is. Delegate consent carries down
   through `headlessApproved`, so without this a trigger run could start a host agent
   with no click.
+- A worker's tools are a subset of its lead's tools. Admission derives the lead's
+  effective tool set (what the lead's own run could call, with `off` tools and tools a
+  headless run drops removed) and intersects it with the requested allowlist before
+  storing it. The existing `normalizeToolAllowlist` only checks names, and the helper that
+  applies an allowlist only filters the tools the child run builds for itself, so neither
+  enforces this. Test: a tool a headless worker could run but its lead lacks is refused.
 - From the user: typing into the worker thread calls `dispatchToWorker`
   (authMutation, owner, `clientId` required). It dedupes through `claimOnce`
   scope `worker-dispatch`, key `<childThreadId>:<clientId>`, TTL 24 h. Add the
@@ -162,7 +168,13 @@ runner: v.optional(v.union(
   `finishRun`. If the host is offline (stale `devices.lastSeenAt`, or the device
   call expires unclaimed), the run fails at once with "host did not answer". It
   never sits queued for a host that may not return.
-- The reaper (`SUB_AGENT_STALE_MS`) fails a silent run of either kind.
+- **A worker-aware reaper.** Today `reapRun` is scheduled once, at admission, and fails
+  the run at that deadline without looking at activity. That would fail a worker that is
+  still making progress, and a queued run that has waited behind another. For
+  `mode: "worker"` runs the reaper starts its clock at claim, not admission. When it fires,
+  it checks the run's latest stream or host event: a run quiet for `SUB_AGENT_STALE_MS`
+  fails, and one with newer activity is rescheduled from that activity. A queued run is
+  never reaped by this timer; a stop or the queue itself ends it.
 
 ### Stopping and stuck runs
 
@@ -197,9 +209,14 @@ ends the run as failed with the daily-limit message, and the queue moves on.
 
 ### Post-back
 
-- Unchanged and per run: `postRunResult`, once per `resultPostedAt`, waiting
-  while the lead streams. Each dispatch is its own run row, so the existing
-  dedupe covers it. No message-id dedupe is added.
+- Per run: `postRunResult`, waiting while the lead streams. Each dispatch is its own run
+  row, so the existing dedupe covers it. No message-id dedupe is added. One thing
+  changes: today `resultPostedAt` is set before the message is written, and `postToParent`
+  returns without a message when the parent is deleted or locked, so the run counts as
+  posted with nothing posted. S4 sets `resultPostedAt` in the same mutation as the
+  successful message write. A parent that is unavailable leaves it unset, and the post is
+  retried with backoff up to a bound, then ends in a terminal `postFailed` reason that the
+  worker row shows.
 - A worker that blocks on an approval or a question tells the lead and the user. The
   lead's wait then ends with "pending question", not with a timeout.
 - Runs started by the lead post back. A run started by the user typing in the
@@ -298,7 +315,8 @@ capability-gated steer.
 **S4 — Post-back rules.** Lead-dispatched runs post back; user-typed ones do not.
 - Acceptance: a result that arrives while the lead streams appears after the
   stream; a run posted twice shows once; a user-typed run posts nothing to the
-  lead.
+  lead; a post to a deleted or locked parent leaves `resultPostedAt` unset, is retried,
+  and ends in `postFailed` after the bound (test with a locked parent).
 
 **S5 — Host workers.** `runner.kind = "host"`, a child thread with
 `runner: "host"`, `acp_send` dispatch, `turn_end` → `finishRun`. Needs ACP S4.
@@ -313,7 +331,9 @@ quiet notice.
 - Acceptance: `current` stops only the active run; `all_queued` also cancels the
   queued runs and charges none of them; a second identical stop is a no-op; a run
   silent past `SUB_WORKER_QUIET_MS` shows the notice; a reaper failure reaches the
-  lead as an error.
+  lead as an error; a worker run that is active across the old fixed deadline is not
+  failed, a queued run that waits longer than the deadline is not failed, and a run quiet
+  for the full window is.
 
 **S7 — Receipts.** Receipt fields on dispatch; per-run post-back isolation.
 - Acceptance: `messageWorker` returns `runId` and `state`; when one run's post

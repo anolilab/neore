@@ -81,6 +81,13 @@ New action kinds in the `call` domain, verified by `envelope.rs`, dispatched by
   open-call budget (3 per device, counted separately from device tools) and their
   own claim window of 60 s. The device tools' 20 s window (`DEVICE_CLAIM_WINDOW_MS`)
   is unchanged. A stuck send therefore never blocks `acp_cancel`.
+- **Claim lease.** For `acp_*` kinds a claim is a lease, not a hand-over. Today a
+  claimed call has no way back: if the desktop crashes after `claimDeviceCall` and
+  before it persists the command, the call expires unrun. A claimed `acp_*` call
+  that is not completed within the lease (set in S4 from measured latency) returns to
+  `pending` and can be claimed again until its deadline. The desktop writes its
+  local receipt before it completes the call, so a redelivered call whose id is
+  already in the receipt log is acknowledged, not run twice.
 - `createDeviceCall`'s other gates apply: the kinds are listed in the manifest, the
   device was online within `DEVICE_ONLINE_WINDOW_MS` (75 s), the per-user
   `devices/call` rate limit holds, and input is capped at 32 KiB.
@@ -280,7 +287,13 @@ the folder and refers to it in its reply. Rules:
   device-signed create on the upload route (`lib/upload-route.ts`), which today
   accepts a session bearer or an API key, never a device signature: the create is signed with the device
   secret, names the folder file, and is checked against the device's user. The
-  chunked upload then follows as usual. The ingest carries only the resulting
+  chunked upload that follows is authenticated
+  the same way: every request (create, `HEAD`, `PATCH`) carries a device signature
+  header under a new `upload` signing domain, over the method, the upload id and an
+  issue time. The route resolves the device's user from the signature, builds its
+  handler for that user exactly as for a session caller, and answers another user's
+  upload id as not found. No user session or API key is ever handed to the desktop,
+  and none reaches the agent. The ingest carries only the resulting
   upload id, and the mutation checks that the upload belongs to the device's user.
   This adds backend work to S8. The phone reads the same file through a signed URL
   ([mobile-acp-and-remote-control.md](mobile-acp-and-remote-control.md) §3.8).
@@ -409,17 +422,9 @@ throttling measurement.
   refuses a host thread; the host states (§4.6: `accepted`, `received`, `running`,
   `ended`) are stored and read back by a second client.
 
-**S4 — Remote start, continue, cancel, answer.** Offers in the manifest,
-`/hosts/send`, `startHostSession`, `cancelHostTurn`, `answerHostPermission`, and
-the retry rule of §4.6 (the relay retries a failed claim or completion until the
-deadline, whatever the error).
-- Acceptance: a valid signature for an unapproved pair is refused by Rust; a
-  continue from the web reaches the agent and streams back; with the host offline
-  the call expires with "host did not answer" and nothing runs later; a remote
-  approve after a local one is `already_answered`; a remote answer closes the
-  local prompt; the phone shows "Sending" until `received` and "Working" only from
+\1the phone shows "Sending" until `received` and "Working" only from
   `running` (UI test); a claim failing with a server error and then a network reset
-  is retried until it succeeds.
+  is retried until it succeeds; killing the main process between claim and receipt returns the call to `pending` and it runs once when re-claimed, and killing it after the receipt but before completion acknowledges the call without running it twice.
 
 **S5 — Registry.** Search and install from the official ACP registry, queried by
 the desktop. Pinned versions, checksum verification, installs under the app data
@@ -453,7 +458,9 @@ backend work, listed in §4.8).
   outside the folder, and to a symlink that leaves the folder each render as text,
   and no bytes are read (test); a file over the cap renders as a link with its
   size; a `.html` or script file is never an image; editing the file afterwards
-  leaves the earlier message unchanged.
+  leaves the earlier message unchanged; an upload `PATCH` or `HEAD` signed by one
+  device for another user's upload id is refused as not found, and a request with a
+  stale device signature is refused.
 - The size cap and the type allowlist are set from a measured sample of real agent
   output before S8 starts.
 
