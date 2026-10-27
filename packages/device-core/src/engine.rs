@@ -242,7 +242,8 @@ impl DeviceState {
             return Ok(false);
         }
 
-        self.change_settings(|settings| {
+        // Counted: a call approved under the previous pairing must not run under this one.
+        self.change_settings_counted(true, |settings| {
             settings.pairing = Some(Pairing {
                 account_label,
                 device_id: device_id.to_owned(),
@@ -298,14 +299,20 @@ impl DeviceState {
         (tool, input, tainted): (&str, &Value, bool),
         action: &Action,
         rule_approved: bool,
+        pairing: &Pairing,
     ) -> bool {
         let _guard = self.save_lock.lock().unwrap();
+        let current = self.settings();
+
+        // The call was verified and approved under one pairing; another (a re-pair, even of the same device) is
+        // another secret, and nothing approved before it carries over.
+        if current.pairing.as_ref() != Some(pairing) {
+            return false;
+        }
 
         if self.generation.load(Ordering::SeqCst) == generation {
             return true;
         }
-
-        let current = self.settings();
 
         plan(tool, input, &current, &self.mcp_tools.lock().unwrap())
             .is_ok_and(|again| again == *action)
@@ -439,6 +446,10 @@ impl DeviceState {
                 // checks again, so the call never starts under a policy the owner has since changed.
                 if answer == Answer::Always && offer_always {
                     let _ = self.change_settings(|next| {
+                        if next.pairing.as_ref() != Some(&pairing) {
+                            return Err("the pairing changed while waiting".to_owned());
+                        }
+
                         // Under the save lock, so nothing changes meanwhile: the tool must still plan to the very
                         // action that was approved (same server config included), or the rule is not saved.
                         if self.generation.load(Ordering::SeqCst) != generation
@@ -478,6 +489,7 @@ impl DeviceState {
                         (&call.tool, &call.input, tainted),
                         &action,
                         skip_prompt,
+                        &pairing,
                     ) =>
                     {
                         Outcome::failed(
@@ -2034,6 +2046,7 @@ mod tests {
 
     #[test]
     fn a_removed_allow_rule_stops_a_call_that_skipped_its_prompt() {
+        crate::store::test_keychain::install();
         let dir = std::env::temp_dir().join(format!("neore-device-rule-{}", std::process::id()));
         let _ = stdfs::remove_dir_all(&dir);
         stdfs::create_dir_all(&dir).unwrap();
@@ -2043,6 +2056,11 @@ mod tests {
             &dir.join("device.json"),
             &Settings {
                 allow_rules: vec!["fs_read".to_owned()],
+                pairing: Some(Pairing {
+                    account_label: "me".into(),
+                    device_id: "dev-rule".into(),
+                    secret: "s".repeat(64),
+                }),
                 roots: vec![root.to_string_lossy().into_owned()],
                 ..Settings::default()
             },
@@ -2054,18 +2072,98 @@ mod tests {
         let settings = state.settings();
         let action = plan("fs_read", &input, &settings, &HashMap::new()).unwrap();
         let (skip, _) = decide("fs_read", false, action.read_only(), &settings.allow_rules);
+        let pairing = settings.pairing.clone().unwrap();
         let planned = state.generation.load(Ordering::SeqCst);
 
         assert!(skip);
-        assert!(state.approval_holds(planned, ("fs_read", &input, false), &action, true));
+        assert!(state.approval_holds(planned, ("fs_read", &input, false), &action, true, &pairing));
 
         state
             .settings_update(serde_json::from_str(r#"{"allowRules":[]}"#).unwrap())
             .unwrap();
 
-        assert!(!state.approval_holds(planned, ("fs_read", &input, false), &action, true));
+        assert!(!state.approval_holds(
+            planned,
+            ("fs_read", &input, false),
+            &action,
+            true,
+            &pairing
+        ));
         // The same change does not matter to a call a person approved in a prompt.
-        assert!(state.approval_holds(planned, ("fs_read", &input, false), &action, false));
+        assert!(state.approval_holds(
+            planned,
+            ("fs_read", &input, false),
+            &action,
+            false,
+            &pairing
+        ));
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// A call verified under one pairing must not run, nor save a rule, after the device was paired again.
+    #[test]
+    fn a_repair_of_the_same_device_cancels_calls_approved_before_it() {
+        use std::sync::mpsc::channel;
+        use std::sync::Arc;
+
+        crate::store::test_keychain::install();
+
+        let dir = std::env::temp_dir().join(format!("neore-device-repair-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+        stdfs::write(dir.join("a.txt"), "hello").unwrap();
+        let root = dir.canonicalize().unwrap();
+        let old = Pairing {
+            account_label: "me".into(),
+            device_id: "dev-repair".into(),
+            secret: "a".repeat(64),
+        };
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                allow_rules: vec!["fs_read".to_owned()],
+                pairing: Some(old.clone()),
+                roots: vec![root.to_string_lossy().into_owned()],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let (events, received) = channel();
+        let state = Arc::new(DeviceState::new(
+            &dir,
+            Box::new(move |event| {
+                let _ = events.send(event);
+            }),
+        ));
+        let input = json!({ "path": "a.txt" });
+        let settings = state.settings();
+        let old = settings.pairing.clone().unwrap();
+        let action = plan("fs_read", &input, &settings, &HashMap::new()).unwrap();
+        let planned = state.generation.load(Ordering::SeqCst);
+
+        assert!(state.approval_holds(planned, ("fs_read", &input, false), &action, true, &old));
+
+        // The same device is paired again, with a new secret (the person confirms it in the window).
+        let worker = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || state.pair("dev-repair", &"b".repeat(64), "me"))
+        };
+        let prompt = loop {
+            if let Event::Prompt { prompt } = received.recv().unwrap() {
+                break prompt;
+            }
+        };
+        state.prompt_answer(prompt.id, "once").unwrap();
+        assert!(worker.join().unwrap().unwrap());
+
+        // Prompted and rule-approved calls both stop, and the new pairing starts without rules.
+        assert_ne!(state.generation.load(Ordering::SeqCst), planned);
+        assert!(!state.approval_holds(planned, ("fs_read", &input, false), &action, false, &old));
+        assert!(!state.approval_holds(planned, ("fs_read", &input, false), &action, true, &old));
+        assert!(state.settings().allow_rules.is_empty());
 
         let _ = stdfs::remove_dir_all(&dir);
     }
