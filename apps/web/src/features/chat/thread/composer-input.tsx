@@ -32,7 +32,7 @@ import {
     AttachmentTooLargeError,
     AttachmentUploadError,
     createLunoraAttachmentAdapter,
-    getAttachmentFileId,
+    uploadedAttachment,
 } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import { useChatActions, useChatIsStreaming, useChatLunora, useChatThread } from "@/features/chat/core/context/chat-context";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
@@ -538,10 +538,8 @@ const ComposerInput = ({
                             },
                         });
 
-                        const fileId = getAttachmentFileId(result);
-
                         updateAttachment(attachmentId, {
-                            fileId,
+                            ...uploadedAttachment(result),
                             progress: 100,
                             status: "complete",
                         });
@@ -705,10 +703,8 @@ const ComposerInput = ({
                             },
                         });
 
-                        const fileId = getAttachmentFileId(result);
-
                         updateAttachment(attachmentId, {
-                            fileId,
+                            ...uploadedAttachment(result),
                             progress: 100,
                             status: "complete",
                         });
@@ -955,10 +951,8 @@ const ComposerInput = ({
                     },
                 });
 
-                const fileId = getAttachmentFileId(result);
-
                 updateAttachment(attachmentId, {
-                    fileId,
+                    ...uploadedAttachment(result),
                     progress: 100,
                     status: "complete",
                 });
@@ -993,7 +987,7 @@ const ComposerInput = ({
                     },
                 });
 
-                updateAttachment(attachmentId, { fileId: getAttachmentFileId(result), progress: 100, status: "complete" });
+                updateAttachment(attachmentId, { ...uploadedAttachment(result), progress: 100, status: "complete" });
             } catch (error) {
                 console.error("Failed to restore attachment:", error);
                 updateAttachment(attachmentId, {
@@ -1036,10 +1030,8 @@ const ComposerInput = ({
                     },
                 });
 
-                const fileId = getAttachmentFileId(result);
-
                 updateAttachment(attachmentId, {
-                    fileId,
+                    ...uploadedAttachment(result),
                     progress: 100,
                     status: "complete",
                 });
@@ -1124,10 +1116,8 @@ const ComposerInput = ({
                     },
                 });
 
-                const fileId = getAttachmentFileId(result);
-
                 updateAttachment(attachmentId, {
-                    fileId,
+                    ...uploadedAttachment(result),
                     progress: 100,
                     status: "complete",
                 });
