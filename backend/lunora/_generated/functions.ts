@@ -8547,7 +8547,7 @@ export interface Caller {
                     stopActiveForThread: (args: { messageId?: string; threadId: string }) => Promise<boolean>;
                 };
                 purge: {
-                    purgeFinishedStreams: (args?: {}) => Promise<{ chunks: number; streams: number }>;
+                    purgeFinishedStreams: (args: { budget?: number }) => Promise<{ chunks: number; streams: number }>;
                 };
             };
         };

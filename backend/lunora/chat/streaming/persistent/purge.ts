@@ -44,9 +44,11 @@ export const PURGE_OP_BUDGET = 2500;
 const TERMINAL_STATUSES = ["done", "error", "timeout"];
 
 export const purgeFinishedStreams = internalMutation
-    .input({})
+    // `budget` exists so tests can prove the paging with small numbers; the sweep passes none.
+    .input({ budget: v.optional(v.number().int().min(1)) })
     .output(v.object({ chunks: v.number(), streams: v.number() }))
-    .mutation(async ({ ctx }) => {
+    .mutation(async ({ args, ctx }) => {
+        const budget = args.budget ?? PURGE_OP_BUDGET;
         let chunks = 0;
         let streams = 0;
         let cursor: string | undefined;
@@ -60,7 +62,7 @@ export const purgeFinishedStreams = internalMutation
 
             for (const stream of page.page) {
                 // The stream row costs one op of its own, so it is only deleted when it fits.
-                const remaining = PURGE_OP_BUDGET - chunks - streams;
+                const remaining = budget - chunks - streams;
 
                 if (remaining <= 0) {
                     return { chunks, streams };
