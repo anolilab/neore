@@ -173,6 +173,41 @@ describe("FallbackLanguageModel", () => {
         expect(backup.doGenerate).toHaveBeenCalledTimes(1);
     });
 
+    describe("provider options on the backup", () => {
+        const reasoningOptions = { openai: { reasoningEffort: "high", user: "u1" }, openrouter: { reasoning: { effort: "high" } } };
+        const withOptions = { ...OPTIONS, providerOptions: reasoningOptions } as unknown as LanguageModelV3CallOptions;
+
+        const backupOptions = async (traits: ConstructorParameters<typeof FallbackLanguageModel>[2]) => {
+            const backup = fakeModel("backup");
+
+            await new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), backup, traits).doGenerate(withOptions);
+
+            return (backup.doGenerate.mock.calls[0]![0] as LanguageModelV3CallOptions).providerOptions;
+        };
+
+        it("sends a non-reasoning backup no reasoning option and none of another provider's", async () => {
+            expect(await backupOptions({ backupProviderKey: "openai", backupSupportsReasoning: false })).toEqual({ openai: { user: "u1" } });
+        });
+
+        it("drops the options altogether when nothing is left for the backup's provider", async () => {
+            expect(await backupOptions({ backupProviderKey: "google", backupSupportsReasoning: true })).toBeUndefined();
+        });
+
+        it("keeps reasoning options for a backup that supports them on the same provider", async () => {
+            expect(await backupOptions({ backupProviderKey: "openai", backupSupportsReasoning: true })).toEqual({
+                openai: { reasoningEffort: "high", user: "u1" },
+            });
+        });
+
+        it("leaves the primary's own call untouched", async () => {
+            const primary = fakeModel("primary");
+
+            await new FallbackLanguageModel(primary, fakeModel("backup"), { backupProviderKey: "google" }).doGenerate(withOptions);
+
+            expect((primary.doGenerate.mock.calls[0]![0] as LanguageModelV3CallOptions).providerOptions).toBe(reasoningOptions);
+        });
+    });
+
     it("presents itself as the primary model until a call falls back", async () => {
         const primary = fakeModel("primary");
         const model = new FallbackLanguageModel(primary, fakeModel("backup"));

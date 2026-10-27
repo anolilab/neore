@@ -169,6 +169,9 @@ export interface GetAgentOptions {
     userProviderKeys?: Record<string, string>;
 }
 
+/** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
+const INTERNAL_PREFIX = /^internal-/;
+
 const PROVIDER_KEY_NAMES: Record<string, string> = {
     fal: "fal",
     google: "google",
@@ -264,7 +267,11 @@ const getAgent = async (model: AgentModel | string, options: GetAgentOptions): P
             const backup = eligibleBackupModel(options.backupModelId, effectiveModel);
 
             if (backup) {
-                chat = new FallbackLanguageModel(chat, gatewayModel(backup), { backupSupportsTools: backup.supportsToolCalling !== false });
+                chat = new FallbackLanguageModel(chat, gatewayModel(backup), {
+                    backupProviderKey: backup.provider.replace(INTERNAL_PREFIX, ""),
+                    backupSupportsReasoning: Boolean(backup.filterCapabilities?.includes("effort_control") || backup.filterCapabilities?.includes("reasoning")),
+                    backupSupportsTools: backup.supportsToolCalling !== false,
+                });
             }
         }
     }

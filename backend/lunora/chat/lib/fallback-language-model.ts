@@ -48,6 +48,47 @@ export const isVisiblePart = (part: LanguageModelV3StreamPart): boolean => {
     }
 };
 
+/** Provider option keys that only a reasoning model accepts (sending one to another is a 400). */
+const REASONING_OPTION_KEYS: ReadonlySet<string> = new Set([
+    "reasoning",
+    "reasoningEffort",
+    "reasoningFormat",
+    "reasoningSummary",
+    "sendReasoning",
+    "thinking",
+    "thinkingConfig",
+]);
+
+/**
+ * The call's provider options as the backup can take them. They were built for the primary's provider and
+ * reasoning support (`buildReasoningProviderOptions`), keyed by provider: another provider's bucket means
+ * nothing to the backup, and a backup without reasoning must not get a reasoning key.
+ */
+export const providerOptionsForBackup = (
+    providerOptions: LanguageModelV3CallOptions["providerOptions"],
+    backup: { providerKey?: string; supportsReasoning?: boolean },
+): LanguageModelV3CallOptions["providerOptions"] => {
+    if (!providerOptions) {
+        return providerOptions;
+    }
+
+    const kept: NonNullable<LanguageModelV3CallOptions["providerOptions"]> = {};
+
+    for (const [provider, bucket] of Object.entries(providerOptions)) {
+        if (provider !== backup.providerKey) {
+            continue;
+        }
+
+        const entries = Object.entries(bucket).filter(([key]) => backup.supportsReasoning === true || !REASONING_OPTION_KEYS.has(key));
+
+        if (entries.length > 0) {
+            kept[provider] = Object.fromEntries(entries) as (typeof kept)[string];
+        }
+    }
+
+    return Object.keys(kept).length > 0 ? kept : undefined;
+};
+
 /** Whether `error` is a gateway failure that another model could serve. */
 export const isInfraFailure = (error: unknown): boolean =>
     typeof error === "object" && error !== null && (error as { fallbackReason?: unknown }).fallbackReason === "infra";
@@ -65,7 +106,18 @@ export class FallbackLanguageModel implements LanguageModelV3 {
 
     private active: LanguageModelV3;
 
-    constructor(primary: LanguageModelV3, backup: LanguageModelV3, { backupSupportsTools = true }: { backupSupportsTools?: boolean } = {}) {
+    private readonly backupTraits: { providerKey?: string; supportsReasoning?: boolean };
+
+    constructor(
+        primary: LanguageModelV3,
+        backup: LanguageModelV3,
+        {
+            backupProviderKey,
+            backupSupportsReasoning,
+            backupSupportsTools = true,
+        }: { backupProviderKey?: string; backupSupportsReasoning?: boolean; backupSupportsTools?: boolean } = {},
+    ) {
+        this.backupTraits = { providerKey: backupProviderKey, supportsReasoning: backupSupportsReasoning };
         this.primary = primary;
         this.backup = backup;
         this.backupSupportsTools = backupSupportsTools;
@@ -106,7 +158,7 @@ export class FallbackLanguageModel implements LanguageModelV3 {
 
             this.switchToBackup(error);
 
-            return await this.backup.doGenerate(options);
+            return await this.backup.doGenerate(this.optionsForBackup(options));
         }
     }
 
@@ -124,7 +176,7 @@ export class FallbackLanguageModel implements LanguageModelV3 {
 
             this.switchToBackup(error);
 
-            return await this.backup.doStream(options);
+            return await this.backup.doStream(this.optionsForBackup(options));
         }
 
         // The gateway reports a provider failure after its 200 as an error event, so look at the stream up to its first visible part before committing to it.
@@ -152,7 +204,7 @@ export class FallbackLanguageModel implements LanguageModelV3 {
 
             this.switchToBackup(error);
 
-            return await this.backup.doStream(options);
+            return await this.backup.doStream(this.optionsForBackup(options));
         }
 
         const stream = new ReadableStream<LanguageModelV3StreamPart>({
@@ -186,6 +238,10 @@ export class FallbackLanguageModel implements LanguageModelV3 {
         }
 
         return this.backupSupportsTools || !options.tools?.length;
+    }
+
+    private optionsForBackup(options: LanguageModelV3CallOptions): LanguageModelV3CallOptions {
+        return { ...options, providerOptions: providerOptionsForBackup(options.providerOptions, this.backupTraits) };
     }
 
     private switchToBackup(error: unknown): void {
