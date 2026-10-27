@@ -274,6 +274,8 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
             <DropdownMenuSeparator />
             <DropdownMenuItem
                 onClick={async () => {
+                    // Before the request, so a failed or dropped sign-out leaves none of this user's list behind.
+                    clearThreadListCache();
                     // Push first, while the session still authenticates the server call.
                     await releasePush();
                     await authClient.signOut({
@@ -287,7 +289,6 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                             },
                             onSuccess: async () => {
                                 resetAnalyticsIdentity();
-                                clearThreadListCache();
                                 // Only after the session ends: a failed sign-out keeps the badge.
                                 await setNativeBadge(0);
                                 globalThis.location.reload();

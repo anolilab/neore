@@ -55,6 +55,8 @@ export const usePersistThreadList = (data: unknown, isPlaceholderData: boolean):
     const client = useCRPCClient();
     const userId = useCacheUserId();
     const clearedElsewhere = useRef(false);
+    // What the query held when this tab's user last changed: that result may still be the previous account's, so it is never written under the new key.
+    const owner = useRef<{ baseline: unknown; seen: boolean; userId: string | undefined }>({ baseline: undefined, seen: false, userId: undefined });
 
     // Another tab removed this user's list (its sign-out); until this tab sees a fresh token it must not put that list back.
     // A removal that was not a sign-out leaves the session alive, so the next token for it lifts the hold.
@@ -78,9 +80,14 @@ export const usePersistThreadList = (data: unknown, isPlaceholderData: boolean):
     }, [client, userId]);
 
     useEffect(() => {
+        if (owner.current.userId !== userId) {
+            owner.current = { baseline: owner.current.seen ? data : undefined, seen: true, userId };
+        }
+
+        const isFromPreviousUser = data !== undefined && data === owner.current.baseline;
         const generation = getThreadListClearGeneration();
         const timer =
-            data && !isPlaceholderData && userId
+            data && !isPlaceholderData && userId && !isFromPreviousUser
                 ? setTimeout(() => {
                       // A sign-out cleared the store while this write waited; writing now would put the list back.
                       if (generation !== getThreadListClearGeneration() || clearedElsewhere.current || userIdOf(client.getAuthToken()) !== userId) {

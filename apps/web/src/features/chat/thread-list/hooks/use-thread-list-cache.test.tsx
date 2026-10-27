@@ -128,6 +128,27 @@ describe("thread list cache hooks", () => {
         expect(localStorage).toHaveLength(1);
     });
 
+    it("never writes the previous account's query result under the new user", () => {
+        vi.useFakeTimers();
+        auth.token = jwtFor("alice");
+
+        const stale = { ...list("alice", "Alice chat"), threads: { page: [{ _id: "t1", title: "Alice chat" }] } };
+        const { rerender } = renderHook(({ data }) => usePersistThreadList(data, false), { initialProps: { data: stale as unknown } });
+
+        setToken(jwtFor("bob"));
+        rerender({ data: stale });
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        expect(localStorage.getItem("neore-thread-list:v1:bob")).toBeNull();
+
+        rerender({ data: { ...stale, threads: { page: [{ _id: "t2", title: "Bob chat" }] } } });
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        expect(localStorage.getItem("neore-thread-list:v1:bob")).toContain("Bob chat");
+    });
+
     it("resumes persisting when a removal in another tab was not a sign-out", () => {
         vi.useFakeTimers();
         auth.token = jwtFor("alice");

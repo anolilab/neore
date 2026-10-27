@@ -101,6 +101,20 @@ const pick = (source: unknown, fields: ReadonlyArray<string>): PersistedRecord |
 const pickAll = (source: unknown, fields: ReadonlyArray<string>): PersistedRecord[] =>
     Array.isArray(source) ? source.map((item) => pick(item, fields)).filter((record) => record !== undefined) : [];
 
+/** A thread row without the title when the chat is locked: a lock set on another device must not be undone by a stored title. */
+const pickThread = (source: unknown): PersistedRecord | undefined => {
+    const picked = pick(source, THREAD_FIELDS);
+
+    if (picked && picked.lockedAt !== undefined) {
+        delete picked.title;
+    }
+
+    return picked;
+};
+
+const pickThreads = (source: unknown): PersistedRecord[] =>
+    Array.isArray(source) ? source.map((item) => pickThread(item)).filter((record) => record !== undefined) : [];
+
 /** Whether a thread row names a different owner than `userId` (an anonymous row names none). */
 const isForeignRow = (row: unknown, userId: string): boolean => isRecord(row) && typeof row.userId === "string" && row.userId !== userId;
 
@@ -120,9 +134,9 @@ export const projectThreadList = (data: unknown, userId: string): PersistedThrea
         pinnedThreads: pickAll(data.pinnedThreads, PIN_FIELDS),
         relationships: pickAll(data.relationships, RELATIONSHIP_FIELDS),
         tags: pickAll(data.tags, TAG_FIELDS),
-        temporaryThreads: pickAll(temporaryPage, THREAD_FIELDS),
+        temporaryThreads: pickThreads(temporaryPage),
         threadOrders: pickAll(data.threadOrders, ORDER_FIELDS),
-        threads: pickAll(data.threads.page, THREAD_FIELDS),
+        threads: pickThreads(data.threads.page),
     };
 };
 
@@ -262,6 +276,17 @@ export const clearThreadListCache = (storage: Storage | undefined = getThreadLis
         for (const key of keys) {
             storage.removeItem(key);
         }
+    } catch {
+        // Nothing to clear when the store is unavailable.
+    }
+};
+
+/** Drops one user's stored list, for an account that was removed from this browser without being the one signed in. */
+export const clearThreadListCacheFor = (userId: string, storage: Storage | undefined = getThreadListStorage()): void => {
+    clears.count += 1;
+
+    try {
+        storage?.removeItem(cacheKey(userId));
     } catch {
         // Nothing to clear when the store is unavailable.
     }

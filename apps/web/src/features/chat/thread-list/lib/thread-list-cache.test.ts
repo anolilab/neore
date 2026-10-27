@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     clearThreadListCache,
+    clearThreadListCacheFor,
     getThreadListStorage,
     projectThreadList,
     readThreadListCache,
@@ -104,6 +105,31 @@ describe("thread list cache", () => {
             expect(localStorage.getItem("neore-collapsed-groups")).toBe('["archived"]');
             expect(localStorage).toHaveLength(1);
         });
+
+        it("removes only the named user's list", () => {
+            writeThreadListCache("alice", listFor("alice"));
+            writeThreadListCache("bob", listFor("bob"));
+
+            clearThreadListCacheFor("bob");
+
+            expect(readThreadListCache("bob")).toBeUndefined();
+            expect(readThreadListCache("alice")).toBeDefined();
+            expect(() => clearThreadListCacheFor("bob", undefined)).not.toThrow();
+        });
+    });
+
+    it("stores no title for a locked chat", () => {
+        const list = listFor("alice");
+
+        list.threads.page.push({ ...list.threads.page[0], _id: "t9", lockedAt: 5, title: "Private" } as never);
+        writeThreadListCache("alice", list);
+
+        const rows = readThreadListCache("alice")?.threads ?? [];
+
+        expect(rows.find((row) => row._id === "t9")).toMatchObject({ lockedAt: 5 });
+        expect(rows.find((row) => row._id === "t9")).not.toHaveProperty("title");
+        expect(rows.find((row) => row._id === "t1")).toHaveProperty("title", "First");
+        expect(localStorage.getItem(Object.keys(localStorage)[0] as string)).not.toContain("Private");
     });
 
     describe("failure handling", () => {
