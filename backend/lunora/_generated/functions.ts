@@ -7642,7 +7642,14 @@ if (typeof source["threadId"] !== "string") return DEFER;
 __val2 = source["threadId"];
 __has2 = true;
 }
-return { ...(__has1 ? { "error": __val1 } : {}), "executionId": source["executionId"], "status": source["status"], ...(__has2 ? { "threadId": __val2 } : {}) };
+let __has3 = false;
+let __val3;
+if (source["userFixable"] !== undefined) {
+if (typeof source["userFixable"] !== "boolean") return DEFER;
+__val3 = source["userFixable"];
+__has3 = true;
+}
+return { ...(__has1 ? { "error": __val1 } : {}), "executionId": source["executionId"], "status": source["status"], ...(__has2 ? { "threadId": __val2 } : {}), ...(__has3 ? { "userFixable": __val3 } : {}) };
 });
 installCompiledValidatorMap(lunora_triggers_functions_171.updateTriggerStats.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9399,7 +9406,7 @@ export interface Caller {
             executeTrigger: (args: { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
         };
         functions: {
-            admitTriggerRun: (args: { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }) => Promise<null | string | { filtered: string }>;
+            admitTriggerRun: (args: { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }) => Promise<null | string | { filtered: string } | { skipped: "disabled" }>;
             createExecution: (args: { payload?: string; triggerId: Id<"triggers"> }) => Promise<Id<"triggerExecutions">>;
             createTrigger: (args: { botComputer?: boolean; botId?: string; cronExpression?: string; description?: string; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model: string; name: string; quietWhenEmpty?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; type: "schedule" | "webhook" | "event"; webhookPreset?: { event: "pull_request_opened" | "pull_request_merged" | "pull_request_review_requested" | "issue_assigned"; provider: "github" } | { event: "merge_request_opened" | "merge_request_merged"; provider: "gitlab" }; webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token" }) => Promise<{ triggerId: string; webhookSecret?: string }>;
             deleteTrigger: (args: { triggerId: Id<"triggers"> }) => Promise<void>;
@@ -9413,7 +9420,7 @@ export interface Caller {
             setTriggerEnabled: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
             setTriggerEnabledInternal: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<null>;
             testRunTrigger: (args: { testPayload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
-            updateExecution: (args: { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string }) => Promise<null>;
+            updateExecution: (args: { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string; userFixable?: boolean }) => Promise<null>;
             updateTrigger: (args: { botComputer?: boolean; botId?: string | null; cronExpression?: string; description?: string; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model?: string; name?: string; quietWhenEmpty?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; triggerId: Id<"triggers"> }) => Promise<void>;
             updateTriggerStats: (args: { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }) => Promise<null>;
         };

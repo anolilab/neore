@@ -221,20 +221,18 @@ ts += `];
 /**
  * Map from model ID to gateway model definition.
  */
-export const MODEL_MAP = new Map<string, GatewayModelDefinition>(
-    GATEWAY_MODELS.map((m) => [m.id, m]),
-);
+export const MODEL_MAP = new Map<string, GatewayModelDefinition>(GATEWAY_MODELS.map((m) => [m.id, m]));
 
 /**
- * Version hash for cache invalidation (changes when model list changes).
+ * Version hash for cache invalidation. It covers every field of every model,
+ * not only the IDs, so a metadata-only change (a capability, a flag) also
+ * rotates the cached /v1/models payload.
  */
 export const MODELS_VERSION: string = (() => {
-    const ids = GATEWAY_MODELS.map((m) => m.id)
-        .toSorted((a, b) => (a < b ? -1 : Number(a > b)))
-        .join(",");
+    const fingerprint = JSON.stringify(GATEWAY_MODELS);
     let hash = 5381;
-    for (let i = 0; i < ids.length; i++) {
-        hash = (hash << 5) + hash + (ids.codePointAt(i) ?? 0);
+    for (let i = 0; i < fingerprint.length; i++) {
+        hash = (hash << 5) + hash + (fingerprint.codePointAt(i) ?? 0);
     }
     return hash.toString(36);
 })();

@@ -8,6 +8,10 @@
  * a repository, a ref and a path, each checked against a strict character set, and
  * the request is built from those on the fixed host `raw.githubusercontent.com`.
  * A pasted host, port, credentials, query or fragment therefore cannot steer it.
+ *
+ * The `npx skills add <owner>/<repo> [--skill <name>]` command a registry shows is
+ * read the same way, as text: it is never run, split by a shell or handed to one.
+ * Every word must match a strict pattern, so anything beyond that exact shape is refused.
  */
 
 import { SKILL_MARKDOWN_FILE } from "./markdown";
@@ -24,7 +28,14 @@ const MAX_PATH_SEGMENTS = 8;
 /** Where a skills.sh listing's `owner/repo/skill` is usually found in the repository. */
 const SKILLS_SH_LAYOUTS = (skill: string): string[] => [`skills/${skill}`, skill, `.claude/skills/${skill}`];
 
-export type SkillSourceResult = { error: string; ok: false } | { ok: true; urls: string[] };
+/** `owner/repo`, or `https://github.com/owner/repo` (with an optional `.git`): the source a registry's command names. */
+const COMMAND_SOURCE = /^(?:https:\/\/github\.com\/)?([\w.-]{1,100})\/([\w.-]{1,100}?)(?:\.git)?$/;
+const DOT_SEGMENT = /^\.+$/;
+const WHITESPACE = /\s+/;
+const COMMAND_PREFIX = /^npx\s/i;
+
+/** `notFound` replaces the generic "no SKILL.md" message when nothing is found at `urls`. */
+export type SkillSourceResult = { error: string; ok: false } | { notFound?: string; ok: true; urls: string[] };
 
 const fail = (error: string): SkillSourceResult => {
     return { error, ok: false };
@@ -96,12 +107,69 @@ const fromSkillsSh = (segments: string[]): SkillSourceResult => {
     return { ok: true, urls: SKILLS_SH_LAYOUTS(skill).map((directory) => rawUrl(owner, repo, "HEAD", directory.split("/"))) };
 };
 
-/** The raw GitHub URLs to try, in order, for a pasted GitHub or skills.sh link; or why the link is refused. */
+const COMMAND_HINT = "Paste the command as npx skills add owner/repo --skill name, with nothing else.";
+
+/** The skill named after the source: `--skill name`, `--skill=name`, `-s name` or a bare `name`. `undefined` when none, `null` for anything else. */
+const skillOf = (rest: string[]): string | null | undefined => {
+    const [first, second] = rest;
+
+    if (first === undefined) {
+        return undefined;
+    }
+
+    if (rest.length === 1) {
+        return first.startsWith("--skill=") ? first.slice("--skill=".length) : first;
+    }
+
+    return rest.length === 2 && (first === "--skill" || first === "-s") ? second : null;
+};
+
+/** `npx skills add <source> [--skill <name> | -s <name> | <name>]`, read word by word; any other word or flag is refused. */
+const fromCommand = (command: string): SkillSourceResult => {
+    const [, tool, verb, source, ...rest] = command.split(WHITESPACE);
+
+    if (tool !== "skills" || verb !== "add" || !source) {
+        return fail(COMMAND_HINT);
+    }
+
+    const match = COMMAND_SOURCE.exec(source);
+    const [, owner, repo] = match ?? [];
+
+    if (!owner || !repo || !GITHUB_NAME.test(owner) || !GITHUB_NAME.test(repo) || DOT_SEGMENT.test(owner) || DOT_SEGMENT.test(repo)) {
+        return fail(COMMAND_HINT);
+    }
+
+    const skill = skillOf(rest);
+
+    if (skill === null) {
+        return fail(COMMAND_HINT);
+    }
+
+    if (skill === undefined) {
+        return {
+            notFound: "No SKILL.md was found at the root of that repository. If it keeps its skills in folders, paste the command with --skill name.",
+            ok: true,
+            urls: [rawUrl(owner, repo, "HEAD", [])],
+        };
+    }
+
+    return SKILL_NAME.test(skill)
+        ? { ok: true, urls: SKILLS_SH_LAYOUTS(skill).map((directory) => rawUrl(owner, repo, "HEAD", directory.split("/"))) }
+        : fail(COMMAND_HINT);
+};
+
+/** The raw GitHub URLs to try, in order, for a pasted GitHub or skills.sh link or `npx skills add` command; or why it is refused. */
 export const resolveSkillSourceUrls = (pasted: string): SkillSourceResult => {
+    const trimmed = pasted.trim();
+
+    if (COMMAND_PREFIX.test(trimmed)) {
+        return fromCommand(trimmed);
+    }
+
     let url: URL;
 
     try {
-        url = new URL(pasted.trim());
+        url = new URL(trimmed);
     } catch {
         return fail("That is not a valid link.");
     }

@@ -2718,6 +2718,8 @@ export const schema = defineSchema({
     triggerExecutions: defineTable({
         completedAt: v.optional(v.number()),
         error: v.optional(v.string()),
+        // Set on the run whose failure paused its trigger, so a redelivered settlement re-sends the pause notice rather than the plain one.
+        pausedTrigger: v.optional(v.boolean()),
         payload: v.optional(v.string()),
         startedAt: v.number(),
         // "filtered": a run that was skipped and ran nothing: a verified delivery whose payload failed the
@@ -2739,10 +2741,14 @@ export const schema = defineSchema({
         cronExpression: v.optional(v.string()),
         description: v.optional(v.string()),
         enabled: v.boolean(),
+        // When the owner last turned the trigger on from off; a run that started earlier is not counted toward the failure streak.
+        enabledAt: v.optional(v.number()),
         eventConnectionId: v.optional(v.string()),
         eventFilter: v.optional(v.string()),
         eventProvider: v.optional(v.string()),
         eventType: v.optional(v.string()),
+        // Consecutive runs that failed for a reason the owner can fix; absent = 0. Enough of them pause the trigger (`triggers/failure-streak.ts`).
+        failureStreak: v.optional(v.number()),
         // Webhook triggers: every filter must match the JSON body for a delivery to run (`triggers/filters.ts`).
         filters: v.optional(
             v.array(
@@ -2762,6 +2768,8 @@ export const schema = defineSchema({
         ),
         inputTemplate: v.optional(v.string()),
         lastError: v.optional(v.string()),
+        // Start time of the latest run that succeeded; a run that began earlier no longer counts toward the failure streak.
+        lastSuccessStartedAt: v.optional(v.number()),
         lastTriggeredAt: v.optional(v.number()),
         model: v.string(),
         name: v.string(),

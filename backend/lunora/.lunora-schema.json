@@ -15293,6 +15293,12 @@
           "optional": true,
           "unique": false
         },
+        "pausedTrigger": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "payload": {
           "kind": "string",
           "nullable": false,
@@ -15415,6 +15421,12 @@
           "optional": false,
           "unique": false
         },
+        "enabledAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "eventConnectionId": {
           "kind": "string",
           "nullable": false,
@@ -15435,6 +15447,12 @@
         },
         "eventType": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "failureStreak": {
+          "kind": "number",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -15523,6 +15541,12 @@
         },
         "lastError": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "lastSuccessStartedAt": {
+          "kind": "number",
           "nullable": false,
           "optional": true,
           "unique": false

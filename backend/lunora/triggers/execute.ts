@@ -10,9 +10,11 @@ import { v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { SANDBOX_TOOLS } from "../chat/lib/tool-builder";
+import { AgentRunError } from "../chat/lib/agent-run";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
+import { isModelUnavailableRefusal, USER_FIXABLE_RUN_ERRORS } from "./failure-streak";
 import { releaseRetryDelayMs } from "../lib/claim-once";
 import { filterTextOf } from "./filters";
 import { canBeQuiet, isQuietRunSkipped, TRIGGER_THREAD_TAG } from "./quiet";
@@ -21,6 +23,9 @@ const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is sche
 
 const RELEASE_LOST_NOTE =
     "Giving this delivery back failed and no retry could be scheduled; a redelivery is refused as a duplicate until it is released by hand.";
+
+/** A run error only the owner's settings can cure; it repeats until they do, so it counts toward pausing the trigger. */
+export const isUserFixableRunError = (error: unknown): error is AgentRunError => error instanceof AgentRunError && USER_FIXABLE_RUN_ERRORS.has(error.kind);
 
 export const executeTrigger = internalAction
     .input({
@@ -211,13 +216,19 @@ export const executeTrigger = internalAction
                 executionId,
                 filterPayload: triggerType === "webhook" && ignoreDisabled !== true ? filterTextOf(payload, invalidUtf8) : undefined,
                 releaseUnlessRun,
+                requireEnabled: ignoreDisabled !== true,
                 triggerId,
             });
 
             if (refusal !== null && typeof refusal === "object") {
                 // Recorded as filtered and not charged; the running row was replaced.
                 // The reason quotes the configured filter value (an address, a token), so it stays in the owner's execution history, not the log.
-                console.info(`[Triggers] Trigger ${triggerId} delivery no longer matches its filters, skipping`);
+                // A trigger paused since the check ("skipped") left no row at all and sends nothing.
+                console.info(
+                    "skipped" in refusal
+                        ? `[Triggers] Trigger ${triggerId} was paused before admission, skipping`
+                        : `[Triggers] Trigger ${triggerId} delivery no longer matches its filters, skipping`,
+                );
                 await releaseWindow();
 
                 return;
@@ -228,6 +239,7 @@ export const executeTrigger = internalAction
                     error: refusal,
                     executionId,
                     status: "failed",
+                    userFixable: isModelUnavailableRefusal(refusal),
                 });
                 await releaseWindow();
 
@@ -299,16 +311,23 @@ export const executeTrigger = internalAction
             });
 
             // 6. Update trigger stats
-            // A run that took the window already moved it to this start, and must not move it again past a give-back.
-            await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
-                lastTriggeredAt: takesWindow ? undefined : runStartedAt,
-                triggerId,
-            });
+            // The run is already settled and the owner told: a bookkeeping failure here must not relabel it as failed.
+            try {
+                // A run that took the window already moved it to this start, and must not move it again past a give-back.
+                await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
+                    lastTriggeredAt: takesWindow ? undefined : runStartedAt,
+                    triggerId,
+                });
+            } catch (statsError) {
+                console.error(`[Triggers] Trigger ${trigger.name} completed, but its stats were not updated:`, statsError);
+            }
 
             console.info(`[Triggers] Trigger ${trigger.name} executed successfully. Thread: ${threadId}, Response length: ${responseText.length}`);
         } catch (error) {
+            const userFixable = isUserFixableRunError(error);
             // The owner reads this in the trigger history; the raw error is logged only.
-            const errorMessage = toUserFacingError(error);
+            // A run's own refusal carries a message written for the owner, which says what to fix.
+            const errorMessage = userFixable ? error.message : toUserFacingError(error);
 
             console.error(`[Triggers] Trigger ${trigger.name} failed:`, error);
 
@@ -340,6 +359,7 @@ export const executeTrigger = internalAction
                 error: [errorMessage, note].filter(Boolean).join(" ").slice(0, 2000),
                 executionId,
                 status: "failed",
+                userFixable,
             });
 
             // Update trigger stats with error. Only a quiet routine reads `lastTriggeredAt` as its window, so only it keeps
