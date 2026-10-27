@@ -728,10 +728,10 @@ export const insertVaultFile = internalMutation
  * unfiled file that no knowledge file points at. Anything else is left alone.
  */
 export const discardUnfiledVaultFile = internalMutation
-    .input({ fileId: v.string(), userId: v.string() })
+    .input({ fileId: v.id("files"), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const row = await ctx.db.get(args.fileId as Id<"files">);
+        const row = await ctx.db.get(args.fileId);
 
         if (!row || row.userId !== args.userId || row.chatId !== undefined || row.folderId !== undefined) {
             return null;
