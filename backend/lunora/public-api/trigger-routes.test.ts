@@ -37,6 +37,7 @@ const stored = {
     model: "m",
     name: "Weekly digest",
     nextTriggerAt: null,
+    quietWhenEmpty: false,
     searchMode: null,
     systemPrompt: null,
     timezone: null,
@@ -46,7 +47,7 @@ const stored = {
     webhookSignatureScheme: null,
 };
 
-const call = (scopes: ApiScopes) => {
+const call = (scopes: ApiScopes, row: Record<string, unknown> = stored) => {
     const calls: { args: unknown; name: string }[] = [];
     const run = async (ref: { __lunoraRef: string }, args: unknown) => {
         const name = ref.__lunoraRef;
@@ -64,7 +65,7 @@ const call = (scopes: ApiScopes) => {
                 return [{ _id: "ex1", completedAt: 2, error: null, startedAt: 1, status: "success", threadId: null }];
             }
             case "triggers_functions:getTriggers": {
-                return [stored];
+                return [row];
             }
             default: {
                 return null;
@@ -179,5 +180,46 @@ describe("trigger routes", () => {
         expect([updated.status, deleted.status]).toEqual([200, 200]);
         expect(calls.find((entry) => entry.name === "triggers_functions:updateTrigger")?.args).toEqual({ name: "Renamed", triggerId: "trg1" });
         expect(calls.find((entry) => entry.name === "triggers_functions:deleteTrigger")?.args).toEqual({ triggerId: "trg1" });
+    });
+
+    it("passes botComputer and quietWhenEmpty through create and update", async () => {
+        const { calls, request } = call({ triggers: ["write"] });
+
+        await request(
+            "/triggers",
+            json("POST", { botComputer: true, botId: "bot1", cronExpression: "0 9 * * 1", model: "m", name: "n", quietWhenEmpty: true, type: "schedule" }),
+        );
+        await request("/triggers/trg1", json("PATCH", { botComputer: true, quietWhenEmpty: false }));
+
+        expect(calls.find((entry) => entry.name === "triggers_functions:createTrigger")?.args).toMatchObject({ botComputer: true, quietWhenEmpty: true });
+        expect(calls.find((entry) => entry.name === "triggers_functions:updateTrigger")?.args).toMatchObject({ botComputer: true, quietWhenEmpty: false });
+    });
+
+    it("refuses inputTemplate on a webhook trigger, on create and on update", async () => {
+        const { calls, request } = call({ triggers: ["write"] }, { ...stored, type: "webhook" });
+
+        const created = await request("/triggers", json("POST", { inputTemplate: "x", model: "m", name: "Hook", type: "webhook" }));
+        const updated = await request("/triggers/trg1", json("PATCH", { inputTemplate: "x" }));
+
+        expect([created.status, updated.status]).toEqual([400, 400]);
+        expect(
+            calls.some((entry) => entry.name.startsWith("triggers_functions:createTrigger") || entry.name.startsWith("triggers_functions:updateTrigger")),
+        ).toBe(false);
+    });
+
+    it("refuses to change an enabled trigger, so a write key cannot rewrite a live run", async () => {
+        const { calls, request } = call({ triggers: ["write"] }, { ...stored, enabled: true });
+        const response = await request("/triggers/trg1", json("PATCH", { systemPrompt: "do something else" }));
+
+        expect(response.status).toBe(409);
+        expect(calls.some((entry) => entry.name === "triggers_functions:updateTrigger")).toBe(false);
+    });
+
+    it("404s an update of an unknown trigger without calling the mutation", async () => {
+        const { calls, request } = call({ triggers: ["write"] });
+        const response = await request("/triggers/missing", json("PATCH", { name: "n" }));
+
+        expect(response.status).toBe(404);
+        expect(calls.some((entry) => entry.name === "triggers_functions:updateTrigger")).toBe(false);
     });
 });

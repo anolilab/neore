@@ -156,6 +156,7 @@ export const zTriggerSchema = z.object({
     model: z.string(),
     name: z.string(),
     nextTriggerAt: z.number().nullable(),
+    quietWhenEmpty: z.boolean(),
     searchMode: z.string().nullable(),
     systemPrompt: z.string().nullable(),
     timezone: z.string().nullable(),
@@ -232,6 +233,10 @@ export const zTaskCreateRequestSchema = z.object({
 });
 
 const zTriggerFields = {
+    botComputer: z
+        .boolean()
+        .optional()
+        .meta({ description: "Scheduled triggers with a bot only: lets the bot use its computer. Takes effect once the trigger is enabled in the app." }),
     cronExpression: z.string().max(200).optional().meta({ description: "Five-field cron expression (UTC) that runs at most hourly. Required for a schedule." }),
     description: z.string().max(10_000).optional(),
     filters: z
@@ -239,7 +244,12 @@ const zTriggerFields = {
         .max(10)
         .optional()
         .meta({ description: "Webhook triggers only. Replaces the stored set; an empty array clears it." }),
-    inputTemplate: z.string().max(100_000).optional(),
+    inputTemplate: z
+        .string()
+        .max(100_000)
+        .optional()
+        .meta({ description: "Schedule triggers only: the message each run starts with. A webhook trigger is refused this field." }),
+    quietWhenEmpty: z.boolean().optional().meta({ description: "Scheduled triggers with a bot only: skip a run that has nothing to report." }),
     searchMode: z.string().max(200).optional(),
     systemPrompt: z.string().max(100_000).optional(),
     timezone: z.string().max(200).optional(),

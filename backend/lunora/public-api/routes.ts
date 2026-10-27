@@ -323,6 +323,7 @@ interface StoredTrigger {
     model: string;
     name: string;
     nextTriggerAt: number | null;
+    quietWhenEmpty: boolean;
     searchMode: string | null;
     systemPrompt: string | null;
     timezone: string | null;
@@ -331,6 +332,19 @@ interface StoredTrigger {
     updatedAt: number;
     webhookSignatureScheme: string | null;
 }
+
+const findOwnTrigger = async (ctx: HttpActionCtx, triggerId: string) => {
+    const triggers = await ctx.runQuery(api.triggers.functions.getTriggers, {});
+    const trigger = triggers.find((candidate) => candidate._id === triggerId);
+
+    if (!trigger) {
+        throw new PublicApiError("not_found", "Trigger not found.");
+    }
+
+    return trigger;
+};
+
+const WEBHOOK_TEMPLATE_MESSAGE = "A webhook trigger does not use `inputTemplate`; its payload is the input.";
 
 /** The public trigger shape: `getTriggers`' row under `id`. It never carries the webhook secret, which only `createTrigger` returns, once. */
 const toPublicTrigger = (trigger: StoredTrigger) => {
@@ -349,6 +363,7 @@ const toPublicTrigger = (trigger: StoredTrigger) => {
         model: trigger.model,
         name: trigger.name,
         nextTriggerAt: trigger.nextTriggerAt,
+        quietWhenEmpty: trigger.quietWhenEmpty,
         searchMode: trigger.searchMode,
         systemPrompt: trigger.systemPrompt,
         timezone: trigger.timezone,
@@ -872,6 +887,11 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
             "Creates the trigger disabled; enable it in the app. A webhook trigger answers with its `webhookSecret`, shown once and never again. For that reason this route does not accept an `Idempotency-Key`.",
         handler: async ({ body, ctx }) => {
             const request = body as z.infer<typeof zTriggerCreateRequestSchema>;
+
+            if (request.type === "webhook" && request.inputTemplate !== undefined) {
+                throw new PublicApiError("invalid_request", WEBHOOK_TEMPLATE_MESSAGE);
+            }
+
             const created = await ctx.runMutation(api.triggers.functions.createTrigger, request);
 
             return { data: { id: created.triggerId, ...(created.webhookSecret && { webhookSecret: created.webhookSecret }) }, status: 201 };
@@ -891,12 +911,7 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
             const triggerId = idParameter(input, "triggerId");
             // `getTriggerExecutions` checks the trigger belongs to the caller.
             const executions = await input.ctx.runQuery(api.triggers.functions.getTriggerExecutions, { limit: 20, triggerId: triggerId as Id<"triggers"> });
-            const triggers = await input.ctx.runQuery(api.triggers.functions.getTriggers, {});
-            const trigger = triggers.find((candidate) => candidate._id === triggerId);
-
-            if (!trigger) {
-                throw new PublicApiError("not_found", "Trigger not found.");
-            }
+            const trigger = await findOwnTrigger(input.ctx, triggerId);
 
             return {
                 data: {
@@ -924,12 +939,23 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
     },
     {
         body: zTriggerUpdateRequestSchema,
-        description: "Changes only the fields sent. Does not enable or disable the trigger.",
+        description:
+            "Changes only the fields sent. Does not enable or disable the trigger, and refuses (409) an enabled one: a live trigger runs on its own, so disable it in the app before changing what it does.",
         handler: async (input) => {
             const triggerId = idParameter(input, "triggerId");
+            const request = input.body as z.infer<typeof zTriggerUpdateRequestSchema>;
+            const trigger = await findOwnTrigger(input.ctx, triggerId);
+
+            if (trigger.enabled) {
+                throw new PublicApiError("conflict", "The trigger is enabled. Disable it in the app before changing it.");
+            }
+
+            if (trigger.type === "webhook" && request.inputTemplate !== undefined) {
+                throw new PublicApiError("invalid_request", WEBHOOK_TEMPLATE_MESSAGE);
+            }
 
             await input.ctx.runMutation(api.triggers.functions.updateTrigger, {
-                ...(input.body as z.infer<typeof zTriggerUpdateRequestSchema>),
+                ...request,
                 triggerId: triggerId as Id<"triggers">,
             });
 
