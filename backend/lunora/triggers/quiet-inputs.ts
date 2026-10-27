@@ -35,6 +35,12 @@ const TASK_EVENT_TYPE = "task";
 /** Rows read per page when looking for a reply in a run thread. */
 const QUIET_REPLY_ROWS_READ = 10;
 
+/** Pages of run threads scanned for a reply; each thread costs a message query, so the scan has a ceiling. */
+const QUIET_REPLY_PAGES_MAX = 5;
+
+/** Stands for the run threads left unscanned once the ceiling is hit: unknown is treated as activity. */
+const UNSCANNED_THREADS_TITLE = "Routine run threads";
+
 /** A column an old row may leave unset, or set to false. */
 const notSet = (field: "deleted" | "isTemporary") => {
     return { OR: [{ [field]: { isNull: true } }, { [field]: false }] };
@@ -73,13 +79,18 @@ const newestUserReplyAt = async (ctx: QueryCtx, threadId: Id<"threads">, since: 
 
 /**
  * The titled run threads of a routine updated inside the window that hold a user's reply, newest first. The threads
- * are paged, not capped: other routines' run threads that were updated later must not push out one with a reply.
+ * are paged, so other routines' run threads updated later do not push out one with a reply, but only up to
+ * QUIET_REPLY_PAGES_MAX pages: past that the rest is unknown, and one entry dated by the last thread scanned is added
+ * so the check reads activity (the routine posts and its window moves forward) rather than growing without bound.
  */
 const repliedRunThreads = async (ctx: QueryCtx, userId: string, since: number): Promise<{ title: string; updatedAt: number }[]> => {
     const replied: { title: string; updatedAt: number }[] = [];
     let cursor: string | undefined;
+    let pages = 0;
 
     do {
+        pages += 1;
+
         const result = await ctx.db.threads.findMany({
             cursor,
             limit: QUIET_THREADS_READ,
@@ -102,6 +113,11 @@ const repliedRunThreads = async (ctx: QueryCtx, userId: string, since: number): 
         });
 
         cursor = result.isDone || replied.length >= QUIET_THREADS_READ ? undefined : (result.continueCursor ?? undefined);
+
+        if (cursor !== undefined && pages >= QUIET_REPLY_PAGES_MAX) {
+            replied.push({ title: UNSCANNED_THREADS_TITLE, updatedAt: result.page.at(-1)?.updatedAt ?? since + 1 });
+            cursor = undefined;
+        }
     } while (cursor !== undefined);
 
     return replied;

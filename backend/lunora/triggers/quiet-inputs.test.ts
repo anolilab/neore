@@ -177,6 +177,31 @@ describe("loadQuietSnapshot", () => {
             expect(threads).toEqual([{ title: "Trigger: Digest", updatedAt: NOW - 2000 }]);
         });
 
+        it("reads as activity when more run threads than the scan ceiling are in the window", async () => {
+            await harness.run(async (ctx: any) => {
+                for (let index = 0; index < 120; index += 1) {
+                    await ctx.db.insert("threads", {
+                        status: "active",
+                        tags: ["trigger"],
+                        title: `Trigger: Other ${String(index)}`,
+                        updatedAt: NOW - 400 + index,
+                        userId: USER,
+                    });
+                }
+            });
+
+            const snapshot = await snapshotSince(NOW - 60_000);
+
+            expect(snapshot.threads).toHaveLength(1);
+            expect(
+                await isQuietRunSkipped(
+                    { botId: "bot-a", createdAt: 1, lastTriggeredAt: NOW - 60_000, quietWhenEmpty: true, type: "schedule" },
+                    snapshotSince,
+                    { manual: false },
+                ),
+            ).toBe(false);
+        });
+
         it("does not count a reply from before the window start, nor the routine's answer to it", async () => {
             await insertRunThread([
                 { at: NOW - 120_000, order: 0, role: "user" },
