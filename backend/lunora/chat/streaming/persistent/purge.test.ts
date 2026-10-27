@@ -41,7 +41,9 @@ const insertStream = async (status: string, expiresAt: number, chunks = 2): Prom
         return id;
     });
 
-const purge = async (): Promise<{ chunks: number; streams: number }> => await harness.run(async (ctx: any) => await ctx.runMutation(purgeFinishedStreams, {}));
+// The paging is the same at any budget, so most tests pass a small one instead of inserting thousands of rows.
+const purge = async (budget?: number): Promise<{ chunks: number; streams: number }> =>
+    await harness.run(async (ctx: any) => await ctx.runMutation(purgeFinishedStreams, budget === undefined ? {} : { budget }));
 
 const count = async (table: string): Promise<number> =>
     await harness.run(async (ctx: any) => {
@@ -67,22 +69,25 @@ describe("purgeFinishedStreams", () => {
     });
 
     it("clears a backlog of small streams beyond one page within the op budget (3 ops each)", async () => {
-        const total = 900;
+        const budget = 90;
+        const total = 100;
 
         for (let index = 0; index < total; index += 1) {
             await insertStream("done", OLD());
         }
 
-        const first = await purge();
+        const first = await purge(budget);
 
-        expect(first.chunks + first.streams).toBe(PURGE_OP_BUDGET);
-        expect(first.streams).toBeGreaterThan(PURGE_STREAM_BATCH * 4);
+        expect(first.chunks + first.streams).toBe(budget);
+        expect(first.streams).toBeGreaterThan(PURGE_STREAM_BATCH);
 
-        await purge();
+        for (let run = 1; run < Math.ceil((total * 3) / budget); run += 1) {
+            await purge(budget);
+        }
 
         expect(await count("persistentStreams")).toBe(0);
         expect(await count("persistentChunks")).toBe(0);
-    }, 120_000);
+    });
 
     it("keeps live streams, recent finished ones, and another stream's chunks", async () => {
         const pending = await insertStream("pending", OLD());
@@ -102,33 +107,42 @@ describe("purgeFinishedStreams", () => {
     });
 
     it("finishes a stream with more chunks than one run deletes on a later run", async () => {
-        const big = await insertStream("done", OLD(), PURGE_OP_BUDGET + 5);
+        const budget = 10;
+        const big = await insertStream("done", OLD(), budget + 5);
 
-        await expect(purge()).resolves.toStrictEqual({ chunks: PURGE_OP_BUDGET, streams: 0 });
+        await expect(purge(budget)).resolves.toStrictEqual({ chunks: budget, streams: 0 });
         expect(await exists(big)).toBe(true);
 
-        await expect(purge()).resolves.toStrictEqual({ chunks: 5, streams: 1 });
+        await expect(purge(budget)).resolves.toStrictEqual({ chunks: 5, streams: 1 });
         expect(await exists(big)).toBe(false);
         expect(await count("persistentChunks")).toBe(0);
     });
 
     it("clears a backlog of more large streams than one run scans, and the small stream behind them, in ceil(chunks / budget) runs", async () => {
-        const largeStreams = PURGE_STREAM_BATCH * 8 + 25;
-        const perStream = 101;
+        const budget = 100;
+        const largeStreams = PURGE_STREAM_BATCH * 2 + 5;
+        const perStream = 11;
 
         for (let index = 0; index < largeStreams; index += 1) {
             await insertStream("done", OLD(), perStream);
         }
 
         const small = await insertStream("done", OLD());
-        const runs = Math.ceil((largeStreams * (perStream + 1) + 3) / PURGE_OP_BUDGET);
+        const runs = Math.ceil((largeStreams * (perStream + 1) + 3) / budget);
 
         for (let run = 0; run < runs; run += 1) {
-            await purge();
+            await purge(budget);
         }
 
         expect(await exists(small)).toBe(false);
         expect(await count("persistentStreams")).toBe(0);
         expect(await count("persistentChunks")).toBe(0);
-    }, 120_000);
+    });
+
+    it("spends the default budget when none is given", async () => {
+        const big = await insertStream("done", OLD(), PURGE_OP_BUDGET + 1);
+
+        await expect(purge()).resolves.toStrictEqual({ chunks: PURGE_OP_BUDGET, streams: 0 });
+        expect(await exists(big)).toBe(true);
+    }, 30_000); // inserts PURGE_OP_BUDGET + 1 rows one by one; the one test that must prove the real constant
 });

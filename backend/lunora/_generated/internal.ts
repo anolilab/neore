@@ -387,7 +387,7 @@ export interface InternalApiTypes {
                     stopActiveForThread: FunctionReference<"mutation", { messageId?: string; threadId: string }, boolean>;
                 };
                 purge: {
-                    purgeFinishedStreams: FunctionReference<"mutation", {}, { chunks: number; streams: number }>;
+                    purgeFinishedStreams: FunctionReference<"mutation", { budget?: number }, { chunks: number; streams: number }>;
                 };
             };
         };
