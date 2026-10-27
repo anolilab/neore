@@ -7,6 +7,7 @@
  * beyond the batch being sent. Output is paused at the pty when the main process says the window
  * cannot keep up, so a runaway `yes` fills the kernel's buffer and not this process's memory.
  */
+import { descendantsOf, killAll } from "./kill-session";
 import type { HostEvent, HostRequest, SpawnRequest } from "./protocol";
 
 export interface HostTransport {
@@ -44,6 +45,8 @@ export const runHost = (transport: HostTransport, loadPty: () => PtyModule, prep
     let ended = false;
     let pending = "";
     let flushTimer: ReturnType<typeof setTimeout> | undefined;
+    /** The shell's descendants when it was told to stop: a job that ignored the hangup is killed with the host. */
+    let jobs: number[] = [];
 
     const flush = (): void => {
         clearTimeout(flushTimer);
@@ -59,6 +62,7 @@ export const runHost = (transport: HostTransport, loadPty: () => PtyModule, prep
 
     const finish = (): void => {
         flush();
+        killAll(jobs);
         // Gives the last messages time to reach the main process before this one goes away.
         // eslint-disable-next-line unicorn/no-process-exit -- this process exists for one shell and ends with it
         setTimeout(() => process.exit(0), EXIT_DELAY_MS);
@@ -73,6 +77,9 @@ export const runHost = (transport: HostTransport, loadPty: () => PtyModule, prep
         }
 
         const { pid } = term;
+
+        // Taken before the hangup: a job that ignores it outlives the shell and is no longer found through it.
+        jobs = descendantsOf(pid);
 
         try {
             term.kill("SIGHUP");

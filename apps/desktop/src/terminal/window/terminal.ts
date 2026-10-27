@@ -8,7 +8,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 
 import { SCROLLBACK_LINES } from "../scrollback";
-import { MAX_INPUT_CHARS } from "../validate";
+import { MAX_COPY_CHARS, MAX_INPUT_CHARS } from "../validate";
 import type { TerminalExit } from "./api";
 
 const $ = (id: string): HTMLElement => {
@@ -102,9 +102,17 @@ const handleKey = (event: KeyboardEvent): boolean => {
     const key = event.key.toLowerCase();
 
     if (modifier && key === "c" && term.hasSelection()) {
+        const selection = term.getSelection();
+
         // xterm skips the key but does not cancel it, so the menu's own Copy would run as well.
         event.preventDefault();
-        quietly(api.copy(term.getSelection()));
+
+        if (selection.length > MAX_COPY_CHARS) {
+            // The main process refuses a copy this large; saying so beats a clipboard that did not change.
+            showNotice("The selection is too large to copy.");
+        } else {
+            quietly(api.copy(selection));
+        }
 
         return false;
     }
