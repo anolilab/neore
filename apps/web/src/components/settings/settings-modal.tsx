@@ -8,33 +8,17 @@ import { ScrollArea } from "@neore/ui/components/scroll-area";
 import cn from "@neore/ui/utils/cn";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import {
-    AlertTriangle,
-    BookOpen,
-    Bot,
-    Brain,
-    Building,
-    Cable,
-    CreditCard,
-    Key,
-    Keyboard,
-    Lock,
-    RefreshCw,
-    Settings,
-    Shield,
-    ShieldCheck,
-    Sparkles,
-    User,
-    UserCog,
-    Users,
-} from "lucide-react";
+import { AlertTriangle, Lock, RefreshCw, Settings } from "lucide-react";
 import type { FC, ReactNode } from "react";
-import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useId, useMemo, useState } from "react";
 
 import { ErrorBoundary } from "@/components/error-boundary";
+import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from "@/components/settings/settings-search";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useModalState } from "@/features/layout/hooks/use-ui-state";
+import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
+import { resolveSettingsNavigation } from "@/features/settings/lib/settings-navigation";
 import { ErrorUtilities } from "@/lib/errors";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -121,41 +105,6 @@ const preloadTab: Record<string, () => void> = {
 
 // Search params the settings modal owns and strips on close.
 const MODAL_SEARCH_KEYS = new Set(["settings", "settingsTab"]);
-
-// Settings tab types
-export type SettingsTab =
-    | "app-customization"
-    | "chat-personalization"
-    | "chat-knowledge"
-    | "app-keyboard"
-    | "chat-default-models"
-    | "chat-models"
-    | "chat-agent"
-    | "chat-mcp"
-    | "chat-tools"
-    | "chat-api-keys"
-    | "chat-system-prompts"
-    | "auth-account"
-    | "auth-security"
-    | "auth-api-keys"
-    | "auth-organizations"
-    | "auth-organization"
-    | "auth-billing"
-    | "auth-members"
-    | "auth-teams"
-    | "privacy";
-
-interface SettingsNavItem {
-    icon: typeof Settings;
-    label: string;
-    requiresAuth?: boolean;
-    tab: SettingsTab;
-}
-
-interface SettingsNavGroup {
-    items: SettingsNavItem[];
-    label: string;
-}
 
 const SettingsLoadingFallback: FC = () => (
     <div className="flex h-64 items-center justify-center">
@@ -244,54 +193,18 @@ export const SettingsModal: FC = () => {
         setHasOpened(true);
     }
 
-    const navigationGroups = useMemo<SettingsNavGroup[]>(() => {
-        const groups: SettingsNavGroup[] = [
-            {
-                items: [
-                    { icon: Settings, label: t`Customization`, tab: "app-customization" },
-                    { icon: Keyboard, label: t`Keyboard Shortcuts`, tab: "app-keyboard" },
-                ],
-                label: t`App`,
-            },
-            {
-                items: [
-                    { icon: UserCog, label: t`Personalization`, tab: "chat-personalization" },
-                    { icon: Sparkles, label: t`System Prompts`, requiresAuth: true, tab: "chat-system-prompts" },
-                    { icon: BookOpen, label: t`Knowledge Base`, requiresAuth: true, tab: "chat-knowledge" },
-                    { icon: Brain, label: t`Default Models`, tab: "chat-default-models" },
-                    { icon: Brain, label: t`Models`, tab: "chat-models" },
-                    { icon: Bot, label: t`Agent`, requiresAuth: true, tab: "chat-agent" },
-                    { icon: Cable, label: t`MCP Servers`, requiresAuth: true, tab: "chat-mcp" },
-                    { icon: ShieldCheck, label: t`Tool Permissions`, requiresAuth: true, tab: "chat-tools" },
-                    { icon: Key, label: t`API Keys`, requiresAuth: true, tab: "chat-api-keys" },
-                ],
-                label: t`Chat`,
-            },
-            {
-                items: [
-                    { icon: User, label: t`Account`, tab: "auth-account" },
-                    { icon: Shield, label: t`Security`, tab: "auth-security" },
-                    ...(apiKey ? [{ icon: Key, label: t`API Keys`, requiresAuth: true, tab: "auth-api-keys" as const }] : []),
-                    ...(organization ? [{ icon: Building, label: t`Organizations`, requiresAuth: true, tab: "auth-organizations" as const }] : []),
-                    // Billing for everyone signed in: Pro is a per-user plan.
-                    { icon: CreditCard, label: t`Billing`, requiresAuth: true, tab: "auth-billing" as const },
-                    ...(activeOrganization
-                        ? [
-                              { icon: Building, label: t`Organization`, requiresAuth: true, tab: "auth-organization" as const },
-                              { icon: Users, label: t`Members`, requiresAuth: true, tab: "auth-members" as const },
-                          ]
-                        : []),
-                ],
-                label: t`Account`,
-            },
-            {
-                items: [{ icon: Lock, label: t`Privacy & Data`, tab: "privacy" }],
-                label: t`Privacy`,
-            },
-        ];
-
-        return groups;
-    }, [t, apiKey, organization, activeOrganization]);
+    const navigationGroups = useMemo(
+        () => resolveSettingsNavigation({ activeOrganization: Boolean(activeOrganization), apiKey: Boolean(apiKey), organization: Boolean(organization) }, t),
+        [t, apiKey, organization, activeOrganization],
+    );
+    const {
+        groups: searchGroups,
+        isSearching,
+        query: searchQuery,
+        resultCount: searchResultCount,
+        setQuery: setSearchQuery,
+    } = useSettingsSearch(navigationGroups);
+    const searchResultsId = useId();
 
     // Compute query options at render time — queryOptions() calls hooks internally
     // and cannot be invoked inside event handlers.
@@ -337,6 +250,8 @@ export const SettingsModal: FC = () => {
 
     const handleClose = () => {
         close(); // Instant via Zustand — no navigation delay
+        // The modal stays mounted, so a query left in the field would greet the next opening.
+        setSearchQuery("");
         // Clean up URL params in the background
         // The registered router type is the widened `createTanstackRouter` return (see the
         // `Register` declaration in `src/router.tsx`), which collapses the search-updater type to
@@ -355,6 +270,11 @@ export const SettingsModal: FC = () => {
         // The current tab is not written to the URL during a session; the initial
         // tab is read from the URL on mount so deep-links (?settingsTab=privacy) still work.
         setCurrentTab(tab);
+    };
+
+    const handleSearchSelect = (tab: SettingsTab) => {
+        handleTabChange(tab);
+        setSearchQuery("");
     };
 
     // Pre-compute the set of auth-required tabs for O(1) lock checks.
@@ -493,48 +413,61 @@ export const SettingsModal: FC = () => {
                         </DialogTitle>
                         <DialogDescription className="sr-only">{t`Configure your application settings`}</DialogDescription>
                     </DialogHeader>
+                    <SettingsSearchField
+                        isSearching={isSearching}
+                        query={searchQuery}
+                        resultCount={searchResultCount}
+                        resultsId={searchResultsId}
+                        setQuery={setSearchQuery}
+                    />
                     <ScrollArea className="flex-1">
-                        <nav className="flex flex-col gap-1 p-2">
-                            {navigationGroups.map((group) => (
-                                <div className="mb-2" key={group.label}>
-                                    <div className="text-muted-foreground mb-1 px-3 text-xs font-medium tracking-wider uppercase">{group.label}</div>
-                                    {group.items.map((item) => {
-                                        const Icon = item.icon;
-                                        const isActive = currentTab === item.tab;
-                                        const isLocked = isAnonymous && item.requiresAuth;
+                        <SettingsSearchResults groups={searchGroups} id={searchResultsId} isSearching={isSearching} onSelect={handleSearchSelect} />
+                        {!isSearching && (
+                            <nav className="flex flex-col gap-1 p-2">
+                                {navigationGroups.map((group) => (
+                                    <div className="mb-2" key={group.label}>
+                                        <div className="text-muted-foreground mb-1 px-3 text-xs font-medium tracking-wider uppercase">{group.label}</div>
+                                        {group.items.map((item) => {
+                                            const Icon = item.icon;
+                                            const isActive = currentTab === item.tab;
+                                            const isLocked = isAnonymous && item.requiresAuth;
 
-                                        let stateClassName = "text-muted-foreground hover:bg-muted hover:text-foreground";
+                                            let stateClassName = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
-                                        if (isActive) {
-                                            stateClassName = "bg-primary text-primary-foreground";
-                                        } else if (isLocked) {
-                                            stateClassName = "text-muted-foreground/40 hover:bg-muted hover:text-muted-foreground";
-                                        }
+                                            if (isActive) {
+                                                stateClassName = "bg-primary text-primary-foreground";
+                                            } else if (isLocked) {
+                                                stateClassName = "text-muted-foreground/40 hover:bg-muted hover:text-muted-foreground";
+                                            }
 
-                                        return (
-                                            <button
-                                                className={cn("flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors", stateClassName)}
-                                                key={item.tab}
-                                                onClick={() => handleTabChange(item.tab)}
-                                                onMouseEnter={() => {
-                                                    if (isLocked) {
-                                                        return;
-                                                    }
+                                            return (
+                                                <button
+                                                    className={cn(
+                                                        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+                                                        stateClassName,
+                                                    )}
+                                                    key={item.tab}
+                                                    onClick={() => handleTabChange(item.tab)}
+                                                    onMouseEnter={() => {
+                                                        if (isLocked) {
+                                                            return;
+                                                        }
 
-                                                    preloadTab[item.tab]?.();
-                                                    prefetchTabData(item.tab);
-                                                }}
-                                                type="button"
-                                            >
-                                                <Icon className="h-4 w-4" />
-                                                <span className="flex-1 text-left">{item.label}</span>
-                                                {isLocked && <Lock className="h-3 w-3 shrink-0 opacity-50" />}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            ))}
-                        </nav>
+                                                        preloadTab[item.tab]?.();
+                                                        prefetchTabData(item.tab);
+                                                    }}
+                                                    type="button"
+                                                >
+                                                    <Icon className="h-4 w-4" />
+                                                    <span className="flex-1 text-left">{item.label}</span>
+                                                    {isLocked && <Lock className="h-3 w-3 shrink-0 opacity-50" />}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                ))}
+                            </nav>
+                        )}
                     </ScrollArea>
                 </div>
 
