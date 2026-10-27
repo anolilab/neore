@@ -12,6 +12,7 @@ import { providerLogger } from "@/lib/logger";
 import type { useCRPC } from "@/lib/lunora/crpc";
 
 import { DEFAULT_MESSAGE_OPTS } from "../constants/query-options";
+import { fetchWithDeadline } from "../lib/fetch-with-deadline";
 import type { PendingAttachment } from "../stores/chat-ui-store";
 import { useChatUIStore } from "../stores/chat-ui-store";
 import type { PendingSettings } from "../stores/model-store";
@@ -296,7 +297,7 @@ export const runSendMessage = async (env: SendMessageEnv, text: string, attachme
         setIsRegenerating(true);
 
         // Call gateway /v1/chat — creates thread + message, schedules agent, returns metadata
-        const response = await fetch(CHAT_STREAM_URL, {
+        const response = await fetchWithDeadline(CHAT_STREAM_URL, {
             body: JSON.stringify(withUnlockProofBody(requestBody, threadId)),
             headers: {
                 "Content-Type": "application/json",
