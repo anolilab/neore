@@ -1339,6 +1339,7 @@ overrides:
   react-router@>=7.0.0 <7.12.0: '>=7.12.0'
   rollup@<2.80.0: '>=2.80.0'
   rollup@>=4.0.0 <4.59.0: '>=4.59.0'
+  satori@<0.33.5: '>=0.33.5 <0.34'
   semver@>=7.0.0 <7.5.2: '>=7.7.3'
   serialize-javascript@<=7.0.2: '>=7.0.3'
   serialize-javascript@>=5.0.0 <7.0.5: '>=7.0.5'
@@ -18460,6 +18461,9 @@ packages:
     engines: {node: '>=0.4.7'}
     hasBin: true
 
+  harfbuzzjs@0.10.0:
+    resolution: {integrity: sha512-SN8LVwCOzvTq3OPNd0+EAghgXugItz56wst567D1vs7LnnKGWprhi3EG58aVOBwhN8HEbQxL4I9NDWkcXUutRw==}
+
   has-bigints@1.1.0:
     resolution: {integrity: sha512-R3pbpkcIqv2Pm3dUwgjclDRVmWpTJW2DcMzcIhEXEx1oh/CEMObMm3KLmRJOdvhM7o4uQBnwr8pzRK2sJWIqfg==}
     engines: {node: '>= 0.4'}
@@ -22182,8 +22186,8 @@ packages:
     engines: {node: '>=12.0.0'}
     hasBin: true
 
-  satori@0.29.0:
-    resolution: {integrity: sha512-fPAfrwNaIQ7EsJLhY382STEqpczN6ZEH9NsKXDQgRcxUXNNPB73iAjSshzFwTaaScT68pxV0pmG6TBzDQ4sEGw==}
+  satori@0.33.5:
+    resolution: {integrity: sha512-PNW6ktrQ8SM6kk7u4aOuTkkUewkzyTOrj+QeEzXSsnNMAdff4ire9CAqIz8+4C3rCiBtK8QTELv52AZEd1PbRw==}
     engines: {node: '>=16'}
 
   sax@1.6.1:
@@ -36267,7 +36271,7 @@ snapshots:
   '@vercel/og@1.0.1(@types/node@26.6.5)':
     dependencies:
       '@resvg/resvg-wasm': 2.4.1
-      satori: 0.29.0
+      satori: 0.33.5
     optionalDependencies:
       sharp: 0.35.5(@types/node@26.6.5)
     transitivePeerDependencies:
@@ -41542,6 +41546,8 @@ snapshots:
     optionalDependencies:
       uglify-js: 3.19.3
 
+  harfbuzzjs@0.10.0: {}
+
   has-bigints@1.1.0: {}
 
   has-flag@3.0.0: {}
@@ -46449,7 +46455,7 @@ snapshots:
       immutable: 5.1.9
       source-map-js: 1.2.2
 
-  satori@0.29.0:
+  satori@0.33.5:
     dependencies:
       '@shuding/opentype.js': 1.4.0-beta.0
       css-background-parser: 0.1.0
@@ -46458,6 +46464,8 @@ snapshots:
       css-to-react-native: 3.2.0
       emoji-regex-xs: 2.0.1
       escape-html: 1.0.3
+      fflate: 0.7.5
+      harfbuzzjs: 0.10.0
       linebreak: 1.1.0
       parse-css-color: 0.2.1
       postcss-value-parser: 4.2.0
