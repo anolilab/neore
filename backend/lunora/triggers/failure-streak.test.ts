@@ -350,13 +350,16 @@ describe("pausing a trigger after repeated user-fixable failures", () => {
         }
     });
 
-    it("refuses an automatic run of a trigger that was paused after the caller checked it", async () => {
+    it("skips an automatic run of a trigger that was paused after the caller checked it, leaving no row and no notice", async () => {
         const triggerId = await insertTrigger({ enabled: false });
+        const executionId = await startRun(triggerId);
         const admit = async (requireEnabled: boolean): Promise<unknown> =>
-            await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, { requireEnabled, triggerId }));
+            await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, { executionId, requireEnabled, triggerId }));
 
-        expect(await admit(true)).toBe("Skipped: the trigger is disabled.");
+        expect(await admit(true)).toEqual({ skipped: "disabled" });
+        expect(await harness.run(async (ctx: any) => await ctx.db.get(executionId))).toBeNull();
+        expect(await notices()).toHaveLength(0);
         // A manual "Run now" does not ask for it, so a disabled trigger still reaches the rest of admission.
-        expect(await admit(false)).not.toBe("Skipped: the trigger is disabled.");
+        expect(await admit(false)).not.toEqual({ skipped: "disabled" });
     });
 });

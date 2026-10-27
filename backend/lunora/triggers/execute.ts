@@ -223,7 +223,12 @@ export const executeTrigger = internalAction
             if (refusal !== null && typeof refusal === "object") {
                 // Recorded as filtered and not charged; the running row was replaced.
                 // The reason quotes the configured filter value (an address, a token), so it stays in the owner's execution history, not the log.
-                console.info(`[Triggers] Trigger ${triggerId} delivery no longer matches its filters, skipping`);
+                // A trigger paused since the check ("skipped") left no row at all and sends nothing.
+                console.info(
+                    "skipped" in refusal
+                        ? `[Triggers] Trigger ${triggerId} was paused before admission, skipping`
+                        : `[Triggers] Trigger ${triggerId} delivery no longer matches its filters, skipping`,
+                );
                 await releaseWindow();
 
                 return;

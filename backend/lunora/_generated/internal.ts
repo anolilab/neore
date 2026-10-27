@@ -976,7 +976,7 @@ export interface InternalApiTypes {
             executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
-            admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }, null | string | { filtered: string }>;
+            admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }, null | string | { filtered: string } | { skipped: "disabled" }>;
             createExecution: FunctionReference<"mutation", { payload?: string; triggerId: Id<"triggers"> }, Id<"triggerExecutions">>;
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;

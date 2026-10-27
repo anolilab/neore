@@ -898,7 +898,7 @@ export const admitTriggerRun = internalMutation
         requireEnabled: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
     })
-    .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() })))
+    .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() }), v.object({ skipped: v.literal("disabled") })))
     .mutation(async ({ args: { claim, executionId, filterPayload, releaseUnlessRun, requireEnabled, triggerId }, ctx }) => {
         const refused = async (reason: string): Promise<string> => {
             if (claim && releaseUnlessRun) {
@@ -914,7 +914,19 @@ export const admitTriggerRun = internalMutation
         }
 
         if (requireEnabled === true && trigger.enabled !== true) {
-            return await refused("Skipped: the trigger is disabled.");
+            // Paused by another run since the caller looked: nothing ran and the pause already told the owner, so the
+            // running row goes (as for a filter miss) rather than being settled as a failure with a second notice.
+            const running = executionId ? await ctx.db.get(executionId) : null;
+
+            if (running && running.triggerId === triggerId && running.status === "running") {
+                await ctx.db.delete(running._id);
+            }
+
+            if (claim) {
+                await giveBackClaim(ctx, claim, triggerId, releaseUnlessRun === true);
+            }
+
+            return { skipped: "disabled" as const };
         }
 
         if (filterPayload !== undefined) {
