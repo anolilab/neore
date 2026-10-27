@@ -270,8 +270,13 @@ mod confined {
     use std::os::windows::io::AsRawHandle;
     use std::path::{Path, PathBuf};
 
-    use windows_sys::Win32::Storage::FileSystem::GetFinalPathNameByHandleW;
+    use windows_sys::Win32::Storage::FileSystem::{
+        FileDispositionInfo, GetFinalPathNameByHandleW, SetFileInformationByHandle,
+        FILE_DISPOSITION_INFO,
+    };
 
+    const DELETE: u32 = 0x0001_0000;
+    const GENERIC_WRITE: u32 = 0x4000_0000;
     const FILE_SHARE_READ: u32 = 0x1;
     const FILE_SHARE_WRITE: u32 = 0x2;
     const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
@@ -350,17 +355,26 @@ mod confined {
     }
 
     fn create(roots: &[PathBuf], path: &Path) -> io::Result<File> {
-        let file = options(true).create_new(true).open(path)?;
+        // DELETE access so a file that turns out to be outside can be removed through this very handle.
+        let file = options(true)
+            .access_mode(GENERIC_WRITE | DELETE)
+            .create_new(true)
+            .open(path)?;
 
         match confirm(&file, roots) {
             Ok(_) => Ok(file),
             Err(error) => {
-                let real = final_path(&file);
+                // Marked for deletion on this handle, not removed by path: a path could name another file by now.
+                let disposition = FILE_DISPOSITION_INFO { DeleteFile: true };
 
-                drop(file);
-
-                if let Ok(real) = real {
-                    let _ = fs::remove_file(real);
+                // SAFETY: the handle is open and the buffer is a `FILE_DISPOSITION_INFO` of the size passed.
+                unsafe {
+                    SetFileInformationByHandle(
+                        file.as_raw_handle(),
+                        FileDispositionInfo,
+                        std::ptr::from_ref(&disposition).cast(),
+                        std::mem::size_of::<FILE_DISPOSITION_INFO>() as u32,
+                    );
                 }
 
                 Err(error)
