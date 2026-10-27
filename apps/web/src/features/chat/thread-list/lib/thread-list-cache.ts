@@ -178,9 +178,10 @@ export const projectThreadList = (data: unknown, userId: string): PersistedThrea
         pinnedThreads: pickAll(data.pinnedThreads, PIN_FIELDS),
         relationships: pickAll(data.relationships, RELATIONSHIP_FIELDS),
         tags: pickAll(data.tags, TAG_FIELDS),
-        temporaryThreads: pickThreads(temporaryPage),
+        // Temporary chats are short-lived by design: the sidebar shows them from live data, and a stored title would outlive the chat.
+        temporaryThreads: [],
         threadOrders: pickAll(data.threadOrders, ORDER_FIELDS),
-        threads: pickThreads(data.threads.page),
+        threads: pickThreads(data.threads.page).filter((row) => row.expiresAt === undefined),
     };
 };
 
@@ -270,7 +271,14 @@ export const readThreadListCache = (userId: string | undefined, storage: Storage
         const entry: unknown = JSON.parse(raw);
 
         if (isRecord(entry) && entry.v === CACHE_VERSION && entry.userId === userId && isPersistedList(entry.data)) {
-            return entry.data;
+            // An older copy may still hold temporary chats; none is painted from disk, and an expired row never is.
+            const now = Date.now();
+
+            return {
+                ...entry.data,
+                temporaryThreads: [],
+                threads: entry.data.threads.filter((row) => typeof row.expiresAt !== "number" || row.expiresAt > now),
+            };
         }
 
         storage.removeItem(cacheKey(userId));

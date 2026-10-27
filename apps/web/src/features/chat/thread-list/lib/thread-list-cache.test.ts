@@ -167,6 +167,34 @@ describe("thread list cache", () => {
         });
     });
 
+    it("does not store temporary chats", () => {
+        const list = listFor("alice");
+
+        list.temporaryThreads.page.push({ _id: "tmp", expiresAt: Date.now() + 60_000, title: "Throwaway", userId: "alice" } as never);
+        list.threads.page.push({ _id: "tmp2", expiresAt: Date.now() + 60_000, title: "Also throwaway", userId: "alice" } as never);
+        writeThreadListCache("alice", list);
+
+        expect(readThreadListCache("alice")?.temporaryThreads).toEqual([]);
+        expect(readThreadListCache("alice")?.threads.map((row) => row._id)).toEqual(["t1"]);
+        expect(JSON.stringify(Object.values(localStorage))).not.toContain("hrowaway");
+    });
+
+    it("drops expired and temporary rows from an older stored copy", () => {
+        writeThreadListCache("alice", listFor("alice"));
+
+        const key = Object.keys(localStorage)[0] as string;
+        const entry = JSON.parse(localStorage.getItem(key) as string);
+
+        entry.data.threads.push({ _id: "old", expiresAt: Date.now() - 1000, title: "Expired" }, { _id: "live", expiresAt: Date.now() + 60_000, title: "Live" });
+        entry.data.temporaryThreads.push({ _id: "tmp", expiresAt: Date.now() + 60_000, title: "Temp" });
+        localStorage.setItem(key, JSON.stringify(entry));
+
+        const stored = readThreadListCache("alice");
+
+        expect(stored?.threads.map((row) => row._id)).toEqual(["t1", "live"]);
+        expect(stored?.temporaryThreads).toEqual([]);
+    });
+
     it("stores no title for a locked chat", () => {
         const list = listFor("alice");
 
