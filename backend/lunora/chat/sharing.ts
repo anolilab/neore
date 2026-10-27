@@ -9,6 +9,7 @@ import { internalQuery } from "../_generated/server";
 import { listActivePathPage } from "../agent/branches";
 import { listMessagesByThreadIdHandler } from "../agent/messages";
 import { getThreadInvitesWithAccessCheckHandler, grantOwnerForThread, listThreadAccessHandler } from "../agent/sharing";
+import { meetsThreadPermission } from "../agent/thread-read-access";
 import { checkThreadAccessBatchHandler } from "../agent/threads";
 import { toUIMessages } from "../agent/ui-messages";
 import type { MessageDoc } from "../agent/validators";
@@ -384,12 +385,16 @@ export const acceptThreadInvite = authMutation
             userId,
         });
 
+        // An invite only raises access; lowering goes through the grant editors.
+        const kept = existingAccess ? meetsThreadPermission(existingAccess.permission, invite.permission) : false;
+
         if (existingAccess) {
-            // Update existing access with new permission
-            await context.runMutation(internal.agent.sharing.updateThreadAccess, {
-                accessId: existingAccess._id,
-                permission: invite.permission,
-            });
+            if (!kept) {
+                await context.runMutation(internal.agent.sharing.updateThreadAccess, {
+                    accessId: existingAccess._id,
+                    permission: invite.permission,
+                });
+            }
         } else {
             // Create new access
             await context.runMutation(internal.agent.sharing.createThreadAccess, {
@@ -409,11 +414,11 @@ export const acceptThreadInvite = authMutation
             status: "accepted",
         });
 
-        context.log.event("chat.accept_thread_invite", { alreadyHadAccess: Boolean(existingAccess), permission: invite.permission });
+        context.log.event("chat.accept_thread_invite", { alreadyHadAccess: Boolean(existingAccess), kept, permission: invite.permission });
 
         return {
             ownerId,
-            permission: invite.permission,
+            permission: existingAccess && kept ? existingAccess.permission : invite.permission,
             threadId: invite.threadId,
         };
     });

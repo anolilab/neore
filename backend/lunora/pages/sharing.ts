@@ -30,6 +30,7 @@ import { admitPage, admitPageInvite, parentKeyOf, systemDb } from "../lib/rls/sc
 import { requirePageAccess, resolvePageAccess } from "./access";
 import { stripCommentMarks } from "./comment-anchors";
 import { vPagePermission } from "./functions";
+import { meetsPagePermission } from "./logic";
 import { MAX_LENGTH } from "../lib/validators";
 
 const MAX_GRANTS_PER_PAGE = 50;
@@ -296,7 +297,10 @@ export const redeemPageInvite = internalMutation
         const existing = await ctx.db.pageAccess.findFirst({ where: { pageId: page._id, userId } });
 
         if (existing) {
-            await ctx.db.patch(existing._id, { permission: invite.permission });
+            // An invite only raises access; lowering goes through `updatePageGrant`.
+            if (!meetsPagePermission(existing.permission, invite.permission)) {
+                await ctx.db.patch(existing._id, { permission: invite.permission });
+            }
         } else {
             // Every grant on the page counts toward the cap, not only the ones
             // this (not yet member) caller could read.

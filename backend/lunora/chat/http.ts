@@ -710,6 +710,7 @@ const runChatStartOnShard = async (
         // (see `SaveMessagesArgs.metadata` -> `base?.fileIds`), so it is typed, not `any`.
         const attachmentFileIds = body.fileIds && body.fileIds.length > 0 ? body.fileIds : undefined;
         const result = await agent.saveMessage(context, {
+            fromUser: true,
             message: { content: messageContent, role: "user" },
             ...(attachmentFileIds && { metadata: { fileIds: attachmentFileIds } }),
             promptMessageId: body.parentId,

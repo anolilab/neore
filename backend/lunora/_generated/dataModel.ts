@@ -1663,6 +1663,7 @@ export interface Doc_threads {
     isTemporary?: boolean;
     language?: string;
     lastCompressionStartedAt?: number;
+    lastUserMessageAt?: number;
     lockedAt?: number;
     messengerConnectionId?: Id<"messengerConnections">;
     mode?: string;
@@ -1755,6 +1756,7 @@ export interface Doc_triggers {
     nextTriggerAt?: number;
     organizationId?: string;
     payloadTemplate?: string;
+    quietWhenEmpty?: boolean;
     searchMode?: string;
     systemPrompt?: string;
     timezone?: string;
@@ -1763,7 +1765,7 @@ export interface Doc_triggers {
     updatedAt: number;
     userId: string;
     webhookSecret?: string;
-    webhookSignatureScheme?: "timestamped" | "native";
+    webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token";
 }
 
 export interface Doc_twoFactor {
@@ -4394,6 +4396,7 @@ export interface Insert_threads {
     isTemporary?: boolean;
     language?: string;
     lastCompressionStartedAt?: number;
+    lastUserMessageAt?: number;
     lockedAt?: number;
     messengerConnectionId?: Id<"messengerConnections">;
     mode?: string;
@@ -4486,6 +4489,7 @@ export interface Insert_triggers {
     nextTriggerAt?: number;
     organizationId?: string;
     payloadTemplate?: string;
+    quietWhenEmpty?: boolean;
     searchMode?: string;
     systemPrompt?: string;
     timezone?: string;
@@ -4494,7 +4498,7 @@ export interface Insert_triggers {
     updatedAt: number;
     userId: string;
     webhookSecret?: string;
-    webhookSignatureScheme?: "timestamped" | "native";
+    webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token";
 }
 
 export interface Insert_twoFactor {

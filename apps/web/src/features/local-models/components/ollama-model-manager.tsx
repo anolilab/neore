@@ -4,6 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
+import { formatFileSize } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
 import { Progress, ProgressIndicator, ProgressLabel, ProgressTrack } from "@neore/ui/components/progress";
@@ -18,7 +19,7 @@ import { deleteOllamaModel, detectOllama, listOllamaModels, pullOllamaModel } fr
 import type { LocalErrorInfo } from "../lib/local-errors";
 import { describeLocalError, diagnoseLocalError } from "../lib/local-errors";
 import type { PullProgress } from "../lib/ollama-pull";
-import { formatBytes, isValidOllamaModelName } from "../lib/ollama-pull";
+import { isValidOllamaModelName } from "../lib/ollama-pull";
 
 interface OllamaModelManagerProps {
     baseUrl: string;
@@ -247,7 +248,7 @@ const OllamaModelManager: FC<OllamaModelManagerProps> = ({ baseUrl, onSyncPicker
                                 <p className="truncate font-mono text-sm">{model.name}</p>
                                 <div className="mt-1 flex flex-wrap gap-1">
                                     <Badge className="text-xs" variant="secondary">
-                                        {formatBytes(model.size)}
+                                        {formatFileSize(model.size)}
                                     </Badge>
                                     {model.parameterSize && (
                                         <Badge className="text-xs" variant="outline">
@@ -314,7 +315,7 @@ const OllamaModelManager: FC<OllamaModelManagerProps> = ({ baseUrl, onSyncPicker
                         <Progress value={pullPercent ?? null}>
                             <ProgressLabel className="text-muted-foreground text-xs font-normal">
                                 {pull.progress?.total
-                                    ? t`${pull.progress.status} — ${formatBytes(pull.progress.completed ?? 0)} of ${formatBytes(pull.progress.total)}`
+                                    ? t`${pull.progress.status} — ${formatFileSize(pull.progress.completed ?? 0)} of ${formatFileSize(pull.progress.total)}`
                                     : (pull.progress?.status ?? t`Starting ${pull.name}…`)}
                             </ProgressLabel>
                             <ProgressTrack>

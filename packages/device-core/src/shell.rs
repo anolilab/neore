@@ -114,7 +114,13 @@ impl TempDir {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_or(0, |elapsed| elapsed.as_nanos());
-        let path = std::env::temp_dir().join(format!("neore-shell-{}-{nanos}", std::process::id()));
+        // The clock alone can repeat (coarse on macOS) when two runs start together, so a counter makes it unique.
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let count = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "neore-shell-{}-{nanos}-{count}",
+            std::process::id()
+        ));
         #[cfg(unix)]
         let builder = {
             use std::os::unix::fs::DirBuilderExt;
@@ -568,8 +574,25 @@ mod tests {
         )
     }
 
+    /// The first Bash the sandbox tests can run, by absolute path so the test
+    /// does not depend on the test process's `PATH`.
+    #[cfg(target_os = "linux")]
+    fn bash_path() -> Option<&'static str> {
+        ["/bin/bash", "/usr/bin/bash"]
+            .into_iter()
+            .find(|path| Path::new(path).exists())
+    }
+
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     fn sandbox_or_skip() -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            if let Err(reason) = super::super::sandbox::network_filter() {
+                eprintln!("skipping: {reason}");
+                return false;
+            }
+        }
+
         match super::super::sandbox::support() {
             super::super::sandbox::Support::Available(_) => true,
             super::super::sandbox::Support::Unavailable(reason) => {
@@ -626,6 +649,145 @@ mod tests {
         );
         assert!(shared.join("inside.txt").exists());
         assert!(!outside.join("escaped.txt").exists());
+
+        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
+    }
+
+    /// The seccomp network filter reaches the real child, and only when the
+    /// policy has no network. The count is relative, since a container or
+    /// service manager may already filter the test process itself.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_sandboxed_command_gets_the_network_filter_only_without_network() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        let (shared, _outside) = folders("seccomp");
+        let filters = |network: bool| {
+            let policy = Policy {
+                network,
+                ..Policy::for_roots(std::slice::from_ref(&shared), None)
+            };
+            let result = run(
+                "grep '^Seccomp_filters:' /proc/self/status",
+                &shared,
+                Duration::from_secs(10),
+                4096,
+                Some(&policy),
+            )
+            .unwrap();
+
+            result
+                .output
+                .trim()
+                .trim_start_matches("Seccomp_filters:")
+                .trim()
+                .parse::<u32>()
+                .unwrap_or_else(|_| panic!("unexpected output: {}", result.output))
+        };
+
+        assert_eq!(filters(false), filters(true) + 1);
+
+        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
+    }
+
+    /// A shell that opens a TCP connection to a local listener: refused with
+    /// no network, accepted with it. Skipped without bash (`/dev/tcp`).
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_sandboxed_command_cannot_connect_without_network() {
+        if !sandbox_or_skip() {
+            return;
+        }
+        let Some(bash) = bash_path() else {
+            return;
+        };
+
+        let (shared, _outside) = folders("connect");
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let line = format!(
+            "{bash} -c 'exec 3<>/dev/tcp/127.0.0.1/{}' && echo connected || echo refused",
+            listener.local_addr().unwrap().port()
+        );
+        let outcome = |network: bool| {
+            let policy = Policy {
+                network,
+                ..Policy::for_roots(std::slice::from_ref(&shared), None)
+            };
+
+            run(&line, &shared, Duration::from_secs(10), 4096, Some(&policy))
+                .unwrap()
+                .output
+        };
+
+        assert!(outcome(false).contains("refused"));
+        assert!(outcome(true).contains("connected"));
+
+        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
+    }
+
+    /// A connected socket the parent leaves inheritable is closed in the child,
+    /// whatever the network setting: the seccomp filter only stops new sockets.
+    /// The unsandboxed control proves the descriptor does reach a child.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_sandboxed_command_cannot_use_an_inherited_socket() {
+        if !sandbox_or_skip() {
+            return;
+        }
+        let Some(bash) = bash_path() else {
+            return;
+        };
+
+        let (shared, _outside) = folders("inherited");
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let client = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let fd = client.as_raw_fd();
+
+        // SAFETY: plain flag update on a descriptor this test owns.
+        assert_eq!(unsafe { libc::fcntl(fd, libc::F_SETFD, 0) }, 0);
+
+        let line = format!("{bash} -c 'echo x >&{fd}' 2>/dev/null && echo leaked || echo closed");
+        let outcome = |policy: Option<&Policy>| {
+            run(&line, &shared, Duration::from_secs(10), 4096, policy)
+                .unwrap()
+                .output
+        };
+
+        assert!(outcome(None).contains("leaked"));
+
+        for network in [false, true] {
+            let policy = Policy {
+                network,
+                ..Policy::for_roots(std::slice::from_ref(&shared), None)
+            };
+
+            assert!(
+                outcome(Some(&policy)).contains("closed"),
+                "network: {network}"
+            );
+        }
+
+        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
+    }
+
+    /// The descriptor sweep must leave the close-on-exec pipe `std` reports an
+    /// `exec` failure through, or a missing program would look like a success.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_sandboxed_spawn_still_reports_a_failed_exec() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        let (shared, _outside) = folders("exec-error");
+        let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
+        let mut command = Command::new("/nonexistent/neore-program");
+        let _guard = super::super::sandbox::confine(&mut command, &policy).unwrap();
+        let error = command.spawn().unwrap_err();
+
+        assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
 
         let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }

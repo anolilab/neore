@@ -235,7 +235,6 @@ catalogs:
   icons:
     "@lobehub/icons": 5.23.0
     lucide-react: 1.60.0
-    react-icons: 5.7.0
   lint:
     "@anolilab/commitlint-config": 10.1.5
     "@anolilab/eslint-config": 30.0.7

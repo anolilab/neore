@@ -44,6 +44,17 @@ packages/ui/src/
 - **Design system**: Consistent styling and patterns
 - **Form ready**: Built-in validation and handling
 
+## DATA GRID LAYOUT
+
+- `hooks/use-data-grid.ts` keeps every React hook call and dependency array of `useDataGrid`; the
+  bodies of the big callbacks live in plain functions under `hooks/data-grid/` (keyboard, navigation,
+  clipboard, scroll, pointer, search, effects, store). They take refs and `store`, never `.current`
+  snapshots, and anything using Lingui's `t` (the toasts) stays inside the hook. Do not turn them
+  into `use*` hooks: `useDataGrid` has destructuring defaults, so the React Compiler skips it, and a
+  new default-free hook would start being compiled.
+- `components/data-grid/data-grid-cell-variants.tsx` is only a barrel; each cell family is
+  `data-grid-cell-<variant>.tsx`.
+
 ## SPREADSHEET COMPONENTS
 
 ```text

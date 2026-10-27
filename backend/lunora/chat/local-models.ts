@@ -178,7 +178,7 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
         return { assistantMessageId: replyRow._id, threadId, userMessageId: promptId };
     }
 
-    const { messages } = await addMessagesHandler(ctx, { messages: [userMessage, replyMessage], threadId, userId });
+    const { messages } = await addMessagesHandler(ctx, { fromUser: true, messages: [userMessage, replyMessage], threadId, userId });
     const [userRow, assistantRow] = messages;
 
     if (!userRow || !assistantRow) {

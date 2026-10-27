@@ -4,8 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UploadFailedError } from "@/lib/upload/upload-error";
 
 import {
+    ATTACHMENT_ACCEPT,
     attachmentContentType,
     attachmentSizeLimit,
+    attachmentTextChars,
     AttachmentTooLargeError,
     AttachmentUploadError,
     createLunoraAttachmentAdapter,
@@ -147,10 +149,28 @@ describe(createLunoraAttachmentAdapter, () => {
         expect(action).not.toHaveBeenCalled();
     });
 
+    it("offers the text-preview suffixes in the accept list the composer's file picker uses", () => {
+        const accept = ATTACHMENT_ACCEPT.split(",");
+
+        expect(createLunoraAttachmentAdapter(client().lunora).accept).toBe(ATTACHMENT_ACCEPT);
+
+        for (const suffix of [".jsonl", ".ndjson", ".mermaid", ".mmd", ".csv", ".tsv"]) {
+            expect(accept).toContain(suffix);
+        }
+    });
+
     it("refuses a type it does not attach, as a typed error", async () => {
         const adapter = createLunoraAttachmentAdapter(client().lunora);
 
         await expect(adapter.upload({ file: new File(["x"], "a.exe", { type: "application/x-msdownload" }) })).rejects.toMatchObject({ reason: "unsupported" });
+    });
+
+    it("accepts a dropped JSON Lines file whose browser type is empty, and uploads it as text", async () => {
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const result = await adapter.upload({ file: new File(['{"a":1}\n'], "rows.jsonl", { type: "" }) });
+
+        expect(result.metadata?.fileId).toBe("file-1");
+        expect(uploadFile).toHaveBeenLastCalledWith(expect.any(File), expect.objectContaining({ contentType: "text/plain" }));
     });
 
     it("passes progress through and returns the file id", async () => {
@@ -175,6 +195,29 @@ describe(attachmentContentType, () => {
         [{ name: "a.docx", type: "" }, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
         [{ name: "a.bin", type: "" }, "application/octet-stream"],
         [{ name: "a.pdf", type: "application/pdf" }, "application/pdf"],
+        [{ name: "rows.jsonl", type: "" }, "text/plain"],
+        [{ name: "rows.jsonl", type: "application/x-ndjson" }, "text/plain"],
+        [{ name: "rows.jsonl", type: "application/octet-stream" }, "text/plain"],
+        [{ name: "rows.ndjson", type: "" }, "text/plain"],
+        [{ name: "flow.mmd", type: "" }, "text/plain"],
+        [{ name: "flow.mmd", type: "application/octet-stream" }, "text/plain"],
+        [{ name: "flow.mermaid", type: "text/vnd.mermaid" }, "text/plain"],
+        [{ name: "data.tsv", type: "" }, "text/plain"],
+        [{ name: "data.tsv", type: "text/tab-separated-values" }, "text/plain"],
+        [{ name: "sheet.csv", type: "" }, "text/plain"],
+        [{ name: "sheet.csv", type: "text/csv" }, "text/plain"],
+        [{ name: "a.bin", type: "application/x-ndjson" }, "application/x-ndjson"],
+        [{ name: "NOTES.MD", type: "" }, "text/markdown"],
+        [{ name: "notes.markdown", type: "text/x-markdown" }, "text/markdown"],
+        [{ name: "a.txt", type: "application/octet-stream" }, "text/plain"],
+        [{ name: "a.docx", type: "application/octet-stream" }, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+        [{ name: "photo.png", type: "image/png" }, "image/png"],
+        [{ name: "report.csv", type: "application/pdf" }, "application/pdf"],
+        [{ name: "flow.mmd", type: "image/png" }, "image/png"],
+        [{ name: "data.jsonl", type: "video/mp4" }, "video/mp4"],
+        [{ name: "data.csv", type: "application/vnd.ms-excel" }, "text/plain"],
+        [{ name: "data.tsv", type: "application/vnd.ms-excel" }, "text/plain"],
+        [{ name: "noextension", type: "" }, "application/octet-stream"],
     ])("%o is uploaded as %s", (file, expected) => {
         expect(attachmentContentType(file)).toBe(expected);
     });
@@ -182,5 +225,23 @@ describe(attachmentContentType, () => {
     it("sizes a document by the backend's 25 MB rule", () => {
         expect(attachmentSizeLimit({ name: "a.pdf", type: "application/pdf" })).toStrictEqual({ isDocument: true, maxBytes: 25 * MB });
         expect(attachmentSizeLimit({ name: "a.png", type: "image/png" })).toStrictEqual({ isDocument: false, maxBytes: 20 * MB });
+    });
+});
+
+describe(attachmentTextChars, () => {
+    it.each([
+        [{ name: "rows.jsonl", size: 120, type: "" }, 120],
+        [{ name: "rows.ndjson", size: 90, type: "application/x-ndjson" }, 90],
+        [{ name: "flow.mmd", size: 40, type: "" }, 40],
+        [{ name: "flow.mermaid", size: 41, type: "application/octet-stream" }, 41],
+        [{ name: "data.csv", size: 300, type: "text/csv" }, 300],
+        [{ name: "data.tsv", size: 301, type: "" }, 301],
+        [{ name: "notes.md", size: 50, type: "" }, 50],
+        [{ name: "config.json", size: 60, type: "application/json" }, 60],
+        [{ name: "photo.png", size: 5000, type: "image/png" }, 0],
+        [{ name: "report.pdf", size: 5000, type: "application/pdf" }, 0],
+        [{ name: "blob.bin", size: 5000, type: "" }, 0],
+    ])("%o adds %i characters to the prompt", (file, expected) => {
+        expect(attachmentTextChars(file)).toBe(expected);
     });
 });

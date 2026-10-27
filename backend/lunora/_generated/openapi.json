@@ -7060,128 +7060,6 @@
         "x-lunora-function-kind": "action"
       }
     },
-    "/_lunora/rpc#auth_organization:acceptInvitation": {
-      "post": {
-        "description": "Invoke the `mutation` `auth_organization:acceptInvitation` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:acceptInvitation",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "invitationId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "invitationId"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:acceptInvitation",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Return shape is TS-inferred (no `.output()` declared); best-effort — any JSON."
-                }
-              }
-            },
-            "description": "Successful response. The return shape is TypeScript-inferred and not declared via `.output()`, so it is documented best-effort."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "mutation: auth_organization:acceptInvitation",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "mutation"
-      }
-    },
-    "/_lunora/rpc#auth_organization:cancelInvitation": {
-      "post": {
-        "description": "Invoke the `mutation` `auth_organization:cancelInvitation` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:cancelInvitation",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "invitationId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "invitationId"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:cancelInvitation",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Return shape is TS-inferred (no `.output()` declared); best-effort — any JSON."
-                }
-              }
-            },
-            "description": "Successful response. The return shape is TypeScript-inferred and not declared via `.output()`, so it is documented best-effort."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "mutation: auth_organization:cancelInvitation",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "mutation"
-      }
-    },
     "/_lunora/rpc#auth_organization:checkSlug": {
       "post": {
         "description": "Invoke the `query` `auth_organization:checkSlug` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -7251,601 +7129,6 @@
         "x-lunora-function-kind": "query"
       }
     },
-    "/_lunora/rpc#auth_organization:createOrganization": {
-      "post": {
-        "description": "Invoke the `mutation` `auth_organization:createOrganization` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:createOrganization",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "name": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "name"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:createOrganization",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "slug": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "slug"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful response."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "mutation: auth_organization:createOrganization",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "mutation"
-      }
-    },
-    "/_lunora/rpc#auth_organization:deleteOrganization": {
-      "post": {
-        "description": "Invoke the `mutation` `auth_organization:deleteOrganization` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:deleteOrganization",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {},
-                    "required": [],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:deleteOrganization",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Return shape is TS-inferred (no `.output()` declared); best-effort — any JSON."
-                }
-              }
-            },
-            "description": "Successful response. The return shape is TypeScript-inferred and not declared via `.output()`, so it is documented best-effort."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "mutation: auth_organization:deleteOrganization",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "mutation"
-      }
-    },
-    "/_lunora/rpc#auth_organization:getActiveMember": {
-      "post": {
-        "description": "Invoke the `query` `auth_organization:getActiveMember` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:getActiveMember",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {},
-                    "required": [],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:getActiveMember",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "properties": {
-                        "createdAt": {
-                          "type": "number"
-                        },
-                        "id": {
-                          "type": "string"
-                        },
-                        "role": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "createdAt",
-                        "id",
-                        "role"
-                      ],
-                      "type": "object"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Successful response."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "query: auth_organization:getActiveMember",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "query"
-      }
-    },
-    "/_lunora/rpc#auth_organization:getOrganization": {
-      "post": {
-        "description": "Invoke the `query` `auth_organization:getOrganization` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:getOrganization",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "slug": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "slug"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:getOrganization",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful response."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "query: auth_organization:getOrganization",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "query"
-      }
-    },
-    "/_lunora/rpc#auth_organization:getOrganizationOverview": {
-      "post": {
-        "description": "Invoke the `query` `auth_organization:getOrganizationOverview` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:getOrganizationOverview",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "inviteId": {
-                        "type": "string"
-                      },
-                      "slug": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "slug"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:getOrganizationOverview",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful response."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "query: auth_organization:getOrganizationOverview",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "query"
-      }
-    },
-    "/_lunora/rpc#auth_organization:inviteMember": {
-      "post": {
-        "description": "Invoke the `mutation` `auth_organization:inviteMember` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:inviteMember",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "email": {
-                        "type": "string"
-                      },
-                      "role": {
-                        "anyOf": [
-                          {
-                            "const": "owner",
-                            "type": "string"
-                          },
-                          {
-                            "const": "member",
-                            "type": "string"
-                          }
-                        ]
-                      }
-                    },
-                    "required": [
-                      "email",
-                      "role"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:inviteMember",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Return shape is TS-inferred (no `.output()` declared); best-effort — any JSON."
-                }
-              }
-            },
-            "description": "Successful response. The return shape is TypeScript-inferred and not declared via `.output()`, so it is documented best-effort."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "mutation: auth_organization:inviteMember",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "mutation"
-      }
-    },
-    "/_lunora/rpc#auth_organization:leaveOrganization": {
-      "post": {
-        "description": "Invoke the `mutation` `auth_organization:leaveOrganization` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:leaveOrganization",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {},
-                    "required": [],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:leaveOrganization",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Return shape is TS-inferred (no `.output()` declared); best-effort — any JSON."
-                }
-              }
-            },
-            "description": "Successful response. The return shape is TypeScript-inferred and not declared via `.output()`, so it is documented best-effort."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "mutation: auth_organization:leaveOrganization",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "mutation"
-      }
-    },
-    "/_lunora/rpc#auth_organization:listMembers": {
-      "post": {
-        "description": "Invoke the `query` `auth_organization:listMembers` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:listMembers",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "slug": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "slug"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:listMembers",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "currentUserRole": {
-                      "type": "string"
-                    },
-                    "isOwner": {
-                      "type": "boolean"
-                    },
-                    "members": {
-                      "items": {
-                        "properties": {
-                          "createdAt": {
-                            "type": "number"
-                          },
-                          "id": {
-                            "type": "string"
-                          },
-                          "organizationId": {
-                            "type": "string"
-                          },
-                          "role": {
-                            "type": "string"
-                          },
-                          "user": {
-                            "properties": {
-                              "email": {
-                                "type": "string"
-                              },
-                              "id": {
-                                "type": "string"
-                              },
-                              "image": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
-                              },
-                              "name": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
-                              }
-                            },
-                            "required": [
-                              "email",
-                              "id",
-                              "name"
-                            ],
-                            "type": "object"
-                          },
-                          "userId": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "createdAt",
-                          "id",
-                          "organizationId",
-                          "user",
-                          "userId"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
-                    }
-                  },
-                  "required": [
-                    "isOwner",
-                    "members"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful response."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "query: auth_organization:listMembers",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "query"
-      }
-    },
     "/_lunora/rpc#auth_organization:listOrganizations": {
       "post": {
         "description": "Invoke the `query` `auth_organization:listOrganizations` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -7893,102 +7176,6 @@
           }
         },
         "summary": "query: auth_organization:listOrganizations",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "query"
-      }
-    },
-    "/_lunora/rpc#auth_organization:listPendingInvitations": {
-      "post": {
-        "description": "Invoke the `query` `auth_organization:listPendingInvitations` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:listPendingInvitations",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "slug": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "slug"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:listPendingInvitations",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "properties": {
-                      "createdAt": {
-                        "type": "number"
-                      },
-                      "email": {
-                        "type": "string"
-                      },
-                      "expiresAt": {
-                        "type": "number"
-                      },
-                      "id": {
-                        "type": "string"
-                      },
-                      "organizationId": {
-                        "type": "string"
-                      },
-                      "role": {
-                        "type": "string"
-                      },
-                      "status": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "createdAt",
-                      "email",
-                      "expiresAt",
-                      "id",
-                      "organizationId",
-                      "role",
-                      "status"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful response."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "query: auth_organization:listPendingInvitations",
         "tags": [
           "auth"
         ],
@@ -8046,328 +7233,6 @@
           "auth"
         ],
         "x-lunora-function-kind": "query"
-      }
-    },
-    "/_lunora/rpc#auth_organization:rejectInvitation": {
-      "post": {
-        "description": "Invoke the `mutation` `auth_organization:rejectInvitation` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:rejectInvitation",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "invitationId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "invitationId"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:rejectInvitation",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Return shape is TS-inferred (no `.output()` declared); best-effort — any JSON."
-                }
-              }
-            },
-            "description": "Successful response. The return shape is TypeScript-inferred and not declared via `.output()`, so it is documented best-effort."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "mutation: auth_organization:rejectInvitation",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "mutation"
-      }
-    },
-    "/_lunora/rpc#auth_organization:removeMember": {
-      "post": {
-        "description": "Invoke the `mutation` `auth_organization:removeMember` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:removeMember",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "memberId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "memberId"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:removeMember",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Return shape is TS-inferred (no `.output()` declared); best-effort — any JSON."
-                }
-              }
-            },
-            "description": "Successful response. The return shape is TypeScript-inferred and not declared via `.output()`, so it is documented best-effort."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "mutation: auth_organization:removeMember",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "mutation"
-      }
-    },
-    "/_lunora/rpc#auth_organization:setActiveOrganization": {
-      "post": {
-        "description": "Invoke the `mutation` `auth_organization:setActiveOrganization` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:setActiveOrganization",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "organizationId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "organizationId"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:setActiveOrganization",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Return shape is TS-inferred (no `.output()` declared); best-effort — any JSON."
-                }
-              }
-            },
-            "description": "Successful response. The return shape is TypeScript-inferred and not declared via `.output()`, so it is documented best-effort."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "mutation: auth_organization:setActiveOrganization",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "mutation"
-      }
-    },
-    "/_lunora/rpc#auth_organization:updateMemberRole": {
-      "post": {
-        "description": "Invoke the `mutation` `auth_organization:updateMemberRole` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:updateMemberRole",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "memberId": {
-                        "type": "string"
-                      },
-                      "role": {
-                        "anyOf": [
-                          {
-                            "const": "owner",
-                            "type": "string"
-                          },
-                          {
-                            "const": "member",
-                            "type": "string"
-                          }
-                        ]
-                      }
-                    },
-                    "required": [
-                      "memberId",
-                      "role"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:updateMemberRole",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Return shape is TS-inferred (no `.output()` declared); best-effort — any JSON."
-                }
-              }
-            },
-            "description": "Successful response. The return shape is TypeScript-inferred and not declared via `.output()`, so it is documented best-effort."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "mutation: auth_organization:updateMemberRole",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "mutation"
-      }
-    },
-    "/_lunora/rpc#auth_organization:updateOrganization": {
-      "post": {
-        "description": "Invoke the `mutation` `auth_organization:updateOrganization` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "auth_organization:updateOrganization",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "logo": {
-                        "type": "string"
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "slug": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "auth_organization:updateOrganization",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Return shape is TS-inferred (no `.output()` declared); best-effort — any JSON."
-                }
-              }
-            },
-            "description": "Successful response. The return shape is TypeScript-inferred and not declared via `.output()`, so it is documented best-effort."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "mutation: auth_organization:updateOrganization",
-        "tags": [
-          "auth"
-        ],
-        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#auth_team:addTeamMember": {
@@ -12872,6 +11737,9 @@
                         ],
                         "type": "object"
                       },
+                      "lastUserMessageAt": {
+                        "type": "number"
+                      },
                       "lockedAt": {
                         "type": "number"
                       },
@@ -13333,6 +12201,9 @@
                       },
                       "isPublic": {
                         "type": "boolean"
+                      },
+                      "lastUserMessageAt": {
+                        "type": "number"
                       },
                       "lockedAt": {
                         "type": "number"
@@ -40289,6 +39160,9 @@
                       "name": {
                         "type": "string"
                       },
+                      "quietWhenEmpty": {
+                        "type": "boolean"
+                      },
                       "searchMode": {
                         "type": "string"
                       },
@@ -40299,6 +39173,68 @@
                         "type": "string"
                       },
                       "type": {},
+                      "webhookPreset": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "event": {
+                                "anyOf": [
+                                  {
+                                    "const": "pull_request_opened",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "pull_request_merged",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "pull_request_review_requested",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "issue_assigned",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "provider": {
+                                "const": "github",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "event",
+                              "provider"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "event": {
+                                "anyOf": [
+                                  {
+                                    "const": "merge_request_opened",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "merge_request_merged",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "provider": {
+                                "const": "gitlab",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "event",
+                              "provider"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
                       "webhookSignatureScheme": {
                         "anyOf": [
                           {
@@ -40307,6 +39243,10 @@
                           },
                           {
                             "const": "native",
+                            "type": "string"
+                          },
+                          {
+                            "const": "gitlab-token",
                             "type": "string"
                           }
                         ]
@@ -40768,6 +39708,9 @@
                       },
                       "name": {
                         "type": "string"
+                      },
+                      "quietWhenEmpty": {
+                        "type": "boolean"
                       },
                       "searchMode": {
                         "type": "string"
