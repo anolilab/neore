@@ -138,6 +138,8 @@ const addMessagesArgs = {
     agentName: v.optional(v.string()),
     embeddings: v.optional(vMessageEmbeddingsWithDimension),
     failPendingSteps: v.optional(v.boolean()),
+    /** A person sent these user messages into the thread: only then do they count as a reply (`threads.lastUserMessageAt`). */
+    fromUser: v.optional(v.boolean()),
     hideFromUserIdSearch: v.optional(v.boolean()),
     messages: v.array(vMessageWithMetadataInternal),
     overrideOrder: v.optional(v.number()),
@@ -165,7 +167,18 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
         userId = thread.userId ?? undefined;
     }
 
-    const { embeddings, failPendingSteps, hideFromUserIdSearch, messages, overrideOrder, parentMessageId, pendingMessageId, promptMessageId, ...rest } = args;
+    const {
+        embeddings,
+        failPendingSteps,
+        fromUser,
+        hideFromUserIdSearch,
+        messages,
+        overrideOrder,
+        parentMessageId,
+        pendingMessageId,
+        promptMessageId,
+        ...rest
+    } = args;
 
     const promptMessage = promptMessageId && (await context.db.get(promptMessageId));
 
@@ -259,9 +272,6 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
 
     const toReturn: Doc<"messages">[] = [];
     let insertedAny = false;
-    // A user message past the thread's first `order` is a reply; the first is the prompt that opened it (a routine
-    // run's own prompt), which must not read as the user writing back.
-    let savedReply = false;
 
     if (embeddings) {
         assert(embeddings.vectors.length === messages.length, "embeddings.vectors.length must match messages.length");
@@ -368,7 +378,6 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
         });
 
         insertedAny = true;
-        savedReply ||= message.message.role === "user" && order > 0;
         const messageId = insertedId as Id<"messages">;
 
         if (activeLeafId) {
@@ -393,7 +402,7 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
     if (threadDocument && messages.some((item) => item.message.role === "user")) {
         const now = Date.now();
 
-        await context.db.patch(threadId, { updatedAt: now, ...(savedReply && { lastUserMessageAt: now }) });
+        await context.db.patch(threadId, { updatedAt: now, ...(fromUser === true && { lastUserMessageAt: now }) });
     }
 
     return { messages: toReturn.map((item) => publicMessage(item)) };

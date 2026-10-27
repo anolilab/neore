@@ -90,9 +90,9 @@ describe("loadQuietSnapshot", () => {
                     await ctx.db.insert("threads", { status: "active", tags: ["trigger"], title, updatedAt: NOW - 500, userId: USER, ...extra }),
             );
 
-        const save = async (threadId: string, role: "assistant" | "user") =>
+        const save = async (threadId: string, role: "assistant" | "user", fromUser = false) =>
             await harness.run(async (ctx: any) => {
-                await addMessagesHandler(ctx, { messages: [{ message: { content: "text", role } }], threadId: threadId as never, userId: USER });
+                await addMessagesHandler(ctx, { fromUser, messages: [{ message: { content: "text", role } }], threadId: threadId as never, userId: USER });
             });
 
         it("does not count the run's own prompt and answer", async () => {
@@ -109,13 +109,25 @@ describe("loadQuietSnapshot", () => {
             expect(row.lastUserMessageAt).toBeUndefined();
         });
 
+        it("does not count a second user row the run itself saves, such as the prompt re-saved by a context-limit retry", async () => {
+            const threadId = await insertRunThread({ updatedAt: NOW - 120_000 });
+
+            await save(threadId, "user");
+            await save(threadId, "assistant");
+            await save(threadId, "user");
+
+            const { threads } = await snapshotSince(NOW - 60_000);
+
+            expect(threads).toEqual([]);
+        });
+
         it("counts a reply saved through the message write even when no stream ever starts", async () => {
             const threadId = await insertRunThread({ updatedAt: NOW - 120_000 });
 
             await save(threadId, "user");
             await save(threadId, "assistant");
             // Only the save: `createStreamWithMessage` (the later `updatedAt` bump) never runs.
-            await save(threadId, "user");
+            await save(threadId, "user", true);
 
             const { threads } = await snapshotSince(NOW - 60_000);
 

@@ -641,6 +641,7 @@ export class Agent<
     ) {
         const { messages } = await this.saveMessages(ctx, {
             embeddings: args.embedding ? { model: args.embedding.model, vectors: [args.embedding.vector] } : undefined,
+            fromUser: args.fromUser,
             messages: args.prompt === undefined ? [args.message] : [{ content: args.prompt, role: "user" }],
             metadata: args.metadata ? [args.metadata] : undefined,
             pendingMessageId: args.pendingMessageId,

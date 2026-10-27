@@ -16157,13 +16157,13 @@
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 279,
+      "line": 280,
       "reason": "\"saveEditedSiblingHandler\" is not a registered function"
     },
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 373,
+      "line": 374,
       "reason": "\"editAssistantReplyHandler\" is not a registered function"
     },
     {
@@ -16205,43 +16205,43 @@
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 800,
+      "line": 801,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 907,
+      "line": 908,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 955,
+      "line": 956,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 967,
+      "line": 968,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1019,
+      "line": 1020,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1036,
+      "line": 1037,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1050,
+      "line": 1051,
       "reason": "at module scope"
     },
     {
@@ -16277,7 +16277,7 @@
     {
       "file": "agent/client/messages",
       "kind": "call",
-      "line": 160,
+      "line": 165,
       "reason": "\"saveMessages\" is not a registered function"
     },
     {
@@ -16667,49 +16667,49 @@
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 207,
+      "line": 209,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 219,
+      "line": 221,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 361,
+      "line": 360,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 379,
+      "line": 377,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 396,
+      "line": 394,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 438,
+      "line": 436,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 448,
+      "line": 446,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 454,
+      "line": 452,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
@@ -17471,55 +17471,55 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 726,
+      "line": 727,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 755,
+      "line": 756,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 868,
+      "line": 869,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 883,
+      "line": 884,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 892,
+      "line": 893,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1004,
+      "line": 1005,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1012,
+      "line": 1013,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1153,
+      "line": 1154,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1179,
+      "line": 1180,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
