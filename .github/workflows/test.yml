@@ -400,6 +400,31 @@ jobs:
               shell: "bash"
               run: "cargo test --manifest-path packages/device-core/Cargo.toml"
 
+            # `neore-host` is built without the `keychain` feature. This runs the host's own tests
+            # (the stdio protocol, the action vectors, the no-socket check) and proves the crate
+            # builds and passes without the paired side.
+            - name: "Run cargo test without the keychain feature"
+              shell: "bash"
+              run: "cargo test --manifest-path packages/device-core/Cargo.toml --no-default-features"
+
+            # The host holds no pairing, so it must not link the keyring (or libdbus, which the
+            # keyring's Secret Service backend needs). Runs after libdbus-dev is installed, so a
+            # regression would link it instead of failing to build.
+            - name: "Check neore-host links no keyring"
+              if: "matrix.os == 'ubuntu-22.04'"
+              shell: "bash"
+              run: |
+                  set -euo pipefail
+                  manifest=packages/device-core/Cargo.toml
+                  if cargo tree --manifest-path "$manifest" --no-default-features --target all -e normal,build | grep -q keyring; then
+                      echo "keyring is in the neore-host dependency tree" >&2
+                      exit 1
+                  fi
+                  cargo build --manifest-path "$manifest" --release --no-default-features --bin neore-host
+                  binary=packages/device-core/target/release/neore-host
+                  ldd "$binary" | tee /dev/stderr | { ! grep -qi dbus; }
+                  strings "$binary" | { ! grep -q "dev.neore.device"; }
+
     # Packages the desktop shell without signing, so a packager break (the xmldom override,
     # a missing addon in the asar) shows on the PR instead of at the next `desktop-v*` tag.
     # Linux x64 only: it is the cheapest runner, and desktop.yml still builds every platform

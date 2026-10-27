@@ -177,13 +177,13 @@ results and calls, and approval would have to move to a machine with no window.
 
 ## 9. Slices
 
-**S1 — Transport seam.** `HostTransport` in `apps/desktop/src/device/` with one
+**S1 — Transport seam (built).** `HostTransport` in `apps/desktop/src/device/` with one
 implementation, `local` (the napi addon). Every device call in the main process
 goes through it. No behaviour change.
 - Acceptance: the existing device tests pass unchanged; the `device-core` CI job
   stays green on all three OSes.
 
-**S2 — Headless host binary.** The engine split (above), the `keychain` feature
+**S2 — Headless host binary (built).** The engine split (above), the `keychain` feature
 gate, the `neore-host` target, and the stdio frame protocol, run locally as a child
 process.
 - Acceptance: the action test vectors give identical results through stdio and
