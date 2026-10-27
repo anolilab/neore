@@ -68,6 +68,15 @@ export {
     toLocalServerRoot,
     validateLocalEndpointUrl,
 } from "./local-endpoint";
+export {
+    deriveModelRegions,
+    type FilterableModel,
+    filterModels,
+    getModelRejectionReason,
+    hasActiveFilters,
+    isModelAllowed,
+    type ModelFilterRules,
+} from "./model-filters";
 
 /**
  * Model exports

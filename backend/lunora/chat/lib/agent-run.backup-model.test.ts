@@ -43,6 +43,17 @@ describe("resolveBackupModelId", () => {
         await expect(resolveBackupModelId(makeCtx(), "u1", FREE_MODEL, FREE_MODEL)).resolves.toBeUndefined();
     });
 
+    it("is none when the user's model filters exclude it, as the gateway would answer MODEL_BLOCKED", async () => {
+        await expect(resolveBackupModelId(makeCtx(), "u1", OTHER_FREE_MODEL, FREE_MODEL, { blockedModels: [OTHER_FREE_MODEL] })).resolves.toBeUndefined();
+        await expect(
+            resolveBackupModelId(makeCtx(), "u1", OTHER_FREE_MODEL, FREE_MODEL, {
+                blockedProviders: [MODEL_REGISTRY.find((m) => m.id === OTHER_FREE_MODEL)!.provider],
+            }),
+        ).resolves.toBeUndefined();
+        await expect(resolveBackupModelId(makeCtx(), "u1", OTHER_FREE_MODEL, FREE_MODEL, { allowedModels: [FREE_MODEL] })).resolves.toBeUndefined();
+        await expect(resolveBackupModelId(makeCtx(), "u1", OTHER_FREE_MODEL, FREE_MODEL, { blockedModels: [FREE_MODEL] })).resolves.toBe(OTHER_FREE_MODEL);
+    });
+
     it("does not open a paid model to a user whose plan cannot run it", async () => {
         await expect(resolveBackupModelId(makeCtx(), "u1", PAID_MODEL, FREE_MODEL)).resolves.toBeUndefined();
         await expect(resolveBackupModelId(makeCtx({ plan: "premium" }), "u1", PAID_MODEL, FREE_MODEL)).resolves.toBe(PAID_MODEL);

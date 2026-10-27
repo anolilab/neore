@@ -12,7 +12,7 @@
  * and flushes the stream, the post-run bookkeeping (`afterRun`), resuming an
  * approved run (`resumeApprovedRun`) and the error cleanup.
  */
-import { MODEL_LOOKUP, type ModelDefinition, parseCustomModelId } from "@neore/ai/models";
+import { MODEL_LOOKUP, type ModelDefinition, type ModelFilterRules, parseCustomModelId } from "@neore/ai/models";
 import type { UserPersonalization } from "@neore/ai/prompts";
 import { buildMemoryContext } from "@neore/ai/prompts";
 
@@ -25,7 +25,7 @@ import type { ResearchDepth } from "../../agent/client/create-tool";
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
-import { eligibleBackupModel } from "./backup-model";
+import { backupFilterRejection, eligibleBackupModel } from "./backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
 import { compressContextMessages, getFallbackContextWindow, getMaxSteps } from "./auto-continue";
 import { isLocalBrowserProvider, toGatewayFormat } from "./custom-providers";
@@ -155,10 +155,15 @@ export const resolveBackupModelId = async (
     userId: string,
     backupModel: string | undefined,
     model: string,
+    filterRules?: ModelFilterRules,
 ): Promise<string | undefined> => {
     const definition = eligibleBackupModel(backupModel, model);
 
-    return definition && (await canRunPaidModel(ctx, userId, definition)) ? definition.id : undefined;
+    if (!definition || backupFilterRejection(definition, filterRules) !== null) {
+        return undefined;
+    }
+
+    return (await canRunPaidModel(ctx, userId, definition)) ? definition.id : undefined;
 };
 
 export const resolveRunModel = async (ctx: Pick<ActionCtx, "runQuery">, model: string, userId: string): Promise<RunModel> => {

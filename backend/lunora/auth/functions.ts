@@ -28,7 +28,7 @@ import roleGuard from "./lib/role-guard";
 import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
-import { eligibleBackupModel } from "../chat/lib/backup-model";
+import { backupFilterRejection, eligibleBackupModel } from "../chat/lib/backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
 import { normalizeModelNicknames } from "./lib/model-nicknames";
 import { isValidShortcut } from "./lib/shortcut";
@@ -215,16 +215,24 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
                 throw new LunoraError("BAD_REQUEST", "Not a model that can be used as a backup");
             }
 
+            const preferences = await context.db
+                .query("aiUserPreferences")
+                .withIndex("by_userId", (q) => q.eq("userId", userId))
+                .unique();
+
+            // The user's model filters as they stand: the gateway would answer MODEL_BLOCKED for a backup they exclude.
+            const excluded = backupFilterRejection(backup, preferences?.modelFilterRules ?? undefined);
+
+            if (excluded) {
+                throw new LunoraError("BAD_REQUEST", `Your model filters exclude this backup model: ${excluded}`);
+            }
+
             // The run's own gate (`canRunPaidModel`): a backup the plan cannot run would be dropped at run time.
             const allowed = await allowsPaidModel(
                 backup,
                 async () => await readUserRunPlan(context, userId),
                 async () => {
-                    const keys = await context.db
-                        .query("aiUserPreferences")
-                        .withIndex("by_userId", (q) => q.eq("userId", userId))
-                        .unique();
-                    const entry = (keys?.providerApiKeys as Record<string, { enabled?: boolean; encryptedKey?: string }> | undefined)?.[backup.provider];
+                    const entry = (preferences?.providerApiKeys as Record<string, { enabled?: boolean; encryptedKey?: string }> | undefined)?.[backup.provider];
 
                     return Boolean(entry?.enabled && entry.encryptedKey);
                 },

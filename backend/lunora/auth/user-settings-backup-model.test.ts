@@ -5,7 +5,7 @@ import { lunoraTest } from "@lunora/testing";
 import { MODEL_REGISTRY, requiresPaidPlan } from "@neore/ai/models";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getPaidModelAccess, getUserSettings, updateUserSettings } from "./functions";
+import { getPaidModelAccess, getUserSettings, updateAIUserPreferences, updateUserSettings } from "./functions";
 import { schemaWithShardedTables } from "../lib/test-schema";
 
 const USER = "user-backup-model";
@@ -114,6 +114,12 @@ describe("saved backup model", () => {
         await expect(save(paid.id)).rejects.toThrow("needs a Pro plan");
 
         expect(await reload()).toBe(BACKUP);
+    });
+
+    it("refuses a model the user's own model filters exclude", async () => {
+        await asUser().mutation(updateAIUserPreferences as never, { modelFilterRules: { blockedModels: [BACKUP] } } as never);
+
+        await expect(save(BACKUP)).rejects.toThrow("filters exclude");
     });
 
     it("is cleared by an empty string", async () => {

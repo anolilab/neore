@@ -1,4 +1,4 @@
-import { MODEL_LOOKUP, type ModelDefinition } from "@neore/ai/models";
+import { deriveModelRegions, getModelRejectionReason, hasActiveFilters, MODEL_LOOKUP, type ModelDefinition, type ModelFilterRules } from "@neore/ai/models";
 
 /**
  * The registry row of the user's backup model (`userSettings.backupModel`), when
@@ -19,3 +19,12 @@ export const eligibleBackupModel = (backupModel: string | undefined, primaryMode
 
     return definition;
 };
+
+/**
+ * Why the user's model filters exclude `definition`, or `null`: the rule the gateway answers `MODEL_BLOCKED` with,
+ * evaluated here so a backup the filters would refuse is not picked for a retry that could only fail.
+ */
+export const backupFilterRejection = (definition: ModelDefinition, rules: ModelFilterRules | undefined): string | null =>
+    hasActiveFilters(rules)
+        ? getModelRejectionReason({ modelId: definition.id, provider: definition.provider, regions: deriveModelRegions(definition) }, rules)
+        : null;
