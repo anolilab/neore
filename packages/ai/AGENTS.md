@@ -21,6 +21,7 @@ packages/ai/src/
 │   ├── free-tier.ts      # FREE_TIER_TEXT_MODELS, requiresPaidPlan
 │   ├── custom-model-id.ts
 │   └── index.ts          # Re-exports from above
+├── capabilities/         # What a RUNNER can do (not a model): types, static declarations, gating rules; dependency-free `@neore/ai/capabilities`
 ├── design/               # Design presets, styles, templates, prompt enhancer
 ├── constants/            # e.g. cinema (`@neore/ai/constants/cinema`)
 ├── prompts/              # Prompt templates
