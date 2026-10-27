@@ -22,6 +22,25 @@ describe("GatewayLanguageModel errors", () => {
         await expect(stream.getReader().read()).rejects.toMatchObject({ fallbackReason: "infra", message: "upstream reset" });
     });
 
+    it("doStream closes the gateway response when it errors the stream on an error event", async () => {
+        let cancelled = false;
+        const body = new ReadableStream<Uint8Array>({
+            cancel() {
+                cancelled = true;
+            },
+            start(controller) {
+                controller.enqueue(
+                    new TextEncoder().encode(`data: ${JSON.stringify({ error: "upstream reset", fallbackReason: "infra", type: "error" })}\n\n`),
+                );
+            },
+        });
+        const { stream } = await modelAnswering(new Response(body, { status: 200 })).doStream(OPTIONS);
+
+        await expect(stream.getReader().read()).rejects.toThrow("upstream reset");
+
+        expect(cancelled).toBe(true);
+    });
+
     it("leaves the reason off an error the gateway did not classify", async () => {
         const model = modelAnswering(Response.json({ error: { code: "MODEL_BLOCKED", message: "blocked" } }, { status: 403 }));
         const error = await model.doGenerate(OPTIONS).catch((error_: unknown) => error_);

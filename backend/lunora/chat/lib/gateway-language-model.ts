@@ -397,6 +397,8 @@ export class GatewayLanguageModel implements LanguageModelV3 {
                                     streamError.fallbackReason = parsed.fallbackReason;
                                 }
 
+                                // The gateway is done with this call: close its response so the connection and the work behind it end.
+                                await sseReader.cancel().catch(() => undefined);
                                 controller.error(streamError);
 
                                 return;

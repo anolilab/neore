@@ -265,7 +265,7 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
     }
 
     if (settings) {
-        await context.db.patch(settings._id, toStore);
+        await context.db.patch(settings._id, withoutUndefined(toStore));
     } else {
         await context.db.insert(tableName, {
             userId,

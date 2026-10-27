@@ -139,6 +139,38 @@ describe("FallbackLanguageModel", () => {
         expect(backup.doStream).toHaveBeenCalledTimes(1);
     });
 
+    it("cancels the abandoned primary stream before the backup starts", async () => {
+        const order: string[] = [];
+        const primary = fakeModel("primary");
+
+        primary.doStream.mockResolvedValue({
+            stream: {
+                getReader: () => {
+                    return {
+                        cancel: async () => {
+                            order.push("cancel");
+                        },
+                        read: async () => {
+                            throw gatewayError("infra");
+                        },
+                    };
+                },
+            },
+        });
+
+        const backup = fakeModel("backup");
+
+        backup.doStream.mockImplementation(async () => {
+            order.push("backup");
+
+            return { stream: new ReadableStream({ start: (controller) => controller.close() }) };
+        });
+
+        await new FallbackLanguageModel(primary, backup).doStream(OPTIONS);
+
+        expect(order).toEqual(["cancel", "backup"]);
+    });
+
     it("does not replay a stream that fails after content was handed on", async () => {
         const primary = fakeModel("primary");
 

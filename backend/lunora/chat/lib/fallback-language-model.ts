@@ -202,6 +202,8 @@ export class FallbackLanguageModel implements LanguageModelV3 {
                 throw error;
             }
 
+            // Release the abandoned primary stream before the backup starts.
+            await reader.cancel().catch(() => undefined);
             this.switchToBackup(error);
 
             return await this.backup.doStream(this.optionsForBackup(options));
