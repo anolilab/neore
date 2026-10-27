@@ -297,7 +297,7 @@ mod confined {
 mod confined {
     use super::{outside_roots, within_roots, Listing, Open};
     use std::ffi::OsString;
-    use std::fs::{self, File, OpenOptions};
+    use std::fs::{File, OpenOptions};
     use std::io;
     use std::os::windows::ffi::OsStringExt;
     use std::os::windows::fs::OpenOptionsExt;
@@ -305,8 +305,10 @@ mod confined {
     use std::path::{Path, PathBuf};
 
     use windows_sys::Win32::Storage::FileSystem::{
-        FileDispositionInfo, GetFinalPathNameByHandleW, SetFileInformationByHandle,
-        FILE_DISPOSITION_INFO,
+        FileDispositionInfo, FileIdBothDirectoryInfo, FileIdBothDirectoryRestartInfo,
+        GetFileInformationByHandleEx, GetFinalPathNameByHandleW, SetFileInformationByHandle,
+        FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT, FILE_DISPOSITION_INFO,
+        FILE_ID_BOTH_DIR_INFO,
     };
 
     const DELETE: u32 = 0x0001_0000;
@@ -416,31 +418,87 @@ mod confined {
         }
     }
 
+    /// Lists the folder through the handle that was checked, so there is no second path to resolve. The directory
+    /// info classes report attributes without following anything: a reparse point is listed as a link.
     pub fn entries(roots: &[PathBuf], path: &Path, max: usize) -> io::Result<Listing> {
-        // Held open (no delete/rename sharing) while the folder is read, so it cannot be moved meanwhile.
         let dir = options(false).open(path)?;
-        let real = confirm(&dir, roots)?;
+
+        confirm(&dir, roots)?;
+
+        // 8-byte aligned, as the entries are.
+        let mut buffer = vec![0u64; 8192];
+        let mut class = FileIdBothDirectoryRestartInfo;
         let mut listed = Vec::new();
         let mut truncated = false;
 
-        for entry in fs::read_dir(real)?.flatten() {
-            if listed.len() >= max {
-                truncated = true;
-                break;
+        'read: loop {
+            // SAFETY: the handle is open and the buffer is writable for the length passed.
+            let read = unsafe {
+                GetFileInformationByHandleEx(
+                    dir.as_raw_handle(),
+                    class,
+                    buffer.as_mut_ptr().cast(),
+                    (buffer.len() * 8) as u32,
+                )
+            };
+
+            if read == 0 {
+                let error = io::Error::last_os_error();
+
+                // ERROR_NO_MORE_FILES: the end of the folder.
+                return if error.raw_os_error() == Some(18) {
+                    Ok((listed, truncated))
+                } else {
+                    Err(error)
+                };
             }
 
-            let kind = match entry.file_type() {
-                Ok(kind) if kind.is_symlink() => "symlink",
-                Ok(kind) if kind.is_dir() => "dir",
-                Ok(_) => "file",
-                Err(_) => "unknown",
-            };
-            let size = entry.metadata().map(|meta| meta.len()).unwrap_or(0);
+            class = FileIdBothDirectoryInfo;
 
-            listed.push((entry.file_name().to_string_lossy().into_owned(), kind, size));
+            let mut offset = 0usize;
+
+            loop {
+                // SAFETY: the system wrote a chain of `FILE_ID_BOTH_DIR_INFO` records; each offset stays inside it.
+                let entry = unsafe {
+                    &*buffer
+                        .as_ptr()
+                        .cast::<u8>()
+                        .add(offset)
+                        .cast::<FILE_ID_BOTH_DIR_INFO>()
+                };
+                // SAFETY: `FileNameLength` bytes of UTF-16 follow the fixed part, inside the buffer.
+                let name = unsafe {
+                    std::slice::from_raw_parts(
+                        std::ptr::addr_of!(entry.FileName).cast::<u16>(),
+                        entry.FileNameLength as usize / 2,
+                    )
+                };
+                let name = String::from_utf16_lossy(name);
+
+                if name != "." && name != ".." {
+                    if listed.len() >= max {
+                        truncated = true;
+                        break 'read;
+                    }
+
+                    let kind = if entry.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+                        "symlink"
+                    } else if entry.FileAttributes & FILE_ATTRIBUTE_DIRECTORY != 0 {
+                        "dir"
+                    } else {
+                        "file"
+                    };
+
+                    listed.push((name, kind, entry.EndOfFile.max(0) as u64));
+                }
+
+                if entry.NextEntryOffset == 0 {
+                    break;
+                }
+
+                offset += entry.NextEntryOffset as usize;
+            }
         }
-
-        drop(dir);
 
         Ok((listed, truncated))
     }
