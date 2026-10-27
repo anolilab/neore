@@ -82,7 +82,12 @@ pattern. Writes into host-run threads are refused server-side, in
   `applyKeyRateLimit` with the route's read or write flag, and idempotency, then
   `handleOnShard`. One code path for REST and MCP.
 - A tool's optional `idempotencyKey` argument feeds the same store as the
-  `Idempotency-Key` header.
+  `Idempotency-Key` header. That store checks and then writes, so two simultaneous first
+  calls with one key can both run. Write tools therefore also take a claim-once
+  (`claimOnce`, scope `mcp-write`, keyed on the API key id and the idempotency key)
+  before the handler; the second concurrent call is answered `in_progress` and retries to
+  read the stored result. Acceptance: two simultaneous `send_message` calls with one key
+  create one message.
 
 | Tool | Route | Scope | Slice |
 | --- | --- | --- | --- |
@@ -116,7 +121,12 @@ pattern. Writes into host-run threads are refused server-side, in
   `ask` tool answers `waiting_on_person` within one poll, not after the deadline;
   a later `read_messages` shows the reply once the person has answered.
   Messages from an outside agent are recorded as such, and a run it starts never
-  gets more than `ask` for its tools.
+  gets more than `ask` for its tools. That ceiling is enforced in the backend, not
+  by the tool text: `startChat` in `routes.ts` passes an `origin: "api-key"` flag into
+  `runChatStart`, which stores it on the run; tool construction for such a run turns
+  every `auto` tool into `ask` and drops device and host tools, whatever the user's
+  own overrides say. Acceptance: for a user whose tools are set to run automatically,
+  a run started over `POST /api/v1/chat` or MCP has no `auto` tool and no device tool.
 
 ### What an outside agent may not do
 

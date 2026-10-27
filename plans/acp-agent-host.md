@@ -294,7 +294,10 @@ the folder and refers to it in its reply. Rules:
   domain. The create has no upload id yet (the handler mints it), so it is signed over the
   method, the path, the declared size and type, a nonce and the issue time; the nonce is
   claim-once, so a replayed create is refused. `HEAD` and `PATCH` are signed over the
-  method, the server-issued upload id and the issue time. The route resolves the device's user from the signature, builds its
+  method, the server-issued upload id and the issue time; a `PATCH` is also signed over its
+  `Upload-Offset` and the SHA-256 of its body, and the route checks both against the request
+  before the handler sees it (a modified chunk or offset under an otherwise valid signature is
+  refused, with a test). The route resolves the device's user from the signature, builds its
   handler for that user exactly as for a session caller, and answers another user's
   upload id as not found. No user session or API key is ever handed to the desktop,
   and none reaches the agent. The ingest carries only the resulting
