@@ -11737,6 +11737,9 @@
                         ],
                         "type": "object"
                       },
+                      "lastUserMessageAt": {
+                        "type": "number"
+                      },
                       "lockedAt": {
                         "type": "number"
                       },
@@ -12198,6 +12201,9 @@
                       },
                       "isPublic": {
                         "type": "boolean"
+                      },
+                      "lastUserMessageAt": {
+                        "type": "number"
                       },
                       "lockedAt": {
                         "type": "number"
@@ -39154,6 +39160,9 @@
                       "name": {
                         "type": "string"
                       },
+                      "quietWhenEmpty": {
+                        "type": "boolean"
+                      },
                       "searchMode": {
                         "type": "string"
                       },
@@ -39164,6 +39173,68 @@
                         "type": "string"
                       },
                       "type": {},
+                      "webhookPreset": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "event": {
+                                "anyOf": [
+                                  {
+                                    "const": "pull_request_opened",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "pull_request_merged",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "pull_request_review_requested",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "issue_assigned",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "provider": {
+                                "const": "github",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "event",
+                              "provider"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "event": {
+                                "anyOf": [
+                                  {
+                                    "const": "merge_request_opened",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "merge_request_merged",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "provider": {
+                                "const": "gitlab",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "event",
+                              "provider"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
                       "webhookSignatureScheme": {
                         "anyOf": [
                           {
@@ -39172,6 +39243,10 @@
                           },
                           {
                             "const": "native",
+                            "type": "string"
+                          },
+                          {
+                            "const": "gitlab-token",
                             "type": "string"
                           }
                         ]
@@ -39633,6 +39708,9 @@
                       },
                       "name": {
                         "type": "string"
+                      },
+                      "quietWhenEmpty": {
+                        "type": "boolean"
                       },
                       "searchMode": {
                         "type": "string"

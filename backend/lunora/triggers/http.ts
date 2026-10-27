@@ -29,20 +29,44 @@ import type { HttpActionCtx } from "lunorash/server";
  * A native signature carries no timestamp, so the ONLY replay defence is the same
  * signature-keyed claim, and it lasts as long as the claim does:
  * `TRIGGER_CLAIM_TTL_MS`. A body-only request replayed after that window is
- * accepted again. Nothing outside the signed bytes (a delivery-id header, say) is
- * ever trusted: it is not covered by the signature, so a claim keyed on it would
- * let anyone replay a captured body under a fresh id.
+ * accepted again. For these two schemes nothing outside the signed bytes (a
+ * delivery-id header, say) is ever trusted: it is not covered by the signature, so
+ * a claim keyed on it would let anyone replay a captured body under a fresh id.
+ *
+ * One more sender, with its own scheme (`triggers/presets.ts`):
+ *   gitlab-token: X-Gitlab-Token: <secret>, sent as plain text, plus
+ *                 X-Gitlab-Event-UUID: <uuid>. GitLab does not sign the body and sends
+ *                 no timestamp, so the token is a BEARER credential and the only thing
+ *                 that can mark a delivery as seen is the UUID. A delivery without one
+ *                 is refused (401, after the token check). The UUID is unsigned, so it
+ *                 is no defence against a holder of the token, who can forge any body
+ *                 under any id anyway; it closes the replay of a CAPTURED delivery,
+ *                 which repeats the UUID. Each accepted delivery is claimed
+ *                 (`lib/claim-once.ts`) for `TRIGGER_DELIVERY_CLAIM_TTL_MS`, effectively
+ *                 for the trigger's life, keyed on the UUID AND the SHA-256 of the body:
+ *                 GitLab documents that recursive webhooks share one event UUID, so the
+ *                 UUID alone would refuse a distinct delivery. That claim replaces the
+ *                 15-minute body claim, which it makes redundant. A delivery that does
+ *                 not run (filtered, refused at admission, failed before the agent
+ *                 started) gives the claim back so a redelivery runs. A claim keyed on
+ *                 the token would swallow every delivery after the first.
+ *
+ * A missing or empty secret is refused for every scheme (fail closed).
  */
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
-import { TRIGGER_CLAIM_TTL_MS } from "../lib/claim-once";
-import { hmacSha256Hex, isWithinWindow, SIGNED_REQUEST_WINDOW_MS, timingSafeEqual } from "../lib/crypto";
+import { releaseRetryDelayMs, TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
+import { hmacSha256Hex, isWithinWindow, SIGNED_REQUEST_WINDOW_MS, secretsMatch, sha256Hex, timingSafeEqual } from "../lib/crypto";
 import { decryptKey } from "../lib/encryption";
 import { httpScheduler } from "../lib/http-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { decodeStrict, evaluateFilters, MAX_WEBHOOK_BODY_BYTES } from "./filters";
+import type { WebhookSignatureScheme } from "./validators";
 
 const DIGITS_ONLY = /^\d{1,12}$/u;
+
+/** Longest `X-Gitlab-Event-UUID` accepted; GitLab sends 36 characters. */
+const MAX_DELIVERY_ID_LENGTH = 128;
 
 /** `X-Hub-Signature-256` is always `sha256=<64 hex>`; anything else is refused before any HMAC work. */
 const NATIVE_SIGNATURE = /^sha256=[\da-f]{64}$/iu;
@@ -157,10 +181,12 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 
         const body = new TextDecoder().decode(rawBody);
 
-        // 3. Verify the HMAC-SHA256 signature. A trigger without a secret
-        //    (legacy rows) is refused: unsigned delivery is no delivery.
+        // 3. Verify the delivery against the trigger's scheme. A trigger without a
+        //    secret (legacy rows) is refused: unsigned delivery is no delivery.
         const encryptedSecret = trigger.webhookSecret;
-        const delivery = readSignedDelivery(request.headers, rawBody, trigger.webhookSignatureScheme ?? "timestamped");
+        const schemeName = trigger.webhookSignatureScheme ?? "timestamped";
+        const scheme = SCHEMES[schemeName];
+        const delivery = readDelivery(request.headers, rawBody, schemeName);
 
         if (!encryptedSecret || "error" in delivery) {
             return Response.json(
@@ -169,13 +195,16 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
             );
         }
 
-        const { presented, signedPayload } = delivery;
-
         // Decrypt the stored secret (supports both encrypted v1: and legacy plaintext)
         const plaintextSecret = encryptedSecret.startsWith("v1:") ? await decryptKey(encryptedSecret, "tool-keys") : encryptedSecret;
 
-        if (!(await verifyHmacSignature(plaintextSecret, signedPayload, presented))) {
+        if (!(await scheme.verify(delivery, plaintextSecret))) {
             return Response.json({ error: "Invalid signature" }, { headers: { "Content-Type": "application/json" }, status: 401 });
+        }
+
+        // Only once the sender is proven, so an unauthenticated caller learns nothing about it.
+        if (scheme.requiresDeliveryId && (!delivery.deliveryId || delivery.deliveryId.length > MAX_DELIVERY_ID_LENGTH)) {
+            return Response.json({ error: MISSING_DELIVERY_ID }, { headers: { "Content-Type": "application/json" }, status: 401 });
         }
 
         // Capped per trigger only once the sender is proven. Charged before the
@@ -187,21 +216,12 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
             return Response.json({ error: "Too many requests" }, { headers: { "Content-Type": "application/json" }, status: 429 });
         }
 
-        // A valid signature seen before is a replay: answer 200 (the sender did
-        // deliver it once) and run nothing.
-        const claimKey = { key: `${triggerId}:${normalizeSignature(presented)}`, scope: "trigger-webhook" };
-        const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, {
-            ...claimKey,
-            ttlMs: TRIGGER_CLAIM_TTL_MS,
-            userId: trigger.userId,
-        });
+        // A delivery seen before is a replay: answer 200 (the sender did deliver it once) and run nothing.
+        const taken = await takeReplayGuard(context, { delivery, rawBody, scheme, trigger, triggerId });
 
-        if (claimedAt === null) {
+        if (taken === null) {
             return Response.json({ duplicate: true, ok: true }, { headers: { "Content-Type": "application/json" }, status: 200 });
         }
-
-        // Every release names the claim it took: a step that outlives the TTL must not clear a redelivery's replacement.
-        const claim = { ...claimKey, claimedAt };
 
         // 4. Payload filters, on the body only now that its signature is proven. A
         //    filtered delivery RELEASES its claim once recorded: the owner may fix the
@@ -209,7 +229,7 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         //    replay must be evaluated again. A replay that still misses writes only the
         //    one collapsed history row. It runs nothing, so it is not charged
         //    (`admitTriggerRun` lives in the execution) and does not count as a run.
-        //    The claim travels to the execution, which gives it back too if admission
+        //    The claim (or delivery record) travels to the execution, which gives it back too if admission
         //    refuses the delivery against filters saved after this check.
         //    202, not 200: the delivery was accepted and deliberately not acted on.
         //    The body is decoded strictly for this: the lossy decode above turns invalid
@@ -226,12 +246,12 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
                     triggerId: triggerId as Id<"triggers">,
                 });
             } catch (error) {
-                await context.runMutation(internal.lib.claim_once.releaseKey, claim);
+                await taken.giveBack();
 
                 throw error;
             }
 
-            await context.runMutation(internal.lib.claim_once.releaseKey, claim);
+            await taken.giveBack();
 
             return Response.json(
                 {
@@ -249,13 +269,13 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         //    this same delivery reads as a replay, and it never runs at all.
         try {
             await httpScheduler(context).runAfter(0, internal.triggers.execute.executeTrigger, {
-                claim,
+                ...taken.args,
                 invalidUtf8: strictBody === null ? true : undefined,
                 payload: body || undefined,
                 triggerId: triggerId as Id<"triggers">,
             });
         } catch (error) {
-            await context.runMutation(internal.lib.claim_once.releaseKey, claim);
+            await taken.giveBack();
 
             throw error;
         }
@@ -282,43 +302,167 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 
 const MISSING_SIGNATURE = "Missing or invalid signature headers";
 
-type SignedDelivery = { presented: string; signedPayload: Uint8Array } | { error: string };
+const MISSING_DELIVERY_ID = "Missing or invalid delivery identifier";
+
+/** What a delivery presented, and the bytes its credential covers. */
+interface Delivery {
+    /** The sender's own identifier for the delivery, when its scheme carries one (`requiresDeliveryId`). */
+    deliveryId?: string;
+    presented: string;
+    signedPayload: Uint8Array;
+}
+
+/** What one signature scheme does with a request. The handler looks the trigger's scheme up here and checks none by name. */
+interface SchemeHandler {
+    /** The headers this scheme owns. A trigger refuses a request carrying any header of a scheme it does not use. */
+    headers: ReadonlyArray<string>;
+    /** Read the credential and the bytes it covers, or say why the request is refused. Timestamps are checked here. */
+    read: (headers: Headers, body: Uint8Array) => Delivery | { error: string };
+    /**
+     * The credential is the same on every delivery, so the sender's delivery id is the only replay defence:
+     * a verified delivery without one is refused, and each accepted one is recorded for the trigger's life.
+     */
+    requiresDeliveryId?: boolean;
+    /** Whether the delivery proves knowledge of the secret. */
+    verify: (delivery: Delivery, secret: string) => Promise<boolean>;
+}
+
+const verifyHmac = async (delivery: Delivery, secret: string): Promise<boolean> =>
+    await verifyHmacSignature(secret, delivery.signedPayload, delivery.presented);
+
+/** One handler per scheme. The record type is exhaustive, so a scheme added to the validator fails to compile until it has one. */
+const SCHEMES: Record<WebhookSignatureScheme, SchemeHandler> = {
+    "gitlab-token": {
+        // Not in `headers`: that list marks a request as another scheme's, and the UUID is only read here.
+        headers: ["x-gitlab-token"],
+        read: (headers, body) => {
+            const token = headers.get("x-gitlab-token");
+            const deliveryId = headers.get("x-gitlab-event-uuid")?.trim();
+
+            // A token signs nothing; the body rides along only so the shape is shared.
+            return token ? { deliveryId: deliveryId || undefined, presented: token, signedPayload: body } : { error: MISSING_SIGNATURE };
+        },
+        requiresDeliveryId: true,
+        // Compared through hashes, so neither the content nor the length of the secret leaks.
+        verify: async (delivery, secret) => await secretsMatch(delivery.presented, secret),
+    },
+    native: {
+        headers: ["x-hub-signature-256"],
+        read: (headers, body) => {
+            const native = headers.get("x-hub-signature-256");
+
+            return native && NATIVE_SIGNATURE.test(native) ? { presented: native, signedPayload: body } : { error: MISSING_SIGNATURE };
+        },
+        verify: verifyHmac,
+    },
+    timestamped: {
+        headers: ["x-signature-256", "x-neore-timestamp"],
+        read: (headers, body) => {
+            const signature = headers.get("x-signature-256");
+            const timestamp = headers.get("x-neore-timestamp");
+
+            if (!signature || !timestamp || !DIGITS_ONLY.test(timestamp)) {
+                return { error: MISSING_SIGNATURE };
+            }
+
+            if (!isWithinWindow(Number(timestamp) * 1000, SIGNED_REQUEST_WINDOW_MS)) {
+                return { error: "Stale or future timestamp" };
+            }
+
+            const prefix = new TextEncoder().encode(`${timestamp}.`);
+            const signedPayload = new Uint8Array(prefix.byteLength + body.byteLength);
+
+            signedPayload.set(prefix);
+            signedPayload.set(body, prefix.byteLength);
+
+            return { presented: signature, signedPayload };
+        },
+        verify: verifyHmac,
+    },
+};
+
+/** What a delivery took to be accepted once: how the execution gives it back, and how this handler does. */
+interface ReplayGuard {
+    /** Handed to `executeTrigger`, which gives the claim back if admission refuses the delivery. */
+    args: { claim: { claimedAt: number; key: string; scope: string }; releaseUnlessRun?: true };
+    giveBack: () => Promise<void>;
+}
 
 /**
- * Read the signature the trigger's configured scheme expects, and say what was
- * signed. A request carrying the OTHER scheme's headers is refused outright, so
- * one scheme's signature is never tried as the other's. The timestamp is checked
- * here; the HMAC itself by the caller.
+ * Takes the once-only claim of a verified delivery, or answers `null` when it was taken before. A scheme that
+ * requires a delivery id claims it with the body's digest for `TRIGGER_DELIVERY_CLAIM_TTL_MS` (effectively
+ * permanent) and gives it back whenever the delivery does not run; the others claim their signature for
+ * `TRIGGER_CLAIM_TTL_MS`.
  */
-const readSignedDelivery = (headers: Headers, body: Uint8Array, scheme: "native" | "timestamped"): SignedDelivery => {
-    const signature = headers.get("x-signature-256");
-    const timestamp = headers.get("x-neore-timestamp");
-    const native = headers.get("x-hub-signature-256");
+const takeReplayGuard = async (
+    context: HttpActionCtx,
+    {
+        delivery,
+        rawBody,
+        scheme,
+        trigger,
+        triggerId,
+    }: { delivery: Delivery; rawBody: Uint8Array; scheme: SchemeHandler; trigger: WebhookTrigger; triggerId: string },
+): Promise<ReplayGuard | null> => {
+    let claimKey: { key: string; scope: string };
+    let ttlMs = TRIGGER_CLAIM_TTL_MS;
 
-    if (scheme === "native") {
-        if (signature !== null || timestamp !== null || !native || !NATIVE_SIGNATURE.test(native)) {
-            return { error: MISSING_SIGNATURE };
+    if (scheme.requiresDeliveryId) {
+        // The handler refused a delivery without one before getting here.
+        if (!delivery.deliveryId) {
+            throw new Error("A delivery id is required");
         }
 
-        return { presented: native, signedPayload: body };
+        // The body is in the key because GitLab documents that recursive webhooks share one event UUID.
+        // The trigger id leads, so deleting the trigger can find its claims.
+        claimKey = { key: `${triggerId}:${delivery.deliveryId}:${await sha256Hex(rawBody)}`, scope: TRIGGER_DELIVERY_SCOPE };
+        ttlMs = TRIGGER_DELIVERY_CLAIM_TTL_MS;
+    } else {
+        claimKey = { key: `${triggerId}:${normalizeSignature(delivery.presented)}`, scope: "trigger-webhook" };
     }
 
-    if (native !== null || !signature || !timestamp || !DIGITS_ONLY.test(timestamp)) {
-        return { error: MISSING_SIGNATURE };
+    const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, { ...claimKey, ttlMs, userId: trigger.userId });
+
+    if (claimedAt === null) {
+        return null;
     }
 
-    if (!isWithinWindow(Number(timestamp) * 1000, SIGNED_REQUEST_WINDOW_MS)) {
-        return { error: "Stale or future timestamp" };
-    }
+    // Every release names the claim it took: a step that outlives the TTL must not clear a redelivery's replacement.
+    const claim = { ...claimKey, claimedAt };
 
-    const prefix = new TextEncoder().encode(`${timestamp}.`);
-    const signedPayload = new Uint8Array(prefix.byteLength + body.byteLength);
+    const permanent = scheme.requiresDeliveryId === true;
 
-    signedPayload.set(prefix);
-    signedPayload.set(body, prefix.byteLength);
+    return {
+        args: permanent ? { claim, releaseUnlessRun: true } : { claim },
+        giveBack: async () => {
+            try {
+                await context.runMutation(internal.lib.claim_once.releaseKey, claim);
+            } catch (error) {
+                if (!permanent) {
+                    throw error;
+                }
 
-    return { presented: signature, signedPayload };
+                // A permanent claim must not be left behind: schedule the release again (it is idempotent), and still fail
+                // this request so the sender retries rather than being told 2xx for work that did not run.
+                await httpScheduler(context).runAfter(releaseRetryDelayMs(1), internal.lib.claim_once.retryReleaseKey, { ...claim, attempt: 1 });
+
+                throw error;
+            }
+        },
+    };
 };
+
+/** Whether a header of a scheme OTHER than `scheme` is on the request. */
+const carriesForeignHeader = (headers: Headers, scheme: WebhookSignatureScheme): boolean =>
+    (Object.keys(SCHEMES) as WebhookSignatureScheme[]).some((other) => other !== scheme && SCHEMES[other].headers.some((name) => headers.has(name)));
+
+/**
+ * Read what the trigger's scheme expects. A request carrying another scheme's
+ * headers is refused outright, so one scheme's credential is never tried as
+ * another's. Every HMAC and token comparison is left to the scheme's `verify`.
+ */
+const readDelivery = (headers: Headers, body: Uint8Array, scheme: WebhookSignatureScheme): Delivery | { error: string } =>
+    carriesForeignHeader(headers, scheme) ? { error: MISSING_SIGNATURE } : SCHEMES[scheme].read(headers, body);
 
 /** `sha256=<hex>` or bare hex, lower-cased — also the dedupe key. */
 const normalizeSignature = (signature: string): string => (signature.startsWith("sha256=") ? signature.slice(7) : signature).toLowerCase();

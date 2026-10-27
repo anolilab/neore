@@ -53,13 +53,35 @@ Receive HTTP POST requests from external services (Stripe, GitHub, Zapier, etc.)
 ```
 
 **Security:**
-- All webhook requests are verified using HMAC-SHA256 signature validation
-- Supports both GitHub-style signatures (`sha256=hex`) and raw hex format
+- Every request must be signed, and a trigger accepts only the headers of its own signature scheme. A request carrying the headers of another scheme is rejected, even when its own signature is valid
+- **Neore (timestamped)**, the default: send `X-Neore-Timestamp` (Unix seconds) and `X-Signature-256: sha256=<hex>`, the HMAC-SHA256 of `<timestamp>.<raw body>` keyed with the secret. Requests more than 5 minutes off are rejected, and each signature is accepted once
+- **GitHub-style (`X-Hub-Signature-256`)**: `sha256=<hex>`, the HMAC-SHA256 of the raw body keyed with the secret. It carries no timestamp, so a captured request can be replayed once the 15-minute duplicate window has passed
+- **GitLab secret token (`X-Gitlab-Token`)**: see [Provider presets](#provider-presets)
+- The scheme is chosen when the trigger is created, together with its secret, and cannot be changed afterwards
 - Requests without a valid signature are rejected
 
 **Payload handling:**
 - The webhook body is passed to the AI as context
 - You can define a **payload template** to transform or filter the incoming data before it reaches the AI
+
+#### Provider presets
+
+Instead of writing payload filters by hand, a webhook trigger can start from a provider and one of its events. Pick the provider under **Source** and the event under **Event**; Neore sets the payload filters and the signature scheme for you, and only that provider's own deliveries for that event run.
+
+| Provider | Events | Signature |
+|---|---|---|
+| GitHub | Pull request opened, pull request merged, review requested on a pull request, issue assigned | `X-Hub-Signature-256` (GitHub-style) |
+| GitLab | Merge request opened, merge request merged | `X-Gitlab-Token` |
+
+A preset is a shortcut and nothing more: the trigger stores the resulting filters and scheme, exactly as a hand-written trigger does. Events whose payload cannot be told apart from a neighbouring event by its body alone are not offered.
+
+Set the secret shown when you create the trigger as the **secret** of the provider's webhook (for GitLab, the **Secret token** field), and the trigger's URL as the target.
+
+##### GitLab secret token
+
+GitLab does not sign the request body. It sends the secret you configured, as plain text, in the `X-Gitlab-Token` header, and sends no timestamp. Neore compares it in constant time, but it is a **bearer token**: whoever holds the secret can send any request to the trigger.
+
+Every GitLab delivery also carries an `X-Gitlab-Event-UUID` header. A delivery without one is refused with `401`. Neore remembers each accepted delivery, by that identifier and the body, for as long as the trigger exists. A delivery that repeats one it already accepted, however long ago, is answered `200` with `{"duplicate": true}` and does not run again, so a captured request cannot be sent again. Deliveries that differ in either the identifier or the body both run. A delivery that did not run (it missed the trigger's filters, or was refused for the daily limit or an unavailable model) is not remembered, so GitLab's retry of it can still run. The identifier is not signed, so this does not stop someone who holds the secret, who can send any request under a new identifier. Treat the secret like a password, and rotate it by creating a new trigger if it leaks. Deleting the trigger deletes these records.
 
 ### Event (not available)
 
@@ -142,8 +164,9 @@ Schedule the AI to draft a weekly newsletter or social media posts on a recurrin
 
 **Issue:** Webhook returns 401 or signature validation fails
 - **Solution:** Ensure the signing secret in the external service matches the one shown in Neore
-- **Solution:** For GitHub webhooks, set the secret in the webhook settings — GitHub uses `sha256=hex` format which is supported automatically
-- **Solution:** Verify the external service is sending the signature in the `X-Hub-Signature-256` or similar header
+- **Solution:** For GitHub webhooks, set the secret in the webhook settings and use the GitHub provider preset (or the GitHub-style signature) — GitHub's `sha256=hex` format is supported
+- **Solution:** For GitLab webhooks, enter the secret as the **Secret token** and use the GitLab provider preset (or the GitLab secret token signature)
+- **Solution:** Verify the external service sends only the headers of the trigger's signature scheme — a request that also carries another scheme's header (for example `X-Gitlab-Token` on a GitHub-style trigger) is rejected
 
 **Issue:** Trigger fires but the AI response is empty or unhelpful
 - **Solution:** Add a detailed system prompt to guide the AI's behavior

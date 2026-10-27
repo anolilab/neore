@@ -233,6 +233,11 @@ export class Agent<
             summary?: string;
 
             /**
+             * System labels written with the thread's first insert, so a reader never sees it untagged.
+             */
+            tags?: string[];
+
+            /**
              * The title of the thread. Not currently used for anything.
              */
             title?: string;
@@ -263,6 +268,11 @@ export class Agent<
             summary?: string;
 
             /**
+             * System labels written with the thread's first insert, so a reader never sees it untagged.
+             */
+            tags?: string[];
+
+            /**
              * The title of the thread. Not currently used for anything.
              */
             title?: string;
@@ -276,7 +286,7 @@ export class Agent<
     ): Promise<{ threadId: string }>;
     async createThread(
         context: (ActionContext & CustomContext) | MutationContext,
-        args?: { summary?: string; title?: string; userId: string | null },
+        args?: { summary?: string; tags?: string[]; title?: string; userId: string | null },
     ): Promise<{ thread?: Thread<AgentTools>; threadId: string }> {
         const threadId = await createThread(context, this.component, args);
 
@@ -631,6 +641,7 @@ export class Agent<
     ) {
         const { messages } = await this.saveMessages(ctx, {
             embeddings: args.embedding ? { model: args.embedding.model, vectors: [args.embedding.vector] } : undefined,
+            fromUser: args.fromUser,
             messages: args.prompt === undefined ? [args.message] : [{ content: args.prompt, role: "user" }],
             metadata: args.metadata ? [args.metadata] : undefined,
             pendingMessageId: args.pendingMessageId,

@@ -234,7 +234,7 @@ const renderSettings = (): void => {
 
     ($("require-sandbox") as HTMLInputElement).checked = view.requireShellSandbox;
     ($("allow-network") as HTMLInputElement).checked = view.allowShellNetwork;
-    const network = view.allowShellNetwork ? "allowed" : "blocked where the sandbox can enforce it (macOS). Linux and Windows do not restrict it";
+    const network = view.allowShellNetwork ? "allowed" : "blocked where the sandbox can enforce it (macOS and Linux). Windows does not restrict it";
     const unsandboxed = view.requireShellSandbox ? "Shell commands are refused." : "Shell commands run with your full access.";
 
     setText(
