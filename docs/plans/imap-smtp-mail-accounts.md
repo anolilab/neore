@@ -246,6 +246,14 @@ Three things the plan has to be precise about:
    to type it; (c) if DoH resolution is acceptable, resolve first and check the
    addresses, noting a TOCTOU window; (d) default to the provider-preset hosts
    and require an explicit confirmation step for a custom host.
+
+   **This is a gate, not a preference.** Even the stage 1 save flow performs a
+   login, so it already sends the credential to whatever host was typed. The
+   policy is therefore chosen in stage 0 (§10.3) and stage 1 does not start
+   without it. Until a policy that covers resolved addresses (a verified
+   platform refusal of internal ranges, or (c)) is in place, stage 1 accepts
+   **preset provider hosts only**: the custom-host field is not shown and the
+   API rejects a host that is not on the preset list.
 3. **`lunora dev` can reach loopback and the LAN; a deployed Worker cannot.**
    The guard must stay on in dev. Tests that need a local fake server (§7) use
    an injected socket seam, not a relaxed guard.
@@ -318,9 +326,15 @@ route even without a send tool (§3.3); and a first use that asks is cheap to
 relax later, while a first use that silently reads a mailbox is not cheap to
 walk back.
 
-The user can set `mailList`/`mailRead` to `auto` through the normal
-per-tool setting. "Always allow" on a read is permitted. Reads stay `off`
-headless: a trigger that reads mail unattended is a different feature (§9).
+The normal per-tool setting is keyed by tool, not by account, so on its own an
+`auto` on `mailRead` would cover every mailbox the user connects later. Reads
+are therefore **account-scoped**: `mailAccounts` carries `readMode`
+(`ask` | `auto`, default `ask`), set per account, and `resolveToolPermission`
+treats `auto` for `mailList`/`mailRead` as applying only to the account the call
+names. "Always allow" on a read approval writes that account's `readMode`, not
+the tool's global key. A new account starts at `ask` whatever the user chose for
+another. Reads stay `off` headless: a trigger that reads mail unattended is a
+different feature (§9).
 
 ### 4.3 Send cannot become automatic
 
@@ -338,10 +352,16 @@ headless: a trigger that reads mail unattended is a different feature (§9).
   it (a sub-agent child does not get a send because its parent was approved
   something).
 - **One send per approval.** The approval claim (`tool-approval-claim.ts`)
-  already makes the resume once-only; the send additionally takes a
-  claim-once on `(draftId, revision)` via `lib/claim-once.ts`, so a redelivered
-  continuation cannot send twice. A draft that changed after approval is a
-  different revision and needs approval again.
+  already makes the resume once-only. The send additionally takes a claim-once
+  via `lib/claim-once.ts`, keyed on a **send attempt id** minted when the
+  approval is granted (the approval's own id), not on `(draftId, revision)`.
+  A redelivered continuation carries the same attempt id, finds the claim taken
+  and sends nothing. The draft row moves `draft` -> `sending` (set in the same
+  mutation as the claim) -> `sent`, or -> `unknown` when the outcome is
+  ambiguous (§6). A retry of an unchanged draft in `unknown` needs a **new
+  approval**, which mints a new attempt id and so a new claim; nothing is ever
+  released, so the old attempt can never fire again. A draft that changed after
+  approval is a different revision and needs approval again.
 - Rate limit family `mail/send` (per user per hour/day), checked in the tool
   before the connection is opened.
 - Recipient cap per message and a rule that a draft's `Bcc` is shown.
@@ -353,7 +373,11 @@ from the model's tool arguments: From (the account's confirmed address), To, Cc,
 Bcc, subject, the full body as it will be sent (plain text, plus the HTML
 alternative if any, previewed sanitised), attachments, and whether it is a
 reply (`In-Reply-To` / `References` of the message it answers). Approving
-approves that revision. Edit is possible in the card; an edit bumps the
+approves that revision **and the sender**: `mailDrafts` snapshots
+`fromAddress` and the account's `accountRevision` when approval is granted, and
+`mailSend` refuses (and asks again) if the account's `address`, hosts or
+username have changed since. `address` and the hosts are also not editable
+while a draft of that account is awaiting approval. Edit is possible in the card; an edit bumps the
 revision and returns to approval.
 
 Where the draft's text is partly copied from a received mail, that part is not
@@ -382,7 +406,7 @@ There are two places mail text can land, and the second is easy to miss.
    `mailAccounts` (settings, ciphertext, status) and `mailDrafts` (below) only.
    No header cache, no body cache, no attachment store. Headers are fetched
    live.
-2. **The conversation.** A `mailRead` result is a tool result, and tool results
+2. **The conversation.** A `mailRead` or `mailList` result is a tool result, and tool results
    are persisted with the assistant message. From there the body reaches
    everything that reads messages: memory extraction, message search and the
    vector index, thread share links, export, branch forks, and the user's own
@@ -392,8 +416,14 @@ There are two places mail text can land, and the second is easy to miss.
       date, message-id, first N characters, `truncated: true`) via the tool's
       output-to-persisted mapping. N is an open question (§10); start at 2,000
       characters.
+    - **Every mail tool, not only `mailRead`.** `mailList` carries private
+      sender, subject, date and flags for many messages. Its persisted form is
+      the same reduced shape (sender, subject, date, message-id per entry,
+      capped at the first 20 entries, `truncated: true`, no snippets), and
+      `mailDraft` / `mailSend` results persist ids and status only, never the
+      body (the draft row is the record).
     - **Mark the part** `source: "mail"` so memory extraction, vector indexing
-      and public share skip it. A share link or public view of a thread that
+      and public share skip it, for the results of all four tools. A share link or public view of a thread that
       contains a mail result must show the part as removed.
     - **Account for thread retention.** A thread is the user's data and follows
       the thread's existing retention and deletion; deleting the thread deletes
@@ -402,8 +432,13 @@ There are two places mail text can land, and the second is easy to miss.
       goes through the file pipeline and its own limits, not into message text.
 3. **Drafts.** `mailDrafts` (`userId`, `accountId`, `threadId`, `to`, `cc`,
    `bcc`, `subject`, `bodyText`, `bodyHtml?`, `inReplyTo?`, `revision`,
-   `status: draft \| sent \| discarded`, timestamps). This is user-authored
-   output, kept so the approval card has something to render. **Retention:**
+   `fromAddress`, `accountRevision`, `attemptId?`,
+   `status: draft \| sending \| sent \| unknown \| discarded`, timestamps). This is user-authored
+   output, kept so the approval card has something to render.
+   **Attachments are rejected in stage 2**: `mailDraft` has no attachment input,
+   the card shows none, and `attachments` is absent from the row until a later
+   stage designs it through the file pipeline (size cap, revision binding,
+   retention). **Retention:**
    drafts are deleted 30 days after last edit, `sent` rows are reduced to
    `{ to count, sentAt, messageId }` after 30 days (kept for the send audit),
    by the existing housekeeping sweep (`lib/shard-housekeeping.ts`
@@ -449,7 +484,7 @@ echo usernames and sometimes more in their error lines, and some echo the
 | Rate limited by the provider                           | IMAP `THROTTLED`/`[LIMIT]`, SMTP 4xx/452             | "The mail provider is limiting requests. Try again in a few minutes."                 | `lastError: "throttled"`, with a backoff before the next attempt                                     |
 | Our own rate limit                                     | `mail/send` or `mail/read` limit                     | The standard rate-limit message.                                                      | none                                                                                                 |
 | Send accepted by SMTP but the Sent copy failed         | `APPEND` error after `250`                           | "Sent. Could not save a copy in Sent."                                                | draft marked `sent`                                                                                  |
-| Send outcome unknown (connection dropped after `DATA`) | No final reply                                       | "Not sure whether it sent. Check your Sent folder before trying again."               | draft `status: "sent"` is **not** set; a retry needs a new approval                                  |
+| Send outcome unknown (connection dropped after `DATA`) | No final reply                                       | "Not sure whether it sent. Check your Sent folder before trying again."               | draft `status: "unknown"`, never `sent`; a retry needs a new approval                                 |
 
 Redaction rules:
 
@@ -575,7 +610,7 @@ added to the PR that ships each stage; a dedicated test mailbox, not a person's.
 
 | Stage | Scope                                                                                                                                                                                                                                                 | Exit criteria                                                                                                                     |
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Decide the §10 questions; spike `cloudflare:sockets` against one provider's IMAP over TLS: connect, verify certificate, `LOGIN`, `SELECT`, one `FETCH`. No product code.                                                                              | A written result on certificate and hostname checks, STARTTLS, port reachability, and library choice.                             |
+| 0     | Decide the §10 questions; spike `cloudflare:sockets` against one provider's IMAP over TLS: connect, verify certificate, `LOGIN`, `SELECT`, one `FETCH`. No product code.                                                                              | A written result on certificate and hostname checks, STARTTLS, port reachability, library choice, and the custom-host policy (§3.2). |
 | 1     | **Read-only, one provider that takes app passwords**, behind a user-level opt-in flag. `mailAccounts`, `mailList`, `mailRead` (`ask`), the connect form with the test-login, failure codes, dev fake transport, GDPR, authz rows. No SMTP, no drafts. | All §8 fake tests green; the real-provider checklist passed; the persisted-result trimming shipped (§5.2); security review of §3. |
 | 2     | **More password providers** (preset list) and **drafts + send**: `mailDraft`, `mailSend` with the approval card, `always` refusal, claim-once, `mail/send` rate limit, Sent-copy append.                                                              | Send abuse tests (§8); the unknown-outcome path verified against a real server; a second reviewer on the approval card.           |
 | 3     | **OAuth (XOAUTH2)** for providers that require it. Reuse the connector flow. Verify each provider's current app-registration and scope policy first.                                                                                                  | Provider review requirements met (§2.2); revoke on delete verified.                                                               |
