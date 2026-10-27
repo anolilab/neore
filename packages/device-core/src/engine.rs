@@ -866,6 +866,7 @@ fn run_action(
     remaining: Duration,
     decision: &'static str,
 ) -> Outcome {
+    let roots = shareable_roots(&state.settings().roots);
     let completed = |output: String| Outcome {
         decision,
         error: None,
@@ -876,18 +877,18 @@ fn run_action(
     };
 
     match action {
-        Action::List(path) => match fs::list(&path) {
+        Action::List(path) => match fs::list(&roots, &path) {
             Ok(listing) => completed(serde_json::to_string_pretty(&listing).unwrap_or_default()),
             Err(error) => Outcome::failed(decision, error),
         },
         Action::Read(path) => {
-            fs::read(&path).map_or_else(|error| Outcome::failed(decision, error), completed)
+            fs::read(&roots, &path).map_or_else(|error| Outcome::failed(decision, error), completed)
         }
         Action::Write {
             content,
             overwrite,
             path,
-        } => fs::write(&path, &content, overwrite)
+        } => fs::write(&roots, &path, &content, overwrite)
             .map_or_else(|error| Outcome::failed(decision, error), completed),
         Action::Shell {
             command,
