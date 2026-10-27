@@ -240,3 +240,27 @@ select {
 #acp-prompt {
     resize: vertical;
 }
+
+#acp-requests {
+    margin: 12px 0;
+    padding: 10px 12px;
+    border: 2px solid var(--accent);
+    border-radius: 6px;
+}
+
+#acp-requests h2 {
+    margin: 0 0 6px;
+}
+
+#acp-requests .request {
+    padding: 6px 0;
+    border-top: 1px solid var(--border);
+}
+
+#acp-requests .line {
+    word-break: break-all;
+}
+
+#acp-requests pre {
+    max-height: 200px;
+}

@@ -14,6 +14,7 @@
 use std::sync::Arc;
 
 use device_core::acp::AcpUpdate;
+use device_core::acp_permission::PermissionRequest;
 use device_core::engine::SettingsUpdate;
 use device_core::envelope::Signed;
 use device_core::{DeviceState, Event};
@@ -42,6 +43,15 @@ where
             .map_err(|error| Error::from_reason(format!("device task failed: {error}")))?
             .map_err(Error::from_reason)
     })
+}
+
+/// A request id from JS: an exact positive integer.
+fn request_id(id: f64) -> Result<u64> {
+    if id.fract() == 0.0 && (1.0..=MAX_SAFE_INTEGER).contains(&id) {
+        Ok(id as u64)
+    } else {
+        Err(Error::from_reason("invalid request id"))
+    }
 }
 
 #[napi]
@@ -205,6 +215,67 @@ impl DeviceCore {
             .map_err(Error::from_reason)?;
 
         to_json(&plan)
+    }
+
+    /// Registers a permission request from a coding agent and resolves with the outcome the agent receives
+    /// (JSON `{"outcome":"selected","optionId":…}` or `{"outcome":"cancelled"}`) once the user has answered it
+    /// in the device window, the session was cancelled, or the request timed out.
+    #[napi]
+    pub fn acp_permission_ask<'env>(
+        &self,
+        env: &'env Env,
+        request: String,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let request: PermissionRequest = serde_json::from_str(&request)
+            .map_err(|_| Error::from_reason("invalid permission request"))?;
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            serde_json::to_string(&state.acp_permission_ask(request))
+                .map_err(|error| error.to_string())
+        })
+    }
+
+    /// The coding-agent requests waiting for the device window (JSON). No "always" option is listed.
+    #[napi]
+    pub fn acp_permissions(&self) -> Result<String> {
+        to_json(&self.state.acp_permissions())
+    }
+
+    /// Answers one request with the agent's own option id. Only "allow once" and "reject once" are accepted.
+    #[napi]
+    pub fn acp_permission_answer(&self, id: f64, option_id: String) -> Result<()> {
+        self.state
+            .acp_permission_answer(request_id(id)?, &option_id)
+            .map_err(Error::from_reason)
+    }
+
+    /// Says no to one request.
+    #[napi]
+    pub fn acp_permission_decline(&self, id: f64) -> Result<()> {
+        self.state
+            .acp_permission_decline(request_id(id)?)
+            .map_err(Error::from_reason)
+    }
+
+    /// Allows exactly the named requests, each once. Resolves how many it answered.
+    #[napi]
+    pub fn acp_permission_answer_batch(&self, ids: Vec<f64>) -> Result<u32> {
+        let ids = ids
+            .into_iter()
+            .map(request_id)
+            .collect::<Result<Vec<u64>>>()?;
+
+        self.state
+            .acp_permission_answer_batch(&ids)
+            .map(|answered| answered as u32)
+            .map_err(Error::from_reason)
+    }
+
+    /// Answers every waiting request of one session cancelled. Call when the session is cancelled or ends.
+    #[napi]
+    pub fn acp_permission_cancel_session(&self, session_id: String) {
+        self.state.acp_permission_cancel_session(&session_id);
     }
 
     /// The most recent audit lines, newest first (each a JSON object).

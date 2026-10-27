@@ -125,7 +125,7 @@ vi.mock("../acp/process", () => {
 });
 
 const { registerDeviceIpc } = await import("./index");
-const { DEVICE_CHANNEL, LOCAL_CHANNEL } = await import("./channels");
+const { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } = await import("./channels");
 
 const SITE_ORIGIN = new URL("https://neore.example");
 const options: DeviceIpcOptions = {
@@ -189,6 +189,12 @@ const invoke = (channel: string, event: IpcEvent, ...args: unknown[]): unknown =
 
 const makeCore = () => {
     return {
+        acpPermissionAnswer: vi.fn(),
+        acpPermissionAnswerBatch: vi.fn(() => 2),
+        acpPermissionAsk: vi.fn(async () => "{\"outcome\":\"cancelled\"}"),
+        acpPermissionCancelSession: vi.fn(),
+        acpPermissionDecline: vi.fn(),
+        acpPermissions: vi.fn(() => "[]"),
         acpSpawnPlan: vi.fn((): string => {
             throw new Error("that folder is not allowed");
         }),
@@ -295,6 +301,10 @@ describe("coding-agent channels", () => {
         LOCAL_CHANNEL.acpCancel,
         LOCAL_CHANNEL.acpClose,
         LOCAL_CHANNEL.acpForget,
+        LOCAL_CHANNEL.acpPermissionAnswer,
+        LOCAL_CHANNEL.acpPermissionAnswerBatch,
+        LOCAL_CHANNEL.acpPermissionDecline,
+        LOCAL_CHANNEL.acpPermissions,
         LOCAL_CHANNEL.acpProbe,
         LOCAL_CHANNEL.acpSend,
         LOCAL_CHANNEL.acpSession,
@@ -317,7 +327,48 @@ describe("coding-agent channels", () => {
 
         expect(core.acpUpdate).not.toHaveBeenCalled();
         expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+        expect(core.acpPermissionAnswer).not.toHaveBeenCalled();
+        expect(core.acpPermissionAnswerBatch).not.toHaveBeenCalled();
         expect(spawnAgent).not.toHaveBeenCalled();
+    });
+
+    it("pass a permission answer to the core as the request id and the agent's option id, and nothing else", () => {
+        invoke(LOCAL_CHANNEL.acpPermissionAnswer, localEvent(), 7, "allow-1");
+        invoke(LOCAL_CHANNEL.acpPermissionDecline, localEvent(), 8);
+        invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), [1, 2]);
+
+        expect(core.acpPermissionAnswer).toHaveBeenCalledWith(7, "allow-1");
+        expect(core.acpPermissionDecline).toHaveBeenCalledWith(8);
+        expect(core.acpPermissionAnswerBatch).toHaveBeenCalledWith([1, 2]);
+    });
+
+    it("let the core's refusal of an always option reach the window", () => {
+        core.acpPermissionAnswer.mockImplementationOnce(() => {
+            throw new Error("\"Always allow\" is not available for coding agents");
+        });
+
+        expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswer, localEvent(), 7, "always")).toThrow("Always allow");
+    });
+
+    it("check the shape of permission answers before they reach the core", () => {
+        for (const id of [0, -1, 1.5, "7", undefined]) {
+            expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswer, localEvent(), id, "allow")).toThrow("device: request id is invalid");
+        }
+
+        expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswer, localEvent(), 7, "")).toThrow("device: option is invalid");
+        expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), [])).toThrow("device: request ids are invalid");
+        expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), [1, "2"])).toThrow("device: request id is invalid");
+        expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), Array.from({ length: 51 }, (_, i) => i + 1))).toThrow("device: request ids are invalid");
+        expect(core.acpPermissionAnswer).not.toHaveBeenCalled();
+        expect(core.acpPermissionAnswerBatch).not.toHaveBeenCalled();
+    });
+
+    it("open the window and notify when an agent asks, without naming the command", () => {
+        fake.coreEmit?.(JSON.stringify({ agent: "Claude", tool: "Run tests", type: "acpPermission" }));
+
+        expect(fake.windows).toHaveLength(1);
+        expect(fake.notifications).toEqual([{ body: "Claude — Run tests", title: "A coding agent is asking for your approval" }]);
+        expect(deviceWindow().webContents.send).toHaveBeenCalledWith(LOCAL_EVENT.acp, undefined);
     });
 
     it("are not on the relay: the site preload's channels carry none of them", () => {

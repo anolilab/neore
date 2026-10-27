@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -277,10 +277,58 @@ test("the device window opens from the site's relay, with its own bridge and not
     }
 });
 
-test("a coding agent is registered, started in a folder and prompted from the device window", async () => {
+/** The device window, with a coding agent registered and the native dialogs answering for the user. */
+const agentWindow = async (app: ElectronApplication, work: string): Promise<{ local: Page; win: Page }> => {
+    const win = await siteWindow(app);
+
+    expect(await app.evaluate(() => (globalThis as { neoreShell?: { device: boolean } }).neoreShell?.device === true), "device-core-node must be built").toBe(true);
+
+    // The native confirmation and the folder picker answer for the user.
+    await app.evaluate(({ dialog }, folder) => {
+        Object.assign(dialog, {
+            showMessageBox: async () => {
+                return { checkboxChecked: false, response: 1 };
+            },
+            showOpenDialog: async () => {
+                return { canceled: false, filePaths: [folder] };
+            },
+        });
+    }, work);
+    await win.evaluate(() => (globalThis as PageGlobal).neoreNative?.device?.openSettings());
+
+    const local = await findPage(app, (url) => url.endsWith("/device-window/device.html"));
+
+    await local.fill("#acp-name", "Fake agent");
+    await local.fill("#acp-command", process.execPath);
+    await local.fill("#acp-args", path.join(appDirectory, "src/acp/testing/fake-agent.mjs"));
+    await local.click("#acp-agent-form button[type=submit]");
+    await expect(local.locator("#acp-agents li")).toContainText("Fake agent");
+
+    return { local, win };
+};
+
+/** What `acpStart` answers for a folder: "started", or the reason it was refused. */
+const startOutcome = (local: Page, folder: string): Promise<string> =>
+    local.evaluate(async (target) => {
+        const api = (globalThis as unknown as { neoreDevice: { acpStart: (key: string, folder: string) => Promise<string> } }).neoreDevice;
+
+        try {
+            await api.acpStart("fake-agent", target);
+
+            return "started";
+        } catch (error) {
+            return (error as Error).message;
+        }
+    }, folder);
+
+const sendPrompt = async (local: Page, prompt: string): Promise<void> => {
+    await local.fill("#acp-prompt", prompt);
+    await local.click("#acp-send");
+};
+
+test("a coding agent runs only in an approved folder, with its environment built and its variables masked", async () => {
     const userData = mkdtempSync(path.join(tmpdir(), "neore-e2e-userdata-"));
     const work = mkdtempSync(path.join(tmpdir(), "neore-e2e-work-"));
-    const fakeAgent = path.join(appDirectory, "src/acp/testing/fake-agent.mjs");
     // The app's own environment holds a Neore variable; the agent must not see it.
     const app = await electron.launch({
         args: [".", `--user-data-dir=${userData}`],
@@ -289,30 +337,13 @@ test("a coding agent is registered, started in a folder and prompted from the de
     });
 
     try {
-        const win = await siteWindow(app);
+        const { local, win } = await agentWindow(app, work);
 
-        expect(await app.evaluate(() => (globalThis as { neoreShell?: { device: boolean } }).neoreShell?.device === true), "device-core-node must be built").toBe(true);
+        // Nothing is approved yet: a start is refused before a process exists.
+        const refused = await startOutcome(local, work);
 
-        // The native confirmation and the folder picker answer for the user.
-        await app.evaluate(({ dialog }, folder) => {
-            Object.assign(dialog, {
-                showMessageBox: async () => {
-                    return { checkboxChecked: false, response: 1 };
-                },
-                showOpenDialog: async () => {
-                    return { canceled: false, filePaths: [folder] };
-                },
-            });
-        }, work);
-        await win.evaluate(() => (globalThis as PageGlobal).neoreNative?.device?.openSettings());
-
-        const local = await findPage(app, (url) => url.endsWith("/device-window/device.html"));
-
-        await local.fill("#acp-name", "Fake agent");
-        await local.fill("#acp-command", process.execPath);
-        await local.fill("#acp-args", fakeAgent);
-        await local.click("#acp-agent-form button[type=submit]");
-        await expect(local.locator("#acp-agents li")).toContainText("Fake agent");
+        expect(refused).toContain("not approved");
+        await expect(local.locator("#acp-sessions li")).toHaveText("None.");
 
         await local.selectOption("#acp-env-scope", "fake-agent");
         await local.fill("#acp-env-name", "ONLY_ME");
@@ -322,23 +353,127 @@ test("a coding agent is registered, started in a folder and prompted from the de
         // Masked in the window: the value is not in the page.
         expect(await local.locator("#acp-env").textContent()).not.toContain("value-xyz-123");
 
-        await local.click("button[aria-label='Start Fake agent in a folder']");
+        await local.fill("#acp-env-name", "NEORE_SNEAKY");
+        await local.fill("#acp-env-value", "x");
+        await local.click("#acp-env-form button[type=submit]");
+        await expect(local.locator("#acp-error")).toContainText("reserved");
+
+        // Approve the folder, then start there.
+        await local.click("button[aria-label='Approve a folder for Fake agent']");
+        await local.click(`button[aria-label^='Start Fake agent in ']`);
         await expect(local.locator("#acp-session-status")).toHaveText("Ready");
 
-        await local.fill("#acp-prompt", "hello");
-        await local.click("#acp-send");
+        await sendPrompt(local, "hello");
         await expect(local.locator("#acp-transcript")).toContainText("Hello world");
 
-        await local.fill("#acp-prompt", "env");
-        await local.click("#acp-send");
+        await sendPrompt(local, "env");
         await expect(local.locator("#acp-transcript")).toContainText("ONLY_ME");
 
         const transcript = await local.locator("#acp-transcript").textContent();
 
         expect(transcript).toContain("value-xyz-123");
         expect(transcript).not.toContain("NEORE_E2E_PROBE");
+        expect(transcript).not.toContain("NEORE_SNEAKY");
         // The site's page never gets a coding-agent bridge.
         expect(await win.evaluate(() => typeof (globalThis as PageGlobal).neoreDevice)).toBe("undefined");
+
+        // Stop approving: the next start in that folder is refused again.
+        await local.click("button[aria-label^='Stop approving Fake agent']");
+        const afterRevoke = await startOutcome(local, work);
+
+        expect(afterRevoke).toContain("not approved");
+    } finally {
+        await app.close();
+
+        for (const directory of [userData, work]) {
+            rmSync(directory, { force: true, recursive: true });
+        }
+    }
+});
+
+test("a coding agent's requests are answered one at a time or together, never with an 'always'", async () => {
+    const userData = mkdtempSync(path.join(tmpdir(), "neore-e2e-userdata-"));
+    const work = mkdtempSync(path.join(tmpdir(), "neore-e2e-work-"));
+    const app = await electron.launch({ args: [".", `--user-data-dir=${userData}`], cwd: appDirectory });
+    const frameLog = path.join(userData, "agent-frames.log");
+
+    try {
+        const { local } = await agentWindow(app, work);
+        const bar = local.locator("#acp-requests");
+        const transcript = local.locator("#acp-transcript");
+
+        // The scripted agent logs every frame it receives and checks it against the protocol's schema.
+        await local.selectOption("#acp-env-scope", "fake-agent");
+        await local.fill("#acp-env-name", "FAKE_AGENT_LOG");
+        await local.fill("#acp-env-value", frameLog);
+        await local.click("#acp-env-form button[type=submit]");
+        await expect(local.locator("#acp-env")).toContainText("FAKE_AGENT_LOG");
+
+        await local.click("button[aria-label='Approve a folder for Fake agent']");
+        await local.click(`button[aria-label^='Start Fake agent in ']`);
+        await expect(local.locator("#acp-session-status")).toHaveText("Ready");
+
+        // Approve once: the agent continues.
+        await sendPrompt(local, "perm 1");
+        await expect(bar).toContainText("Run command 1");
+        await expect(bar).toContainText("/work/file.txt");
+        // The agent offered an "always" option; the window shows none of it.
+        const shown = await bar.textContent();
+
+        expect(shown?.toLowerCase()).not.toContain("always");
+
+        // Rust refuses an always option from the window's own API too, and the request keeps waiting.
+        const refusal = await local.evaluate(async () => {
+            const api = (globalThis as unknown as { neoreDevice: { acpPermissionAnswer: (id: number, option: string) => Promise<void>; acpPermissions: () => Promise<{ id: number }[]> } }).neoreDevice;
+            const [first] = await api.acpPermissions();
+
+            try {
+                await api.acpPermissionAnswer(first.id, "always");
+
+                return "accepted";
+            } catch (error) {
+                return (error as Error).message;
+            }
+        });
+
+        expect(refusal).toContain("Always allow");
+        await expect(bar).toContainText("Run command 1");
+
+        await expect(bar.locator("button", { hasText: "Allow once" })).toBeEnabled();
+        await bar.locator("button", { hasText: "Allow once" }).click();
+        await expect(transcript).toContainText("ran 1");
+
+        // A second request later in the same session still reaches the prompt; decline ends that call as declined.
+        await sendPrompt(local, "perm 2");
+        await expect(bar).toContainText("Run command 2");
+        await expect(bar.locator("button", { hasText: "Deny" })).toBeEnabled();
+        await bar.locator("button", { hasText: "Deny" }).click();
+        await expect(transcript).toContainText("declined 2: reject");
+
+        // Several requests from one session: one bar, one line each, and Approve all answers each once.
+        await sendPrompt(local, "permmany 3");
+        await expect(bar.locator(".request")).toHaveCount(3);
+        const all = bar.locator("button", { hasText: "Approve all (3)" });
+
+        await expect(all).toBeEnabled();
+        await all.click();
+        await expect(transcript).toContainText("allow,allow,allow");
+        await expect(bar).toBeHidden();
+
+        // Stopping a turn that waits on a request cancels it.
+        await sendPrompt(local, "perm 4");
+        await expect(bar).toContainText("Run command 4");
+        await local.click("#acp-stop");
+        await expect(bar).toBeHidden();
+        await expect(local.locator("#acp-session-status")).toHaveText("Ready");
+
+        // On the wire: every answer the agent received was a once-option or a cancel, and every frame was valid.
+        const frames = readFileSync(frameLog, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line) as { received?: { result?: { outcome?: { optionId?: string; outcome: string } } }; violation?: string });
+        const outcomes = frames.flatMap((frame) => frame.received?.result?.outcome === undefined ? [] : [frame.received.result.outcome]);
+
+        expect(outcomes.length).toBeGreaterThanOrEqual(6);
+        expect(outcomes.filter((outcome) => outcome.outcome === "selected").map((outcome) => outcome.optionId)).not.toContain("always");
+        expect(frames.flatMap((frame) => frame.violation === undefined ? [] : [frame.violation])).toEqual([]);
     } finally {
         await app.close();
         rmSync(userData, { force: true, recursive: true });

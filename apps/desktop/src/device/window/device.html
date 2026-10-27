@@ -86,8 +86,10 @@
                 <h1 id="acp-heading">Coding agents</h1>
                 <p class="muted">
                     Agents that speak the Agent Client Protocol run on this computer with your rights, outside the shell sandbox. Each one signs in with its own tool;
-                    Neore stores no login for it. macOS and Linux only for now.
+                    Neore stores no login for it. An agent starts only in a folder you approved for it here. Anything it asks to change prompts you first, once per request; there is no "always allow". macOS and Linux only for now.
                 </p>
+                <!-- Requests an agent is waiting on. Rendered with textContent only: everything in them came from the agent. -->
+                <div id="acp-requests" role="region" aria-label="Requests from coding agents waiting for you" aria-live="assertive" hidden></div>
                 <ul id="acp-agents" aria-labelledby="acp-heading"></ul>
                 <form id="acp-agent-form" novalidate>
                     <label for="acp-name">Name</label>

@@ -18,6 +18,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use crate::acp_permission::AcpPermissions;
 use crate::approval::{Answer, Prompt, PromptBody, Prompts, SandboxState};
 use crate::envelope::{self, Domain, NonceSet, Signed};
 use crate::fs;
@@ -47,6 +48,8 @@ pub enum Event {
     Progress(ProgressEvent),
     /// The tool set changed: the page should send a fresh manifest.
     Changed,
+    /// A coding agent is asking for approval: show the device window. Read the requests with `acp_permissions`.
+    AcpPermission { agent: String, tool: String },
 }
 
 /// Receives [`Event`]s. Called from engine threads; must not block.
@@ -60,6 +63,7 @@ struct McpToolRef {
 }
 
 pub struct DeviceState {
+    pub(crate) acp_permissions: AcpPermissions,
     audit_path: PathBuf,
     last_manifest_at: Mutex<u64>,
     mcp: McpManager,
@@ -85,6 +89,7 @@ impl DeviceState {
         let settings = store::load(&settings_path);
 
         DeviceState {
+            acp_permissions: AcpPermissions::default(),
             audit_path: data_dir.join("device-audit.jsonl"),
             last_manifest_at: Mutex::new(0),
             mcp: McpManager::default(),
@@ -199,6 +204,7 @@ impl DeviceState {
     /// Closing the approval window is a "no" to everything it was asking.
     pub fn deny_prompts(&self) {
         self.prompts.deny_all();
+        self.acp_decline_all();
     }
 
     pub fn status(&self) -> StatusView {

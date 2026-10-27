@@ -12,14 +12,18 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 
-use crate::engine::{now_ms, validate_roots, DeviceState};
+use crate::acp_permission::{Answered, Outcome, PendingView, PermissionRequest};
+use crate::engine::{now_ms, validate_roots, DeviceState, Event};
+use crate::hmac::to_hex;
 
 const MAX_AGENTS: usize = 20;
+const MAX_CONSENTS: usize = 100;
 const MAX_ARGS: usize = 50;
 const MAX_ARG_BYTES: usize = 1000;
 const MAX_ENV_VARS: usize = 50;
@@ -101,6 +105,18 @@ pub struct AcpAgent {
     pub label: String,
 }
 
+/// The user's approval of one agent in one folder, given in the local window and nowhere else.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AcpConsent {
+    pub agent_key: String,
+    /// An opaque id for the folder, stable for its canonical path. What an offer names later; no path leaves here.
+    pub folder_id: String,
+    pub folder_label: String,
+    /// Canonical. The agent's folder must be this one to start.
+    pub folder_path: String,
+}
+
 /// What the main process spawns: nothing else may start an agent.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -126,6 +142,7 @@ pub struct AcpAgentView {
 #[serde(rename_all = "camelCase")]
 pub struct AcpView {
     pub agents: Vec<AcpAgentView>,
+    pub consents: Vec<AcpConsent>,
     pub env_names: Vec<String>,
 }
 
@@ -147,6 +164,15 @@ pub enum AcpUpdate {
     RemoveAgent {
         key: String,
     },
+    /// Approves an agent for a folder. The window asks the user first.
+    Grant {
+        agent_key: String,
+        folder: String,
+    },
+    Revoke {
+        agent_key: String,
+        folder_id: String,
+    },
     /// Sets one variable, for one agent or (without `agent_key`) for all.
     SetEnv {
         agent_key: Option<String>,
@@ -157,6 +183,17 @@ pub enum AcpUpdate {
         agent_key: Option<String>,
         name: String,
     },
+}
+
+fn folder_id(canonical: &str) -> String {
+    to_hex(&Sha256::digest(canonical.as_bytes())[..8])
+}
+
+fn folder_label(canonical: &str) -> String {
+    Path::new(canonical).file_name().map_or_else(
+        || canonical.to_owned(),
+        |name| name.to_string_lossy().into_owned(),
+    )
 }
 
 fn valid_key(key: &str) -> bool {
@@ -315,6 +352,7 @@ impl DeviceState {
                 })
                 .collect(),
             env_names: settings.acp_env.names(),
+            consents: settings.acp_consents,
         }
     }
 
@@ -343,7 +381,16 @@ impl DeviceState {
                     validate_agent(&agent)?;
 
                     match existing {
-                        Some(i) => settings.acp_agents[i] = agent,
+                        Some(i) => {
+                            // A different program is not the one the user approved for these folders.
+                            if settings.acp_agents[i].command != agent.command
+                                || settings.acp_agents[i].args != agent.args
+                            {
+                                settings.acp_consents.retain(|c| c.agent_key != agent.key);
+                            }
+
+                            settings.acp_agents[i] = agent;
+                        }
                         None if settings.acp_agents.len() >= MAX_AGENTS => {
                             return Err(format!("at most {MAX_AGENTS} agents"));
                         }
@@ -352,6 +399,44 @@ impl DeviceState {
                 }
                 AcpUpdate::RemoveAgent { key } => {
                     settings.acp_agents.retain(|agent| agent.key != key);
+                    settings.acp_consents.retain(|c| c.agent_key != key);
+                }
+                AcpUpdate::Grant { agent_key, folder } => {
+                    if !settings
+                        .acp_agents
+                        .iter()
+                        .any(|agent| agent.key == agent_key)
+                    {
+                        return Err("that agent is not registered".into());
+                    }
+
+                    let canonical = validate_roots(&[folder])?.pop().ok_or("choose a folder")?;
+                    let folder_id = folder_id(&canonical);
+
+                    if settings.acp_consents.len() >= MAX_CONSENTS {
+                        return Err(format!("at most {MAX_CONSENTS} approvals"));
+                    }
+
+                    if !settings
+                        .acp_consents
+                        .iter()
+                        .any(|c| c.agent_key == agent_key && c.folder_id == folder_id)
+                    {
+                        settings.acp_consents.push(AcpConsent {
+                            agent_key,
+                            folder_id,
+                            folder_label: folder_label(&canonical),
+                            folder_path: canonical,
+                        });
+                    }
+                }
+                AcpUpdate::Revoke {
+                    agent_key,
+                    folder_id,
+                } => {
+                    settings
+                        .acp_consents
+                        .retain(|c| !(c.agent_key == agent_key && c.folder_id == folder_id));
                 }
                 AcpUpdate::SetEnv {
                     agent_key,
@@ -393,10 +478,25 @@ impl DeviceState {
             .find(|agent| agent.key == agent_key)
             .ok_or("that agent is not registered")?;
         let cwd: PathBuf = match folder {
-            Some(folder) => validate_roots(&[folder.to_owned()])?
-                .pop()
-                .map(PathBuf::from)
-                .ok_or("choose a folder")?,
+            Some(folder) => {
+                let canonical = validate_roots(&[folder.to_owned()])?
+                    .pop()
+                    .ok_or("choose a folder")?;
+
+                // Checked before anything starts: a valid request for a pair the user did not approve is refused.
+                if !settings
+                    .acp_consents
+                    .iter()
+                    .any(|c| c.agent_key == agent_key && c.folder_path == canonical)
+                {
+                    return Err(format!(
+                        "{} is not approved for that folder. Approve it in this window first",
+                        agent.label
+                    ));
+                }
+
+                PathBuf::from(canonical)
+            }
             None => {
                 let scratch = self.data_dir().join("acp-probe");
 
@@ -417,6 +517,69 @@ impl DeviceState {
             cwd: cwd.to_string_lossy().into_owned(),
             env,
         })
+    }
+}
+
+impl DeviceState {
+    /// Registers a request from a coding agent and blocks until it is answered, cancelled or times out.
+    /// Run it on a worker thread. The outcome is exactly what the agent receives.
+    pub fn acp_permission_ask(&self, request: PermissionRequest) -> Outcome {
+        let (agent, tool) = (request.agent_label.clone(), request.tool.clone());
+
+        self.acp_permissions
+            .ask(request, |_| self.emit(Event::AcpPermission { agent, tool }))
+    }
+
+    pub fn acp_permissions(&self) -> Vec<PendingView> {
+        self.acp_permissions.view()
+    }
+
+    /// Answers one request with the agent's own option id. Only "allow once" and "reject once" are accepted.
+    pub fn acp_permission_answer(&self, id: u64, option_id: &str) -> Result<(), String> {
+        let answer = self.acp_permissions.answer(id, option_id)?;
+
+        self.audit_acp_answers(&[answer], false);
+
+        Ok(())
+    }
+
+    pub fn acp_permission_decline(&self, id: u64) -> Result<(), String> {
+        let answer = self.acp_permissions.decline(id)?;
+
+        self.audit_acp_answers(&[answer], false);
+
+        Ok(())
+    }
+
+    /// Allows exactly the requests named, each once. Returns how many it answered.
+    pub fn acp_permission_answer_batch(&self, ids: &[u64]) -> Result<usize, String> {
+        let answers = self.acp_permissions.answer_batch(ids)?;
+
+        self.audit_acp_answers(&answers, true);
+
+        Ok(answers.len())
+    }
+
+    /// The host sent `session/cancel` or the agent ended: its waiting requests are answered cancelled.
+    pub fn acp_permission_cancel_session(&self, session_id: &str) {
+        self.acp_permissions.cancel_session(session_id);
+    }
+
+    pub(crate) fn acp_decline_all(&self) {
+        let answers = self.acp_permissions.decline_all();
+
+        self.audit_acp_answers(&answers, false);
+    }
+
+    /// One line per answered request. The tool and its target only: the command may carry a secret.
+    fn audit_acp_answers(&self, answers: &[Answered], batch: bool) {
+        for answer in answers {
+            self.audit(json!({
+                "at": now_ms(), "decision": answer.decision, "detail": answer.target.clone().unwrap_or_default(),
+                "status": if batch { "approved with others" } else { "answered" }, "thread": answer.agent_label,
+                "tool": format!("acp: {}", answer.tool),
+            }));
+        }
     }
 }
 
@@ -443,6 +606,15 @@ mod tests {
                 r#"{{"op":"saveAgent","key":"{key}","label":"Agent {key}","command":"/bin/{key}","args":["--acp"]}}"#
             )))
             .unwrap();
+    }
+
+    fn grant(state: &DeviceState, agent: &str, folder: &Path) -> AcpView {
+        state
+            .acp_update(AcpUpdate::Grant {
+                agent_key: agent.into(),
+                folder: folder.to_string_lossy().into_owned(),
+            })
+            .unwrap()
     }
 
     fn set_env(
@@ -606,6 +778,7 @@ mod tests {
 
         fs::create_dir_all(&work).unwrap();
         save(&state, "alpha");
+        grant(&state, "alpha", &work);
 
         let probe = state.acp_spawn_plan("alpha", None).unwrap();
         assert!(probe.cwd.ends_with("acp-probe"));
@@ -657,6 +830,192 @@ mod tests {
             .unwrap();
         assert!(state.acp_view().agents.is_empty());
         assert!(set_env(&state, Some("alpha"), "K", "v").is_err());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_unapproved_pair_is_refused_before_anything_is_planned() {
+        let (state, dir) = state("consent");
+        let (one, two) = (dir.join("one"), dir.join("two"));
+
+        fs::create_dir_all(&one).unwrap();
+        fs::create_dir_all(&two).unwrap();
+        save(&state, "alpha");
+        save(&state, "beta");
+
+        let ask = |agent: &str, folder: &Path| {
+            state.acp_spawn_plan(agent, Some(folder.to_str().unwrap()))
+        };
+
+        assert!(ask("alpha", &one).unwrap_err().contains("not approved"));
+
+        grant(&state, "alpha", &one);
+
+        assert!(ask("alpha", &one).is_ok());
+        // Another folder, and another agent in the approved folder, are different pairs.
+        assert!(ask("alpha", &two).is_err());
+        assert!(ask("beta", &one).is_err());
+        // A path that does not exist is refused too.
+        assert!(ask("alpha", &dir.join("missing")).is_err());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_approval_is_stored_and_shows_no_path_in_its_id() {
+        let (state, dir) = state("persist");
+        let work = dir.join("project");
+
+        fs::create_dir_all(&work).unwrap();
+        save(&state, "alpha");
+
+        let view = grant(&state, "alpha", &work);
+        let consent = view.consents[0].clone();
+
+        assert_eq!(consent.folder_label, "project");
+        assert_eq!(consent.folder_id.len(), 16);
+        assert!(!consent.folder_id.contains("project"));
+        // Granting twice is one approval.
+        assert_eq!(grant(&state, "alpha", &work).consents.len(), 1);
+
+        let restarted = DeviceState::new(&dir, Box::new(|_| {}));
+
+        assert!(restarted
+            .acp_spawn_plan("alpha", Some(work.to_str().unwrap()))
+            .is_ok());
+
+        restarted
+            .acp_update(AcpUpdate::Revoke {
+                agent_key: "alpha".into(),
+                folder_id: consent.folder_id,
+            })
+            .unwrap();
+        assert!(restarted
+            .acp_spawn_plan("alpha", Some(work.to_str().unwrap()))
+            .is_err());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_changed_program_or_a_removed_agent_loses_its_approvals() {
+        let (state, dir) = state("drop");
+        let work = dir.join("work");
+
+        fs::create_dir_all(&work).unwrap();
+        save(&state, "alpha");
+        grant(&state, "alpha", &work);
+
+        // The same program under a new name keeps them.
+        state
+            .acp_update(update(r#"{"op":"saveAgent","key":"alpha","label":"Renamed","command":"/bin/alpha","args":["--acp"]}"#))
+            .unwrap();
+        assert_eq!(state.acp_view().consents.len(), 1);
+
+        for changed in [
+            r#"{"op":"saveAgent","key":"alpha","label":"A","command":"/bin/other","args":["--acp"]}"#,
+            r#"{"op":"saveAgent","key":"alpha","label":"A","command":"/bin/alpha","args":[]}"#,
+        ] {
+            state.acp_update(update(changed)).unwrap();
+            assert!(state.acp_view().consents.is_empty(), "{changed}");
+            grant(&state, "alpha", &work);
+        }
+
+        state
+            .acp_update(update(r#"{"op":"removeAgent","key":"alpha"}"#))
+            .unwrap();
+        assert!(state.acp_view().consents.is_empty());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn approvals_need_a_registered_agent_and_a_folder_that_may_be_shared() {
+        let (state, dir) = state("grant");
+
+        let unregistered = state.acp_update(AcpUpdate::Grant {
+            agent_key: "nobody".into(),
+            folder: dir.to_string_lossy().into_owned(),
+        });
+
+        assert!(unregistered.is_err());
+
+        save(&state, "alpha");
+
+        for folder in ["/", "/nonexistent/neore"] {
+            assert!(
+                state
+                    .acp_update(AcpUpdate::Grant {
+                        agent_key: "alpha".into(),
+                        folder: folder.into(),
+                    })
+                    .is_err(),
+                "{folder}"
+            );
+        }
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_decline_reaches_the_agent_and_the_audit_log_has_no_command() {
+        use crate::acp_permission::{OfferedOption, PermissionRequest};
+
+        let (state, dir) = state("audit");
+        let state = std::sync::Arc::new(state);
+        let request = PermissionRequest {
+            agent_label: "Agent".into(),
+            command: Some("curl --data sentinel-token x".into()),
+            details: "{}".into(),
+            details_complete: true,
+            folder: "/work".into(),
+            options: vec![
+                OfferedOption {
+                    kind: "allow_once".into(),
+                    name: "Yes".into(),
+                    option_id: "y".into(),
+                },
+                OfferedOption {
+                    kind: "allow_always".into(),
+                    name: "Always".into(),
+                    option_id: "a".into(),
+                },
+                OfferedOption {
+                    kind: "reject_once".into(),
+                    name: "No".into(),
+                    option_id: "n".into(),
+                },
+            ],
+            session_id: "s1".into(),
+            target: Some("/work/x".into()),
+            tool: "Run curl".into(),
+            tool_kind: "execute".into(),
+        };
+        let asking = state.clone();
+        let waiting = std::thread::spawn(move || asking.acp_permission_ask(request));
+
+        let id = loop {
+            if let Some(pending) = state.acp_permissions().first() {
+                break pending.id;
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        };
+
+        assert!(state.acp_permission_answer(id, "a").is_err());
+        state.acp_permission_decline(id).unwrap();
+        assert_eq!(
+            waiting.join().unwrap(),
+            Outcome::Selected {
+                option_id: "n".into()
+            }
+        );
+
+        let audit = fs::read_to_string(dir.join("device-audit.jsonl")).unwrap();
+
+        assert!(audit.contains("acp: Run curl") && audit.contains("deny"));
+        assert!(!audit.contains("sentinel-token"));
 
         let _ = fs::remove_dir_all(&dir);
     }

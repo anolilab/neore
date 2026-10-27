@@ -3,11 +3,13 @@
  * a session in a folder, talk to it, stop it. Everything an agent wrote is rendered with `textContent`.
  * Variable values are typed here and never read back: the core returns names only.
  */
-import type { AcpView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
+import type { AcpView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
+import { approveAllIds, barSignature, groupBySession } from "./permission-bar";
 
 const TOOL_LABELS: Record<ToolStatus, string> = {
     cancelled: "stopped",
     completed: "done",
+    declined: "declined",
     failed: "failed",
     in_progress: "running",
     pending: "waiting",
@@ -28,7 +30,17 @@ const IPC_PREFIX = /^Error invoking remote method '[^']+': (?:Error: )?/u;
 const NON_KEY = /[^a-z0-9]+/u;
 const TRAILING_DASH = /-$/u;
 
-const state: { selected?: string; sessions: SessionSummary[]; view: AcpView } = { sessions: [], view: { agents: [], envNames: [] } };
+/** Buttons on a bar that just changed stay disabled this long, so a click meant for the old bar cannot land on the new one. */
+const CLICK_THROUGH_GUARD_MS = 800;
+
+const state: {
+    guard?: ReturnType<typeof setTimeout>;
+    requests: PermissionView[];
+    selected?: string;
+    sessions: SessionSummary[];
+    signature: string;
+    view: AcpView;
+} = { requests: [], sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
 
 const showError = (error: unknown): void => {
     $("acp-error").textContent = String(error instanceof Error ? error.message : error).replace(IPC_PREFIX, "");
@@ -103,7 +115,15 @@ const slug = (name: string): string => {
     return key;
 };
 
-const startIn = (key: string) =>
+const startIn = (key: string, folder: string) =>
+    guarded(async () => {
+        const id = await globalThis.neoreDevice.acpStart(key, folder);
+
+        state.selected = id;
+        await refreshSessions();
+    });
+
+const approveFolder = (key: string) =>
     guarded(async () => {
         const folder = await globalThis.neoreDevice.pickFolder();
 
@@ -111,10 +131,14 @@ const startIn = (key: string) =>
             return;
         }
 
-        const id = await globalThis.neoreDevice.acpStart(key, folder);
+        const confirmed = await globalThis.neoreDevice.confirm(
+            `Let “${agentLabel(key)}” work in ${folder}?\n\nIt runs as you. It is not confined to this folder, and anything it asks to do prompts you here first. You can stop approving at any time.`,
+        );
 
-        state.selected = id;
-        await refreshSessions();
+        if (confirmed) {
+            state.view = await globalThis.neoreDevice.acpUpdate({ agentKey: key, folder, op: "grant" });
+            renderAgents();
+        }
     });
 
 const probe = (key: string) =>
@@ -130,11 +154,11 @@ const renderAgents = (): void => {
     $("acp-agents").replaceChildren(
         ...view.agents.length === 0
             ? [item("No agents yet.")]
-            : view.agents.map((agent) =>
+            : view.agents.flatMap((agent) => [
                 item(
                     `${agent.label}: ${[agent.command, ...agent.args].join(" ")}`,
                     button("Check version", `Check the version of ${agent.label}`, () => probe(agent.key)),
-                    button("Start in a folder…", `Start ${agent.label} in a folder`, () => startIn(agent.key)),
+                    button("Approve a folder…", `Approve a folder for ${agent.label}`, () => approveFolder(agent.key)),
                     button("Remove", `Remove ${agent.label}`, () => {
                         guarded(async () => {
                             if (!await globalThis.neoreDevice.confirm(`Remove “${agent.label}” and its variables?`)) {
@@ -146,7 +170,21 @@ const renderAgents = (): void => {
                         });
                     }),
                 ),
-            ),
+                ...view.consents
+                    .filter((consent) => consent.agentKey === agent.key)
+                    .map((consent) =>
+                        item(
+                            `↳ ${consent.folderPath}`,
+                            button("Start", `Start ${agent.label} in ${consent.folderPath}`, () => startIn(agent.key, consent.folderPath)),
+                            button("Stop approving", `Stop approving ${agent.label} in ${consent.folderPath}`, () => {
+                                guarded(async () => {
+                                    state.view = await globalThis.neoreDevice.acpUpdate({ agentKey: agent.key, folderId: consent.folderId, op: "revoke" });
+                                    renderAgents();
+                                });
+                            }),
+                        ),
+                    ),
+            ]),
     );
 
     const scope = $<HTMLSelectElement>("acp-env-scope");
@@ -180,6 +218,101 @@ const renderAgents = (): void => {
                 );
             }),
     );
+};
+
+// ─── Requests waiting for the user ──────────────────────────────────────────
+
+const answerRequests = (action: () => Promise<unknown>) =>
+    guarded(async () => {
+        await action();
+        await refreshRequests();
+    });
+
+const requestLine = (request: PermissionView): HTMLElement => {
+    const box = document.createElement("div");
+    const line = document.createElement("div");
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    const full = document.createElement("pre");
+    const actions = document.createElement("div");
+
+    box.className = "request";
+    line.className = "line";
+    line.textContent = [request.tool, request.target, request.folder].filter(Boolean).join(" · ");
+    summary.textContent = request.command === null ? "Full details" : "Full command and details";
+    full.tabIndex = 0;
+    full.textContent = request.command === null ? request.details : `${request.command}\n\n${request.details}`;
+    details.append(summary, full);
+    actions.className = "row";
+
+    for (const option of request.options) {
+        const label = request.options.length > 1 ? `Allow once: ${option.name}` : "Allow once";
+
+        actions.append(button(label, `${label}: ${request.tool}`, () => answerRequests(() => globalThis.neoreDevice.acpPermissionAnswer(request.id, option.optionId))));
+    }
+
+    actions.append(button("Deny", `Deny: ${request.tool}`, () => answerRequests(() => globalThis.neoreDevice.acpPermissionDecline(request.id))));
+    box.append(line, details, actions);
+
+    return box;
+};
+
+const renderRequests = (): void => {
+    const bar = $("acp-requests");
+    const groups = groupBySession(state.requests);
+    const signature = barSignature(state.requests);
+    const changed = signature !== state.signature;
+
+    // Redrawing for nothing would re-enable the buttons the guard holds still, and fold the panels the user opened.
+    if (!changed) {
+        return;
+    }
+
+    state.signature = signature;
+    bar.hidden = groups.length === 0;
+    bar.replaceChildren(
+        ...groups.map((group) => {
+            const section = document.createElement("div");
+            const heading = document.createElement("h2");
+            const ids = approveAllIds(group);
+
+            heading.textContent = `${group.agentLabel} asks (${String(group.requests.length)})`;
+            section.append(heading, ...group.requests.map((request) => requestLine(request)));
+
+            // The ids are the ones drawn here. A request that arrives later redraws the bar, and answers only itself until the user presses again.
+            if (ids !== undefined) {
+                const all = button(`Approve all (${String(ids.length)})`, `Allow once each of the ${String(ids.length)} requests from ${group.agentLabel}`, () =>
+                    answerRequests(() => globalThis.neoreDevice.acpPermissionAnswerBatch(ids)));
+
+                all.classList.add("primary");
+                section.append(all);
+            }
+
+            return section;
+        }),
+    );
+
+    if (groups.length > 0) {
+        const buttons = [...bar.querySelectorAll("button")];
+
+        for (const element of buttons) {
+            element.disabled = true;
+        }
+
+        clearTimeout(state.guard);
+        state.guard = setTimeout(() => {
+            if (state.signature === signature) {
+                for (const element of buttons) {
+                    element.disabled = false;
+                }
+            }
+        }, CLICK_THROUGH_GUARD_MS);
+    }
+};
+
+const refreshRequests = async (): Promise<void> => {
+    state.requests = await globalThis.neoreDevice.acpPermissions();
+    renderRequests();
 };
 
 // ─── Sessions ───────────────────────────────────────────────────────────────
@@ -362,7 +495,7 @@ export const initAcp = async (): Promise<void> => {
 
     globalThis.neoreDevice.onAcpChanged(async () => {
         try {
-            await refreshSessions();
+            await Promise.all([refreshRequests(), refreshSessions()]);
         } catch (error) {
             showError(error);
         }
@@ -371,6 +504,6 @@ export const initAcp = async (): Promise<void> => {
     await guarded(async () => {
         state.view = await globalThis.neoreDevice.acpView();
         renderAgents();
-        await refreshSessions();
+        await Promise.all([refreshRequests(), refreshSessions()]);
     });
 };

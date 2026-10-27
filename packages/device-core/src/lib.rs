@@ -7,6 +7,7 @@
 //! and the audit log.
 
 pub mod acp;
+pub mod acp_permission;
 pub mod approval;
 pub mod engine;
 pub mod envelope;

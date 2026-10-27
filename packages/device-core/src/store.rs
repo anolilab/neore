@@ -15,7 +15,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::acp::{AcpAgent, EnvVars};
+use super::acp::{AcpAgent, AcpConsent, EnvVars};
 use super::mcp::McpServerConfig;
 
 const KEYCHAIN_SERVICE: &str = "dev.neore.device";
@@ -36,6 +36,9 @@ pub struct Settings {
     /// Coding agents (ACP) the user registered in the local window.
     #[serde(default)]
     pub acp_agents: Vec<AcpAgent>,
+    /// The (agent, folder) pairs the user approved in the local window. An agent starts in nothing else.
+    #[serde(default)]
+    pub acp_consents: Vec<AcpConsent>,
     /// Environment variables every agent gets, on top of the built environment. Values are secrets.
     #[serde(default)]
     pub acp_env: EnvVars,

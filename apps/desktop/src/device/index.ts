@@ -16,12 +16,26 @@ import type { BrowserWindow as BrowserWindowInstance, IpcMainInvokeEvent, WebCon
 import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 
 import { AcpManager } from "../acp/manager";
+import { coreGate } from "../acp/permission";
 import { spawnAgent } from "../acp/process";
-import type { AcpView, SpawnPlan } from "../acp/types";
+import type { AcpView, PermissionView, SpawnPlan } from "../acp/types";
 import { loadDeviceCore } from "./addon";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
 import type { CoreEvent, DeviceCore, Prompt, Signed } from "./types";
-import { readAcpUpdate, readAgentKey, readFolder, readPairing, readPrompt, readPromptAnswer, readSessionId, readSettingsUpdate, readSigned } from "./validate";
+import {
+    readAcpUpdate,
+    readAgentKey,
+    readFolder,
+    readOptionId,
+    readPairing,
+    readPrompt,
+    readPromptAnswer,
+    readRequestId,
+    readRequestIds,
+    readSessionId,
+    readSettingsUpdate,
+    readSigned,
+} from "./validate";
 
 /** Stopping idle MCP servers runs once a minute. */
 const REAP_INTERVAL_MS = 60_000;
@@ -165,10 +179,23 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         }
     };
 
+    const showAgentRequest = (agent: string, tool: string): void => {
+        openLocalWindow();
+        send(state.local?.webContents, LOCAL_EVENT.acp);
+
+        if (Notification.isSupported()) {
+            new Notification({ body: `${agent} — ${tool}`, title: "A coding agent is asking for your approval" }).show();
+        }
+    };
+
     const onEvent = (json: string): void => {
         const event = JSON.parse(json) as CoreEvent;
 
         switch (event.type) {
+            case "acpPermission": {
+                showAgentRequest(event.agent, event.tool);
+                break;
+            }
             case "changed": {
                 for (const site of sites) {
                     send(site, DEVICE_CHANNEL.changed);
@@ -210,6 +237,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         // The core decides what may start: it refuses an unregistered agent and a folder that is not allowed.
         state.acp ??= new AcpManager({
             appVersion: app.getVersion(),
+            gate: coreGate(core),
             onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
             plan: (agentKey, folder) => JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan,
             spawn: spawnAgent,
@@ -313,6 +341,16 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
         return requireAcp().startSession(key, agent.label, readFolder(folder));
     });
+
+    local(LOCAL_CHANNEL.acpPermissions, () => JSON.parse(requireCore().acpPermissions()) as PermissionView[]);
+
+    // Rust decides what an answer may be: the agent's own allow-once or reject-once option, for a request still
+    // waiting. Nothing here, and nothing the window sends, can choose an "always" option.
+    local(LOCAL_CHANNEL.acpPermissionAnswer, (id, optionId) => requireCore().acpPermissionAnswer(readRequestId(id), readOptionId(optionId)));
+
+    local(LOCAL_CHANNEL.acpPermissionDecline, (id) => requireCore().acpPermissionDecline(readRequestId(id)));
+
+    local(LOCAL_CHANNEL.acpPermissionAnswerBatch, (ids) => requireCore().acpPermissionAnswerBatch(readRequestIds(ids)));
 
     local(LOCAL_CHANNEL.acpSessions, () => requireAcp().summaries());
 

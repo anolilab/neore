@@ -6,6 +6,7 @@ import { PROTOCOL_VERSION as SDK_PROTOCOL_VERSION } from "@agentclientprotocol/s
 import { describe, expect, it } from "vitest";
 
 import type { PermissionGate } from "./permission";
+import { declineGate } from "./permission";
 import { PROTOCOL_VERSION } from "./protocol";
 import { AgentSession } from "./session";
 import { acpSchema, memoryAgent, readTranscript, transcriptPlayer } from "./testing/harness";
@@ -173,5 +174,56 @@ describe("the end of a turn", () => {
         await expect.poll(() => session.snapshot().status).toBe("ended");
         expect(session.snapshot().turns[0].stopReason).toBe("failed");
         expect(() => session.send("again")).toThrow("ended");
+    });
+});
+
+describe("a request the user declined", () => {
+    const ask = (id: number, toolCallId: string) => {
+        return {
+            id,
+            method: "session/request_permission",
+            params: {
+                options: [
+                    { kind: "allow_once", name: "Allow", optionId: "allow" },
+                    { kind: "reject_once", name: "Reject", optionId: "reject" },
+                ],
+                sessionId: "sess_1",
+                toolCall: { title: "Run it", toolCallId },
+            },
+        };
+    };
+
+    it("ends the call as declined on this side, even when the agent says nothing more, and sends the agent its reject option", async () => {
+        const { agent, session } = await setup(declineGate);
+
+        session.send("go");
+        await expect.poll(() => agent.written.length).toBe(3);
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { kind: "execute", sessionUpdate: "tool_call", status: "pending", title: "Run it", toolCallId: "c1" } } });
+        agent.say(ask(9, "c1"));
+        await expect.poll(() => agent.written.length).toBe(4);
+
+        expect(agent.written[3]).toMatchObject({ id: 9, result: { outcome: { optionId: "reject", outcome: "selected" } } });
+        expect(session.snapshot().turns[0].tools[0].status).toBe("declined");
+
+        // The agent reports the call in progress anyway: it stays declined.
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "tool_call_update", status: "in_progress", toolCallId: "c1" } } });
+        await expect.poll(() => session.snapshot().turns[0].tools[0].status).toBe("declined");
+    });
+
+    it("leaves a call the user allowed to the agent's own reports", async () => {
+        const allow: PermissionGate = {
+            ask: async () => { return { optionId: "allow", outcome: "selected" }; },
+            cancelSession: () => {},
+        };
+        const { agent, session } = await setup(allow);
+
+        session.send("go");
+        await expect.poll(() => agent.written.length).toBe(3);
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "tool_call", status: "pending", title: "Run it", toolCallId: "c1" } } });
+        agent.say(ask(9, "c1"));
+        await expect.poll(() => agent.written.length).toBe(4);
+
+        expect(agent.written[3]).toMatchObject({ result: { outcome: { optionId: "allow" } } });
+        expect(session.snapshot().turns[0].tools[0].status).toBe("pending");
     });
 });

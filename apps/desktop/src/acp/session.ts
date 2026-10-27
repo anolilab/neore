@@ -13,7 +13,8 @@
 import { randomUUID } from "node:crypto";
 
 import { JsonRpcConnection } from "./jsonrpc";
-import type { PermissionGate } from "./permission";
+import type { PermissionGate, PermissionOutcome } from "./permission";
+import { offeredOptions } from "./permission";
 import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
 import { initialize, METHOD, newSession, promptParams } from "./protocol";
@@ -29,6 +30,9 @@ const DEFAULT_CANCEL_GRACE_MS = 5000;
 
 /** After the agent's output closes, how long to wait for its exit status so the error can say why. */
 const EXIT_WAIT_MS = 500;
+
+/** A call this host ended itself; whatever the agent sends later does not change it. */
+const isFinal = (tool: ToolState): boolean => tool.status === "cancelled" || tool.status === "declined";
 
 const TOOL_STATUSES = new Set<ToolStatus>(["completed", "failed", "in_progress", "pending"]);
 const STOP_REASONS = new Set<StopReason>(["cancelled", "end_turn", "max_tokens", "max_turn_requests", "refusal"]);
@@ -312,6 +316,29 @@ export class AgentSession {
         this.options.onChange();
     }
 
+    /** A "no": the agent's reject option, or a cancel that did not come from stopping the turn. */
+    private wasDeclined(params: Record<string, unknown>, outcome: PermissionOutcome): boolean {
+        if (outcome.outcome === "cancelled") {
+            return !this.cancelRequested;
+        }
+
+        return offeredOptions(params).some((option) => option.optionId === outcome.optionId && option.kind.startsWith("reject"));
+    }
+
+    /** The call the user said no to ends as declined here, whether or not the agent reports it afterwards. */
+    private markDeclined(params: Record<string, unknown>): void {
+        const toolCall = isRecord(params.toolCall) ? params.toolCall : {};
+        const id = text(toolCall.toolCallId);
+        const tool = this.tools.get(id);
+
+        if (tool === undefined || tool.status === "completed" || tool.status === "failed") {
+            return;
+        }
+
+        tool.status = "declined";
+        this.options.onChange();
+    }
+
     // ─── From the agent ────────────────────────────────────────────────────
 
     private onNotification(method: string, params: unknown): void {
@@ -372,8 +399,8 @@ export class AgentSession {
             tool.kind = update.kind;
         }
 
-        // A call we ended as cancelled stays cancelled: a late `in_progress` must not bring it back.
-        if (tool.status !== "cancelled" && TOOL_STATUSES.has(update.status as ToolStatus)) {
+        // A call we ended as cancelled or declined stays that way: a late `in_progress` must not bring it back.
+        if (!isFinal(tool) && TOOL_STATUSES.has(update.status as ToolStatus)) {
             tool.status = update.status as ToolStatus;
         }
     }
@@ -392,7 +419,11 @@ export class AgentSession {
             return { outcome: { outcome: "cancelled" } };
         }
 
-        const outcome = await this.options.gate.ask({ params, sessionId: this.id });
+        const outcome = await this.options.gate.ask({ agentLabel: this.options.agentLabel, folder: this.options.folder, params, sessionId: this.id });
+
+        if (this.wasDeclined(params, outcome)) {
+            this.markDeclined(params);
+        }
 
         return { outcome };
     }

@@ -1,5 +1,5 @@
 /** What the local device window's preload exposes as `window.neoreDevice`. */
-import type { AcpUpdate, AcpView, ProbeResult, SessionSnapshot, SessionSummary } from "../../acp/types";
+import type { AcpUpdate, AcpView, PermissionView, ProbeResult, SessionSnapshot, SessionSummary } from "../../acp/types";
 import type { Prompt, SettingsView } from "../types";
 
 declare global {
@@ -12,6 +12,10 @@ export interface DeviceWindowApi {
     acpCancel: (sessionId: string) => Promise<void>;
     acpClose: (sessionId: string) => Promise<void>;
     acpForget: (sessionId: string) => Promise<void>;
+    acpPermissionAnswer: (id: number, optionId: string) => Promise<void>;
+    acpPermissionAnswerBatch: (ids: number[]) => Promise<number>;
+    acpPermissionDecline: (id: number) => Promise<void>;
+    acpPermissions: () => Promise<PermissionView[]>;
     acpProbe: (agentKey: string) => Promise<ProbeResult>;
     acpSend: (sessionId: string, prompt: string) => Promise<{ position?: number; status: "queued" | "started" }>;
     acpSession: (sessionId: string) => Promise<SessionSnapshot>;

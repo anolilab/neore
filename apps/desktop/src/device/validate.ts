@@ -96,3 +96,21 @@ export const readSessionId = (value: unknown): string => text(value, "session", 
 export const readFolder = (value: unknown): string => text(value, "folder", MAX_PATH_CHARS);
 
 export const readPrompt = (value: unknown): string => text(value, "prompt", MAX_PROMPT_CHARS);
+
+export const readRequestId = (value: unknown): number => {
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
+        throw new Error("device: request id is invalid");
+    }
+
+    return value;
+};
+
+export const readOptionId = (value: unknown): string => text(value, "option", 256);
+
+export const readRequestIds = (value: unknown): number[] => {
+    if (!Array.isArray(value) || value.length === 0 || value.length > 50) {
+        throw new Error("device: request ids are invalid");
+    }
+
+    return value.map((id) => readRequestId(id));
+};
