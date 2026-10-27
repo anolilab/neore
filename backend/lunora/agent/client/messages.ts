@@ -102,6 +102,11 @@ export type SaveMessagesArgs = {
     failPendingSteps?: boolean;
 
     /**
+     * True when a person sent the user messages into the thread (not a headless run, a retry or a continuation).
+     */
+    fromUser?: boolean;
+
+    /**
      * The messages to save.
      */
     messages: (ModelMessage | Message)[];
@@ -161,6 +166,7 @@ export const saveMessages = async (
         agentName: args.agentName,
         embeddings,
         failPendingSteps: args.failPendingSteps ?? false,
+        ...(args.fromUser === true && { fromUser: true }),
         messages: (await Promise.all(
             args.messages.map(async (m, i) => {
                 const { fileIds, message } = await serializeMessage(context, m);
@@ -192,6 +198,9 @@ export type SaveMessageArgs = {
      * The embedding to save with the message.
      */
     embedding?: { model: string; vector: number[] };
+
+    /** True when a person sent the message into the thread. */
+    fromUser?: boolean;
 
     /**
      * Metadata to save with the messages. Each element corresponds to the
@@ -257,6 +266,7 @@ export const saveMessage = async (
     const { messages } = await saveMessages(ctx, {
         agentName: args.agentName,
         embeddings,
+        fromUser: args.fromUser,
         messages: args.prompt === undefined ? [args.message] : [{ content: args.prompt, role: "user" }],
         metadata: args.metadata ? [args.metadata] : undefined,
         pendingMessageId: args.pendingMessageId,

@@ -1,7 +1,7 @@
 import { createAuthClient } from "better-auth/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { parseInviteToken, withInviteToken } from "./invite-token";
+import { parseInviteToken, readInviteToken, withInviteToken } from "./invite-token";
 
 describe("parseInviteToken", () => {
     it("reads the token", () => {
@@ -96,5 +96,29 @@ describe("the token actually reaches the sign-up request body", () => {
 
         expect(body["inviteToken"]).toBe("tok-123");
         expect(body).not.toHaveProperty("fetchOptions");
+    });
+});
+
+describe("reading the token from the live URL", () => {
+    afterEach(() => {
+        globalThis.history.replaceState({}, "", "/");
+    });
+
+    it("readInviteToken reads ?invite= off the current location", () => {
+        globalThis.history.replaceState({}, "", "/auth/sign-up?redirectTo=%2Fchat&invite=tok-9");
+
+        expect(readInviteToken()).toBe("tok-9");
+    });
+
+    it("readInviteToken is undefined when the link carries none", () => {
+        globalThis.history.replaceState({}, "", "/auth/sign-up");
+
+        expect(readInviteToken()).toBeUndefined();
+    });
+
+    it("withInviteToken defaults to the token on the current URL", () => {
+        globalThis.history.replaceState({}, "", "/auth/sign-up?invite=tok-9");
+
+        expect(withInviteToken({ email: "a@b.test" })).toStrictEqual({ email: "a@b.test", inviteToken: "tok-9" });
     });
 });

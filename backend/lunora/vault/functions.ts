@@ -720,3 +720,34 @@ export const insertVaultFile = internalMutation
     .input({ key: v.string(), name: v.string(), organizationId: v.optional(v.string()), size: v.number(), type: v.string(), userId: v.string() })
     .output(v.id("files"))
     .mutation(async ({ args, ctx }) => await ctx.db.insert("files", withoutUndefined(args)));
+
+/**
+ * Drops the row {@link saveVaultFile} just made when the caller could not use it
+ * (the public API's knowledge file was refused, and its staged upload is spent).
+ * Narrower than `deleteAttachments` on purpose: only the user's OWN, chat-less,
+ * unfiled file that no knowledge file points at. Anything else is left alone.
+ */
+export const discardUnfiledVaultFile = internalMutation
+    .input({ fileId: v.id("files"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const row = await ctx.db.get(args.fileId);
+
+        if (!row || row.userId !== args.userId || row.chatId !== undefined || row.folderId !== undefined) {
+            return null;
+        }
+
+        const referencedBy = await ctx.db
+            .query("knowledgeFiles")
+            .withIndex("by_vaultFileId", (q) => q.eq("vaultFileId", row._id))
+            .first();
+
+        if (referencedBy) {
+            return null;
+        }
+
+        await scheduleObjectDeletion(ctx, [row.key]);
+        await ctx.db.delete(row._id);
+
+        return null;
+    });

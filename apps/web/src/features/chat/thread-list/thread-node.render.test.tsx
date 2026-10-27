@@ -70,8 +70,12 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
-vi.mock("@/lib/lunora/unlock-proofs", () => {
-    return { forgetUnlockProof: () => {}, useUnlockProof: () => undefined };
+vi.mock("@neore/client-runtime", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("@neore/client-runtime")>()),
+        forgetUnlockProof: () => {},
+        useUnlockProof: () => undefined,
+    };
 });
 
 vi.mock("@/lib/toast", () => {

@@ -15,6 +15,8 @@ import MessageItem from "@neore/chat-ui/chat/message-item";
 import { Badge } from "@neore/ui/components/badge";
 import { buttonVariants } from "@neore/ui/components/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@neore/ui/components/empty";
+import { FetchableOriginsProvider } from "@neore/ui/components/file-renderers/fetchable-origins-provider";
+import { originsOf } from "@neore/ui/hooks/use-fetchable-origins";
 import cn from "@neore/ui/utils/cn";
 import { Link } from "@tanstack/react-router";
 import { Eye, LinkIcon, MessageSquarePlus, Paperclip, Wrench } from "lucide-react";
@@ -26,6 +28,9 @@ import env from "@/lib/env";
 
 import type { PublicThread } from "./public-thread-message";
 import { formatToolName, toPublicThreadRenderable } from "./public-thread-message";
+
+/** A shared thread's file parts carry signed URLs on the backend, which its previews may fetch. */
+const FETCHABLE_ORIGINS = originsOf(env.VITE_LUNORA_URL);
 
 export type SharedThreadStatus = "error" | "ok" | "unavailable";
 
@@ -151,7 +156,9 @@ const SharedThread: FC<{ thread: PublicThread }> = ({ thread }) => {
                             <PlaceholderChips attachments={attachments} tools={tools} />
                             {message.parts.length > 0 && (
                                 <div className="message-text w-full">
-                                    <MessageItem message={message} />
+                                    <FetchableOriginsProvider origins={FETCHABLE_ORIGINS}>
+                                        <MessageItem message={message} />
+                                    </FetchableOriginsProvider>
                                 </div>
                             )}
                         </li>

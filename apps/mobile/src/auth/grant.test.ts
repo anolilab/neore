@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Fetch, GrantStore, StoredGrant } from "./grant";
-import { buildAuthorizeUrl, createPkce, exchangeGrant, fetchAccessToken, parseAuthorizeResponse, SignInError, signOutGrant, toBase64Url } from "./grant";
+import { buildAuthorizeUrl, createPkce, exchangeGrant, fetchAccessToken, parseAuthorizeResponse, readStoredUser, SignInError, signOutGrant, toBase64Url } from "./grant";
 
 const REDIRECT = "neore-mobile://auth/callback";
 const LUNORA = "https://backend.example";
@@ -234,5 +234,23 @@ describe("randomness", () => {
         const b = await createPkce(dependencies);
 
         expect(a.state).not.toBe(b.state);
+    });
+});
+
+describe("readStoredUser", () => {
+    it("returns the stored user", async () => {
+        expect(await readStoredUser(memoryStore({ token: "t", user: USER }))).toEqual(USER);
+    });
+
+    it("returns null when nothing is stored", async () => {
+        expect(await readStoredUser(memoryStore())).toBeNull();
+    });
+
+    it("returns null instead of rejecting when the store cannot be read", async () => {
+        const store = { ...memoryStore(), get: async (): Promise<StoredGrant | null> => {
+            throw new Error("store locked");
+        } };
+
+        expect(await readStoredUser(store)).toBeNull();
     });
 });

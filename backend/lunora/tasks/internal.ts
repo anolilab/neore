@@ -550,8 +550,9 @@ export const checkDueTasks = internalMutation
             }
 
             // Advance first, whatever happens next, so a task that cannot start
-            // now is not re-examined every minute.
-            await ctx.db.patch(task._id, { nextRunAt: nextRecurrenceAt(task.cronExpression, now), updatedAt: now });
+            // now is not re-examined every minute. `updatedAt` is left alone: only a
+            // task that really starts changes, and a quiet routine reads it as activity.
+            await ctx.db.patch(task._id, { nextRunAt: nextRecurrenceAt(task.cronExpression, now) });
 
             if (!shouldRecurNow(task.status)) {
                 continue;

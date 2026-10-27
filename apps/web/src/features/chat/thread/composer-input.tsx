@@ -27,6 +27,8 @@ import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, use
 import ReferenceStrip from "@/features/chat/components/reference-picker/reference-strip";
 import type { AttachmentAdapter } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import {
+    ATTACHMENT_ACCEPT,
+    attachmentTextChars,
     AttachmentTooLargeError,
     AttachmentUploadError,
     createLunoraAttachmentAdapter,
@@ -123,13 +125,6 @@ const wasRefused = (error: unknown): boolean => {
  * that lands late queues nothing (`withdrawQueuedSteer`).
  */
 const STEER_ANSWER_MS = 15_000;
-
-const TEXT_ATTACHMENT_TYPE = /^(?:text\/|application\/(?:json|xml)$)/u;
-const TEXT_ATTACHMENT_NAME = /\.(?:md|txt|csv)$/iu;
-
-/** The characters an attachment adds to the prompt as typed text: its size for a text file, nothing for binary. */
-const textAttachmentChars = (file: File | undefined): number =>
-    file && (TEXT_ATTACHMENT_TYPE.test(file.type) || TEXT_ATTACHMENT_NAME.test(file.name)) ? file.size : 0;
 
 /** The translated sentence for one upload failure; outside the component for the React Compiler. */
 const uploadErrorText = (
@@ -583,7 +578,7 @@ const ComposerInput = ({
         // A text attachment's bytes roughly are its characters. A binary one's
         // are not: a 3 MB PDF read as ~786k tokens and blocked sending, while
         // the model receives only its extracted text (or the media itself).
-        const attachmentChars = attachments.reduce((total, att) => total + textAttachmentChars(att.file), 0);
+        const attachmentChars = attachments.reduce((total, att) => total + (att.file ? attachmentTextChars(att.file) : 0), 0);
         const totalChars = textChars + attachmentChars;
         const estimatedTokens = Math.ceil(totalChars / 4);
 
@@ -1161,7 +1156,7 @@ const ComposerInput = ({
             onDrop={handleDrop}
         >
             {/* Hidden file input (attachment button) */}
-            <input accept="image/*,.pdf,.doc,.docx,.txt,.md" className="hidden" multiple onChange={handleFileInputChange} ref={fileInputRef} type="file" />
+            <input accept={ATTACHMENT_ACCEPT} className="hidden" multiple onChange={handleFileInputChange} ref={fileInputRef} type="file" />
             {/* Hidden file input (@ mention trigger - dynamic accept) */}
             <input className="hidden" multiple onChange={handleFileInputChange} ref={mentionFileInputRef} type="file" />
 

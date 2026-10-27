@@ -110,6 +110,35 @@ describe(withMediaCharge, () => {
         expect(paid).toHaveBeenCalledOnce();
     });
 
+    it("charges a three-image node three units in one keyed charge, and a parallel-compare node one per model", async () => {
+        const runMutation = vi.fn(async () => true);
+
+        await withMediaCharge({ runMutation } as never, run, node("i", "image", { mode: "generate" }), "user-1", async (charge) => {
+            await charge(imageCountOf(3));
+        });
+        await withMediaCharge({ runMutation } as never, run, node("p", "parallel-compare"), "user-1", async (charge) => {
+            await charge(4);
+        });
+
+        expect(runMutation.mock.calls.map(([, args]: any[]) => [args.count, args.kind, args.requestId])).toStrictEqual([
+            [3, "Image", mediaRequestId("run", "i")],
+            [4, "Image", mediaRequestId("run", "p")],
+        ]);
+    });
+
+    it("runs no paid call when a multi-image charge is refused", async () => {
+        const paid = vi.fn(async () => "url");
+
+        await expect(
+            withMediaCharge({ runMutation: vi.fn(async () => false) } as never, run, node("i", "image", { mode: "generate" }), "user-1", async (charge) => {
+                await charge(3);
+
+                return await paid();
+            }),
+        ).rejects.toThrow("daily image generation limit");
+        expect(paid).not.toHaveBeenCalled();
+    });
+
     it("takes nothing when the executor fails validation before it charges", async () => {
         const runMutation = vi.fn(async () => true);
 

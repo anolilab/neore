@@ -92,6 +92,7 @@ import {
 import { getAgentForUser } from "./lib/thread-helpers";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
+import { deleteThreadShardRoutes } from "../lib/shard-routes";
 import { retryClipStore } from "../workflow/clip-store-retry";
 
 const DATA_URL_BASE64_RE = /^data:[^;]+;base64,/;
@@ -1198,6 +1199,7 @@ export const getThreadsWithTemporaryFilter = internalQuery
                     isPublic: v.optional(v.boolean()),
                     isTemporary: v.optional(v.boolean()),
                     language: v.optional(v.string()),
+                    lastUserMessageAt: v.optional(v.number()),
                     lockedAt: v.optional(v.number()),
                     mode: v.optional(v.string()),
                     model: v.optional(v.string()),
@@ -1929,6 +1931,8 @@ export const deleteThread = authMutation
             });
         }
 
+        await deleteThreadShardRoutes(context, threadBeforeDelete, threadId);
+
         context.log.event("chat.delete_thread", { isDone: result.isDone });
 
         return result;
@@ -1993,6 +1997,16 @@ export const deleteThreads = authMutation
 
         // Count successful deletions
         const deletedCount = deletionResults.filter((result) => result.status === "fulfilled" && result.value !== null).length;
+
+        // The share routes of the threads that went, one at a time and outside the
+        // fan-out above: a route write never fails (or reorders) a delete.
+        for (const [index, result] of deletionResults.entries()) {
+            const thread = threads[index];
+
+            if (thread && result.status === "fulfilled" && result.value !== null) {
+                await deleteThreadShardRoutes(context, thread, thread._id);
+            }
+        }
 
         context.log.event("chat.delete_threads", { deletedCount, requested: threadIds.length });
 
@@ -2150,6 +2164,7 @@ export const getPinnedThreads = authQuery
                 deletedAt: v.optional(v.number()),
                 enabledFeatures: v.optional(v.array(v.string())),
                 isPublic: v.optional(v.boolean()),
+                lastUserMessageAt: v.optional(v.number()),
                 lockedAt: v.optional(v.number()),
                 model: v.optional(v.string()),
                 order: v.optional(v.number()),
@@ -2970,6 +2985,8 @@ export const hardDeleteThread = internalMutation
 
         // Record audit history for hard delete
         if (threadBeforeDelete) {
+            await deleteThreadShardRoutes(context, threadBeforeDelete, threadId);
+
             await context.runMutation(internal.lib.document_history.recordHistory, {
                 attribution: { action: "delete", metadata: { hardDelete: true }, source: "manual" },
                 doc: null,

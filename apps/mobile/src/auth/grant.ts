@@ -295,3 +295,19 @@ export const signOutGrant = async (input: { fetch: Fetch; lunoraUrl: string; sto
         await input.store.clear();
     }
 };
+
+/**
+ * The stored user, or null when there is none or the store cannot be read. A failed read must not
+ * stop the caller: the access token is already valid, so the session carries on without a profile.
+ */
+export const readStoredUser = async (store: GrantStore): Promise<GrantUser | null> => {
+    try {
+        const stored = await store.get();
+
+        // eslint-disable-next-line unicorn/no-null -- `AuthProvider`'s user state is `GrantUser | null`
+        return stored?.user ?? null;
+    } catch {
+        // eslint-disable-next-line unicorn/no-null -- same contract as above
+        return null;
+    }
+};

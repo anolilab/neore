@@ -21,6 +21,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { parentKeyOf, systemDb } from "../lib/rls/scope";
+import { deleteShardRoute } from "../lib/shard-routes";
 import { requireOwnedPage, requirePageAccess } from "./access";
 import { collectCommentAnchors, reconcileCommentAnchors, removeCommentMarks, sameContentIgnoringComments } from "./comment-anchors";
 import type { VersionReason } from "./logic";
@@ -388,7 +389,17 @@ export const deletePageRows = async (ctx: MutationCtx, pageId: Id<"pages">): Pro
         await ctx.db.delete(row._id);
     }
 
+    const page = await ctx.db.get(pageId);
+
     await ctx.db.delete(pageId);
+
+    // The anonymous `/p/$token` link resolves through `shardRoutes`; a deleted
+    // page must not leave its route behind. A route write never fails the delete.
+    if (page?.publicAccessToken) {
+        await deleteShardRoute(ctx, "page-public", page.publicAccessToken).catch((error: unknown) => {
+            console.error("[pages] Failed to drop the public route of a deleted page:", error);
+        });
+    }
 };
 
 // ─── Reads ───────────────────────────────────────────────────────────────────

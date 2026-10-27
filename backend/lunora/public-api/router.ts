@@ -70,6 +70,7 @@ const applyKeyRateLimit = async (ctx: HttpActionCtx, identity: ApiKeyIdentity, i
 };
 
 const readBody = async (route: RouteDefinition, request: Request): Promise<{ parsed: unknown; raw: string }> => {
+    // Content-Length is only checked up front: a chunked body is read in full before the cap below applies.
     const declared = Number(request.headers.get("Content-Length") ?? "0");
 
     if (declared > MAX_BODY_BYTES) {

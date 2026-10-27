@@ -263,6 +263,7 @@ export const saveEditedSiblingHandler = async (
     const threadId = original.threadId as Id<"threads">;
     const parent = await parentOf(ctx, threadId, original);
     const { messages } = await addMessagesHandler(ctx, {
+        fromUser: true,
         messages: [{ fileIds: args.fileIds, message: args.message, status: "success" }],
         parentMessageId: parent?._id ?? BRANCH_ROOT,
         threadId,
