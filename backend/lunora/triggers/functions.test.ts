@@ -234,7 +234,9 @@ describe("trigger schedules", () => {
     });
 
     it("refuses an unknown time zone on create and on update, storing nothing", async () => {
-        await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), timezone: "Europe/Berln" } as never)).rejects.toThrow("Unknown time zone");
+        await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), timezone: "Europe/Berln" } as never)).rejects.toThrow(
+            "Unknown time zone",
+        );
 
         const { triggerId } = (await as().mutation(createTrigger as never, schedule("0 9 * * 1") as never)) as { triggerId: string };
 
