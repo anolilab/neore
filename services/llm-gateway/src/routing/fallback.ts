@@ -205,6 +205,22 @@ export const extractProviderErrorInfo = (error: unknown): { body: string; status
     return { body: "", statusCode: 500 };
 };
 
+/** The words of an error to match: the error itself when it is a string, else its name and message, looking through `{ error: ... }` nesting. */
+const errorText = (error: unknown, depth = 0): string => {
+    if (typeof error === "string") {
+        return error;
+    }
+
+    if (!error || typeof error !== "object" || depth > 2) {
+        return "";
+    }
+
+    const { error: nested, message, name, type } = error as { error?: unknown; message?: unknown; name?: unknown; type?: unknown };
+    const own = [name, type, message].filter((part): part is string => typeof part === "string").join(" ");
+
+    return `${own} ${errorText(nested, depth + 1)}`;
+};
+
 const TRANSIENT_NETWORK_PATTERN =
     /timeout|timed out|econnreset|econnrefused|network|fetch failed|socket hang up|overloaded|unavailable|rate.?limit|too many requests|at capacity/i;
 
@@ -223,36 +239,9 @@ export const classifyProviderFailure = (error: unknown, promptTokens: number, co
         return reason;
     }
 
-    const record = error && typeof error === "object" ? (error as { message?: unknown; name?: unknown }) : undefined;
-
     if (readStatus(error) !== undefined) {
         return statusCode === 429 || statusCode === 408 || statusCode >= 500 ? "infra" : undefined;
     }
 
-    const text = `${typeof record?.name === "string" ? record.name : ""} ${typeof record?.message === "string" ? record.message : ""}`;
-
-    return TRANSIENT_NETWORK_PATTERN.test(text) ? "infra" : undefined;
-};
-
-/**
- * Whether a stream part carries something the user would see: text or reasoning with characters in it, a
- * tool call or its argument deltas, a file, or the end of the stream. Until one goes out the caller can
- * still retry the call on another model, whatever structural parts (`text-start`, ...) came first.
- */
-export const isVisiblePart = (part: { delta?: unknown; type: string }): boolean => {
-    switch (part.type) {
-        case "file":
-        case "finish":
-        case "tool-call": {
-            return true;
-        }
-        case "reasoning-delta":
-        case "text-delta":
-        case "tool-input-delta": {
-            return typeof part.delta === "string" && part.delta.length > 0;
-        }
-        default: {
-            return false;
-        }
-    }
+    return TRANSIENT_NETWORK_PATTERN.test(errorText(error)) ? "infra" : undefined;
 };

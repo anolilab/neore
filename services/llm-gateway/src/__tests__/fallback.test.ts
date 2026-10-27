@@ -19,6 +19,7 @@ import { GATEWAY_MODELS } from "../models.js";
 import type { ProviderHealthService } from "../providers/health.js";
 import {
     classifyFailure,
+    classifyProviderFailure,
     CONTENT_POLICY_FALLBACK_MODELS,
     extractProviderErrorInfo,
     selectFallback,
@@ -331,5 +332,21 @@ describe("extractProviderErrorInfo", () => {
         const result = extractProviderErrorInfo(error);
 
         expect(result.statusCode).toBe(500);
+    });
+});
+
+describe("classifyProviderFailure on errors that are not Error objects", () => {
+    it.each(["overloaded", "Service Unavailable", "rate limit exceeded", "fetch failed"])("treats the string %j as infra", (message) => {
+        expect(classifyProviderFailure(message, 10, 100_000)).toBe("infra");
+    });
+
+    it("treats a nested { error: { message } } like the error itself", () => {
+        expect(classifyProviderFailure({ error: { message: "Overloaded", type: "overloaded_error" }, type: "error" }, 10, 100_000)).toBe("infra");
+    });
+
+    it("gives a string or nested error that names no outage no reason", () => {
+        expect(classifyProviderFailure("invalid api key", 10, 100_000)).toBeUndefined();
+        expect(classifyProviderFailure({ error: { message: "bad schema" } }, 10, 100_000)).toBeUndefined();
+        expect(classifyProviderFailure(undefined, 10, 100_000)).toBeUndefined();
     });
 });

@@ -23,30 +23,9 @@ import type {
     LanguageModelV3StreamResult,
 } from "@ai-sdk/provider";
 
-import { streamLogger } from "../../lib/logger";
+import { isVisiblePart } from "@neore/ai/models";
 
-/**
- * Whether a stream part carries something the user would see: text or reasoning with characters in it, a
- * tool call or its argument deltas, a file, or the end of the stream. Structural parts before it
- * (`stream-start`, `text-start`, ...) are held back, so they can be dropped if the call moves to the backup.
- */
-export const isVisiblePart = (part: LanguageModelV3StreamPart): boolean => {
-    switch (part.type) {
-        case "file":
-        case "finish":
-        case "tool-call": {
-            return true;
-        }
-        case "reasoning-delta":
-        case "text-delta":
-        case "tool-input-delta": {
-            return part.delta.length > 0;
-        }
-        default: {
-            return false;
-        }
-    }
-};
+import { streamLogger } from "../../lib/logger";
 
 /** Provider option keys that only a reasoning model accepts (sending one to another is a 400). */
 const REASONING_OPTION_KEYS: ReadonlySet<string> = new Set([

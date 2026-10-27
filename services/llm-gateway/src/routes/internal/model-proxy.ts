@@ -13,6 +13,7 @@
 import type { LanguageModelV3, LanguageModelV3CallOptions } from "@ai-sdk/provider";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { CUSTOM_PROVIDER_FORMATS } from "@neore/ai/gateway";
+import { isVisiblePart } from "@neore/ai/models";
 import { z } from "zod";
 
 import type { AppEnv, HonoEnv } from "../../env.js";
@@ -26,7 +27,7 @@ import { createProviderModelForEnv, resolveApiKey } from "../../providers/factor
 import { ProviderHealthService } from "../../providers/health.js";
 import type { ModelPricing } from "../../providers/pricing.js";
 import { calculateCost, PricingService } from "../../providers/pricing.js";
-import { classifyProviderFailure, isVisiblePart } from "../../routing/fallback.js";
+import { classifyProviderFailure } from "../../routing/fallback.js";
 import type { ModelFilterRules } from "../../routing/filters.js";
 import { getModelRejectionReason, hasActiveFilters } from "../../routing/filters.js";
 import type { BillingMode } from "../../usage/billing.js";

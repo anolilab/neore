@@ -224,11 +224,6 @@ const deserializeFromWire = <T>(object: T): T => {
     return object;
 };
 
-/**
- * An error from the gateway's model proxy. `fallbackReason` is the gateway's own
- * classification of a provider failure (`infra`, `content_policy`,
- * `context_overflow`); absent on errors the gateway did not classify.
- */
 /** The message of a stream error event: the gateway sends a string, a provider's own error part may carry an object. */
 const streamErrorMessage = (error: unknown): string => {
     if (typeof error === "string") {
@@ -240,6 +235,11 @@ const streamErrorMessage = (error: unknown): string => {
     return typeof message === "string" ? message : "Unknown stream error from gateway";
 };
 
+/**
+ * An error from the gateway's model proxy. `fallbackReason` is the gateway's own
+ * classification of a provider failure (`infra`, `content_policy`,
+ * `context_overflow`); absent on errors the gateway did not classify.
+ */
 export type GatewayError = Error & { fallbackReason?: string; statusCode?: number };
 
 // ── GatewayLanguageModel ─────────────────────────────────────────────────────
