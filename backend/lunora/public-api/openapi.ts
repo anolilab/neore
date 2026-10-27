@@ -19,7 +19,7 @@ const TRAILING_SLASH = /\/$/u;
 
 type JsonSchema = Record<string, unknown>;
 
-export const toSchema = (schema: z.ZodType, io: "input" | "output"): JsonSchema => {
+const toSchema = (schema: z.ZodType, io: "input" | "output"): JsonSchema => {
     const document = z.toJSONSchema(schema, { io, unrepresentable: "any" }) as JsonSchema;
 
     // Embedded in an OpenAPI document, which declares its own dialect.

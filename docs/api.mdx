@@ -51,7 +51,7 @@ The stream emits one JSON object per line: `{"type":"text","text":"…"}`, `{"ty
 
 `POST /api/v1/mcp` is an [MCP](https://modelcontextprotocol.io) server over the same API, so an agent such as Claude Code can read your account. Point the client at it with the key as a bearer header, for example `claude mcp add --transport http neore "$NEORE_API_URL/api/v1/mcp" --header "Authorization: Bearer $NEORE_API_KEY"`.
 
-The tools are read-only: `list_threads`, `get_thread`, `read_messages`, `search_knowledge`, `list_tasks` and `get_task`. `tools/list` shows only the tools your key's scopes allow (`threads:read`, `knowledge:read`, `tasks:read`), and every call is checked against them again and counts against the same per-key read limit as the REST routes. A refused call comes back as a tool result with `isError: true` and the usual error body. A locked thread is not found. Titles, message text and knowledge passages are your data, and each tool says so to the agent.
+The tools are read-only: `list_threads`, `get_thread`, `read_messages`, `search_knowledge`, `list_tasks` and `get_task`. `tools/list` shows only the tools your key's scopes allow (`threads:read`, `knowledge:read`, `tasks:read`), and every tool call is checked against them again and counts against the same per-key read limit as the REST routes. A refused call comes back as a tool result with `isError: true` and the usual error body. A locked thread is not found. Titles, message text and knowledge passages are your data, and each tool says so to the agent.
 
 ## The `neore` CLI
 

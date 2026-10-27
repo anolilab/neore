@@ -151,7 +151,7 @@ interface RpcMessage {
 }
 
 /** A single JSON-RPC 2.0 request or notification, or the refusal to send back. */
-export const parseRpcMessage = (raw: string): { message: RpcMessage } | { refusal: Response } => {
+const parseRpcMessage = (raw: string): { message: RpcMessage } | { refusal: Response } => {
     let json: unknown;
 
     try {
@@ -210,8 +210,14 @@ const resolveEra = (message: RpcMessage, headers: Headers): { modern: boolean } 
 
 const callResult = async (response: Response): Promise<Record<string, unknown>> => {
     const text = await response.text();
+    const content = [{ text, type: "text" }];
 
-    return { content: [{ text, type: "text" }], isError: !response.ok, structuredContent: JSON.parse(text) as unknown };
+    try {
+        return { content, isError: !response.ok, structuredContent: JSON.parse(text) as unknown };
+    } catch {
+        // A route that answers without a JSON body still yields a tool result, not a 500.
+        return { content, isError: true };
+    }
 };
 
 /** Answer one POST of the MCP endpoint, once the caller is authenticated. */
