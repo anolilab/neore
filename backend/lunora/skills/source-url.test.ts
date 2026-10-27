@@ -87,6 +87,13 @@ describe("npx skills add commands", () => {
         expect(urls("npx skills add https://github.com/acme/skills")).toStrictEqual([`${RAW}/acme/skills/HEAD/SKILL.md`]);
     });
 
+    it("tells a bare command to name a skill when the root has none", () => {
+        const bare = resolveSkillSourceUrls("npx skills add acme/skills");
+
+        expect(bare.ok && bare.notFound).toContain("--skill name");
+        expect(resolveSkillSourceUrls("npx skills add acme/skills --skill pdf")).not.toHaveProperty("notFound");
+    });
+
     it.each([
         ["an extra flag", "npx skills add acme/skills --skill pdf --global"],
         ["a short extra flag", "npx skills add acme/skills -y --skill pdf"],

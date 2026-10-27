@@ -34,7 +34,8 @@ const DOT_SEGMENT = /^\.+$/;
 const WHITESPACE = /\s+/;
 const COMMAND_PREFIX = /^npx\s/i;
 
-export type SkillSourceResult = { error: string; ok: false } | { ok: true; urls: string[] };
+/** `notFound` replaces the generic "no SKILL.md" message when nothing is found at `urls`. */
+export type SkillSourceResult = { error: string; ok: false } | { notFound?: string; ok: true; urls: string[] };
 
 const fail = (error: string): SkillSourceResult => {
     return { error, ok: false };
@@ -145,7 +146,11 @@ const fromCommand = (command: string): SkillSourceResult => {
     }
 
     if (skill === undefined) {
-        return { ok: true, urls: [rawUrl(owner, repo, "HEAD", [])] };
+        return {
+            notFound: "No SKILL.md was found at the root of that repository. If it keeps its skills in folders, paste the command with --skill name.",
+            ok: true,
+            urls: [rawUrl(owner, repo, "HEAD", [])],
+        };
     }
 
     return SKILL_NAME.test(skill)

@@ -176,7 +176,7 @@ export const fetchSkillFromUrl = authAction
         }
 
         if (!found) {
-            throw new LunoraError("NOT_FOUND", "No SKILL.md was found at that link.");
+            throw new LunoraError("NOT_FOUND", resolved.notFound ?? "No SKILL.md was found at that link.");
         }
 
         // Returned even when it does not parse: the dialog's preview lists the problems so the user can fix them in place,
