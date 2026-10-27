@@ -236,19 +236,26 @@ const REQUIRED_FIELDS: Record<keyof PersistedThreadList, ReadonlyArray<string>> 
     tags: ["_id"],
     temporaryThreads: ["_id"],
     threadOrders: ["_id"],
-    threads: ["_id"],
+    threads: ["_id", "status"],
 };
+
+const isFiniteNumber = (value: unknown): boolean => typeof value === "number" && Number.isFinite(value);
+
+/** Thread rows are grouped by status and creation time; a row without them would be painted as an active chat in "Older". */
+const isGroupableThread = (row: Record<string, unknown>): boolean => isFiniteNumber(row.createdAt) || isFiniteNumber(row._creationTime);
 
 /** A stored row is only trusted when it holds its identifying fields and every field has the type the sidebar reads. */
 const isPersistedRow = (row: unknown, required: ReadonlyArray<string>): boolean =>
     isRecord(row) && required.every((field) => row[field] !== undefined) && Object.entries(row).every(([field, value]) => FIELD_TYPES[field]?.(value) === true);
+
+const isPersistedThread = (row: unknown): boolean => isPersistedRow(row, REQUIRED_FIELDS.threads) && isGroupableThread(row as Record<string, unknown>);
 
 const isPersistedList = (value: unknown): value is PersistedThreadList =>
     isRecord(value) &&
     (Object.keys(REQUIRED_FIELDS) as (keyof PersistedThreadList)[]).every((name) => {
         const rows = value[name];
 
-        return Array.isArray(rows) && rows.every((row) => isPersistedRow(row, REQUIRED_FIELDS[name]));
+        return Array.isArray(rows) && rows.every((row) => (name === "threads" ? isPersistedThread(row) : isPersistedRow(row, REQUIRED_FIELDS[name])));
     });
 
 /**

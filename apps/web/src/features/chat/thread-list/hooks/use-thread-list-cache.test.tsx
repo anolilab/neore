@@ -27,7 +27,7 @@ const list = (userId: string, title: string) => {
         tags: [],
         temporaryThreads: { page: [] },
         threadOrders: [],
-        threads: { page: [{ _id: "t1", title, userId }] },
+        threads: { page: [{ _id: "t1", createdAt: 1, status: "active", title, userId }] },
     };
 };
 

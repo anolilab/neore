@@ -185,7 +185,10 @@ describe("thread list cache", () => {
         const key = Object.keys(localStorage)[0] as string;
         const entry = JSON.parse(localStorage.getItem(key) as string);
 
-        entry.data.threads.push({ _id: "old", expiresAt: Date.now() - 1000, title: "Expired" }, { _id: "live", expiresAt: Date.now() + 60_000, title: "Live" });
+        entry.data.threads.push(
+            { _id: "old", createdAt: 1, expiresAt: Date.now() - 1000, status: "active", title: "Expired" },
+            { _id: "live", createdAt: 1, expiresAt: Date.now() + 60_000, status: "active", title: "Live" },
+        );
         entry.data.temporaryThreads.push({ _id: "tmp", expiresAt: Date.now() + 60_000, title: "Temp" });
         localStorage.setItem(key, JSON.stringify(entry));
 
@@ -193,6 +196,32 @@ describe("thread list cache", () => {
 
         expect(stored?.threads.map((row) => row._id)).toEqual(["t1", "live"]);
         expect(stored?.temporaryThreads).toEqual([]);
+    });
+
+    it.each([
+        ["no status", { _id: "x", createdAt: 1 }],
+        ["no creation time", { _id: "x", status: "active" }],
+        ["a non-finite creation time", { _id: "x", createdAt: null, status: "active" }],
+    ])("rejects the whole stored list when a thread row has %s", (_name, row) => {
+        writeThreadListCache("alice", listFor("alice"));
+
+        const key = Object.keys(localStorage)[0] as string;
+        const entry = JSON.parse(localStorage.getItem(key) as string);
+
+        entry.data.threads.push(row);
+        localStorage.setItem(key, JSON.stringify(entry));
+
+        expect(readThreadListCache("alice")).toBeUndefined();
+        expect(localStorage.getItem(key)).toBeNull();
+    });
+
+    it("accepts a row that has only _creationTime and a title-less locked row", () => {
+        const list = listFor("alice");
+
+        list.threads.page.push({ _creationTime: 9, _id: "t8", lockedAt: 3, status: "active", userId: "alice" } as never);
+        writeThreadListCache("alice", list);
+
+        expect(readThreadListCache("alice")?.threads.map((row) => row._id)).toContain("t8");
     });
 
     it("stores no title for a locked chat", () => {
