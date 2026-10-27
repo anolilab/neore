@@ -26,7 +26,7 @@ import { createProviderModelForEnv, resolveApiKey } from "../../providers/factor
 import { ProviderHealthService } from "../../providers/health.js";
 import type { ModelPricing } from "../../providers/pricing.js";
 import { calculateCost, PricingService } from "../../providers/pricing.js";
-import { classifyProviderFailure } from "../../routing/fallback.js";
+import { classifyProviderFailure, isVisiblePart } from "../../routing/fallback.js";
 import type { ModelFilterRules } from "../../routing/filters.js";
 import { getModelRejectionReason, hasActiveFilters } from "../../routing/filters.js";
 import type { BillingMode } from "../../usage/billing.js";
@@ -341,7 +341,7 @@ modelProxyRouter.openapi(
 
                     try {
                         let isErrored = false;
-                        // Until a part beyond the preamble goes out, the caller can still retry the call elsewhere.
+                        // Until a part the user would see goes out, the caller can still retry the call elsewhere.
                         let hasContent = false;
 
                         while (true) {
@@ -402,7 +402,7 @@ modelProxyRouter.openapi(
                             // An in-band provider error before any content is classified like a thrown one.
                             const fallbackReason = !hasContent && value.type === "error" ? failureReason(value.error) : undefined;
 
-                            if (value.type !== "stream-start" && value.type !== "response-metadata") {
+                            if (isVisiblePart(value)) {
                                 hasContent = true;
                             }
 

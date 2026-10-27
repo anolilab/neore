@@ -126,6 +126,17 @@ describe("POST /internal/model/proxy tags a provider failure with its fallback r
             expect(events.find((event) => event.type === "error")?.fallbackReason).toBe("infra");
         });
 
+        it("after only structural parts and an empty delta is still classified", async () => {
+            const events = await streamOf([
+                { type: "stream-start", warnings: [] },
+                { id: "1", type: "text-start" },
+                { delta: "", id: "1", type: "text-delta" },
+                { error: providerError(503, "unavailable"), type: "error" },
+            ]);
+
+            expect(events.find((event) => event.type === "error")?.fallbackReason).toBe("infra");
+        });
+
         it("after content has gone out is left unclassified", async () => {
             const events = await streamOf([
                 { delta: "hi", id: "1", type: "text-delta" },

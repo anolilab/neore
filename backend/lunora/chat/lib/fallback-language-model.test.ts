@@ -118,6 +118,27 @@ describe("FallbackLanguageModel", () => {
         expect(model.modelId).toBe("backup");
     });
 
+    it("still falls back when the stream fails after text-start but before any text", async () => {
+        const primary = fakeModel("primary");
+
+        primary.doStream.mockResolvedValue({
+            stream: new ReadableStream({
+                start(controller) {
+                    controller.enqueue({ type: "stream-start", warnings: [] });
+                    controller.enqueue({ id: "1", type: "text-start" });
+                    controller.enqueue({ delta: "", id: "1", type: "text-delta" });
+                    controller.error(gatewayError("infra"));
+                },
+            }),
+        });
+
+        const backup = fakeModel("backup");
+
+        await new FallbackLanguageModel(primary, backup).doStream(OPTIONS);
+
+        expect(backup.doStream).toHaveBeenCalledTimes(1);
+    });
+
     it("does not replay a stream that fails after content was handed on", async () => {
         const primary = fakeModel("primary");
 

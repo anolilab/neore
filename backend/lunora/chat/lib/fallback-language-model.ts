@@ -25,6 +25,29 @@ import type {
 
 import { streamLogger } from "../../lib/logger";
 
+/**
+ * Whether a stream part carries something the user would see: text or reasoning with characters in it, a
+ * tool call or its argument deltas, a file, or the end of the stream. Structural parts before it
+ * (`stream-start`, `text-start`, ...) are held back, so they can be dropped if the call moves to the backup.
+ */
+export const isVisiblePart = (part: LanguageModelV3StreamPart): boolean => {
+    switch (part.type) {
+        case "file":
+        case "finish":
+        case "tool-call": {
+            return true;
+        }
+        case "reasoning-delta":
+        case "text-delta":
+        case "tool-input-delta": {
+            return part.delta.length > 0;
+        }
+        default: {
+            return false;
+        }
+    }
+};
+
 /** Whether `error` is a gateway failure that another model could serve. */
 export const isInfraFailure = (error: unknown): boolean =>
     typeof error === "object" && error !== null && (error as { fallbackReason?: unknown }).fallbackReason === "infra";
@@ -53,6 +76,10 @@ export class FallbackLanguageModel implements LanguageModelV3 {
     /** The model the call is first made on, whichever one served the latest call. */
     get primaryModelId(): string {
         return this.primary.modelId;
+    }
+
+    get supportsToolsOnBackup(): boolean {
+        return this.backupSupportsTools;
     }
 
     get backupModelId(): string {
@@ -100,7 +127,7 @@ export class FallbackLanguageModel implements LanguageModelV3 {
             return await this.backup.doStream(options);
         }
 
-        // The gateway reports a provider failure after its 200 as an error event, so look at the stream up to its first content part before committing to it.
+        // The gateway reports a provider failure after its 200 as an error event, so look at the stream up to its first visible part before committing to it.
         const reader = result.stream.getReader();
         const head: LanguageModelV3StreamPart[] = [];
 
@@ -114,7 +141,7 @@ export class FallbackLanguageModel implements LanguageModelV3 {
 
                 head.push(value);
 
-                if (value.type !== "stream-start" && value.type !== "response-metadata") {
+                if (isVisiblePart(value)) {
                     break;
                 }
             }

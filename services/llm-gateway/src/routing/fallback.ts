@@ -233,3 +233,26 @@ export const classifyProviderFailure = (error: unknown, promptTokens: number, co
 
     return TRANSIENT_NETWORK_PATTERN.test(text) ? "infra" : undefined;
 };
+
+/**
+ * Whether a stream part carries something the user would see: text or reasoning with characters in it, a
+ * tool call or its argument deltas, a file, or the end of the stream. Until one goes out the caller can
+ * still retry the call on another model, whatever structural parts (`text-start`, ...) came first.
+ */
+export const isVisiblePart = (part: { delta?: unknown; type: string }): boolean => {
+    switch (part.type) {
+        case "file":
+        case "finish":
+        case "tool-call": {
+            return true;
+        }
+        case "reasoning-delta":
+        case "text-delta":
+        case "tool-input-delta": {
+            return typeof part.delta === "string" && part.delta.length > 0;
+        }
+        default: {
+            return false;
+        }
+    }
+};
