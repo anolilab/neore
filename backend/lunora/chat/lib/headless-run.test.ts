@@ -220,7 +220,9 @@ describe("runHeadlessAgent context sizing for a backup", () => {
     const NO_TOOLS_BACKUP = MODEL_REGISTRY.find(
         (m) => m.supportsToolCalling === false && m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text",
     )!.id;
-    const big = Array.from({ length: 24 }, (_, index) => {return { content: "y".repeat(40_000), role: index % 2 === 0 ? "user" : "assistant" }});
+    const big = Array.from({ length: 24 }, (_, index) => {
+        return { content: "y".repeat(40_000), role: index % 2 === 0 ? "user" : "assistant" };
+    });
 
     beforeEach(() => {
         seen.prepareSteps = [];
