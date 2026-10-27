@@ -111,6 +111,13 @@ pub fn resolve_for_write(raw: &str, roots: &[PathBuf]) -> Result<PathBuf, String
     Ok(target)
 }
 
+/// Whether a reparse tag names another place (symlink, junction): bit 29 of the tag. Other tags (cloud placeholders,
+/// deduplicated files, ...) are ordinary files and folders whose content a filter driver supplies.
+#[cfg(any(windows, test))]
+fn is_name_surrogate(tag: u32) -> bool {
+    tag & 0x2000_0000 != 0
+}
+
 /// How a file is opened by [`confined::open_file`].
 #[derive(Clone, Copy)]
 enum Open {
@@ -310,13 +317,16 @@ mod confined {
 
     use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
     use windows_sys::Win32::Storage::FileSystem::{
-        FileDispositionInfo, FileIdBothDirectoryInfo, FileIdBothDirectoryRestartInfo,
-        GetFileInformationByHandleEx, GetFinalPathNameByHandleW, ReOpenFile,
-        SetFileInformationByHandle, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT,
-        FILE_DISPOSITION_INFO, FILE_ID_BOTH_DIR_INFO,
+        FileAttributeTagInfo, FileDispositionInfo, FileIdBothDirectoryInfo,
+        FileIdBothDirectoryRestartInfo, GetFileInformationByHandleEx, GetFinalPathNameByHandleW,
+        ReOpenFile, SetFileInformationByHandle, FILE_ATTRIBUTE_DIRECTORY,
+        FILE_ATTRIBUTE_REPARSE_POINT, FILE_ATTRIBUTE_TAG_INFO, FILE_DISPOSITION_INFO,
+        FILE_ID_BOTH_DIR_INFO,
     };
 
     const DELETE: u32 = 0x0001_0000;
+    const GENERIC_READ: u32 = 0x8000_0000;
+    const GENERIC_WRITE: u32 = 0x4000_0000;
     const FILE_SHARE_READ: u32 = 0x1;
     const FILE_SHARE_WRITE: u32 = 0x2;
     const FILE_SHARE_DELETE: u32 = 0x4;
@@ -354,11 +364,70 @@ mod confined {
     fn confirm(file: &File, roots: &[PathBuf]) -> io::Result<PathBuf> {
         let real = final_path(file)?;
 
-        if !within_roots(&real, roots) || file.metadata()?.file_type().is_symlink() {
+        if !within_roots(&real, roots) || reparse_tag(file)?.is_some_and(super::is_name_surrogate) {
             return Err(outside_roots());
         }
 
         Ok(real)
+    }
+
+    /// The reparse tag of an open handle, if it has one.
+    fn reparse_tag(file: &File) -> io::Result<Option<u32>> {
+        let mut info = FILE_ATTRIBUTE_TAG_INFO {
+            FileAttributes: 0,
+            ReparseTag: 0,
+        };
+
+        // SAFETY: the handle is open and `info` is a `FILE_ATTRIBUTE_TAG_INFO` of the size passed.
+        let read = unsafe {
+            GetFileInformationByHandleEx(
+                file.as_raw_handle(),
+                FileAttributeTagInfo,
+                std::ptr::from_mut(&mut info).cast(),
+                std::mem::size_of::<FILE_ATTRIBUTE_TAG_INFO>() as u32,
+            )
+        };
+
+        if read == 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        Ok((info.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0).then_some(info.ReparseTag))
+    }
+
+    /// Reopens the file object `file` is open on, this time letting a filter driver process its reparse point.
+    fn reopen(file: &File, access: u32, flags: u32) -> io::Result<File> {
+        // SAFETY: the handle is open; the result is checked before use and owned by the `File` made from it.
+        let reopened = unsafe {
+            ReOpenFile(
+                file.as_raw_handle(),
+                access,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                flags,
+            )
+        };
+
+        if reopened == INVALID_HANDLE_VALUE {
+            return Err(io::Error::last_os_error());
+        }
+
+        // SAFETY: `reopened` is a valid handle nothing else owns.
+        Ok(unsafe { File::from_raw_handle(reopened) })
+    }
+
+    /// `file` was opened as itself (`FILE_FLAG_OPEN_REPARSE_POINT`) and passed `confirm`, so a link is already
+    /// refused. A cloud placeholder or deduplicated file is not a link, but its content only arrives when the
+    /// reparse point is processed: reopen that same file object that way and check the new handle again.
+    fn with_content(file: File, roots: &[PathBuf], access: u32) -> io::Result<File> {
+        if reparse_tag(&file)?.is_none() {
+            return Ok(file);
+        }
+
+        let reopened = reopen(&file, access, FILE_FLAG_BACKUP_SEMANTICS)?;
+
+        confirm(&reopened, roots)?;
+
+        Ok(reopened)
     }
 
     fn options(write: bool) -> OpenOptions {
@@ -378,13 +447,18 @@ mod confined {
             Open::Read => {
                 let file = options(false).open(path)?;
 
-                confirm(&file, roots).map(|_| file)
+                confirm(&file, roots)?;
+
+                with_content(file, roots, GENERIC_READ)
             }
             Open::Create => create(roots, path),
             Open::Overwrite => match options(true).open(path) {
                 Ok(file) => {
                     // Truncate only once the handle is known to be inside a root.
                     confirm(&file, roots)?;
+
+                    let file = with_content(file, roots, GENERIC_WRITE)?;
+
                     file.set_len(0)?;
 
                     Ok(file)
@@ -417,27 +491,16 @@ mod confined {
     /// (a path could name another file by now). If the reopen is refused the empty file is left behind and logged;
     /// the call is refused either way.
     fn remove_through_handle(file: &File) {
-        // SAFETY: the handle is open; the result is checked before use and owned by the `File` made from it.
-        let reopened = unsafe {
-            ReOpenFile(
-                file.as_raw_handle(),
-                DELETE,
-                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                FILE_FLAG_OPEN_REPARSE_POINT,
-            )
+        let reopened = match reopen(file, DELETE, FILE_FLAG_OPEN_REPARSE_POINT) {
+            Ok(reopened) => reopened,
+            Err(error) => {
+                eprintln!(
+                    "[device-core] could not remove a file created outside the shared folders: {error}"
+                );
+
+                return;
+            }
         };
-
-        if reopened == INVALID_HANDLE_VALUE {
-            eprintln!(
-                "[device-core] could not remove a file created outside the shared folders: {}",
-                io::Error::last_os_error()
-            );
-
-            return;
-        }
-
-        // SAFETY: `reopened` is a valid handle nothing else owns; dropping the `File` closes it after the mark below.
-        let reopened = unsafe { File::from_raw_handle(reopened) };
         let disposition = FILE_DISPOSITION_INFO { DeleteFile: true };
 
         // SAFETY: the handle is open and the buffer is a `FILE_DISPOSITION_INFO` of the size passed.
@@ -464,6 +527,8 @@ mod confined {
         let dir = options(false).open(path)?;
 
         confirm(&dir, roots)?;
+
+        let dir = with_content(dir, roots, GENERIC_READ)?;
 
         // 8-byte aligned, as the entries are.
         let mut buffer = vec![0u64; 8192];
@@ -521,7 +586,10 @@ mod confined {
                         break 'read;
                     }
 
-                    let kind = if entry.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+                    // With a reparse point set, `EaSize` carries its tag. Only a name surrogate is a link.
+                    let link = entry.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
+                        && super::is_name_surrogate(entry.EaSize);
+                    let kind = if link {
                         "symlink"
                     } else if entry.FileAttributes & FILE_ATTRIBUTE_DIRECTORY != 0 {
                         "dir"
@@ -822,5 +890,14 @@ mod tests {
         assert_eq!(read(&roots, &read_path).unwrap(), "hello");
         assert!(write(&roots, &write_path, "x", true).is_ok());
         assert_eq!(fs::read_to_string(dir.join("root/a.txt")).unwrap(), "x");
+    }
+
+    #[test]
+    fn only_a_name_surrogate_reparse_tag_is_a_link() {
+        assert!(is_name_surrogate(0xA000_000C), "symlink");
+        assert!(is_name_surrogate(0xA000_0003), "mount point (junction)");
+        assert!(!is_name_surrogate(0x9000_001A), "cloud files placeholder");
+        assert!(!is_name_surrogate(0x8000_0013), "deduplicated file");
+        assert!(!is_name_surrogate(0));
     }
 }
