@@ -441,7 +441,7 @@ export interface InternalApiTypes {
         };
         functions: {
             appendRunLog: FunctionReference<"mutation", { runId: Id<"codingAgentRuns">; text: string }, { cancelled: boolean }>;
-            beginPullRequest: FunctionReference<"mutation", { followUp: boolean; runId: Id<"codingAgentRuns">; userId: string }, { baseBranch: string; diff: string; pollSeq: number; prompt: string; repoUrl: string; staleSandboxId?: string; startedAt: number; summary?: string } | { error: string }>;
+            beginPullRequest: FunctionReference<"mutation", { followUp: boolean; runId: Id<"codingAgentRuns">; userId: string }, { baseBranch: string; diff: string; pollSeq: number; prompt: string; repoUrl: string; startedAt: number; summary?: string } | { error: string }>;
             claimFinish: FunctionReference<"mutation", { runId: Id<"codingAgentRuns"> }, { claimed: boolean; wantsPr: boolean }>;
             claimPoll: FunctionReference<"mutation", { prStartedAt?: number; runId: Id<"codingAgentRuns">; seq: number }, boolean>;
             claimRun: FunctionReference<"mutation", { runId: Id<"codingAgentRuns"> }, { agent: "claude_code" | "codex"; branch?: string; openPr: boolean; prompt: string; repoUrl: string; userId: string } | null>;

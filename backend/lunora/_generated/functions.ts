@@ -8542,7 +8542,7 @@ export interface Caller {
         };
         functions: {
             appendRunLog: (args: { runId: Id<"codingAgentRuns">; text: string }) => Promise<{ cancelled: boolean }>;
-            beginPullRequest: (args: { followUp: boolean; runId: Id<"codingAgentRuns">; userId: string }) => Promise<{ baseBranch: string; diff: string; pollSeq: number; prompt: string; repoUrl: string; staleSandboxId?: string; startedAt: number; summary?: string } | { error: string }>;
+            beginPullRequest: (args: { followUp: boolean; runId: Id<"codingAgentRuns">; userId: string }) => Promise<{ baseBranch: string; diff: string; pollSeq: number; prompt: string; repoUrl: string; startedAt: number; summary?: string } | { error: string }>;
             cancelRun: (args: { runId: Id<"codingAgentRuns"> }) => Promise<null>;
             claimFinish: (args: { runId: Id<"codingAgentRuns"> }) => Promise<{ claimed: boolean; wantsPr: boolean }>;
             claimPoll: (args: { prStartedAt?: number; runId: Id<"codingAgentRuns">; seq: number }) => Promise<boolean>;

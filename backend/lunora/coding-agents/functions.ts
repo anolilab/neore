@@ -645,8 +645,6 @@ export const beginPullRequest = internalMutation
                 pollSeq: v.number(),
                 prompt: v.string(),
                 repoUrl: v.string(),
-                /** The sandbox of the stale attempt this one replaced, for the caller to kill: nothing else tracks it. */
-                staleSandboxId: v.optional(v.string()),
                 /** Identifies this attempt (its `prStartedAt`); every later write for it must present it. */
                 startedAt: v.number(),
                 summary: v.optional(v.string()),
@@ -673,6 +671,13 @@ export const beginPullRequest = internalMutation
         }
 
         await patchById(ctx.db, run._id, { prFollowUp: args.followUp, prSandboxId: undefined, prStartedAt: now, prStatus: "pending", updatedAt: now });
+        // A reclaimed attempt's reaper may never have run, and its sandbox id is cleared above:
+        // schedule the kill in this transaction so the claim and the cleanup commit together.
+        // A failed kill leaves the sandbox to its own E2B lifetime (PR_SANDBOX_TIMEOUT_MS).
+        if (run.prStatus === "pending" && run.prSandboxId !== undefined) {
+            await ctx.scheduler.runAfter(0, internal.coding_agents.execute.killRunSandbox, { sandboxId: run.prSandboxId });
+        }
+
         // Fails the attempt if its poll chain is lost; a no-op once it has ended or been claimed again.
         await ctx.scheduler.runAfter(PR_REAP_AFTER_MS, internal.coding_agents.execute.reapPullRequest, { runId: run._id, startedAt: now });
 
@@ -682,7 +687,6 @@ export const beginPullRequest = internalMutation
             pollSeq: run.pollSeq ?? 0,
             prompt: run.prompt,
             repoUrl: run.repoUrl,
-            ...(run.prStatus === "pending" && run.prSandboxId !== undefined && { staleSandboxId: run.prSandboxId }),
             startedAt: now,
             ...(run.summary !== undefined && { summary: run.summary }),
         };
