@@ -26,6 +26,7 @@ import type {
 import { isVisiblePart } from "@neore/ai/models";
 
 import { streamLogger } from "../../lib/logger";
+import { estimateTokens, getModelContextWindow } from "./auto-continue";
 import { type BackupCapabilities, backupCanServe } from "./backup-model";
 
 /** Provider option keys that only a reasoning model accepts (sending one to another is a 400). */
@@ -86,6 +87,13 @@ export class FallbackLanguageModel implements LanguageModelV3 {
 
     private active: LanguageModelV3;
 
+    /**
+     * Set once a call fell back on an infrastructure failure, and kept for the life of this instance. A wrapper is built
+     * per run (\`getAgent\` makes a new one for every run, group turn and continuation, never shared across users), so
+     * the later steps of that run go straight to the backup instead of each waiting on the failing primary first.
+     */
+    private onBackup = false;
+
     private readonly backupTraits: { providerKey?: string; supportsReasoning?: boolean };
 
     constructor(
@@ -136,6 +144,12 @@ export class FallbackLanguageModel implements LanguageModelV3 {
     }
 
     async doGenerate(options: LanguageModelV3CallOptions): Promise<LanguageModelV3GenerateResult> {
+        if (this.onBackup && this.canTakeCall(options)) {
+            this.active = this.backup;
+
+            return await this.backup.doGenerate(this.optionsForBackup(options));
+        }
+
         this.active = this.primary;
 
         try {
@@ -152,6 +166,12 @@ export class FallbackLanguageModel implements LanguageModelV3 {
     }
 
     async doStream(options: LanguageModelV3CallOptions): Promise<LanguageModelV3StreamResult> {
+        if (this.onBackup && this.canTakeCall(options)) {
+            this.active = this.backup;
+
+            return await this.backup.doStream(this.optionsForBackup(options));
+        }
+
         this.active = this.primary;
 
         let result: LanguageModelV3StreamResult;
@@ -228,8 +248,21 @@ export class FallbackLanguageModel implements LanguageModelV3 {
             return false;
         }
 
-        // A call the backup could not take (tools, images or documents it does not support) keeps the primary's own error.
-        return this.canServe({ hasTools: (options.tools?.length ?? 0) > 0, messages: options.prompt });
+        // A call the backup could not take keeps the primary's own error.
+        return this.canTakeCall(options);
+    }
+
+    /**
+     * The final word on whether the backup can take this call, whatever sizing and compression did before: it supports
+     * the tools and attachments in it (\`canServe\`), and the prompt fits its context window (the estimator and the
+     * 95% line the gateway's overflow rule uses). A prompt sized for a larger primary would only fail again on the backup.
+     */
+    private canTakeCall(options: LanguageModelV3CallOptions): boolean {
+        if (!this.canServe({ hasTools: (options.tools?.length ?? 0) > 0, messages: options.prompt })) {
+            return false;
+        }
+
+        return estimateTokens(options.prompt as never) <= getModelContextWindow(this.backup.modelId) * 0.95;
     }
 
     private optionsForBackup(options: LanguageModelV3CallOptions): LanguageModelV3CallOptions {
@@ -239,5 +272,6 @@ export class FallbackLanguageModel implements LanguageModelV3 {
     private switchToBackup(error: unknown): void {
         streamLogger.warn(`[FallbackModel] ${this.primary.modelId} failed with an infrastructure error, retrying on ${this.backup.modelId}:`, error);
         this.active = this.backup;
+        this.onBackup = true;
     }
 }

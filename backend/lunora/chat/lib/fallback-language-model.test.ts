@@ -240,6 +240,61 @@ describe("FallbackLanguageModel", () => {
         });
     });
 
+    describe("once it has switched", () => {
+        it.each(["doGenerate", "doStream"] as const)("%s: later steps go straight to the backup, not through the failing primary", async (method) => {
+            const primary = fakeModel("primary", gatewayError("infra"));
+            const backup = fakeModel("backup");
+            const model = new FallbackLanguageModel(primary, backup);
+
+            await model[method](OPTIONS);
+            await model[method](OPTIONS);
+            await model[method](OPTIONS);
+
+            expect(primary[method]).toHaveBeenCalledTimes(1);
+            expect(backup[method]).toHaveBeenCalledTimes(3);
+            expect(model.modelId).toBe("backup");
+        });
+
+        it("still tries the primary for a step the backup could not take", async () => {
+            const primary = fakeModel("primary", gatewayError("infra"));
+            const model = new FallbackLanguageModel(primary, fakeModel("backup"), { backupSupportsImages: false });
+            const image = {
+                ...OPTIONS,
+                prompt: [{ content: [{ data: "x", mediaType: "image/png", type: "file" }], role: "user" }],
+            } as unknown as LanguageModelV3CallOptions;
+
+            await model.doGenerate(OPTIONS);
+            await expect(model.doGenerate(image)).rejects.toThrow();
+
+            expect(primary.doGenerate).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    describe("a prompt sized for a larger primary", () => {
+        // ~150k tokens: inside a 1M primary window, past the backup's 128k.
+        const huge = {
+            ...OPTIONS,
+            prompt: [{ content: [{ text: "y".repeat(600_000), type: "text" }], role: "user" }],
+        } as unknown as LanguageModelV3CallOptions;
+
+        it.each(["doGenerate", "doStream"] as const)("%s: keeps the primary's error when the prompt cannot fit the backup's window", async (method) => {
+            const error = gatewayError("infra");
+            const backup = fakeModel("backup");
+
+            await expect(new FallbackLanguageModel(fakeModel("primary", error), backup)[method](huge)).rejects.toBe(error);
+
+            expect(backup[method]).not.toHaveBeenCalled();
+        });
+
+        it("falls back for a prompt that fits", async () => {
+            const backup = fakeModel("backup");
+
+            await new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), backup).doGenerate(OPTIONS);
+
+            expect(backup.doGenerate).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe("a call the backup cannot take", () => {
         const withAttachment = (part: object) => ({ ...OPTIONS, prompt: [{ content: [part], role: "user" }] }) as unknown as LanguageModelV3CallOptions;
         const image = withAttachment({ data: "x", mediaType: "image/png", type: "file" });
