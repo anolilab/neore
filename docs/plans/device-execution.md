@@ -197,13 +197,16 @@ by RFC 4231 test vectors) — **no new crate**.
 - **Shell.** `shell_run({ command, cwd?, timeoutMs? })` runs via the user's shell
   (`sh -c` / `cmd /C`) as the user, with a timeout, stdin closed and the process
   group killed on timeout. Never always-allowable. It runs in an **OS sandbox**
-  (`device/sandbox.rs`): writes only in the shared folders and a private
+  (`packages/device-core/src/sandbox.rs`): writes only in the shared folders and a private
   per-run `$TMPDIR` (which also receives the common cache variables:
   `XDG_CACHE_HOME`, `npm_config_cache`, `PIP_CACHE_DIR`, `UV_CACHE_DIR`,
   `GOCACHE`, `GOMODCACHE`, `YARN_CACHE_FOLDER`, `BUN_INSTALL_CACHE_DIR`, unless
   already set inside a shared folder); reads only system folders and a fixed list of per-user
-  toolchain folders; the rest of `$HOME` is invisible. Network is NOT
-  restricted. Linux uses Landlock (best effort across ABIs; no Landlock → no
+  toolchain folders; the rest of `$HOME` is invisible. Network is blocked on
+  macOS and Linux while "Allow network for shell commands" (`allow_shell_network`,
+  default off) is off; Windows does not restrict it. On Linux that is a seccomp-bpf
+  filter that makes `socket(2)` fail with `EPERM` for every family except `AF_UNIX` and
+  `AF_NETLINK` (and refuses `io_uring_setup`); local Unix and netlink sockets stay open. The filter exists for little-endian x86_64 and aarch64 only: on other CPUs the call is refused unless unsandboxed shells are allowed, and then it keeps Landlock and the prompt says its network is NOT blocked. Linux uses Landlock (best effort across ABIs; no Landlock → no
   sandbox) with `PR_SET_NO_NEW_PRIVS`, macOS `sandbox-exec` with a generated
   profile, Windows has none (a kill-on-close Job Object, reported unsandboxed).
   The Rust-side setting "Require sandbox for shell commands" (default ON)
@@ -357,7 +360,8 @@ A looping model therefore cannot stack up approval prompts.
 - Headless / background use of devices (would need a device-side standing
   policy with its own consent design).
 - OS-level sandboxing of local MCP server processes, a Windows shell sandbox
-  (AppContainer), and network restriction for `shell_run`.
+  (AppContainer), and network restriction for `shell_run` on Windows
+  (macOS and Linux already block it by default; see the shell section).
 - Device tools in shared, group or public threads.
 - Remote MCP servers proxied through the device (network from the user's LAN).
 - Streaming partial output of long commands into the chat.

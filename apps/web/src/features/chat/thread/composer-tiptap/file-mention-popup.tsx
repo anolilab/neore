@@ -16,6 +16,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Command, CommandEmpty, CommandGroup, CommandGroupLabel, CommandInput, CommandItem, CommandList, CommandSeparator } from "@neore/ui/components/command";
+import { formatFileSize } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { FileIcon, FileImage, FileText, MessageSquareIcon, UploadIcon } from "lucide-react";
@@ -26,7 +27,6 @@ import { createPortal } from "react-dom";
 import useAllThreadsData from "@/features/chat/core/hooks/use-all-threads-data";
 import { SpeakerAvatar } from "@/features/chat/group/speaker-label";
 import { useRouteGroupChat } from "@/features/chat/group/use-group-chat";
-import { formatFileSize } from "@/features/vault/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import type { ChatReference } from "../chat-reference";

@@ -67,6 +67,10 @@ describe(parseStreamLine, () => {
         expect(parseStreamLine(JSON.stringify({ lastChunkIndex: 40, type: "resume" }))).toStrictEqual({ kind: "resume", lastChunkIndex: 40 });
     });
 
+    it("reads the end marker as the end of the reply, not a chunk", () => {
+        expect(parseStreamLine(JSON.stringify({ type: "end" }))).toStrictEqual({ kind: "end" });
+    });
+
     it("does not read a malformed resume marker as a resume", () => {
         expect(parseStreamLine(JSON.stringify({ lastChunkIndex: -1, type: "resume" })).kind).toBe("chunk");
         expect(parseStreamLine(JSON.stringify({ lastChunkIndex: "4", type: "resume" })).kind).toBe("chunk");

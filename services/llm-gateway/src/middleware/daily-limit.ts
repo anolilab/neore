@@ -23,6 +23,7 @@ import { createMiddleware } from "hono/factory";
 
 import type { AppEnv, HonoEnv } from "../env.js";
 import { logger } from "../lib/logger.js";
+import { sqliteTime } from "../lib/sqlite-time.js";
 
 type TierLimits = Readonly<Record<string, number>>;
 
@@ -67,9 +68,6 @@ export const secondsUntilUtcMidnight = (now: number = Date.now()): number => {
 };
 
 const MINUTE_MS = 60_000;
-
-/** `usage_log.created_at` is SQLite's `datetime('now')`: UTC, `YYYY-MM-DD HH:MM:SS`. */
-const sqliteTime = (ms: number): string => new Date(ms).toISOString().slice(0, 19).replace("T", " ");
 
 export interface DailyUsage {
     requests: number;

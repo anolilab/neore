@@ -11,7 +11,7 @@
 
 mod shape;
 
-use futures_util::StreamExt;
+use futures_util::{Stream, StreamExt};
 use serde::Serialize;
 use worker::{Context, Env, Method, Request, Response, Result, console_error, event};
 
@@ -206,8 +206,12 @@ pub async fn extract_document(
 /// The body, or `None` once it passes `max` bytes — counted while streaming, so
 /// a body without (or lying about) `Content-Length` is cut off at the cap
 /// instead of being buffered whole first.
-async fn read_capped(req: &mut Request, max: usize, capacity: usize) -> Result<Option<Vec<u8>>> {
-    let mut stream = req.stream()?;
+/// Generic over the chunk stream so the cap is tested on the host, without a
+/// workerd request; `handle_extract` passes the request's own `ByteStream`.
+async fn read_capped<S>(mut stream: S, max: usize, capacity: usize) -> Result<Option<Vec<u8>>>
+where
+    S: Stream<Item = Result<Vec<u8>>> + Unpin,
+{
     let mut body = Vec::with_capacity(capacity);
 
     while let Some(chunk) = stream.next().await {
@@ -257,7 +261,7 @@ async fn handle_extract(mut req: Request) -> Result<Response> {
         declared_length(content_length.as_deref()),
         MAX_DOCUMENT_BYTES,
     );
-    let Some(body) = read_capped(&mut req, MAX_DOCUMENT_BYTES, capacity).await? else {
+    let Some(body) = read_capped(req.stream()?, MAX_DOCUMENT_BYTES, capacity).await? else {
         return json(413, &too_large(MAX_DOCUMENT_BYTES));
     };
 
@@ -303,6 +307,8 @@ mod tests {
         pin::pin,
         task::{Context, Poll, Waker},
     };
+
+    use futures_util::stream;
 
     use super::*;
 
@@ -574,5 +580,31 @@ mod tests {
         assert!(limits.max_archive_size < 64 * 1024 * 1024);
         assert!(limits.max_content_size < 64 * 1024 * 1024);
         assert!(limits.max_archive_size > MAX_DOCUMENT_BYTES);
+    }
+
+    /// Reads `chunks` through `read_capped` at `max` bytes.
+    fn read_chunks(chunks: Vec<Vec<u8>>, max: usize) -> Option<Vec<u8>> {
+        let stream = stream::iter(chunks.into_iter().map(Ok::<_, worker::Error>));
+
+        block_on(read_capped(stream, max, 0)).unwrap()
+    }
+
+    #[test]
+    fn read_capped_refuses_a_body_one_byte_past_the_cap() {
+        assert_eq!(read_chunks(vec![vec![0; 6], vec![0; 5]], 10), None);
+    }
+
+    #[test]
+    fn read_capped_accepts_a_body_of_exactly_the_cap() {
+        assert_eq!(
+            read_chunks(vec![vec![1; 6], vec![2; 4]], 10),
+            Some([vec![1; 6], vec![2; 4]].concat())
+        );
+    }
+
+    #[test]
+    fn read_capped_counts_many_small_chunks_across_the_cap() {
+        assert_eq!(read_chunks(vec![vec![0]; 11], 10), None);
+        assert_eq!(read_chunks(vec![vec![0]; 10], 10), Some(vec![0; 10]));
     }
 }

@@ -3,10 +3,8 @@ import { useQuery } from "@lunora/react";
 import { sorted } from "@neore/backend/agent/shared";
 import type { SyncStreamsReturnValue } from "@neore/backend/agent/types";
 import type { StreamArgs, StreamDelta, StreamMessage } from "@neore/backend/agent/validators";
+import { shardOptionsFor, withUnlockProof } from "@neore/client-runtime";
 import { useState } from "react";
-
-import { shardOptionsFor } from "@/lib/lunora/shard-routing";
-import { withUnlockProof } from "@/lib/lunora/unlock-proofs";
 
 import type { StreamQuery, StreamQueryArgs } from "./types";
 
@@ -58,7 +56,7 @@ const useDeltaStreams = <Query extends StreamQuery<any> = StreamQuery<object>>(
         }
     }
 
-    // A shared thread's streams live on its owner's shard (`lib/lunora/shard-routing.ts`).
+    // A shared thread's streams live on its owner's shard (`packages/client-runtime/src/shard-routing.ts`).
     const shardOptions = shardOptionsFor(args);
 
     // Get all the active streams

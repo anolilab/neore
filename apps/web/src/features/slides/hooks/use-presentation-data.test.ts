@@ -1,7 +1,6 @@
+import { forgetAllUnlockProofs, rememberUnlockProof, useUnlockProof } from "@neore/client-runtime";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-
-import { forgetAllUnlockProofs, rememberUnlockProof, useUnlockProof } from "@/lib/lunora/unlock-proofs";
 
 import { deckQueryArgs } from "./use-presentation-data";
 

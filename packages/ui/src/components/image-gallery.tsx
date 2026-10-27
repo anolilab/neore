@@ -35,12 +35,8 @@ interface ImageGalleryProps {
     /** Maximum number of items that can be selected (default: 4) */
     maxSelections?: number;
     onItemClick?: (item: GalleryItem) => void;
-    /** @deprecated Use onSelectionChange instead */
-    onSelect?: (id: string | null) => void;
     /** Callback when selection changes (for multi-selection) */
     onSelectionChange?: (ids: string[]) => void;
-    /** @deprecated Use selectedIds instead */
-    selectedId?: string | null;
     /** Array of selected item IDs for multi-selection */
     selectedIds?: string[];
     /** Whether selection is enabled (default: true) */
@@ -53,31 +49,24 @@ const ImageGallery = ({
     items,
     maxSelections = 4,
     onItemClick,
-    onSelect: controlledOnSelect,
     onSelectionChange,
-    selectedId: controlledSelectedId,
     selectedIds: controlledSelectedIds,
     selectionEnabled = true,
     ...props
 }: ImageGalleryProps) => {
     const [internalSelectedIds, setInternalSelectedIds] = useState<string[]>([]);
 
-    // Support both old single-selection API and new multi-selection API
-    const uncontrolledSelectedIds = controlledSelectedId === undefined || controlledSelectedId === null ? internalSelectedIds : [controlledSelectedId];
-    const selectedIds = controlledSelectedIds === undefined ? uncontrolledSelectedIds : controlledSelectedIds;
+    const selectedIds = controlledSelectedIds ?? internalSelectedIds;
 
     const handleSelectionChange = useCallback(
         (ids: string[]) => {
             if (onSelectionChange) {
                 onSelectionChange(ids);
-            } else if (controlledOnSelect) {
-                // Backward compatibility: call old API with first selected item
-                controlledOnSelect(ids.length > 0 ? (ids[0] ?? null) : null);
             } else {
                 setInternalSelectedIds(ids);
             }
         },
-        [onSelectionChange, controlledOnSelect],
+        [onSelectionChange],
     );
 
     const handleToggleSelection = useCallback(

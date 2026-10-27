@@ -2,13 +2,13 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
+import { notePageShard } from "@neore/client-runtime";
 import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { FC } from "react";
 import { useEffect, useRef } from "react";
 
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
-import { notePageShard } from "@/lib/lunora/shard-routing";
 
 /** Spends a page invite link for the signed-in user, then opens the page. */
 const PageInviteAccept: FC<{ token: string }> = ({ token }) => {
@@ -29,7 +29,7 @@ const PageInviteAccept: FC<{ token: string }> = ({ token }) => {
             { token },
             {
                 onSuccess: ({ ownerId, pageId }) => {
-                    // The page lives on its owner's shard (`lib/lunora/shard-routing.ts`).
+                    // The page lives on its owner's shard (`packages/client-runtime/src/shard-routing.ts`).
                     notePageShard(pageId, ownerId);
                     void navigate({ params: { pageId }, replace: true, to: "/pages/$pageId" });
                 },

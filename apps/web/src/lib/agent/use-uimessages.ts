@@ -8,10 +8,8 @@ import type { SyncStreamsReturnValue } from "@neore/backend/agent/types";
 import type { UIMessage, UIStatus } from "@neore/backend/agent/ui-messages";
 import { combineUIMessages } from "@neore/backend/agent/ui-messages";
 import type { StreamArgs } from "@neore/backend/agent/validators";
+import { shardOptionsFor, withUnlockProof } from "@neore/client-runtime";
 import { useLayoutEffect, useMemo, useRef } from "react";
-
-import { shardOptionsFor } from "@/lib/lunora/shard-routing";
-import { withUnlockProof } from "@/lib/lunora/unlock-proofs";
 
 import { shareUnchangedMessages } from "./share-unchanged-messages";
 import type { BetterOmit, ErrorMessage, Expand } from "./type-utilities";
@@ -186,8 +184,8 @@ export const useUIMessages = <Query extends UIMessagesQuery<any, any>>(
     // message type from the query's `M` parameter. They are the same type for every
     // real query, but TypeScript cannot see that through two unresolved generics —
     // so `.order` and `.status` came back missing on a value that has both.
-    // A shared thread's messages live on its owner's shard (`lib/lunora/shard-routing.ts`).
-    // A locked chat's messages need its in-memory proof (`lib/lunora/unlock-proofs.ts`).
+    // A shared thread's messages live on its owner's shard (`packages/client-runtime/src/shard-routing.ts`).
+    // A locked chat's messages need its in-memory proof (`packages/client-runtime/src/unlock-proofs.ts`).
     const paginated = usePaginatedQuery(query, withUnlockProof(args) as PaginatedArgs<Query> | "skip", {
         initialNumItems: options.initialNumItems,
         ...shardOptionsFor(args),

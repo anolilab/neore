@@ -12,6 +12,7 @@ import { z } from "zod";
 import type { HonoEnv } from "../../env.js";
 import { countPromptTextChars, estimateCancelledUsage } from "../../lib/cancelled-usage.js";
 import { contextPreflight } from "../../lib/context-preflight.js";
+import { deferWaitUntil } from "../../lib/deferred-wait-until.js";
 import type { ErrorCode } from "../../lib/errors.js";
 import { enrichError, GatewayError } from "../../lib/errors.js";
 import type { GuardrailConfig } from "../../lib/guardrails.js";
@@ -420,6 +421,10 @@ streamRouter.openapi(
             const execContext = c.executionCtx;
 
             let isCancelled = false;
+            // Registered before the Response is returned: a cancelled relay finishes after the response has
+            // ended, and the provider-usage and pricing awaits it makes first would otherwise be cancelled with the request.
+            const settleBackground = deferWaitUntil(execContext);
+            let backgroundWork: Promise<unknown> = Promise.resolve();
             let emittedChars = 0;
             let reasoningChars = 0;
 
@@ -526,51 +531,49 @@ streamRouter.openapi(
 
                         send(finishChunk);
 
-                        // Record usage via waitUntil so it survives after stream/response ends.
+                        // Record usage through the waitUntil registered up front so it survives after stream/response ends.
                         // Use allSettled so individual failures don't cause uncaught rejections.
-                        execContext.waitUntil(
-                            Promise.allSettled([
-                                usageTracker.record(
-                                    {
-                                        cachedTokens: tokens.cachedTokens,
-                                        completionTokens: tokens.completionTokens,
-                                        costMicrodollars,
-                                        // A provider error inside a stream the client did not cancel is a failed call, so its GenAI span must not export as OK.
-                                        ...(isErrored && !isCancelled && { errorCode: "PROVIDER_ERROR" }),
-                                        finishReason,
-                                        guardrailViolations: guardrailViolationsJson,
-                                        isStreaming: true,
-                                        latencyMs,
-                                        modelApiId: body.modelApiId,
-                                        modelId: body.modelId,
-                                        operation: "chat",
-                                        orgId: body.orgId,
-                                        promptTokens: tokens.promptTokens,
-                                        provider: body.provider,
-                                        reasoningTokens: tokens.reasoningTokens,
-                                        requestId: body.requestId,
-                                        source: "internal",
-                                        threadId: body.threadId,
-                                        ttftMs,
-                                        userId: body.userId,
-                                    },
-                                    c.var.telemetry,
-                                ),
-                                ...(isCancelled || isErrored ? [] : [healthService.recordSuccess(body.provider, body.modelApiId, latencyMs)]),
-                                ...(isErrored && !isCancelled ? [healthService.recordFailure(body.provider, body.modelApiId)] : []),
-                                usageReporter.report({
-                                    billingMode,
-                                    byokFeeRate,
+                        backgroundWork = Promise.allSettled([
+                            usageTracker.record(
+                                {
+                                    cachedTokens: tokens.cachedTokens,
                                     completionTokens: tokens.completionTokens,
                                     costMicrodollars,
+                                    // A provider error inside a stream the client did not cancel is a failed call, so its GenAI span must not export as OK.
+                                    ...(isErrored && !isCancelled && { errorCode: "PROVIDER_ERROR" }),
+                                    finishReason,
+                                    guardrailViolations: guardrailViolationsJson,
+                                    isStreaming: true,
+                                    latencyMs,
+                                    modelApiId: body.modelApiId,
                                     modelId: body.modelId,
+                                    operation: "chat",
                                     orgId: body.orgId,
                                     promptTokens: tokens.promptTokens,
+                                    provider: body.provider,
+                                    reasoningTokens: tokens.reasoningTokens,
                                     requestId: body.requestId,
+                                    source: "internal",
+                                    threadId: body.threadId,
+                                    ttftMs,
                                     userId: body.userId,
-                                }),
-                            ]),
-                        );
+                                },
+                                c.var.telemetry,
+                            ),
+                            ...(isCancelled || isErrored ? [] : [healthService.recordSuccess(body.provider, body.modelApiId, latencyMs)]),
+                            ...(isErrored && !isCancelled ? [healthService.recordFailure(body.provider, body.modelApiId)] : []),
+                            usageReporter.report({
+                                billingMode,
+                                byokFeeRate,
+                                completionTokens: tokens.completionTokens,
+                                costMicrodollars,
+                                modelId: body.modelId,
+                                orgId: body.orgId,
+                                promptTokens: tokens.promptTokens,
+                                requestId: body.requestId,
+                                userId: body.userId,
+                            }),
+                        ]);
                     } catch (error) {
                         const errorChunk = formatSSE({
                             error: {
@@ -583,9 +586,11 @@ streamRouter.openapi(
                         send(errorChunk);
 
                         if (!isCancelled) {
-                            execContext.waitUntil(healthService.recordFailure(body.provider, body.modelApiId));
+                            backgroundWork = Promise.allSettled([healthService.recordFailure(body.provider, body.modelApiId)]);
                         }
                     } finally {
+                        settleBackground(backgroundWork);
+
                         if (!isCancelled) {
                             controller.close();
                         }

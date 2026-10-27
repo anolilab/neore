@@ -351,6 +351,9 @@ export interface PullRequestSpec {
 /** Lifetime of the PR sandbox; the PR poller's deadline follows it. */
 export const PR_SANDBOX_TIMEOUT_MS = 5 * 60 * 1000;
 
+/** A PR attempt unfinished this long after it was claimed is over, whatever the sandbox says. */
+export const PR_BUDGET_MS = PR_SANDBOX_TIMEOUT_MS + 60_000;
+
 /**
  * Start turning a finished run's diff into a pushed branch — in a FRESH sandbox,
  * never the agent's own. The agent ran untrusted code there: it could have left

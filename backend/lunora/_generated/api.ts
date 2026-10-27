@@ -126,25 +126,9 @@ export interface ApiTypes {
             revokeInvitation: FunctionReference<"action", { email: string }, null>;
         };
         organization: {
-            acceptInvitation: FunctionReference<"mutation", { invitationId: string }, void>;
-            cancelInvitation: FunctionReference<"mutation", { invitationId: string }, void>;
             checkSlug: FunctionReference<"query", { slug: string }, { available: boolean }>;
-            createOrganization: FunctionReference<"mutation", { name: string }, { id: string; slug: string }>;
-            deleteOrganization: FunctionReference<"mutation", {}, void>;
-            getActiveMember: FunctionReference<"query", {}, { createdAt: number; id: string; role: string } | null>;
-            getOrganization: FunctionReference<"query", { slug: string }, ({ logo?: string | null | undefined; role?: string | undefined; } & { createdAt: number; id: string; isActive: boolean; isOwner: boolean; membersCount: number; name: string; plan: string; slug: string; }) | null>;
-            getOrganizationOverview: FunctionReference<"query", { inviteId?: string; slug: string }, ({ logo?: string | null | undefined; plan?: string | undefined; role?: string | undefined; } & { createdAt: number; id: string; invitation: ({} & { email: string; expiresAt: number; id: string; inviterEmail: string; inviterId: string; inviterName: string; inviterUsername: string | null; organizationId: string; organizationName: string; organizationSlug: string; role: string; status: string; }) | null; isActive: boolean; isOwner: boolean; name: string; slug: string; }) | null>;
-            inviteMember: FunctionReference<"mutation", { email: string; role: "owner" | "member" }, void>;
-            leaveOrganization: FunctionReference<"mutation", {}, void>;
-            listMembers: FunctionReference<"query", { slug: string }, { currentUserRole?: string; isOwner: boolean; members: Array<{ createdAt: number; id: string; organizationId: string; role?: string; user: { email: string; id: string; image?: string | null; name: string | null }; userId: string }> }>;
             listOrganizations: FunctionReference<"query", {}, {} & { canCreateOrganization: boolean; organizations: ({ logo?: string | null | undefined; } & { createdAt: number; id: string; isOwner: boolean; name: string; plan: string; slug: string; })[]; }>;
-            listPendingInvitations: FunctionReference<"query", { slug: string }, Array<{ createdAt: number; email: string; expiresAt: number; id: string; organizationId: string; role: string; status: string }>>;
             listUserInvitations: FunctionReference<"query", {}, ({} & { expiresAt: number; id: string; inviterName: string | null; organizationName: string; organizationSlug: string; role: string; })[]>;
-            rejectInvitation: FunctionReference<"mutation", { invitationId: string }, void>;
-            removeMember: FunctionReference<"mutation", { memberId: string }, void>;
-            setActiveOrganization: FunctionReference<"mutation", { organizationId: string }, void>;
-            updateMemberRole: FunctionReference<"mutation", { memberId: string; role: "owner" | "member" }, void>;
-            updateOrganization: FunctionReference<"mutation", { logo?: string; name?: string; slug?: string }, void>;
         };
         team: {
             addTeamMember: FunctionReference<"mutation", { teamId: string; userId: string }, void>;
@@ -891,25 +875,9 @@ export const api: ApiTypes = {
             revokeInvitation: { __lunoraRef: "auth_invitations:revokeInvitation" },
         },
         organization: {
-            acceptInvitation: { __lunoraRef: "auth_organization:acceptInvitation" },
-            cancelInvitation: { __lunoraRef: "auth_organization:cancelInvitation" },
             checkSlug: { __lunoraRef: "auth_organization:checkSlug" },
-            createOrganization: { __lunoraRef: "auth_organization:createOrganization" },
-            deleteOrganization: { __lunoraRef: "auth_organization:deleteOrganization" },
-            getActiveMember: { __lunoraRef: "auth_organization:getActiveMember" },
-            getOrganization: { __lunoraRef: "auth_organization:getOrganization" },
-            getOrganizationOverview: { __lunoraRef: "auth_organization:getOrganizationOverview" },
-            inviteMember: { __lunoraRef: "auth_organization:inviteMember" },
-            leaveOrganization: { __lunoraRef: "auth_organization:leaveOrganization" },
-            listMembers: { __lunoraRef: "auth_organization:listMembers" },
             listOrganizations: { __lunoraRef: "auth_organization:listOrganizations" },
-            listPendingInvitations: { __lunoraRef: "auth_organization:listPendingInvitations" },
             listUserInvitations: { __lunoraRef: "auth_organization:listUserInvitations" },
-            rejectInvitation: { __lunoraRef: "auth_organization:rejectInvitation" },
-            removeMember: { __lunoraRef: "auth_organization:removeMember" },
-            setActiveOrganization: { __lunoraRef: "auth_organization:setActiveOrganization" },
-            updateMemberRole: { __lunoraRef: "auth_organization:updateMemberRole" },
-            updateOrganization: { __lunoraRef: "auth_organization:updateOrganization" },
         },
         team: {
             addTeamMember: { __lunoraRef: "auth_team:addTeamMember" },

@@ -16,7 +16,7 @@ nearest scoped `AGENTS.md` (`apps/web/src/`, `backend/lunora/`).
 ├── apps/
 │   ├── web/                # Main React app (TanStack Start)
 │   ├── browser-extension/  # CRXJS + React
-│   └── native/             # Tauri v2 desktop/mobile shell around the DEPLOYED web app
+│   └── desktop/            # Electron 44 shell around the DEPLOYED web app
 ├── backend/                # Lunora backend (ShardDO + .global() D1 + R2), Better Auth
 ├── packages/
 │   ├── ai/                 # MODEL_REGISTRY, prompts, design presets, tool defs
@@ -354,6 +354,8 @@ written here is what is not.
   loopback-only validator — widen one alone and saves succeed that the browser
   then blocks, or the CSP opens the LAN. Safari cannot use it (WebKit upgrades
   `http://localhost` from https pages); Chromium and Firefox exempt loopback.
+  The Electron desktop shell is Chromium, so the Safari mixed-content check
+  (`isSafariUserAgent`) is skipped inside it (`isNativeShell()`).
 
 - **Coding agents** (`backend/lunora/coding-agents/`) — `delegateToCodingAgent`
   (chat tool, built-in that defaults to `ask`) and a task's `codingAgent`
@@ -538,10 +540,10 @@ written here is what is not.
   is a CONFLICT (`data.code = PAGE_REVISION_CONFLICT`) only if content moved
   past it — comment activity alone never makes a collaborator's save stale.
 
-- **Native shell** (`apps/native`, Tauri v2) loads the deployed app from a
-  COMPILE-TIME `NEORE_SITE_URL` and grants IPC to that origin only, through a
-  runtime `CapabilityBuilder` (four commands + event listen, plus on desktop the
-  five `device_*` relay commands; no plugin command is reachable from the page). The web side is `apps/web/src/lib/native/bridge.ts`,
+- **Native shell** (`apps/desktop`, Electron 44) loads the deployed app from a
+  BUILD-TIME `NEORE_SITE_URL` and exposes `window.neoreNative` only on that
+  origin, through a sandboxed preload; every IPC handler checks the sender's
+  origin in the main process. Device execution sits behind `packages/device-core`. The web side is `apps/web/src/lib/native/bridge.ts`,
   a no-op outside the shell — call `notifyNative` from any long-running flow.
   **The web CSP deliberately does not allow `ipc:`**: Tauri falls back to
   `postMessage` IPC when the fetch is blocked, so do not "fix" the resulting
@@ -551,7 +553,7 @@ written here is what is not.
   `neore://auth/callback`, opt-in in `TRUSTED_EXTENSION_REDIRECT_URIS`) and ends
   at `/api/auth/client-grant/cookie`, which sets the normal session cookie — do
   not add a second grant system. See its README.
-  **Device execution** (`src-tauri/src/device/`, `backend/lunora/devices/`,
+  **Device execution** (`packages/device-core/src/{shell,sandbox}.rs`, `backend/lunora/devices/`,
   `features/devices`, docs/plans/device-execution.md) is remote code execution
   on the user's machine, so the page is a RELAY only: the backend signs each
   call (HMAC, domain-prefixed payload STRING — no canonical JSON) with a
@@ -563,10 +565,14 @@ written here is what is not.
   headless whatever the mode. A call that follows untrusted content carries a
   server-computed, SIGNED `taintedBy` (`devices/lib/taint.ts`, fail-closed):
   it always prompts and never offers "Always allow"; `shell_run`/`fs_write`
-  never do either. `shell_run` runs in an OS sandbox (`device/sandbox.rs`:
+  never do either. `shell_run` runs in an OS sandbox (`packages/device-core/src/sandbox.rs`:
   Landlock / `sandbox-exec`; Windows has none) that writes only the shared
-  folders + a per-run `$TMPDIR` and hides the rest of `$HOME` — network is NOT
-  restricted, MCP servers are NOT sandboxed. Where there is no sandbox the call
+  folders + a per-run `$TMPDIR` and hides the rest of `$HOME`. Network is blocked
+  on macOS and Linux unless the user turns on "Allow network for shell commands" (default
+  off); on Linux that is a seccomp filter making `socket(2)` fail with `EPERM` for
+  every family except `AF_UNIX` and `AF_NETLINK` (and `io_uring_setup`), on little-endian
+  x86_64 and aarch64 only (elsewhere the call is refused unless unsandboxed shells are allowed, and then it keeps
+  Landlock and the prompt says the network is NOT blocked); Windows does not restrict it. MCP servers are NOT sandboxed. Where there is no sandbox the call
   is REFUSED unless the user turned off "Require sandbox for shell commands"
   (stored inverted, `allowUnsandboxedShell`, so absent = required). Allow
   rules, shared folders, that setting and local MCP servers live only in Rust. **The pairing secret crosses the page exactly once**

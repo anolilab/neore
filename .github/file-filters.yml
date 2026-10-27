@@ -37,6 +37,19 @@ e2e:
     - ".github/actions/**"
     - ".github/file-filters.yml"
 
+# What the desktop package check exercises: the Electron shell and the Rust addon it loads.
+desktop:
+    - "apps/desktop/**"
+    - "packages/device-core/**"
+    - "packages/device-core-node/**"
+    - "**/tsconfig*.json"
+    - "pnpm-lock.yaml"
+    - "pnpm-workspace.yaml"
+    - "package.json"
+    - ".github/workflows/test.yml"
+    - ".github/actions/**"
+    - ".github/file-filters.yml"
+
 packages: &packages
     - "**/tsconfig*.json"
     - "pnpm-lock.yaml"
