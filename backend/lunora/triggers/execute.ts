@@ -7,6 +7,8 @@
  */
 import { v } from "lunorash/server";
 
+import { parseCustomModelId } from "@neore/ai/models";
+
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { SANDBOX_TOOLS } from "../chat/lib/tool-builder";
@@ -21,6 +23,13 @@ const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is sche
 
 const RELEASE_LOST_NOTE =
     "Giving this delivery back failed and no retry could be scheduled; a redelivery is refused as a duplicate until it is released by hand.";
+
+/**
+ * `AgentRunError` of kind `custom-endpoint` / `local-endpoint`, read by shape: importing the class
+ * would pull the agent client into this module's import graph (see `ask-user-constants.ts`).
+ */
+const isEndpointRunError = (error: unknown): error is Error =>
+    error instanceof Error && error.name === "AgentRunError" && ["custom-endpoint", "local-endpoint"].includes((error as { kind?: string }).kind ?? "");
 
 export const executeTrigger = internalAction
     .input({
@@ -308,7 +317,10 @@ export const executeTrigger = internalAction
             console.info(`[Triggers] Trigger ${trigger.name} executed successfully. Thread: ${threadId}, Response length: ${responseText.length}`);
         } catch (error) {
             // The owner reads this in the trigger history; the raw error is logged only.
-            const errorMessage = toUserFacingError(error);
+            // A bot's model can stop being runnable after the trigger was saved: its own endpoint was deleted, disabled or is browser-only.
+            const errorMessage = isEndpointRunError(error)
+                ? `${error.message}. Check the model '${model}' of this trigger or its bot in Settings → API Keys.`
+                : toUserFacingError(error, { customEndpoint: parseCustomModelId(model) !== null });
 
             console.error(`[Triggers] Trigger ${trigger.name} failed:`, error);
 

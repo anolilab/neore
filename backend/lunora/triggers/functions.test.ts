@@ -43,6 +43,7 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 beforeAll(async () => {
     registerModule(registry, "triggers_functions", await import("./functions"));
     registerModule(registry, "chat_custom_providers", await import("../chat/custom-providers"));
+    registerModule(registry, "bots_functions", await import("../bots/functions"));
 });
 
 vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
@@ -224,6 +225,23 @@ describe("trigger schedules", () => {
             "custom endpoint is missing",
         );
         await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), model: "m" } as never)).resolves.toHaveProperty("triggerId");
+    });
+
+    it("refuses a bot whose model is a custom endpoint that is not runnable", async () => {
+        const botId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("bots", {
+                    computerEnabled: false,
+                    createdAt: 1,
+                    instructions: "i",
+                    model: "custom:gone/model",
+                    name: "Bot",
+                    updatedAt: 1,
+                    userId: "user-a",
+                }),
+        );
+
+        await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), botId } as never)).rejects.toThrow("custom endpoint is missing");
     });
 
     it("refuses an expression the parser would read as a wildcard, on create and on update", async () => {

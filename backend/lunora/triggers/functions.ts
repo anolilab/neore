@@ -354,9 +354,14 @@ export const createTrigger = authMutation
         const webhookSecret = plaintextSecret ? await encryptKey(plaintextSecret, "tool-keys") : undefined;
 
         // A routine can only name a bot the caller owns; a foreign id is a refusal, not a silent plain routine.
-        if (args.botId && !(await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }))) {
+        const createBot = args.botId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }) : null;
+
+        if (args.botId && !createBot) {
             throw new LunoraError("NOT_FOUND", "Bot not found");
         }
+
+        // The bot's model is the one the run uses, so it is checked like the trigger's own.
+        if (createBot) await assertCustomModelRunnable(context, createBot.model, userId);
 
         assertBotRoutineOptions({ botComputer: args.botComputer === true, botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true, type: triggerType });
 
@@ -541,9 +546,14 @@ export const updateTrigger = authMutation
         const nextQuiet = botCleared ? undefined : (args.quietWhenEmpty ?? keptQuiet);
 
         // An unchanged bot is not re-checked, so a routine whose bot was deleted stays editable.
-        if (args.botId && args.botId !== trigger.botId && !(await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }))) {
+        const newBot =
+            args.botId && args.botId !== trigger.botId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }) : null;
+
+        if (args.botId && args.botId !== trigger.botId && !newBot) {
             throw new LunoraError("NOT_FOUND", "Bot not found");
         }
+
+        if (newBot) await assertCustomModelRunnable(context, newBot.model, userId);
 
         assertBotRoutineOptions({ botComputer: nextComputer === true, botId: nextBotId, quietWhenEmpty: nextQuiet === true, type: trigger.type });
 

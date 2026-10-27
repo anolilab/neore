@@ -329,7 +329,6 @@ interface StoredTrigger {
     name: string;
     nextTriggerAt: number | null;
     quietWhenEmpty: boolean;
-    searchMode: string | null;
     systemPrompt: string | null;
     timezone: string | null;
     triggerCount: number;
@@ -389,7 +388,6 @@ const toPublicTrigger = (trigger: StoredTrigger) => {
         name: trigger.name,
         nextTriggerAt: trigger.nextTriggerAt,
         quietWhenEmpty: trigger.quietWhenEmpty,
-        searchMode: trigger.searchMode,
         systemPrompt: trigger.systemPrompt,
         timezone: trigger.timezone,
         triggerCount: trigger.triggerCount,

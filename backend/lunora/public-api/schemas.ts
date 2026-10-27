@@ -161,7 +161,6 @@ export const zTriggerSchema = z.object({
     name: z.string(),
     nextTriggerAt: z.number().nullable(),
     quietWhenEmpty: z.boolean(),
-    searchMode: z.string().nullable(),
     systemPrompt: z.string().nullable(),
     timezone: z.string().nullable(),
     triggerCount: z.number(),
@@ -253,7 +252,6 @@ const zTriggerFields = {
         .optional()
         .meta({ description: "Schedule triggers only: the message each run starts with. A webhook trigger is refused this field." }),
     quietWhenEmpty: z.boolean().optional().meta({ description: "Scheduled triggers with a bot only: skip a run that has nothing to report." }),
-    searchMode: z.string().max(200).optional(),
     systemPrompt: z.string().max(100_000).optional(),
     timezone: z.string().max(200).optional(),
 };

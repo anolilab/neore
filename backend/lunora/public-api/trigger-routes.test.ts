@@ -38,7 +38,6 @@ const stored = {
     name: "Weekly digest",
     nextTriggerAt: null,
     quietWhenEmpty: false,
-    searchMode: null,
     systemPrompt: null,
     timezone: null,
     triggerCount: 0,
@@ -293,5 +292,12 @@ describe("trigger routes", () => {
 
         expect([created.status, updated.status]).toEqual([400, 400]);
         expect(calls.some((entry) => entry.name === "triggers_functions:createTrigger" || entry.name === "triggers_functions:updateTrigger")).toBe(false);
+    });
+
+    it("does not advertise searchMode, which a trigger run never reads", async () => {
+        const { request } = call({ triggers: ["read"] });
+        const body = (await bodyOf(await request("/triggers/trg1"))) as Record<string, unknown>;
+
+        expect(body).not.toHaveProperty("searchMode");
     });
 });
