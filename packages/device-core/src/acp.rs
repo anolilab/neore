@@ -784,8 +784,14 @@ mod tests {
         set_env(&state, None, "FOR_ALL", "g1").unwrap();
         set_env(&state, Some("beta"), "FOR_ALL", "b-wins").unwrap();
 
-        let alpha = state.acp_spawn_plan("alpha", None).unwrap().env.0;
-        let beta = state.acp_spawn_plan("beta", None).unwrap().env.0;
+        let (alpha_plan, beta_plan) = (
+            state.acp_spawn_plan("alpha", None).unwrap(),
+            state.acp_spawn_plan("beta", None).unwrap(),
+        );
+        let (alpha, beta) = (alpha_plan.env.0.clone(), beta_plan.env.0.clone());
+
+        let _ = fs::remove_dir_all(&alpha_plan.cwd);
+        let _ = fs::remove_dir_all(&beta_plan.cwd);
 
         assert_eq!(alpha.get("ONLY_ALPHA").map(String::as_str), Some("a1"));
         assert_eq!(alpha.get("FOR_ALL").map(String::as_str), Some("g1"));
@@ -808,10 +814,10 @@ mod tests {
         assert!(view.contains("API_KEY") && view.contains("HTTPS_PROXY"));
         assert!(!view.contains("sentinel-value"));
         assert!(!format!("{:?}", state.settings()).contains("sentinel-value"));
-        assert!(
-            !format!("{:?}", state.acp_spawn_plan("alpha", None).unwrap())
-                .contains("sentinel-value")
-        );
+        let plan = state.acp_spawn_plan("alpha", None).unwrap();
+
+        assert!(!format!("{plan:?}").contains("sentinel-value"));
+        let _ = fs::remove_dir_all(&plan.cwd);
 
         // The values are stored (owner-only, in device.json) so the next start still has them.
         let stored = crate::store::load(&dir.join("device.json"));

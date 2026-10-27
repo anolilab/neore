@@ -64,7 +64,19 @@ export class AcpManager {
         requireSupported();
 
         const plan = this.options.plan(agentKey, null);
-        const child = this.spawn(plan);
+        let child: AgentProcess;
+
+        try {
+            child = this.spawn(plan);
+        } catch (error) {
+            // The folder exists before anything starts; a start that fails must not leave it behind.
+            if (plan.scratch) {
+                await removeQuietly(plan.cwd);
+            }
+
+            throw error;
+        }
+
         const connection = new JsonRpcConnection(child.stdout, child.stdin, {
             notification: () => {},
             request: async () => {
@@ -83,10 +95,13 @@ export class AcpManager {
             throw new Error(child.scrub(`${(error as Error).message}${stderr === "" ? "" : `: ${stderr}`}`));
         } finally {
             connection.close(new Error("probe finished"));
-            await child.stop();
 
-            if (plan.scratch) {
-                await removeQuietly(plan.cwd);
+            try {
+                await child.stop();
+            } finally {
+                if (plan.scratch) {
+                    await removeQuietly(plan.cwd);
+                }
             }
         }
     }
