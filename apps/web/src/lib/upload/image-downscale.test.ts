@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+    bmpHasAlpha,
     downscaleOversizedImage,
     firstAttempt,
     isOversizedImage,
@@ -20,7 +21,7 @@ const uint32 = (value: number): number[] => [24, 16, 8, 0].map((shift) => Math.f
 const zeros = (length: number): number[] => [...new Uint8Array(length)];
 
 /** A PNG head: signature, an IHDR of `colorType`, then `chunks` (type, payload length). */
-const pngHead = (colorType: number, chunks: [string, number][] = [["IDAT", 4]]): Uint8Array => {
+const pngHead = (colorType: number, chunks: [string, number][] = [["IDAT", 4]]): Uint8Array<ArrayBuffer> => {
     const bytes: number[] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
     const chunk = (type: string, length: number, payload: number[] = []) => {
         const name = [...type].map((c) => c.codePointAt(0) ?? 0);
@@ -144,12 +145,48 @@ describe(pngHasAlpha, () => {
         ).toBe(true);
     });
 
+    it("is true for an animated PNG, whose acTL chunk comes before the image data", () => {
+        expect(
+            pngHasAlpha(
+                pngHead(2, [
+                    ["acTL", 8],
+                    ["IDAT", 8],
+                ]),
+            ),
+        ).toBe(true);
+    });
+
     it("is true when the head ends before the image data, and for bytes that are not a PNG", () => {
         expect(pngHasAlpha(pngHead(2, [["iCCP", 200]]))).toBe(true);
         const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...zeros(40)]);
 
         expect(pngHasAlpha(jpeg)).toBe(true);
         expect(pngHasAlpha(new Uint8Array(4))).toBe(true);
+    });
+});
+
+/** A BMP head: "BM", the file header, then a DIB header whose bits-per-pixel field sits at byte 28. */
+const bmpHead = (bitsPerPixel: number): Uint8Array<ArrayBuffer> => {
+    const head = new Uint8Array(54);
+
+    head.set([0x42, 0x4d]);
+    new DataView(head.buffer).setUint16(28, bitsPerPixel, true);
+
+    return head;
+};
+
+describe(bmpHasAlpha, () => {
+    it("is true only for 32 bits per pixel", () => {
+        expect(bmpHasAlpha(bmpHead(32))).toBe(true);
+        expect(bmpHasAlpha(bmpHead(24))).toBe(false);
+        expect(bmpHasAlpha(bmpHead(8))).toBe(false);
+    });
+
+    it("is true for bytes that are not a BMP", () => {
+        const jpeg = new Uint8Array([0xff, 0xd8, ...zeros(40)]);
+
+        expect(bmpHasAlpha(jpeg)).toBe(true);
+        expect(bmpHasAlpha(new Uint8Array(4))).toBe(true);
     });
 });
 
@@ -208,5 +245,88 @@ describe(downscaleOversizedImage, () => {
         const file = new File([new Uint8Array(TARGET_IMAGE_BYTES + 1)], "a.jpg", { type: "image/jpeg" });
 
         expect(await downscaleOversizedImage(file)).toBe(file);
+    });
+
+    describe("with a stubbed decoder and canvas", () => {
+        afterEach(() => {
+            vi.unstubAllGlobals();
+            vi.restoreAllMocks();
+        });
+
+        /** A decoder for a 4000 × 3000 photo; every canvas encodes to `jpegBytes(quality)` bytes. */
+        const stubBrowser = (jpegBytes: (width: number) => number) => {
+            const create = vi.fn(async () => {
+                return { close: vi.fn(), height: 3000, width: 4000 };
+            });
+
+            vi.stubGlobal("createImageBitmap", create);
+            vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+                drawImage: vi.fn(),
+                fillRect: vi.fn(),
+            } as unknown as CanvasRenderingContext2D);
+            vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function toBlob(this: HTMLCanvasElement, callback) {
+                // eslint-disable-next-line unicorn/no-this-outside-of-class, unicorn/max-nested-calls -- the spied method is called on its canvas
+                callback(new Blob([new Uint8Array(jpegBytes(this.width))], { type: "image/jpeg" }));
+            });
+
+            return create;
+        };
+
+        it("re-encodes an oversized opaque photo as a JPEG under the target", async () => {
+            stubBrowser(() => TARGET_IMAGE_BYTES - 1);
+
+            const file = new File([pngHead(2), new Uint8Array(TARGET_IMAGE_BYTES * 3)], "photo.png", { type: "image/png" });
+            const result = await downscaleOversizedImage(file);
+
+            expect(result.type).toBe("image/jpeg");
+            expect(result.name).toBe("photo.jpg");
+            expect(result.size).toBeLessThanOrEqual(TARGET_IMAGE_BYTES);
+        });
+
+        it("keeps shrinking past the first quality steps until the result fits", async () => {
+            // Size follows the width: too big at 2048 px, so the quality steps and one shrink are not enough.
+            stubBrowser((width) => width * 3000);
+
+            const file = new File([new Uint8Array(TARGET_IMAGE_BYTES * 8)], "photo.jpg", { type: "image/jpeg" });
+            const result = await downscaleOversizedImage(file);
+
+            expect(result.size).toBeLessThanOrEqual(TARGET_IMAGE_BYTES);
+        });
+
+        it("leaves a 32-bit BMP alone, because a JPEG would flatten its alpha", async () => {
+            const create = stubBrowser(() => 10);
+            const head = bmpHead(32);
+            const file = new File([head, new Uint8Array(TARGET_IMAGE_BYTES + 1)], "a.bmp", { type: "image/bmp" });
+
+            expect(await downscaleOversizedImage(file)).toBe(file);
+            expect(create).not.toHaveBeenCalled();
+        });
+
+        it("re-encodes a 24-bit BMP", async () => {
+            stubBrowser(() => 10);
+            const file = new File([bmpHead(24), new Uint8Array(TARGET_IMAGE_BYTES + 1)], "a.bmp", { type: "image/bmp" });
+
+            const result = await downscaleOversizedImage(file);
+
+            expect(result.name).toBe("a.jpg");
+        });
+
+        it("leaves an opaque animated PNG alone", async () => {
+            const create = stubBrowser(() => 10);
+            const file = new File(
+                [
+                    pngHead(2, [
+                        ["acTL", 8],
+                        ["IDAT", 8],
+                    ]),
+                    new Uint8Array(TARGET_IMAGE_BYTES + 1),
+                ],
+                "a.png",
+                { type: "image/png" },
+            );
+
+            expect(await downscaleOversizedImage(file)).toBe(file);
+            expect(create).not.toHaveBeenCalled();
+        });
     });
 });

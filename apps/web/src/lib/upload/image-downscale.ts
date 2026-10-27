@@ -24,15 +24,15 @@ export const TARGET_IMAGE_BYTES = Math.floor(3.4 * MEGABYTE);
  */
 export const MAX_IMAGE_EDGE = 2048;
 
-/** Attempts at the target size before the smallest result is uploaded as it is. */
-export const MAX_ATTEMPTS = 4;
+/** Attempts at the target size before the smallest result is uploaded as it is: three qualities, then shrinking three times. */
+export const MAX_ATTEMPTS = 6;
 
 const FIRST_QUALITY = 0.85;
 const MIN_QUALITY = 0.6;
 const QUALITY_STEP = 0.15;
 const SHRINK_MARGIN = 0.92;
 
-/** What gets re-encoded. GIF (animation), SVG (vector) and icons are left alone, and so are transparent PNGs and transparent or animated WebPs. */
+/** What gets re-encoded. GIF (animation), SVG (vector) and icons are left alone, and so are transparent or animated PNGs, transparent or animated WebPs and 32-bit BMPs. */
 const REENCODABLE_TYPES: ReadonlySet<string> = new Set(["image/bmp", "image/jpeg", "image/png", "image/webp"]);
 
 /** The one type every re-encoded photo has: its leading bytes pass the server's sniff and it is on the allowlist. */
@@ -45,7 +45,7 @@ export interface EncodeAttempt {
     width: number;
 }
 
-/** Whether a file of this type and size is re-encoded at all. A PNG or WebP with alpha, or an animated WebP, is a further check, on its bytes. */
+/** Whether a file of this type and size is re-encoded at all. A PNG, WebP or BMP that a JPEG would flatten is a further check, on its bytes. */
 export const isOversizedImage = (file: { size: number; type: string }): boolean => REENCODABLE_TYPES.has(file.type) && file.size > TARGET_IMAGE_BYTES;
 
 /** The first encode of an image of `width` × `height`: the long edge clamped to {@link MAX_IMAGE_EDGE}. */
@@ -75,7 +75,7 @@ export const nextAttempt = (previous: EncodeAttempt, outputBytes: number): Encod
     return { height: Math.max(1, Math.floor(previous.height * scale)), quality: previous.quality, width: Math.max(1, Math.floor(previous.width * scale)) };
 };
 
-/** Bytes of a PNG's or WebP's head to read for {@link pngHasAlpha} and {@link webpIsAnimatedOrTransparent}: both keep their flags before the image data. */
+/** Bytes of a file's head to read for {@link pngHasAlpha}, {@link bmpHasAlpha} and {@link webpIsAnimatedOrTransparent}: both keep their flags before the image data. */
 const HEAD_BYTES = 256 * 1024;
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -108,7 +108,8 @@ export const pngHasAlpha = (head: Uint8Array): boolean => {
     while (offset + CHUNK_HEADER_BYTES <= head.length) {
         const type = ascii(head, offset + 4, 4);
 
-        if (type === "tRNS") {
+        // tRNS: transparency. acTL: an animated PNG, whose frames a JPEG would drop.
+        if (type === "tRNS" || type === "acTL") {
             return true;
         }
 
@@ -120,6 +121,23 @@ export const pngHasAlpha = (head: Uint8Array): boolean => {
     }
 
     return true;
+};
+
+const BMP_BITS_PER_PIXEL_OFFSET = 28;
+const BMP_HEADER_BYTES = 30;
+const BMP_ALPHA_BITS_PER_PIXEL = 32;
+
+/**
+ * Whether a BMP can carry transparency: only a 32-bit-per-pixel one has an
+ * alpha channel (browsers decode it as such). Bytes that are not a BMP answer
+ * "yes", so the file is left as it is.
+ */
+export const bmpHasAlpha = (head: Uint8Array): boolean => {
+    if (head.length < BMP_HEADER_BYTES || head[0] !== 0x42 || head[1] !== 0x4d) {
+        return true;
+    }
+
+    return new DataView(head.buffer, head.byteOffset, head.byteLength).getUint16(BMP_BITS_PER_PIXEL_OFFSET, true) === BMP_ALPHA_BITS_PER_PIXEL;
 };
 
 /* eslint-disable no-bitwise -- WebP flags are bits of one byte */
@@ -181,6 +199,13 @@ const encoded = async (canvas: HTMLCanvasElement, quality: number): Promise<Blob
         canvas.toBlob((blob) => resolve(blob ?? undefined), REENCODED_TYPE, quality);
     });
 
+/** Per type, whether the head of a file says a JPEG would lose something (alpha, animation). A type with no entry is always re-encoded. */
+const JPEG_LOSES: Readonly<Record<string, ((head: Uint8Array) => boolean) | undefined>> = {
+    "image/bmp": bmpHasAlpha,
+    "image/png": pngHasAlpha,
+    "image/webp": webpIsAnimatedOrTransparent,
+};
+
 const EXTENSION = /\.[^./\\]+$/;
 
 const jpegName = (name: string): string => `${name.replace(EXTENSION, "")}.jpg`;
@@ -189,22 +214,21 @@ const jpegName = (name: string): string => `${name.replace(EXTENSION, "")}.jpg`;
  * The file to upload for `file`: itself, unless it is a photo over
  * {@link TARGET_IMAGE_BYTES}, in which case a JPEG (named `.jpg`, EXIF
  * orientation applied, metadata dropped) re-encoded until it fits or
- * {@link MAX_ATTEMPTS} runs out, when the smallest result is used. Any failure
+ * {@link MAX_ATTEMPTS} runs out, when the smallest result is used: still smaller
+ * than the original, and the server's own cap and the provider decide from there. Any failure
  * (no decoder, a canvas that cannot encode JPEG) answers the original, which the
  * server then accepts or refuses as before.
  */
 export const downscaleOversizedImage = async (file: File): Promise<File> => {
-    if (!isOversizedImage(file) || typeof createImageBitmap !== "function") {
+    if (typeof createImageBitmap !== "function" || !isOversizedImage(file)) {
         return file;
     }
 
     try {
-        if (file.type === "image/png" || file.type === "image/webp") {
-            const head = new Uint8Array(await file.slice(0, HEAD_BYTES).arrayBuffer());
+        const losesSomething = JPEG_LOSES[file.type];
 
-            if (file.type === "image/png" ? pngHasAlpha(head) : webpIsAnimatedOrTransparent(head)) {
-                return file;
-            }
+        if (losesSomething && losesSomething(new Uint8Array(await file.slice(0, HEAD_BYTES).arrayBuffer()))) {
+            return file;
         }
 
         const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
