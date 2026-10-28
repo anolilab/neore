@@ -9,6 +9,7 @@
  * that still lists threads.
  */
 import { apiKey } from "@better-auth/api-key";
+import { resolveAuthOptions } from "@lunora/auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { Hono } from "hono";
@@ -35,14 +36,16 @@ vi.mock("../lib/http-shard", () => {
 const BASE_URL = "http://localhost:3000";
 
 const buildHarness = async () => {
-    const auth = betterAuth({
-        baseURL: BASE_URL,
-        database: memoryAdapter({ account: [], apikey: [], session: [], user: [], verification: [] }),
-        emailAndPassword: { enabled: true },
-        plugins: [apiKey(API_KEY_OPTIONS)],
-        rateLimit: { enabled: false },
-        secret: "a-test-secret-that-is-long-enough-for-lunora-auth",
-    });
+    // The options `@lunora/auth` resolves from ours, as the app builds them, over an in-memory store.
+    const auth = betterAuth(
+        resolveAuthOptions({
+            baseURL: BASE_URL,
+            database: memoryAdapter({ account: [], apikey: [], rateLimit: [], session: [], user: [], verification: [] }),
+            emailAndPassword: { enabled: true },
+            plugins: [apiKey(API_KEY_OPTIONS)],
+            secret: "a-test-secret-that-is-long-enough-for-lunora-auth",
+        }),
+    );
     const api = auth.api as unknown as ApiKeyAuthApi;
     const signUp = await auth.handler(
         new Request(`${BASE_URL}/api/auth/sign-up/email`, {
