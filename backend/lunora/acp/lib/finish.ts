@@ -44,6 +44,13 @@ export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId:
  */
 const saveHostReply = async (ctx: MutationCtx, stream: Stream, reason: HostReplyReason, error: string | undefined): Promise<Id<"messages"> | undefined> => {
     const threadId = stream.threadId as Id<"threads">;
+    const thread = await ctx.db.get(threadId);
+
+    // The thread was deleted while the turn ran: a reply saved now would outlive its cleanup.
+    if (!thread || thread.deleted) {
+        return undefined;
+    }
+
     const session = await sessionOfThread(ctx, threadId);
     const reply = buildHostReply({
         agentKey: session?.agentKey ?? "host",

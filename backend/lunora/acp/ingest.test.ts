@@ -418,6 +418,23 @@ describe("a host turn", () => {
         expect(await messagesOf(threadId)).toHaveLength(2);
     });
 
+    it("saves no reply into a thread deleted during the turn, and ends the session when the desktop reopens it", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("hello"), TEXT("half")]);
+        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true }));
+        await turn(device, threadId, "t1", 2, [{ kind: "turn_end", reason: "finished" }]);
+
+        const saved = await messagesOf(threadId);
+
+        expect(saved.filter((message) => message.message.role === "assistant")).toHaveLength(0);
+
+        const reopened = await ingest(device, { events: [SESSION_OPEN] });
+
+        expect(reopened.json).toMatchObject({ ended: true, threadId });
+    });
+
     it("ends an interrupted turn as a failed reply that says why", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
