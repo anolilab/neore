@@ -30,15 +30,19 @@ const listen = <Payload>(channel: string, handler: (payload: Payload) => void): 
 };
 
 /**
- * The device RELAY only: status, pairing, manifest, execute and opening the local
+ * The device RELAY only: status, pairing, the servers this computer speaks for, manifest, execute and opening the local
  * window. Answering prompts and changing settings belong to the device window's
  * own preload, which the site cannot reach. Exposed only with the `device` capability.
  */
 const deviceRelay = {
     execute: (call: { envelope: string; signature: string }) => ipcRenderer.invoke(DEVICE_CHANNEL.execute, call),
-    manifest: () => ipcRenderer.invoke(DEVICE_CHANNEL.manifest),
+    hostConnect: (deviceId: string) => ipcRenderer.invoke(DEVICE_CHANNEL.hostConnect, deviceId),
+    hostDisconnect: (deviceId: string) => ipcRenderer.invoke(DEVICE_CHANNEL.hostDisconnect, deviceId),
+    hostPair: (pairing: { deviceId: string; secret: string; spec: Record<string, unknown> }) => ipcRenderer.invoke(DEVICE_CHANNEL.hostPair, pairing),
+    hostProbe: (spec: Record<string, unknown>) => ipcRenderer.invoke(DEVICE_CHANNEL.hostProbe, spec),
+    manifest: (deviceId?: string) => ipcRenderer.invoke(DEVICE_CHANNEL.manifest, deviceId),
     onChanged: (handler: () => void): () => void => listen(DEVICE_CHANNEL.changed, () => handler()),
-    onProgress: (handler: (report: { callId: string; payload: string; signature: string }) => void): () => void =>
+    onProgress: (handler: (report: { callId: string; deviceId: string; payload: string; signature: string }) => void): () => void =>
         listen(DEVICE_CHANNEL.progress, handler),
     openSettings: () => ipcRenderer.invoke(DEVICE_CHANNEL.openSettings),
     pair: (pairing: { accountLabel: string; deviceId: string; secret: string }) => ipcRenderer.invoke(DEVICE_CHANNEL.pair, pairing),

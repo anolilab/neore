@@ -18,6 +18,11 @@
                 <div id="prompt-warning" class="warning" role="alert" hidden></div>
                 <p id="prompt-sandbox" hidden></p>
                 <pre id="prompt-detail" tabindex="0" aria-label="What will happen"></pre>
+                <!-- A key passphrase: typed here, handed to ssh, kept nowhere. -->
+                <div id="prompt-secret-box" hidden>
+                    <label for="prompt-secret">Passphrase</label>
+                    <input id="prompt-secret" type="password" autocomplete="off" spellcheck="false" maxlength="1024" />
+                </div>
                 <details id="prompt-input-box">
                     <summary>Exact input</summary>
                     <pre id="prompt-input" tabindex="0"></pre>
@@ -56,6 +61,13 @@
                     Allow network for shell commands (macOS and Linux only: Windows does not block network access)
                 </label>
                 <p id="sandbox-status" class="muted"></p>
+
+                <h2 id="hosts-heading">Servers over SSH</h2>
+                <p class="muted">
+                    Servers this computer speaks for. Add one from Settings → Devices in the Neore app. The server holds no secret of yours:
+                    every action is approved here first, then sent down the SSH connection.
+                </p>
+                <div id="hosts" aria-labelledby="hosts-heading"></div>
 
                 <h2 id="servers-heading">Local MCP servers</h2>
                 <p class="muted">Started on this computer when the agent first uses them. Only add commands you trust.</p>

@@ -19,7 +19,17 @@ import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
 import type { HostTransport } from "./transport";
 import { createLocalTransport } from "./transport";
 import type { CoreEvent, Prompt } from "./types";
-import { readPairing, readPromptAnswer, readSettingsUpdate, readSigned } from "./validate";
+import {
+    readDeviceId,
+    readHostPairing,
+    readHostSpec,
+    readOptionalDeviceId,
+    readPairing,
+    readPromptAnswer,
+    readSecretAnswer,
+    readSettingsUpdate,
+    readSigned,
+} from "./validate";
 
 /** Stopping idle MCP servers runs once a minute. */
 const REAP_INTERVAL_MS = 60_000;
@@ -155,7 +165,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         openLocalWindow();
         send(state.local?.webContents, LOCAL_EVENT.prompt);
 
-        const body = prompt.body.kind === "pairing" ? "Confirm pairing this computer" : `${prompt.body.tool} — ${prompt.body.threadTitle}`;
+        const body = promptSummary(prompt);
 
         if (Notification.isSupported()) {
             new Notification({ body, title: "Neore is asking for your approval" }).show();
@@ -174,7 +184,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             case "progress": {
                 // The signed report; the page forwards it to the backend, which verifies it.
                 for (const site of sites) {
-                    send(site, DEVICE_CHANNEL.progress, { callId: event.callId, payload: event.payload, signature: event.signature });
+                    send(site, DEVICE_CHANNEL.progress, { callId: event.callId, deviceId: event.deviceId, payload: event.payload, signature: event.signature });
                 }
 
                 break;
@@ -217,7 +227,23 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return requireTransport().pair(deviceId, secret, accountLabel);
     });
 
-    relay(DEVICE_CHANNEL.manifest, async () => requireTransport().manifest());
+    relay(DEVICE_CHANNEL.manifest, async (_event, deviceId) => requireTransport().manifest(readOptionalDeviceId(deviceId)));
+
+    // The servers this computer speaks for. The page asks; the host key, the passphrase and the pairing are each
+    // decided by the person at the local window, so a page can connect nowhere on its own.
+    relay(DEVICE_CHANNEL.hostProbe, async (_event, spec) => requireTransport().hostProbe(readHostSpec(spec)));
+
+    relay(DEVICE_CHANNEL.hostPair, async (_event, pairing) => {
+        const { deviceId, secret, spec } = readHostPairing(pairing);
+
+        return requireTransport().hostPair(spec, deviceId, secret);
+    });
+
+    relay(DEVICE_CHANNEL.hostConnect, async (_event, deviceId) => requireTransport().hostConnect(readDeviceId(deviceId)));
+
+    relay(DEVICE_CHANNEL.hostDisconnect, (_event, deviceId) => {
+        requireTransport().hostDisconnect(readDeviceId(deviceId));
+    });
 
     relay(DEVICE_CHANNEL.execute, async (_event, call) => {
         const { envelope, signature } = readSigned(call);
@@ -237,6 +263,27 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const checked = readPromptAnswer(id, answer);
 
         requireTransport().promptAnswer(checked.id, checked.answer);
+    });
+
+    // The passphrase has a channel of its own: it is not an answer, and nothing on the way logs it.
+    local(LOCAL_CHANNEL.promptSecret, (id, secret) => {
+        const checked = readSecretAnswer(id, secret);
+
+        requireTransport().promptSecret(checked.id, checked.secret);
+    });
+
+    local(LOCAL_CHANNEL.hostConnect, async (deviceId) => requireTransport().hostConnect(readDeviceId(deviceId)));
+
+    local(LOCAL_CHANNEL.hostDisconnect, (deviceId) => {
+        requireTransport().hostDisconnect(readDeviceId(deviceId));
+    });
+
+    local(LOCAL_CHANNEL.hostForgetKey, (deviceId) => {
+        requireTransport().hostForgetKey(readDeviceId(deviceId));
+    });
+
+    local(LOCAL_CHANNEL.hostRemove, (deviceId) => {
+        requireTransport().hostRemove(readDeviceId(deviceId));
     });
 
     local(LOCAL_CHANNEL.settingsGet, () => requireTransport().settingsGet());
@@ -269,6 +316,30 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     local(LOCAL_CHANNEL.auditTail, () => requireTransport().auditTail());
 
     return state.transport !== undefined;
+};
+
+/** The one line a notification shows for a prompt. */
+const promptSummary = ({ body }: Prompt): string => {
+    switch (body.kind) {
+        case "call": {
+            return `${body.tool}${body.host === undefined ? "" : ` on ${body.host}`} — ${body.threadTitle}`;
+        }
+        case "hostKey": {
+            return `Trust the key of ${body.host}?`;
+        }
+        case "hostKeyChanged": {
+            return `The key of ${body.host} changed`;
+        }
+        case "hostPairing": {
+            return `Add the server ${body.name}`;
+        }
+        case "passphrase": {
+            return `A key passphrase for ${body.host}`;
+        }
+        default: {
+            return "Confirm pairing this computer";
+        }
+    }
 };
 
 export interface DeviceIpcOptions {

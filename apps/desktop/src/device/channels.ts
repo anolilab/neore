@@ -10,6 +10,10 @@
 export const DEVICE_CHANNEL = {
     changed: "neore:device:changed",
     execute: "neore:device:execute",
+    hostConnect: "neore:device:host-connect",
+    hostDisconnect: "neore:device:host-disconnect",
+    hostPair: "neore:device:host-pair",
+    hostProbe: "neore:device:host-probe",
     manifest: "neore:device:manifest",
     openSettings: "neore:device:open-settings",
     pair: "neore:device:pair",
@@ -20,9 +24,14 @@ export const DEVICE_CHANNEL = {
 export const LOCAL_CHANNEL = {
     auditTail: "neore:device-local:audit-tail",
     confirm: "neore:device-local:confirm",
+    hostConnect: "neore:device-local:host-connect",
+    hostDisconnect: "neore:device-local:host-disconnect",
+    hostForgetKey: "neore:device-local:host-forget-key",
+    hostRemove: "neore:device-local:host-remove",
     pickFolder: "neore:device-local:pick-folder",
     promptAnswer: "neore:device-local:prompt-answer",
     promptCurrent: "neore:device-local:prompt-current",
+    promptSecret: "neore:device-local:prompt-secret",
     settingsGet: "neore:device-local:settings-get",
     settingsUpdate: "neore:device-local:settings-update",
 } as const;
