@@ -336,7 +336,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // CRITICAL: Validate that initialThread matches current threadId before using it.
     // During navigation, the component can re-render with NEW threadId but OLD initialThread (from previous route).
     // Only use initialThread if its _id matches the current threadId, otherwise fall back to query data.
-    const thread: ThreadData | null = (initialThread && initialThread._id === threadId ? initialThread : null) ?? (threadData as ThreadData | null) ?? null;
+    // The live row wins once there is one: it is seeded from `initialThread`, so it equals it until a switch or an
+    // edit moves the thread, and the loader's snapshot would otherwise keep showing the creation model after one.
+    const thread: ThreadData | null = (threadData as ThreadData | null) ?? (initialThread && initialThread._id === threadId ? initialThread : null) ?? null;
 
     // Backup sync: when Lunora query resolves with fresh data, update store
     // Only if user hasn't explicitly changed model/mode for this thread
