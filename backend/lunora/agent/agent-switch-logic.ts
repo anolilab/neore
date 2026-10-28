@@ -6,8 +6,7 @@
  */
 import { type AgentRef, type AgentSwitchPart, vAgentSwitch } from "./agent-switch-validators";
 
-/** The `providerMetadata` key that marks a row as an agent switch. */
-export const AGENT_SWITCH_KEY = "neoreAgentSwitch";
+import { AGENT_SWITCH_KEY } from "./agent-switch-shape";
 
 /** The part a row carries, or `undefined` for every other row (and for a part that does not check). */
 export const agentSwitchOf = (row: { providerMetadata?: unknown }): AgentSwitchPart | undefined => {
@@ -37,3 +36,5 @@ export const sameAgent = (a: AgentRef, b: AgentRef): boolean => a.kind === b.kin
 /** The newest switch among `rows` (newest first, as a path walk returns them), if any. */
 export const lastAgentSwitch = (rows: ReadonlyArray<{ providerMetadata?: unknown }>): AgentSwitchPart | undefined =>
     rows.map((row) => agentSwitchOf(row)).find((part) => part !== undefined);
+
+export { AGENT_SWITCH_KEY } from "./agent-switch-shape";
