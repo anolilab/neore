@@ -313,24 +313,6 @@ export class HostCommands {
         return outcome;
     }
 
-    /** A held command the core will not allow any more: it leaves the log as a refusal, so a redelivery is refused the same way. */
-    private async refuse(callId: string, reason: string): Promise<void> {
-        const receipt = this.receipts.get(callId);
-
-        if (receipt === undefined) {
-            return;
-        }
-
-        delete receipt.held;
-        receipt.refusal = reason;
-
-        try {
-            await this.persist();
-        } catch {
-            // The next write carries it.
-        }
-    }
-
     private async replay(): Promise<void> {
         await this.load();
 
@@ -381,7 +363,17 @@ export class HostCommands {
             const reason = prepared.refusal ?? "refused";
 
             this.options.log?.(`[acp-host] a command left from the last run is not allowed any more and was dropped: ${reason}`);
-            await this.refuse(callId, reason);
+
+            const receipt = this.receipts.get(callId) as Receipt;
+
+            delete receipt.held;
+            receipt.refusal = reason;
+
+            try {
+                await this.persist();
+            } catch {
+                // The next write carries it.
+            }
 
             return;
         }

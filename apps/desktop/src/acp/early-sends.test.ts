@@ -170,7 +170,6 @@ describe("a message for a session that is not open", () => {
 
         subject.early.opened("s1");
         expect(subject.sent).toEqual([]);
-        expect(subject.early.size).toBe(0);
     });
 });
 

@@ -265,7 +265,11 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     /** Saves what the agents do on the backend, from here and not from the page. Without a pairing it posts nothing. */
     const requireHost = (core: DeviceCore): HostPoster => {
         state.host ??= new HostPoster({
-            cancelTurn: (sessionId, turnId) => state.acp?.cancelTurn(sessionId, turnId),
+            // The turn may be running, queued in the session, or still held for a session that is opening.
+            cancelTurn: (sessionId, turnId) => {
+                state.acp?.cancelTurn(sessionId, turnId);
+                state.early?.cancel(sessionId, turnId);
+            },
             deviceId: () => (JSON.parse(core.status()) as { deviceId: string | null }).deviceId ?? undefined,
             endpoint: new URL("hosts/ingest", backendOrigin()),
             log: (message) => console.error(message),
