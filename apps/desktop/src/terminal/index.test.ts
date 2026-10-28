@@ -337,6 +337,31 @@ describe("a terminal on a server", () => {
         expect(hosts).toHaveLength(1);
     });
 
+    it("starts nothing for a window that closed while the connection waited on a prompt", async () => {
+        const args = vi.fn(async () => SSH_ARGS);
+
+        await terminals.openSsh(server(args));
+        await startShell();
+        hosts[0]?.emit({ exitCode: 255, signal: 0, type: "exit" });
+
+        let answer: (value: string[]) => void = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the project's TypeScript lib does not have it yet
+        const pending = new Promise<string[]>((resolve) => {
+            answer = resolve;
+        });
+
+        args.mockImplementationOnce(() => pending);
+
+        const restarting = startShell();
+
+        lastWindow().close();
+        answer(SSH_ARGS);
+
+        await expect(restarting).rejects.toThrow("went away");
+        expect(hosts).toHaveLength(1);
+    });
+
     it("names the server in the exit report, so the page can say the connection ended", async () => {
         await terminals.openSsh(server());
         await startShell();

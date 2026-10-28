@@ -363,6 +363,12 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
         try {
             // A local shell starts at once: awaiting first would let a quit or a reload slip in before its host exists.
             const launch = entry.ssh === undefined ? localLaunch() : await sshLaunch(entry.ssh);
+
+            // Connecting can wait on a prompt for minutes; a window that went away meanwhile gets no login on the server.
+            if (entry.closed || entry.epoch !== epoch) {
+                throw new Error("terminal: the window went away");
+            }
+
             const target = entry.window.webContents;
             const started = await startSession({
                 onData: (data) => {
