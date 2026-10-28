@@ -68,7 +68,8 @@ Decisions:
 Windows, and Linux. Record model size, download size, first-word latency, time to
 finish for a 10-second clip, peak memory, CPU use, and accuracy on a fixed set of
 prompts in the languages we support. Check each model's licence for redistribution
-in the app. Output: one chosen model, or a stop.
+in the app. Output: one chosen model, or a stop (per platform; Windows arm64 is
+decided in S4, see Appendix A).
 - Acceptance: a table of measurements in the plan's appendix; the chosen model's
   licence is recorded and allows redistribution.
 
@@ -190,4 +191,6 @@ terms, so both may be redistributed inside the app with the licence text.
   reason to block it.
 
 The chosen models' licences allow redistribution (above). Every platform row is
-recorded, so S1 is done; the Windows arm64 model choice moves to S4.
+recorded, so S1 is done for macOS, Windows x64 and Linux. S1's model-or-stop decision
+for Windows arm64 is deliberately left open and decided in S4, once the clang-cl rebuild
+shows what that platform can run; until then dictation is not offered there.
