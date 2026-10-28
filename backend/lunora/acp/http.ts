@@ -21,8 +21,10 @@
 import type { HttpActionCtx, Infer } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
+import { isDeviceSignature } from "../devices/lib/signing";
 import { inShard } from "../lib/http-shard";
 import { threadShardFor } from "../lib/thread-shard";
+import { MAX_LENGTH } from "../lib/validators";
 import { MAX_EVENTS_PER_POST, MAX_INGEST_BYTES, INGEST_FLOOD_LIMIT_PER_MINUTE } from "./lib/constants";
 import { vHostEvent } from "./validators";
 
@@ -172,8 +174,11 @@ const readPost = (payload: Record<string, unknown>): Post | null => {
 
     if (
         typeof payload.sessionId !== "string" ||
+        payload.sessionId.length > MAX_LENGTH.id ||
         threadId === null ||
         turnId === null ||
+        (threadId?.length ?? 0) > MAX_LENGTH.id ||
+        (turnId?.length ?? 0) > MAX_LENGTH.id ||
         (firstSeq !== undefined && typeof firstSeq !== "number") ||
         !Array.isArray(payload.events) ||
         payload.events.length > MAX_EVENTS_PER_POST
@@ -257,14 +262,16 @@ export const hostIngestHttpAction = async (context: HttpActionCtx, request: Requ
     const payload = isRecord(body) ? body.payload : undefined;
     const signature = isRecord(body) ? body.signature : undefined;
 
-    if (typeof payload !== "string" || typeof signature !== "string") {
+    // A signature that is not 64 hex characters can belong to no device: refused before any lookup, so its
+    // answer cannot tell whether the device exists (and never reaches a validator that would throw).
+    if (typeof payload !== "string" || typeof signature !== "string" || !isDeviceSignature(signature)) {
         return unauthorized();
     }
 
     const claimed = parseJson(payload);
     const deviceId = isRecord(claimed) ? claimed.deviceId : undefined;
 
-    if (typeof deviceId !== "string" || deviceId.length === 0 || deviceId.length > 128) {
+    if (typeof deviceId !== "string" || deviceId.length === 0 || deviceId.length > MAX_LENGTH.id) {
         return unauthorized();
     }
 

@@ -63,6 +63,7 @@ export const vHostEvent = v.union(
         title: v.string().max(500),
         toolKind: v.string().max(64),
     }),
+    // `command` and `target` may carry paths and file contents' names: §4.4 shows the request in full to its owner.
     v.object({
         command: v.optional(v.string().max(10_000)),
         folder: v.optional(v.string().max(500)),

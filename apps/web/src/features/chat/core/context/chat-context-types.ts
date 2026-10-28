@@ -40,6 +40,8 @@ export interface ThreadData {
     multiChat?: boolean;
     parentThreadId?: string;
     reasoningEffort?: number;
+    /** `host`: a coding agent on a paired computer runs the turns (`backend/lunora/acp/`). Unset: the cloud. */
+    runner?: "host";
     statelessMode?: boolean;
     status?: string;
     title?: string;

@@ -67,6 +67,8 @@ registerModule(registry, "chat_streaming_persistent_library", await import("../c
 const FLOODER = "192.0.2.1";
 const NEIGHBOUR = "192.0.2.2";
 const RESTARTED = /restarted/u;
+const STOPPED_SENDING = /stopped sending output/u;
+const REMOVED = /was removed/u;
 const HEX_SIGNATURE = /^[0-9a-f]{64}$/u;
 const CANNOT_STEER = /cannot be steered/u;
 
@@ -516,6 +518,39 @@ describe("ingest refusals", () => {
         await expect(hostIngestHttpAction(httpContext(), request("x".repeat(300 * 1024)))).resolves.toHaveProperty("status", 413);
     });
 
+    it("answers 401 to a signature that is not 64 hex characters, before any device is looked up", async () => {
+        const device = await pair(ownerId);
+        const { payload } = await signed(device, { events: [START()] });
+        let lookups = 0;
+        const context = httpContext() as unknown as { runQuery: (ref: never, args: never) => Promise<unknown> };
+        const counted = {
+            ...context,
+            runQuery: async (ref: never, args: never) => {
+                lookups += 1;
+
+                return await context.runQuery(ref, args);
+            },
+        } as never;
+
+        for (const signature of ["a".repeat(65), "a".repeat(5000), "g".repeat(64), ""]) {
+            const response = await hostIngestHttpAction(counted, request({ payload, signature }));
+
+            expect(response.status).toBe(401);
+        }
+
+        expect(lookups).toBe(0);
+    });
+
+    it("answers 400 to a session, turn or thread id past 128 characters", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const long = "x".repeat(129);
+
+        await expect(ingest(device, { events: [SESSION_OPEN], sessionId: long })).resolves.toMatchObject({ status: 400 });
+        await expect(turn(device, threadId, long, 0, [START()])).resolves.toMatchObject({ status: 400 });
+        await expect(turn(device, long, "t1", 0, [START()])).resolves.toMatchObject({ status: 400 });
+    });
+
     it("counts the body, not the Content-Length the sender claims", async () => {
         const big = request("y".repeat(300 * 1024), { "content-length": "10" });
 
@@ -595,6 +630,14 @@ describe("the reaper", () => {
 
         expect(stream).toMatchObject({ hostEndReason: "timeout", hostState: "ended", status: "timeout" });
         expect(await row(threadId)).toMatchObject({ status: "active" });
+
+        // What the host wrote stays in the thread, as a failed reply that says why it stopped.
+        const [reply, ...others] = await assistantRepliesOf(threadId);
+
+        expect(others).toHaveLength(0);
+        expect(reply).toMatchObject({ finishReason: "error", status: "failed" });
+        expect(reply?.message.content).toEqual([{ text: "working", type: "text" }]);
+        expect(reply?.error).toMatch(STOPPED_SENDING);
         expect(call).toMatchObject({ deviceId: device.deviceId, status: "pending", toolName: "acp_cancel" });
         expect(JSON.parse(call?.envelope)).toMatchObject({ input: { sessionId: "host-s1", turnId: "t1" }, kind: "call", tool: "acp_cancel" });
         expect(call?.signature).toMatch(HEX_SIGNATURE);
@@ -603,6 +646,61 @@ describe("the reaper", () => {
 
         expect(late).toMatchObject({ json: { ended: true }, status: 200 });
         expect(await chunksOf(stream?._id)).toHaveLength(2);
+    });
+
+    it("saves a failed reply even when the silent turn wrote nothing", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START()]);
+        await expire("t1", Date.now() - 1000);
+        await reap();
+
+        const [reply] = await assistantRepliesOf(threadId);
+
+        expect(reply).toMatchObject({ finishReason: "error", status: "failed" });
+        expect(reply?.error).toMatch(STOPPED_SENDING);
+    });
+
+    it("a restart that follows the reaper moves the end reason to interrupted without a second reply", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("half")]);
+        await expire("t1", Date.now() - 1000);
+        await reap();
+
+        const before = await messagesOf(threadId);
+
+        // The desktop's next start ends the turn it left behind, with a probe far past the end.
+        const late = await turn(device, threadId, "t1", 1_000_000_000, [{ kind: "turn_end", reason: "interrupted" }]);
+
+        expect(late).toMatchObject({ json: { ended: true }, status: 200 });
+        expect(await streamFor("t1")).toMatchObject({ hostEndReason: "interrupted", hostState: "ended", status: "timeout" });
+        expect(await messagesOf(threadId)).toHaveLength(before.length);
+    });
+
+    it("keeps every chunk of a turn longer than one page when it saves the reply", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const texts = Array.from({ length: 450 }, (_, index) => TEXT(String(index % 10)));
+
+        await turn(device, threadId, "t1", 0, [START(), ...texts, { kind: "turn_end", reason: "finished" }]);
+
+        const [reply] = await assistantRepliesOf(threadId);
+
+        expect(reply?.message.content).toEqual([{ text: texts.map((event) => event.text).join(""), type: "text" }]);
+    });
+
+    it("keeps a stopped turn's end reason when the host's end arrives afterwards", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("x")]);
+        await harness.run(async (ctx: any) => await ctx.runMutation(library.stopActiveForThread, { threadId }));
+        await turn(device, threadId, "t1", 2, [{ kind: "turn_end", reason: "interrupted" }]);
+
+        expect(await streamField("t1", "hostEndReason")).toBe("stopped");
     });
 
     it("leaves a stream that is waiting on a permission answer alone, and moves its window on", async () => {
@@ -683,6 +781,12 @@ describe("stopping and revoking", () => {
         await as(ownerId).mutation(devices.revokeDevice as never, { deviceId: device.deviceId } as never);
 
         expect(await streamFor("t1")).toMatchObject({ hostEndReason: "revoked", hostState: "ended", status: "error" });
+
+        const [reply] = await assistantRepliesOf(threadId);
+
+        expect(reply).toMatchObject({ finishReason: "error", status: "failed" });
+        expect(reply?.message.content).toEqual([{ text: "busy", type: "text" }]);
+        expect(reply?.error).toMatch(REMOVED);
         await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "ended" });
         expect(await row(threadId)).toMatchObject({ status: "active" });
     });
