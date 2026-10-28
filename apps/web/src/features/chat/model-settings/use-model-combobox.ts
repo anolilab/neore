@@ -89,12 +89,18 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
                 if (result.coldStartCostly) {
                     showInfo(t`The next reply re-reads this whole conversation without the model's cache, so it costs more than usual.`);
                 }
-            } catch (error) {
-                loadThreadData({ mode: thread.mode, model: thread.activeAgent?.model ?? thread.model }, threadId);
-                showError(error instanceof Error ? error : t`Could not switch the model. Please try again.`);
-            }
 
-            return;
+                return;
+            } catch (error) {
+                // A thread with nothing to switch from yet (no messages) has no transcript to put a divider in: the
+                // pick is an edit of the thread's model, below.
+                if ((error as { data?: { code?: string } }).data?.code !== "AGENT_SWITCH_UNSUPPORTED") {
+                    loadThreadData({ mode: thread.mode, model: thread.activeAgent?.model ?? thread.model }, threadId);
+                    showError(error instanceof Error ? error : t`Could not switch the model. Please try again.`);
+
+                    return;
+                }
+            }
         }
 
         // If existing thread, also persist to Lunora. A switched thread keeps its model: it is the agent of every
