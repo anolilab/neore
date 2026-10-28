@@ -3,6 +3,8 @@ import { type EmbeddingModel, embedMany as embedMany_, type ModelMessage } from 
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { assert } from "../../lib/error-helpers";
+import { assembleHandoffContext, withHandoff } from "../handoff-context";
+import { agentSwitchOf } from "../agent-switch-logic";
 import { docsToModelMessages, toModelMessage } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, extractText, getModelName, getProviderName, isTool, sorted } from "../shared";
 import type { MessageDoc as MessageDocument } from "../validators";
@@ -653,6 +655,17 @@ export const fetchContextWithPrompt = async (
         }
     }
 
+    // A switch's handoff stands in for the turns before it. A window cut below the divider that holds it asks for
+    // the newest one above (`agent/agent-switch.ts`); a thread that starts inside the window needs no lookup.
+    const oldest = prePromptDocs[0];
+    const earlierHandoff =
+        threadId && oldest && oldest.order > 0 && prePromptDocs.every((doc) => !agentSwitchOf(doc)?.handoff)
+            ? await context.runQuery(internal.agent.agent_switch.getHandoffAbove, { belowMessageId: oldest._id, threadId: threadId as Id<"threads"> })
+            : null;
+    const handoff = assembleHandoffContext(prePromptDocs, earlierHandoff ?? undefined);
+
+    prePromptDocs = handoff.docs;
+
     // Attachments and generated media are persisted as storage references (or,
     // in older rows, URLs that have since expired). Sign them NOW, for this call
     // only, so every turn — follow-ups included — hands the model live links.
@@ -681,7 +694,7 @@ export const fetchContextWithPrompt = async (
     }
 
     const search = docsToModelMessages(signedSearch);
-    const recent = docsToModelMessages(signedPrePrompt);
+    const recent = withHandoff(signedPrePrompt, handoff.blocks);
     const inputMessages = messages.map((item) => toModelMessage(item));
     const inputPrompt = promptArray.map((item) => toModelMessage(item));
     const existingResponses = docsToModelMessages(signedExisting);

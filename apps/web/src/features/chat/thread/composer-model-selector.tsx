@@ -9,6 +9,7 @@ import { ModelPickerButton } from "@/components/model-picker";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useChatIsRunning, useChatThread } from "@/features/chat/core/context/chat-context";
 import { MIN_COMPARISON_MODELS, useModelStore } from "@/features/chat/core/stores/model-store";
+import AgentSwitchConfirmDialog from "@/features/chat/model-settings/agent-switch-confirm-dialog";
 import useModelCombobox from "@/features/chat/model-settings/use-model-combobox";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -19,7 +20,7 @@ interface ComposerModelSelectorProps {
 const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) => {
     const { t } = useLingui();
     const { model, thread, threadId } = useChatThread();
-    const { changeModel } = useModelCombobox({ threadId });
+    const { cancelSwitch, changeModel, confirmSwitch, pendingSwitch } = useModelCombobox({ threadId });
     const { isAnonymous } = useIsAnonymous();
     // A switch is refused while a reply streams, so the picker waits for it (`chat.agent_switch`).
     const isRunning = useChatIsRunning();
@@ -85,6 +86,7 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
                 }
                 size="sm"
             />
+            <AgentSwitchConfirmDialog onCancel={cancelSwitch} onConfirm={confirmSwitch} pending={pendingSwitch} />
             {isBotThread && <span className="text-muted-foreground text-xs">{t`The bot sets the model for this chat.`}</span>}
         </>
     );

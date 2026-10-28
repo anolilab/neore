@@ -16,3 +16,11 @@ export const CHARACTERS_PER_TOKEN = 4;
 
 /** Rough token count of `characters` of text. Only the magnitude matters, so no tokenizer. */
 export const estimateTokensFromCharacters = (characters: number): number => characters / CHARACTERS_PER_TOKEN;
+
+/**
+ * What re-sending `tokens` as fresh input costs on a model priced at `inputPerMillionUsd` dollars per million
+ * input tokens (the gateway catalog's `pricing.input_per_million`), in microdollars. A dollar per million tokens
+ * is exactly one microdollar per token, so the price is the multiplier. The cache-write surcharge some providers
+ * add is not included: this is the floor the cost notice states.
+ */
+export const estimateInputCostMicrodollars = (tokens: number, inputPerMillionUsd: number): number => tokens * inputPerMillionUsd;

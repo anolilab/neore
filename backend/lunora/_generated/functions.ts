@@ -261,6 +261,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "admin_cleanup:writeCleanupLog": lunora_admin_cleanup_1.writeCleanupLog as unknown as RegisteredLunoraFunction,
     "admin_gateway_analytics:getGatewayAnalytics": lunora_admin_gateway_analytics_2.getGatewayAnalytics as unknown as RegisteredLunoraFunction,
     "agent_agent_switch:adoptForkAgent": lunora_agent_agent_switch_3.adoptForkAgent as unknown as RegisteredLunoraFunction,
+    "agent_agent_switch:getHandoffAbove": lunora_agent_agent_switch_3.getHandoffAbove as unknown as RegisteredLunoraFunction,
     "agent_agent_switch:getRunAgentModel": lunora_agent_agent_switch_3.getRunAgentModel as unknown as RegisteredLunoraFunction,
     "agent_auto_archive:archiveIfStillIdle": lunora_agent_auto_archive_4.archiveIfStillIdle as unknown as RegisteredLunoraFunction,
     "agent_auto_archive:autoArchiveContinue": lunora_agent_auto_archive_4.autoArchiveContinue as unknown as RegisteredLunoraFunction,
@@ -560,6 +561,9 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_import_workflow_actions:default": lunora_chat_import_workflow_actions_43.default as unknown as RegisteredLunoraFunction,
     "chat_import_workflow_actions:failImportStart": lunora_chat_import_workflow_actions_43.failImportStart as unknown as RegisteredLunoraFunction,
     "chat_import_workflow_actions:startImportWorkflow": lunora_chat_import_workflow_actions_43.startImportWorkflow as unknown as RegisteredLunoraFunction,
+    "chat_agent_switch:commitAgentSwitch": lunora_chat_agent_switch_44.commitAgentSwitch as unknown as RegisteredLunoraFunction,
+    "chat_agent_switch:planAgentSwitch": lunora_chat_agent_switch_44.planAgentSwitch as unknown as RegisteredLunoraFunction,
+    "chat_agent_switch:previewAgentSwitch": lunora_chat_agent_switch_44.previewAgentSwitch as unknown as RegisteredLunoraFunction,
     "chat_agent_switch:switchThreadAgent": lunora_chat_agent_switch_44.switchThreadAgent as unknown as RegisteredLunoraFunction,
     "chat_ask_user:answerAskUser": lunora_chat_ask_user_45.answerAskUser as unknown as RegisteredLunoraFunction,
     "chat_autocomplete:isComposerAutocompleteEnabled": lunora_chat_autocomplete_46.isComposerAutocompleteEnabled as unknown as RegisteredLunoraFunction,
@@ -1479,6 +1483,13 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "threadId": source["threadId"] };
+});
+installCompiledValidatorMap(lunora_agent_agent_switch_3.getHandoffAbove.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["belowMessageId"] !== "string") return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+return { "belowMessageId": source["belowMessageId"], "threadId": source["threadId"] };
 });
 installCompiledValidatorMap(lunora_agent_agent_switch_3.getRunAgentModel.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -7986,6 +7997,7 @@ export interface Caller {
     agent: {
         agent_switch: {
             adoptForkAgent: (args: { threadId: Id<"threads"> }) => Promise<null>;
+            getHandoffAbove: (args: { belowMessageId: Id<"messages">; threadId: Id<"threads"> }) => Promise<string | null>;
             getRunAgentModel: (args: { promptMessageId?: Id<"messages">; replacedMessageId?: Id<"messages">; threadId: Id<"threads"> }) => Promise<string | null>;
         };
         auto_archive: {
@@ -8357,7 +8369,10 @@ export interface Caller {
     };
     chat: {
         agent_switch: {
-            switchThreadAgent: (args: { clientId: string; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ agent: { kind: "model"; model: string }; coldStartCostly: boolean; messageId: string | null; switched: boolean }>;
+            commitAgentSwitch: (args: { clientId: string; expectedLeafId: string; handoff?: { mode: "delta" | "portable"; summarized: boolean; text: string }; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }) => Promise<{ agent: { kind: "model"; model: string }; coldStartCostly: boolean; messageId: string | null; switched: boolean }>;
+            planAgentSwitch: (args: { clientId: string; mode?: "full" | "portable"; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }) => Promise<{ agent: { kind: "model"; model: string }; leafId?: string; mode?: "full" | "portable" | "delta"; omittedEarlier?: boolean; turns?: Array<{ role: "assistant" | "user"; text: string }> }>;
+            previewAgentSwitch: (args: { model: string; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ alreadyThere: boolean; coldStartCostly: boolean; contextTokens: number; defaultMode: "full" | "portable"; handoffTokens: number }>;
+            switchThreadAgent: (args: { clientId: string; mode?: "full" | "portable"; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ agent: { kind: "model"; model: string }; coldStartCostly: boolean; messageId: string | null; switched: boolean }>;
         };
         ask_user: {
             answerAskUser: (args: { answer: string | null; approvalId: string; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
@@ -9637,6 +9652,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
     agent: {
         agent_switch: {
             adoptForkAgent: (args) => callRegistered(context, "agent_agent_switch:adoptForkAgent", args),
+            getHandoffAbove: (args) => callRegistered(context, "agent_agent_switch:getHandoffAbove", args),
             getRunAgentModel: (args) => callRegistered(context, "agent_agent_switch:getRunAgentModel", args),
         },
         auto_archive: {
@@ -10008,6 +10024,9 @@ export const createCaller = (context: CallerCtx): Caller => ({
     },
     chat: {
         agent_switch: {
+            commitAgentSwitch: (args) => callRegistered(context, "chat_agent_switch:commitAgentSwitch", args),
+            planAgentSwitch: (args) => callRegistered(context, "chat_agent_switch:planAgentSwitch", args),
+            previewAgentSwitch: (args) => callRegistered(context, "chat_agent_switch:previewAgentSwitch", args),
             switchThreadAgent: (args) => callRegistered(context, "chat_agent_switch:switchThreadAgent", args),
         },
         ask_user: {

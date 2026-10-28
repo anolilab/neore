@@ -172,7 +172,8 @@ export interface ApiTypes {
     };
     chat: {
         agent_switch: {
-            switchThreadAgent: FunctionReference<"mutation", { clientId: string; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string }, { agent: { kind: "model"; model: string }; coldStartCostly: boolean; messageId: string | null; switched: boolean }>;
+            previewAgentSwitch: FunctionReference<"query", { model: string; threadId: Id<"threads">; unlockProof?: string }, { alreadyThere: boolean; coldStartCostly: boolean; contextTokens: number; defaultMode: "full" | "portable"; handoffTokens: number }>;
+            switchThreadAgent: FunctionReference<"action", { clientId: string; mode?: "full" | "portable"; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string }, { agent: { kind: "model"; model: string }; coldStartCostly: boolean; messageId: string | null; switched: boolean }>;
         };
         ask_user: {
             answerAskUser: FunctionReference<"mutation", { answer: string | null; approvalId: string; threadId: Id<"threads">; unlockProof?: string }, { alreadyResolved: boolean; streamId: string | null }>;
@@ -925,6 +926,7 @@ export const api: ApiTypes = {
     },
     chat: {
         agent_switch: {
+            previewAgentSwitch: { __lunoraRef: "chat_agent_switch:previewAgentSwitch" },
             switchThreadAgent: { __lunoraRef: "chat_agent_switch:switchThreadAgent" },
         },
         ask_user: {

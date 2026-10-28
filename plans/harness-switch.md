@@ -190,8 +190,12 @@ verbatim tail, and delta on switching back.
   bytes in the context are identical on the first and the third turn after a
   switch (test), and on a provider that caches, the second turn's usage reports
   cache reads; above the threshold a cloud-to-cloud switch defaults to `portable`.
-- Still to do from S1: the cost notice shows only a "long conversation" flag, after the switch. S2 adds the
-  credit estimate to it and a confirm-before-switch step, so the user sees the cost before the divider is written.
+- Built in S2: above the threshold the confirm step shows the credit estimate for the handoff and for the full
+  history before the divider is written (`previewAgentSwitch`, priced client-side with the target's catalog price).
+  `delta` keeps what the agent saw before it left, adds the stored handoff of what happened since, and then the turns
+  after; when its earlier divider lies outside the 100-row context window only the delta block is sent. Each summary
+  call is one metered gateway call; a retry after a failed write summarises again, but is charged (`chargeRound`) once.
+  The Anthropic cache breakpoint on the handoff message and the provider's cache reads need a real provider to check.
 
 **S3 — Host handoff.** Host to host, in the same thread, using the `portable` mode.
 Cloud to host, and host to cloud, create a new thread linked to the source through
@@ -238,7 +242,7 @@ report says it can load a saved session, and only when agent, folder and host al
 
 1. **Summary model.** Recommendation: the cloud utility model, cheapest tier that
    passes the S2 quality check.
-2. **Budget size.** Measure on real threads in S2; no value is fixed here.
+2. **Budget size.** Decided in S2: 12,000 estimated tokens (`HANDOFF_BUDGET_TOKENS`), measured on a 300-turn fixture; the reason is on the constant. The attachments of the next message are not reserved for in S2: the handoff is its own message ahead of the turns, and the user's next message is appended unchanged. A host handoff (S3), where the handoff and the first prompt are one message, reserves room then.
 3. **Switching mid-stream.** Recommendation: refuse, as stated in §3.
 4. **Stored summary.** Decided: stored on the `agentSwitch` part (§3, prompt
    caching), so the handoff is byte-stable; a repeat switch reuses it and

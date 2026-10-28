@@ -317,8 +317,9 @@ const createSystemUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataType
 
     // An agent switch is a system row whose part is the divider, not text (`agent-switch-logic.ts`).
     const agentSwitch = agentSwitchOf(message);
+    // The handoff is transcript text for the next model, not for the divider: it stays off the wire.
     const parts = agentSwitch
-        ? ([{ data: agentSwitch, id: message._id, type: "data-agentSwitch" }] as unknown as UIMessage<METADATA, DATA_PARTS, TOOLS>["parts"])
+        ? ([{ data: omit(agentSwitch, ["handoff"]), id: message._id, type: "data-agentSwitch" }] as unknown as UIMessage<METADATA, DATA_PARTS, TOOLS>["parts"])
         : [{ text, type: "text", ...partCommon } satisfies TextUIPart];
 
     return {

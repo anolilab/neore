@@ -317,7 +317,8 @@ describe("shared access still works", () => {
 
     it("a collaborator with a write grant is refused a switch while the owner's tool approval is open", async () => {
         const threadId = await seedThread({ model: "openai/gpt-4.1-mini" });
-        const switchArgs = { clientId: "click", target: { kind: "model", model: "google/gemini-2.0-flash-001" }, threadId };
+        // The switch itself is an action over internal functions; its checks run the same in the guarded preview.
+        const switchArgs = { model: "google/gemini-2.0-flash-001", threadId };
 
         await run(async (context) => {
             await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: GRANTEE });
@@ -356,7 +357,7 @@ describe("shared access still works", () => {
             });
         });
 
-        await expect(as(GRANTEE).mutation(procedureAt("chat_agent_switch", "switchThreadAgent"), switchArgs as never)).rejects.toMatchObject({
+        await expect(as(GRANTEE).query(procedureAt("chat_agent_switch", "previewAgentSwitch"), switchArgs as never)).rejects.toMatchObject({
             data: { code: "AGENT_SWITCH_STREAMING" },
         });
 

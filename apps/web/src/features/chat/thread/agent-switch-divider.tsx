@@ -12,11 +12,16 @@ const AgentSwitchDivider: FC<{ part: AgentSwitchPart }> = ({ part }) => {
     const models = useFeatureFlaggedModels();
     const nameOf = (model: string): string => models.find((candidate) => candidate.id === model)?.name ?? model;
     const label = t`Switched from ${nameOf(part.from.model)} to ${nameOf(part.to.model)}`;
+    let note: string | null = null;
+
+    if (part.mode !== "full") {
+        note = part.summarized ? t`Older messages were summarised` : t`Handed over`;
+    }
 
     return (
-        <div aria-label={label} className="text-muted-foreground flex items-center gap-3 py-2 text-xs" role="separator">
+        <div aria-label={note ? `${label}. ${note}` : label} className="text-muted-foreground flex items-center gap-3 py-2 text-xs" role="separator">
             <span aria-hidden="true" className="bg-border h-px flex-1" />
-            <span aria-hidden="true">{label}</span>
+            <span aria-hidden="true">{note ? `${label} · ${note}` : label}</span>
             <span aria-hidden="true" className="bg-border h-px flex-1" />
         </div>
     );

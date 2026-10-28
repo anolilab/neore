@@ -797,6 +797,14 @@ msgstr "{fileCount, plural, one {Nie udało się przesłać # pliku} few {Nie ud
 msgid "{fps} fps"
 msgstr "{fps} kl./s"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:65
+msgid "{full} credits"
+msgstr ""
+
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:61
+msgid "{handoff} credits"
+msgstr ""
+
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:54
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr ""
@@ -4727,6 +4735,7 @@ msgstr "Kanada"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
 #: src/features/chat/pins/pin-item.tsx:282
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
@@ -7299,7 +7308,7 @@ msgstr ""
 msgid "Could not stop the sub-agent."
 msgstr ""
 
-#: src/features/chat/model-settings/use-model-combobox.ts:94
+#: src/features/chat/model-settings/use-model-combobox.ts:86
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
@@ -14142,6 +14151,18 @@ msgstr "W"
 msgid "Hand (pan)"
 msgstr "Rączka (przesuwanie)"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:74
+msgid "Hand over a summary"
+msgstr ""
+
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:60
+msgid "Hand over a summary and the recent messages"
+msgstr ""
+
+#: src/features/chat/thread/agent-switch-divider.tsx:15
+msgid "Handed over"
+msgstr ""
+
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:28
 msgid "Handle"
 msgstr ""
@@ -15757,6 +15778,10 @@ msgstr "Zachowaj obecne wiersze"
 msgid "Keep files"
 msgstr "Zachowaj pliki"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:72
+msgid "Keep full history"
+msgstr ""
+
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:146
 msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
 msgstr "Zachowaj część filmu. Zachowana część jest ponownie kodowana do MP4 w tej przeglądarce, co może chwilę potrwać."
@@ -15768,6 +15793,10 @@ msgstr "Zachowaj na stałe"
 #: src/features/knowledge/components/collection-picker.tsx:108
 msgid "Keep the files as uncategorised, or delete them together with the collection. Chats and projects that use the collection stop searching it."
 msgstr "Zachowaj pliki jako bez kategorii lub usuń je razem z kolekcją. Czaty i projekty korzystające z kolekcji przestaną ją przeszukiwać."
+
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:64
+msgid "Keep the full history"
+msgstr ""
 
 #: src/features/chat/core/utils/language-utilities.ts:370
 msgid "Kenya"
@@ -18488,6 +18517,11 @@ msgstr "Mjanma"
 msgid "Myanmar (Myanmar)"
 msgstr "Birmański (Mjanma)"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:61
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:65
+msgid "n/a"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:26
 #: src/features/settings/lib/settings-keywords.ts:87
 msgid "name"
@@ -20014,6 +20048,10 @@ msgstr "Filmowy model starszej generacji o większej spójności"
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:519
 msgid "Older"
 msgstr "Starsze"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:15
+msgid "Older messages were summarised"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:66
 msgid "ollama"
@@ -27778,6 +27816,10 @@ msgstr "Zmień model"
 msgid "Switch to {label}"
 msgstr "Przełącz na {label}"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:52
+msgid "Switch to {name}?"
+msgstr ""
+
 #: src/features/knowledge/components/collection-dialog.tsx:84
 msgid "Switch to an organization to share a collection with it."
 msgstr "Przełącz się na organizację, aby udostępnić jej kolekcję."
@@ -28488,7 +28530,7 @@ msgstr "Asystent ma pytanie"
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:88
+#: src/features/chat/thread/composer-model-selector.tsx:90
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -28726,8 +28768,8 @@ msgid "The new passcode needs {MIN_PASSCODE_LENGTH} characters, typed twice the 
 msgstr ""
 
 #: src/features/chat/model-settings/use-model-combobox.ts:90
-msgid "The next reply re-reads this whole conversation without the model's cache, so it costs more than usual."
-msgstr ""
+#~ msgid "The next reply re-reads this whole conversation without the model's cache, so it costs more than usual."
+#~ msgstr ""
 
 #: src/features/pages/components/page-agent-dialog.tsx:64
 msgid "The page agent could not edit this page"
@@ -29040,6 +29082,10 @@ msgstr "Ta rozmowa nie ma jeszcze wiadomości."
 #: src/features/chat/sharing/shared-thread-page.tsx:142
 msgid "This conversation is long, so only its most recent messages are shown."
 msgstr "Ta rozmowa jest długa, więc wyświetlane są tylko jej najnowsze wiadomości."
+
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:54
+msgid "This conversation is long. {name} has not seen it, so its next reply reads it without the cache and costs more than usual."
+msgstr ""
 
 #: src/features/chat/sharing/shared-thread-page.tsx:71
 msgid "This conversation is not available"

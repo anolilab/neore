@@ -9303,9 +9303,112 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#chat_agent_switch:previewAgentSwitch": {
+      "post": {
+        "description": "Invoke the `query` `chat_agent_switch:previewAgentSwitch` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_agent_switch:previewAgentSwitch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "model": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "model",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_agent_switch:previewAgentSwitch",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "alreadyThere": {
+                      "type": "boolean"
+                    },
+                    "coldStartCostly": {
+                      "type": "boolean"
+                    },
+                    "contextTokens": {
+                      "type": "number"
+                    },
+                    "defaultMode": {
+                      "anyOf": [
+                        {
+                          "const": "full",
+                          "type": "string"
+                        },
+                        {
+                          "const": "portable",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "handoffTokens": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "alreadyThere",
+                    "coldStartCostly",
+                    "contextTokens",
+                    "defaultMode",
+                    "handoffTokens"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: chat_agent_switch:previewAgentSwitch",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#chat_agent_switch:switchThreadAgent": {
       "post": {
-        "description": "Invoke the `mutation` `chat_agent_switch:switchThreadAgent` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "description": "Invoke the `action` `chat_agent_switch:switchThreadAgent` over the Lunora RPC envelope (POST /_lunora/rpc).",
         "operationId": "chat_agent_switch:switchThreadAgent",
         "requestBody": {
           "content": {
@@ -9317,6 +9420,18 @@
                     "properties": {
                       "clientId": {
                         "type": "string"
+                      },
+                      "mode": {
+                        "anyOf": [
+                          {
+                            "const": "full",
+                            "type": "string"
+                          },
+                          {
+                            "const": "portable",
+                            "type": "string"
+                          }
+                        ]
                       },
                       "target": {
                         "anyOf": [
@@ -9439,11 +9554,11 @@
             "$ref": "#/components/responses/LunoraError"
           }
         },
-        "summary": "mutation: chat_agent_switch:switchThreadAgent",
+        "summary": "action: chat_agent_switch:switchThreadAgent",
         "tags": [
           "chat"
         ],
-        "x-lunora-function-kind": "mutation"
+        "x-lunora-function-kind": "action"
       }
     },
     "/_lunora/rpc#chat_ask_user:answerAskUser": {
