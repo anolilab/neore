@@ -384,6 +384,10 @@ describe("capability reports", () => {
             await expect(reportOf(await insertThread())).resolves.toMatchObject({ groups: { turns: { followUp: { kind: "steer" } } }, version: 1 });
         });
 
+        it("answers a stranger with nothing", async () => {
+            await expect(reportOf(await insertThread(), await insertUser())).resolves.toBeNull();
+        });
+
         it("answers a live grantee with the cloud declaration, and an expired one with nothing", async () => {
             const threadId = await insertThread();
             const live = await insertUser();
@@ -439,25 +443,12 @@ describe("capability reports", () => {
         });
     });
 
-    it("returns nothing to a stranger, for a host thread, a cloud thread and an id that does not exist", async () => {
+    it("returns nothing to a stranger, for a host thread and an id that does not exist", async () => {
         const device = await pair(ownerId);
         const hostThread = await openWith(device, REPORT);
-        const cloudThread = (await harness.run(
-            async (ctx: any) =>
-                await ctx.db.insert("threads", {
-                    createdBy: ownerId,
-                    mode: "text",
-                    status: "active",
-                    tags: [],
-                    title: "t",
-                    updatedAt: Date.now(),
-                    userId: ownerId,
-                }),
-        )) as string;
         const stranger = await insertUser();
 
         await expect(reportOf(hostThread, stranger)).resolves.toBeNull();
-        await expect(reportOf(cloudThread, stranger)).resolves.toBeNull();
         await expect(reportOf("not-an-id", stranger)).resolves.toBeNull();
     });
 });
