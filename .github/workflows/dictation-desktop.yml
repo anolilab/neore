@@ -4,9 +4,9 @@
 # end-to-end suite (network blocked, checksum mismatch, killed helper, no audio on disk, microphone only for the
 # dictation window).
 #
-# Windows on ARM is the one platform marked unsupported in settings (`unsupportedReason`, `src/dictation/catalog.ts`):
-# its leg builds the helper with clang-cl, measures it, and asserts that settings says "unavailable". The measurement is in
-# each job's step summary; when the default model is inside the budget there, it moves into the supported list.
+# Every leg times the default model on a spoken clip (the step summary), and a supported platform must be inside the budget
+# (`real-helper.test.ts`). A platform that cannot pass is left out of `SUPPORTED` in `src/dictation/catalog.ts`, which settings
+# shows as unavailable; `catalog.test.ts` asserts that table against the runner (`NEORE_DICTATION_EXPECT`).
 #
 # Runs on a pull request that touches dictation or the desktop shell, or by hand. Nothing else depends on it.
 
@@ -102,12 +102,11 @@ jobs:
                       expect: "supported"
                       helper: "win-x64"
                       models: "small"
-                    # Unsupported until measured: the smaller models are measured too, for the choice of its default.
                     - os: "windows-11-arm"
                       arch: "arm64"
-                      expect: "unsupported"
+                      expect: "supported"
                       helper: "win-arm64"
-                      models: "small base tiny"
+                      models: "small"
         env:
             NEORE_DICTATION_EXPECT: "${{ matrix.expect }}"
         steps:
@@ -137,11 +136,11 @@ jobs:
                   echo "node architecture: $actual"
                   [[ "$actual" == "$EXPECTED_ARCH" ]]
 
-            # Windows on ARM builds with clang-cl (ggml cannot build ARM with MSVC without tuning for the build machine).
-            # The component is part of Visual Studio's "Desktop development with C++" workload; if the runner image lacks
-            # it, it is added with the installer, and the build fails here, not later, when clang-cl is still missing.
-            - name: "Make sure clang-cl is installed (Windows on ARM)"
-              if: "matrix.helper == 'win-arm64'"
+            # The Windows on ARM helper is built with clang-cl (ggml cannot build ARM with MSVC without tuning for the build
+            # machine), on its own runner and cross-built on the x64 one, as the release does. The component is part of Visual
+            # Studio's "Desktop development with C++" workload; if the image lacks it, it is added with the installer.
+            - name: "Make sure clang-cl is installed (Windows)"
+              if: "runner.os == 'Windows'"
               shell: "pwsh"
               run: |
                   $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer"
@@ -171,13 +170,16 @@ jobs:
                   # Electron needs the libraries Chromium does (GTK, NSS, GBM, ALSA); the arm64 image does not carry them all.
                   pnpm --filter @neore/desktop exec playwright install-deps chromium
 
-            # On the unsupported leg a failed build must not hide the assertion that settings says "unavailable"; the
-            # failed step stays visible, and the helper's own steps below are marked the same way.
             - name: "Build the speech helper (Windows)"
               if: "runner.os == 'Windows'"
-              continue-on-error: ${{ matrix.expect == 'unsupported' }}
               shell: "bash"
               run: 'pnpm --filter @neore/desktop run build:dictation-helper -- --work "$RUNNER_TEMP/whisper.cpp"'
+
+            # The release builds the arm64 helper on the x64 runner. It cannot run here, so the build and its checks are all there is.
+            - name: "Cross-build the Windows on ARM helper (x64 runner)"
+              if: "matrix.helper == 'win-x64'"
+              shell: "bash"
+              run: 'pnpm --filter @neore/desktop run build:dictation-helper -- --arch arm64 --work "$RUNNER_TEMP/whisper.cpp-arm64"'
 
             - name: "Download the speech helper built on the older runner (Linux)"
               if: "runner.os == 'Linux'"
@@ -187,7 +189,6 @@ jobs:
                   path: "${{ runner.temp }}/stage"
 
             - name: "Download the models and verify them"
-              continue-on-error: ${{ matrix.expect == 'unsupported' }}
               shell: "bash"
               env:
                   MODELS: "${{ matrix.models }}"
@@ -255,24 +256,18 @@ jobs:
             # The helper alone: the same arguments the app gives it, a spoken clip in, its text out, and the time it took.
             - name: "The real helper on a spoken clip"
               if: "always()"
-              continue-on-error: ${{ matrix.expect == 'unsupported' }}
               run: "pnpm --filter @neore/desktop exec vitest run src/dictation/real-helper.test.ts"
 
-            - name: "End-to-end tests (supported platform)"
-              if: "always() && matrix.expect == 'supported' && runner.os != 'Linux'"
-              run: 'pnpm --filter @neore/desktop exec playwright test e2e/dictation.spec.ts --grep-invert "unsupported platform"'
+            - name: "End-to-end tests"
+              if: "always() && runner.os != 'Linux'"
+              run: "pnpm --filter @neore/desktop exec playwright test e2e/dictation.spec.ts"
 
             # No display on the runner: Xvfb gives Electron one.
-            - name: "End-to-end tests (supported platform, Linux)"
-              if: "always() && matrix.expect == 'supported' && runner.os == 'Linux'"
-              run: 'xvfb-run -a pnpm --filter @neore/desktop exec playwright test e2e/dictation.spec.ts --grep-invert "unsupported platform"'
+            - name: "End-to-end tests (Linux)"
+              if: "always() && runner.os == 'Linux'"
+              run: "xvfb-run -a pnpm --filter @neore/desktop exec playwright test e2e/dictation.spec.ts"
 
-            - name: "End-to-end test: an unsupported platform says so (Windows on ARM)"
-              if: "always() && matrix.expect == 'unsupported'"
-              run: 'pnpm --filter @neore/desktop exec playwright test e2e/dictation.spec.ts --grep "unsupported platform"'
-
-            # The leg is not green without a measurement of the default model, even where the steps above are allowed to fail
-            # (Windows on ARM): the numbers are what decides whether that platform is offered.
+            # The leg is not green without a measurement of the default model: the numbers are what decides whether a platform is offered.
             - name: "Record the measurement and require one"
               if: "always()"
               shell: "bash"

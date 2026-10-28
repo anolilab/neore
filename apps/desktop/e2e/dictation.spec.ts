@@ -39,8 +39,6 @@ const FAKE_TRANSCRIPT = /^Hello from the fake recogniser, \d+ samples\. Second s
 const DICTATION_PAGE = /\/dictation-window\/dictation\.html$/u;
 /** A real recogniser, when one is built: `NEORE_WHISPER_CLI` and `NEORE_WHISPER_MODEL`, and `NEORE_WHISPER_CLIP` (16 kHz mono WAV of speech that says `NEORE_WHISPER_EXPECT`, "test" by default). */
 const REAL = { cli: process.env.NEORE_WHISPER_CLI, clip: process.env.NEORE_WHISPER_CLIP, expect: process.env.NEORE_WHISPER_EXPECT ?? "test", model: process.env.NEORE_WHISPER_MODEL };
-/** What CI says of this runner (`supported` or `unsupported`): an unsupported platform runs only the test that it says so. */
-const EXPECTED_SUPPORT = process.env.NEORE_DICTATION_EXPECT;
 
 const USE_MICROPHONE = process.env.NEORE_E2E_MICROPHONE === "1";
 
@@ -476,32 +474,6 @@ test("the settings window turns dictation on, deletes a model file, and is out o
         await app.close();
     }
 });
-
-// Registered only where CI expects the platform to be unsupported (`NEORE_DICTATION_EXPECT`): the other platforms must not be.
-if (EXPECTED_SUPPORT === "unsupported") {
-    test("an unsupported platform says so in settings and never holds the shortcut", async () => {
-        // The switch is stored on, as if it had been turned on before: it must still do nothing here.
-        const { app } = await launch();
-
-        try {
-            await siteWindow(app);
-            await app.evaluate(() => (globalThis as unknown as { neoreShell: { dictation: Probe } }).neoreShell.dictation.openSettings());
-
-            const page = await findPage(app, (url) => SETTINGS_PAGE.test(url));
-
-            await expect(page.locator("#unavailable")).toBeVisible();
-            await expect(page.locator("#unavailable")).toContainText("not available");
-            await expect(page.getByRole("switch", { name: "Dictate on this computer" })).toBeDisabled();
-            expect(await shortcutHeld(app)).toBe(false);
-
-            await call(app, "begin");
-            await expect.poll(() => call<string | undefined>(app, "outcome")).toBe("no-helper");
-            expect(app.windows().filter((window) => DICTATION_PAGE.test(window.url()))).toHaveLength(0);
-        } finally {
-            await app.close();
-        }
-    });
-}
 
 // Registered only when a real recogniser is given (NEORE_WHISPER_CLI, NEORE_WHISPER_MODEL and NEORE_WHISPER_CLIP): `.github/workflows/dictation-desktop.yml` builds one, with a model and whisper.cpp's own spoken clip, on every supported OS.
 if (REAL.cli !== undefined && REAL.model !== undefined && REAL.clip !== undefined) {

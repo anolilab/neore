@@ -35,11 +35,13 @@ const flagValue = (name) => {
 
     return index === -1 ? undefined : process.argv[index + 1];
 };
+const targetArch = flagValue("--arch") ?? process.arch;
 const work =
-    flagValue("--work") === undefined ? path.join(os.tmpdir(), `neore-whisper.cpp-${WHISPER_CPP_SHA.slice(0, 12)}`) : path.resolve(flagValue("--work"));
+    flagValue("--work") === undefined
+        ? path.join(os.tmpdir(), `neore-whisper.cpp-${WHISPER_CPP_SHA.slice(0, 12)}-${targetArch}`)
+        : path.resolve(flagValue("--work"));
 const executable = process.platform === "win32" ? "whisper-cli.exe" : "whisper-cli";
 const builderOs = { darwin: "mac", linux: "linux", win32: "win" }[process.platform];
-const targetArch = flagValue("--arch") ?? process.arch;
 
 if (builderOs === undefined) {
     throw new Error(`no helper build for ${process.platform}`);

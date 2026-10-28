@@ -53,7 +53,7 @@ export interface DictationProbe {
     openSettings?: () => void;
     outcome: () => string | undefined;
     state: () => string;
-    /** Replaces the recogniser and its model with these, skipping the model store. */
+    /** Replaces the recogniser and its model with these, skipping the model store and the OS microphone check (a CI runner has no microphone, and Windows reports it denied). */
     useTestEngine?: (engine: { args: string[]; command: string; modelPath: string }) => void;
 }
 
@@ -262,12 +262,17 @@ export const createDictation = (options: DictationOptions): Dictation => {
     const helper = (): HelperCommand => testEngine === undefined ? { args: [], command: helperPath() } : { args: testEngine.args, command: testEngine.command };
 
     // `getMediaAccessStatus` exists on macOS and Windows only; Linux has no OS gate and is never asked.
-    const microphoneAllowed = (): Promise<boolean> =>
-        osAllowsMicrophone({
+    const microphoneAllowed = (): Promise<boolean> => {
+        if (testEngine !== undefined) {
+            return Promise.resolve(true);
+        }
+
+        return osAllowsMicrophone({
             ask: () => systemPreferences.askForMediaAccess("microphone"),
             platform: process.platform,
             status: () => systemPreferences.getMediaAccessStatus("microphone"),
         });
+    };
 
     const confirmDownload = async (spec: ModelSpec): Promise<boolean> => {
         const megabytes = Math.round(spec.bytes / 1_000_000);

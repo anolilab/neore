@@ -8,12 +8,12 @@ describe("unsupportedReason", () => {
         ["linux", "x64"],
         ["linux", "arm64"],
         ["win32", "x64"],
+        ["win32", "arm64"],
     ] as const)("offers on-device dictation on %s %s", (platform, arch) => {
         expect(unsupportedReason(platform, arch)).toBeUndefined();
     });
 
     it.each([
-        ["win32", "arm64", "Windows on ARM"],
         ["darwin", "x64", "Intel Macs"],
         ["freebsd", "x64", "this system"],
         ["linux", "ia32", "this system"],
@@ -34,6 +34,7 @@ describe("the default model without a GPU", () => {
         ["linux", "x64"],
         ["linux", "arm64"],
         ["win32", "x64"],
+        ["win32", "arm64"],
     ] as const)("is small on %s %s", (platform, arch) => {
         expect(resolveModel(undefined, platform, arch)).toBe(SMALL);
         expect(offeredModels(platform, arch).find(({ isDefault }) => isDefault)?.spec).toBe(SMALL);
