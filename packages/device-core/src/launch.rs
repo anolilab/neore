@@ -22,6 +22,9 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+/// The shortest Unix socket path limit of the platforms the host runs on (macOS).
+const SOCKET_PATH_LIMIT: usize = 104;
+
 /// Where a test points the run folder. The desktop starts the host with an empty environment, so no server's
 /// session can set it.
 pub const RUN_DIR_VARIABLE: &str = "NEORE_HOST_RUN_DIR";
@@ -166,6 +169,14 @@ pub fn stabilise_agent_socket(dir: &Path, desktop: &str) -> io::Result<Option<Pa
     if !session.is_absolute() || !is_desktop_tag(desktop) {
         std::env::remove_var("SSH_AUTH_SOCK");
 
+        return Ok(None);
+    }
+
+    let link = dir.join(format!("agent-{desktop}.sock"));
+
+    // A socket path holds 104 bytes on macOS (108 on Linux): past that the link would be no use, and the session's
+    // own socket stays.
+    if link.as_os_str().len() >= SOCKET_PATH_LIMIT {
         return Ok(None);
     }
 

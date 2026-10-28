@@ -147,7 +147,7 @@ impl DeviceState {
                 }
 
                 // The count is read under the keeps lock, which a disconnect takes right after counting.
-                let disconnects = self.ssh.disconnects.load(Ordering::SeqCst);
+                let disconnects = self.disconnects_of(&host.device_id);
 
                 if !self.upgrade_running(&target_of(host)) && keep.due(now).is_some() {
                     start.push((host.device_id.clone(), slot, disconnects));
@@ -289,6 +289,27 @@ impl DeviceState {
         }
 
         true
+    }
+
+    /// How many times the person disconnected this server. A connect compares it before and after it waits.
+    pub(super) fn disconnects_of(&self, device_id: &str) -> u64 {
+        self.ssh
+            .disconnects
+            .lock()
+            .unwrap()
+            .get(device_id)
+            .copied()
+            .unwrap_or(0)
+    }
+
+    pub(super) fn note_disconnect(&self, device_id: &str) {
+        *self
+            .ssh
+            .disconnects
+            .lock()
+            .unwrap()
+            .entry(device_id.to_owned())
+            .or_default() += 1;
     }
 
     /// The person disconnected, removed or unpaired a server: it is no longer kept.

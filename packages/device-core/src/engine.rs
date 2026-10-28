@@ -121,7 +121,7 @@ struct SshState {
     launches: Mutex<HashMap<String, Vec<String>>>,
     /// Counts explicit disconnects, so a connect that was waiting (on a passphrase, say) can tell the user ended
     /// connections meanwhile and not install its link over that.
-    disconnects: std::sync::atomic::AtomicU64,
+    disconnects: Mutex<HashMap<String, u64>>,
     paths: SshPaths,
     /// The connection a server was probed over, waiting for its pairing: at most one.
     probe: Mutex<Option<(Target, Arc<dyn HostLink>)>>,
@@ -171,7 +171,7 @@ impl DeviceState {
                 keeps: Mutex::default(),
                 launches: Mutex::default(),
                 connections: Mutex::default(),
-                disconnects: std::sync::atomic::AtomicU64::new(0),
+                disconnects: Mutex::default(),
                 paths: SshPaths::under(data_dir, sandbox::home().as_deref()),
                 probe: Mutex::default(),
                 root: Root::Home,

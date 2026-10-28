@@ -166,6 +166,12 @@ impl SshPaths {
     /// A name for this installation, drawn once and kept beside the pinned keys: it tells apart the agent sockets of
     /// two desktops that use one account on a server.
     pub fn desktop_tag(&self) -> io::Result<String> {
+        // Two first connections must not each draw a tag and keep only one.
+        static DRAWING: Mutex<()> = Mutex::new(());
+        let _drawing = DRAWING
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+
         let file = self
             .known_hosts
             .parent()
