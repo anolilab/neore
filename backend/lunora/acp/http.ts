@@ -22,6 +22,7 @@ import type { HttpActionCtx, Infer } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { isDeviceSignature } from "../devices/lib/signing";
+import { vCapabilityReport } from "../lib/capability-report";
 import { inShard } from "../lib/http-shard";
 import { threadShardFor } from "../lib/thread-shard";
 import { MAX_LENGTH } from "../lib/validators";
@@ -158,6 +159,20 @@ const optionalString = (value: unknown): string | undefined | null => {
     return typeof value === "string" ? value : null;
 };
 
+/**
+ * A `session_open` whose capability report does not validate keeps the session: the report is stored as "all
+ * unknown" (every control hidden) and the failure is logged, instead of the whole post being refused.
+ */
+const withValidReport = (raw: unknown, now: number): unknown => {
+    if (!isRecord(raw) || raw.kind !== "session_open" || raw.capabilities === undefined || vCapabilityReport.safeParse(raw.capabilities).ok) {
+        return raw;
+    }
+
+    console.warn("[acp] a host sent a capability report that does not validate; stored as all unknown");
+
+    return { ...raw, capabilities: { groups: {}, reportedAt: now, version: 1 } };
+};
+
 interface Post {
     events: Infer<typeof vHostEvent>[];
     firstSeq: number | undefined;
@@ -167,7 +182,7 @@ interface Post {
 }
 
 /** The signed payload's fields, or null when they are not the shape of a post. */
-const readPost = (payload: Record<string, unknown>): Post | null => {
+const readPost = (payload: Record<string, unknown>, now: number): Post | null => {
     const threadId = optionalString(payload.threadId);
     const turnId = optionalString(payload.turnId);
     const { firstSeq } = payload;
@@ -189,7 +204,7 @@ const readPost = (payload: Record<string, unknown>): Post | null => {
     const events: Post["events"] = [];
 
     for (const raw of payload.events) {
-        const parsed = vHostEvent.safeParse(raw);
+        const parsed = vHostEvent.safeParse(withValidReport(raw, now));
 
         if (!parsed.ok) {
             return null;
@@ -209,7 +224,7 @@ const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: 
         return unauthorized();
     }
 
-    const post = readPost(parseJson(payload) as Record<string, unknown>);
+    const post = readPost(parseJson(payload) as Record<string, unknown>, Date.now());
 
     if (!post) {
         return json({ error: "malformed" }, 400);
