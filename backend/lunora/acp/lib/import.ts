@@ -172,10 +172,15 @@ export const applyImportTurns = async (
         return { next: held, outcome: "gap" };
     }
 
+    const unseen = events.slice(held - firstSeq);
+
+    // Refused before any turn is written: a refusal returns, it does not roll back what the loop already wrote.
+    if (held + unseen.filter((event) => event.kind === "import_turn").length > MAX_IMPORT_TURNS) {
+        return REFUSED;
+    }
+
     let count = held;
     let done = false;
-
-    const unseen = events.slice(held - firstSeq);
 
     for (const event of unseen) {
         if (event.kind === "import_end") {
@@ -184,10 +189,6 @@ export const applyImportTurns = async (
         }
 
         if (event.kind === "import_turn") {
-            if (count >= MAX_IMPORT_TURNS) {
-                return REFUSED;
-            }
-
             await writeTurn(ctx, session, threadId, event);
             count += 1;
         }

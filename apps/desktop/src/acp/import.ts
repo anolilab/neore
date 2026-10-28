@@ -82,11 +82,19 @@ export class AcpImporter {
             { notification: (method, params) => method === METHOD.sessionUpdate && collector?.update(params) },
             async ({ connection, plan, report, scrub }) => {
                 requireAdvertised(report, "sessions.load", "load its saved sessions");
+                requireAdvertised(report, "sessions.listNative", "list its saved sessions");
 
                 const approved = this.options.hostInfo(agentKey, plan.cwd);
 
                 if (approved === undefined) {
                     throw new Error("approve this folder for the agent first");
+                }
+
+                // Only a session of the approved folder: the id comes from the window, the agent loads whatever it is given.
+                const listed = await listSessions(connection, plan.cwd);
+
+                if (listed.every((session) => session.sessionId !== nativeSessionId)) {
+                    throw new Error("that session is not one of this folder's saved sessions");
                 }
 
                 collector = new ReplayCollector(nativeSessionId, scrub);

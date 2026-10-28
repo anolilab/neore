@@ -147,7 +147,7 @@ describe("importing", () => {
     });
 
     it("sends nothing past the open when the session is already in Neore", async () => {
-        const importer = make({ FAKE_AGENT_SESSIONS: "load" });
+        const importer = make({ FAKE_AGENT_SESSIONS: "list,load" });
 
         backend = () => {
             return { ended: true, existing: true, kind: "ok", next: 2, threadId: "thread-1" };
@@ -158,7 +158,7 @@ describe("importing", () => {
     });
 
     it("resumes an import the backend holds part of", async () => {
-        const importer = make({ FAKE_AGENT_SESSIONS: "load" });
+        const importer = make({ FAKE_AGENT_SESSIONS: "list,load" });
         const fresh = freshBackend();
 
         backend = (payload) => payload.events[0]?.kind === "import_open" ? { ended: false, existing: true, kind: "ok", next: 1, threadId: "thread-1" } : fresh(payload);
@@ -180,8 +180,19 @@ describe("importing", () => {
         expect(posted).toEqual([]);
     });
 
+    it("sends no load frame for an agent that loads but does not list, or for a session outside the folder", async () => {
+        await expect(make({ FAKE_AGENT_SESSIONS: "load" }).import("fake", scratch.work, "s-new")).rejects.toThrow("does not list its saved sessions");
+
+        const importer = make({ FAKE_AGENT_ELSEWHERE: "1", FAKE_AGENT_SESSIONS: "list,load" });
+
+        await expect(importer.import("fake", scratch.work, "s-elsewhere")).rejects.toThrow("not one of this folder's saved sessions");
+        await expect(importer.import("fake", scratch.work, "s-unlisted")).rejects.toThrow("not one of this folder's saved sessions");
+        expect(frames("session/load")).toEqual([]);
+        expect(posted).toEqual([]);
+    });
+
     it("starts nothing for a computer that is not paired, or an agent that is not registered", async () => {
-        const importer = make({ FAKE_AGENT_SESSIONS: "load" });
+        const importer = make({ FAKE_AGENT_SESSIONS: "list,load" });
 
         deviceId = undefined;
         await expect(importer.import("fake", scratch.work, "s-new")).rejects.toThrow("pair this computer");
@@ -191,14 +202,14 @@ describe("importing", () => {
     });
 
     it("leaves no thread behind when the agent cannot load the session", async () => {
-        const importer = make({ FAKE_AGENT_SESSIONS: "load" });
+        const importer = make({ FAKE_AGENT_SESSIONS: "list,load" });
 
         await expect(importer.import("fake", scratch.work, "s-missing")).rejects.toThrow();
         expect(posted).toEqual([]);
     });
 
     it("gives up on a backend that refuses", async () => {
-        const importer = make({ FAKE_AGENT_SESSIONS: "load" });
+        const importer = make({ FAKE_AGENT_SESSIONS: "list,load" });
 
         backend = () => {
             return { kind: "refused" };
@@ -209,7 +220,7 @@ describe("importing", () => {
     });
 
     it("retries a post that fails and then goes on from the same place", async () => {
-        const importer = make({ FAKE_AGENT_SESSIONS: "load" });
+        const importer = make({ FAKE_AGENT_SESSIONS: "list,load" });
         const fresh = freshBackend();
         let failures = 2;
 
