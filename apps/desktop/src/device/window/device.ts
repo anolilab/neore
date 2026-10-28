@@ -833,6 +833,27 @@ $("files-host").addEventListener("change", () => showFolder(null));
 $("files-more").addEventListener("click", () => loadFiles(false));
 $("files-up").addEventListener("click", () => {
     const { folder } = files;
+    const slash = folder?.lastIndexOf("/") ?? -1;
+
+    // A shared folder is the top: above it the server would only answer that it is outside them.
+    showFolder(folder === null || slash <= 0 || filesHost()?.roots.includes(folder) === true ? null : folder.slice(0, slash));
+});
+$("files-download") as HTMLButtonElement).disabled = folder === null;
+
+    if (folder === null) {
+        setText("files-path", host === undefined ? "Connect a server to browse it." : "Shared folders");
+        $("files-list").replaceChildren(...(host?.roots ?? []).map((root) => fileRow(root, () => showFolder(root))));
+
+        return;
+    }
+
+    loadFiles(true);
+};
+
+$("files-host").addEventListener("change", () => showFolder(null));
+$("files-more").addEventListener("click", () => loadFiles(false));
+$("files-up").addEventListener("click", () => {
+    const { folder } = files;
 
     // A shared folder is the top: above it the server would only answer that it is outside them.
     showFolder(folder === null || filesHost()?.roots.includes(folder) === true || folder.lastIndexOf("/") <= 0 ? null : folder.slice(0, folder.lastIndexOf("/")));
