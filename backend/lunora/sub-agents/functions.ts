@@ -279,8 +279,8 @@ const workerOrigin = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childThread
 };
 
 /**
- * The worker's newest runs, newest first by `createdAt`, plus the queued and running ones, and the newest
- * cancelled ones (a stopped loop may still be unwinding), however old: a burst of newer cancelled messages
+ * The worker's newest runs, newest first by `createdAt`, plus the queued and running ones, and the cancelled
+ * ones down to the newest that started (a stopped loop may still be unwinding), however old: a burst of newer cancelled messages
  * must not push a live run out of view, or a second one would start beside it. Admission keeps `createdAt` strictly increasing per worker, so the order is the order
  * the messages were sent even when `_creationTime` ties.
  */
@@ -293,7 +293,7 @@ const latestWorkerRuns = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childTh
     const seen = new Set<string>(recent.map((run) => run._id));
     const older: RunDoc[] = [];
 
-    for (const status of ["running", "queued", "cancelled"] as const) {
+    for (const status of ["running", "queued"] as const) {
         const live = await ctx.db
             .query("subAgentRuns")
             .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", childThreadId).eq("status", status))
@@ -301,6 +301,22 @@ const latestWorkerRuns = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childTh
             .take(WORKER_RUNS_CHECKED);
 
         older.push(...live.filter((run) => !seen.has(run._id)));
+    }
+
+    // Only the newest cancelled run that started can still have a loop unwinding (nothing starts beside a live
+    // loop), but runs cancelled while queued never started and can sit above it in any number.
+    let cursor: string | null = null;
+
+    for (let done = false; !done; ) {
+        const page = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", childThreadId).eq("status", "cancelled"))
+            .order("desc")
+            .paginate({ cursor, numItems: WORKER_RUNS_CHECKED });
+
+        older.push(...page.page.filter((run) => !seen.has(run._id)));
+        cursor = page.continueCursor;
+        done = page.isDone || page.page.some((run) => run.startedAt !== undefined);
     }
 
     return [...recent, ...older].toSorted((a, b) => b.createdAt - a.createdAt);

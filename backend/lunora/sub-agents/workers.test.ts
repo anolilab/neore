@@ -398,6 +398,32 @@ describe("a Stop in the lead", () => {
     });
 });
 
+describe("a loop unwinding after a Stop", () => {
+    it("keeps the next message queued behind it however many newer runs were cancelled while queued", async () => {
+        const first = await create();
+
+        await claim(first.run._id);
+        await harness.run(async (ctx: any) => await cancelSubAgentRunsForStop(ctx, first.run.childThreadId!, userId));
+
+        const [live] = await runs();
+
+        // Runs cancelled before they started carry no `startedAt`; enough of them bury the unwinding loop from a fixed-size read.
+        await harness.run(async (ctx: any) => {
+            for (let index = 1; index <= 25; index += 1) {
+                const { _creationTime, _id, loopExitedAt, startedAt, ...fields } = live;
+
+                await ctx.db.insert("subAgentRuns", { ...fields, clientId: `buried-${String(index)}`, createdAt: live.createdAt + index, status: "cancelled", toolCallId: `buried-${String(index)}` });
+            }
+        });
+
+        const next = (await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-after" })) as { run: { _id: string } };
+
+        const started = await claim(next.run._id);
+
+        expect(started).toBeNull();
+    });
+});
+
 describe("a Stop in a worker's thread", () => {
     it("cancels its active run, not an older finished one", async () => {
         const first = await create();
