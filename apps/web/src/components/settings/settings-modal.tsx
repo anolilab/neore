@@ -223,9 +223,11 @@ export const SettingsModal: FC = () => {
 
     // The modal stays mounted, so a query left in the field would greet the next opening.
     // Cleared on any close, including ones that bypass `handleClose`.
-    if (!isOpen && (searchQuery !== "" || announcement !== "")) {
+    if (!isOpen && (searchQuery !== "" || announcement !== "" || pendingJump !== null)) {
         setSearchQuery("");
         setAnnouncement("");
+        // A jump that was cancelled by closing must not replay when the dialog opens again.
+        setPendingJump(null);
     }
 
     // Compute query options at render time — queryOptions() calls hooks internally
@@ -475,6 +477,8 @@ export const SettingsModal: FC = () => {
                         resultCount={settingsSearch.resultCount}
                         setQuery={(value) => {
                             setAnnouncement("");
+                            // Typing starts a new search: a row still being waited for must not take focus meanwhile.
+                            setPendingJump(null);
                             setSearchQuery(value);
                         }}
                     />
