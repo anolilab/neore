@@ -158,6 +158,27 @@ describe("a switch in a thread that never branched", () => {
         expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
     });
 
+    it("is refused while an edit's reply streams through the delta stream, and works again once it finished", async () => {
+        const streamId = await run(
+            async (ctx) =>
+                await ctx.db.insert("streamingMessages", {
+                    order: 1,
+                    state: { kind: "streaming", lastHeartbeat: Date.now() },
+                    stateKind: "streaming",
+                    stepOrder: 0,
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_STREAMING } });
+        expect(await switchRows()).toHaveLength(0);
+
+        await run(async (ctx) => await ctx.db.patch(streamId, { state: { endedAt: Date.now(), kind: "finished" }, stateKind: "finished" }));
+
+        expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
+    });
+
     it("refuses a host target with a typed error, and a model that is not an enabled chat model", async () => {
         await expect(
             run(async (ctx) => await switchThreadAgentHandler(ctx, { clientId: "c", target: { kind: "host" }, threadId: threadId as never, userId: OWNER })),
