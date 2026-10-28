@@ -23,7 +23,16 @@ import { internalAction } from "../_generated/server";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { isTaskModelAllowed } from "../tasks/logic";
-import { buildSubAgentPrompt, canNest, MESSAGE_WORKER_TOOL_NAME, resolveSubAgentModel, SUB_AGENT_SYSTEM, SUB_AGENT_TOOL_NAME, WORKER_SYSTEM } from "./logic";
+import {
+    buildSubAgentPrompt,
+    canNest,
+    MESSAGE_WORKER_TOOL_NAME,
+    originOfRun,
+    resolveSubAgentModel,
+    SUB_AGENT_SYSTEM,
+    SUB_AGENT_TOOL_NAME,
+    WORKER_SYSTEM,
+} from "./logic";
 
 /** A failure this run raised itself, whose message is written for the user. */
 class SubAgentRunError extends Error {}
@@ -101,6 +110,8 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
                     throw new SubAgentRunError("This sub-agent was stopped.");
                 }
             },
+            // A nested dispatch carries what reached this run, so an unattended chain is not read as the lead's own.
+            origin: originOfRun(claim.dispatchedBy),
             personalization: "full",
             // A message the user typed into the worker's thread is the prompt as written.
             prompt: worker && claim.clientId !== undefined ? claim.task : buildSubAgentPrompt(claim.task),

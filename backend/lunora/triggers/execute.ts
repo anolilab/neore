@@ -296,6 +296,7 @@ export const executeTrigger = internalAction
                 onThread: () => {
                     threadCreated = true;
                 },
+                origin: "trigger",
                 personalization: "full",
                 prompt: inputMessage,
                 system: systemPrompt,

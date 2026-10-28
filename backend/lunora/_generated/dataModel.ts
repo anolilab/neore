@@ -1459,6 +1459,7 @@ export interface Doc_subAgentRuns {
     completedAt?: number;
     createdAt: number;
     depth: number;
+    dispatchedBy?: "lead" | "user" | "trigger" | "messenger" | "outside_agent";
     error?: string;
     loopExitedAt?: number;
     mode?: "run" | "worker";
@@ -1693,6 +1694,7 @@ export interface Doc_threads {
     title?: string;
     updatedAt?: number;
     userId?: string;
+    workerPolicy?: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; hostDispatch: "ask"; maxDispatchesPerHour?: number };
 }
 
 export interface Doc_threadTags {
@@ -4204,6 +4206,7 @@ export interface Insert_subAgentRuns {
     completedAt?: number;
     createdAt: number;
     depth: number;
+    dispatchedBy?: "lead" | "user" | "trigger" | "messenger" | "outside_agent";
     error?: string;
     loopExitedAt?: number;
     mode?: "run" | "worker";
@@ -4438,6 +4441,7 @@ export interface Insert_threads {
     title?: string;
     updatedAt?: number;
     userId?: string;
+    workerPolicy?: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; hostDispatch: "ask"; maxDispatchesPerHour?: number };
 }
 
 export interface Insert_threadTags {

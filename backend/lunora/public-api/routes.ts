@@ -195,6 +195,7 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
         input.ctx,
         { mode: "text", model: resolveChatModel(request.model), prompt: request.prompt, ...(request.threadId && { threadId: request.threadId }) },
         signingSecret,
+        "outside_agent",
     );
     const body = (await response.json()) as {
         error?: string;

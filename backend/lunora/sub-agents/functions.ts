@@ -51,6 +51,9 @@ import { MAX_LENGTH } from "../lib/validators";
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import {
     buildResultMessage,
+    DISPATCH_SOURCES,
+    type DispatchSource,
+    dispatchSourceProblem,
     distinctChildCount,
     intersectWithLeadTools,
     isActiveSubAgentStatus,
@@ -78,13 +81,17 @@ import {
     workerFollowUp,
     workerPostFailure,
     workerReapDecision,
+    WORKER_POLICY_MAX_PER_HOUR,
     workerRunToStop,
 } from "./logic";
-import { vSubAgentRunMode, vSubAgentRunStatus } from "./validators";
+import type { vWorkerPolicy } from "./validators";
+import { vDispatchSource, vSubAgentRunMode, vSubAgentRunStatus } from "./validators";
 
 type RunDoc = Doc<"subAgentRuns">;
 
 export interface CreateSubAgentRunArgs {
+    /** Who sent the dispatch; a lead's own call when unset. */
+    dispatchedBy?: DispatchSource;
     parentModel?: string;
     parentThreadId: string;
     skillSlug?: string;
@@ -229,6 +236,7 @@ export const admitSubAgentRun = async (
         row: {
             createdAt: now,
             depth,
+            dispatchedBy: args.dispatchedBy ?? "lead",
             organizationId: parent.organizationId,
             parentModel: args.parentModel,
             parentThreadId: parent._id,
@@ -248,7 +256,7 @@ export const admitSubAgentRun = async (
 /** Why a worker dispatch was refused; `kind` picks the error a person-facing procedure throws. */
 export interface WorkerRefusal {
     error: string;
-    kind: "archived" | "limit" | "not_found" | "other";
+    kind: "archived" | "forbidden" | "limit" | "not_found" | "other";
 }
 
 export interface WorkerRunArgs extends CreateSubAgentRunArgs {
@@ -404,6 +412,21 @@ const findDispatchedRun = async (ctx: Pick<MutationCtx, "db">, args: WorkerRunAr
     return null;
 };
 
+const HOUR_MS = 60 * 60_000;
+
+/** Worker runs of one lead's readable in the last hour: enough rows to see a limit is reached. */
+const DISPATCHES_COUNTED = 200;
+
+/** How many dispatches the lead's workers received in the last hour, for its policy's `maxDispatchesPerHour`. */
+const dispatchesInLastHour = async (ctx: Pick<MutationCtx, "db">, userId: string, parentThreadId: string, now: number): Promise<number> => {
+    const recent = await ctx.db
+        .query("subAgentRuns")
+        .withIndex("by_user_and_createdAt", (q) => q.eq("userId", userId).gte("createdAt", now - HOUR_MS))
+        .take(DISPATCHES_COUNTED);
+
+    return recent.filter((run) => run.mode === "worker" && run.parentThreadId === parentThreadId).length;
+};
+
 /**
  * Admits and inserts one worker run, creating the worker's child thread when `childThreadId` is
  * unset. The dispatch is claimed first (`worker-dispatch`), before the rate limit and the insert: a
@@ -457,6 +480,19 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
 
         return refusal;
     };
+
+    // The lead's policy, before the caps and the rate limit: a source it refuses consumes nothing.
+    const sourceProblem = dispatchSourceProblem({ policy: parent.workerPolicy, runner: origin?.runner, source: args.dispatchedBy ?? "lead" });
+
+    if (sourceProblem) {
+        return await refuse({ error: sourceProblem, kind: "forbidden" });
+    }
+
+    const hourlyCap = parent.workerPolicy?.maxDispatchesPerHour;
+
+    if (hourlyCap !== undefined && (await dispatchesInLastHour(ctx, args.userId, parent._id, Date.now())) >= hourlyCap) {
+        return await refuse({ error: "This conversation has reached its hourly limit for worker messages.", kind: "limit" });
+    }
 
     // Whether the worker has no run going or waiting, so this one starts at once.
     let idle = true;
@@ -545,6 +581,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         clientId: args.toolCallId === undefined ? args.clientId : undefined,
         createdAt: Math.max(now, newestRunAt + 1),
         depth,
+        dispatchedBy: args.dispatchedBy ?? "lead",
         mode: "worker",
         organizationId: parent.organizationId,
         parentModel: args.parentModel,
@@ -585,6 +622,7 @@ export const dispatchWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): 
 
 export const createRun = internalMutation
     .input({
+        dispatchedBy: vDispatchSource,
         // Bounded at the boundary; the name is cut to its display length further down, and a tool name has its own pattern.
         leadTools: v.optional(v.array(v.string().max(128))),
         model: v.optional(v.string().max(256)),
@@ -626,11 +664,19 @@ export const createRun = internalMutation
  * A lead's message to one of its workers (the `messageWorker` tool). The tool call id dedupes it.
  */
 export const messageWorker = internalMutation
-    .input({ message: v.string().max(SUB_AGENT_TASK_MAX), parentThreadId: v.string(), toolCallId: v.string(), userId: v.string(), workerId: v.string() })
+    .input({
+        dispatchedBy: vDispatchSource,
+        message: v.string().max(SUB_AGENT_TASK_MAX),
+        parentThreadId: v.string(),
+        toolCallId: v.string(),
+        userId: v.string(),
+        workerId: v.string(),
+    })
     .output(v.union(v.object({ runId: v.id("subAgentRuns"), state: vSubAgentRunStatus, workerId: v.string() }), v.object({ error: v.string() })))
     .mutation(async ({ args, ctx }) => {
         const dispatched = await dispatchWorkerRun(ctx, {
             childThreadId: args.workerId,
+            dispatchedBy: args.dispatchedBy,
             parentThreadId: args.parentThreadId,
             task: args.message,
             toolCallId: args.toolCallId,
@@ -708,6 +754,7 @@ export const claimRun = internalMutation
                 childThreadId: v.optional(v.string()),
                 clientId: v.optional(v.string()),
                 depth: v.number(),
+                dispatchedBy: v.optional(vDispatchSource),
                 mode: v.optional(vSubAgentRunMode),
                 // The worker's own model, read from its thread: the picker there changes only that worker.
                 model: v.optional(v.string()),
@@ -735,6 +782,7 @@ export const claimRun = internalMutation
             ...(run.childThreadId !== undefined && { childThreadId: run.childThreadId }),
             ...(run.clientId !== undefined && { clientId: run.clientId }),
             depth: run.depth,
+            ...(run.dispatchedBy !== undefined && { dispatchedBy: run.dispatchedBy }),
             ...(run.mode !== undefined && { mode: run.mode }),
             ...(worker?.model !== undefined && { model: worker.model }),
             ...(run.organizationId !== undefined && { organizationId: run.organizationId }),
@@ -910,6 +958,8 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
         run,
         buildResultMessage({
             childThreadId: run.childThreadId,
+            // Only a worker run names its sender: a one-shot result reads as it always did.
+            dispatchedBy: run.mode === "worker" ? run.dispatchedBy : undefined,
             error: run.error,
             result: run.result,
             started: run.startedAt !== undefined,
@@ -1240,6 +1290,7 @@ const vWorkerReceipt = v.object({ runId: v.id("subAgentRuns"), state: vSubAgentR
 
 const WORKER_REFUSAL_CODES = {
     archived: "CONFLICT",
+    forbidden: "FORBIDDEN",
     limit: "TOO_MANY_REQUESTS",
     not_found: "NOT_FOUND",
     other: "BAD_REQUEST",
@@ -1283,6 +1334,7 @@ export const createWorker = authMutation
 
         return await dispatchOrThrow(ctx, {
             clientId: args.clientId,
+            dispatchedBy: "user",
             ...(lead?.model !== undefined && { parentModel: lead.model }),
             ...(args.model !== undefined && { model: args.model }),
             name: args.name,
@@ -1316,10 +1368,42 @@ export const dispatchToWorker = authMutation
         return await dispatchOrThrow(ctx, {
             childThreadId: args.workerId,
             clientId: args.clientId,
+            dispatchedBy: "user",
             parentThreadId: origin.parentThreadId,
             task: args.message,
             userId: ctx.user.userId,
         });
+    });
+
+/**
+ * Sets which sources may dispatch to a lead's workers, for the lead's owner. `hostDispatch` is always
+ * `ask`: the schema admits no other value. `outside_agent` is for cloud workers only (checked at each
+ * dispatch). Takes effect on the next dispatch; runs already queued keep what they were admitted under.
+ */
+export const setWorkerPolicy = authMutation
+    .use(rateLimit("chat/update"))
+    .input({
+        allowedSources: v.array(vDispatchSource).max(DISPATCH_SOURCES.length),
+        leadThreadId: v.id("threads"),
+        maxDispatchesPerHour: v.optional(v.number().min(1).max(WORKER_POLICY_MAX_PER_HOUR)),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const lead = await ctx.db.get(args.leadThreadId);
+
+        if (!lead || lead.deleted || lead.userId !== ctx.user.userId) {
+            throw new LunoraError("NOT_FOUND", "Conversation not found.");
+        }
+
+        const policy: Infer<typeof vWorkerPolicy> = {
+            allowedSources: [...new Set(args.allowedSources)],
+            hostDispatch: "ask",
+            ...(args.maxDispatchesPerHour !== undefined && { maxDispatchesPerHour: args.maxDispatchesPerHour }),
+        };
+
+        await patchThread(ctx.db, lead._id, { workerPolicy: policy });
+
+        return null;
     });
 
 /**
@@ -1376,6 +1460,8 @@ const vWorkerRunView = v.object({
     createdAt: v.number(),
     // Whether the lead received this run's result: posted, still waiting, given up, or never owed.
     delivery: vRunDelivery,
+    // Who sent it; null on a run from before that was recorded.
+    dispatchedBy: v.union(vDispatchSource, v.null()),
     runId: v.id("subAgentRuns"),
     state: vSubAgentRunStatus,
     task: v.string(),
@@ -1441,6 +1527,7 @@ const progressFields = async (
             return {
                 createdAt: run.createdAt,
                 delivery: runDelivery(run),
+                dispatchedBy: run.dispatchedBy ?? null,
                 runId: run._id,
                 state: run.status,
                 task: run.task.split("\n", 1)[0]!.slice(0, 160),

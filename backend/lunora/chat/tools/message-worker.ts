@@ -31,7 +31,12 @@ A worker handles one message at a time, in the order sent: a message sent while 
             return { error: "Sign in to use workers.", status: "failed" };
         }
 
+        if (!context.dispatchOrigin) {
+            return { error: "Workers are unavailable in this run.", status: "failed" };
+        }
+
         const sent = await context.runMutation(internal.sub_agents.functions.messageWorker, {
+            dispatchedBy: context.dispatchOrigin,
             message: input.message,
             parentThreadId: context.threadId,
             toolCallId: options.toolCallId,

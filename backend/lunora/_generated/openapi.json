@@ -11846,6 +11846,49 @@
                         },
                         "type": "array"
                       },
+                      "workerPolicy": {
+                        "properties": {
+                          "allowedSources": {
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "const": "lead",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "user",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "trigger",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "messenger",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "outside_agent",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "type": "array"
+                          },
+                          "hostDispatch": {
+                            "const": "ask",
+                            "type": "string"
+                          },
+                          "maxDispatchesPerHour": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "allowedSources",
+                          "hostDispatch"
+                        ],
+                        "type": "object"
+                      },
                       "branchPoint": {
                         "type": "number"
                       },
@@ -38370,6 +38413,37 @@
                                   }
                                 ]
                               },
+                              "dispatchedBy": {
+                                "anyOf": [
+                                  {
+                                    "anyOf": [
+                                      {
+                                        "const": "lead",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "user",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "trigger",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "messenger",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "outside_agent",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "runId": {
                                 "description": "Id<\"subAgentRuns\">",
                                 "type": "string",
@@ -38406,6 +38480,7 @@
                             "required": [
                               "createdAt",
                               "delivery",
+                              "dispatchedBy",
                               "runId",
                               "state",
                               "task"
@@ -38751,6 +38826,37 @@
                                 }
                               ]
                             },
+                            "dispatchedBy": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "const": "lead",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "user",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "trigger",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "messenger",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "outside_agent",
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "runId": {
                               "description": "Id<\"subAgentRuns\">",
                               "type": "string",
@@ -38787,6 +38893,7 @@
                           "required": [
                             "createdAt",
                             "delivery",
+                            "dispatchedBy",
                             "runId",
                             "state",
                             "task"
@@ -38848,6 +38955,100 @@
           "sub-agents"
         ],
         "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#sub_agents_functions:setWorkerPolicy": {
+      "post": {
+        "description": "Invoke the `mutation` `sub_agents_functions:setWorkerPolicy` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "sub_agents_functions:setWorkerPolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "allowedSources": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "const": "lead",
+                              "type": "string"
+                            },
+                            {
+                              "const": "user",
+                              "type": "string"
+                            },
+                            {
+                              "const": "trigger",
+                              "type": "string"
+                            },
+                            {
+                              "const": "messenger",
+                              "type": "string"
+                            },
+                            {
+                              "const": "outside_agent",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "leadThreadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "maxDispatchesPerHour": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "allowedSources",
+                      "leadThreadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "sub_agents_functions:setWorkerPolicy",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: sub_agents_functions:setWorkerPolicy",
+        "tags": [
+          "sub-agents"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#sub_agents_functions:stopWorker": {

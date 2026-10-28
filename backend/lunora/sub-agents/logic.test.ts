@@ -4,6 +4,8 @@ import {
     applyToolAllowlist,
     buildResultMessage,
     canNest,
+    dispatchSourceProblem,
+    originOfRun,
     nextQueuedWorkerRun,
     normalizeToolAllowlist,
     postsBack,
@@ -26,6 +28,8 @@ import {
     workerRunToStop,
 } from "./logic";
 
+const NOT_ACCEPTED = /does not accept/u;
+const HOST_WORKER = /host worker/u;
 const DEPTH_CAP = /at most 2 levels/u;
 const FAN_OUT_CAP = /At most 3 sub-agents/u;
 const PER_RUN_CAP = /at most 5 sub-agents of its own/u;
@@ -327,5 +331,33 @@ describe(runDelivery, () => {
         expect(runDelivery({ ...asked, status: "failed" })).toBe("pending");
         expect(runDelivery({ ...asked, status: "running" })).toBe("none");
         expect(runDelivery({ mode: "worker", status: "succeeded" })).toBe("none");
+    });
+});
+
+describe(dispatchSourceProblem, () => {
+    it("admits the lead and the user by default and refuses every unattended source", () => {
+        expect(dispatchSourceProblem({ source: "lead" })).toBeUndefined();
+        expect(dispatchSourceProblem({ source: "user" })).toBeUndefined();
+
+        for (const source of ["trigger", "messenger", "outside_agent"] as const) {
+            expect(dispatchSourceProblem({ source })).toMatch(NOT_ACCEPTED);
+        }
+    });
+
+    it("follows the policy, and never lets an outside agent reach a host worker", () => {
+        const policy = { allowedSources: ["lead", "outside_agent"] } as const;
+
+        expect(dispatchSourceProblem({ policy, runner: { kind: "headless" }, source: "outside_agent" })).toBeUndefined();
+        expect(dispatchSourceProblem({ policy, runner: { kind: "host" }, source: "outside_agent" })).toMatch(HOST_WORKER);
+        expect(dispatchSourceProblem({ policy, source: "user" })).toMatch(NOT_ACCEPTED);
+    });
+});
+
+describe(originOfRun, () => {
+    it("carries an unattended source down, and reads a person typing or an unrecorded one as the worker's own agent", () => {
+        expect(originOfRun("trigger")).toBe("trigger");
+        expect(originOfRun("outside_agent")).toBe("outside_agent");
+        expect(originOfRun("user")).toBe("lead");
+        expect(originOfRun(undefined)).toBe("lead");
     });
 });

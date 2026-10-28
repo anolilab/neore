@@ -1205,6 +1205,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     completedAt: real("completedAt"),
     createdAt: real("createdAt").notNull(),
     depth: real("depth").notNull(),
+    dispatchedBy: text("dispatchedBy", { mode: "json" }).$type<"lead" | "user" | "trigger" | "messenger" | "outside_agent">(),
     error: text("error"),
     loopExitedAt: real("loopExitedAt"),
     mode: text("mode", { mode: "json" }).$type<"run" | "worker">(),
@@ -1420,6 +1421,7 @@ export const threads = sqliteTable("threads", {
     title: text("title"),
     updatedAt: real("updatedAt"),
     userId: text("userId"),
+    workerPolicy: text("workerPolicy", { mode: "json" }).$type<{ allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; hostDispatch: "ask"; maxDispatchesPerHour?: number }>(),
 }, (t) => ({
     by_user_and_organization_and_updatedAt: index("by_user_and_organization_and_updatedAt").on(t.userId, t.organizationId, t.updatedAt),
     by_user_and_updatedAt: index("by_user_and_updatedAt").on(t.userId, t.updatedAt),

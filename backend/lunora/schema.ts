@@ -33,7 +33,7 @@ import {
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
 import { notificationInputFields } from "./notifications/validators";
 import { vSkillConfig } from "./skills/validators";
-import { vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus } from "./sub-agents/validators";
+import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
 import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./tasks/validators";
 import { vWebhookSignatureScheme } from "./triggers/validators";
 
@@ -2266,6 +2266,8 @@ export const schema = defineSchema({
         completedAt: v.optional(v.number()),
         createdAt: v.number(),
         depth: v.number(),
+        // Who sent this dispatch (`sub-agents/logic.ts:DISPATCH_SOURCES`); unset on rows from before it was recorded.
+        dispatchedBy: v.optional(vDispatchSource),
         error: v.optional(v.string()),
         // Set when the loop of a run that was stopped while running is known to be gone (it reported, or the
         // reaper fired): until then it may still write into the worker's thread, so the next message waits.
@@ -2627,6 +2629,8 @@ export const schema = defineSchema({
         title: v.optional(v.string()),
         updatedAt: v.optional(v.number()),
         userId: v.optional(v.string()),
+        // Which sources may dispatch to this lead's workers; unset = the lead and the user.
+        workerPolicy: v.optional(vWorkerPolicy),
     })
         .shardBy("userId")
         // The usage backfill's walk (`usage/backfill.ts`): a key no thread edit

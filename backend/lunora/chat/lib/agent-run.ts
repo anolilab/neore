@@ -58,6 +58,7 @@ import { buildKnowledgeCitations, type KnowledgeSource } from "../../knowledge/c
 import type { ReplySkill } from "../../usage/activity-logic";
 import { repliesByOrder, replyUsageArgs } from "../../usage/activity-logic";
 import { scheduleReplyUsage } from "../../usage/schedule";
+import type { DispatchOrigin } from "../../sub-agents/logic";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
 export const INTERNAL_PREFIX_RE = /^internal-/;
@@ -229,6 +230,11 @@ export const toResearchDepth = (value: string | undefined): ResearchDepth => (va
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `researchDepth`; the action ctx has no such field. */
 export const setResearchDepth = (ctx: object, researchDepth: ResearchDepth): void => {
     (ctx as { researchDepth?: ResearchDepth }).researchDepth = researchDepth;
+};
+
+/** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `dispatchOrigin`; the action ctx has no such field. */
+export const setDispatchOrigin = (ctx: object, origin: DispatchOrigin): void => {
+    (ctx as { dispatchOrigin?: DispatchOrigin }).dispatchOrigin = origin;
 };
 
 /** Personalization only when the user set any of it; `undefined` otherwise, so the prompt carries no empty block. */
@@ -995,6 +1001,8 @@ export const resumeApprovedRun = async (
         }
 
         setResearchDepth(ctx, config.researchDepth);
+        // A resumed run is one a person answered (an approval or a question), whoever started it.
+        setDispatchOrigin(ctx, "lead");
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({

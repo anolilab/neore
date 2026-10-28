@@ -364,6 +364,20 @@ quiet notice.
 - Acceptance: a dispatch from a disallowed source fails at admission and charges
   nothing; a host dispatch asks for approval even when the policy would allow it;
   the attribution shows on the run row and in the post-back.
+- Built (cloud): `dispatchedBy` is on every run row (one-shot too) and in each post-back as a
+  "Sent by" line. A lead's tool call carries its run's **origin** (`ToolCtx.dispatchOrigin`,
+  required: a tool refuses without it): the user's own chat turn and a resumed (approved) run are
+  `lead`; the public API's key callers are `outside_agent`; triggers, tasks and evals are `trigger`
+  (the more restrictive reading of unattended); messenger replies are `messenger`. A sub-agent run
+  carries what reached it down (`originOfRun`), so an unattended chain stays unattended one hop
+  later. `workerPolicy` is checked at admission, after the claim and before the caps and the rate
+  limit, so a refused source consumes nothing; `setWorkerPolicy` writes it, `maxDispatchesPerHour`
+  (at most 60) is counted from the lead's runs in the last hour. The "sent by" label is per run in
+  the worker thread; per-message labels need metadata on the saved prompt row and are a follow-up.
+  There is no UI to edit the policy yet.
+- Left for S5: a dispatch to a host worker asks for approval even when the policy would allow it
+  (`hostDispatch` is the literal `ask`; the tool's forced `ask` for a host runner is S5's), and
+  `outside_agent` is already refused for a host runner in `dispatchSourceProblem`.
 
 **S9 — Cheap-first worker models with escalation (optional, measure first).** A
 `workerPolicy.models` field: `"own"` (default, open question 3) or `"escalate"`.

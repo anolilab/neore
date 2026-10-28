@@ -53,6 +53,10 @@ This tool returns as soon as the sub-agent has started. Its result is posted to 
             return { error: "Sign in to use sub-agents.", status: "failed" };
         }
 
+        if (!context.dispatchOrigin) {
+            return { error: "Sub-agents are unavailable in this run.", status: "failed" };
+        }
+
         // A worker is bounded by its lead's tools, so a lead whose tools are unknown starts none.
         const leadTools = input.persistent ? leadToolNames(context) : undefined;
 
@@ -62,6 +66,7 @@ This tool returns as soon as the sub-agent has started. Its result is posted to 
 
         const parentModel = parentModelOf(context);
         const created = await context.runMutation(internal.sub_agents.functions.createRun, {
+            dispatchedBy: context.dispatchOrigin,
             ...(parentModel !== undefined && { parentModel }),
             parentThreadId: context.threadId,
             ...(input.persistent && { leadTools, name: input.name, persistent: true }),

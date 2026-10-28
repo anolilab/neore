@@ -23,6 +23,7 @@ import {
     listWorkers,
     messageWorker,
     reapSubAgentRun,
+    setWorkerPolicy,
     stopWorker,
 } from "./functions";
 import { SUB_AGENT_STALE_MS, SUB_WORKER_QUIET_MS } from "./logic";
@@ -805,6 +806,7 @@ describe("receipts", () => {
         await run(
             async (context) =>
                 (await context.runMutation(messageWorker as never, {
+                    dispatchedBy: "lead",
                     message: "Next",
                     parentThreadId,
                     toolCallId,
@@ -828,7 +830,13 @@ describe("receipts", () => {
         // The same receipt names a run the worker list reads back, with nothing delivered yet.
         const worker = (await as(OWNER).query(getWorker as never, { workerId } as never)) as { runs: { delivery: string; runId: string; state: string }[] };
 
-        expect(worker.runs.find((entry) => entry.runId === receipt.runId)).toMatchObject({ delivery: "none", state: "queued" });
+        expect(worker.runs.find((entry) => entry.runId === receipt.runId)).toMatchObject({ delivery: "none", dispatchedBy: "lead", state: "queued" });
+
+        // A message the user typed shows as theirs.
+        const typed = (await message(workerId, "c-typed")) as { runId: string };
+        const after = (await as(OWNER).query(getWorker as never, { workerId } as never)) as { runs: { dispatchedBy: string; runId: string }[] };
+
+        expect(after.runs.find((entry) => entry.runId === typed.runId)?.dispatchedBy).toBe("user");
     });
 
     it("tells each run's delivery apart: posted, given up, and never owed", async () => {
@@ -899,5 +907,30 @@ describe("receipts", () => {
         expect(posted).toHaveLength(1);
         // The unpostable result did not hold the worker's line: the waiting message started.
         expect(jobsQueueMessages.some((queued) => queued.body.args?.runId === waiting.runId)).toBe(true);
+    });
+});
+
+describe("setWorkerPolicy", () => {
+    const setPolicy = async (userId: string, args: Record<string, unknown> = {}) =>
+        await as(userId).mutation(setWorkerPolicy as never, { allowedSources: ["lead", "messenger", "messenger"], leadThreadId: leadId, ...args } as never);
+
+    it("stores the policy for the lead's owner with host dispatch fixed to ask, and dispatch follows it", async () => {
+        await setPolicy(OWNER, { maxDispatchesPerHour: 5 });
+
+        const lead = await run(async (context) => await context.db.get(leadId));
+
+        expect(lead.workerPolicy).toStrictEqual({ allowedSources: ["lead", "messenger"], hostDispatch: "ask", maxDispatchesPerHour: 5 });
+
+        const refused = await run(
+            async (context) =>
+                await admitWorkerRun(context, { dispatchedBy: "trigger", name: "W", parentThreadId: leadId, task: "T", toolCallId: "call-t", userId: OWNER }),
+        );
+
+        expect(refused).toMatchObject({ kind: "forbidden" });
+    });
+
+    it("answers a stranger as it would a conversation that does not exist, and refuses an hourly cap past the tier limit", async () => {
+        expect(await setPolicy(STRANGER).catch((error: unknown) => error)).toMatchObject({ code: "NOT_FOUND" });
+        await expect(setPolicy(OWNER, { maxDispatchesPerHour: 1000 })).rejects.toBeDefined();
     });
 });

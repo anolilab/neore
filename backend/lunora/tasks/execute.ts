@@ -106,6 +106,7 @@ const runAgent = async (
         memory: false,
         model,
         onThread,
+        origin: "trigger",
         personalization: "full",
         prompt: buildTaskPrompt(claim),
         skill,

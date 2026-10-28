@@ -305,6 +305,56 @@ export const workerPostFailure = (
     newestFirst: ReadonlyArray<{ mode?: "run" | "worker"; postFailed?: string; resultPostedAt?: number; toolCallId?: string }>,
 ): string | null => newestFirst.find((run) => postsBack(run))?.postFailed ?? null;
 
+/** Who may send a dispatch: the lead agent, the user typing in a worker's thread, or what drove an unattended lead run. */
+export const DISPATCH_SOURCES = ["lead", "user", "trigger", "messenger", "outside_agent"] as const;
+
+export type DispatchSource = (typeof DISPATCH_SOURCES)[number];
+
+/**
+ * What a lead run was started by, as its tools see it: the user's own chat turn (`lead`), or an unattended
+ * cause. A dispatch the lead sends carries it as `dispatchedBy`; `user` is only a person typing in a
+ * worker's thread, never a lead run.
+ */
+export type DispatchOrigin = Exclude<DispatchSource, "user">;
+
+/** A policy that is not set: the lead and the user. Unattended sources are opted into, never defaulted. */
+export const DEFAULT_ALLOWED_SOURCES: ReadonlyArray<DispatchSource> = ["lead", "user"];
+
+/** What a run's nested dispatches carry: the source that reached it, except that a person typing is the worker's own agent acting. */
+export const originOfRun = (dispatchedBy: DispatchSource | undefined): DispatchOrigin =>
+    dispatchedBy === undefined || dispatchedBy === "user" ? "lead" : dispatchedBy;
+
+const SOURCE_LABELS: Record<DispatchSource, string> = {
+    lead: "the lead agent",
+    messenger: "a messenger reply",
+    outside_agent: "an outside agent",
+    trigger: "an unattended run",
+    user: "you",
+};
+
+export const dispatchSourceLabel = (source: DispatchSource): string => SOURCE_LABELS[source];
+
+/**
+ * Why a dispatch from `source` may not reach a lead whose policy is `policy`, or `undefined` when it may.
+ * `outside_agent` is for cloud workers only: a host worker never takes it, whatever the policy lists.
+ */
+export const dispatchSourceProblem = (input: {
+    policy?: { allowedSources: ReadonlyArray<DispatchSource> };
+    runner?: { kind: "headless" | "host" };
+    source: DispatchSource;
+}): string | undefined => {
+    if (input.source === "outside_agent" && input.runner?.kind === "host") {
+        return "A host worker takes no dispatch from an outside agent.";
+    }
+
+    const allowed = input.policy?.allowedSources ?? DEFAULT_ALLOWED_SOURCES;
+
+    return allowed.includes(input.source) ? undefined : `This conversation does not accept worker messages from ${dispatchSourceLabel(input.source)}.`;
+};
+
+/** The most dispatches a lead's policy may allow per hour: the premium tier's rate limit (the free tier's own is lower and still applies). */
+export const WORKER_POLICY_MAX_PER_HOUR = 60;
+
 /** Whether the result of a run reached the lead: `none` when the lead never asked for one (or the run has not ended). */
 export type RunDelivery = "failed" | "none" | "pending" | "posted";
 
@@ -349,6 +399,8 @@ export const distinctChildCount = (runs: ReadonlyArray<{ _id: string; childThrea
 /** The follow-up message posted to the parent thread when a run ends. */
 export const buildResultMessage = (input: {
     childThreadId?: string;
+    /** Who sent the dispatch; named in the message so the lead reads where it came from. */
+    dispatchedBy?: DispatchSource;
     error?: string;
     result?: string;
     /** Whether the run had been claimed — a cancelled one that had not ran nothing. */
@@ -375,6 +427,7 @@ export const buildResultMessage = (input: {
     }
 
     const link = input.childThreadId ? `\n\n[Open the sub-agent's thread](/chat/${input.childThreadId})` : "";
+    const sentBy = input.dispatchedBy ? `\n\nSent by: ${dispatchSourceLabel(input.dispatchedBy)}` : "";
 
-    return `${heading}\n\n${body}${link}`;
+    return `${heading}\n\n${body}${link}${sentBy}`;
 };

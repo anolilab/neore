@@ -25,6 +25,7 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { sumMessageCosts } from "../../agent/message-cost";
 import type { SkillConfig } from "../../skills/validators";
+import type { DispatchOrigin } from "../../sub-agents/logic";
 import {
     buildRunStreamArgs,
     loadModelFilterRules,
@@ -32,6 +33,7 @@ import {
     resolveBackupModelId,
     resolveRunModel,
     retrieveMemoryContext,
+    setDispatchOrigin,
     setResearchDepth,
     toPersonalization,
 } from "./agent-run";
@@ -82,6 +84,11 @@ export interface HeadlessRunOptions {
     onGenerationStart?: () => Promise<void> | void;
     /** Called with the new thread's id before generation starts, so a failure can still point at it. */
     onThread?: (threadId: string) => Promise<void> | void;
+    /**
+     * What started this run. A dispatch to a worker from its tools carries it as `dispatchedBy`, and the
+     * lead's policy decides on it: an unattended cause is refused unless the policy lists it.
+     */
+    origin: DispatchOrigin;
     /** Whether the user's personalization reaches the prompt — `"none"` when someone else reads the reply. */
     personalization: "full" | "none";
     /** Omitted when continuing a thread: its latest message is the prompt. */
@@ -163,6 +170,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
 
     try {
         setResearchDepth(ctx, "balanced");
+        setDispatchOrigin(ctx, options.origin);
 
         const existingThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
         const personal = options.personalization === "full";
