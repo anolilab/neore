@@ -61,7 +61,7 @@ const FLOATING_BUTTON_CLASS = cn("rounded-full shadow-md", "bg-background hover:
  * Uses isAtBottom state from Zustand store. Beside scroll-to-bottom sits a jump back to the user's
  * newest prompt: in a busy thread the answer to it is usually right below it, far up by now.
  */
-const ScrollToBottomButton: FC<{ className?: string; onClick: () => void }> = ({ className, onClick }) => {
+const ScrollToBottomButton: FC<{ canJumpToPrompt: boolean; className?: string; onClick: () => void }> = ({ canJumpToPrompt, className, onClick }) => {
     const isAtBottom = useChatUIStore((state) => state.isAtBottom);
     const { messages } = useChatMessages();
     const { threadId } = useChatThread();
@@ -71,7 +71,8 @@ const ScrollToBottomButton: FC<{ className?: string; onClick: () => void }> = ({
         return null;
     }
 
-    const promptId = lastPromptId(messages);
+    // The media gallery has no message list to scroll, so the jump would do nothing there.
+    const promptId = canJumpToPrompt ? lastPromptId(messages) : undefined;
 
     return (
         <div className={cn("absolute -top-14 flex gap-2", className)}>
@@ -292,7 +293,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
 
                         {/* Footer with composer */}
                         <div className="sticky bottom-0 mx-auto flex w-full max-w-(--thread-max-width) flex-col items-center justify-end rounded-t-lg bg-inherit">
-                            <ScrollToBottomButton className="z-10" onClick={handleScrollToBottom} />
+                            <ScrollToBottomButton canJumpToPrompt={composerMode === "text"} className="z-10" onClick={handleScrollToBottom} />
                             {/* Error display */}
                             <ChatError className="mb-3 w-full" />
                             <ForwardSelectionBar threadId={threadId} />
