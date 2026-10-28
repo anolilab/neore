@@ -42,7 +42,7 @@ const MAX_SOURCE = 1000;
 const RESERVED_ENV_PREFIXES = ["NEORE_", "ELECTRON_"];
 /** Variables that decide which code a program runs: an install may not set them. */
 const CODE_LOADING_ENV_NAMES = new Set(["_JAVA_OPTIONS", "BASH_ENV", "CLASSPATH", "COMSPEC", "ELECTRON_RUN_AS_NODE", "ENV", "GCONV_PATH", "IFS", "JDK_JAVA_OPTIONS", "NODE_OPTIONS", "PATH", "PATHEXT", "PROMPT_COMMAND", "RUBYGEMS_GEMDEPS", "ZDOTDIR"]);
-const CODE_LOADING_ENV_PREFIXES = ["BUNDLE_", "DYLD_", "GEM_", "GIT_", "JAVA", "LD_", "NODE_", "NPM_", "PERL", "PYTHON", "RUBY"];
+const CODE_LOADING_ENV_PREFIXES = ["BUNDLE_", "DYLD_", "GEM_", "GIT_", "JAVA", "LD_", "NODE_", "NPM_", "PERL", "PHP", "PYTHON", "RUBY"];
 const CONTROL_CHARACTER = /\p{Cc}/u;
 const GITHUB_OWNER = /^https:\/\/github\.com\/([^/]+)\//u;
 
@@ -207,7 +207,14 @@ export const parseRegistry = (json: unknown): RegistryAgent[] => {
         });
     }
 
-    return agents;
+    // Two entries with one id are ambiguous: an install resolves by id, so neither is offered.
+    const counts = new Map<string, number>();
+
+    for (const { id } of agents) {
+        counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+
+    return agents.filter(({ id }) => counts.get(id) === 1);
 };
 
 const badEnvName = (name: string): boolean => {
