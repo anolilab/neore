@@ -29,7 +29,7 @@ describe("agentSwitchOf", () => {
 
     it("reads a marker that does not check as no switch, rather than guessing", () => {
         expect(agentSwitchOf({ providerMetadata: { [AGENT_SWITCH_KEY]: { to: "b" } } })).toBeUndefined();
-        expect(agentSwitchOf({ providerMetadata: { [AGENT_SWITCH_KEY]: { ...part("a", "b"), mode: "portable" } } })).toBeUndefined();
+        expect(agentSwitchOf({ providerMetadata: { [AGENT_SWITCH_KEY]: { ...part("a", "b"), mode: "native" } } })).toBeUndefined();
     });
 });
 

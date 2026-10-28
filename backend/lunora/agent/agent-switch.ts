@@ -10,7 +10,7 @@
  * first paint, and doubles as the "was ever switched" flag: a thread without it keeps every send's
  * own model and pays for no walk. The derived value wins whenever they differ.
  */
-import { estimateTokensFromCharacters, PROMPT_CACHE_COLD_START_TOKENS } from "@neore/ai/models";
+import { PROMPT_CACHE_COLD_START_TOKENS } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
@@ -18,6 +18,7 @@ import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from
 import { agentSwitchOf, lastAgentSwitch, sameAgent } from "./agent-switch-logic";
 import type { AgentRef, AgentSwitchPart } from "./agent-switch-validators";
 import { childrenOf, getThreadRow, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
+import { findPathHandoff, pathTokens } from "./handoff-source";
 import { getMaxMessage, pinFollowingRowParent } from "./messages";
 import { insertAgentSwitchRow, patchAgentSwitchRow, patchThread } from "./table-writes";
 
@@ -94,35 +95,31 @@ const MAX_COLD_START_PAGES = 30;
  * warning about (`PROMPT_CACHE_COLD_START_TOKENS`). Counts the stored text of each row with the
  * shared characters-per-token estimate, and stops as soon as the answer is yes.
  */
-export const pathExceedsColdStart = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<boolean> => {
-    let characters = 0;
-    let cursor = from;
+export const pathExceedsColdStart = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<boolean> =>
+    (await pathTokens(context, threadId, from, { cap: PROMPT_CACHE_COLD_START_TOKENS, maxPages: MAX_COLD_START_PAGES })) > PROMPT_CACHE_COLD_START_TOKENS;
 
-    let pages = 0;
+/**
+ * The stored handoff a context window needs when it starts below the divider that holds it: the newest one
+ * on the path above `belowMessageId`. `null` for a thread that was never switched, which is every thread
+ * but the few that were and costs them one thread read.
+ */
+export const handoffAboveOf = async (context: QueryCtx, args: { belowMessageId: Id<"messages">; threadId: Id<"threads"> }): Promise<string | null> => {
+    const thread = await context.db.get(args.threadId);
 
-    while (cursor) {
-        pages += 1;
-
-        // A path this long is past the threshold whatever the rows say: the read stays bounded.
-        if (pages > MAX_COLD_START_PAGES) {
-            return true;
-        }
-
-        const { next, rows } = await walkPath(context, threadId, cursor, { limit: PATH_PAGE_ROWS });
-
-        for (const row of rows) {
-            characters += row.text?.length ?? 0;
-        }
-
-        if (estimateTokensFromCharacters(characters) > PROMPT_CACHE_COLD_START_TOKENS) {
-            return true;
-        }
-
-        cursor = next;
+    if (!thread?.activeAgent) {
+        return null;
     }
 
-    return false;
+    const below = await getThreadRow(context, args.threadId, args.belowMessageId);
+    const from = below && (await parentOf(context, args.threadId, below));
+
+    return (await findPathHandoff(context, args.threadId, from)) ?? null;
 };
+
+export const getHandoffAbove = internalQuery
+    .input({ belowMessageId: v.id("messages"), threadId: v.id("threads") })
+    .output(v.union(v.string(), v.null()))
+    .query(async ({ args, ctx }) => await handoffAboveOf(ctx, args));
 
 /**
  * Re-points the `activeAgent` cache after the active path moved: a sibling switch, a regenerate's

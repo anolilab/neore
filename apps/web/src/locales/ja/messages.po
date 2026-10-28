@@ -415,7 +415,7 @@ msgid "{0} deleted"
 msgstr "{0} を削除しました"
 
 #. placeholder {0}: formatDuration(elapsedMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:557
+#: src/features/chat/thread/streaming-placeholder.tsx:555
 msgid "{0} elapsed"
 msgstr "経過 {0}"
 
@@ -575,7 +575,7 @@ msgid "{0} tok/s"
 msgstr ""
 
 #. placeholder {0}: tokPerSec.toFixed(1)
-#: src/features/chat/thread/streaming-placeholder.tsx:547
+#: src/features/chat/thread/streaming-placeholder.tsx:545
 msgid "{0} tokens/s"
 msgstr "{0} トークン/秒"
 
@@ -586,7 +586,7 @@ msgstr "{0} 個のツールを検出しました"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:95
+#: src/features/devices/components/devices-settings.tsx:78
 msgid "{0} tools: {1}"
 msgstr "{0} 個のツール: {1}"
 
@@ -797,6 +797,14 @@ msgstr "{fileCount, plural, other {# 個のファイルをアップロードで�
 msgid "{fps} fps"
 msgstr "{fps} fps"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:65
+msgid "{full} credits"
+msgstr ""
+
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:61
+msgid "{handoff} credits"
+msgstr ""
+
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:54
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr ""
@@ -876,7 +884,7 @@ msgstr "残り {minutes} 分"
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel}モード — クリックして変更"
 
-#: src/features/chat/thread/thread.tsx:223
+#: src/features/chat/thread/thread.tsx:203
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, other {# 個のモデルに何でも質問...}}"
 
@@ -945,7 +953,7 @@ msgid "{name} is installed"
 msgstr "{name} はインストール済みです"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:241
-#: src/features/chat/thread/streaming-placeholder.tsx:475
+#: src/features/chat/thread/streaming-placeholder.tsx:473
 msgid "{name} is responding"
 msgstr "{name} が応答中です"
 
@@ -1169,7 +1177,7 @@ msgstr "<0>スケジュール</0> — cron スケジュールで実行します�
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0> — 外部サービス（Stripe、GitHub、Zapier）から HTTP POST リクエストを受信します。リクエストはタイムスタンプ付きの HMAC で署名され、リプレイは拒否されます。"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:548
+#: src/features/chat/thread/streaming-placeholder.tsx:546
 msgid "~{approxTokenCount} tokens"
 msgstr "約 {approxTokenCount} トークン"
 
@@ -1768,10 +1776,6 @@ msgstr "メモを追加..."
 msgid "Add a note…"
 msgstr "メモを追加…"
 
-#: src/features/devices/components/devices-settings.tsx:256
-msgid "Add a server over SSH"
-msgstr ""
-
 #: src/features/prompts/components/prompt-form-dialog.tsx:293
 msgid "Add a tag"
 msgstr "タグを追加"
@@ -2061,17 +2065,9 @@ msgstr "追加："
 msgid "Adding documents… {0} of {1}"
 msgstr "ドキュメントを追加中… {0} / {1}"
 
-#: src/features/devices/components/devices-settings.tsx:238
-msgid "Adding the server was cancelled on this computer."
-msgstr ""
-
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:237
 msgid "Adding your earlier replies…"
 msgstr "以前の返信を追加しています…"
-
-#: src/features/devices/components/devices-settings.tsx:269
-msgid "Address"
-msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:121
 msgid "Adjust"
@@ -2320,7 +2316,7 @@ msgstr "ここで接続を有効化すると、Discord アプリ設定の Intera
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "ここで接続を有効化すると、Slack アプリの Event Subscriptions の Request URL に設定する Webhook URL が発行されます。"
 
-#: src/features/devices/components/devices-settings.tsx:185
+#: src/features/devices/components/devices-settings.tsx:148
 msgid "After outside content"
 msgstr "外部コンテンツ参照後"
 
@@ -3092,7 +3088,7 @@ msgstr "API キー"
 msgid "API key (optional)"
 msgstr "API キー（任意）"
 
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:29
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:35
 msgid "API Key Created"
 msgstr "API キーを作成しました"
 
@@ -3248,11 +3244,6 @@ msgstr "Arcee の小型推論 LLM"
 msgid "archive"
 msgstr "アーカイブ"
 
-#. placeholder {0}: worker.name
-#: src/features/sub-agents/components/worker-list.tsx:129
-msgid "Archive {0}"
-msgstr ""
-
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
 #: src/components/command-palette.tsx:415
 #: src/components/command-palette.tsx:555
@@ -3265,7 +3256,6 @@ msgstr "スレッドをアーカイブ"
 #~ msgstr "スレッドのアーカイブ/解除"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:520
-#: src/features/sub-agents/components/worker-list.tsx:83
 #: src/features/tasks/components/goal-form-dialog.tsx:47
 #: src/features/tasks/components/goal-list.tsx:26
 msgid "Archived"
@@ -3292,13 +3282,9 @@ msgstr "{selectedCount, plural, other {# 件のスレッド}}を削除しても�
 msgid "Are you sure you want to delete <0>{0}</0>?"
 msgstr "<0>{0}</0> を削除してもよろしいですか？"
 
-#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:80
-msgid "Are you sure you want to delete this API key? Anything using it, such as a script or an MCP client, is refused from its next request on. This action cannot be undone."
-msgstr ""
-
 #: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:75
-#~ msgid "Are you sure you want to delete this API key? This action cannot be undone."
-#~ msgstr "この API キーを削除してもよろしいですか？この操作は元に戻せません。"
+msgid "Are you sure you want to delete this API key? This action cannot be undone."
+msgstr "この API キーを削除してもよろしいですか？この操作は元に戻せません。"
 
 #: src/components/delete-confirmation-dialog.tsx:45
 msgid "Are you sure you want to delete this item? This action cannot be undone."
@@ -3420,7 +3406,7 @@ msgstr ""
 msgid "Ask"
 msgstr "確認"
 
-#: src/features/chat/thread/thread.tsx:223
+#: src/features/chat/thread/thread.tsx:203
 msgid "Ask all models anything..."
 msgstr "すべてのモデルに何でも質問..."
 
@@ -3466,8 +3452,8 @@ msgid "Assistant replied:"
 msgstr "アシスタントの返信："
 
 #: src/features/chat/thread/message-item.tsx:205
+#: src/features/chat/thread/streaming-placeholder.tsx:687
 #: src/features/chat/thread/streaming-placeholder.tsx:723
-#: src/features/chat/thread/streaming-placeholder.tsx:760
 msgid "Assistant Reply:"
 msgstr "アシスタントの返信:"
 
@@ -4736,7 +4722,7 @@ msgstr "カナダ"
 #: src/features/auth/components/organization/remove-member-dialog.tsx:83
 #: src/features/auth/components/organization/update-member-role-dialog.tsx:135
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:141
-#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:109
+#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:104
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:174
 #: src/features/auth/components/team/add-team-member-dialog.tsx:136
 #: src/features/auth/components/team/create-team-dialog.tsx:117
@@ -4749,6 +4735,7 @@ msgstr "カナダ"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
 #: src/features/chat/pins/pin-item.tsx:282
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
@@ -5442,17 +5429,9 @@ msgstr ""
 msgid "claude"
 msgstr ""
 
-#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:65
-msgid "Claude Code"
-msgstr ""
-
 #: src/features/tasks/components/task-form-dialog.tsx:111
 msgid "Claude Code (coding agent)"
 msgstr "Claude Code（コーディングエージェント）"
-
-#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:61
-msgid "Claude Code and other MCP clients can reach your account with this key. They only see the tools its permissions allow."
-msgstr ""
 
 #: src/features/marketing/components/gateway-landing-page.tsx:34
 msgid "Claude Opus, Sonnet, Haiku — latest model family"
@@ -5551,10 +5530,6 @@ msgstr "選択を解除"
 #: src/features/chat/tags/thread-tag-filter.tsx:81
 msgid "Clear tag filter"
 msgstr "タグフィルターをクリア"
-
-#: src/features/sub-agents/components/worker-stop-bar.tsx:61
-msgid "Clear the queue"
-msgstr ""
 
 #: src/features/settings/components/personalization/memory-settings.tsx:132
 msgid "Cleared {count} memories"
@@ -6356,7 +6331,6 @@ msgstr "確認用パスワードは必須です"
 msgid "Confirm your password"
 msgstr "パスワードを再入力してください"
 
-#: src/features/devices/components/devices-settings.tsx:118
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
 #: src/routes/auth/extension.tsx:154
@@ -6382,10 +6356,6 @@ msgstr "音声/ファイルノードを入力として接続してください"
 #: src/features/workflow/components/nodes/video-node.tsx:158
 msgid "Connect an image node as input"
 msgstr "画像ノードを入力として接続してください"
-
-#: src/features/devices/components/devices-settings.tsx:287
-msgid "Connect and add"
-msgstr ""
 
 #: src/features/marketing/components/landing-page.tsx:288
 msgid "Connect any external tool or API"
@@ -6878,8 +6848,6 @@ msgid "cookies"
 msgstr ""
 
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:211
-#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
-#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:34
 #: src/features/local-models/components/local-setup-guide.tsx:44
 #: src/features/pages/components/page-kept-draft.tsx:30
 msgid "Copied"
@@ -6889,8 +6857,7 @@ msgstr "コピーしました"
 msgid "Copied the last code block"
 msgstr ""
 
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:47
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:58
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:55
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:133
 msgid "Copied to clipboard"
 msgstr "クリップボードにコピーしました"
@@ -6904,7 +6871,6 @@ msgstr "コピーしました！"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:76
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
-#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
 #: src/features/chat/thread/message-item.tsx:353
@@ -6993,14 +6959,6 @@ msgstr "選択したセルをコピー"
 msgid "Copy the Channel secret (Basic settings) and issue a long-lived Channel access token (Messaging API tab)."
 msgstr "Channel secret（Basic settings）をコピーし、長期の Channel access token（Messaging API タブ）を発行してください。"
 
-#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:65
-msgid "Copy the Claude Code command"
-msgstr ""
-
-#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:67
-msgid "Copy the JSON configuration"
-msgstr ""
-
 #. placeholder {0}: defaultShortcut("copyLastCodeBlock")
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:120
 msgid "Copy the last code block of the latest assistant reply ({0})"
@@ -7016,7 +6974,7 @@ msgstr "このシークレットは今すぐコピーして、Webhook の送信�
 
 #: src/components/copy-button.tsx:45
 #: src/components/copy-button.tsx:50
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:52
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:60
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:661
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:800
 msgid "Copy to clipboard"
@@ -7103,10 +7061,6 @@ msgstr "Gemini 2.5 の最下位ティアで信頼性の高い Google AI を必�
 msgid "Costa Rica"
 msgstr "コスタリカ"
 
-#: src/features/devices/components/devices-settings.tsx:248
-msgid "Could not add the server."
-msgstr ""
-
 #: src/features/pages/components/page-agent-dialog.tsx:81
 msgid "Could not apply the changes"
 msgstr "変更を適用できませんでした"
@@ -7131,10 +7085,6 @@ msgstr "実行をキャンセルできませんでした。"
 msgid "Could not change push notifications. Try again."
 msgstr "プッシュ通知を変更できませんでした。もう一度お試しください。"
 
-#: src/features/devices/components/devices-settings.tsx:109
-msgid "Could not connect to the server."
-msgstr ""
-
 #: src/features/chat/sharing/thread-share-button.tsx:98
 msgid "Could not copy automatically. Invite link: {inviteLink}"
 msgstr "自動コピーできませんでした。招待リンク：{inviteLink}"
@@ -7147,7 +7097,6 @@ msgstr "自動コピーできませんでした。公開リンク：{publicLink}
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr "シークレットをコピーできませんでした。選択して手動でコピーしてください。"
 
-#: src/features/auth/components/settings/api-key/use-copy-to-clipboard.ts:18
 #: src/features/chat/thread/copy-last-code-block.tsx:41
 msgid "Could not copy to the clipboard"
 msgstr ""
@@ -7245,7 +7194,7 @@ msgstr "ページとして開けませんでした"
 msgid "Could not open the pull request."
 msgstr "プルリクエストを作成できませんでした。"
 
-#: src/features/devices/components/devices-settings.tsx:347
+#: src/features/devices/components/devices-settings.tsx:216
 msgid "Could not pair this computer. Try again."
 msgstr "このコンピューターをペアリングできませんでした。もう一度お試しください。"
 
@@ -7268,7 +7217,7 @@ msgstr "プレビューできません · クリックしてダウンロード"
 msgid "Could not pull {0}: {1}"
 msgstr "{0} を取得できませんでした：{1}"
 
-#: src/features/chat/core/context/chat-context.tsx:653
+#: src/features/chat/core/context/chat-context.tsx:651
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
@@ -7284,7 +7233,7 @@ msgstr "そのチャットを読み込めませんでした。ロックされて
 msgid "Could not refine the draft. Try again."
 msgstr "下書きを改善できませんでした。もう一度お試しください。"
 
-#: src/features/devices/components/devices-settings.tsx:133
+#: src/features/devices/components/devices-settings.tsx:96
 msgid "Could not remove the device."
 msgstr "デバイスを削除できませんでした。"
 
@@ -7292,7 +7241,7 @@ msgstr "デバイスを削除できませんでした。"
 msgid "Could not remove the participant"
 msgstr "参加者を削除できませんでした"
 
-#: src/features/devices/components/devices-settings.tsx:87
+#: src/features/devices/components/devices-settings.tsx:70
 msgid "Could not rename the device."
 msgstr "デバイス名を変更できませんでした。"
 
@@ -7320,10 +7269,6 @@ msgstr "{label} の新しい順序を保存できませんでした"
 #: src/features/pages/components/page-view.tsx:248
 msgid "Could not save the page"
 msgstr "ページを保存できませんでした"
-
-#: src/features/sub-agents/components/worker-composer.tsx:59
-msgid "Could not send the message."
-msgstr ""
 
 #: src/features/chat/thread/ask-user-prompt.tsx:83
 #: src/features/chat/thread/tool-approval.tsx:63
@@ -7363,12 +7308,7 @@ msgstr ""
 msgid "Could not stop the sub-agent."
 msgstr ""
 
-#: src/features/sub-agents/components/worker-list.tsx:52
-#: src/features/sub-agents/components/worker-stop-bar.tsx:40
-msgid "Could not stop the worker."
-msgstr ""
-
-#: src/features/chat/model-settings/use-model-combobox.ts:121
+#: src/features/chat/model-settings/use-model-combobox.ts:86
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
@@ -8375,8 +8315,8 @@ msgstr "AI ソフトウェアエンジニアの Devin にタスクを委任"
 
 #: src/components/delete-confirmation-dialog.tsx:42
 #: src/components/delete-confirmation-dialog.tsx:68
-#: src/features/auth/components/settings/api-key/api-key-cell.tsx:94
-#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:120
+#: src/features/auth/components/settings/api-key/api-key-cell.tsx:95
+#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:115
 #: src/features/auth/components/settings/passkey/passkey-cell.tsx:98
 #: src/features/chat/thread-list/group-header.tsx:150
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:166
@@ -8462,7 +8402,7 @@ msgstr "アラート「{ruleName}」を削除"
 msgid "Delete All"
 msgstr "すべて削除"
 
-#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:77
+#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:72
 msgid "Delete API Key"
 msgstr "API キーを削除"
 
@@ -8661,14 +8601,6 @@ msgstr "{0, plural, other {# 件のプロンプトを削除しました}}"
 msgid "Deleting..."
 msgstr "削除しています..."
 
-#: src/features/sub-agents/components/worker-run-log.tsx:36
-msgid "Delivered to the lead"
-msgstr ""
-
-#: src/features/sub-agents/components/worker-run-log.tsx:36
-msgid "Delivering"
-msgstr ""
-
 #: src/features/marketing/data/models-data.ts:668
 msgid "Demanding applications that require OpenAI's latest frontier model capabilities"
 msgstr "OpenAI の最新フロンティアモデルの機能を必要とする高負荷なアプリケーション"
@@ -8701,7 +8633,7 @@ msgstr "Z.AI で最も強力かつ高性能なフロンティア GLM モデル�
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "最大限の AI 性能と洗練された推論が最も重要となる高負荷なタスク"
 
-#: src/features/devices/components/devices-settings.tsx:170
+#: src/features/devices/components/devices-settings.tsx:133
 msgid "Denied"
 msgstr "拒否"
 
@@ -8978,19 +8910,19 @@ msgstr "オープンソースモデルで強力なコーディング能力と汎
 msgid "Development"
 msgstr "開発"
 
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:273
 msgid "Device activity"
 msgstr "デバイスのアクティビティ"
 
-#: src/features/devices/components/devices-settings.tsx:76
+#: src/features/devices/components/devices-settings.tsx:59
 msgid "Device name"
 msgstr "デバイス名"
 
-#: src/features/devices/components/devices-settings.tsx:136
+#: src/features/devices/components/devices-settings.tsx:99
 msgid "Device removed"
 msgstr "デバイスを削除しました"
 
-#: src/features/devices/components/devices-settings.tsx:357
+#: src/features/devices/components/devices-settings.tsx:226
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "デバイス"
@@ -9088,7 +9020,6 @@ msgstr "無効化しています..."
 msgid "Discard"
 msgstr "破棄"
 
-#: src/features/devices/components/devices-settings.tsx:118
 #: src/features/settings/connectors/connector-card.tsx:186
 #: src/features/settings/connectors/connector-card.tsx:206
 msgid "Disconnect"
@@ -9257,14 +9188,13 @@ msgstr "ドミニカ共和国"
 msgid "Don't have an account?"
 msgstr "アカウントをお持ちでないですか？"
 
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:62
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:66
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:110
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:171
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
-#: src/features/devices/components/devices-settings.tsx:169
+#: src/features/devices/components/devices-settings.tsx:132
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
-#: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:16
 msgid "Done"
 msgstr "完了"
@@ -11084,7 +11014,7 @@ msgid "expired"
 msgstr "期限切れ"
 
 #: src/features/chat/thread-list/thread-node.tsx:290
-#: src/features/devices/components/devices-settings.tsx:171
+#: src/features/devices/components/devices-settings.tsx:134
 #: src/features/settings/connectors/connector-card.tsx:75
 msgid "Expired"
 msgstr "期限切れ"
@@ -11108,7 +11038,7 @@ msgid "Expires"
 msgstr "有効期限"
 
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:41
-#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:70
+#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:65
 msgid "Expires {date}"
 msgstr "有効期限 {date}"
 
@@ -11339,12 +11269,11 @@ msgstr "不合格"
 
 #: src/features/chat/thread-list/thread-node.tsx:503
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
-#: src/features/devices/components/devices-settings.tsx:172
+#: src/features/devices/components/devices-settings.tsx:135
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:164
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:52
-#: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:17
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:64
 #: src/features/workflow/components/canvas/workflow-controls.tsx:52
@@ -11371,10 +11300,6 @@ msgstr "プリセットを適用できませんでした"
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:172
 msgid "Failed to apply system prompt"
 msgstr "システムプロンプトを適用できませんでした"
-
-#: src/features/sub-agents/components/worker-list.tsx:132
-msgid "Failed to archive the worker"
-msgstr ""
 
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:207
 msgid "Failed to archive thread"
@@ -12763,7 +12688,7 @@ msgid "First slide"
 msgstr "最初のスライド"
 
 #. placeholder {0}: formatDuration(ttftMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:549
+#: src/features/chat/thread/streaming-placeholder.tsx:547
 msgid "First token {0}"
 msgstr "最初のトークン {0}"
 
@@ -14226,6 +14151,18 @@ msgstr "H"
 msgid "Hand (pan)"
 msgstr "ハンド（パン）"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:74
+msgid "Hand over a summary"
+msgstr ""
+
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:60
+msgid "Hand over a summary and the recent messages"
+msgstr ""
+
+#: src/features/chat/thread/agent-switch-divider.tsx:15
+msgid "Handed over"
+msgstr ""
+
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:28
 msgid "Handle"
 msgstr ""
@@ -14344,8 +14281,8 @@ msgstr "添付コンテンツを非表示"
 msgid "Hide column"
 msgstr "列を非表示"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:240
-#: src/features/chat/thread/composer-followup-suggestions.tsx:256
+#: src/features/chat/thread/composer-followup-suggestions.tsx:239
+#: src/features/chat/thread/composer-followup-suggestions.tsx:255
 msgid "Hide follow-up suggestions"
 msgstr "フォローアップの提案を非表示"
 
@@ -14759,7 +14696,6 @@ msgid "Identity"
 msgstr "アイデンティティ"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:53
-#: src/features/sub-agents/components/worker-list.tsx:80
 msgid "Idle"
 msgstr "待機中"
 
@@ -15792,10 +15728,6 @@ msgstr "ジャッジスコア"
 msgid "Judge: {0}"
 msgstr "ジャッジ：{0}"
 
-#: src/features/chat/thread/thread.tsx:89
-msgid "Jump to my last message"
-msgstr ""
-
 #: src/features/chat/thread/thread-minimap.tsx:95
 msgid "Jump to prompt {promptNumber}, {gap} after the previous prompt: {preview}"
 msgstr "プロンプト {promptNumber} へ移動（前のプロンプトから {gap} 後）: {preview}"
@@ -15846,6 +15778,10 @@ msgstr "現在の行を保持"
 msgid "Keep files"
 msgstr "ファイルを残す"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:72
+msgid "Keep full history"
+msgstr ""
+
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:146
 msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
 msgstr "動画の一部を残します。残した部分はこのブラウザーで MP4 に再エンコードされるため、少し時間がかかることがあります。"
@@ -15858,6 +15794,10 @@ msgstr "永続的に保持"
 msgid "Keep the files as uncategorised, or delete them together with the collection. Chats and projects that use the collection stop searching it."
 msgstr "ファイルを未分類として残すか、コレクションと一緒に削除します。このコレクションを使っているチャットやプロジェクトは検索しなくなります。"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:64
+msgid "Keep the full history"
+msgstr ""
+
 #: src/features/chat/core/utils/language-utilities.ts:370
 msgid "Kenya"
 msgstr "ケニア"
@@ -15869,10 +15809,6 @@ msgstr "ケニア"
 #: src/routes/admin/gateway/keys.tsx:146
 #~ msgid "Key Created"
 #~ msgstr "キー作成日"
-
-#: src/features/devices/components/devices-settings.tsx:281
-msgid "Key file (optional, absolute path)"
-msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
 #: src/features/chat/thread-list/thread-list-header.tsx:146
@@ -16186,7 +16122,7 @@ msgstr "最終更新 <0>{0}</0>"
 #~ msgid "Last Used"
 #~ msgstr "最終使用"
 
-#: src/features/auth/components/settings/api-key/api-key-cell.tsx:54
+#: src/features/auth/components/settings/api-key/api-key-cell.tsx:55
 msgid "Last used {date}"
 msgstr "最終使用 {date}"
 
@@ -16449,13 +16385,9 @@ msgstr "少ない"
 msgid "Let replies use tools"
 msgstr "返信でツールを使う"
 
-#: src/features/devices/components/devices-settings.tsx:356
+#: src/features/devices/components/devices-settings.tsx:225
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Neore デスクトップアプリを通じて、エージェントがあなたのコンピューター上のファイル、ターミナル、ローカル MCP サーバーを使えるようにします。すべての操作はまずそのコンピューターで確認を求め、共有チャットやバックグラウンドタスクからは何も実行されません。"
-
-#: src/features/devices/components/devices-settings.tsx:413
-msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
-msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:237
 msgid "Let the bot use its computer"
@@ -16903,7 +16835,7 @@ msgstr "読み込んでいます…"
 msgid "local"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:689
+#: src/features/chat/core/context/chat-context.tsx:687
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "ローカルモデルはテキストのみに対応しています。送信するには添付ファイルを削除してください。"
 
@@ -17739,14 +17671,6 @@ msgstr "メッセージ入力"
 msgid "Message selection"
 msgstr "メッセージの選択"
 
-#: src/features/sub-agents/components/worker-composer.tsx:92
-msgid "Message the worker"
-msgstr ""
-
-#: src/features/sub-agents/components/worker-composer.tsx:101
-msgid "Message the worker..."
-msgstr ""
-
 #: src/features/chat/thread/message-branch-switcher.tsx:55
 msgid "Message versions"
 msgstr "メッセージのバージョン"
@@ -18564,11 +18488,11 @@ msgstr "ミュート"
 msgid "my data"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:190
 msgid "My Linux computer"
 msgstr "マイ Linux コンピューター"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:190
 msgid "My Mac"
 msgstr "マイ Mac"
 
@@ -18580,7 +18504,7 @@ msgstr "マイ MCP サーバー"
 msgid "My skills"
 msgstr "マイスキル"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:190
 msgid "My Windows PC"
 msgstr "マイ Windows PC"
 
@@ -18593,6 +18517,11 @@ msgstr "ミャンマー"
 msgid "Myanmar (Myanmar)"
 msgstr "ミャンマー語（ミャンマー）"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:61
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:65
+msgid "n/a"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:26
 #: src/features/settings/lib/settings-keywords.ts:87
 msgid "name"
@@ -18601,7 +18530,6 @@ msgstr ""
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:485
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:265
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
@@ -18817,7 +18745,7 @@ msgstr "Neore - AI テキスト・動画・音声・画像・ドキュメント�
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:655
+#: src/features/chat/thread/composer.tsx:643
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore は間違えることがあります。重要な情報は確認してください。"
 
@@ -18908,7 +18836,7 @@ msgstr "ニュートラルな色、大作映画の雰囲気"
 #~ msgstr "なし"
 
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:32
-#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:61
+#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:56
 msgid "Never expires"
 msgstr "無期限"
 
@@ -19235,7 +19163,7 @@ msgstr "絞りが選択されていません"
 msgid "No API keys found. Create one to get started."
 msgstr "API キーがありません。作成して始めましょう。"
 
-#: src/features/auth/components/settings/api-key/api-key-cell.tsx:61
+#: src/features/auth/components/settings/api-key/api-key-cell.tsx:62
 msgid "No API permissions"
 msgstr "API の権限なし"
 
@@ -19358,7 +19286,7 @@ msgstr "データセットはまだありません"
 msgid "No description"
 msgstr "説明なし"
 
-#: src/features/devices/components/devices-settings.tsx:407
+#: src/features/devices/components/devices-settings.tsx:269
 msgid "No devices paired."
 msgstr "ペアリングされたデバイスはありません。"
 
@@ -19555,20 +19483,6 @@ msgstr "プリセットはまだありません。設定から作成してくだ
 msgid "No presets yet. Create one to get started."
 msgstr "プリセットはまだありません。作成して始めましょう。"
 
-#: src/features/sub-agents/components/worker-stop-bar.tsx:48
-msgid "No progress"
-msgstr ""
-
-#: src/features/sub-agents/components/worker-list.tsx:47
-#: src/features/sub-agents/components/worker-stop-bar.tsx:50
-msgid "No progress for {quietMinutes} min"
-msgstr ""
-
-#. placeholder {0}: quietNames.join(", ")
-#: src/features/sub-agents/components/worker-list.tsx:94
-msgid "No progress: {0}"
-msgstr ""
-
 #: src/features/projects/components/move-to-project-dialog.tsx:89
 msgid "No projects available. Create a project first."
 msgstr "利用可能なプロジェクトがありません。先にプロジェクトを作成してください。"
@@ -19756,7 +19670,7 @@ msgstr "スレッドはまだありません"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "ティアデータはまだありません。ティア情報はゲートウェイのアップグレード後の新しいリクエストから記録されます。"
 
-#: src/features/devices/components/devices-settings.tsx:95
+#: src/features/devices/components/devices-settings.tsx:78
 msgid "No tools shared yet"
 msgstr "共有されているツールはまだありません"
 
@@ -19925,10 +19839,6 @@ msgstr "未設定"
 msgid "Not configured by the operator"
 msgstr "運営者によって設定されていません"
 
-#: src/features/sub-agents/components/worker-run-log.tsx:36
-msgid "Not delivered to the lead"
-msgstr ""
-
 #: src/features/evals/components/run-detail.tsx:80
 msgid "not measured"
 msgstr "未測定"
@@ -19971,7 +19881,7 @@ msgstr "注: モジュールはメッセージ単位ではなく会話単位で�
 msgid "Nothing found"
 msgstr "見つかりません"
 
-#: src/features/devices/components/devices-settings.tsx:164
+#: src/features/devices/components/devices-settings.tsx:127
 msgid "Nothing has run on a device yet."
 msgstr "デバイスではまだ何も実行されていません。"
 
@@ -19990,10 +19900,6 @@ msgstr "保存を選択するまで、何も保存、インストール、有効
 #: src/features/home/components/home-page.tsx:153
 msgid "Nothing is waiting on you."
 msgstr "対応待ちのものはありません。"
-
-#: src/features/sub-agents/hooks/use-stop-worker.ts:33
-msgid "Nothing to stop: that run had already ended."
-msgstr ""
 
 #: src/features/notifications/lib/notification-labels.ts:60
 msgid "Notification"
@@ -20102,7 +20008,7 @@ msgstr "オフ"
 msgid "Official"
 msgstr "公式"
 
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:83
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "オフライン"
@@ -20142,6 +20048,10 @@ msgstr "一貫性の高い旧世代のシネマティックモデル"
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:519
 msgid "Older"
 msgstr "それ以前"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:15
+msgid "Older messages were summarised"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:66
 msgid "ollama"
@@ -20291,7 +20201,7 @@ msgstr "ワンタイムパスワードが無効です"
 msgid "One-time password is required"
 msgstr "ワンタイムパスワードは必須です"
 
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:83
 msgid "Online"
 msgstr "オンライン"
 
@@ -20465,7 +20375,7 @@ msgstr "メッセージを開く"
 msgid "Open Model Picker"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:361
+#: src/features/devices/components/devices-settings.tsx:230
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "このコンピューターをペアリングするには、デスクトップアプリで Neore を開いてください。これまでにペアリングしたデバイスは下に表示されます。"
 
@@ -21102,10 +21012,6 @@ msgstr "元のシステムプロンプト"
 msgid "Other"
 msgstr "その他"
 
-#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:67
-msgid "Other clients (JSON)"
-msgstr ""
-
 #: src/features/evals/components/case-fields.tsx:136
 msgid "Other file names"
 msgstr "その他のファイル名"
@@ -21284,11 +21190,11 @@ msgstr "編集したい領域を塗りつぶしてください。白い領域は
 msgid "Paired"
 msgstr "ペアリング済み"
 
-#: src/features/devices/components/devices-settings.tsx:394
+#: src/features/devices/components/devices-settings.tsx:263
 msgid "Paired devices"
 msgstr "ペアリング済みのデバイス"
 
-#: src/features/devices/components/devices-settings.tsx:337
+#: src/features/devices/components/devices-settings.tsx:206
 msgid "Pairing was cancelled on this computer."
 msgstr "このコンピューターでペアリングがキャンセルされました。"
 
@@ -21989,10 +21895,6 @@ msgstr "洗練されたハリウッド調"
 #: src/features/marketing/components/landing-page.tsx:1003
 msgid "Popular"
 msgstr "人気"
-
-#: src/features/devices/components/devices-settings.tsx:277
-msgid "Port"
-msgstr ""
 
 #: src/features/canvas/components/design-preset-selector.tsx:91
 msgid "Portrait"
@@ -23006,8 +22908,6 @@ msgstr "メッセージを待機列に追加 — 現在の返信が終わると�
 #: src/features/home/components/home-page.tsx:184
 #: src/features/home/components/home-page.tsx:192
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:53
-#: src/features/sub-agents/components/worker-list.tsx:80
-#: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:19
 msgid "Queued"
 msgstr "待機中"
@@ -23397,10 +23297,6 @@ msgstr "最近"
 msgid "Recent chats"
 msgstr "最近のチャット"
 
-#: src/features/sub-agents/components/worker-run-log.tsx:39
-msgid "Recent messages"
-msgstr ""
-
 #: src/features/admin/components/admin-dashboard-stats.tsx:215
 msgid "Recent Registrations"
 msgstr "最近の登録"
@@ -23430,7 +23326,7 @@ msgstr "{0} を再接続"
 msgid "Reconnecting to the server…"
 msgstr "サーバーに再接続しています…"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:539
+#: src/features/chat/thread/streaming-placeholder.tsx:537
 msgid "Reconnecting…"
 msgstr "再接続しています…"
 
@@ -23769,8 +23665,8 @@ msgstr "サインイン状態を保持"
 #: src/features/chat/sharing/thread-share-button.tsx:339
 #: src/features/chat/thread/composer-input.tsx:313
 #: src/features/chat/thread/composer-input.tsx:375
-#: src/features/devices/components/devices-settings.tsx:122
-#: src/features/devices/components/devices-settings.tsx:126
+#: src/features/devices/components/devices-settings.tsx:85
+#: src/features/devices/components/devices-settings.tsx:89
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
@@ -23787,7 +23683,7 @@ msgid "Remove \"{0}\"?"
 msgstr "「{0}」を削除しますか？"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:143
+#: src/features/devices/components/devices-settings.tsx:106
 msgid "Remove “{0}”?"
 msgstr "「{0}」を削除しますか？"
 
@@ -24085,7 +23981,7 @@ msgstr "返信"
 msgid "Reply complete"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:621
+#: src/features/chat/core/context/chat-context.tsx:619
 msgid "Reply ready"
 msgstr "返信の準備ができました"
 
@@ -24334,10 +24230,6 @@ msgstr ""
 #: src/features/workflow/templates/index.ts:116
 msgid "Result"
 msgstr "結果"
-
-#: src/features/sub-agents/components/worker-list.tsx:114
-msgid "Result not delivered"
-msgstr ""
 
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
@@ -25090,7 +24982,7 @@ msgstr "列を 1 ページ左にスクロール"
 msgid "Scroll right one page of columns"
 msgstr "列を 1 ページ右にスクロール"
 
-#: src/features/chat/thread/thread.tsx:95
+#: src/features/chat/thread/thread.tsx:72
 msgid "Scroll to bottom"
 msgstr "一番下までスクロール"
 
@@ -25635,10 +25527,6 @@ msgstr "プロンプトへの忠実度が高いセミリアルなモデル"
 msgid "Semi-realistic visual style"
 msgstr "セミリアルなビジュアルスタイル"
 
-#: src/features/sub-agents/components/worker-composer.tsx:104
-msgid "Send"
-msgstr ""
-
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:192
 msgid "Send <0>X-Hub-Signature-256: sha256=<hex></0>, the HMAC-SHA256 of the raw request body keyed with the secret (the format GitHub webhooks use). This signature has no timestamp, so a captured request can be replayed once the 15-minute duplicate window has passed. Requests with the neore headers are rejected."
 msgstr ""
@@ -25715,33 +25603,9 @@ msgstr "確認コードを送信"
 msgid "Sending your message and waiting for the reply"
 msgstr "メッセージを送信して返信を待っています"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:587
-msgid "Sending…"
-msgstr ""
-
-#: src/features/devices/components/devices-settings.tsx:173
+#: src/features/devices/components/devices-settings.tsx:136
 msgid "Sent"
 msgstr "送信済み"
-
-#: src/features/sub-agents/components/worker-run-log.tsx:31
-msgid "Sent by a messenger reply"
-msgstr ""
-
-#: src/features/sub-agents/components/worker-run-log.tsx:32
-msgid "Sent by an outside agent"
-msgstr ""
-
-#: src/features/sub-agents/components/worker-run-log.tsx:33
-msgid "Sent by an unattended run"
-msgstr ""
-
-#: src/features/sub-agents/components/worker-run-log.tsx:30
-msgid "Sent by the lead agent"
-msgstr ""
-
-#: src/features/sub-agents/components/worker-run-log.tsx:34
-msgid "Sent by you"
-msgstr ""
 
 #: src/features/devices/components/device-tool-call.tsx:47
 msgid "Sent to {device}…"
@@ -25771,10 +25635,6 @@ msgstr "セルビア語（セルビア）"
 msgid "Serif"
 msgstr "セリフ"
 
-#: src/features/devices/components/devices-settings.tsx:245
-msgid "Server added. Choose which of its folders to share in the desktop app."
-msgstr ""
-
 #: src/features/settings/components/chat/mcp/server-form.tsx:176
 msgid "Server configuration"
 msgstr "サーバー設定"
@@ -25786,10 +25646,6 @@ msgstr "サーバーエラーです。しばらくしてからもう一度お試
 #: src/features/settings/components/chat/mcp-settings.tsx:158
 msgid "Server name is required"
 msgstr "サーバー名は必須です"
-
-#: src/features/devices/components/devices-settings.tsx:100
-msgid "Server over SSH"
-msgstr ""
 
 #: src/features/settings/components/chat/mcp-settings.tsx:172
 msgid "Server URL is required"
@@ -25809,10 +25665,6 @@ msgstr "ブランチ機能付きのサーバーレス Postgres データベー�
 
 #: src/features/settings/lib/settings-keywords.ts:102
 msgid "servers"
-msgstr ""
-
-#: src/features/devices/components/devices-settings.tsx:414
-msgid "Servers over SSH"
 msgstr ""
 
 #: src/features/admin/components/audit-log-card.tsx:143
@@ -25948,7 +25800,7 @@ msgstr "共有"
 msgid "Shared conversation"
 msgstr "共有された会話"
 
-#: src/features/devices/components/devices-settings.tsx:389
+#: src/features/devices/components/devices-settings.tsx:258
 msgid "Shared folders and local servers…"
 msgstr "共有フォルダーとローカルサーバー…"
 
@@ -26051,8 +25903,8 @@ msgstr "すべてのタスクを表示"
 msgid "Show attached content"
 msgstr "添付コンテンツを表示"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:240
-#: src/features/chat/thread/composer-followup-suggestions.tsx:256
+#: src/features/chat/thread/composer-followup-suggestions.tsx:239
+#: src/features/chat/thread/composer-followup-suggestions.tsx:255
 msgid "Show follow-up suggestions"
 msgstr "フォローアップの提案を表示"
 
@@ -26726,7 +26578,7 @@ msgid "Source"
 msgstr "ソース"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1110
-#: src/features/chat/thread/message-content.tsx:125
+#: src/features/chat/thread/message-content.tsx:124
 msgid "Source {index}"
 msgstr "出典 {index}"
 
@@ -27313,22 +27165,13 @@ msgstr "株式"
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
-#: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
 msgid "Stop"
 msgstr "停止"
 
-#: src/features/sub-agents/components/worker-list.tsx:49
-msgid "Stop {name}"
-msgstr ""
-
 #: src/features/chat/group/group-participant-bar.tsx:226
 msgid "Stop after the current speaker"
 msgstr "現在の話者の後に停止"
-
-#: src/features/sub-agents/components/worker-stop-bar.tsx:61
-msgid "Stop and clear the queue"
-msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:522
 #: src/features/chat/thread-list/thread-node.tsx:544
@@ -27366,7 +27209,6 @@ msgid "Stop reading"
 msgstr "読み上げを停止"
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:51
-#: src/features/sub-agents/components/worker-run-log.tsx:28
 msgid "Stopped"
 msgstr ""
 
@@ -27377,11 +27219,6 @@ msgstr "予算に達したため停止"
 #: src/features/local-models/lib/local-errors.ts:166
 msgid "Stopped."
 msgstr "停止しました。"
-
-#: src/features/sub-agents/components/worker-list.tsx:86
-#: src/features/sub-agents/components/worker-stop-bar.tsx:51
-msgid "Stopping…"
-msgstr ""
 
 #: src/features/canvas/components/design-preset-selector.tsx:134
 msgid "Story Promo"
@@ -27978,6 +27815,10 @@ msgstr "モデルを切り替え"
 #: src/components/language-toggle.tsx:42
 msgid "Switch to {label}"
 msgstr "{label} に切り替え"
+
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:52
+msgid "Switch to {name}?"
+msgstr ""
 
 #: src/features/knowledge/components/collection-dialog.tsx:84
 msgid "Switch to an organization to share a collection with it."
@@ -28652,7 +28493,7 @@ msgstr ""
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "43 文字の EncodingAESKey（メッセージの暗号化を安全モードに設定する必要があります）"
 
-#: src/features/devices/components/devices-settings.tsx:127
+#: src/features/devices/components/devices-settings.tsx:90
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "エージェントはこのデバイスに何も要求できなくなります。アクティビティログは期限切れになるまで残ります。"
 
@@ -28689,7 +28530,7 @@ msgstr "アシスタントから質問があります"
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:88
+#: src/features/chat/thread/composer-model-selector.tsx:90
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -28926,9 +28767,9 @@ msgstr "このデバイスの Neore アプリが {0} としてサインインし
 msgid "The new passcode needs {MIN_PASSCODE_LENGTH} characters, typed twice the same."
 msgstr ""
 
-#: src/features/chat/model-settings/use-model-combobox.ts:108
-msgid "The next reply re-reads this whole conversation without the model's cache, so it costs more than usual."
-msgstr ""
+#: src/features/chat/model-settings/use-model-combobox.ts:90
+#~ msgid "The next reply re-reads this whole conversation without the model's cache, so it costs more than usual."
+#~ msgstr ""
 
 #: src/features/pages/components/page-agent-dialog.tsx:64
 msgid "The page agent could not edit this page"
@@ -29057,14 +28898,6 @@ msgstr "ハンズフリーモードが返信を読み上げる音声です。独
 msgid "The whole answer, exactly"
 msgstr "回答全体が完全に一致"
 
-#: src/features/sub-agents/components/worker-composer.tsx:43
-msgid "The worker is busy. Your message runs after the earlier ones."
-msgstr ""
-
-#: src/features/sub-agents/components/worker-composer.tsx:43
-msgid "The worker is working on an earlier message."
-msgstr ""
-
 #: src/features/workflow/hooks/use-workflow-transfer.ts:26
 msgid "The workflow file contains a node type this version does not support."
 msgstr "ワークフローファイルに、このバージョンがサポートしていないノードタイプが含まれています。"
@@ -29170,7 +29003,7 @@ msgstr "思考機能を備えた視覚言語モデル"
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1036
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
-#: src/features/chat/thread/streaming-placeholder.tsx:764
+#: src/features/chat/thread/streaming-placeholder.tsx:727
 msgid "Thinking..."
 msgstr "考えています..."
 
@@ -29196,10 +29029,6 @@ msgstr "このブラウザーではここでプッシュ通知を受信できま
 msgid "This chat is locked"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:584
-msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
-msgstr ""
-
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:294
 msgid "This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files."
 msgstr "このコレクションは組織のメンバーから共有されています。チャットやプロジェクトに添付できますが、ファイルを変更できるのは所有者のみです。"
@@ -29208,25 +29037,25 @@ msgstr "このコレクションは組織のメンバーから共有されてい
 msgid "This command name is reserved"
 msgstr "このコマンド名は予約されています"
 
-#: src/features/devices/components/devices-settings.tsx:99
+#: src/features/devices/components/devices-settings.tsx:82
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "このコンピューター"
 
-#: src/features/devices/components/devices-settings.tsx:366
+#: src/features/devices/components/devices-settings.tsx:235
 msgid "This computer is not paired yet."
 msgstr "このコンピューターはまだペアリングされていません。"
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:382
+#: src/features/devices/components/devices-settings.tsx:251
 msgid "This computer is paired as “{0}”."
 msgstr "このコンピューターは「{0}」としてペアリングされています。"
 
-#: src/features/devices/components/devices-settings.tsx:366
+#: src/features/devices/components/devices-settings.tsx:235
 msgid "This computer is paired with another account."
 msgstr "このコンピューターは別のアカウントとペアリングされています。"
 
-#: src/features/devices/components/devices-settings.tsx:344
+#: src/features/devices/components/devices-settings.tsx:213
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "このコンピューターはペアリングされました。共有するフォルダーはデスクトップアプリで選択してください。"
 
@@ -29253,6 +29082,10 @@ msgstr "この会話にはまだメッセージがありません。"
 #: src/features/chat/sharing/shared-thread-page.tsx:142
 msgid "This conversation is long, so only its most recent messages are shown."
 msgstr "この会話は長いため、最新のメッセージのみ表示しています。"
+
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:54
+msgid "This conversation is long. {name} has not seen it, so its next reply reads it without the cache and costs more than usual."
+msgstr ""
 
 #: src/features/chat/sharing/shared-thread-page.tsx:71
 msgid "This conversation is not available"
@@ -29524,10 +29357,6 @@ msgstr "これら {0} 件のファイルとインデックス済みの内容が�
 #: src/features/canvas/canvas-panel.tsx:644
 msgid "This workbook has {sheetCount} sheets — only the first sheet was imported."
 msgstr "このブックには {sheetCount} 枚のシートがあります。インポートされたのは最初のシートのみです。"
-
-#: src/features/sub-agents/components/worker-composer.tsx:41
-msgid "This worker is archived. Restore it to message it again."
-msgstr ""
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:27
 msgid "This workflow file uses a version this app cannot read."
@@ -31117,10 +30946,6 @@ msgstr "チャットで使用"
 msgid "Use in Temp Chat"
 msgstr "一時チャットで使用"
 
-#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:57
-msgid "Use it from an MCP client"
-msgstr ""
-
 #: src/features/skills/components/skill-form-dialog.tsx:81
 msgid "Use lowercase letters, numbers and single hyphens only"
 msgstr "小文字、数字、単一のハイフンのみ使用できます"
@@ -31150,7 +30975,7 @@ msgstr "組織で許可されたモデルを使用"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "これらのキーボードショートカットを使うと、データグリッドをより効率的に移動・操作できます。"
 
-#: src/features/devices/components/devices-settings.tsx:376
+#: src/features/devices/components/devices-settings.tsx:245
 msgid "Use this computer for agent tools"
 msgstr "このコンピューターをエージェントのツールに使う"
 
@@ -31190,7 +31015,6 @@ msgstr "ユーザー"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:273
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:186
@@ -32032,7 +31856,7 @@ msgstr "幅"
 msgid "Waiting for {device} to pick this up…"
 msgstr "{device} が受け取るのを待っています…"
 
-#: src/features/devices/components/devices-settings.tsx:168
+#: src/features/devices/components/devices-settings.tsx:131
 msgid "Waiting for approval"
 msgstr "承認待ち"
 
@@ -32043,10 +31867,6 @@ msgstr "{device} で承認待ち"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:103
 msgid "Waiting for output…"
 msgstr "出力を待っています…"
-
-#: src/features/chat/thread/streaming-placeholder.tsx:594
-msgid "Waiting for the agent…"
-msgstr ""
 
 #: src/features/chat/thread/ask-user-prompt.tsx:124
 msgid "Waiting for the owner to answer"
@@ -32085,7 +31905,7 @@ msgstr "待機対象：{0}"
 msgid "Want to continue from here?"
 msgstr "ここから続けますか？"
 
-#: src/features/chat/core/context/chat-context.tsx:691
+#: src/features/chat/core/context/chat-context.tsx:689
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "時間内にセッションを確認できませんでした。メッセージは入力欄に残っています。もう一度送信してください。"
 
@@ -32310,7 +32130,7 @@ msgstr "エージェントに何をさせますか？"
 msgid "What should the AI call you?"
 msgstr "AI にどう呼んでほしいですか？"
 
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:273
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "過去 30 日間にエージェントがあなたのデバイスに依頼した内容です。"
 
@@ -32448,10 +32268,6 @@ msgstr "管理者権限あり"
 msgid "With email/password"
 msgstr "メールアドレス/パスワード"
 
-#: src/features/devices/components/devices-settings.tsx:283
-msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
-msgstr ""
-
 #: src/features/settings/components/chat/mcp/popular-servers.ts:256
 msgid "Wix developer docs, Velo code assistance, and site management"
 msgstr "Wix 開発者ドキュメント、Velo コードのサポート、サイト管理"
@@ -32463,10 +32279,6 @@ msgstr ""
 #: src/features/settings/components/chat/mcp/popular-servers.ts:131
 msgid "Work management and team collaboration"
 msgstr "ワーク管理とチームコラボレーション"
-
-#: src/features/sub-agents/components/worker-list.tsx:92
-msgid "Workers"
-msgstr ""
 
 #: src/features/settings/components/chat/mcp/popular-servers.ts:27
 msgid "Workers, KV, R2, and Cloudflare platform tools"
@@ -32502,12 +32314,9 @@ msgid "Workflows"
 msgstr "ワークフロー"
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:54
-#: src/features/sub-agents/components/worker-list.tsx:80
-#: src/features/sub-agents/components/worker-run-log.tsx:28
 msgid "Working"
 msgstr "作業中"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:601
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"
@@ -32858,7 +32667,7 @@ msgstr "あなたの AI ワークスペースは<0>ここから始まります�
 msgid "Your answer"
 msgstr "あなたの回答"
 
-#: src/features/chat/core/context/chat-context.tsx:621
+#: src/features/chat/core/context/chat-context.tsx:619
 msgid "Your answer in Neore has finished."
 msgstr "Neore での回答が完了しました。"
 
@@ -32866,7 +32675,7 @@ msgstr "Neore での回答が完了しました。"
 msgid "Your answer:"
 msgstr "あなたの回答："
 
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:32
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:38
 msgid "Your API key has been created successfully. Make sure to copy it now as you won't be able to see it again."
 msgstr "API キーを作成しました。再表示できないため、今すぐコピーしてください。"
 
@@ -32965,7 +32774,7 @@ msgstr "ローカルサーバーは応答しましたが、このサイトを拒
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "所在地（例：「アメリカ、ニューヨーク」「ドイツ、ベルリン」）。"
 
-#: src/features/chat/core/context/chat-context.tsx:688
+#: src/features/chat/core/context/chat-context.tsx:686
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "メッセージに不適切なコンテンツが含まれているため、送信できません。"
 

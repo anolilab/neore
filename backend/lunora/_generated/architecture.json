@@ -7187,6 +7187,13 @@
     },
     {
       "detail": "query",
+      "id": "function:agent_agent_switch:getHandoffAbove",
+      "kind": "function",
+      "name": "agent.agent_switch.getHandoffAbove",
+      "module": "agent"
+    },
+    {
+      "detail": "query",
       "id": "function:agent_agent_switch:getRunAgentModel",
       "kind": "function",
       "name": "agent.agent_switch.getRunAgentModel",
@@ -9168,6 +9175,27 @@
     },
     {
       "detail": "mutation",
+      "id": "function:chat_agent_switch:commitAgentSwitch",
+      "kind": "function",
+      "name": "chat.agent_switch.commitAgentSwitch",
+      "module": "chat"
+    },
+    {
+      "detail": "query",
+      "id": "function:chat_agent_switch:planAgentSwitch",
+      "kind": "function",
+      "name": "chat.agent_switch.planAgentSwitch",
+      "module": "chat"
+    },
+    {
+      "detail": "query",
+      "id": "function:chat_agent_switch:previewAgentSwitch",
+      "kind": "function",
+      "name": "chat.agent_switch.previewAgentSwitch",
+      "module": "chat"
+    },
+    {
+      "detail": "action",
       "id": "function:chat_agent_switch:switchThreadAgent",
       "kind": "function",
       "name": "chat.agent_switch.switchThreadAgent",
@@ -16566,55 +16594,61 @@
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 111,
+      "line": 113,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 133,
+      "line": 135,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 134,
+      "line": 136,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 164,
+      "line": 166,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 192,
+      "line": 194,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 195,
+      "line": 197,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 527,
+      "line": 529,
       "reason": "\"generateAndSaveEmbeddings\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 662,
+      "line": 663,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 663,
+      "line": 675,
+      "reason": "\"fetchContextWithPrompt\" is not a registered function"
+    },
+    {
+      "file": "agent/client/search",
+      "kind": "call",
+      "line": 676,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
@@ -17510,6 +17544,30 @@
       "kind": "call",
       "line": 77,
       "reason": "\"chatImportWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 414,
+      "reason": "\"runAgentSwitch\" is not a registered function"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 439,
+      "reason": "\"runAgentSwitch\" is not a registered function"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 466,
+      "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 467,
+      "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/gdpr",
