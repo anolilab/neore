@@ -153,13 +153,18 @@ the process's resident peak.
 | macOS x64 | base | 148 MB | 12.2 % | 2.67 s | 8.1 s | 338 MB |
 | macOS x64 | small | 488 MB | 6.5 % | 7.47 s | 24.8 s | 809 MB |
 | macOS x64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 25.4 s | 87.2 s | 874 MB |
-| Windows arm64 (runner) | — | — | — | — | — | — |
+| Windows arm64 (runner, 4 vCPU) | tiny | 78 MB | 15.9 % | 5.15 s | 19.7 s | 184 MB |
+| Windows arm64 | base | 148 MB | 12.2 % | 11.2 s | 44.1 s | 294 MB |
+| Windows arm64 | small | 488 MB | 6.5 % | 42.9 s | 169 s | 755 MB |
+| Windows arm64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 295 s | 1,047 s | 720 MB |
 
 macOS x64: a first run used Metal on the runner's virtual GPU, which was slower
 than the CPU (tiny took 23 s for the 10 s clip) and returned no text for the
 quantised large model; the rows above are the CPU-only run (`--no-gpu`), which
-is also what Intel Macs should use. Windows arm64: the first run did not finish within
-90 minutes; the leg now has 180.
+is also what Intel Macs should use. Windows arm64 is four to seven times slower than
+Linux arm64 on the same model, which points at the build rather than the chip: the
+leg builds with MSVC, and ggml's arm64 fast paths are written for GCC and Clang.
+S4 rebuilds it with clang-cl and measures again before choosing its model.
 
 Error rates are the same on every platform that ran, so accuracy depends only on
 the model; speed depends on the hardware. Without a GPU, large-v3-turbo needs
@@ -178,10 +183,11 @@ terms, so both may be redistributed inside the app with the licence text.
   (488 MB, 6.5 %), about 7 s for a 10 s clip on a 4-core runner and faster on a
   typical desktop CPU. Settings says it is weaker on Chinese (24 %) and Italian
   (14 %), and offers large-v3-turbo as a slower, more accurate choice.
+- **Windows arm64:** undecided until S4's clang-cl rebuild. As measured, even
+  small takes four times the clip's length, so only tiny or base would be usable.
 - A GPU backend for Windows and Linux (Vulkan or CUDA builds of whisper.cpp) would
   let them use large-v3-turbo too; that is a packaging question for S2, not a
   reason to block it.
 
-The chosen models' licences allow redistribution (above). S1 stays open until the
-Windows arm64 row is recorded; S2 can start on Apple Silicon with
-this split meanwhile.
+The chosen models' licences allow redistribution (above). Every platform row is
+recorded, so S1 is done; the Windows arm64 model choice moves to S4.
