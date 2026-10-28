@@ -131,6 +131,15 @@ describe("startRecognizer", () => {
         await expect(recognizer.transcribe(pcm(8000))).rejects.toMatchObject({ code: "crashed" });
     });
 
+    it("reports that the helper has exited once it is killed, and at once when it already has", async () => {
+        const recognizer = startRecognizer({ cwd: directory, helper, language: "auto", modelPath: model });
+        const exited = recognizer.exited();
+
+        recognizer.kill();
+        await exited;
+        await expect(recognizer.exited()).resolves.toBeUndefined();
+    });
+
     it("rejects with `crashed` when the helper dies while it holds the audio", async () => {
         await writeFile(model, "die");
 

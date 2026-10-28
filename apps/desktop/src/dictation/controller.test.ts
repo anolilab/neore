@@ -59,6 +59,7 @@ const harness = (overrides: Partial<ControllerDependencies> = {}, transcribe: (p
     };
     const recognizer = {
         early: undefined as ((error: RecognizerError) => void) | undefined,
+        exited: vi.fn(async () => {}),
         kill: vi.fn(),
         onEarlyExit: (listener: (error: RecognizerError) => void) => {
             recognizer.early = listener;

@@ -41,6 +41,8 @@ export interface Transcript {
 }
 
 export interface Recognizer {
+    /** Resolves once the helper process has ended (killed, crashed or done), so its model file is no longer open. */
+    exited: () => Promise<void>;
     /** Stops the helper. Safe to call after it has exited. */
     kill: () => void;
     /** Called once if the helper exits or fails to start before `transcribe` was called. */
@@ -225,6 +227,15 @@ export const startRecognizer = (options: RecognizerOptions): Recognizer => {
     };
 
     return {
+        exited: async () => {
+            await new Promise<void>((resolve) => {
+                if (ended === undefined) {
+                    endedListeners.push(resolve);
+                } else {
+                    resolve();
+                }
+            });
+        },
         kill,
         onEarlyExit: (listener) => {
             const earlier = failure();

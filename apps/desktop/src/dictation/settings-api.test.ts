@@ -3,7 +3,7 @@
  * These are the two acceptance checks of plans/desktop-dictation.md S3: with the switch off nothing is downloaded, and delete removes the file.
  */
 import { createHash } from "node:crypto";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -31,6 +31,9 @@ let models: string;
 let fetched: string[];
 let log: string[];
 let cancelled: number;
+let helper: boolean;
+let refused: boolean;
+let beforeCancelDone: (() => Promise<void>) | undefined;
 let shortcut: boolean[];
 let api: SettingsApi;
 let settingsFile: string;
@@ -42,6 +45,9 @@ beforeEach(async () => {
     fetched = [];
     log = [];
     cancelled = 0;
+    helper = true;
+    refused = false;
+    beforeCancelDone = undefined;
     shortcut = [];
 
     const settings = createSettingsStore(settingsFile, new Set(OFFERED.map((model) => model.spec.id)));
@@ -55,10 +61,11 @@ beforeEach(async () => {
     });
 
     api = createSettingsApi({
-        cancelDictation: () => {
+        cancelDictation: async () => {
             cancelled += 1;
+            await beforeCancelDone?.();
         },
-        hasHelper: () => true,
+        hasHelper: () => helper,
         models: store,
         offered: OFFERED,
         onEnabledChange: (enabled) => {
@@ -70,6 +77,7 @@ beforeEach(async () => {
         resolveModel: (current) => current.model ?? SMALL.id,
         settings,
         shortcut: "Ctrl Shift D",
+        shortcutRefused: () => refused,
     });
 });
 
@@ -139,7 +147,7 @@ describe("with the switch off", () => {
         });
         const settings = createSettingsStore(settingsFile, new Set(["large", "small"]));
         const running = createSettingsApi({
-            cancelDictation: () => {},
+            cancelDictation: async () => {},
             hasHelper: () => true,
             models: slow,
             offered: OFFERED,
@@ -150,6 +158,7 @@ describe("with the switch off", () => {
             resolveModel: () => SMALL.id,
             settings,
             shortcut: "x",
+            shortcutRefused: () => false,
         });
 
         await running.update({ enabled: true });
@@ -183,11 +192,69 @@ describe("delete", () => {
         expect(log.at(-1)).toBe("small was deleted from this computer.");
     });
 
+    it("waits for the helper to let go before it deletes the file", async () => {
+        let existedWhileCancelling = false;
+
+        beforeCancelDone = async () => {
+            existedWhileCancelling = (await files()).includes(SMALL.file);
+        };
+        await api.remove("small");
+
+        expect(existedWhileCancelling).toBe(true);
+        expect(await files()).toStrictEqual([LARGE.file]);
+    });
+
+    it("does not say it deleted a file it could not delete", async () => {
+        // A directory where the file should be: the unlink fails with something other than "not found".
+        await rm(path.join(models, SMALL.file));
+        await mkdir(path.join(models, SMALL.file));
+
+        await expect(api.remove("small")).rejects.toMatchObject({ code: "delete" });
+        expect(log.filter((message) => message.includes("deleted"))).toStrictEqual([]);
+        expect(await files()).toContain(SMALL.file);
+    });
+
     it("works with the switch off too", async () => {
         await api.update({ enabled: false });
         await api.remove("large");
 
         expect(await files()).toStrictEqual([SMALL.file]);
+    });
+});
+
+describe("where the speech helper was not built", () => {
+    it("refuses to download and to turn the switch on, and leaves the stored switch off", async () => {
+        helper = false;
+
+        expect(() => api.download("small")).toThrow("not available");
+        await expect(api.update({ enabled: true })).rejects.toThrow("not available");
+        expect((await api.view()).enabled).toBe(false);
+        expect((await api.view()).available).toBe(false);
+        expect(fetched).toStrictEqual([]);
+        expect(shortcut).toStrictEqual([]);
+    });
+
+    it("still lets the switch be turned off", async () => {
+        await api.update({ enabled: true });
+        helper = false;
+
+        await expect(api.update({ enabled: false })).resolves.toMatchObject({ enabled: false });
+    });
+});
+
+describe("the shortcut", () => {
+    it("is reported unavailable only while the switch is on and the OS refused it", async () => {
+        refused = true;
+
+        expect((await api.view()).shortcutUnavailable).toBe(false);
+
+        await api.update({ enabled: true });
+
+        expect((await api.view()).shortcutUnavailable).toBe(true);
+
+        refused = false;
+
+        expect((await api.view()).shortcutUnavailable).toBe(false);
     });
 });
 

@@ -40,6 +40,8 @@ const PARTITION = "dictation";
 /** How long to wait for the page to hand over its last chunk after a stop. */
 const STOP_TIMEOUT_MS = 1500;
 const MAX_CHUNK_BYTES = 65_536;
+/** After a cancel, how long a delete waits for the helper to let go of its model file. */
+const HELPER_EXIT_WAIT_MS = 3000;
 
 /** What the e2e suite drives and reads through `app.evaluate`. Test hooks exist only in an unpackaged build. */
 export interface DictationProbe {
@@ -119,6 +121,8 @@ export const createDictation = (options: DictationOptions): Dictation => {
     const models = createModelStore({ directory: path.join(dictationFolder, "models"), fetch: (url, init) => net.fetch(String(url), init) });
     const chosenModel = () => resolveModel(settings.get().model, process.platform, process.arch);
     let shortcutHeld = false;
+    /** The OS refused the shortcut (another app holds it): settings says so instead of leaving the switch looking healthy. */
+    let shortcutRefused = false;
     let capture: BrowserWindowInstance | undefined;
     let ended: (() => void) | undefined;
     let recognizer: Recognizer | undefined;
@@ -290,23 +294,44 @@ export const createDictation = (options: DictationOptions): Dictation => {
 
     /** The shortcut is held only while the switch is on and the helper exists: off, other apps keep the key. */
     const syncShortcut = (): void => {
-        const wanted = settings.get().enabled && existsSync(helperPath());
+        const wanted = settings.get().enabled && hasHelper();
 
         if (wanted && !shortcutHeld) {
             shortcutHeld = globalShortcut.register(DICTATION_SHORTCUT, () => controller?.press());
+            shortcutRefused = !shortcutHeld;
 
-            if (!shortcutHeld) {
+            if (shortcutRefused) {
                 options.log(`dictation: could not register ${DICTATION_SHORTCUT}`);
             }
-        } else if (!wanted && shortcutHeld) {
-            globalShortcut.unregister(DICTATION_SHORTCUT);
+        } else if (!wanted) {
+            if (shortcutHeld) {
+                globalShortcut.unregister(DICTATION_SHORTCUT);
+            }
+
             shortcutHeld = false;
+            shortcutRefused = false;
+        }
+    };
+
+    /** Cancels a dictation and waits (briefly) for its helper to exit: Windows will not delete a model file the helper still has open. */
+    const cancelDictation = async (): Promise<void> => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise((resolve) => {
+            timer = setTimeout(resolve, HELPER_EXIT_WAIT_MS);
+        });
+
+        controller?.cancel();
+
+        try {
+            await Promise.race([recognizer?.exited(), timeout]);
+        } finally {
+            clearTimeout(timer);
         }
     };
 
     const settingsWindow = createSettingsWindow({
         api: createSettingsApi({
-            cancelDictation: () => controller?.cancel(),
+            cancelDictation,
             hasHelper,
             models,
             offered,
@@ -315,6 +340,7 @@ export const createDictation = (options: DictationOptions): Dictation => {
             resolveModel: () => chosenModel().id,
             settings,
             shortcut: DICTATION_SHORTCUT_LABEL,
+            shortcutRefused: () => shortcutRefused,
         }),
         log: options.log,
     });
@@ -338,7 +364,18 @@ export const createDictation = (options: DictationOptions): Dictation => {
             microphoneAllowed,
             model: chosenModel,
             models: {
-                download: (spec) => models.download(spec),
+                // A download the shortcut started shows in an open settings window too.
+                download: async (spec) => {
+                    const running = models.download(spec);
+
+                    settingsWindow.changed();
+
+                    try {
+                        return await running;
+                    } finally {
+                        settingsWindow.changed();
+                    }
+                },
                 ensureVerified: async (spec) => testEngine?.modelPath ?? models.ensureVerified(spec),
                 isDownloading: (spec) => models.isDownloading(spec),
                 status: async (spec) => testEngine === undefined ? models.status(spec) : { bytes: 0, file: spec.file, state: "present", version: spec.version },

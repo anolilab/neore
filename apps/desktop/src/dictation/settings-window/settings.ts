@@ -22,6 +22,9 @@ const language = $<HTMLSelectElement>("language");
 const status = $("status");
 const list = $("model-list");
 
+const IPC_PREFIX = /^Error invoking remote method '[^']*': (?:\w*Error: )?/u;
+const SETTINGS_PREFIX = /^dictation settings: /u;
+
 /** Each model's row is built once and updated in place, so the focus stays where the person put it. */
 const rows = new Map<string, { download: HTMLButtonElement; radio: HTMLInputElement; remove: HTMLButtonElement; state: HTMLElement }>();
 
@@ -29,11 +32,32 @@ const show = (message: string): void => {
     status.textContent = message;
 };
 
+/** What the main process said, without Electron's "Error invoking remote method" wrapper and our own prefix. */
+const reasonOf = (error: unknown): string => {
+    const message = error instanceof Error ? error.message : "";
+    const reason = message.replace(IPC_PREFIX, "").replace(SETTINGS_PREFIX, "");
+
+    if (reason === "") {
+        return "That could not be done.";
+    }
+
+    const sentence = `${reason.charAt(0).toUpperCase()}${reason.slice(1)}`;
+
+    return sentence.endsWith(".") ? sentence : `${sentence}.`;
+};
+
 const run = async (action: () => Promise<SettingsView>): Promise<void> => {
     try {
         render(await action());
-    } catch {
-        show("That could not be done.");
+    } catch (error) {
+        // Show what is actually stored, so a refused change does not leave the switch or the choice looking applied.
+        try {
+            render(await api.get());
+        } catch {
+            // The window is closing; there is nothing to draw on.
+        }
+
+        show(reasonOf(error));
     }
 };
 
@@ -102,6 +126,7 @@ const buildRow = (model: ModelView): void => {
 const render = (view: SettingsView): void => {
     $("shortcut").textContent = view.shortcut;
     $("unavailable").hidden = view.available;
+    $("shortcut-unavailable").hidden = !view.shortcutUnavailable;
     enabled.checked = view.enabled;
     enabled.disabled = !view.available;
 
@@ -122,6 +147,8 @@ const render = (view: SettingsView): void => {
         const row = rows.get(model.id);
 
         if (row !== undefined) {
+            const focused = document.activeElement;
+
             row.radio.checked = model.id === view.model;
             row.radio.disabled = !view.available;
             row.state.textContent = stateText(model);
@@ -129,6 +156,11 @@ const render = (view: SettingsView): void => {
             row.download.hidden = model.state !== "missing";
             row.download.disabled = !view.enabled || !view.available;
             row.remove.hidden = model.state !== "present";
+
+            // The button that was clicked may have just gone away; focus would drop to the page, so it moves to the next control in the row.
+            if ((focused === row.download && row.download.hidden) || (focused === row.remove && row.remove.hidden)) {
+                [row.radio, row.download, row.remove].find((control) => !control.hidden && !control.disabled)?.focus();
+            }
         }
     }
 };

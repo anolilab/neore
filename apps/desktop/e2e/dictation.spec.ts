@@ -375,6 +375,10 @@ test("only the dictation window is given the microphone", async () => {
 
 const SETTINGS_PAGE = /\/dictation-settings-window\/settings\.html$/u;
 const DICTATION_KEY = /dictation|settings/iu;
+const SHORTCUT = "CommandOrControl+Shift+D";
+
+/** Whether the app holds the dictation shortcut with the OS right now. */
+const shortcutHeld = (app: ElectronApplication): Promise<boolean> => app.evaluate(({ globalShortcut }, accelerator) => globalShortcut.isRegistered(accelerator), SHORTCUT);
 const MODEL_FILES = ["ggml-small.bin", "ggml-large-v3-turbo-q5_0.bin"];
 
 test("on a first run the switch is off: a press opens no window and downloads nothing", async () => {
@@ -416,6 +420,8 @@ test("the settings window turns dictation on, deletes a model file, and is out o
         const switchControl = page.getByRole("switch", { name: "Dictate on this computer" });
 
         await expect(switchControl).not.toBeChecked();
+        // Off, the app does not hold the key: other apps keep it.
+        expect(await shortcutHeld(app)).toBe(false);
         expect(new Set(await page.evaluate(() => Object.keys((globalThis as { neoreDictationSettings?: object }).neoreDictationSettings ?? {})))).toStrictEqual(
             new Set(["download", "get", "onChanged", "remove", "update"]),
         );
@@ -423,6 +429,7 @@ test("the settings window turns dictation on, deletes a model file, and is out o
 
         await switchControl.check();
         await expect.poll(async () => JSON.parse(await readFile(path.join(userData, "dictation", "settings.json"), "utf8")).enabled).toBe(true);
+        await expect.poll(() => shortcutHeld(app)).toBe(true);
 
         await page.getByLabel("Language").selectOption("de");
         await expect.poll(async () => JSON.parse(await readFile(path.join(userData, "dictation", "settings.json"), "utf8")).language).toBe("de");
@@ -431,6 +438,9 @@ test("the settings window turns dictation on, deletes a model file, and is out o
         await expect.poll(() => readdir(models)).not.toContain("ggml-small.bin");
         expect(await readdir(models)).toStrictEqual(["ggml-large-v3-turbo-q5_0.bin"]);
         await expect(page.getByRole("status").filter({ hasText: "was deleted from this computer" })).toBeVisible();
+
+        await switchControl.uncheck();
+        await expect.poll(() => shortcutHeld(app)).toBe(false);
 
         // The window cannot reach the network either.
         const reached = await page.evaluate(async (site_) => {
