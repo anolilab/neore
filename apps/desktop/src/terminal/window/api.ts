@@ -2,6 +2,8 @@
 export interface TerminalExit {
     crashed: boolean;
     exitCode: number | null;
+    /** `user@address` when the shell is on a server, so the page can say the connection ended. */
+    host?: string;
 }
 
 export interface TerminalWindowApi {

@@ -127,6 +127,17 @@ const handleKey = (event: KeyboardEvent): boolean => {
     return true;
 };
 
+/** ssh answers 255 when the connection, not the shell, ended. */
+const SSH_CONNECTION_LOST = 255;
+
+const endedText = ({ crashed, exitCode, host }: TerminalExit): string => {
+    if (host !== undefined) {
+        return crashed || exitCode === SSH_CONNECTION_LOST ? `The connection to ${host} ended.` : `The session on ${host} ended (code ${String(exitCode)}).`;
+    }
+
+    return crashed ? "The shell stopped unexpectedly." : `The shell exited (code ${String(exitCode)}).`;
+};
+
 const showEnded = (text: string): void => {
     $("ended-text").textContent = text;
     $("ended").hidden = false;
@@ -190,7 +201,7 @@ api.onData((data) => {
 api.onExit((exit: TerminalExit) => {
     state.ended = true;
     state.running = false;
-    showEnded(exit.crashed ? "The shell stopped unexpectedly." : `The shell exited (code ${String(exit.exitCode)}).`);
+    showEnded(endedText(exit));
 });
 
 $("restart").addEventListener("click", () => start());

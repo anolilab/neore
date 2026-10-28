@@ -44,6 +44,7 @@ const api: DeviceWindowApi = {
 
         return () => ipcRenderer.removeListener(LOCAL_EVENT.prompt, listener);
     },
+    openHostTerminal: (deviceId) => ipcRenderer.invoke(LOCAL_CHANNEL.openHostTerminal, deviceId),
     openTerminal: (folder) => ipcRenderer.invoke(LOCAL_CHANNEL.openTerminal, folder),
     pickFolder: () => ipcRenderer.invoke(LOCAL_CHANNEL.pickFolder),
     promptAnswer: (id, answer) => ipcRenderer.invoke(LOCAL_CHANNEL.promptAnswer, id, answer),

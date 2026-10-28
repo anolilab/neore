@@ -1,7 +1,7 @@
 # Desktop terminal: an interactive shell per folder
 
-Status: S1 and S2 built (macOS and Linux), 2026-10-27; S4 built (Windows, proved by the `desktop-windows-check` CI job); S3 open. Part of [agent-host-roadmap.md](agent-host-roadmap.md).
-S3 needs the SSH transport ([ssh-environments.md](ssh-environments.md) S3).
+Status: S1 and S2 built (macOS and Linux), 2026-10-27; S3 built, 2026-10-28; S4 built (Windows, proved by the `desktop-windows-check` CI job). Part of [agent-host-roadmap.md](agent-host-roadmap.md).
+S3 rides the SSH transport ([ssh-environments.md](ssh-environments.md) S3).
 
 ## 1. Goal and decision
 
@@ -74,6 +74,16 @@ input, resize, copy and paste, kill on close.
 - Acceptance: the host-key prompt appears before the terminal opens; a host that
   was not trusted gets no shell; the terminal ends when the connection ends, with a
   message.
+
+As built: a "Terminal" button on each server's card in the device window. `device-core`'s `host_terminal`
+connects the server first (which asks to trust its key and for a passphrase, in that window, before any terminal
+window exists) and returns the `ssh` arguments; the terminal module runs the local `ssh` on its pseudo-terminal like
+any other shell. The shell rides the connection's multiplexed master and never becomes one (`ControlMaster=no`,
+`BatchMode=yes`), and `ProxyCommand=false` makes it fail instead of opening a connection of its own when the master
+is gone. `-e none` removes the escape character, so `~C` cannot add a forward (a listener); the agent is never
+forwarded to a terminal. There is no remote command, so the server starts the user's own login shell. When the
+connection ends, ssh exits with 255 and the window says so. Left out: opening in a chosen folder on the server,
+and a terminal on a server without the host binary (connecting needs it until the install slice).
 
 **S4 — Windows.** The pseudo-terminal on Windows, with its own tests.
 - Acceptance: S1 acceptance on Windows in CI, or the feature is marked unsupported

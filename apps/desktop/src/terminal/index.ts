@@ -7,6 +7,7 @@
  * runs in an in-memory session that cancels every request but `file:`, so nothing a shell prints can
  * leave the machine from here, and nothing is written to disk.
  */
+import { homedir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -18,7 +19,7 @@ import type { HostEvent, HostRequest } from "./protocol";
 import type { HostHandle, TerminalSession } from "./session";
 import { startSession } from "./session";
 import type { Availability } from "./shell";
-import { readFolder, resolveShell, shellEnvironment, terminalAvailability } from "./shell";
+import { readFolder, resolveShell, resolveSsh, shellEnvironment, sshEnvironment, terminalAvailability } from "./shell";
 import { readAck, readCopy, readInput, readSize } from "./validate";
 
 const WINDOW_DIR = path.join(__dirname, "terminal-window");
@@ -28,14 +29,41 @@ const HOST_PATH = path.join(__dirname, "terminal-host.cjs");
 /** No `persist:` prefix: the session lives in memory and is gone when the app quits. */
 const PARTITION = "neore-terminal";
 
+/** A shell on a server: the local `ssh` on the pseudo-terminal, through the connection the device module holds open. */
+interface SshEntry {
+    /** The arguments for the next start, as `args` returned them when the window opened. Used once. */
+    first?: string[];
+    label: string;
+    resolveArgs: () => Promise<string[]>;
+}
+
+/** What runs on the pseudo-terminal. */
+interface Launch {
+    args: string[];
+    env: Record<string, string>;
+    file: string;
+    name: string;
+}
+
 interface Entry {
     closed: boolean;
+    /** The folder of a local shell; the home folder, which ssh starts in, for one on a server. */
     cwd: string;
     /** Counts the page loads this window has had; a shell belongs to the load it was started for. */
     epoch: number;
     session?: TerminalSession;
+    ssh?: SshEntry;
     starting: boolean;
     window: BrowserWindowInstance;
+}
+
+/** A server the device module has paired. */
+export interface SshTerminal {
+    /** The `ssh` arguments of a shell on it (`device-core`'s `hostTerminal`). Asks to trust the server's key when it must. */
+    args: () => Promise<string[]>;
+    deviceId: string;
+    /** `user@address`, for the window's title and for saying which connection ended. */
+    label: string;
 }
 
 /** What the device window and the tray ask for. */
@@ -43,6 +71,8 @@ export interface TerminalOpener {
     availability: Availability;
     /** Opens a terminal for the folder, or asks for one when it is `null`. Rejects with the reason it cannot. */
     open: (folder: string | null) => Promise<void>;
+    /** Opens a terminal on a server. Rejects, and opens no window, when the server cannot be reached or trusted. */
+    openSsh: (terminal: SshTerminal) => Promise<void>;
 }
 
 export interface TerminalController extends TerminalOpener {
@@ -149,17 +179,27 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
         /* eslint-enable no-param-reassign */
     };
 
-    const openWindow = (cwd: string): void => {
-        const existing = byFolder.get(cwd);
+    /** Brings the window that already has this key to the front. */
+    const focusExisting = (key: string): boolean => {
+        const existing = byFolder.get(key);
 
-        if (existing !== undefined && !existing.closed) {
-            if (existing.window.isMinimized()) {
-                existing.window.restore();
-            }
+        if (existing === undefined || existing.closed) {
+            return false;
+        }
 
-            existing.window.show();
-            existing.window.focus();
+        if (existing.window.isMinimized()) {
+            existing.window.restore();
+        }
 
+        existing.window.show();
+        existing.window.focus();
+
+        return true;
+    };
+
+    /** `key` names the window: a folder, or a server. */
+    const openWindow = (key: string, cwd: string, title: string, ssh?: SshEntry): void => {
+        if (focusExisting(key)) {
             return;
         }
 
@@ -173,8 +213,8 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
             height: 520,
             minHeight: 240,
             minWidth: 360,
-            // The path in the title says which folder this shell is in.
-            title: `Terminal — ${cwd}`,
+            // The title says which folder, or which server, this shell is in.
+            title: `Terminal — ${title}`,
             webPreferences: {
                 // A minimized window still acknowledges output; throttled timers would leave a busy shell paused.
                 backgroundThrottling: false,
@@ -189,10 +229,10 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
             width: 780,
         });
         const { webContents } = window;
-        const entry: Entry = { closed: false, cwd, epoch: 0, starting: false, window };
+        const entry: Entry = { closed: false, cwd, epoch: 0, ssh, starting: false, window };
 
         entries.set(webContents, entry);
-        byFolder.set(cwd, entry);
+        byFolder.set(key, entry);
 
         webContents.setWindowOpenHandler(() => {
             return { action: "deny" };
@@ -211,8 +251,8 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
             endShell(entry);
             entries.delete(webContents);
 
-            if (byFolder.get(cwd) === entry) {
-                byFolder.delete(cwd);
+            if (byFolder.get(key) === entry) {
+                byFolder.delete(key);
             }
         });
         window.loadFile(TERMINAL_PAGE);
@@ -224,7 +264,9 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
         }
 
         if (folder !== null) {
-            openWindow(readFolder(folder));
+            const cwd = readFolder(folder);
+
+            openWindow(cwd, cwd, cwd);
 
             return;
         }
@@ -236,8 +278,44 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
         const [picked] = result.filePaths;
 
         if (picked !== undefined && !result.canceled) {
-            openWindow(readFolder(picked));
+            const cwd = readFolder(picked);
+
+            openWindow(cwd, cwd, cwd);
         }
+    };
+
+    const openSsh = async (terminal: SshTerminal): Promise<void> => {
+        if (!availability.available) {
+            throw new Error(availability.reason);
+        }
+
+        const key = `ssh:${terminal.deviceId}`;
+
+        if (focusExisting(key)) {
+            return;
+        }
+
+        // Before any window: connecting is what asks to trust the server's key, and a server that is not trusted gets no shell.
+        const first = await terminal.args();
+
+        openWindow(key, homedir(), terminal.label, { first, label: terminal.label, resolveArgs: terminal.args });
+    };
+
+    /** What to run on the pseudo-terminal: the user's login shell, or `ssh` to a server. */
+    const localLaunch = (): Launch => {
+        const shell = resolveShell();
+
+        return { args: shell.args, env: shellEnvironment(), file: shell.file, name: path.basename(shell.file) };
+    };
+
+    const sshLaunch = async (ssh: SshEntry): Promise<Launch> => {
+        // A restart connects again, and asks again if it must; only the first start uses what opening the window got.
+        const args = ssh.first ?? await ssh.resolveArgs();
+
+        // eslint-disable-next-line no-param-reassign -- an entry is this window's mutable record
+        ssh.first = undefined;
+
+        return { args, env: sshEnvironment(), file: resolveSsh(), name: "ssh" };
     };
 
     /** The sender is a terminal window's own main frame, on our page. Returns its entry. */
@@ -283,7 +361,8 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
         entry.starting = true;
 
         try {
-            const shell = resolveShell();
+            // A local shell starts at once: awaiting first would let a quit or a reload slip in before its host exists.
+            const launch = entry.ssh === undefined ? localLaunch() : await sshLaunch(entry.ssh);
             const target = entry.window.webContents;
             const started = await startSession({
                 onData: (data) => {
@@ -298,9 +377,9 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
 
                     exited = true;
                     entry.session = undefined;
-                    send(target, TERMINAL_EVENT.exit, info);
+                    send(target, TERMINAL_EVENT.exit, entry.ssh === undefined ? info : { ...info, host: entry.ssh.label });
                 },
-                spawn: { args: shell.args, cols, cwd: entry.cwd, env: shellEnvironment(), file: shell.file, rows },
+                spawn: { args: launch.args, cols, cwd: entry.cwd, env: launch.env, file: launch.file, rows },
                 startHost: trackedHost,
             });
 
@@ -314,7 +393,7 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
                 entry.session = started;
             }
 
-            return { cwd: entry.cwd, shell: path.basename(shell.file) };
+            return { cwd: entry.cwd, shell: launch.name };
         } finally {
             if (entry.epoch === epoch) {
                 entry.starting = false;
@@ -389,6 +468,7 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
     return {
         availability,
         open,
+        openSsh,
         pids: () => {
             const pids: number[] = [];
 

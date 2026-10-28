@@ -399,6 +399,7 @@ const hostCard = (host: HostView): HTMLElement => {
         host.connected
             ? button("Disconnect", () => hostAction(() => globalThis.neoreDevice.hostDisconnect(host.deviceId), "Disconnected."), host.name)
             : button("Connect", () => hostAction(() => globalThis.neoreDevice.hostConnect(host.deviceId), "Connected."), host.name),
+        ...state.terminalAvailable ? [button("Terminal", () => hostAction(() => globalThis.neoreDevice.openHostTerminal(host.deviceId), "Terminal opened."), `Open a terminal on ${host.name}`)] : [],
         button(
             "Forget host key",
             async () => {

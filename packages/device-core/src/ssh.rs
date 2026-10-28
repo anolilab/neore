@@ -224,9 +224,23 @@ fn quoted(path: &str, suffix: &str) -> String {
     format!("\"{}{suffix}\"", path.replace('%', "%%"))
 }
 
+/// What an ssh run is for. They share every hardening option and differ in a few.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Session {
+    /// The host binary on the stdio pipe, riding (or becoming) the multiplexed master.
+    Pipe,
+    /// A person's shell on a terminal, riding a master that is already up and never becoming one.
+    Terminal,
+}
+
 /// The options every ssh run of ours carries, then the control options, then the destination. The remote command
 /// is the caller's, appended after the destination.
 pub fn ssh_args(target: &Target, paths: &SshPaths) -> Vec<String> {
+    build_args(target, paths, Session::Pipe)
+}
+
+fn build_args(target: &Target, paths: &SshPaths, session: Session) -> Vec<String> {
+    let terminal = session == Session::Terminal;
     let mut args: Vec<String> = Vec::new();
     let mut option = |text: String| {
         args.push("-o".into());
@@ -245,9 +259,14 @@ pub fn ssh_args(target: &Target, paths: &SshPaths) -> Vec<String> {
     option("VerifyHostKeyDNS=no".into());
     option("PasswordAuthentication=no".into());
     option("KbdInteractiveAuthentication=no".into());
+    // A shell somebody types into is not given the user's agent, whatever the server's opt-in for the pipe.
     option(format!(
         "ForwardAgent={}",
-        if target.forward_agent { "yes" } else { "no" }
+        if target.forward_agent && !terminal {
+            "yes"
+        } else {
+            "no"
+        }
     ));
     option("ForwardX11=no".into());
     option("ClearAllForwardings=yes".into());
@@ -257,9 +276,24 @@ pub fn ssh_args(target: &Target, paths: &SshPaths) -> Vec<String> {
     option("ServerAliveCountMax=3".into());
     option("LogLevel=ERROR".into());
 
+    if terminal {
+        // All asking happens in the device window, never on the terminal.
+        option("BatchMode=yes".into());
+        // ssh tries the control socket before it connects. With the master gone it would connect by itself, on
+        // the agent's key, as a second connection nobody pinned a lifetime for; this command makes that fail.
+        option("ProxyCommand=false".into());
+    }
+
     // Windows' OpenSSH has no multiplexing.
     if cfg!(unix) {
-        option("ControlMaster=auto".into());
+        option(
+            if terminal {
+                "ControlMaster=no"
+            } else {
+                "ControlMaster=auto"
+            }
+            .into(),
+        );
         // `%C` is ssh's own token (a hash of the connection), so it is added after the escaping. It does not
         // cover the key file, so a server using another key must not land on this master: the key file's own
         // tag goes in front.
@@ -280,14 +314,49 @@ pub fn ssh_args(target: &Target, paths: &SshPaths) -> Vec<String> {
         args.push("IdentitiesOnly=yes".into());
     }
 
-    // No tty, no user config, no system config: this run does what this list says.
-    args.extend(["-T".into(), "-F".into(), NULL_DEVICE.into()]);
+    // No user config, no system config: this run does what this list says. A terminal gets a tty, and no escape
+    // character, because `~C` opens ssh's command line, where a person can add a forward (a listener).
+    if terminal {
+        args.extend(["-t".into(), "-e".into(), "none".into()]);
+    } else {
+        args.push("-T".into());
+    }
+
+    args.extend(["-F".into(), NULL_DEVICE.into()]);
     args.extend(["-p".into(), target.port.to_string()]);
     args.extend(["-l".into(), target.user.clone()]);
     args.push("--".into());
     args.push(target.address.clone());
 
     args
+}
+
+/// The arguments of an interactive shell on the server through the master that is already up: the program is
+/// `ssh`, the desktop puts it on a pseudo-terminal. No remote command, so the server starts the user's own login
+/// shell and nothing is built into a command line. Fails when the master is not up, naming it plainly.
+pub fn terminal_args(target: &Target, paths: &SshPaths) -> Result<Vec<String>, String> {
+    if !cfg!(unix) {
+        return Err(
+            "a terminal on a server needs a multiplexed connection, which this platform lacks"
+                .into(),
+        );
+    }
+
+    target.validate()?;
+
+    let up = Command::new("ssh")
+        .args(control_args(target, paths, "check"))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success());
+
+    if !up {
+        return Err(format!("the connection to {} is not up", target.label()));
+    }
+
+    Ok(build_args(target, paths, Session::Terminal))
 }
 
 /// [`ssh_args`] for a control operation on the multiplexed master (`check`, `exit`) instead of a session: the
@@ -1207,6 +1276,47 @@ mod tests {
         assert!(!options.iter().any(|option| option.starts_with("BatchMode")));
         assert_eq!(&args[args.len() - 2..], ["--", "build.example.com"]);
         assert!(args.windows(2).any(|pair| pair == ["-l", "deploy"]));
+    }
+
+    #[test]
+    fn a_terminal_is_a_tty_that_cannot_open_a_connection_or_a_listener() {
+        let mut target = target();
+
+        target.forward_agent = true;
+
+        let args = build_args(&target, &paths(), Session::Terminal);
+        let options = option_values(&args);
+
+        for expected in [
+            "StrictHostKeyChecking=yes",
+            "UserKnownHostsFile=\"/data/ssh/known_hosts\"",
+            "GlobalKnownHostsFile=/dev/null",
+            "ClearAllForwardings=yes",
+            "PasswordAuthentication=no",
+            // Nothing is asked on a terminal, and the agent is not handed to a server's shell.
+            "BatchMode=yes",
+            "ForwardAgent=no",
+            // Fails closed when the master is gone, instead of connecting by itself.
+            "ProxyCommand=false",
+        ] {
+            assert!(
+                options.contains(&expected),
+                "{expected} is missing: {options:?}"
+            );
+        }
+
+        #[cfg(unix)]
+        {
+            assert!(options.contains(&"ControlMaster=no"));
+            assert!(!options.contains(&"ControlMaster=auto"));
+        }
+
+        // A tty, no escape character (`~C` would open ssh's command line and its forwards), no remote command.
+        assert!(args.contains(&"-t".to_owned()));
+        assert!(!args.contains(&"-T".to_owned()));
+        assert!(args.windows(2).any(|pair| pair == ["-e", "none"]));
+        assert!(args.windows(2).any(|pair| pair == ["-F", "/dev/null"]));
+        assert_eq!(&args[args.len() - 2..], ["--", "build.example.com"]);
     }
 
     #[test]

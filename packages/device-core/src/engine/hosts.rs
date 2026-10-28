@@ -737,6 +737,22 @@ impl DeviceState {
         Ok(probe)
     }
 
+    /// The `ssh` arguments of a shell on a paired server, after connecting it: that asks to trust its key on first
+    /// use and for a key passphrase, in the local window, so an untrusted server gets no terminal. The shell rides
+    /// the connection's master, so it ends with it.
+    pub fn host_terminal(&self, device_id: &str) -> Result<Vec<String>, String> {
+        let host = self
+            .settings()
+            .hosts
+            .into_iter()
+            .find(|host| host.device_id == device_id)
+            .ok_or("that server is not paired with this computer")?;
+
+        self.host_connect(device_id)?;
+
+        crate::ssh::terminal_args(&target_of(&host), &self.ssh.paths)
+    }
+
     pub fn host_disconnect(&self, device_id: &str) {
         self.ssh.disconnects.fetch_add(1, Ordering::SeqCst);
 
@@ -1573,6 +1589,24 @@ mod tests {
             serde_json::to_value(state.status()).unwrap()["hosts"][0]["connected"],
             false
         );
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_terminal_is_only_for_a_paired_server_with_a_connection_that_is_up() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("terminal", &link);
+
+        assert_eq!(
+            state.host_terminal("nobody").unwrap_err(),
+            "that server is not paired with this computer"
+        );
+        // The stand-in link has no ssh master behind it, so nothing is offered to run.
+        assert!(state
+            .host_terminal("host-1")
+            .unwrap_err()
+            .contains("is not up"));
 
         let _ = stdfs::remove_dir_all(dir);
     }

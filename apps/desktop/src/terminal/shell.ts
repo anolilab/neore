@@ -110,6 +110,36 @@ export const shellEnvironment = (env: NodeJS.ProcessEnv = process.env): Record<s
     return result;
 };
 
+/** The `ssh` the terminal runs: the first one on the path, as an absolute path, so the pseudo-terminal does no lookup of its own. */
+export const resolveSsh = (env: NodeJS.ProcessEnv = process.env, executable: (file: string) => boolean = isExecutable): string => {
+    const directories = [...(env.PATH ?? "").split(path.delimiter), "/usr/bin", "/bin"];
+    const found = directories.map((directory) => path.join(directory, "ssh")).find((candidate) => path.isAbsolute(candidate) && executable(candidate));
+
+    if (found === undefined) {
+        throw new Error("terminal: ssh was not found on this computer");
+    }
+
+    return found;
+};
+
+/** What ssh needs of the local environment: where things are, who is asking, the agent's socket and the locale. Nothing else is handed on. */
+const SSH_ENVIRONMENT = /^(?:HOME|LANG|LC_.*|LOGNAME|PATH|SSH_AUTH_SOCK|TMPDIR|USER)$/u;
+
+/** The environment of the local `ssh` of a terminal on a server. `TERM` is the one thing ssh passes on, in its request for a terminal. */
+export const sshEnvironment = (env: NodeJS.ProcessEnv = process.env): Record<string, string> => {
+    const result: Record<string, string> = {};
+
+    for (const [key, value] of Object.entries(env)) {
+        if (value !== undefined && SSH_ENVIRONMENT.test(key)) {
+            result[key] = value;
+        }
+    }
+
+    result.TERM = "xterm-256color";
+
+    return result;
+};
+
 /**
  * The folder a terminal opens in: an absolute path to an existing directory, with symlinks and `..` resolved, so
  * `/w`, `/w/` and `/a/link/..` name one folder (and one window) and the shell starts where the title says.

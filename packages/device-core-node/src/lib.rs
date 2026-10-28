@@ -199,6 +199,23 @@ impl DeviceCore {
         })
     }
 
+    /// The `ssh` arguments of an interactive shell on a paired server (a JSON array), once it is connected and its
+    /// key is trusted. The desktop runs `ssh` with them on a pseudo-terminal.
+    #[napi]
+    pub fn host_terminal<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let args = state.host_terminal(&device_id)?;
+
+            serde_json::to_string(&args).map_err(|error| error.to_string())
+        })
+    }
+
     #[napi]
     pub fn host_disconnect(&self, device_id: String) {
         self.state.host_disconnect(&device_id);

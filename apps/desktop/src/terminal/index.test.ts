@@ -255,6 +255,137 @@ describe("opening", () => {
     });
 });
 
+describe("a terminal on a server", () => {
+    const SSH_ARGS = ["-o", "StrictHostKeyChecking=yes", "-t", "--", "build.example.com"];
+    const server = (args: () => Promise<string[]> = async () => SSH_ARGS) => {
+        return { args, deviceId: "host-1", label: "deploy@build.example.com" };
+    };
+
+    it("asks for the shell's arguments before it opens a window, and a server that is not trusted gets none", async () => {
+        const refused = vi.fn(async () => {
+            throw new Error("the server's host key was not trusted");
+        });
+
+        await expect(terminals.openSsh(server(refused))).rejects.toThrow("not trusted");
+        expect(refused).toHaveBeenCalledTimes(1);
+        expect(fake.windows).toHaveLength(0);
+        expect(hosts).toHaveLength(0);
+    });
+
+    it("runs ssh with those arguments and the environment ssh needs, and nothing the app runs under", async () => {
+        vi.stubEnv("ELECTRON_RUN_AS_NODE", "1");
+        vi.stubEnv("NEORE_SITE_URL", "https://neore.example");
+        vi.stubEnv("AWS_SECRET_ACCESS_KEY", "do-not-hand-on");
+        vi.stubEnv("SSH_AUTH_SOCK", "/run/user/1000/agent.sock");
+
+        await terminals.openSsh(server());
+
+        expect(lastWindow().options.title).toBe("Terminal — deploy@build.example.com");
+
+        const result = await startShell();
+        const spawn = hosts[0]?.posted[0];
+
+        expect(result).toMatchObject({ shell: "ssh" });
+        expect(spawn).toMatchObject({ args: SSH_ARGS, type: "spawn" });
+        expect(spawn?.type === "spawn" && path.basename(spawn.file)).toBe("ssh");
+        expect(spawn?.type === "spawn" && path.isAbsolute(spawn.file)).toBe(true);
+
+        const names = spawn?.type === "spawn" ? Object.keys(spawn.env) : [];
+
+        expect(names).toContain("SSH_AUTH_SOCK");
+        expect(names).not.toContain("ELECTRON_RUN_AS_NODE");
+        expect(names).not.toContain("NEORE_SITE_URL");
+        expect(names).not.toContain("AWS_SECRET_ACCESS_KEY");
+        vi.unstubAllEnvs();
+    });
+
+    it("opens one window per server and focuses it the second time, without connecting again", async () => {
+        const args = vi.fn(async () => SSH_ARGS);
+
+        await terminals.openSsh(server(args));
+        await terminals.openSsh(server(args));
+
+        expect(fake.windows).toHaveLength(1);
+        expect(args).toHaveBeenCalledTimes(1);
+        expect(lastWindow().focus).toHaveBeenCalled();
+    });
+
+    it("connects again for a new shell, so a lost connection is asked for afresh", async () => {
+        const args = vi.fn(async () => SSH_ARGS);
+
+        await terminals.openSsh(server(args));
+        await startShell();
+        // The first start used what opening the window got.
+        expect(args).toHaveBeenCalledTimes(1);
+
+        hosts[0]?.emit({ exitCode: 255, signal: 0, type: "exit" });
+        await startShell();
+
+        expect(args).toHaveBeenCalledTimes(2);
+        expect(hosts).toHaveLength(2);
+    });
+
+    it("starts no shell when a new connection is refused, and says why", async () => {
+        const args = vi.fn(async () => SSH_ARGS);
+
+        await terminals.openSsh(server(args));
+        await startShell();
+        hosts[0]?.emit({ exitCode: 255, signal: 0, type: "exit" });
+        args.mockRejectedValueOnce(new Error("the connection to deploy@build.example.com is not up"));
+
+        await expect(startShell()).rejects.toThrow("is not up");
+        expect(hosts).toHaveLength(1);
+    });
+
+    it("names the server in the exit report, so the page can say the connection ended", async () => {
+        await terminals.openSsh(server());
+        await startShell();
+        hosts[0]?.emit({ exitCode: 255, signal: 0, type: "exit" });
+
+        expect(lastWindow().webContents.send).toHaveBeenCalledWith(TERMINAL_EVENT.exit, { crashed: false, exitCode: 255, host: "deploy@build.example.com" });
+    });
+
+    it("keeps the channels the local terminal has: the site cannot drive it, and a local shell reports no host", async () => {
+        await terminals.openSsh(server());
+
+        for (const channel of Object.values(TERMINAL_CHANNEL)) {
+            expect(() => invoke(channel, siteEvent(), { cols: 80, rows: 24 })).toThrow("terminal: not a terminal window");
+        }
+
+        await terminals.open(folder);
+        await startShell();
+        hosts[0]?.emit({ exitCode: 0, signal: 0, type: "exit" });
+
+        expect(lastWindow().webContents.send).toHaveBeenCalledWith(TERMINAL_EVENT.exit, { crashed: false, exitCode: 0 });
+    });
+
+    it("is refused where no terminal is offered", async () => {
+        const platform = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+
+        fake.handlers.clear();
+
+        const windows = registerTerminalIpc({ startHost });
+        const args = vi.fn(async () => SSH_ARGS);
+
+        platform.mockRestore();
+
+        await expect(windows.openSsh(server(args))).rejects.toThrow("not available");
+        expect(args).not.toHaveBeenCalled();
+        expect(fake.windows).toHaveLength(0);
+    });
+
+    it("hangs up a server's shell with the app, as it does a local one", async () => {
+        await terminals.openSsh(server());
+        await startShell();
+
+        const kill = vi.spyOn(process, "kill").mockImplementation(() => true);
+
+        fake.appListeners.get("before-quit")?.();
+
+        expect(kill).toHaveBeenCalledWith(9000, "SIGHUP");
+    });
+});
+
 describe("unavailable platforms", () => {
     it("refuses cleanly where there is no pseudo-terminal: nothing is opened or started", async () => {
         const platform = vi.spyOn(process, "platform", "get").mockReturnValue("freebsd");

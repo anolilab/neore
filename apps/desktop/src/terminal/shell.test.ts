@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { readFolder, resolveShell, shellEnvironment, terminalAvailability } from "./shell";
+import { readFolder, resolveShell, resolveSsh, shellEnvironment, sshEnvironment, terminalAvailability } from "./shell";
 
 const NOT_AVAILABLE = /not available/u;
 const TOO_OLD = /Windows 10 version 1903/u;
@@ -109,6 +109,55 @@ describe("shellEnvironment", () => {
         expect(env.XDG_CURRENT_DESKTOP).toBe("GNOME");
         expect(env).not.toHaveProperty("ORIGINAL_XDG_CURRENT_DESKTOP");
         expect(shellEnvironment({ XDG_CURRENT_DESKTOP: "KDE" }).XDG_CURRENT_DESKTOP).toBe("KDE");
+    });
+});
+
+describe("resolveSsh", () => {
+    const exists = (...files: string[]) => (file: string) => files.includes(file);
+
+    it("is the first ssh on the path, as an absolute path", () => {
+        expect(resolveSsh({ PATH: "/opt/bin:/usr/bin" }, exists("/usr/bin/ssh", "/opt/bin/ssh"))).toBe("/opt/bin/ssh");
+    });
+
+    it("looks in the system folders when the app was started with a thin path", () => {
+        expect(resolveSsh({ PATH: "" }, exists("/usr/bin/ssh"))).toBe("/usr/bin/ssh");
+        expect(resolveSsh({}, exists("/usr/bin/ssh"))).toBe("/usr/bin/ssh");
+    });
+
+    it("never takes a relative entry of the path", () => {
+        expect(() => resolveSsh({ PATH: "bin:." }, (file) => file === "bin/ssh" || file === "ssh")).toThrow("ssh was not found");
+    });
+
+    it("fails clearly when there is no ssh", () => {
+        expect(() => resolveSsh({ PATH: "/usr/bin" }, exists())).toThrow("ssh was not found");
+    });
+});
+
+describe("sshEnvironment", () => {
+    it("hands ssh where things are, who is asking, the agent and the locale, and nothing else", () => {
+        const env = sshEnvironment({
+            AWS_SECRET_ACCESS_KEY: "secret",
+            ELECTRON_RUN_AS_NODE: "1",
+            HOME: "/home/me",
+            LANG: "de_DE.UTF-8",
+            LC_ALL: "de_DE.UTF-8",
+            NEORE_SITE_URL: "https://neore.example",
+            PATH: "/usr/bin",
+            SSH_ASKPASS: "/opt/askpass",
+            SSH_AUTH_SOCK: "/run/user/1000/agent",
+            TERM: "dumb",
+            USER: "me",
+        });
+
+        expect(env).toEqual({
+            HOME: "/home/me",
+            LANG: "de_DE.UTF-8",
+            LC_ALL: "de_DE.UTF-8",
+            PATH: "/usr/bin",
+            SSH_AUTH_SOCK: "/run/user/1000/agent",
+            TERM: "xterm-256color",
+            USER: "me",
+        });
     });
 });
 

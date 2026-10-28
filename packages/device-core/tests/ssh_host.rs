@@ -20,8 +20,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use device_core::ssh::{
-    control_args, forget_keys, pinned_keys, HostConnection, HostKey, HostLink, Interact, SshError,
-    SshPaths, Target,
+    control_args, forget_keys, pinned_keys, terminal_args, HostConnection, HostKey, HostLink,
+    Interact, SshError, SshPaths, Target,
 };
 use serde_json::json;
 
@@ -174,7 +174,7 @@ impl Server {
         fs::write(
             dir.join("sshd_config"),
             format!(
-                "Port {port}\nListenAddress 127.0.0.1\nHostKey {dir}/host_key\nAuthorizedKeysFile {dir}/authorized_keys\nPidFile {dir}/sshd.pid\nUsePAM no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nPubkeyAuthentication yes\nStrictModes no\nAllowUsers {user}\nLogLevel ERROR\n",
+                "Port {port}\nListenAddress 127.0.0.1\nHostKey {dir}/host_key\nAuthorizedKeysFile {dir}/authorized_keys\nPidFile {dir}/sshd.pid\nUsePAM no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nPubkeyAuthentication yes\nStrictModes no\nAllowUsers {user}\nLogLevel INFO\n",
                 dir = dir.display()
             ),
         )
@@ -519,6 +519,113 @@ fn closing_one_session_leaves_the_others_and_the_master_alone() {
         !master_is_running(&target, &paths),
         "ending the master left it running"
     );
+}
+
+/// Runs the terminal's ssh arguments with a remote command, on a forced tty (the test has none of its own).
+fn terminal_ssh(args: &[String], remote: &str) -> Command {
+    let mut command = Command::new("ssh");
+
+    command
+        .arg("-tt")
+        .args(args)
+        .arg(remote)
+        .stdin(Stdio::null());
+
+    command
+}
+
+#[test]
+fn a_terminal_rides_the_open_connection_and_ends_with_it() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "terminal");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let interact = trusting();
+
+    // No connection yet: no terminal, and nothing is started to make one.
+    assert!(terminal_args(&target, &paths)
+        .unwrap_err()
+        .contains("is not up"));
+
+    let connection = connect(&server, &target, &paths, &interact).unwrap();
+    let args = terminal_args(&target, &paths).unwrap();
+    let logins = || {
+        fs::read_to_string(server.dir.join("sshd.log"))
+            .unwrap_or_default()
+            .matches("Accepted")
+            .count()
+    };
+    let before = logins();
+
+    assert_eq!(before, 1, "the connection's own login is not in sshd's log");
+
+    // The shell on the server is the user's own, started from nothing the desktop sets: no agent socket, and the
+    // session variables ssh itself adds are the only ones.
+    let output = terminal_ssh(&args, "echo marker-$((6*7)); env")
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "{text}");
+    assert!(text.contains("marker-42"), "{text}");
+    assert!(!text.contains("SSH_AUTH_SOCK"), "{text}");
+    assert!(!text.contains("NEORE_"), "{text}");
+    assert!(
+        interact.prompts.lock().unwrap().is_empty(),
+        "the terminal asked something"
+    );
+
+    // It rode the master: sshd saw no second login, and the key was not asked about again.
+    assert_eq!(logins(), before);
+    assert_eq!(interact.trusted.load(Ordering::SeqCst), 1);
+    assert!(
+        master_is_running(&target, &paths),
+        "the terminal ended the master"
+    );
+
+    // A shell that is running when the connection ends ends with it, with ssh's connection-lost status.
+    let mut shell = terminal_ssh(&args, "sleep 60").spawn().unwrap();
+
+    thread::sleep(Duration::from_millis(500));
+    finish(&connection);
+
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let status = loop {
+        if let Some(status) = shell.try_wait().unwrap() {
+            break status;
+        }
+
+        assert!(
+            Instant::now() < deadline,
+            "the terminal outlived its connection"
+        );
+        thread::sleep(Duration::from_millis(50));
+    };
+
+    assert_eq!(status.code(), Some(255));
+
+    // With the master gone the same arguments fail instead of opening a connection of their own.
+    let alone = terminal_ssh(&args, "echo should-not-run").output().unwrap();
+
+    assert!(!alone.status.success());
+    assert!(!String::from_utf8_lossy(&alone.stdout).contains("should-not-run"));
+    assert_eq!(logins(), before);
+}
+
+#[test]
+fn a_server_that_was_not_trusted_gets_no_terminal() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "terminal-declined");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let interact = Arc::new(Scripted::default());
+
+    assert!(matches!(
+        connect(&server, &target, &paths, &interact),
+        Err(SshError::HostKeyDeclined)
+    ));
+    assert_eq!(interact.trusted.load(Ordering::SeqCst), 1);
+    assert!(terminal_args(&target, &paths).is_err());
+    assert!(pinned_keys(&paths, &server.spec()).is_empty());
+    assert!(server.remote_env().is_empty());
 }
 
 #[test]

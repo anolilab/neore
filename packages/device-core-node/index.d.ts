@@ -38,6 +38,11 @@ export declare class DeviceCore {
   hostPair(spec: string, deviceId: string, secret: string): Promise<boolean>
   /** Connects a paired server again. Resolves what the server reported (JSON). */
   hostConnect(deviceId: string): Promise<string>
+  /**
+   * The `ssh` arguments of an interactive shell on a paired server (a JSON array), once it is connected and its
+   * key is trusted. The desktop runs `ssh` with them on a pseudo-terminal.
+   */
+  hostTerminal(deviceId: string): Promise<string>
   hostDisconnect(deviceId: string): void
   /** Forgets a server on this computer: its secret, folders and connection. */
   hostRemove(deviceId: string): void
