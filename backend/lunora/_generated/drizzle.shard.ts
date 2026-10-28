@@ -5,6 +5,29 @@ import { index, integer, real, sqliteTable, text, uniqueIndex } from "lunorash/s
 import type { AnySQLiteColumn } from "lunorash/server/drizzle";
 import type { Id } from "./dataModel.js";
 
+export const acpSessions = sqliteTable("acpSessions", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    agentKey: text("agentKey").notNull(),
+    agentLabel: text("agentLabel").notNull(),
+    capabilities: text("capabilities", { mode: "json" }).$type<{ groups: { checkpoints?: { fileRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; memoryRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; context?: { compactOnRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; usageMeter?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; identity?: { account?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; models?: Array<{ id: string; name: string }>; reasoningEffort?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; permissions?: { modes?: Array<string> }; planning?: { planMode?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; sessions?: { create?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; listNative?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; load?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; streaming?: { reasoning?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; text?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; toolParts?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; subagents?: { ownChildren?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; tools?: { approvalRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; call?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; declinePath?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; turns?: { cancel?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; followUp?: { degradation?: "restart"; kind: "steer" } | { kind: "queue" } | { kind: "none" } } }; reportedAt: number; version: 1 }>(),
+    createdAt: real("createdAt").notNull(),
+    deviceId: text("deviceId").references((): AnySQLiteColumn => devices._id).notNull(),
+    folderId: text("folderId").notNull(),
+    folderLabel: text("folderLabel").notNull(),
+    hostSessionId: text("hostSessionId").notNull(),
+    lastEventAt: real("lastEventAt"),
+    nativeSessionId: text("nativeSessionId"),
+    status: text("status", { mode: "json" }).$type<"starting" | "idle" | "busy" | "offline" | "ended">().notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    updatedAt: real("updatedAt").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_deviceId_hostSessionId: index("by_deviceId_hostSessionId").on(t.deviceId, t.hostSessionId),
+    by_userId_status: index("by_userId_status").on(t.userId, t.status),
+    by_threadId: index("by_threadId").on(t.threadId),
+}));
+
 export const aiUserPreferences = sqliteTable("aiUserPreferences", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
@@ -1002,6 +1025,7 @@ export const pageVersions = sqliteTable("pageVersions", {
 export const persistentChunks = sqliteTable("persistentChunks", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    event: text("event", { mode: "json" }).$type<{ agentKey: string; agentLabel: string; capabilities?: { groups: { checkpoints?: { fileRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; memoryRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; context?: { compactOnRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; usageMeter?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; identity?: { account?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; models?: Array<{ id: string; name: string }>; reasoningEffort?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; permissions?: { modes?: Array<string> }; planning?: { planMode?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; sessions?: { create?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; listNative?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; load?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; streaming?: { reasoning?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; text?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; toolParts?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; subagents?: { ownChildren?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; tools?: { approvalRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; call?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; declinePath?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; turns?: { cancel?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; followUp?: { degradation?: "restart"; kind: "steer" } | { kind: "queue" } | { kind: "none" } } }; reportedAt: number; version: 1 }; folderId: string; folderLabel: string; kind: "session_open"; nativeSessionId?: string } | { kind: "turn_start"; text: string } | { kind: "text"; text: string } | { kind: "reasoning"; text: string } | { id: string; kind: "tool"; status: "pending" | "in_progress" | "completed" | "failed" | "cancelled" | "declined"; title: string; toolKind: string } | { command?: string; folder?: string; kind: "permission_request"; options: Array<{ kind: string; name: string; optionId: string }>; requestId: string; target?: string; tool: string } | { kind: "permission_resolved"; outcome: "allowed" | "declined" | "cancelled"; requestId: string } | { error?: string; kind: "turn_end"; reason: "finished" | "cancelled" | "failed" | "interrupted" }>(),
     reasoning: text("reasoning"),
     restart: integer("restart", { mode: "boolean" }),
     seq: real("seq").notNull(),
@@ -1016,7 +1040,13 @@ export const persistentStreams = sqliteTable("persistentStreams", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     expiresAt: real("expiresAt").notNull(),
+    hostEndReason: text("hostEndReason", { mode: "json" }).$type<"finished" | "cancelled" | "failed" | "interrupted" | "timeout" | "revoked" | "stopped">(),
+    hostPendingPermissions: text("hostPendingPermissions", { mode: "json" }).$type<Array<string>>(),
+    hostRegenerate: integer("hostRegenerate", { mode: "boolean" }),
+    hostState: text("hostState", { mode: "json" }).$type<"accepted" | "received" | "running" | "ended">(),
+    hostTurnId: text("hostTurnId"),
     messageId: text("messageId").notNull(),
+    producer: text("producer"),
     runClaimedAt: real("runClaimedAt"),
     status: text("status").notNull(),
     steers: text("steers", { mode: "json" }).$type<Array<{ id: string; messageId?: string; pendingMessageId?: string; status: "queued" | "delivered" | "withdrawn"; text?: string }>>(),
@@ -1024,6 +1054,7 @@ export const persistentStreams = sqliteTable("persistentStreams", {
     threadId: text("threadId").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
+    by_hostTurnId: index("by_hostTurnId").on(t.hostTurnId),
     by_threadId_status: index("by_threadId_status").on(t.threadId, t.status),
     by_threadId: index("by_threadId").on(t.threadId),
     by_userId_status: index("by_userId_status").on(t.userId, t.status),
@@ -1405,6 +1436,7 @@ export const threads = sqliteTable("threads", {
     projectId: text("projectId"),
     publicAccessToken: text("publicAccessToken"),
     reasoningEffort: real("reasoningEffort"),
+    runner: text("runner"),
     source: text("source"),
     statelessMode: integer("statelessMode", { mode: "boolean" }),
     status: text("status").notNull(),

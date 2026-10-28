@@ -144,6 +144,7 @@ export const memoryAgent = (): MemoryAgent => {
             killNow: () => exit({ code: null, signal: "SIGKILL" }),
             pid: undefined,
             scrub: (text) => text,
+            secretLength: 0,
             stderrTail: () => "",
             stdin,
             stdout,

@@ -11,9 +11,15 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
-import { DEVICE_CALL_DEADLINE_MS, DEVICE_CALL_RETENTION_MS, MAX_DEVICE_INPUT_BYTES, MAX_OPEN_CALLS_PER_DEVICE } from "./lib/constants";
+import {
+    DEVICE_CALL_DEADLINE_MS,
+    DEVICE_CALL_RETENTION_MS,
+    MAX_DEVICE_INPUT_BYTES,
+    MAX_OPEN_ACP_CALLS_PER_DEVICE,
+    MAX_OPEN_CALLS_PER_DEVICE,
+} from "./lib/constants";
 import { signDevicePayload, utf8Length } from "./lib/signing";
-import { isDeviceOnline, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
+import { isAcpTool, isDeviceOnline, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDeviceTaintSource } from "./validators";
 
 type ThreadRow = Pick<Doc<"threads">, "deleted" | "externalThreadId" | "groupChat" | "isPublic" | "userId">;
@@ -119,9 +125,13 @@ export const createDeviceCall = internalMutation
         let open = 0;
 
         for (const status of OPEN_CALL_STATUSES) {
-            const { page } = await ctx.db.deviceCalls.findMany({ limit: MAX_OPEN_CALLS_PER_DEVICE, where: { deviceId, status } });
+            const { page } = await ctx.db.deviceCalls.findMany({
+                limit: MAX_OPEN_CALLS_PER_DEVICE + MAX_OPEN_ACP_CALLS_PER_DEVICE,
+                where: { deviceId, status },
+            });
 
-            open += page.length;
+            // Coding-agent calls have a budget of their own (`lib/acp-call.ts`).
+            open += page.filter((call) => !isAcpTool(call.toolName)).length;
         }
 
         if (open >= MAX_OPEN_CALLS_PER_DEVICE) {

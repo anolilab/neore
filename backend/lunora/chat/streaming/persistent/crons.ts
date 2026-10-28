@@ -1,5 +1,6 @@
 import type { Id } from "../../../_generated/dataModel";
 import { internalMutation } from "../../../_generated/server";
+import { expireHostStream } from "../../../acp/lib/reap";
 import { patchThread } from "../../../agent/table-writes";
 import { type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
 import { purgeExpiredToolApprovalRuns } from "../../lib/tool-approval-cleanup";
@@ -17,6 +18,14 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
     });
 
     for (const stream of expiredStreams) {
+        // A coding agent's turn is reaped by `acp/lib/reap.ts` (which also tells its host to cancel); this sweep
+        // is only the backstop for when the shard tick has not reached it.
+        if (stream.producer === "host") {
+            await expireHostStream(ctx, stream, now);
+
+            continue;
+        }
+
         console.log("Cleaning up expired stream", stream._id, {
             expiresAt: new Date(stream.expiresAt).toISOString(),
             status: stream.status,

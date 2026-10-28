@@ -146,6 +146,8 @@ for a schema table that is neither policed nor listed:
 
 | procedure | kind | builder | resources | ownership check | status |
 | --- | --- | --- | --- | --- | --- |
+| `acp_functions.getHostSession` | query | authQuery | acpSessions | row.userId == caller AND row.threadId == arg | ok — new; a stranger's or non-host thread id answers null; no device id of anyone else, no path |
+| `acp_functions.listHostSessions` | query | authQuery | acpSessions | caller-scoped (ctx.user) | ok — new; labels, status and the capability report only; paths never reach the backend |
 | `admin_audit_log.getAuditLogEntry` | query | adminQuery | auditLog | admin role | ok |
 | `admin_audit_log.getAuditLogs` | query | adminQuery | auditLog | admin role | ok |
 | `admin_audit_log.getAuditLogStats` | query | adminQuery | — | admin role | ok |
@@ -666,6 +668,7 @@ else the better-auth cookie). No route takes identity from a header.
 | `POST /email/resend/webhook` | Svix HMAC, 5 min window | — | ok |
 | `POST /messenger/{telegram,slack,discord}/:id` | platform signature | pairing gate (`messenger/pairing.ts`); event dedupe | **fixed** (low) — the first sender to reach a bot claimed it. Now only the contact who sent `/pair <code>` (one-time, 15 min, SHA-256 at rest, 5 guesses / 15 min per connection) is answered; strangers get one "this bot is private" reply per hour. Discord's signed timestamp is now checked (±5 min) and all three dedupe by event id |
 | `/messenger/{whatsapp,line,feishu,teams,wechat}/:id` | platform signature / JWT | pairing gate via `acceptInbound`; dedupe | **fixed** (low) — same pairing gate, applied after the dedupe claim |
+| `POST /hosts/ingest` | per-device HMAC over the exact payload, `turn` domain (`devices/lib/signing.ts`), fresh `issuedAt`; device owner from the `.global()` `shardRoutes` row `device:<id>` | `thread.userId == device.userId`, `thread.runner == "host"`, the thread's `acpSessions` row names this device and desktop session; stream `userId`/`threadId` match; events claimed once by `(turnId, seq)` | ok — new; every auth failure is the same 401 and the per-device limit (`hosts/ingest`, after verification) never moves for one; body capped at 256 KiB while reading; per-address flood guard in the isolate; a post into another user's or a cloud thread is 403 |
 | `POST /triggers/webhook/:triggerId` | per-trigger HMAC over `<timestamp>.<body>`, constant-time | trigger → owner | **fixed** (low) — `X-Neore-Timestamp` must be within ±5 min and is signed with the body; each signature is accepted once (`triggerWebhookDeliveries`, 15 min); 60 deliveries/min per trigger; unsigned requests (legacy rows without a secret) are refused. Breaking for senders: documented in the trigger settings UI |
 | `/extension/auth/*` | JWT / PKCE code / session token | own user | ok |
 | `/api/v1/*` | API key (`verifyApiKey`) + scope | shared procedure checks; stream token userId must equal the key's | ok |

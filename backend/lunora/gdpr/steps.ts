@@ -451,6 +451,9 @@ export const collectPrompts = internalQuery.input({ userId: v.string() }).query(
 
 export const generateExportFile = internalAction
     .input({
+        // Coding-agent sessions on paired devices (`acp/gdpr.ts`). Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        acpSessions: v.optional(v.any()),
         // Usage history, sub-agent runs and knowledge collections
         // (`collectActivityForExport`). Optional for the same in-flight-replay
         // reason as `threadTags`.
@@ -498,6 +501,7 @@ export const generateExportFile = internalAction
     .action(async ({ args, ctx: context }) => {
         const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
         const exportData = {
+            acpSessions: args.acpSessions ?? { sessions: [] },
             bots: args.bots ?? { bots: [] },
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,

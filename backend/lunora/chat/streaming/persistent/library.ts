@@ -12,6 +12,7 @@ import { patchThread } from "../../../agent/table-writes";
 import { internal } from "../../../_generated/internal";
 import type { Doc, Id } from "../../../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx } from "../../../_generated/server";
+import { stopHostTurn } from "../../../acp/lib/finish";
 import { patchRow } from "../../../lib/patch";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { MAX_LENGTH } from "../../../lib/validators";
@@ -207,6 +208,14 @@ export const stopActiveForThread = internalMutation
         const streams = named.length > 0 ? named : live;
 
         for (const stream of streams) {
+            // A coding agent's turn has no run here to notice the stop: end it now, keep the text written so
+            // far as the reply, and tell its host to cancel.
+            if (stream.producer === "host") {
+                await stopHostTurn(ctx, stream, ctx.now);
+
+                continue;
+            }
+
             const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
 
             await ctx.db.patch(stream._id, { status: "done", ...(steers && { steers }) });
@@ -348,6 +357,8 @@ export const getStreamText = internalQuery
     })
     .output(
         v.object({
+            /** A coding agent's turn only (`acp/`). */
+            hostState: v.optional(v.union(v.literal("accepted"), v.literal("received"), v.literal("running"), v.literal("ended"))),
             messageId: v.optional(v.string()),
             reasoning: v.string(), // Concatenated reasoning from all chunks
             /** Group chat: who is speaking. `text`/`reasoning` then cover only their reply. */
@@ -406,6 +417,7 @@ export const getStreamText = internalQuery
         }
 
         return {
+            ...(stream.hostState !== undefined && { hostState: stream.hostState }),
             messageId: stream.messageId,
             reasoning,
             ...(speaker && { speaker }),

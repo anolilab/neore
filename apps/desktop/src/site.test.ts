@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { clampText, isSameOrigin, originOf, parseDeepLink, remotePattern, siteOrigin, threadUrl } from "./site";
+import { backendOrigin, clampText, isSameOrigin, originOf, parseDeepLink, remotePattern, siteOrigin, threadUrl } from "./site";
 import { isTrustedUrl } from "./trust";
 
 const origin = new URL("https://app.example.com");
@@ -21,6 +21,11 @@ describe("origin", () => {
     it("refuses a build without an http(s) origin", () => {
         expect(() => siteOrigin("file:///etc/passwd")).toThrow();
         expect(siteOrigin("https://app.example.com/some/path").href).toBe("https://app.example.com/");
+    });
+
+    it("takes the backend origin from the build, and refuses a non-http(s) one", () => {
+        expect(backendOrigin("https://api.example.com/some/path").href).toBe("https://api.example.com/");
+        expect(() => backendOrigin("file:///etc/passwd")).toThrow();
     });
 
     it("compares scheme, host and port", () => {

@@ -583,6 +583,7 @@ class AppBuilder<Env extends object> {
 
         const tableSharding = new Map<string, ShardingInfo>([
             ["account", { mode: { kind: "global" } }],
+            ["acpSessions", { mode: { field: "userId", kind: "shardBy" } }],
             ["actionCache", { mode: { kind: "global" } }],
             ["aiUserPreferences", { mode: { field: "userId", kind: "shardBy" } }],
             ["apikey", { mode: { kind: "global" } }],

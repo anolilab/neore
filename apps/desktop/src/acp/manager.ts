@@ -6,6 +6,7 @@
  */
 import { rm } from "node:fs/promises";
 
+import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate } from "./permission";
 import { declineGate } from "./permission";
@@ -39,6 +40,10 @@ export interface ManagerOptions {
     appVersion: string;
     cancelGraceMs?: number;
     gate?: PermissionGate;
+    /** The label of the folder the user approved for this agent (never its path), for the backend's thread. Undefined: keep the session on this computer. */
+    hostInfo?: (agentKey: string, folder: string) => Pick<HostSessionInfo, "folderId" | "folderLabel"> | undefined;
+    /** Saves what the sessions do on the backend (`ingest.ts`). Without it, sessions stay on this computer. */
+    observer?: SessionObserver;
     /** Told that the window should read the sessions again. */
     onChange: () => void;
     /** `device-core`'s `acpSpawnPlan`, parsed. Throws when the agent or folder is not allowed. */
@@ -116,6 +121,7 @@ export class AcpManager {
         // The core decides: it refuses an unregistered agent and (with consent) a folder the user has not approved.
         const plan = this.options.plan(agentKey, folder);
         const child = this.spawn(plan);
+        const folderInfo = this.options.hostInfo?.(agentKey, plan.cwd);
         const session = new AgentSession({
             agentKey,
             agentLabel,
@@ -126,6 +132,7 @@ export class AcpManager {
             onChange: () => this.changed(),
             process: child,
             startupTimeoutMs: this.options.startupTimeoutMs,
+            ...folderInfo !== undefined && this.options.observer !== undefined && { hostInfo: { agentKey, agentLabel, ...folderInfo }, observer: this.options.observer },
         });
 
         this.sessions.set(session.id, session);
@@ -140,6 +147,11 @@ export class AcpManager {
 
     public cancel(sessionId: string): void {
         this.require(sessionId).cancel();
+    }
+
+    /** Stops the turn the backend named, if that session still runs it. A turn that already ended is not an error. */
+    public cancelTurn(sessionId: string, turnId: string): boolean {
+        return this.sessions.get(sessionId)?.cancelTurn(turnId) ?? false;
     }
 
     public async close(sessionId: string): Promise<void> {

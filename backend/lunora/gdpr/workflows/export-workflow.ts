@@ -86,6 +86,10 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         );
         const pages = await context.step.do("collect-pages", async () => await context.run(internal.pages.gdpr.collectPagesForExport, { userId }));
         const devices = await context.step.do("collect-devices", async () => await context.run(internal.devices.gdpr.collectDevicesForExport, { userId }));
+        const acpSessions = await context.step.do(
+            "collect-acp-sessions",
+            async () => await context.run(internal.acp.gdpr.collectAcpSessionsForExport, { userId }),
+        );
         const activity = await context.step.do("collect-activity", async () => await context.run(internal.gdpr.steps.collectActivityForExport, { userId }));
 
         await progress({ currentStep: "generating_export", progress: 80 });
@@ -118,6 +122,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                 "generate-export-file",
                 async () =>
                     await context.run(internal.gdpr.steps.generateExportFile, {
+                        acpSessions,
                         activity,
                         bots,
                         codingAgentRuns,

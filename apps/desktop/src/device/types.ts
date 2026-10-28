@@ -47,7 +47,7 @@ export interface SettingsView {
 }
 
 /** What the engine emits, parsed from the addon's JSON event strings. */
-export type CoreEvent = { agent: string; tool: string; type: "acpPermission" } | { prompt: Prompt; type: "prompt" } | { callId: string; payload: string; signature: string; type: "progress" } | { type: "changed" };
+export type CoreEvent = { agent: string; tool: string; type: "acpPermission" } | { sessionId: string; turnId: string; type: "acpCancel" } | { prompt: Prompt; type: "prompt" } | { callId: string; payload: string; signature: string; type: "progress" } | { type: "changed" };
 
 /** The surface of the native `DeviceCore` class. */
 export interface DeviceCore {
@@ -71,6 +71,8 @@ export interface DeviceCore {
     reapIdleServers: () => Promise<boolean>;
     settingsGet: () => string;
     settingsUpdate: (update: string) => string;
+    /** Signs one turn post for the backend's ingest route; refuses anything that is not a turn post for this computer. */
+    signTurn: (payload: string) => string;
     status: () => string;
     stop: () => void;
 }

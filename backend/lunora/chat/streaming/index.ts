@@ -4,6 +4,7 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { QueryCtx } from "../../_generated/server";
 import { internalMutation, internalQuery } from "../../_generated/server";
+import { vHostState } from "../../acp/validators";
 import { patchThread } from "../../agent/table-writes";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
 import { publicThread } from "../../agent/threads";
@@ -49,6 +50,8 @@ export const persistentTextStreaming = new PersistentTextStreaming({
  * Query to get stream body - required by useStream hook on client
  */
 const vStreamBody = v.object({
+    /** A coding agent's turn only (`acp/`): "Sending" until `received`, "Working" from `running`. */
+    hostState: v.optional(vHostState),
     reasoning: v.string(),
     /** Group chat: the participant speaking; `text`/`reasoning` are theirs only. */
     speaker: v.optional(v.object({ name: v.string(), skillId: v.string() })),
@@ -163,6 +166,8 @@ export const getActiveStreamForThread = optionalAuthQuery
                  * the composer to retire their chips. The run's own user only.
                  */
                 deliveredSteerIds: v.optional(v.array(v.string())),
+                /** A coding agent's turn only (`acp/`): where the host is with it. */
+                hostState: v.optional(vHostState),
                 streamId: v.id("persistentStreams"),
             }),
             v.null(),
@@ -193,7 +198,11 @@ export const getActiveStreamForThread = optionalAuthQuery
 
         const delivered = stream.userId === ctx.user?.userId ? deliveredSteerIds(stream.steers as SteerEntry[] | undefined) : [];
 
-        return delivered.length > 0 ? { deliveredSteerIds: delivered, streamId: stream._id } : { streamId: stream._id };
+        return {
+            streamId: stream._id,
+            ...(delivered.length > 0 && { deliveredSteerIds: delivered }),
+            ...(stream.hostState !== undefined && { hostState: stream.hostState }),
+        };
     });
 
 /**

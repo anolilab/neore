@@ -4,10 +4,16 @@
  */
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { DEVICE_ONLINE_WINDOW_MS } from "./constants";
+import { ACP_CLAIM_WINDOW_MS, DEVICE_CLAIM_WINDOW_MS, DEVICE_ONLINE_WINDOW_MS } from "./constants";
 
 export const isDeviceOnline = (device: Pick<Doc<"devices">, "lastSeenAt">, now: number): boolean =>
     device.lastSeenAt !== undefined && now - device.lastSeenAt <= DEVICE_ONLINE_WINDOW_MS;
+
+/** A coding-agent call (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`), not a device tool. */
+export const isAcpTool = (toolName: string): boolean => toolName.startsWith("acp_");
+
+/** How long a call may wait for its device to claim it. */
+export const claimWindowMs = (toolName: string): number => (isAcpTool(toolName) ? ACP_CLAIM_WINDOW_MS : DEVICE_CLAIM_WINDOW_MS);
 
 export const OPEN_CALL_STATUSES = ["pending", "claimed"] as const;
 

@@ -1,6 +1,7 @@
 // Bundles the main process, the two sandboxed preloads and the Quick Composer
-// page into `dist/`. The site origin is baked in at build time (`NEORE_SITE_URL`):
-// there is no runtime override.
+// page into `dist/`. The site origin (`NEORE_SITE_URL`) and the backend origin the
+// main process posts coding-agent output to (`NEORE_BACKEND_URL`) are baked in at build
+// time: there is no runtime override, and the page cannot choose where output goes.
 import { copyFileSync, mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -9,10 +10,15 @@ import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
 
 const DEFAULT_SITE_URL = "http://localhost:5173";
+const DEFAULT_BACKEND_URL = "http://localhost:8788";
 const release = process.env.NEORE_RELEASE === "1";
 
 if (release && !process.env.NEORE_SITE_URL) {
     throw new Error("NEORE_SITE_URL is required for a release build");
+}
+
+if (release && !process.env.NEORE_BACKEND_URL) {
+    throw new Error("NEORE_BACKEND_URL is required for a release build");
 }
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -30,7 +36,10 @@ const common = {
     format: "cjs",
     // electron-updater is a runtime dependency: electron-builder packs it, esbuild does not inline it.
     external: ["electron", "electron-updater"],
-    define: { "process.env.NEORE_SITE_URL": JSON.stringify(process.env.NEORE_SITE_URL ?? DEFAULT_SITE_URL) },
+    define: {
+        "process.env.NEORE_BACKEND_URL": JSON.stringify(process.env.NEORE_BACKEND_URL ?? DEFAULT_BACKEND_URL),
+        "process.env.NEORE_SITE_URL": JSON.stringify(process.env.NEORE_SITE_URL ?? DEFAULT_SITE_URL),
+    },
     sourcemap: !release,
     logLevel: "info",
 };
