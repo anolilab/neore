@@ -351,6 +351,13 @@ quiet notice.
 - Acceptance: `messageWorker` returns `runId` and `state`; when one run's post
   fails permanently, another run's post still lands; a host run whose host goes
   away posts "host did not answer" to the lead.
+- Built (cloud): the receipt is `{ runId, state, workerId }`; a redelivery returns the first run's.
+  The worker views list the latest runs, each with its own `state` and `delivery` (`posted`,
+  `pending`, `failed`, or `none` when the lead never asked), and the worker thread shows them.
+  `finishRun` posts inline and `postRunResult` answers a refusal rather than throwing, so a result
+  that cannot land ends in its own `postFailed` and never holds the line.
+- Left for S5: a host run whose host goes away fails with "host did not answer" and posts to the
+  lead as a failure, through the same `finishRun` and per-run post.
 
 **S8 — Dispatch policy and attribution.** `workerPolicy`, `dispatchedBy`, the
 "sent by" label.

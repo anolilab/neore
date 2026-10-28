@@ -21,6 +21,7 @@ import {
     getWorker,
     listActiveWorkerRuns,
     listWorkers,
+    messageWorker,
     reapSubAgentRun,
     stopWorker,
 } from "./functions";
@@ -794,5 +795,109 @@ describe("the worker reaper", () => {
         await writeStep(workerId);
 
         expect(await as(OWNER).query(listWorkers as never, { leadThreadId: leadId } as never)).toMatchObject([{ lastActivityAt: Date.now(), queuedRuns: 1 }]);
+    });
+});
+
+describe("receipts", () => {
+    const claim = async (runId: string) => await run(async (context) => await claimQueuedRun(context, runId as never));
+    const finishOk = async (runId: string) => await run(async (context) => await finishRun(context, runId as never, { kind: "succeeded", result: "done" }));
+    const asLead = async (workerId: string, toolCallId: string, parentThreadId = leadId) =>
+        await run(
+            async (context) =>
+                (await context.runMutation(messageWorker as never, {
+                    message: "Next",
+                    parentThreadId,
+                    toolCallId,
+                    userId: OWNER,
+                    workerId,
+                })) as {
+                    runId: string;
+                    state: string;
+                    workerId: string;
+                },
+        );
+
+    it("answers a lead's message with the run's id, its state and the worker, and a redelivery with the same receipt", async () => {
+        const workerId = await idleWorker();
+        const receipt = await asLead(workerId, "call-next");
+
+        expect(receipt).toStrictEqual({ runId: expect.any(String), state: "queued", workerId });
+        expect(await asLead(workerId, "call-next")).toStrictEqual(receipt);
+        expect(await runRows()).toHaveLength(2);
+
+        // The same receipt names a run the worker list reads back, with nothing delivered yet.
+        const worker = (await as(OWNER).query(getWorker as never, { workerId } as never)) as { runs: { delivery: string; runId: string; state: string }[] };
+
+        expect(worker.runs.find((entry) => entry.runId === receipt.runId)).toMatchObject({ delivery: "none", state: "queued" });
+    });
+
+    it("tells each run's delivery apart: posted, given up, and never owed", async () => {
+        const workerId = await idleWorker();
+        const typed = (await message(workerId, "c-typed")) as { runId: string };
+
+        await claim(typed.runId);
+        await finishOk(typed.runId);
+
+        const worker = (await as(OWNER).query(getWorker as never, { workerId } as never)) as { runs: { delivery: string; runId: string }[] };
+        const deliveries = Object.fromEntries(worker.runs.map((entry) => [entry.runId, entry.delivery]));
+        const [first] = await runRows();
+
+        expect(deliveries[first._id]).toBe("posted");
+        expect(deliveries[typed.runId]).toBe("none");
+
+        // A run the lead asked for whose lead is then deleted gives up posting.
+        const asked = await asLead(workerId, "call-asked");
+
+        await claim(asked.runId);
+        await run(async (context) => await context.db.patch(leadId as never, { deleted: true }));
+        await finishOk(asked.runId);
+
+        const after = (await as(OWNER).query(getWorker as never, { workerId } as never)) as { runs: { delivery: string; runId: string }[] };
+
+        expect(after.runs.find((entry) => entry.runId === asked.runId)?.delivery).toBe("failed");
+    });
+
+    it("lands one run's result when another run's post has given up for good", async () => {
+        const otherLead = await newThread(OWNER, { title: "Other lead" });
+        const first = await run(
+            async (context) => await admitWorkerRun(context, { name: "A", parentThreadId: leadId, task: "A", toolCallId: "call-a", userId: OWNER }),
+        );
+        const second = await run(
+            async (context) => await admitWorkerRun(context, { name: "B", parentThreadId: otherLead, task: "B", toolCallId: "call-b", userId: OWNER }),
+        );
+
+        if ("error" in first || "error" in second) {
+            throw new Error("setup refused");
+        }
+
+        await claim(first.run._id);
+        await claim(second.run._id);
+        // A message the user typed waits behind the first run.
+        const waiting = (await message(first.run.childThreadId!, "c-waiting")) as { runId: string };
+
+        // The first lead is deleted while both runs are going: its result can never land.
+        await run(async (context) => await context.db.patch(leadId as never, { deleted: true }));
+
+        await finishOk(first.run._id);
+        await finishOk(second.run._id);
+
+        const [gone, landed] = [await runRow(first.run._id), await runRow(second.run._id)];
+
+        expect(gone).toMatchObject({ postFailed: expect.any(String), status: "succeeded" });
+        expect(gone.resultPostedAt).toBeUndefined();
+        expect(landed.resultPostedAt).toBeDefined();
+        expect(landed.postFailed).toBeUndefined();
+
+        const posted = await run(
+            async (context) =>
+                await context.db
+                    .query("messages")
+                    .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", otherLead))
+                    .collect(),
+        );
+
+        expect(posted).toHaveLength(1);
+        // The unpostable result did not hold the worker's line: the waiting message started.
+        expect(jobsQueueMessages.some((queued) => queued.body.args?.runId === waiting.runId)).toBe(true);
     });
 });

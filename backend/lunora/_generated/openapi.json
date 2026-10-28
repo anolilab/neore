@@ -38344,6 +38344,76 @@
                         "quietAfterMs": {
                           "type": "number"
                         },
+                        "runs": {
+                          "items": {
+                            "properties": {
+                              "createdAt": {
+                                "type": "number"
+                              },
+                              "delivery": {
+                                "anyOf": [
+                                  {
+                                    "const": "failed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "none",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "pending",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "posted",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "runId": {
+                                "description": "Id<\"subAgentRuns\">",
+                                "type": "string",
+                                "x-lunora-table": "subAgentRuns"
+                              },
+                              "state": {
+                                "anyOf": [
+                                  {
+                                    "const": "queued",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "running",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "succeeded",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "failed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "cancelled",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "task": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "createdAt",
+                              "delivery",
+                              "runId",
+                              "state",
+                              "task"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
                         "state": {
                           "anyOf": [
                             {
@@ -38376,6 +38446,7 @@
                         "postFailed",
                         "queuedRuns",
                         "quietAfterMs",
+                        "runs",
                         "state",
                         "workerId"
                       ],
@@ -38654,6 +38725,76 @@
                       "quietAfterMs": {
                         "type": "number"
                       },
+                      "runs": {
+                        "items": {
+                          "properties": {
+                            "createdAt": {
+                              "type": "number"
+                            },
+                            "delivery": {
+                              "anyOf": [
+                                {
+                                  "const": "failed",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "none",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pending",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "posted",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "runId": {
+                              "description": "Id<\"subAgentRuns\">",
+                              "type": "string",
+                              "x-lunora-table": "subAgentRuns"
+                            },
+                            "state": {
+                              "anyOf": [
+                                {
+                                  "const": "queued",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "running",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "succeeded",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "failed",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "cancelled",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "task": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "createdAt",
+                            "delivery",
+                            "runId",
+                            "state",
+                            "task"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
                       "state": {
                         "anyOf": [
                           {
@@ -38686,6 +38827,7 @@
                       "postFailed",
                       "queuedRuns",
                       "quietAfterMs",
+                      "runs",
                       "state",
                       "workerId"
                     ],

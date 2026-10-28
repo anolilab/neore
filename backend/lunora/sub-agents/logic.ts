@@ -305,6 +305,32 @@ export const workerPostFailure = (
     newestFirst: ReadonlyArray<{ mode?: "run" | "worker"; postFailed?: string; resultPostedAt?: number; toolCallId?: string }>,
 ): string | null => newestFirst.find((run) => postsBack(run))?.postFailed ?? null;
 
+/** Whether the result of a run reached the lead: `none` when the lead never asked for one (or the run has not ended). */
+export type RunDelivery = "failed" | "none" | "pending" | "posted";
+
+/**
+ * Where a run's result stands with the lead. `posted` is the receipt (`resultPostedAt`, written with the
+ * message); `failed` is a post that gave up; `pending` is an ended run still waiting for the lead's stream
+ * or a lock to lift. A run the lead did not ask for owes nothing.
+ */
+export const runDelivery = (run: {
+    mode?: "run" | "worker";
+    postFailed?: string;
+    resultPostedAt?: number;
+    status: SubAgentStatus;
+    toolCallId?: string;
+}): RunDelivery => {
+    if (isActiveSubAgentStatus(run.status) || !postsBack(run)) {
+        return "none";
+    }
+
+    if (run.resultPostedAt !== undefined) {
+        return "posted";
+    }
+
+    return run.postFailed === undefined ? "pending" : "failed";
+};
+
 /**
  * How a message sent to a busy worker is handled, read from what its runner can do. Cloud headless
  * workers have no stream to steer into, so theirs wait their turn; a host runner reports its own

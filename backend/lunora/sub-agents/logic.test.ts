@@ -8,6 +8,7 @@ import {
     normalizeToolAllowlist,
     postsBack,
     resolveSubAgentModel,
+    runDelivery,
     SUB_AGENT_MAX_CONCURRENT,
     SUB_AGENT_MAX_DEPTH,
     SUB_AGENT_MAX_PER_RUN,
@@ -314,5 +315,17 @@ describe(workerRunToStop, () => {
         expect(workerRunToStop([queuedTail, queuedHead, unwinding])).toBeUndefined();
         expect(workerRunToStop([queuedTail, queuedHead, gone])).toBe(queuedHead);
         expect(workerRunToStop([])).toBeUndefined();
+    });
+});
+
+describe(runDelivery, () => {
+    it("reads the receipt, a post that gave up, a post still waiting, and a result nobody asked for", () => {
+        const asked = { mode: "worker", toolCallId: "call" } as const;
+
+        expect(runDelivery({ ...asked, resultPostedAt: 1, status: "succeeded" })).toBe("posted");
+        expect(runDelivery({ ...asked, postFailed: "gone", status: "succeeded" })).toBe("failed");
+        expect(runDelivery({ ...asked, status: "failed" })).toBe("pending");
+        expect(runDelivery({ ...asked, status: "running" })).toBe("none");
+        expect(runDelivery({ mode: "worker", status: "succeeded" })).toBe("none");
     });
 });

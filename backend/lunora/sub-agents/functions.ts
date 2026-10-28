@@ -60,6 +60,7 @@ import {
     postRetryDelayMs,
     postsBack,
     resolveSubAgentModel,
+    runDelivery,
     SUB_AGENT_NAME,
     SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS,
     SUB_AGENT_POST_MAX_ATTEMPTS,
@@ -1369,6 +1370,20 @@ export const stopWorker = authMutation
         return { cancelled };
     });
 
+const vRunDelivery = v.union(v.literal("failed"), v.literal("none"), v.literal("pending"), v.literal("posted"));
+
+const vWorkerRunView = v.object({
+    createdAt: v.number(),
+    // Whether the lead received this run's result: posted, still waiting, given up, or never owed.
+    delivery: vRunDelivery,
+    runId: v.id("subAgentRuns"),
+    state: vSubAgentRunStatus,
+    task: v.string(),
+});
+
+/** Runs a worker view lists, newest first. */
+const WORKER_RUNS_SHOWN = 5;
+
 const vFollowUp = v.union(v.literal("none"), v.literal("queue"), v.literal("steer"), v.literal("steer-restart"));
 
 const vWorkerView = v.object({
@@ -1388,6 +1403,8 @@ const vWorkerView = v.object({
     // Queued runs waiting behind the one going (or for it to be claimed), for the Stop choice.
     queuedRuns: v.number(),
     quietAfterMs: v.number(),
+    // The latest runs, each with its own state and delivery: one run's result never holds up another's.
+    runs: v.array(vWorkerRunView),
     state: v.union(v.literal("idle"), v.literal("queued"), v.literal("running")),
     workerId: v.string(),
 });
@@ -1408,18 +1425,27 @@ const workerState = (working: RunDoc | undefined, unwinding: boolean): "idle" | 
     return working.status === "running" ? "running" : "queued";
 };
 
-/** The progress fields of a worker view: activity only for a running run, so an idle or queued worker's list never re-runs on a message. */
+/** The progress and run-list fields of a worker view: activity only for a running run, so an idle or queued worker's list never re-runs on a message. */
 const progressFields = async (
     ctx: QueryCtx,
     group: ReadonlyArray<RunDoc>,
     working: RunDoc | undefined,
-): Promise<{ lastActivityAt: number | null; queuedRuns: number; quietAfterMs: number }> => {
+): Promise<{ lastActivityAt: number | null; queuedRuns: number; quietAfterMs: number; runs: Infer<typeof vWorkerRunView>[] }> => {
     const activityAt = working?.status === "running" && working.childThreadId !== undefined ? await workerActivityAt(ctx, working.childThreadId) : undefined;
 
     return {
         lastActivityAt: working?.status === "running" ? Math.max(working.startedAt ?? 0, activityAt ?? 0) : null,
         queuedRuns: group.filter((run) => run.status === "queued").length,
         quietAfterMs: SUB_WORKER_QUIET_MS,
+        runs: group.slice(0, WORKER_RUNS_SHOWN).map((run) => {
+            return {
+                createdAt: run.createdAt,
+                delivery: runDelivery(run),
+                runId: run._id,
+                state: run.status,
+                task: run.task.split("\n", 1)[0]!.slice(0, 160),
+            };
+        }),
     };
 };
 
