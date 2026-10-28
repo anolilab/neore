@@ -732,6 +732,10 @@ impl DeviceState {
     /// Ends a server's connection and the master under it, even when another session still rides that master: for
     /// a change ssh only reads when the master starts.
     pub(super) fn host_restart(&self, device_id: &str) {
+        // A connect still waiting (on a passphrase) was opened with the settings from before this change; it must not
+        // be installed afterwards with, say, agent forwarding the owner has just turned off.
+        self.ssh.disconnects.fetch_add(1, Ordering::SeqCst);
+
         let link = self.ssh.connections.lock().unwrap().remove(device_id);
 
         if let Some(link) = link {
