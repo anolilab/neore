@@ -2,16 +2,18 @@
  * Validators for a thread's agent switch — the `threads.activeAgent` column and the
  * `agentSwitch` part a switch leaves in the transcript (`agent/agent-switch.ts`).
  *
- * Imported by `schema.ts`, so this module must stay free of runtime imports beyond
+ * Imported by `schema.ts`, so this module must stay free of runtime imports beyond `../lib/validators` and
  * `lunorash/server`.
  */
 import type { Infer } from "lunorash/server";
 import { v } from "lunorash/server";
 
+import { MAX_LENGTH } from "../lib/validators";
+
 /** A cloud model. The host variant `{ kind: "host", … }` joins this union with host switches. */
 export const vAgentRef = v.object({
     kind: v.literal("model"),
-    model: v.string(),
+    model: v.string().max(MAX_LENGTH.short),
 });
 
 export type AgentRef = Infer<typeof vAgentRef>;
@@ -29,7 +31,7 @@ export const vAgentSwitchMode = v.literal("full");
 export const vAgentSwitch = v.object({
     from: vAgentRef,
     mode: vAgentSwitchMode,
-    startMessageId: v.string(),
+    startMessageId: v.string().max(MAX_LENGTH.id),
     to: vAgentRef,
 });
 
