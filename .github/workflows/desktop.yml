@@ -171,6 +171,11 @@ jobs:
                   fi
                   node -e "const fs = require('node:fs'); const file = 'apps/desktop/package.json'; const pkg = JSON.parse(fs.readFileSync(file, 'utf8')); pkg.version = process.argv[1]; fs.writeFileSync(file, JSON.stringify(pkg, null, 4) + '\n');" "$version"
 
+            # The shell bundles `@neore/ai/capabilities` (plain data, read through its built `dist/`), and nothing
+            # else builds that package on this job.
+            - name: "Build the shared capability rules"
+              run: "pnpm --filter @neore/ai run build"
+
             - name: "Bundle the main process and preloads"
               run: "pnpm --filter @neore/desktop run build"
 
