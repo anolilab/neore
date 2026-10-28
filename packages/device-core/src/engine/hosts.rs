@@ -708,6 +708,27 @@ impl DeviceState {
                 ));
             }
 
+            // An earlier probe of this server that was never paired is replaced by this one anyway; it must not
+            // keep a session on the binary being replaced.
+            let earlier = {
+                let mut probe = self.ssh.probe.lock().unwrap();
+
+                match probe.as_ref() {
+                    Some((_, link))
+                        if link
+                            .target()
+                            .is_some_and(|other| same_server(other, &target)) =>
+                    {
+                        probe.take()
+                    }
+                    _ => None,
+                }
+            };
+
+            if let Some((_, link)) = earlier {
+                self.retire(&link);
+            }
+
             let interact = self.ask_user();
             let remote = Remote {
                 interact: &interact,
