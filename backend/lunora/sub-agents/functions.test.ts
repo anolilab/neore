@@ -79,6 +79,7 @@ const ONLY_OWNER = /Only the owner/u;
 const FAN_OUT_CAP = /At most 3 sub-agents/u;
 const DEPTH_CAP = /at most 2 levels/u;
 const PER_RUN_CAP = /at most 5 sub-agents of its own/u;
+const GONE_PARENT = /is gone/u;
 const LOCKED_PARENT = /is locked/u;
 
 const messagesIn = async (id: string) =>
@@ -342,7 +343,7 @@ describe("finishRun", () => {
     describe("when the parent cannot take the post", () => {
         const postJobs = () => harness.scheduler.list().filter((job) => job.functionPath?.includes("postResult") === true);
 
-        it("leaves resultPostedAt unset and retries a post to a deleted thread", async () => {
+        it("ends in postFailed at once for a deleted thread, which will not come back", async () => {
             await admit();
 
             const [run] = await runs();
@@ -356,9 +357,8 @@ describe("finishRun", () => {
 
             expect(ended).toMatchObject({ error: "boom", status: "failed" });
             expect(ended).not.toHaveProperty("resultPostedAt");
-            expect(ended).not.toHaveProperty("postFailed");
-            expect(postJobs()).toHaveLength(1);
-            expect(postJobs()[0]!.args).toMatchObject({ attempt: 0, failures: 1, runId: run._id });
+            expect(ended).toMatchObject({ postFailed: expect.stringMatching(GONE_PARENT) });
+            expect(postJobs()).toHaveLength(0);
         });
 
         it("posts a retry that finds the parent unlocked, and a run is not posted twice", async () => {

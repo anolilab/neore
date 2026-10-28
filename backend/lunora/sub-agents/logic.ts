@@ -232,7 +232,8 @@ export const stopWhenRequested = (isStopRequested: () => Promise<boolean>): Stop
 
 /**
  * The run that starts next on a worker, from its runs newest first: the oldest queued one, or none
- * while a run is going. A worker runs one message at a time, in the order they were sent.
+ * while a run is going. A worker runs one message at a time, in the order they were sent
+ * (`latestWorkerRuns` sorts by `createdAt`, which admission makes strictly increasing per worker).
  */
 export const nextQueuedWorkerRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>
     newestFirst.some((run) => run.status === "running") ? undefined : newestFirst.findLast((run) => run.status === "queued");
@@ -240,6 +241,30 @@ export const nextQueuedWorkerRun = <T extends { status: SubAgentStatus }>(newest
 /** The run a worker is on, from its runs newest first: the one going, else the next in line. A Stop in its thread means this one. */
 export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>
     newestFirst.find((run) => run.status === "running") ?? newestFirst.findLast((run) => run.status === "queued");
+
+/**
+ * Why the lead never got the worker's latest result, from its runs newest first: the newest run the
+ * lead asked for that gave up posting, unless a later one of them posted. Null when none did.
+ */
+export const workerPostFailure = (
+    newestFirst: ReadonlyArray<{ mode?: "run" | "worker"; postFailed?: string; resultPostedAt?: number; toolCallId?: string }>,
+): string | null => {
+    for (const run of newestFirst) {
+        if (!postsBack(run)) {
+            continue;
+        }
+
+        if (run.postFailed !== undefined) {
+            return run.postFailed;
+        }
+
+        if (run.resultPostedAt !== undefined) {
+            return null;
+        }
+    }
+
+    return null;
+};
 
 /**
  * How a message sent to a busy worker is handled, read from what its runner can do. Cloud headless

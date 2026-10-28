@@ -18,6 +18,7 @@ import {
     truncateResult,
     workerCurrentRun,
     workerFollowUp,
+    workerPostFailure,
 } from "./logic";
 
 const DEPTH_CAP = /at most 2 levels/u;
@@ -178,6 +179,38 @@ describe("a worker's line of messages", () => {
         expect(workerCurrentRun(newestFirst("queued", "queued", "running"))).toMatchObject({ id: 2 });
         expect(workerCurrentRun(newestFirst("queued", "queued", "succeeded"))).toMatchObject({ id: 1 });
         expect(workerCurrentRun(newestFirst("succeeded"))).toBeUndefined();
+    });
+
+    it("reports a failed post of the newest run the lead asked for, until a later one of them posts", () => {
+        const asked = { mode: "worker", toolCallId: "call" } as const;
+        const typed = { mode: "worker" } as const;
+
+        expect(
+            workerPostFailure([
+                { ...asked, postFailed: "gone" },
+                { ...asked, resultPostedAt: 1 },
+            ]),
+        ).toBe("gone");
+        expect(
+            workerPostFailure([
+                { ...asked, resultPostedAt: 2 },
+                { ...asked, postFailed: "gone" },
+            ]),
+        ).toBeNull();
+        // A run the person typed is never owed a post, so it neither shows a failure nor hides one.
+        expect(
+            workerPostFailure([
+                { ...typed, postFailed: "ignored" },
+                { ...asked, postFailed: "gone" },
+            ]),
+        ).toBe("gone");
+        expect(
+            workerPostFailure([
+                { ...typed, resultPostedAt: 3 },
+                { ...asked, postFailed: "gone" },
+            ]),
+        ).toBe("gone");
+        expect(workerPostFailure([asked, typed])).toBeNull();
     });
 
     it("queues a follow-up for a cloud worker and offers no steer", () => {

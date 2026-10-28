@@ -71,6 +71,7 @@ import {
     WORKER_CLIENT_ID_MAX,
     WORKER_NAME_MAX,
     workerCurrentRun,
+    workerPostFailure,
     workerFollowUp,
 } from "./logic";
 import { vSubAgentRunMode, vSubAgentRunStatus } from "./validators";
@@ -276,13 +277,19 @@ const workerOrigin = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childThread
     return origin?.mode === "worker" ? origin : null;
 };
 
-/** The worker's newest runs, newest first. */
-const latestWorkerRuns = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childThreadId: string): Promise<RunDoc[]> =>
-    await ctx.db
+/**
+ * The worker's newest runs, newest first by `createdAt`. Admission keeps that strictly increasing
+ * per worker, so the order is the order the messages were sent even when `_creationTime` ties.
+ */
+const latestWorkerRuns = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childThreadId: string): Promise<RunDoc[]> => {
+    const runs = await ctx.db
         .query("subAgentRuns")
         .withIndex("by_childThreadId", (q) => q.eq("childThreadId", childThreadId))
         .order("desc")
         .take(WORKER_RUNS_CHECKED);
+
+    return runs.toSorted((a, b) => b.createdAt - a.createdAt);
+};
 
 /**
  * Puts a queued run on the jobs queue and schedules its reaper, in the caller's transaction. A
@@ -410,6 +417,8 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
 
     // Whether the worker has no run going or waiting, so this one starts at once.
     let idle = true;
+    // The newest run's `createdAt`: a message sent in the same millisecond still queues behind it.
+    let newestRunAt = 0;
 
     if (child && origin) {
         if (child.status === "archived") {
@@ -423,6 +432,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         const recent = await latestWorkerRuns(ctx, child._id);
 
         idle = recent.every((run) => !isActiveSubAgentStatus(run.status));
+        newestRunAt = recent[0]?.createdAt ?? 0;
     }
 
     let allowlist = origin?.toolAllowlist;
@@ -490,7 +500,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
     const row: Omit<RunDoc, "_creationTime" | "_id"> = {
         childThreadId,
         clientId: args.toolCallId === undefined ? args.clientId : undefined,
-        createdAt: now,
+        createdAt: Math.max(now, newestRunAt + 1),
         depth,
         mode: "worker",
         organizationId: parent.organizationId,
@@ -611,7 +621,7 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
     if (run.mode === "worker") {
         // Archived, deleted or locked after this run was queued: it ends cancelled and uncharged, the
         // thread stays as it is, and the rest of the queue drains the same way.
-        if (!worker || worker.status === "archived" || isThreadLocked(worker)) {
+        if (!worker || worker.deleted || worker.status === "archived" || isThreadLocked(worker)) {
             await finishRun(ctx, run._id, { kind: "cancelled" });
 
             return null;
@@ -735,19 +745,19 @@ export const attachChildThread = internalMutation
 /**
  * The result as a follow-up assistant message in the parent thread, under the
  * sub-agent's name, as a new turn on the thread's active branch. Writes nothing
- * and answers why when the thread is gone, no longer the run's owner's, or locked;
- * `undefined` means it wrote.
+ * and answers why when the thread is gone, no longer the run's owner's (`retry: false`, it
+ * will not come back), or locked (`retry: true`, it may be unlocked); `undefined` means it wrote.
  */
-const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promise<string | undefined> => {
+const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promise<{ reason: string; retry: boolean } | undefined> => {
     const thread = await ctx.db.get(run.parentThreadId as Id<"threads">);
 
     if (!thread || thread.deleted || thread.userId !== run.userId) {
-        return "The conversation that started this run is gone.";
+        return { reason: "The conversation that started this run is gone.", retry: false };
     }
 
     // A locked parent takes no background post: the result stays with the run, unread.
     if (isThreadLocked(thread)) {
-        return "The conversation that started this run is locked.";
+        return { reason: "The conversation that started this run is locked.", retry: true };
     }
 
     const last = await getMaxMessage(ctx, thread._id);
@@ -768,19 +778,25 @@ const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promis
     return undefined;
 };
 
-/**
- * Starts the worker's next queued run after one of its runs ended, if that run was the one going
- * or the head of the line. Ending a run further back changes nothing: the head already has its job.
- */
-const startNextWorkerRun = async (ctx: MutationCtx, ended: RunDoc): Promise<void> => {
-    if (ended.mode !== "worker" || ended.childThreadId === undefined) {
-        return;
-    }
+/** Starts the worker's next queued run, if none is going: the head of the line has no job until now. */
+const startNextWorkerRun = async (ctx: MutationCtx, childThreadId: string): Promise<void> => {
+    const next = nextQueuedWorkerRun(await latestWorkerRuns(ctx, childThreadId));
 
-    const next = nextQueuedWorkerRun(await latestWorkerRuns(ctx, ended.childThreadId));
-
-    if (next && (ended.status === "running" || ended._creationTime < next._creationTime)) {
+    if (next) {
         await startQueuedRun(ctx, next._id);
+    }
+};
+
+/**
+ * Moves a worker's line on after a run that was cancelled while running: its loop stops at the next
+ * step boundary, and until then it still writes into the thread, so the next message waits for the
+ * loop to exit ({@link completeRun}) or, if it died, for the reaper. A no-op for any other run.
+ */
+const resumeLineAfterStoppedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<void> => {
+    const run = await ctx.db.get(runId);
+
+    if (run?.mode === "worker" && run.status === "cancelled" && run.startedAt !== undefined && run.childThreadId !== undefined) {
+        await startNextWorkerRun(ctx, run.childThreadId);
     }
 };
 
@@ -807,10 +823,10 @@ const isThreadStreaming = async (ctx: Pick<MutationCtx, "db">, threadId: string)
  * lands after that reply rather than between its steps; past
  * {@link SUB_AGENT_POST_MAX_ATTEMPTS} it posts anyway.
  *
- * `resultPostedAt` is set only with the message write. A parent that cannot take it
- * (deleted, locked) leaves it unset and the post is retried with backoff; after
- * {@link SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS} tries the run ends in `postFailed`, the
- * terminal state the worker row shows. `failures` counts those tries. Returns whether
+ * `resultPostedAt` is set only with the message write. A locked parent leaves it unset and
+ * the post is retried with backoff; after {@link SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS} tries
+ * the run ends in `postFailed`, the terminal state the worker row shows, and a deleted or
+ * no-longer-owned parent ends there at once. `failures` counts the tries. Returns whether
  * this call posted.
  */
 export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, attempt: number, failures = 0): Promise<boolean> => {
@@ -845,8 +861,8 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
         return true;
     }
 
-    if (failures + 1 >= SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS) {
-        await patchById(ctx.db, run._id, { postFailed: refusal });
+    if (!refusal.retry || failures + 1 >= SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS) {
+        await patchById(ctx.db, run._id, { postFailed: refusal.reason });
     } else {
         await ctx.scheduler.runAfter(postRetryDelayMs(failures), internal.sub_agents.functions.postResult, { attempt, failures: failures + 1, runId });
     }
@@ -871,6 +887,13 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
         return false;
     }
 
+    // The run the worker's line waits on: the one going, or the head of the queue. Ending one further
+    // back changes nothing, the head already has its job. Read before the patch takes it out of the line.
+    const wasRunning = run.status === "running";
+    const wasHead =
+        run.mode === "worker" &&
+        run.childThreadId !== undefined &&
+        (wasRunning || nextQueuedWorkerRun(await latestWorkerRuns(ctx, run.childThreadId))?._id === run._id);
     const now = Date.now();
     const result = outcome.kind === "succeeded" ? truncateResult(outcome.result) : undefined;
     const error = outcome.kind === "failed" ? outcome.error.slice(0, 1000) : undefined;
@@ -886,7 +909,11 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     }
 
     await postRunResult(ctx, run._id, 0);
-    await startNextWorkerRun(ctx, run);
+
+    // A stopped running run is still mid-step: its line moves on when its loop exits, not before.
+    if (wasHead && !(wasRunning && outcome.kind === "cancelled")) {
+        await startNextWorkerRun(ctx, run.childThreadId!);
+    }
 
     if (outcome.kind !== "cancelled") {
         await notifyQuietly(ctx, {
@@ -914,20 +941,35 @@ export const postResult = internalMutation
         return null;
     });
 
+/** The child's loop is over: ends the run, or, when a Stop ended it first, lets the worker's next message go. */
+export const finishRunFromLoop = async (
+    ctx: MutationCtx,
+    runId: Id<"subAgentRuns">,
+    outcome: Exclude<SubAgentOutcome, { kind: "cancelled" }>,
+): Promise<boolean> => {
+    const ended = await finishRun(ctx, runId, outcome);
+
+    if (!ended) {
+        await resumeLineAfterStoppedRun(ctx, runId);
+    }
+
+    return ended;
+};
+
 export const completeRun = internalMutation
     .input({
         outcome: v.union(v.object({ error: v.string(), kind: v.literal("failed") }), v.object({ kind: v.literal("succeeded"), result: v.string() })),
         runId: v.id("subAgentRuns"),
     })
     .output(v.boolean())
-    .mutation(async ({ args, ctx }) => await finishRun(ctx, args.runId, args.outcome));
+    .mutation(async ({ args, ctx }) => await finishRunFromLoop(ctx, args.runId, args.outcome));
 
-/** Scheduled at admission: fails a run that never reported, which also frees its fan-out slot. */
+/** Scheduled at admission: fails a run that never reported, which also frees its fan-out slot (and a stopped run's line). */
 export const reapRun = internalMutation
     .input({ runId: v.id("subAgentRuns") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await finishRun(ctx, args.runId, { error: "The sub-agent did not finish in time.", kind: "failed" });
+        await finishRunFromLoop(ctx, args.runId, { error: "The sub-agent did not finish in time.", kind: "failed" });
 
         return null;
     });
@@ -1235,34 +1277,30 @@ export const listWorkers = authQuery
             );
         }
 
-        const latest = new Map<string, RunDoc>();
-        const active = new Map<string, RunDoc>();
+        // Each worker's runs, newest first: its state and delivery status read from all of them, as `getWorker` does.
+        const byWorker = new Map<string, RunDoc[]>();
+        const newestFirst = runs.toSorted((a, b) => b.createdAt - a.createdAt);
 
-        for (const run of runs) {
+        for (const run of newestFirst) {
             if (run.mode !== "worker" || run.userId !== ctx.user.userId || run.childThreadId === undefined) {
                 continue;
             }
 
-            if (!latest.has(run.childThreadId) || latest.get(run.childThreadId)!.createdAt < run.createdAt) {
-                latest.set(run.childThreadId, run);
-            }
-
-            if (isActiveSubAgentStatus(run.status)) {
-                active.set(run.childThreadId, run);
-            }
+            byWorker.set(run.childThreadId, [...(byWorker.get(run.childThreadId) ?? []), run]);
         }
 
-        const newest = [...latest.values()].toSorted((a, b) => b.createdAt - a.createdAt).slice(0, WORKER_LIST_MAX);
+        const newest = [...byWorker.values()].toSorted((a, b) => b[0]!.createdAt - a[0]!.createdAt).slice(0, WORKER_LIST_MAX);
         const views: Infer<typeof vWorkerView>[] = [];
 
-        for (const run of newest) {
+        for (const group of newest) {
+            const run = group[0]!;
             const thread = await ctx.db.get(run.childThreadId as Id<"threads">);
 
             if (!thread || thread.deleted || thread.userId !== ctx.user.userId) {
                 continue;
             }
 
-            const working = active.get(run.childThreadId!);
+            const working = workerCurrentRun(group);
 
             views.push({
                 activeRunId: working?._id ?? null,
@@ -1272,7 +1310,7 @@ export const listWorkers = authQuery
                 lastRunStatus: run.status,
                 leadThreadId: run.parentThreadId,
                 name: workerName(thread, run),
-                postFailed: run.postFailed ?? null,
+                postFailed: workerPostFailure(group),
                 state: workerState(working),
                 workerId: run.childThreadId!,
             });
@@ -1305,7 +1343,7 @@ export const getWorker = authQuery
             lastRunStatus: latest.status,
             leadThreadId: origin.parentThreadId,
             name: workerName(thread, origin),
-            postFailed: latest.postFailed ?? null,
+            postFailed: workerPostFailure(recent),
             state: workerState(working),
             workerId: args.workerId,
         };

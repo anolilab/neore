@@ -15,10 +15,12 @@ import {
     createWorker,
     dispatchToWorker,
     finishRun,
+    finishRunFromLoop,
     getWorker,
     listActiveWorkerRuns,
     listWorkers,
 } from "./functions";
+import { createRatelimit } from "../lib/rate-limiter";
 import schema from "../schema";
 
 const OWNER = "user-owner";
@@ -236,8 +238,96 @@ describe("a busy worker", () => {
         const rows = await runRows();
 
         expect(rows.find((row) => row._id === a!.runId)).toMatchObject({ status: "cancelled" });
-        // The stopped run's slot goes to the next message.
+        // The stopped loop is still mid-step and writes into the thread: the next message waits for it.
+        expect(startedRuns()).toStrictEqual([a!.runId]);
+
+        // Its loop exits (the late success finds the run already ended), and the line moves on.
+        expect(await run(async (context) => await finishRunFromLoop(context, a!.runId as never, { kind: "succeeded", result: "late" }))).toBe(false);
         expect(startedRuns()).toStrictEqual([a!.runId, b!.runId]);
+    });
+
+    it("moves the line on past a stopped run whose loop died, when the reaper fires", async () => {
+        const workerId = await idleWorker();
+        const [a, b] = [await message(workerId, "c-a"), await message(workerId, "c-b")] as { runId: string }[];
+
+        await claim(a!.runId);
+        await run(async (context) => await cancelSubAgentRunsForStop(context, workerId, OWNER));
+        expect(startedRuns()).toStrictEqual([a!.runId]);
+
+        await run(async (context) => await finishRunFromLoop(context, a!.runId as never, { error: "The sub-agent did not finish in time.", kind: "failed" }));
+        expect(startedRuns()).toStrictEqual([a!.runId, b!.runId]);
+    });
+
+    it("starts the next message when the head ends, though both were sent in the same millisecond", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(Date.now());
+
+        try {
+            const workerId = await idleWorker();
+            const [a, b, c] = [await message(workerId, "c-a"), await message(workerId, "c-b"), await message(workerId, "c-c")] as { runId: string }[];
+            const rows = await runRows();
+
+            expect(new Set(rows.map((row) => row._creationTime)).size).toBe(1);
+            expect(startedRuns()).toStrictEqual([a!.runId]);
+
+            // Cancelled while queued: B was waiting behind it and takes the slot, then C behind B.
+            await finish(a!.runId, "cancelled");
+            expect(startedRuns()).toStrictEqual([a!.runId, b!.runId]);
+
+            expect(await claim(b!.runId)).toMatchObject({ _id: b!.runId });
+            await finish(b!.runId);
+            expect(startedRuns()).toStrictEqual([a!.runId, b!.runId, c!.runId]);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it.each([{ status: "archived" }, { lockedAt: 1 }, { deleted: true }])(
+        "lets the whole queue drain as cancelled, uncharged, when the worker is changed meanwhile: %o",
+        async (patch) => {
+            const workerId = await idleWorker();
+            const [a, b, c] = [await message(workerId, "c-a"), await message(workerId, "c-b"), await message(workerId, "c-c")] as { runId: string }[];
+            const charged = await dailyCounter();
+
+            await run(async (context) => await context.db.patch(workerId, patch));
+
+            expect(await claim(a!.runId)).toBeNull();
+            expect(startedRuns()).toStrictEqual([a!.runId, b!.runId]);
+            expect(await claim(b!.runId)).toBeNull();
+            expect(await claim(c!.runId)).toBeNull();
+            expect(startedRuns()).toStrictEqual([a!.runId, b!.runId, c!.runId]);
+
+            const rows = await runRows();
+
+            expect([a, b, c].map((queued) => rows.find((row) => row._id === queued!.runId).status)).toStrictEqual(["cancelled", "cancelled", "cancelled"]);
+            expect(await dailyCounter()).toStrictEqual(charged);
+        },
+    );
+
+    it("fails each queued run at the claim while the daily limit is spent, the next one taking its turn", async () => {
+        const workerId = await idleWorker();
+        const [a, b] = [await message(workerId, "c-a"), await message(workerId, "c-b")] as { runId: string }[];
+
+        await run(async (context) => {
+            const limiter = createRatelimit("chat/dailyText:free", context.db as never);
+
+            for (let attempt = 0; attempt < 1000; attempt += 1) {
+                const { ok } = await limiter.limit(OWNER);
+
+                if (!ok) {
+                    break;
+                }
+            }
+        });
+
+        expect(await claim(a!.runId)).toBeNull();
+        expect(startedRuns()).toStrictEqual([a!.runId, b!.runId]);
+        expect(await claim(b!.runId)).toBeNull();
+
+        const rows = await runRows();
+
+        expect(rows.find((row) => row._id === a!.runId)).toMatchObject({ status: "failed" });
+        expect(rows.find((row) => row._id === b!.runId)).toMatchObject({ status: "failed" });
     });
 
     it("offers no steer: a cloud worker's runner queues", async () => {
@@ -245,6 +335,24 @@ describe("a busy worker", () => {
 
         expect(await as(OWNER).query(getWorker as never, { workerId } as never)).toMatchObject({ followUp: "queue" });
         expect(await as(OWNER).query(listWorkers as never, { leadThreadId: leadId } as never)).toMatchObject([{ followUp: "queue" }]);
+    });
+});
+
+describe("reading a busy worker", () => {
+    it("lists the running run as current, not a queued one behind it, and the lead's undelivered result", async () => {
+        const workerId = await idleWorker();
+        const [a] = [await message(workerId, "c-a"), await message(workerId, "c-b")] as { runId: string }[];
+
+        await run(async (context) => await claimQueuedRun(context, a!.runId as never));
+        // The first run, which the lead asked for, never reached the lead; the typed ones are not owed.
+        const [first] = await runRows();
+
+        await run(async (context) => await context.db.patch(first._id, { postFailed: "The conversation that started this run is gone." }));
+
+        const expected = { activeRunId: a!.runId, postFailed: "The conversation that started this run is gone.", state: "running" };
+
+        expect(await as(OWNER).query(listWorkers as never, { leadThreadId: leadId } as never)).toMatchObject([expected]);
+        expect(await as(OWNER).query(getWorker as never, { workerId } as never)).toMatchObject(expected);
     });
 });
 
