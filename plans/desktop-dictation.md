@@ -68,7 +68,8 @@ Decisions:
 Windows, and Linux. Record model size, download size, first-word latency, time to
 finish for a 10-second clip, peak memory, CPU use, and accuracy on a fixed set of
 prompts in the languages we support. Check each model's licence for redistribution
-in the app. Output: one chosen model, or a stop.
+in the app. Output: one chosen model, or a stop (per platform; Windows arm64 is
+decided in S4, see Appendix A).
 - Acceptance: a table of measurements in the plan's appendix; the chosen model's
   licence is recorded and allows redistribution.
 
@@ -117,3 +118,79 @@ microphone prompt and helper packaging for each.
 2. **Hold key or toggle.** Recommendation: hold, with a toggle in settings.
 3. **Cloud fallback.** Recommendation: none. A failure is shown, and the user
    chooses the cloud path.
+
+## Appendix A — S1 spike measurements
+
+Harness: `tools/dictation-bench/` (`bench.py`, 18 prompts in the nine supported
+languages read by synthetic voices, plus one clip of exactly ten seconds), run by
+`.github/workflows/dictation-bench.yml`. Recogniser: whisper.cpp v1.9.5 (pinned
+commit in the workflow). The error figure is the mean of the per-language rates (word
+error rate, character error rate for Japanese and Chinese), so languages counted
+in characters and in words are not mixed in one total. "10 s clip" is the wall time to finish the
+ten-second clip with batch decoding. First-word latency is not measured here:
+batch decoding returns the text only at the end. S2 measures it with streamed
+partial results on the chosen model. Peak memory is
+the process's resident peak.
+
+| Platform | Model | Size | Mean error per language | 10 s clip | CPU time (10 s clip) | Peak memory |
+| --- | --- | --- | --- | --- | --- | --- |
+| macOS arm64 (M4, Metal, machine under build load) | tiny | 78 MB | 16.1 % | 0.70 s | 0.53 s | 279 MB |
+| macOS arm64 | base | 148 MB | 12.2 % | 0.67 s | — | 383 MB |
+| macOS arm64 | small | 488 MB | 6.5 % | 1.38 s | — | 857 MB |
+| macOS arm64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 3.91 s | — | 852 MB |
+| Linux x64 (GitHub runner, 4 vCPU, no GPU) | tiny | 78 MB | 15.9 % | 1.15 s | 4.2 s | 177 MB |
+| Linux x64 | base | 148 MB | 12.2 % | 2.15 s | 8.0 s | 285 MB |
+| Linux x64 | small | 488 MB | 6.5 % | 6.68 s | 25.2 s | 751 MB |
+| Linux x64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 39.0 s | 154 s | 794 MB |
+| Linux arm64 (runner, 4 vCPU) | tiny | 78 MB | 15.9 % | 1.46 s | 5.3 s | 176 MB |
+| Linux arm64 | base | 148 MB | 12.2 % | 2.76 s | 10.4 s | 284 MB |
+| Linux arm64 | small | 488 MB | 6.5 % | 8.44 s | 32.5 s | 750 MB |
+| Linux arm64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 44.6 s | 176 s | 793 MB |
+| Windows x64 (runner, 4 vCPU) | tiny | 78 MB | 15.9 % | 1.22 s | 4.2 s | 195 MB |
+| Windows x64 | base | 148 MB | 12.2 % | 2.23 s | 8.1 s | 303 MB |
+| Windows x64 | small | 488 MB | 6.5 % | 6.84 s | 25.1 s | 769 MB |
+| Windows x64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 36.8 s | 140 s | 812 MB |
+| macOS x64 (runner, CPU only) | tiny | 78 MB | 15.9 % | 1.65 s | 4.5 s | 228 MB |
+| macOS x64 | base | 148 MB | 12.2 % | 2.67 s | 8.1 s | 338 MB |
+| macOS x64 | small | 488 MB | 6.5 % | 7.47 s | 24.8 s | 809 MB |
+| macOS x64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 25.4 s | 87.2 s | 874 MB |
+| Windows arm64 (runner, 4 vCPU) | tiny | 78 MB | 15.9 % | 5.15 s | 19.7 s | 184 MB |
+| Windows arm64 | base | 148 MB | 12.2 % | 11.2 s | 44.1 s | 294 MB |
+| Windows arm64 | small | 488 MB | 6.5 % | 42.9 s | 169 s | 755 MB |
+| Windows arm64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 295 s | 1,047 s | 720 MB |
+
+macOS x64: a first run used Metal on the runner's virtual GPU, which was slower
+than the CPU (tiny took 23 s for the 10 s clip) and returned no text for the
+quantised large model; the rows above are the CPU-only run (`--no-gpu`), which
+is also what Intel Macs should use. Windows arm64 is four to seven times slower than
+Linux arm64 on the same model, which points at the build rather than the chip: the
+leg builds with MSVC, and ggml's arm64 fast paths are written for GCC and Clang.
+S4 rebuilds it with clang-cl and measures again before choosing its model.
+
+Error rates are the same on every platform that ran, so accuracy depends only on
+the model; speed depends on the hardware. Without a GPU, large-v3-turbo needs
+about four times the clip's length on these 4-core runners.
+
+**Licences.** whisper.cpp is MIT. The Whisper model weights are MIT (released by
+their authors under MIT), and the ggml conversions are published under the same
+terms, so both may be redistributed inside the app with the licence text.
+
+**Recommendation.** Pick the model per machine, from what the recogniser can use:
+
+- **Apple Silicon:** large-v3-turbo q5_0 (574 MB). It is the only candidate that
+  holds in all nine languages (1.5 % mean across languages, no language above 6 %), and Metal
+  finishes a 10 s clip in about 4 s.
+- **Machines without a supported GPU (Windows, Linux, Intel Macs):** small
+  (488 MB, 6.5 %), about 7 s for a 10 s clip on a 4-core runner and faster on a
+  typical desktop CPU. Settings says it is weaker on Chinese (24 %) and Italian
+  (14 %), and offers large-v3-turbo as a slower, more accurate choice.
+- **Windows arm64:** undecided until S4's clang-cl rebuild. As measured, even
+  small takes four times the clip's length, so only tiny or base would be usable.
+- A GPU backend for Windows and Linux (Vulkan or CUDA builds of whisper.cpp) would
+  let them use large-v3-turbo too; that is a packaging question for S2, not a
+  reason to block it.
+
+The chosen models' licences allow redistribution (above). Every platform row is
+recorded, so S1 is done for macOS, Windows x64 and Linux. S1's model-or-stop decision
+for Windows arm64 is deliberately left open and decided in S4, once the clang-cl rebuild
+shows what that platform can run; until then dictation is not offered there.

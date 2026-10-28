@@ -1,0 +1,122 @@
+# Dictation spike (plans/desktop-dictation.md S1): measures on-device speech models on the
+# platforms the desktop ships to. Run by hand, or by a pull request that changes the benchmark
+# itself; nothing else depends on it.
+
+name: "Dictation benchmark"
+
+on: # yamllint disable-line rule:truthy
+    pull_request:
+        paths:
+            - ".github/workflows/dictation-bench.yml"
+            - "tools/dictation-bench/**"
+    workflow_dispatch:
+        inputs:
+            models:
+                description: "Space-separated whisper.cpp model names"
+                required: false
+                default: "tiny base small large-v3-turbo-q5_0"
+
+concurrency:
+    group: "${{ github.workflow }}-${{ github.ref }}"
+    cancel-in-progress: true
+
+permissions:
+    contents: "read" # to fetch code (actions/checkout)
+
+env:
+    # whisper.cpp v1.9.5, pinned by commit.
+    WHISPER_CPP_SHA: "d1be6fde11ac6e0407606b4e42fe72d34add8037"
+
+jobs:
+    bench:
+        name: "Benchmark (${{ matrix.os }})"
+        runs-on: "${{ matrix.os }}"
+        timeout-minutes: 180
+        strategy:
+            fail-fast: false
+            matrix:
+                os: ["ubuntu-24.04", "ubuntu-24.04-arm", "macos-15-intel", "windows-latest", "windows-11-arm"]
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Build whisper.cpp"
+              shell: "bash"
+              run: |
+                  set -euo pipefail
+                  git init -q "$RUNNER_TEMP/whisper.cpp"
+                  cd "$RUNNER_TEMP/whisper.cpp"
+                  git remote add origin https://github.com/ggml-org/whisper.cpp.git
+                  git fetch -q --depth 1 origin "$WHISPER_CPP_SHA"
+                  git checkout -q FETCH_HEAD
+                  cmake -B build -DCMAKE_BUILD_TYPE=Release -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON
+                  cmake --build build --config Release -j 4 --target whisper-cli
+                  cli="$(find build -type f \( -name whisper-cli -o -name whisper-cli.exe \) | head -n 1)"
+                  cli="$PWD/$cli"
+                  # Git Bash paths (/d/a/...) mean nothing to the Windows Python that runs the harness.
+                  if command -v cygpath > /dev/null; then
+                      cli="$(cygpath -m "$cli")"
+                  fi
+                  echo "WHISPER_CLI=$cli" >> "$GITHUB_ENV"
+
+            - name: "Download the models and verify them"
+              shell: "bash"
+              env:
+                  MODELS: "${{ inputs.models || 'tiny base small large-v3-turbo-q5_0' }}"
+              run: |
+                  set -euo pipefail
+                  mkdir -p "$RUNNER_TEMP/models"
+                  cd "$RUNNER_TEMP/models"
+                  # macOS ships bash 3.2 (no associative arrays), so the checksums sit in a case.
+                  for model in $MODELS; do
+                      case "$model" in
+                          tiny) sum=be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21 ;;
+                          base) sum=60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe ;;
+                          small) sum=1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b ;;
+                          large-v3-turbo-q5_0) sum=394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2 ;;
+                          *)
+                              echo "no checksum recorded for $model" >&2
+                              exit 1
+                              ;;
+                      esac
+                      curl -fsSL -o "ggml-$model.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-$model.bin"
+                      actual="$(python3 -I -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "ggml-$model.bin")"
+                      if [[ "$actual" != "$sum" ]]; then
+                          echo "checksum mismatch for $model" >&2
+                          exit 1
+                      fi
+                  done
+
+            - name: "Install psutil (Windows measures memory through it)"
+              if: "runner.os == 'Windows'"
+              shell: "bash"
+              run: "python3 -m pip install --quiet psutil==7.1.3"
+
+            - name: "Install GNU time (Linux)"
+              if: "runner.os == 'Linux'"
+              run: "sudo apt-get install -y -qq time"
+
+            - name: "Run the benchmark"
+              shell: "bash"
+              env:
+                  # The Intel macOS runner's GPU is virtual: Metal there is slower than the CPU and cannot run the quantised large model.
+                  WHISPER_ARGS: "${{ matrix.os == 'macos-15-intel' && '-ng' || '' }}"
+                  MODELS: "${{ inputs.models || 'tiny base small large-v3-turbo-q5_0' }}"
+              run: |
+                  set -euo pipefail
+                  # shellcheck disable=SC2086 # MODELS is a word list on purpose.
+                  python3 -I tools/dictation-bench/bench.py "$WHISPER_CLI" "$RUNNER_TEMP/models" tools/dictation-bench/clips tools/dictation-bench/prompts.tsv $MODELS \
+                      | tee "$RUNNER_TEMP/result-${{ matrix.os }}.json"
+
+            - name: "Upload the result"
+              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              with:
+                  name: "dictation-bench-${{ matrix.os }}"
+                  path: "${{ runner.temp }}/result-${{ matrix.os }}.json"
