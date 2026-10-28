@@ -89,6 +89,9 @@ pub struct DeviceState {
     ssh: SshState,
 }
 
+#[cfg(test)]
+type Connector = Box<dyn Fn(&Target) -> Result<Arc<dyn HostLink>, String> + Send + Sync>;
+
 /// What the engine keeps for the servers it reaches over SSH.
 struct SshState {
     /// The remote path of `neore-host`; shell text, never taken from a page.
@@ -107,6 +110,9 @@ struct SshState {
     probe: Mutex<Option<(Target, Arc<dyn HostLink>)>>,
     /// Where the host versions live on a server.
     root: Root,
+    /// Stands in for ssh in tests that need a session they can pause.
+    #[cfg(test)]
+    connector: Option<Connector>,
     /// The servers (by device id) whose host software is being installed or upgraded. No session may start on one.
     upgrading: Mutex<Vec<(String, Target)>>,
 }
@@ -149,6 +155,8 @@ impl DeviceState {
                 paths: SshPaths::under(data_dir, sandbox::home().as_deref()),
                 probe: Mutex::default(),
                 root: Root::Home,
+                #[cfg(test)]
+                connector: None,
                 upgrading: Mutex::default(),
             },
         }
