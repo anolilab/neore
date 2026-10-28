@@ -28,12 +28,14 @@ export const LOCAL_CHANNEL = {
     hostDisconnect: "neore:device-local:host-disconnect",
     hostForgetKey: "neore:device-local:host-forget-key",
     hostRemove: "neore:device-local:host-remove",
+    openTerminal: "neore:device-local:open-terminal",
     pickFolder: "neore:device-local:pick-folder",
     promptAnswer: "neore:device-local:prompt-answer",
     promptCurrent: "neore:device-local:prompt-current",
     promptSecret: "neore:device-local:prompt-secret",
     settingsGet: "neore:device-local:settings-get",
     settingsUpdate: "neore:device-local:settings-update",
+    terminalAvailability: "neore:device-local:terminal-availability",
 } as const;
 
 /** Main → device window: a prompt was queued, read `promptCurrent` again. */

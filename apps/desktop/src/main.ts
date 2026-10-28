@@ -21,6 +21,8 @@ import { loginItemMenuState } from "./login-item.js";
 import type { PendingSignIn, SignInHandoff } from "./sign-in.js";
 import { beginSignIn, completeSignIn, isFlowState, parseSignInCallback } from "./sign-in.js";
 import { clampText, MAX_COMPOSE_CHARS, newChatUrl, parseDeepLink, SCHEME, siteOrigin } from "./site.js";
+import type { TerminalController } from "./terminal/index.js";
+import { registerTerminalIpc } from "./terminal/index.js";
 import { threadWindowUrl } from "./thread-window.js";
 import { classifyUrl, isLocalPage, isTrustedUrl } from "./trust.js";
 import { createDebouncer, DEFAULT_SIZE, readWindowState, restorableState, SAVE_DEBOUNCE_MS, WINDOW_STATE_FILE, writeWindowState } from "./window-state.js";
@@ -36,6 +38,7 @@ interface ShellState {
     pendingFiles?: DroppedFile[];
     pendingSignIn?: SignInHandoff;
     signInFlow?: PendingSignIn;
+    terminals?: TerminalController;
     tray?: Tray;
 }
 
@@ -82,7 +85,13 @@ const pendingDeepLinks: string[] = [];
  * What the e2e suite (`e2e/shell.spec.ts`) reads through `app.evaluate`: Electron
  * has no API to list trays, so the shell reports what it created.
  */
-const shellProbe = { device: false, quickComposer: false, tray: false };
+const shellProbe = {
+    device: false,
+    openTerminal: async (_folder: string): Promise<void> => {},
+    quickComposer: false,
+    terminalPids: (): number[] => [],
+    tray: false,
+};
 
 Object.assign(globalThis, { neoreShell: shellProbe });
 
@@ -608,6 +617,15 @@ const registerQuickComposerShortcut = (): void => {
     }
 };
 
+/** Asks for a folder, then opens a terminal in it. A refusal (no such folder, no terminal here) is logged. */
+const openTerminalFromTray = async (): Promise<void> => {
+    try {
+        await state.terminals?.open(null);
+    } catch (error) {
+        log(`could not open a terminal: ${String(error)}`);
+    }
+};
+
 const buildTrayMenu = (): Menu => {
     const login = loginItemMenuState({
         isPackaged: app.isPackaged,
@@ -619,6 +637,13 @@ const buildTrayMenu = (): Menu => {
         { click: () => focusMain(), label: "Open Neore" },
         { accelerator: QUICK_COMPOSER_SHORTCUT, click: () => toggleQuickComposer(), label: "Quick Composer" },
         { click: () => startBrowserSignIn(), label: "Sign in with browser" },
+        {
+            click: () => {
+                openTerminalFromTray();
+            },
+            enabled: state.terminals?.availability.available === true,
+            label: "Terminal…",
+        },
         { type: "separator" },
         { checked: login.checked, click: () => toggleLoginItem(), enabled: login.enabled, label: "Start at login", type: "checkbox" },
         { type: "separator" },
@@ -782,7 +807,11 @@ const registerIpc = (): void => {
         state.composer?.hide();
     });
 
-    state.deviceReady = registerDeviceIpc({ isTrusted: isMainWindow });
+    // The terminal has no site-facing channel at all: it is opened from the device window or the tray menu.
+    state.terminals = registerTerminalIpc();
+    shellProbe.terminalPids = () => state.terminals?.pids() ?? [];
+    shellProbe.openTerminal = (folder) => state.terminals?.open(folder) ?? Promise.reject(new Error("no terminal"));
+    state.deviceReady = registerDeviceIpc({ isTrusted: isMainWindow, terminal: state.terminals });
 };
 
 /**

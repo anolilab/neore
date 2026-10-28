@@ -1,4 +1,5 @@
 /** What the local device window's preload exposes as `window.neoreDevice`. */
+import type { Availability } from "../../terminal/shell";
 import type { HostProbe, Prompt, SettingsView } from "../types";
 
 declare global {
@@ -15,6 +16,8 @@ export interface DeviceWindowApi {
     hostForgetKey: (deviceId: string) => Promise<void>;
     hostRemove: (deviceId: string) => Promise<void>;
     onPromptQueued: (handler: () => void) => () => void;
+    /** Opens a terminal for the folder; `null` asks for one. */
+    openTerminal: (folder: string | null) => Promise<void>;
     pickFolder: () => Promise<string | null>;
     promptAnswer: (id: number, answer: "always" | "deny" | "once") => Promise<void>;
     promptCurrent: () => Promise<Prompt | null>;
@@ -22,4 +25,5 @@ export interface DeviceWindowApi {
     promptSecret: (id: number, secret: string) => Promise<void>;
     settingsGet: () => Promise<SettingsView>;
     settingsUpdate: (update: Record<string, unknown>) => Promise<SettingsView>;
+    terminalAvailability: () => Promise<Availability>;
 }

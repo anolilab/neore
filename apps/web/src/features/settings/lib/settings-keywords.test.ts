@@ -35,4 +35,15 @@ describe("settings keyword lists", () => {
 
         expect(tabsWithoutKeywordList(SETTINGS_TABS, withoutPrivacy)).toEqual(["privacy"]);
     });
+
+    it("lists a tab's settings under labels of their own, each once", () => {
+        const items = SETTINGS_NAVIGATION.flatMap((group) => group.items);
+
+        for (const item of items) {
+            const labels = SETTINGS_KEYWORDS[item.tab].map((entry) => entry.label.id);
+
+            expect(labels, `${item.tab} repeats its own label`).not.toContain(item.label.id);
+            expect(new Set(labels).size, `${item.tab} repeats a setting`).toBe(labels.length);
+        }
+    });
 });

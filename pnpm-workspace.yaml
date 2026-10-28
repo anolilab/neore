@@ -522,6 +522,7 @@ allowBuilds:
   geckodriver: true
   msgpackr-extract: true
   msw: true
+  node-pty: true
   oxc-resolver: true
   prisma: true
   protobufjs: true

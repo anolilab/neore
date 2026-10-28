@@ -1,5 +1,5 @@
-// Packaging smoke test: the built shell's bundles exist and the device-execution
-// addon loads and answers. Plain Node, no display, so it runs on all three CI OSes.
+// Packaging smoke test: the built shell's bundles exist, the device-execution
+// addon loads and answers, and the terminal's PTY library loads. Plain Node, no display, so it runs on all three CI OSes.
 // Run after `pnpm --filter @neore/desktop run build`.
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -16,7 +16,17 @@ const fail = (message) => {
     process.exit(1);
 };
 
-const bundles = ["main.cjs", "preload.cjs", "quick-composer/preload.cjs", "device-window/preload.cjs"];
+const bundles = [
+    "main.cjs",
+    "preload.cjs",
+    "quick-composer/preload.cjs",
+    "device-window/preload.cjs",
+    "terminal-host.cjs",
+    "terminal-window/preload.cjs",
+    "terminal-window/terminal.html",
+    "terminal-window/terminal.js",
+    "terminal-window/xterm.css",
+];
 
 for (const bundle of bundles) {
     if (!existsSync(path.join(dist, bundle))) {
@@ -30,6 +40,13 @@ try {
     ({ DeviceCore } = require("@neore/device-core-node"));
 } catch (error) {
     fail(`cannot load @neore/device-core-node: ${error instanceof Error ? error.message : String(error)}`);
+}
+
+// node-pty's native binding is picked by platform and arch at load time; a missing one is a silent "no terminal" otherwise.
+try {
+    require("node-pty");
+} catch (error) {
+    fail(`cannot load node-pty: ${error instanceof Error ? error.message : String(error)}`);
 }
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "neore-smoke-"));
