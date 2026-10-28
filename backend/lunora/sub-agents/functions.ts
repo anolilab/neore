@@ -278,6 +278,9 @@ const workerOrigin = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childThread
     return origin?.mode === "worker" ? origin : null;
 };
 
+/** Pages of cancelled runs `latestWorkerRuns` reads looking for a stopped loop that may still be unwinding. */
+const CANCELLED_PAGES_CHECKED = 4;
+
 /**
  * The worker's newest runs, newest first by `createdAt`, plus the queued and running ones, and the cancelled
  * ones down to the newest that started (a stopped loop may still be unwinding), however old: a burst of newer cancelled messages
@@ -304,10 +307,11 @@ const latestWorkerRuns = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childTh
     }
 
     // Only the newest cancelled run that started can still have a loop unwinding (nothing starts beside a live
-    // loop), but runs cancelled while queued never started and can sit above it in any number.
+    // loop), but runs cancelled while queued never started and can sit above it in any number. The scan stops after
+    // a few pages so a long history is not re-read on every lookup; a loop past them is still released by the reaper.
     let cursor: string | null = null;
 
-    for (let done = false; !done; ) {
+    for (let done = false, pages = 0; !done && pages < CANCELLED_PAGES_CHECKED; pages += 1) {
         const page = await ctx.db
             .query("subAgentRuns")
             .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", childThreadId).eq("status", "cancelled"))
