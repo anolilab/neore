@@ -564,6 +564,7 @@ for a schema table that is neither policed nor listed:
 | `skills_marketplace.rateSkill` | mutation | authMutation + RL | skillRatings, skillStats, skills | skill access | ok |
 | `skills_marketplace.searchSkills` | query | authQuery | — | public skills only, projected | ok |
 | `skills_marketplace.uninstallSkill` | mutation | authMutation + RL | skills | caller-scoped (ctx.user) | ok |
+| `sub_agents_functions.createWorker` | mutation | authMutation | subAgentRuns, threads, threadRelationships, idempotencyClaims | lead thread owner == caller (else a refusal, nothing created); `clientId` claimed under `worker-dispatch` before the rate limit; admission charges nothing | ok — new |
 | `sub_agents_functions.cancelRun` | mutation | authMutation + RL | subAgentRuns, threads, notifications | run.userId == caller AND parent thread owner == caller (else NOT_FOUND); ended run is a no-op | ok — new |
 | `sub_agents_functions.getRunByToolCall` | query | authQuery | subAgentRuns | caller-scoped (ctx.user) — index `by_user_and_toolCallId` pinned to the caller | ok |
 | `system_prompts_functions.createPreset` | mutation | authMutation | systemPromptPresets | caller-scoped (ctx.user) | accepted — own rows; no rate limit |

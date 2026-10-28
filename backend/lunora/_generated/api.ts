@@ -642,6 +642,7 @@ export interface ApiTypes {
     sub_agents: {
         functions: {
             cancelRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, { cancelled: boolean }>;
+            createWorker: FunctionReference<"mutation", { clientId: string; leadThreadId: Id<"threads">; model?: string; name: string; skill?: string; task: string; toolAllowlist?: Array<string> }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
             getRunByToolCall: FunctionReference<"query", { toolCallId: string }, { _id: Id<"subAgentRuns">; childThreadId: string | null; completedAt: number | null; createdAt: number; depth: number; error: string | null; result: string | null; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; task: string } | null>;
         };
     };
@@ -1392,6 +1393,7 @@ export const api: ApiTypes = {
     sub_agents: {
         functions: {
             cancelRun: { __lunoraRef: "sub_agents_functions:cancelRun" },
+            createWorker: { __lunoraRef: "sub_agents_functions:createWorker" },
             getRunByToolCall: { __lunoraRef: "sub_agents_functions:getRunByToolCall" },
         },
     },

@@ -1278,7 +1278,9 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "sub_agents_functions:claimRun": lunora_sub_agents_functions_164.claimRun as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:completeRun": lunora_sub_agents_functions_164.completeRun as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:createRun": lunora_sub_agents_functions_164.createRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:createWorker": lunora_sub_agents_functions_164.createWorker as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:getRunByToolCall": lunora_sub_agents_functions_164.getRunByToolCall as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:messageWorker": lunora_sub_agents_functions_164.messageWorker as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:postResult": lunora_sub_agents_functions_164.postResult as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:reapRun": lunora_sub_agents_functions_164.reapRun as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:shouldRunStop": lunora_sub_agents_functions_164.shouldRunStop as unknown as RegisteredLunoraFunction,
@@ -7414,44 +7416,88 @@ return { "runId": source["runId"] };
 installCompiledValidatorMap(lunora_sub_agents_functions_164.createRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["parentModel"] !== undefined) {
-if (typeof source["parentModel"] !== "string") return DEFER;
-__val1 = source["parentModel"];
-__has1 = true;
-}
-if (typeof source["parentThreadId"] !== "string") return DEFER;
 let __has2 = false;
 let __val2;
-if (source["skillSlug"] !== undefined) {
-if (typeof source["skillSlug"] !== "string") return DEFER;
-__val2 = source["skillSlug"];
+if (source["leadTools"] !== undefined) {
+if (!Array.isArray(source["leadTools"])) return DEFER;
+const __arr1 = new Array(source["leadTools"].length);
+for (let __i1 = 0; __i1 < source["leadTools"].length; __i1++) {
+const __e1 = source["leadTools"][__i1];
+if (typeof __e1 !== "string") return DEFER;
+__arr1[__i1] = __e1;
+}
+__val2 = __arr1;
 __has2 = true;
 }
-if (typeof source["task"] !== "string") return DEFER;
+let __has3 = false;
+let __val3;
+if (source["model"] !== undefined) {
+if (typeof source["model"] !== "string") return DEFER;
+__val3 = source["model"];
+__has3 = true;
+}
 let __has4 = false;
 let __val4;
-if (source["toolAllowlist"] !== undefined) {
-if (!Array.isArray(source["toolAllowlist"])) return DEFER;
-const __arr3 = new Array(source["toolAllowlist"].length);
-for (let __i3 = 0; __i3 < source["toolAllowlist"].length; __i3++) {
-const __e3 = source["toolAllowlist"][__i3];
-if (typeof __e3 !== "string") return DEFER;
-__arr3[__i3] = __e3;
-}
-__val4 = __arr3;
+if (source["name"] !== undefined) {
+if (typeof source["name"] !== "string") return DEFER;
+__val4 = source["name"];
 __has4 = true;
 }
 let __has5 = false;
 let __val5;
-if (source["toolCallId"] !== undefined) {
-if (typeof source["toolCallId"] !== "string") return DEFER;
-__val5 = source["toolCallId"];
+if (source["parentModel"] !== undefined) {
+if (typeof source["parentModel"] !== "string") return DEFER;
+__val5 = source["parentModel"];
 __has5 = true;
 }
+if (typeof source["parentThreadId"] !== "string") return DEFER;
+let __has6 = false;
+let __val6;
+if (source["persistent"] !== undefined) {
+if (typeof source["persistent"] !== "boolean") return DEFER;
+__val6 = source["persistent"];
+__has6 = true;
+}
+let __has7 = false;
+let __val7;
+if (source["skillSlug"] !== undefined) {
+if (typeof source["skillSlug"] !== "string") return DEFER;
+__val7 = source["skillSlug"];
+__has7 = true;
+}
+if (typeof source["task"] !== "string") return DEFER;
+let __has9 = false;
+let __val9;
+if (source["toolAllowlist"] !== undefined) {
+if (!Array.isArray(source["toolAllowlist"])) return DEFER;
+const __arr8 = new Array(source["toolAllowlist"].length);
+for (let __i8 = 0; __i8 < source["toolAllowlist"].length; __i8++) {
+const __e8 = source["toolAllowlist"][__i8];
+if (typeof __e8 !== "string") return DEFER;
+__arr8[__i8] = __e8;
+}
+__val9 = __arr8;
+__has9 = true;
+}
+let __has10 = false;
+let __val10;
+if (source["toolCallId"] !== undefined) {
+if (typeof source["toolCallId"] !== "string") return DEFER;
+__val10 = source["toolCallId"];
+__has10 = true;
+}
 if (typeof source["userId"] !== "string") return DEFER;
-return { ...(__has1 ? { "parentModel": __val1 } : {}), "parentThreadId": source["parentThreadId"], ...(__has2 ? { "skillSlug": __val2 } : {}), "task": source["task"], ...(__has4 ? { "toolAllowlist": __val4 } : {}), ...(__has5 ? { "toolCallId": __val5 } : {}), "userId": source["userId"] };
+return { ...(__has2 ? { "leadTools": __val2 } : {}), ...(__has3 ? { "model": __val3 } : {}), ...(__has4 ? { "name": __val4 } : {}), ...(__has5 ? { "parentModel": __val5 } : {}), "parentThreadId": source["parentThreadId"], ...(__has6 ? { "persistent": __val6 } : {}), ...(__has7 ? { "skillSlug": __val7 } : {}), "task": source["task"], ...(__has9 ? { "toolAllowlist": __val9 } : {}), ...(__has10 ? { "toolCallId": __val10 } : {}), "userId": source["userId"] };
+});
+installCompiledValidatorMap(lunora_sub_agents_functions_164.messageWorker.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["message"] !== "string") return DEFER;
+if (typeof source["parentThreadId"] !== "string") return DEFER;
+if (typeof source["toolCallId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+if (typeof source["workerId"] !== "string") return DEFER;
+return { "message": source["message"], "parentThreadId": source["parentThreadId"], "toolCallId": source["toolCallId"], "userId": source["userId"], "workerId": source["workerId"] };
 });
 installCompiledValidatorMap(lunora_sub_agents_functions_164.postResult.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9359,10 +9405,12 @@ export interface Caller {
         functions: {
             attachChildThread: (args: { childThreadId: string; runId: Id<"subAgentRuns"> }) => Promise<boolean>;
             cancelRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<{ cancelled: boolean }>;
-            claimRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<{ depth: number; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
+            claimRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<{ childThreadId?: string; clientId?: string; depth: number; mode?: "run" | "worker"; model?: string; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
             completeRun: (args: { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }) => Promise<boolean>;
-            createRun: (args: { parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }) => Promise<{ runId: Id<"subAgentRuns"> } | { error: string }>;
+            createRun: (args: { leadTools?: Array<string>; model?: string; name?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }) => Promise<{ runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
+            createWorker: (args: { clientId: string; leadThreadId: Id<"threads">; model?: string; name: string; skill?: string; task: string; toolAllowlist?: Array<string> }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
             getRunByToolCall: (args: { toolCallId: string }) => Promise<{ _id: Id<"subAgentRuns">; childThreadId: string | null; completedAt: number | null; createdAt: number; depth: number; error: string | null; result: string | null; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; task: string } | null>;
+            messageWorker: (args: { message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: (args: { attempt: number; runId: Id<"subAgentRuns"> }) => Promise<null>;
             reapRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<null>;
             shouldRunStop: (args: { runId: Id<"subAgentRuns"> }) => Promise<boolean>;
@@ -11006,7 +11054,9 @@ export const createCaller = (context: CallerCtx): Caller => ({
             claimRun: (args) => callRegistered(context, "sub_agents_functions:claimRun", args),
             completeRun: (args) => callRegistered(context, "sub_agents_functions:completeRun", args),
             createRun: (args) => callRegistered(context, "sub_agents_functions:createRun", args),
+            createWorker: (args) => callRegistered(context, "sub_agents_functions:createWorker", args),
             getRunByToolCall: (args) => callRegistered(context, "sub_agents_functions:getRunByToolCall", args),
+            messageWorker: (args) => callRegistered(context, "sub_agents_functions:messageWorker", args),
             postResult: (args) => callRegistered(context, "sub_agents_functions:postResult", args),
             reapRun: (args) => callRegistered(context, "sub_agents_functions:reapRun", args),
             shouldRunStop: (args) => callRegistered(context, "sub_agents_functions:shouldRunStop", args),

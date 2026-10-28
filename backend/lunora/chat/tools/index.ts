@@ -30,6 +30,7 @@ import imageSearchTool from "./image-search";
 import knowledgeSearchTool from "./knowledge-search";
 import { findPlaceTool, nearbyPlacesSearchTool } from "./map-tools";
 import movieTvSearchTool from "./movie-tv-search";
+import messageWorkerTool from "./message-worker";
 import musicGenerationTool from "./music-generation";
 import peopleSearchTool from "./people-search";
 import redditSearchTool from "./reddit-search";
@@ -94,6 +95,8 @@ export { default as imageSearchTool } from "./image-search";
 export { default as knowledgeSearchTool } from "./knowledge-search";
 export type { GeocodingResult, NearbyPlace } from "./map-tools";
 export { findPlaceTool, nearbyPlacesSearchTool } from "./map-tools";
+export type { MessageWorkerOutput } from "./message-worker";
+export { default as messageWorkerTool } from "./message-worker";
 export type { MediaDetails, MediaResult } from "./movie-tv-search";
 export { default as movieTvSearchTool } from "./movie-tv-search";
 export { default as musicGenerationTool } from "./music-generation";
@@ -202,6 +205,9 @@ export enum ToolName {
 
     ListCurrencies = "listCurrencies",
     ListLanguages = "listLanguages",
+
+    // Sub-agent workers
+    MessageWorker = "messageWorker",
 
     // Entertainment Tools
     MovieTvSearch = "movieTvSearch",
@@ -317,6 +323,7 @@ export const getAllTools = () => {
         [ToolName.KnowledgeSearch]: knowledgeSearchTool,
         [ToolName.ListCurrencies]: listCurrenciesTool,
         [ToolName.ListLanguages]: listLanguagesTool,
+        [ToolName.MessageWorker]: messageWorkerTool,
         [ToolName.MovieTvSearch]: movieTvSearchTool,
         [ToolName.MusicGeneration]: musicGenerationTool,
         [ToolName.NearbyPlacesSearch]: nearbyPlacesSearchTool,

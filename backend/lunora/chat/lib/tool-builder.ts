@@ -37,6 +37,7 @@ import {
     knowledgeSearchTool,
     listCurrenciesTool,
     listLanguagesTool,
+    messageWorkerTool,
     movieTvSearchTool,
     musicGenerationTool,
     nearbyPlacesSearchTool,
@@ -132,7 +133,7 @@ const CODING_AGENT_TOOLS = [ToolName.DelegateToCodingAgent];
 // Headless runs lose it (`tool-permissions.ts`), as nobody is there to answer.
 const INTERACTION_TOOLS = [ToolName.AskUser];
 // Delegating a self-contained piece of work to a headless sub-agent (`sub-agents/`)
-const SUB_AGENT_TOOLS = [ToolName.DelegateToSubAgent];
+const SUB_AGENT_TOOLS = [ToolName.DelegateToSubAgent, ToolName.MessageWorker];
 
 const SEARCH_MODE_TOOLS: Record<SearchMode, ToolName[]> = {
     academic: [
@@ -370,6 +371,7 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
 
     [ToolName.ListCurrencies]: listCurrenciesTool,
     [ToolName.ListLanguages]: listLanguagesTool,
+    [ToolName.MessageWorker]: messageWorkerTool,
 
     // Entertainment Tools
     [ToolName.MovieTvSearch]: movieTvSearchTool,
@@ -466,7 +468,7 @@ const TOOLS_BY_CATEGORY = {
         ToolName.PeopleSearch,
         ToolName.CompanySearch,
     ],
-    subAgent: [ToolName.DelegateToSubAgent],
+    subAgent: [ToolName.DelegateToSubAgent, ToolName.MessageWorker],
     travel: [ToolName.FlightTracker],
     utility: [
         ToolName.DateTime,
