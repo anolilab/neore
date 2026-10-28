@@ -69,14 +69,29 @@ const renderPrompt = (prompt: Prompt | null): void => {
     setText("deny", "Deny");
     ($("prompt-secret") as HTMLInputElement).value = "";
 
+    const identityLine = (identityFile: string | null): string =>
+        identityFile === null ? "Login: your SSH agent and default keys" : `Login: only the key file ${identityFile}`;
+
     switch (body.kind) {
+        case "hostConnect": {
+            setText("prompt-heading", `Connect to ${body.user}@${body.address}?`);
+            setText(
+                "prompt-context",
+                "A page in Neore asks this computer to open an SSH connection so it can add this server. Nothing is sent until you agree; if you did not just start adding a server, cancel.",
+            );
+            setText("prompt-detail", `${body.user}@${body.address}:${String(body.port)}\n${identityLine(body.identityFile)}`);
+            setText("once", "Connect");
+            setText("deny", "Cancel");
+
+            break;
+        }
         case "hostKey": {
             setText("prompt-heading", `Trust ${body.host}?`);
             setText(
                 "prompt-context",
                 `This is the first connection to ${body.host}:${String(body.port)}. Compare the fingerprint with the one your server's administrator gave you. Neore remembers this key and refuses the server if it ever presents another.`,
             );
-            setText("prompt-detail", `${body.keyType} key\n${body.fingerprint}`);
+            setText("prompt-detail", `${body.keyType} key\n${body.fingerprint}\n${identityLine(body.identityFile)}`);
             setText("once", "Trust and connect");
             setText("deny", "Cancel");
 
@@ -103,7 +118,7 @@ const renderPrompt = (prompt: Prompt | null): void => {
                 "prompt-context",
                 "It becomes a device of your Neore account that this computer speaks for. Every action on it will still ask you here first, and the server never receives a secret of yours.",
             );
-            setText("prompt-detail", `${body.user}@${body.address}:${String(body.port)}`);
+            setText("prompt-detail", `${body.user}@${body.address}:${String(body.port)}\n${identityLine(body.identityFile)}`);
             setText("once", "Add server");
             setText("deny", "Cancel");
 

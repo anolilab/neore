@@ -44,7 +44,13 @@ const CONTROL_PATH_MARGIN: usize = 1 + 40 + 1 + 16 + 1;
 const SOCKET_PATH_LIMIT: usize = 104;
 
 /// Key types worth pinning, best first. DSA is long dead.
-const KEY_TYPES: [&str; 3] = ["ssh-ed25519", "ecdsa-sha2-nistp256", "ssh-rsa"];
+const KEY_TYPES: [&str; 5] = [
+    "ssh-ed25519",
+    "ecdsa-sha2-nistp256",
+    "ecdsa-sha2-nistp384",
+    "ecdsa-sha2-nistp521",
+    "ssh-rsa",
+];
 
 #[cfg(unix)]
 const NULL_DEVICE: &str = "/dev/null";
@@ -312,7 +318,9 @@ impl HostKey {
         match self.key_type.as_str() {
             "ssh-ed25519" => "ED25519".to_owned(),
             "ssh-rsa" => "RSA".to_owned(),
-            "ecdsa-sha2-nistp256" => "ECDSA".to_owned(),
+            "ecdsa-sha2-nistp256" | "ecdsa-sha2-nistp384" | "ecdsa-sha2-nistp521" => {
+                "ECDSA".to_owned()
+            }
             other => other.to_owned(),
         }
     }
@@ -1068,6 +1076,13 @@ mod tests {
         }
     }
 
+    /// An absolute path on the platform the tests run on: `/x` is relative on Windows.
+    const ABSOLUTE_KEY: &str = if cfg!(windows) {
+        "C:\\Users\\me\\.ssh\\id"
+    } else {
+        "/home/me/.ssh/id"
+    };
+
     fn paths() -> SshPaths {
         SshPaths::under(Path::new("/data"), None)
     }
@@ -1083,11 +1098,16 @@ mod tests {
     fn ssh_runs_with_every_option_the_plan_names_and_no_config() {
         let args = ssh_args(&target(), &paths());
         let options = option_values(&args);
+        let known_hosts = format!(
+            "UserKnownHostsFile=\"{}\"",
+            Path::new("/data").join("ssh").join("known_hosts").display()
+        );
+        let global_hosts = format!("GlobalKnownHostsFile={NULL_DEVICE}");
 
         for expected in [
             "StrictHostKeyChecking=yes",
-            "UserKnownHostsFile=\"/data/ssh/known_hosts\"",
-            "GlobalKnownHostsFile=/dev/null",
+            known_hosts.as_str(),
+            global_hosts.as_str(),
             "UpdateHostKeys=no",
             "CheckHostIP=no",
             "PasswordAuthentication=no",
@@ -1111,7 +1131,7 @@ mod tests {
         }
 
         // Without a tty, without the user's or the system's config, and no option can be read from the data.
-        assert!(args.windows(2).any(|pair| pair == ["-F", "/dev/null"]));
+        assert!(args.windows(2).any(|pair| pair == ["-F", NULL_DEVICE]));
         assert!(args.contains(&"-T".to_owned()));
         assert!(!options.iter().any(|option| option.starts_with("BatchMode")));
         assert_eq!(&args[args.len() - 2..], ["--", "build.example.com"]);
@@ -1152,9 +1172,15 @@ mod tests {
         );
         let args = ssh_args(&target(), &paths);
 
-        assert!(option_values(&args).contains(
-            &"UserKnownHostsFile=\"/Users/me/Library/Application Support/Neore/ssh/known_hosts\""
-        ));
+        let known_hosts = format!(
+            "UserKnownHostsFile=\"{}\"",
+            Path::new("/Users/me/Library/Application Support/Neore")
+                .join("ssh")
+                .join("known_hosts")
+                .display()
+        );
+
+        assert!(option_values(&args).contains(&known_hosts.as_str()));
     }
 
     #[test]
@@ -1189,7 +1215,7 @@ mod tests {
         assert!(with(|t| t.port = 0).is_err());
         assert!(with(|t| t.identity_file = Some("relative/key".into())).is_err());
         assert!(with(|t| t.identity_file = Some("/k\"ey".into())).is_err());
-        assert!(with(|t| t.identity_file = Some("/home/me/.ssh/id".into())).is_ok());
+        assert!(with(|t| t.identity_file = Some(ABSOLUTE_KEY.into())).is_ok());
     }
 
     #[test]
@@ -1207,11 +1233,11 @@ mod tests {
         let home = Path::new("/Users/someone");
         let moved = SshPaths::under(deep, Some(home));
 
-        assert_eq!(moved.control_dir, home.join(".neore/cm"));
+        assert_eq!(moved.control_dir, home.join(".neore").join("cm"));
         assert!(moved.control_dir.as_os_str().len() + CONTROL_PATH_MARGIN <= SOCKET_PATH_LIMIT);
         assert_eq!(
             SshPaths::under(Path::new("/data"), Some(home)).control_dir,
-            Path::new("/data/ssh/cm")
+            Path::new("/data").join("ssh").join("cm")
         );
     }
 
@@ -1244,6 +1270,15 @@ mod tests {
         assert_eq!(parse_keys(text, Some("[host-b]:2222")).len(), 1);
         assert!(parse_keys(text, Some("host-c")).is_empty());
         assert_eq!(parse_keys(text, None).len(), 2);
+    }
+
+    #[test]
+    fn every_ecdsa_curve_ssh_scans_for_can_be_pinned() {
+        let text = "h ecdsa-sha2-nistp256 A\nh ecdsa-sha2-nistp384 B\nh ecdsa-sha2-nistp521 C\n";
+        let keys = parse_keys(text, Some("h"));
+
+        assert_eq!(keys.len(), 3);
+        assert!(keys.iter().all(|key| key.label() == "ECDSA"));
     }
 
     #[test]

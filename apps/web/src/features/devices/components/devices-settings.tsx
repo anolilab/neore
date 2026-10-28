@@ -203,7 +203,7 @@ const DeviceActivity: FC = () => {
 
 /**
  * Adds a server this computer reaches over SSH. The shell does the connecting and asks the person at the
- * desktop for everything that matters (trusting the server's key, a key passphrase, the final "add it"), so this
+ * desktop for everything that matters (connecting at all, trusting the server's key, a key passphrase, the final "add it"), so this
  * form only says where the server is.
  */
 const AddServer: FC<{ desktopId: string; onAdded: () => void }> = ({ desktopId, onAdded }) => {

@@ -61,8 +61,9 @@ export interface HostView {
 export interface Prompt {
     body:
         | { accountLabel: string; kind: "pairing" }
-        | { address: string; kind: "hostPairing"; name: string; port: number; user: string }
-        | { fingerprint: string; host: string; keyType: string; kind: "hostKey"; port: number }
+        | { address: string; identityFile: string | null; kind: "hostConnect"; name: string; port: number; user: string }
+        | { address: string; identityFile: string | null; kind: "hostPairing"; name: string; port: number; user: string }
+        | { fingerprint: string; host: string; identityFile: string | null; keyType: string; kind: "hostKey"; port: number }
         | { host: string; kind: "hostKeyChanged"; pinned: string[]; port: number; presented: string[] }
         | { host: string; kind: "passphrase"; prompt: string }
         | {

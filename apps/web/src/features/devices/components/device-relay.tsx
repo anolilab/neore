@@ -149,7 +149,11 @@ const DeviceRelay: FC = () => {
             const manifest = await getNativeDeviceManifest(id === deviceId ? undefined : id);
 
             if (manifest) {
-                await mutations.current.updateManifest({ deviceId: id as Id<"devices">, viaDeviceId: viaDeviceFor(deviceId, id) as Id<"devices"> | undefined, ...manifest });
+                await mutations.current.updateManifest({
+                    deviceId: id as Id<"devices">,
+                    viaDeviceId: viaDeviceFor(deviceId, id) as Id<"devices"> | undefined,
+                    ...manifest,
+                });
             }
         };
 
@@ -220,9 +224,7 @@ const DeviceRelay: FC = () => {
     // Live: a new call reaches this page as soon as the agent makes it.
     const { data: pending } = useQuery(
         crpc.devices.functions.listPendingDeviceCalls.queryOptions(
-            paired && deviceId !== undefined
-                ? { deviceId: deviceId as Id<"devices">, hostDeviceIds: hostIds as Id<"devices">[] }
-                : skipToken,
+            paired && deviceId !== undefined ? { deviceId: deviceId as Id<"devices">, hostDeviceIds: hostIds as Id<"devices">[] } : skipToken,
         ),
     );
 

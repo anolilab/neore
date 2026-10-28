@@ -519,3 +519,36 @@ fn closing_one_session_leaves_the_others_and_the_master_alone() {
         "ending the master left it running"
     );
 }
+
+#[test]
+fn a_data_folder_with_a_space_that_is_too_deep_for_a_socket_still_connects_over_the_short_one() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "deep");
+    let home = server.dir.join("home");
+    let data = server
+        .dir
+        .join("Application Support")
+        .join("Neore Desktop Preview Build")
+        .join("profiles");
+    let paths = SshPaths::under(&data, Some(&home));
+
+    // The folder the product would use does not fit a Unix socket, so the control socket moved under the home.
+    assert_eq!(paths.control_dir, home.join(".neore").join("cm"));
+    assert!(paths.known_hosts.starts_with(&data));
+    assert!(paths.known_hosts.to_string_lossy().contains(' '));
+
+    let target = server.target("client");
+    let connection = connect(&server, &target, &paths, &trusting()).unwrap();
+
+    assert!(master_is_running(&target, &paths));
+    assert_eq!(pinned_keys(&paths, &server.spec()).len(), 1);
+
+    let root = vectors::fixture("ssh");
+    let params = json!({ "tool": "fs_list", "input": { "path": root }, "roots": [root], "remainingMs": 60_000 });
+    let outcome = connection.run(&params, Duration::from_secs(30)).unwrap();
+
+    assert_eq!(outcome.status, "completed");
+
+    finish(&connection);
+    assert!(!master_is_running(&target, &paths));
+}

@@ -52,9 +52,19 @@ pub struct SandboxState {
 pub enum PromptBody {
     /// Pair this app with an account.
     Pairing { account_label: String },
+    /// A page asks to open an SSH connection to a server that is not paired yet. Asked before anything touches the
+    /// network, so a page cannot probe hosts or log in as a user of its choosing on its own.
+    HostConnect {
+        address: String,
+        identity_file: Option<String>,
+        name: String,
+        port: u16,
+        user: String,
+    },
     /// Add a server reached over SSH as a device of its own.
     HostPairing {
         address: String,
+        identity_file: Option<String>,
         name: String,
         port: u16,
         user: String,
@@ -63,6 +73,7 @@ pub enum PromptBody {
     HostKey {
         fingerprint: String,
         host: String,
+        identity_file: Option<String>,
         key_type: String,
         port: u16,
     },

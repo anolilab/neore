@@ -458,10 +458,13 @@ describe("servers reached over SSH", () => {
         expect(context.devices.map((device) => device.deviceId).toSorted(byId)).toEqual([desktop.deviceId, host.deviceId].toSorted(byId));
 
         const { callId } = await hostCall(ownerId, host.deviceId);
-        const pending = (await as(ownerId).query(functions.listPendingDeviceCalls as never, {
-            deviceId: desktop.deviceId,
-            hostDeviceIds: [host.deviceId],
-        } as never)) as { callId: string; deviceId: string; envelope: string; signature: string }[];
+        const pending = (await as(ownerId).query(
+            functions.listPendingDeviceCalls as never,
+            {
+                deviceId: desktop.deviceId,
+                hostDeviceIds: [host.deviceId],
+            } as never,
+        )) as { callId: string; deviceId: string; envelope: string; signature: string }[];
 
         expect(pending.map((call) => call.deviceId)).toEqual([host.deviceId]);
         await expect(verifyDevicePayload(host.secret, "call", pending[0]!.envelope, pending[0]!.signature)).resolves.toBe(true);
@@ -499,10 +502,7 @@ describe("servers reached over SSH", () => {
         const { desktop, host } = await desktopWithHost(ownerId);
         const { callId } = await hostCall(ownerId, host.deviceId);
         const complete = async (secret: string, viaDeviceId = desktop.deviceId) =>
-            await as(ownerId).mutation(
-                functions.completeDeviceCall as never,
-                { ...(await signedResult(host.deviceId, secret, callId)), viaDeviceId } as never,
-            );
+            await as(ownerId).mutation(functions.completeDeviceCall as never, { ...(await signedResult(host.deviceId, secret, callId)), viaDeviceId } as never);
 
         await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId: host.deviceId, viaDeviceId: desktop.deviceId } as never);
 

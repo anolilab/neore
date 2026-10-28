@@ -213,6 +213,11 @@ Where S3 departs from the text above:
   passphrase prompt and no multiplexing yet.
 - "Always allow" is not offered for a server's calls yet: the allow rules are keyed by tool name and global.
 - Agent forwarding is a per-server flag that passes `SSH_AUTH_SOCK` through. Only the local window turns it on (behind a confirmation); a page's pairing request cannot carry it. The stable socket path of §6 is S5.
+- A page can start nothing on the network: a probe of a server that is not paired yet first asks in the local
+  window ("Connect to user@address:port", with the identity file), and `ssh-keyscan`/`ssh` run only after
+  "Connect". Every prompt of the pairing (connect, host key, add server) names the identity file in use. A
+  "key changed" notice is shown once per server while it is on screen. A server cannot be paired under the
+  desktop's own device id.
 - `~/.ssh/config` suggestions (§4) and the Windows-desktop askpass are not built.
 
 **S4 — Install and upgrade.** §8. The release build of `neore-host` must pass

@@ -88,6 +88,8 @@ pub struct DeviceState {
 struct SshState {
     /// The remote path of `neore-host`; shell text, never taken from a page.
     binary: String,
+    /// The servers (`host:port`) with a "key changed" prompt on screen, so a retry does not queue another.
+    changed_prompts: Arc<Mutex<std::collections::HashSet<String>>>,
     /// Live connections by the server's device id.
     connections: Mutex<HashMap<String, Arc<dyn HostLink>>>,
     paths: SshPaths,
@@ -125,6 +127,7 @@ impl DeviceState {
             sink: Arc::from(sink),
             ssh: SshState {
                 binary: binary.to_owned(),
+                changed_prompts: Arc::default(),
                 connections: Mutex::default(),
                 paths: SshPaths::under(data_dir, sandbox::home().as_deref()),
                 probe: Mutex::default(),
@@ -420,9 +423,9 @@ impl DeviceState {
         })?;
         self.drop_stale_connections();
 
-        // Forwarding is chosen when ssh starts, so the connection it changes for is ended.
+        // Forwarding is chosen when the master starts, so the master it changes for is ended, whoever else rides it.
         if let Some(host) = update.host.filter(|host| host.forward_agent.is_some()) {
-            self.host_disconnect(&host.device_id);
+            self.host_restart(&host.device_id);
         }
 
         self.emit(Event::Changed);

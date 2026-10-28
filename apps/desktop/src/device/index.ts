@@ -324,6 +324,9 @@ const promptSummary = ({ body }: Prompt): string => {
         case "call": {
             return `${body.tool}${body.host === undefined ? "" : ` on ${body.host}`} — ${body.threadTitle}`;
         }
+        case "hostConnect": {
+            return `Connect to ${body.user}@${body.address}?`;
+        }
         case "hostKey": {
             return `Trust the key of ${body.host}?`;
         }

@@ -433,9 +433,10 @@ describe("events", () => {
             return fake.notifications.at(-1)?.body;
         };
 
-        expect(notify({ fingerprint: "SHA256:x", host: "build", keyType: "ED25519", kind: "hostKey", port: 22 })).toBe("Trust the key of build?");
+        expect(notify({ address: "build", identityFile: null, kind: "hostConnect", name: "build-box", port: 22, user: "deploy" })).toBe("Connect to deploy@build?");
+        expect(notify({ fingerprint: "SHA256:x", host: "build", identityFile: null, keyType: "ED25519", kind: "hostKey", port: 22 })).toBe("Trust the key of build?");
         expect(notify({ host: "build", kind: "hostKeyChanged", pinned: [], port: 22, presented: [] })).toBe("The key of build changed");
-        expect(notify({ address: "build", kind: "hostPairing", name: "build-box", port: 22, user: "u" })).toBe("Add the server build-box");
+        expect(notify({ address: "build", identityFile: null, kind: "hostPairing", name: "build-box", port: 22, user: "u" })).toBe("Add the server build-box");
         expect(
             notify({ allowAlways: false, detail: "ls", host: "build-box", input: "{}", kind: "call", taintedBy: [], threadTitle: "T", tool: "fs_list", toolKind: "fs" }),
         ).toBe("fs_list on build-box — T");

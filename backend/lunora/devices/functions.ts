@@ -275,9 +275,7 @@ export const updateDeviceManifest = authMutation
 export const listPendingDeviceCalls = authQuery
     .input({
         deviceId: v.id("devices"),
-        hostDeviceIds: v.optional(
-            v.array(v.id("devices")).check((ids) => ids.length <= MAX_DEVICES_PER_USER, { message: "Too many servers" }),
-        ),
+        hostDeviceIds: v.optional(v.array(v.id("devices")).check((ids) => ids.length <= MAX_DEVICES_PER_USER, { message: "Too many servers" })),
     })
     .output(v.array(v.object({ callId: v.string(), deviceId: v.string(), envelope: v.string(), signature: v.string() })))
     .query(async ({ args, ctx }) => {

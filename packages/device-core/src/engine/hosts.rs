@@ -3,6 +3,7 @@
 //! it, so the calls and the results are verified and signed HERE, with the server's secret; what goes down the pipe
 //! is the already approved action (`host.rs` runs it).
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::thread;
 
@@ -197,6 +198,7 @@ fn target_of(host: &Host) -> Target {
 
 /// Asks the person at the local window what an SSH connection needs a person for.
 struct AskUser {
+    changed_prompts: Arc<Mutex<HashSet<String>>>,
     prompts: Arc<Prompts>,
     sink: SharedSink,
 }
@@ -204,6 +206,14 @@ struct AskUser {
 impl AskUser {
     fn expires_at() -> u64 {
         now_ms() + PAIRING_WAIT.as_millis() as u64
+    }
+
+    fn clone_handle(&self) -> AskUser {
+        AskUser {
+            changed_prompts: Arc::clone(&self.changed_prompts),
+            prompts: Arc::clone(&self.prompts),
+            sink: Arc::clone(&self.sink),
+        }
     }
 
     fn show(&self, prompt: &Prompt) {
@@ -218,6 +228,7 @@ impl Interact for AskUser {
         let body = PromptBody::HostKey {
             fingerprint: key.fingerprint(),
             host: target.address.clone(),
+            identity_file: target.identity_file.clone(),
             key_type: key.label(),
             port: target.port,
         };
@@ -231,16 +242,20 @@ impl Interact for AskUser {
     }
 
     fn key_changed(&self, target: &Target, pinned: &[String], presented: &[String]) {
+        let spec = target.host_spec();
+
+        // One notice per server: a page that keeps retrying a refused connection must not stack them.
+        if !self.changed_prompts.lock().unwrap().insert(spec.clone()) {
+            return;
+        }
+
         let body = PromptBody::HostKeyChanged {
             host: target.address.clone(),
             pinned: pinned.to_vec(),
             port: target.port,
             presented: presented.to_vec(),
         };
-        let ask = AskUser {
-            prompts: Arc::clone(&self.prompts),
-            sink: Arc::clone(&self.sink),
-        };
+        let ask = self.clone_handle();
 
         // Nothing is decided here, so the connection error does not wait for the window to be dismissed.
         thread::spawn(move || {
@@ -248,6 +263,7 @@ impl Interact for AskUser {
                 .ask(body, Self::expires_at(), PAIRING_WAIT, |prompt| {
                     ask.show(prompt);
                 });
+            ask.changed_prompts.lock().unwrap().remove(&spec);
         });
     }
 
@@ -369,6 +385,7 @@ impl DeviceState {
 
     fn ask_user(&self) -> Arc<dyn Interact> {
         Arc::new(AskUser {
+            changed_prompts: Arc::clone(&self.ssh.changed_prompts),
             prompts: Arc::clone(&self.prompts),
             sink: Arc::clone(&self.sink),
         })
@@ -499,17 +516,40 @@ impl DeviceState {
     }
 
     /// Connects to a server that is not paired yet, so the page can register it (it needs the server's platform)
-    /// and then call [`Self::host_pair`]. Asks to trust the server's key on first use, and for a key passphrase.
+    /// and then call [`Self::host_pair`]. Nothing leaves this computer before the person at the local window
+    /// approves the connection: a page alone must not scan hosts or log in anywhere. Then asks to trust the
+    /// server's key on first use, and for a key passphrase.
     pub fn host_probe(&self, spec: &HostSpec) -> Result<HostProbe, String> {
         let target = spec.target()?;
         usable_pairing(&self.settings()).map_err(|_| "pair this computer first")?;
+
+        let answer = self.prompts.ask(
+            PromptBody::HostConnect {
+                address: target.address.clone(),
+                identity_file: target.identity_file.clone(),
+                name: spec.name.trim().to_owned(),
+                port: target.port,
+                user: target.user.clone(),
+            },
+            now_ms() + PAIRING_WAIT.as_millis() as u64,
+            PAIRING_WAIT,
+            |prompt| {
+                self.emit(Event::Prompt {
+                    prompt: prompt.clone(),
+                });
+            },
+        );
+
+        if !matches!(answer, Answer::Once | Answer::Always) {
+            return Err("the connection was not approved on this computer".into());
+        }
 
         let link = self.connect_target(&target)?;
         let probe = HostProbe::of(link.hello());
         let replaced = self.ssh.probe.lock().unwrap().replace((target, link));
 
         if let Some((_, previous)) = replaced {
-            previous.close();
+            self.retire(&previous);
         }
 
         Ok(probe)
@@ -531,6 +571,13 @@ impl DeviceState {
         }
 
         let desktop = usable_pairing(&self.settings())?;
+
+        // The id is the server's own device: this computer's id would make a call for the server verify as one
+        // for this computer.
+        if device_id == desktop.device_id {
+            return Err("that id is this computer's own".into());
+        }
+
         let link = {
             let mut probe = self.ssh.probe.lock().unwrap();
 
@@ -546,6 +593,7 @@ impl DeviceState {
         let answer = self.prompts.ask(
             PromptBody::HostPairing {
                 address: target.address.clone(),
+                identity_file: target.identity_file.clone(),
                 name: name.clone(),
                 port: target.port,
                 user: target.user.clone(),
@@ -560,7 +608,7 @@ impl DeviceState {
         );
 
         if !matches!(answer, Answer::Once | Answer::Always) {
-            link.close();
+            self.retire(&link);
 
             return Ok(false);
         }
@@ -594,19 +642,20 @@ impl DeviceState {
         });
 
         if let Err(error) = saved {
-            link.close();
+            self.retire(&link);
 
             return Err(error);
         }
 
-        if let Some(previous) = self
+        let previous = self
             .ssh
             .connections
             .lock()
             .unwrap()
-            .insert(device_id.to_owned(), link)
-        {
-            previous.close();
+            .insert(device_id.to_owned(), link);
+
+        if let Some(previous) = previous {
+            self.retire(&previous);
         }
 
         self.emit(Event::Changed);
@@ -637,19 +686,20 @@ impl DeviceState {
             .iter()
             .any(|current| current.device_id == device_id)
         {
-            link.close();
+            self.retire(&link);
 
             return Err("that server was removed meanwhile".into());
         }
 
-        if let Some(previous) = self
+        let previous = self
             .ssh
             .connections
             .lock()
             .unwrap()
-            .insert(device_id.to_owned(), link)
-        {
-            previous.close();
+            .insert(device_id.to_owned(), link);
+
+        if let Some(previous) = previous {
+            self.retire(&previous);
         }
 
         self.emit(Event::Changed);
@@ -662,6 +712,18 @@ impl DeviceState {
 
         if let Some(link) = link {
             self.retire(&link);
+            self.emit(Event::Changed);
+        }
+    }
+
+    /// Ends a server's connection and the master under it, even when another session still rides that master: for
+    /// a change ssh only reads when the master starts.
+    pub(super) fn host_restart(&self, device_id: &str) {
+        let link = self.ssh.connections.lock().unwrap().remove(device_id);
+
+        if let Some(link) = link {
+            link.close();
+            link.exit_master();
             self.emit(Event::Changed);
         }
     }
@@ -984,7 +1046,22 @@ mod tests {
         }
     }
 
-    /// A paired desktop `desk-1` and its server `host-1`, with the server connected over `link`.
+    // The keychain stand-in is shared by every test of the process and a test's ids name its entries, so each test
+    // gets ids of its own: one test forgetting its server's secret must not take another's.
+    fn host_id(test: &str) -> String {
+        format!("hs-{test}-host")
+    }
+
+    fn desk_id(test: &str) -> String {
+        format!("hs-{test}-desk")
+    }
+
+    fn other_id(test: &str) -> String {
+        format!("hs-{test}-other")
+    }
+
+    /// A paired desktop and its server, with the server connected over `link`. Their ids are `desk_id(name)` and
+    /// `host_id(name)`.
     fn engine(name: &str, link: &Arc<FakeLink>) -> (DeviceState, PathBuf, Arc<Mutex<Vec<Event>>>) {
         test_keychain::install();
 
@@ -994,10 +1071,10 @@ mod tests {
         store::save(
             &dir.join("device.json"),
             &Settings {
-                hosts: vec![server("host-1")],
+                hosts: vec![server(&host_id(name))],
                 pairing: Some(Pairing {
                     account_label: "me".into(),
-                    device_id: "desk-1".into(),
+                    device_id: desk_id(name),
                     secret: DESKTOP_SECRET.into(),
                 }),
                 ..Settings::default()
@@ -1018,7 +1095,7 @@ mod tests {
             .connections
             .lock()
             .unwrap()
-            .insert("host-1".into(), link);
+            .insert(host_id(name), link);
 
         (state, dir, events)
     }
@@ -1070,7 +1147,7 @@ mod tests {
         let prompts = answering(&state, "once");
         let call = call_for(
             HOST_SECRET,
-            "host-1",
+            host_id("run").as_str(),
             "shell_run",
             json!({ "command": "make test", "cwd": "/srv/app" }),
             &[],
@@ -1080,7 +1157,7 @@ mod tests {
 
         assert_eq!(result["status"], "completed");
         assert_eq!(result["output"], "from the server");
-        assert_eq!(result["deviceId"], "host-1");
+        assert_eq!(result["deviceId"], host_id("run").as_str());
         // Only the server's own secret signs it: this computer's pairing secret cannot, so a computer that does
         // not hold the server's secret has no way to produce a result the backend would accept.
         assert!(envelope::verify(
@@ -1133,8 +1210,20 @@ mod tests {
         let (state, dir, _) = engine("secret", &link);
 
         // The desktop's secret naming the server, and the server's secret naming the desktop: neither verifies.
-        let forged = call_for(DESKTOP_SECRET, "host-1", "fs_list", json!({}), &[]);
-        let swapped = call_for(HOST_SECRET, "desk-1", "fs_list", json!({}), &[]);
+        let forged = call_for(
+            DESKTOP_SECRET,
+            host_id("secret").as_str(),
+            "fs_list",
+            json!({}),
+            &[],
+        );
+        let swapped = call_for(
+            HOST_SECRET,
+            desk_id("secret").as_str(),
+            "fs_list",
+            json!({}),
+            &[],
+        );
 
         assert!(state.execute(&forged).is_err());
         assert!(state.execute(&swapped).is_err());
@@ -1155,7 +1244,7 @@ mod tests {
             &state
                 .execute(&call_for(
                     HOST_SECRET,
-                    "host-1",
+                    host_id("deny").as_str(),
                     "fs_read",
                     json!({ "path": "/srv/app/a" }),
                     &[],
@@ -1180,7 +1269,7 @@ mod tests {
         state
             .execute(&call_for(
                 HOST_SECRET,
-                "host-1",
+                host_id("taint").as_str(),
                 "fs_read",
                 json!({ "path": "/srv/app/a" }),
                 &["device"],
@@ -1205,7 +1294,13 @@ mod tests {
         link.close();
 
         let signed = state
-            .execute(&call_for(HOST_SECRET, "host-1", "fs_list", json!({}), &[]))
+            .execute(&call_for(
+                HOST_SECRET,
+                host_id("offline").as_str(),
+                "fs_list",
+                json!({}),
+                &[],
+            ))
             .unwrap();
         let result = result_of(&signed);
 
@@ -1232,7 +1327,7 @@ mod tests {
         state
             .execute(&call_for(
                 HOST_SECRET,
-                "host-1",
+                host_id("nosandbox").as_str(),
                 "shell_run",
                 json!({ "command": "ls" }),
                 &[],
@@ -1258,7 +1353,7 @@ mod tests {
             &state
                 .execute(&call_for(
                     HOST_SECRET,
-                    "host-1",
+                    host_id("unknown").as_str(),
                     "mcp__x__y",
                     json!({}),
                     &[],
@@ -1276,7 +1371,9 @@ mod tests {
     fn a_servers_manifest_is_signed_with_its_own_secret_over_its_own_folders() {
         let link = FakeLink::new(true);
         let (state, dir, _) = engine("manifest", &link);
-        let signed = state.manifest_for(Some("host-1")).unwrap();
+        let signed = state
+            .manifest_for(Some(host_id("manifest").as_str()))
+            .unwrap();
         let manifest: Value = serde_json::from_str(&signed.payload).unwrap();
 
         assert!(envelope::verify(
@@ -1291,7 +1388,7 @@ mod tests {
             &signed.payload,
             &signed.signature
         ));
-        assert_eq!(manifest["deviceId"], "host-1");
+        assert_eq!(manifest["deviceId"], host_id("manifest").as_str());
 
         let tools = manifest["tools"].as_array().unwrap();
 
@@ -1316,13 +1413,20 @@ mod tests {
         ));
 
         // Issued times only go up, across devices, so the backend never sees one go back.
-        let again: Value =
-            serde_json::from_str(&state.manifest_for(Some("host-1")).unwrap().payload).unwrap();
+        let again: Value = serde_json::from_str(
+            &state
+                .manifest_for(Some(host_id("manifest").as_str()))
+                .unwrap()
+                .payload,
+        )
+        .unwrap();
 
         assert!(again["issuedAt"].as_u64() > manifest["issuedAt"].as_u64());
 
         link.close();
-        assert!(state.manifest_for(Some("host-1")).is_err());
+        assert!(state
+            .manifest_for(Some(host_id("manifest").as_str()))
+            .is_err());
         assert!(state.manifest_for(Some("not-ours")).is_err());
 
         let _ = stdfs::remove_dir_all(dir);
@@ -1333,8 +1437,10 @@ mod tests {
         let link = FakeLink::new(true);
         let (state, dir, _) = engine("roots", &link);
         let update = |roots: &[&str]| -> SettingsUpdate {
-            serde_json::from_value(json!({ "host": { "deviceId": "host-1", "roots": roots } }))
-                .unwrap()
+            serde_json::from_value(
+                json!({ "host": { "deviceId": host_id("roots").as_str(), "roots": roots } }),
+            )
+            .unwrap()
         };
 
         assert!(state.settings_update(update(&["relative"])).is_err());
@@ -1354,7 +1460,7 @@ mod tests {
         assert!(view.roots.is_empty());
 
         let policy: SettingsUpdate =
-            serde_json::from_value(json!({ "host": { "deviceId": "host-1", "requireShellSandbox": false, "allowShellNetwork": true } })).unwrap();
+            serde_json::from_value(json!({ "host": { "deviceId": host_id("roots").as_str(), "requireShellSandbox": false, "allowShellNetwork": true } })).unwrap();
         let view = state.settings_update(policy).unwrap();
 
         assert!(!view.hosts[0].require_shell_sandbox && view.hosts[0].allow_shell_network);
@@ -1373,7 +1479,7 @@ mod tests {
         let link = FakeLink::new(true);
         let (state, dir, events) = engine("unpair", &link);
 
-        assert!(test_keychain::holds("host-1"));
+        assert!(test_keychain::holds(host_id("unpair").as_str()));
 
         let view = state
             .settings_update(serde_json::from_value(json!({ "unpair": true })).unwrap())
@@ -1382,11 +1488,13 @@ mod tests {
         assert!(view.hosts.is_empty());
         assert!(store::load(&dir.join("device.json")).hosts.is_empty());
         assert!(
-            !test_keychain::holds("host-1"),
+            !test_keychain::holds(host_id("unpair").as_str()),
             "the server's secret stayed in the keychain"
         );
         assert_eq!(link.closed.load(Ordering::SeqCst), 1);
-        assert!(state.manifest_for(Some("host-1")).is_err());
+        assert!(state
+            .manifest_for(Some(host_id("unpair").as_str()))
+            .is_err());
         assert!(events
             .lock()
             .unwrap()
@@ -1406,7 +1514,9 @@ mod tests {
 
         let other = "b2".repeat(32);
 
-        assert!(state.pair("desk-2", &other, "me").unwrap());
+        assert!(state
+            .pair(other_id("repair").as_str(), &other, "me")
+            .unwrap());
         assert!(state.settings().hosts.is_empty());
         assert_eq!(link.closed.load(Ordering::SeqCst), 1);
 
@@ -1420,7 +1530,7 @@ mod tests {
 
         assert_eq!(
             serde_json::to_value(state.status()).unwrap()["hosts"],
-            json!([{ "connected": true, "deviceId": "host-1", "name": "build-box" }])
+            json!([{ "connected": true, "deviceId": host_id("status").as_str(), "name": "build-box" }])
         );
         link.close();
         assert_eq!(
@@ -1439,23 +1549,21 @@ mod tests {
 
         // A probe of the same server is still using the master: only this session ends.
         *state.ssh.probe.lock().unwrap() = Some((
-            target_of(&server("host-1")),
+            target_of(&server(host_id("master").as_str())),
             Arc::clone(&probed) as Arc<dyn HostLink>,
         ));
-        state.host_disconnect("host-1");
+        state.host_disconnect(host_id("master").as_str());
 
         assert_eq!(link.closed.load(Ordering::SeqCst), 1);
         assert_eq!(link.master_exits.load(Ordering::SeqCst), 0);
 
         // Nothing else on it any more: the master goes too.
-        state
-            .ssh
-            .connections
-            .lock()
-            .unwrap()
-            .insert("host-1".into(), Arc::clone(&link) as Arc<dyn HostLink>);
+        state.ssh.connections.lock().unwrap().insert(
+            host_id("master").as_str().into(),
+            Arc::clone(&link) as Arc<dyn HostLink>,
+        );
         state.ssh.probe.lock().unwrap().take();
-        state.host_disconnect("host-1");
+        state.host_disconnect(host_id("master").as_str());
 
         assert_eq!(link.master_exits.load(Ordering::SeqCst), 1);
 
@@ -1466,8 +1574,15 @@ mod tests {
     fn agent_forwarding_is_the_local_windows_to_turn_on_and_restarts_the_connection() {
         let link = FakeLink::new(true);
         let (state, dir, _) = engine("forward", &link);
+        let probed = FakeLink::new(true);
+
+        // Another session rides the same master, which ssh configured with the old forwarding.
+        *state.ssh.probe.lock().unwrap() = Some((
+            target_of(&server(&host_id("forward"))),
+            Arc::clone(&probed) as Arc<dyn HostLink>,
+        ));
         let turn_on: SettingsUpdate = serde_json::from_value(
-            json!({ "host": { "deviceId": "host-1", "forwardAgent": true } }),
+            json!({ "host": { "deviceId": host_id("forward").as_str(), "forwardAgent": true } }),
         )
         .unwrap();
 
@@ -1479,6 +1594,11 @@ mod tests {
         assert!(
             !view.hosts[0].connected,
             "the connection kept running without the change"
+        );
+        assert_eq!(
+            link.master_exits.load(Ordering::SeqCst),
+            1,
+            "the master kept the old forwarding for the session that shares it"
         );
         // A page that asks for it is refused outright, not ignored.
         assert!(serde_json::from_value::<HostSpec>(
@@ -1505,23 +1625,23 @@ mod tests {
         state
             .change_settings(|settings| {
                 settings.hosts.push(Host {
-                    device_id: "host-2".into(),
+                    device_id: other_id("forget").as_str().into(),
                     name: "twin".into(),
-                    ..server("host-2")
+                    ..server(other_id("forget").as_str())
                 });
 
                 Ok(())
             })
             .unwrap();
 
-        state.host_remove("host-1").unwrap();
+        state.host_remove(host_id("forget").as_str()).unwrap();
         assert_eq!(
             crate::ssh::pinned_keys(paths, "build.example.com").len(),
             1,
             "the key the other server needs was dropped"
         );
 
-        state.host_remove("host-2").unwrap();
+        state.host_remove(other_id("forget").as_str()).unwrap();
         assert!(crate::ssh::pinned_keys(paths, "build.example.com").is_empty());
 
         let _ = stdfs::remove_dir_all(dir);
@@ -1544,5 +1664,136 @@ mod tests {
             json!({ "address": "a", "name": "x", "user": "u", "command": "x" })
         )
         .is_err());
+    }
+
+    fn spec_for(port: u16) -> HostSpec {
+        serde_json::from_value(
+            json!({ "address": "127.0.0.1", "name": "build-box", "port": port, "user": "deploy" }),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_probe_nobody_approved_makes_no_network_call() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("probe", &link);
+        let state = Arc::new(state);
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        listener.set_nonblocking(true).unwrap();
+
+        let prompts = answering(&state, "deny");
+        let error = state.host_probe(&spec_for(port)).unwrap_err();
+
+        assert!(error.contains("not approved"), "{error}");
+        assert!(
+            matches!(
+                listener.accept(),
+                Err(ref error) if error.kind() == std::io::ErrorKind::WouldBlock
+            ),
+            "ssh reached the server before anyone approved it"
+        );
+        assert!(state.ssh.probe.lock().unwrap().is_none());
+
+        let seen = prompts.lock().unwrap();
+
+        assert!(matches!(
+            seen.as_slice(),
+            [Prompt { body: PromptBody::HostConnect { user, port: asked, .. }, .. }] if user == "deploy" && *asked == port
+        ));
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn an_unpaired_computer_refuses_a_probe_without_asking() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("probe-unpaired", &link);
+
+        state
+            .change_settings(|settings| {
+                settings.pairing = None;
+
+                Ok(())
+            })
+            .unwrap();
+
+        // Unpaired: refused before even asking, so a page cannot make a prompt appear on a computer with no account.
+        assert_eq!(
+            state.host_probe(&spec_for(22)).unwrap_err(),
+            "pair this computer first"
+        );
+        assert!(state.prompts.current().is_none());
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_server_cannot_be_paired_under_this_computers_own_id() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("own-id", &link);
+        let spec = spec_for(22);
+        let probed = FakeLink::new(true);
+
+        *state.ssh.probe.lock().unwrap() = Some((
+            spec.target().unwrap(),
+            Arc::clone(&probed) as Arc<dyn HostLink>,
+        ));
+
+        let error = state
+            .host_pair(&spec, &desk_id("own-id"), HOST_SECRET)
+            .unwrap_err();
+
+        assert!(error.contains("own"), "{error}");
+        // Refused before the probe was used up, and nothing was added.
+        assert!(state.ssh.probe.lock().unwrap().is_some());
+        assert_eq!(state.settings().hosts.len(), 1);
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_retried_connection_shows_one_key_changed_notice_per_server() {
+        let link = FakeLink::new(true);
+        let (state, dir, events) = engine("changed", &link);
+        let ask = state.ask_user();
+        let target = target_of(&server(&host_id("changed")));
+        let shown = || {
+            events
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|event| matches!(event, Event::Prompt { .. }))
+                .count()
+        };
+        let notices = |expected: usize| {
+            for _ in 0..200 {
+                if shown() == expected {
+                    return;
+                }
+
+                thread::sleep(Duration::from_millis(10));
+            }
+
+            panic!("{} notices, not {expected}", shown());
+        };
+
+        ask.key_changed(&target, &["a".into()], &["b".into()]);
+        ask.key_changed(&target, &["a".into()], &["b".into()]);
+        notices(1);
+        thread::sleep(Duration::from_millis(100));
+        assert_eq!(shown(), 1, "a retry stacked another notice");
+
+        // Dismissed: the next refusal is news again.
+        state.prompts.deny_all();
+        while !state.ssh.changed_prompts.lock().unwrap().is_empty() {
+            thread::sleep(Duration::from_millis(10));
+        }
+        ask.key_changed(&target, &["a".into()], &["b".into()]);
+        notices(2);
+        state.prompts.deny_all();
+
+        let _ = stdfs::remove_dir_all(dir);
     }
 }
