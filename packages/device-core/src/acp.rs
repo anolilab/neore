@@ -371,8 +371,9 @@ const CODE_LOADING_NAMES: [&str; 14] = [
     "_JAVA_OPTIONS",
     "ZDOTDIR",
 ];
-const CODE_LOADING_PREFIXES: [&str; 11] = [
-    "BUNDLE_", "DYLD_", "GEM_", "GIT_", "JAVA", "LD_", "NODE_", "NPM_", "PERL", "PYTHON", "RUBY",
+const CODE_LOADING_PREFIXES: [&str; 12] = [
+    "BUNDLE_", "DYLD_", "GEM_", "GIT_", "JAVA", "LD_", "NODE_", "NPM_", "PERL", "PHP", "PYTHON",
+    "RUBY",
 ];
 
 /// Whether `name` changes which program (or which code in it) runs. Case-insensitive: Windows names are. A name
@@ -454,6 +455,7 @@ impl DeviceState {
 
     pub fn acp_update(&self, update: AcpUpdate) -> Result<AcpView, String> {
         let mut uninstall = None;
+        let install_root = self.install_root();
 
         self.change_settings(|settings| {
             match update {
@@ -494,8 +496,13 @@ impl DeviceState {
                                 settings.acp_consents.retain(|c| c.agent_key != agent.key);
                             }
 
-                            // A command that is no longer the installed one leaves its files with no owner.
-                            if settings.acp_agents[i].install.is_some() && agent.install.is_none() {
+                            // A command that is no longer the installed one leaves its files with no owner, unless it
+                            // still points inside them (other arguments, or another program of the same download).
+                            if settings.acp_agents[i].install.is_some()
+                                && agent.install.is_none()
+                                && !Path::new(&agent.command)
+                                    .starts_with(install_root.join(&agent.key))
+                            {
                                 uninstall = Some(agent.key.clone());
                             }
 

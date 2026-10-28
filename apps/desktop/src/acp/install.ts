@@ -13,7 +13,7 @@ import { pipeline } from "node:stream/promises";
 
 import type { DeviceCore } from "../device/types";
 import type { AgentRegistry, ResolvedInstall } from "./registry";
-import { assertHttps } from "./registry";
+import { fetchHttps } from "./registry";
 import type { AcpView } from "./types";
 
 /** Longer than any agent should need on a slow line, and the end of a stalled one. */
@@ -69,15 +69,13 @@ const countBytes = (max: number): Transform => {
 
 /** Downloads `url` to `file`, which must not exist. https only, also after redirects. */
 export const download = async (fetchImpl: typeof fetch, url: string, file: string): Promise<void> => {
-    const response = await fetchImpl(url, { redirect: "follow", signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
+    const response = await fetchHttps(fetchImpl, url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
 
     if (!response.ok || response.body === null) {
         await response.body?.cancel();
 
         throw new Error(`The download failed (${String(response.status)}).`);
     }
-
-    assertHttps(response, url);
 
     if (Number(response.headers.get("content-length") ?? 0) > MAX_DOWNLOAD_BYTES) {
         await response.body.cancel();
