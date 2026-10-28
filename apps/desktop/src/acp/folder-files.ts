@@ -1,23 +1,60 @@
 /**
  * Reads files of one approved folder, and only inside it. Paths are resolved against the folder and refused outside
  * it (`..`, an absolute path elsewhere, a symlink that leaves it); a refused path is never opened.
+ *
+ * The check and the open are two steps: the path is resolved with links followed, then the resolved path is opened
+ * with `O_NOFOLLOW` and the OPEN handle is examined (a regular file, its size), so a link swapped in after the check
+ * fails the open instead of being followed. A swap of a folder higher up in the same instant is not closed (the Rust
+ * walk in `packages/device-core/src/fs.rs` opens every component, this does not), which is why this path only READS
+ * files the user's own agent named. Windows has no `O_NOFOLLOW`; there the resolved path is opened as is.
  */
-import { lstat, readFile, realpath } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
 
-import { MAX_SUMMARY_PATH_CHARS } from "./host-events";
+import { isSummaryPath } from "./host-events";
 
-/** One side of one file. The device file tools cap a read at the same size. */
+/** One side of one file, in UTF-8 bytes. The device file tools cap a read at the same size. */
 export const MAX_FILE_BYTES = 1024 * 1024;
 
 /** The file operations used; tests swap them to see what was read. */
 export interface FileIo {
     lstat: typeof lstat;
-    readFile: (file: string) => Promise<Buffer>;
+    /** The file's bytes, or undefined when it is not a regular file or holds more than `maxBytes`. Never follows a link at the last step. */
+    readRegular: (file: string, maxBytes: number) => Promise<Buffer | undefined>;
     realpath: (file: string) => Promise<string>;
 }
 
-const nodeIo: FileIo = { lstat, readFile: async (file) => await readFile(file), realpath: async (file) => await realpath(file) };
+const readRegular = async (file: string, maxBytes: number): Promise<Buffer | undefined> => {
+    const handle = await open(file, constants.O_RDONLY + (constants.O_NOFOLLOW ?? 0));
+
+    try {
+        const info = await handle.stat();
+
+        if (!info.isFile() || info.size > maxBytes) {
+            return undefined;
+        }
+
+        const buffer = Buffer.alloc(Math.min(info.size, maxBytes) + 1);
+        const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+
+        // The file grew between `fstat` and the read.
+        return bytesRead > maxBytes ? undefined : buffer.subarray(0, bytesRead);
+    } finally {
+        await handle.close();
+    }
+};
+
+export const nodeIo: FileIo = { lstat, readRegular, realpath: async (file) => await realpath(file) };
+
+const VERBATIM_UNC = /^\\\\\?\\UNC\\/u;
+const VERBATIM_DRIVE = /^\\\\\?\\(?=[A-Za-z]:)/u;
+
+/**
+ * The core canonicalises the approved folder, which on Windows gives `\\?\C:\work`; an agent names `C:\work\a.ts`.
+ * The two only compare once the verbatim prefix is gone. Anything else passes through.
+ */
+export const withoutVerbatimPrefix = (value: string): string => value.replace(VERBATIM_UNC, "\\\\").replace(VERBATIM_DRIVE, "");
 
 const isInside = (root: string, target: string): boolean => {
     const relative = path.relative(root, target);
@@ -27,16 +64,17 @@ const isInside = (root: string, target: string): boolean => {
 
 const isMissing = (error: unknown): boolean => (error as NodeJS.ErrnoException).code === "ENOENT";
 
-/** A path with a control character could forge a line of the patch, so it is not a path. */
-const isPlainPath = (value: string): boolean => value.length <= MAX_SUMMARY_PATH_CHARS && [...value].every((char) => (char.codePointAt(0) ?? 0) > 0x1F);
-
 export class FolderFiles {
+    private readonly folder: string;
+
     private realFolder: Promise<string> | undefined;
 
     public constructor(
-        private readonly folder: string,
+        folder: string,
         private readonly io: FileIo = nodeIo,
-    ) {}
+    ) {
+        this.folder = withoutVerbatimPrefix(folder);
+    }
 
     /** The path as the folder sees it (relative, forward slashes); undefined when it is outside the folder or not a plain path. */
     public relative(raw: string): string | undefined {
@@ -52,7 +90,7 @@ export class FolderFiles {
 
         const relative = path.relative(this.folder, absolute).split(path.sep).join("/");
 
-        return isPlainPath(relative) ? relative : undefined;
+        return isSummaryPath(relative) ? relative : undefined;
     }
 
     /**
@@ -66,7 +104,7 @@ export class FolderFiles {
             const root = await this.root();
 
             try {
-                return isInside(root, await this.io.realpath(target));
+                return isInside(root, withoutVerbatimPrefix(await this.io.realpath(target)));
             } catch (error) {
                 // Not there yet (a new file may sit in a new folder): the nearest folder that exists decides, and the name itself must not be a link.
                 return isMissing(error) && await this.absentBelow(root, target);
@@ -88,7 +126,7 @@ export class FolderFiles {
             let real: string;
 
             try {
-                real = await this.io.realpath(target);
+                real = withoutVerbatimPrefix(await this.io.realpath(target));
             } catch (error) {
                 // Nothing there, or a link that points nowhere: only a plain absence counts, and only below the folder.
                 return isMissing(error) && await this.confines(relative) ? null : undefined;
@@ -98,15 +136,9 @@ export class FolderFiles {
                 return undefined;
             }
 
-            const info = await this.io.lstat(real);
+            const bytes = await this.io.readRegular(real, MAX_FILE_BYTES);
 
-            if (!info.isFile() || info.size > MAX_FILE_BYTES) {
-                return undefined;
-            }
-
-            const bytes = await this.io.readFile(real);
-
-            return bytes.length > MAX_FILE_BYTES || bytes.includes(0) ? undefined : bytes.toString("utf8");
+            return bytes === undefined || bytes.includes(0) ? undefined : bytes.toString("utf8");
         } catch {
             return undefined;
         }
@@ -130,7 +162,7 @@ export class FolderFiles {
 
     private async nearestExisting(folder: string): Promise<string> {
         try {
-            return await this.io.realpath(folder);
+            return withoutVerbatimPrefix(await this.io.realpath(folder));
         } catch (error) {
             if (!isMissing(error) || !isInside(this.folder, folder)) {
                 throw error;
@@ -141,8 +173,12 @@ export class FolderFiles {
     }
 
     private async root(): Promise<string> {
-        this.realFolder ??= this.io.realpath(this.folder);
+        this.realFolder ??= this.resolveRoot();
 
         return await this.realFolder;
+    }
+
+    private async resolveRoot(): Promise<string> {
+        return withoutVerbatimPrefix(await this.io.realpath(this.folder));
     }
 }

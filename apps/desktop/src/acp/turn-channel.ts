@@ -17,6 +17,15 @@ const MAX_BATCH_EVENTS = 200;
 /** Unsent output a turn holds while the backend is out of reach; past this, new text is dropped, not the turn. */
 const MAX_PENDING_JSON = 4_000_000;
 
+/** The same events with the end of the turn stripped of its summary; undefined when no event carries one. */
+const withoutSummary = (events: HostEvent[]): HostEvent[] | undefined => {
+    if (events.every((event) => event.kind !== "turn_end" || event.summary === undefined)) {
+        return undefined;
+    }
+
+    return events.map((event) => event.kind === "turn_end" ? { kind: "turn_end", reason: event.reason, ...event.error !== undefined && { error: event.error } } : event);
+};
+
 const jsonLength = (event: HostEvent): number => JSON.stringify(event).length;
 
 interface Inflight {
@@ -259,6 +268,17 @@ export class TurnChannel {
                 break;
             }
             case "refused": {
+                const plain = withoutSummary(inflight.events);
+
+                // The summary is a courtesy and the end of the turn is not: one the backend will not take is sent
+                // again without it, once, so the reply is still saved.
+                if (plain !== undefined) {
+                    this.host.log("[acp-host] the backend refused this turn's summary of changed files; the turn ends without it");
+                    this.inflight = { events: plain, firstSeq: inflight.firstSeq };
+                    this.schedule(Math.max(0, POST_INTERVAL_MS - (this.host.now() - this.lastPostAt)));
+                    break;
+                }
+
                 this.host.log("[acp-host] the backend refused this turn's output; it is no longer posted");
                 this.finish();
                 break;

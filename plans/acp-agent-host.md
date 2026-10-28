@@ -582,12 +582,20 @@ backend work, listed in §4.8).
   read; a patch over the cap keeps its file list.
 
 **S9 as built** (differences from the text above):
-- A file is recorded from a completed tool call only: ACP `diff` content (both sides are in the message, nothing is read), or
-  an edit, delete or move call that names `locations` with no diff, whose earlier text is read when the call or its permission
-  request first names the path and whose later text is read at completion (`apps/desktop/src/acp/changes.ts`). Declined,
-  failed and cancelled calls, binary files, files over 1 MiB and a call already complete when first seen are left out.
+- A file is recorded from a completed tool call only: ACP `diff` content (both sides are in the message, nothing is read;
+  a call first seen already complete still counts), or an edit, delete or move call that names `locations` with no diff,
+  whose earlier text is read when the call or its permission request first names the path and whose later text is read at
+  completion (`apps/desktop/src/acp/changes.ts`). Declined, failed and cancelled calls, binary files, files over 1 MiB a
+  side (in UTF-8 bytes) and a `locations` call first seen already complete (no earlier text exists to read) are left out.
   Every path is resolved against the approved folder, links followed, before anything is read or listed
-  (`folder-files.ts`); the summary carries paths relative to the folder.
+  (`folder-files.ts`; the open uses `O_NOFOLLOW` and examines the open handle; a verbatim `\\?\` prefix on the core's
+  folder is removed so Windows paths compare); the summary carries paths relative to the folder.
+- Bounds: at most 200 paths (a dropped file gives its slot back), 16 MiB of text held, one snapshot read at a time that
+  stops at the cap, and a diff budget for the turn (table cells, patch bytes): past it a file keeps its counts and loses
+  its text, which makes the patch `{ tooLarge: true }`.
+- The path rule is one predicate on both sides (`isSummaryPath` / `isFolderRelativePath`), applied on the text that is
+  sent, after masking. An entry that fails it is left out; if the backend still refuses a post that carries a summary, the
+  host sends the end of the turn again without it, so the reply is not lost.
 - **The host's patch cap is 96 KiB, not 256 KiB.** A post is capped at 256 KiB whole and the `turn_end` event, escaped twice,
   must fit one post alone, so a 256 KiB patch could never be sent. The backend still accepts the plan's bounds (200 files,
   256 KiB patch); the host falls back to `{ tooLarge: true }` for the patch and then trims the tail of the file list until the

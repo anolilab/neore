@@ -341,7 +341,11 @@ export class AgentSession {
 
         turn.end(this.cancelRequested ? "cancelled" : reason);
         this.observeUnanswered(turn);
-        this.observeEnd(turn);
+
+        // A turn that changed files ends once the reads for them have; the next queued prompt waits for that, so its
+        // turn does not start before this one's end is queued.
+        const delivered = this.observeEnd(turn);
+
         // A request the agent made during this turn and left unanswered must not stay answerable: an Allow now
         // would authorize something for a turn that is over. A queued turn asks for its own once it starts.
         this.options.gate.cancelSession(this.id);
@@ -349,6 +353,15 @@ export class AgentSession {
         this.cancelTimer = undefined;
         this.current = undefined;
 
+        if (delivered === undefined) {
+            this.startNext();
+        } else {
+            this.startNextAfter(delivered);
+        }
+    }
+
+    /** The session is free: the next queued prompt runs, or the window is told it is idle. */
+    private startNext(): void {
         if (this.status === "ended") {
             return;
         }
@@ -362,6 +375,11 @@ export class AgentSession {
         } else {
             this.run(next);
         }
+    }
+
+    private async startNextAfter(delivered: Promise<void>): Promise<void> {
+        await delivered;
+        this.startNext();
     }
 
     private end(reason: string): void {
@@ -496,7 +514,8 @@ export class AgentSession {
         }
     }
 
-    private observeEnd(turn: Turn, error?: string): void {
+    /** Tells the observer the turn ended. Undefined when that is done; otherwise a promise that never rejects and settles once it is. */
+    private observeEnd(turn: Turn, error?: string): Promise<void> | undefined {
         this.observeDelta(turn, "text", true);
         this.observeDelta(turn, "thought", true);
 
@@ -510,15 +529,22 @@ export class AgentSession {
         if (changes?.active !== true) {
             this.observe((observer) => observer.turnEnded(this.id, turn.id, reason, said));
 
-            return;
+            return undefined;
         }
 
         // Reads for the files the turn named may still be running; the turn ends once they have.
-        this.observeEndWithChanges(turn, changes, reason, said);
+        return this.observeEndWithChanges(turn, changes, reason, said);
     }
 
     private async observeEndWithChanges(turn: Turn, changes: TurnChanges, reason: StopReason | "failed", error: string | undefined): Promise<void> {
-        const summary = await changes.summary();
+        let summary: Awaited<ReturnType<TurnChanges["summary"]>>;
+
+        try {
+            summary = await changes.summary();
+        } catch {
+            // What the turn changed is a courtesy; the turn's end is not.
+            summary = undefined;
+        }
 
         this.observe((observer) => summary === undefined ? observer.turnEnded(this.id, turn.id, reason, error) : observer.turnEnded(this.id, turn.id, reason, error, summary));
     }

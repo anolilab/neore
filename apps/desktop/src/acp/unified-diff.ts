@@ -8,14 +8,56 @@ const NO_EOL = "\u{0}";
 const CONTEXT_LINES = 3;
 /** The most cells the line-matching table may have (4 bytes each). Past it, the changed middle is shown as removed, then added. */
 const MAX_TABLE_CELLS = 4_000_000;
+/** The same for a whole turn: past it, every further file is counted as all removed, then all added. */
+const MAX_TURN_CELLS = 16_000_000;
 
 interface Op {
     kind: " " | "+" | "-";
     line: string;
 }
 
+/**
+ * What one turn may spend on diffs, shared by all its files and spent as they are diffed: table cells (CPU and
+ * memory of the line matching) and bytes of patch text. A file past either still gets its counts.
+ */
+export class DiffLimits {
+    public constructor(
+        private cells: number,
+        private patchBytes: number,
+    ) {}
+
+    /** Takes `cells` of the table budget when there are that many left. */
+    public spendCells(cells: number): boolean {
+        if (cells > this.cells) {
+            return false;
+        }
+
+        this.cells -= cells;
+
+        return true;
+    }
+
+    /** Whether a patch of this many bytes still fits; it is not taken until {@link spendBytes}. */
+    public fits(bytes: number): boolean {
+        return bytes <= this.patchBytes;
+    }
+
+    public spendBytes(bytes: number): void {
+        this.patchBytes -= bytes;
+    }
+
+    public get exhausted(): boolean {
+        return this.patchBytes <= 0;
+    }
+}
+
+export const newDiffLimits = (patchBytes: number): DiffLimits => new DiffLimits(MAX_TURN_CELLS, patchBytes);
+
 export interface FileDiff {
     added: number;
+    /** The patch would not fit the limits, so it was not built. */
+    overflow?: boolean;
+    /** The patch text; empty when it was not printed (`overflow`) or the texts are equal. */
     patch: string;
     removed: number;
 }
@@ -59,8 +101,10 @@ const matchTable = (a: string[], b: string[]): Uint32Array => {
 };
 
 /** The edit script of two short runs of lines, walked along the table. */
-const diffMiddle = (a: string[], b: string[]): Op[] => {
-    if ((a.length + 1) * (b.length + 1) > MAX_TABLE_CELLS) {
+const diffMiddle = (a: string[], b: string[], limits: DiffLimits): Op[] => {
+    const cells = (a.length + 1) * (b.length + 1);
+
+    if (cells > MAX_TABLE_CELLS || !limits.spendCells(cells)) {
         return [...ops("-", a), ...ops("+", b)];
     }
 
@@ -87,7 +131,7 @@ const diffMiddle = (a: string[], b: string[]): Op[] => {
     return [...script, ...ops("-", a.slice(i)), ...ops("+", b.slice(j))];
 };
 
-const diffLines = (a: string[], b: string[]): Op[] => {
+const diffLines = (a: string[], b: string[], limits: DiffLimits): Op[] => {
     let start = 0;
 
     while (start < a.length && start < b.length && a[start] === b[start]) {
@@ -102,7 +146,7 @@ const diffLines = (a: string[], b: string[]): Op[] => {
         endB -= 1;
     }
 
-    return [...ops(" ", a.slice(0, start)), ...diffMiddle(a.slice(start, endA), b.slice(start, endB)), ...ops(" ", a.slice(endA))];
+    return [...ops(" ", a.slice(0, start)), ...diffMiddle(a.slice(start, endA), b.slice(start, endB), limits), ...ops(" ", a.slice(endA))];
 };
 
 const printLine = (op: Op): string => op.line.endsWith(NO_EOL) ? `${op.kind}${op.line.slice(0, -1)}\n\\ No newline at end of file` : `${op.kind}${op.line}`;
@@ -143,9 +187,23 @@ const linesBefore = (script: Op[], absent: Op["kind"]): number[] => {
     return counts;
 };
 
-/** `null` for a side that does not exist (a created or a deleted file). Identical texts give no patch and zero counts. */
-export const unifiedDiff = (path: string, before: string | null, after: string | null): FileDiff => {
-    const script = diffLines(splitLines(before ?? ""), splitLines(after ?? ""));
+const printHunk = (script: Op[], start: number, end: number, before: number[], after: number[]): string[] => {
+    const slice = script.slice(start, end);
+    const oldLines = slice.filter((op) => op.kind !== "+").length;
+    const newLines = slice.filter((op) => op.kind !== "-").length;
+    // A side with no lines in the hunk is named by the line before it.
+    const oldStart = before[start] + Math.sign(oldLines);
+    const newStart = after[start] + Math.sign(newLines);
+
+    return [`@@ -${String(oldStart)},${String(oldLines)} +${String(newStart)},${String(newLines)} @@`, ...slice.map((op) => printLine(op))];
+};
+
+/**
+ * `null` for a side that does not exist (a created or a deleted file). Identical texts give no patch and zero
+ * counts. The patch is built hunk by hunk and abandoned (`overflow`) once it passes what `limits` has left.
+ */
+export const unifiedDiff = (path: string, before: string | null, after: string | null, limits: DiffLimits = newDiffLimits(Number.MAX_SAFE_INTEGER)): FileDiff => {
+    const script = diffLines(splitLines(before ?? ""), splitLines(after ?? ""), limits);
     const added = script.filter((op) => op.kind === "+").length;
     const removed = script.filter((op) => op.kind === "-").length;
 
@@ -153,20 +211,28 @@ export const unifiedDiff = (path: string, before: string | null, after: string |
         return { added, patch: "", removed };
     }
 
+    if (limits.exhausted) {
+        return { added, overflow: true, patch: "", removed };
+    }
+
     const oldBefore = linesBefore(script, "+");
     const newBefore = linesBefore(script, "-");
     const out = [`--- ${before === null ? "/dev/null" : `a/${path}`}`, `+++ ${after === null ? "/dev/null" : `b/${path}`}`];
+    let size = out.reduce((total, line) => total + Buffer.byteLength(line) + 1, 0);
 
     for (const { end, start } of hunkRanges(script)) {
-        const slice = script.slice(start, end);
-        const oldLines = slice.filter((op) => op.kind !== "+").length;
-        const newLines = slice.filter((op) => op.kind !== "-").length;
-        // A side with no lines in the hunk is named by the line before it.
-        const oldStart = oldBefore[start] + Math.sign(oldLines);
-        const newStart = newBefore[start] + Math.sign(newLines);
+        const hunk = printHunk(script, start, end, oldBefore, newBefore);
 
-        out.push(`@@ -${String(oldStart)},${String(oldLines)} +${String(newStart)},${String(newLines)} @@`, ...slice.map((op) => printLine(op)));
+        size += hunk.reduce((total, line) => total + Buffer.byteLength(line) + 1, 0);
+
+        if (!limits.fits(size)) {
+            return { added, overflow: true, patch: "", removed };
+        }
+
+        out.push(...hunk);
     }
+
+    limits.spendBytes(size);
 
     return { added, patch: `${out.join("\n")}\n`, removed };
 };

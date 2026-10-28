@@ -119,6 +119,35 @@ const LIMIT_STOPS: ReadonlySet<StopReason | "failed"> = new Set(["failed", "max_
 /** The files a turn may list, and the paths in them (`backend/lunora/acp/validators.ts`). */
 export const MAX_SUMMARY_FILES = 200;
 export const MAX_SUMMARY_PATH_CHARS = 1024;
+/** The backend's cap on a patch, in characters; the host keeps a smaller one (`changes.ts`). */
+const MAX_BACKEND_PATCH_CHARS = 256 * 1024;
+
+const DRIVE_PATH = /^[A-Za-z]:/u;
+const SEPARATOR = /[/\\]/u;
+
+/**
+ * A path the backend accepts in a summary: `isFolderRelativePath` and the length bounds of `backend/lunora/acp`. One
+ * entry the backend refuses refuses the whole post, so it is checked here, on the text that is actually sent.
+ */
+export const isSummaryPath = (value: string): boolean =>
+    value.length > 0
+    && value.length <= MAX_SUMMARY_PATH_CHARS
+    && !value.startsWith("/")
+    && !value.startsWith("\\")
+    && !DRIVE_PATH.test(value)
+    && [...value].every((char) => (char.codePointAt(0) ?? 0) > 0x1F)
+    && !value.split(SEPARATOR).includes("..");
+
+const isCount = (value: number): boolean => Number.isSafeInteger(value) && value >= 0;
+
+/** Only what the backend takes: an entry it would refuse is left out, so it cannot cost the turn its end. */
+const sendableSummary = (summary: TurnSummary): TurnSummary => {
+    const files = summary.files.filter((file) => isSummaryPath(file.path) && isCount(file.added) && isCount(file.removed)).slice(0, MAX_SUMMARY_FILES);
+    const { patch } = summary;
+    const keep = typeof patch !== "string" || patch.length <= MAX_BACKEND_PATCH_CHARS;
+
+    return { files, ...patch !== undefined && { patch: keep ? patch : { tooLarge: true as const } } };
+};
 
 /**
  * The end of a turn with its summary, held to what one post can carry. The backend allows a 256 KiB patch, but a post
@@ -128,12 +157,13 @@ export const MAX_SUMMARY_PATH_CHARS = 1024;
 export const turnEndEvent = (reason: TurnEndEvent["reason"], error: string | undefined, summary: TurnSummary | undefined): TurnEndEvent => {
     const base: TurnEndEvent = { kind: "turn_end", reason, ...error !== undefined && { error: error.slice(0, 1000) } };
 
-    if (summary === undefined || summary.files.length === 0) {
+    const sendable = summary === undefined ? undefined : sendableSummary(summary);
+
+    if (sendable === undefined || sendable.files.length === 0) {
         return base;
     }
 
-    let files = summary.files.slice(0, MAX_SUMMARY_FILES);
-    let { patch } = summary;
+    let { files, patch } = sendable;
     const fits = (): boolean => wireBytes({ ...base, summary: { files, ...patch !== undefined && { patch } } }) <= MAX_EVENT_BYTES;
 
     if (typeof patch === "string" && !fits()) {
