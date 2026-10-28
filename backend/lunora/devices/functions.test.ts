@@ -436,6 +436,17 @@ describe("servers reached over SSH", () => {
         expect(listed.find((device) => device._id === desktop.deviceId)).not.toHaveProperty("transport");
     });
 
+    it("lets the owner rename a server, and nobody else", async () => {
+        const { host } = await desktopWithHost(ownerId);
+
+        await as(ownerId).mutation(functions.renameDevice as never, { deviceId: host.deviceId, name: "renamed" } as never);
+
+        const listed = (await as(ownerId).query(functions.listDevices as never, {} as never)) as { _id: string; name: string }[];
+
+        expect(listed.find((device) => device._id === host.deviceId)?.name).toBe("renamed");
+        await expect(as(STRANGER).mutation(functions.renameDevice as never, { deviceId: host.deviceId, name: "mine" } as never)).rejects.toThrow(NOT_FOUND_ERROR);
+    });
+
     it("refuses to pair a host under a desktop that is not the caller's, or under another host", async () => {
         const mine = await pairedDevice(ownerId);
         const stranger = await insertUser();

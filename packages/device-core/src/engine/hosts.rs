@@ -586,6 +586,13 @@ impl DeviceState {
                 }
             }
         };
+
+        // A forwarding change can end the master this probe rode: a dead link is no connection to pair.
+        if !link.is_alive() {
+            self.retire(&link);
+
+            return Err("the connection to the server dropped; connect to it again".into());
+        }
         let answer = self.prompts.ask(
             PromptBody::HostPairing {
                 address: target.address.clone(),
@@ -672,8 +679,16 @@ impl DeviceState {
             return Ok(HostProbe::of(link.hello()));
         }
 
+        let disconnects = self.ssh.disconnects.load(Ordering::SeqCst);
         let link = self.connect_target(&target_of(&host))?;
         let probe = HostProbe::of(link.hello());
+
+        // Disconnected while the connect was waiting: the user asked for that, and it stays asked.
+        if self.ssh.disconnects.load(Ordering::SeqCst) != disconnects {
+            self.retire(&link);
+
+            return Err("that server was disconnected meanwhile".into());
+        }
 
         // Dropped from the settings while the user was typing a passphrase: nothing to keep.
         if !self
@@ -704,6 +719,8 @@ impl DeviceState {
     }
 
     pub fn host_disconnect(&self, device_id: &str) {
+        self.ssh.disconnects.fetch_add(1, Ordering::SeqCst);
+
         let link = self.ssh.connections.lock().unwrap().remove(device_id);
 
         if let Some(link) = link {

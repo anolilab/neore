@@ -160,7 +160,12 @@ export const renameDevice = authMutation
     .input({ deviceId: v.id("devices"), name: vDeviceName })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const device = await requireOwnDevice(ctx, args.deviceId, ctx.user.userId);
+        // The owner renames any of their devices, a server included: `viaDeviceId` guards the relay, not this.
+        const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId: ctx.user.userId } });
+
+        if (!device) {
+            throw new LunoraError("NOT_FOUND", "Device not found");
+        }
 
         await ctx.db.patch(device._id, { name: args.name.trim() });
 

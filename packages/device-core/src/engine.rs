@@ -92,6 +92,9 @@ struct SshState {
     changed_prompts: Arc<Mutex<std::collections::HashSet<String>>>,
     /// Live connections by the server's device id.
     connections: Mutex<HashMap<String, Arc<dyn HostLink>>>,
+    /// Counts explicit disconnects, so a connect that was waiting (on a passphrase, say) can tell the user ended
+    /// connections meanwhile and not install its link over that.
+    disconnects: std::sync::atomic::AtomicU64,
     paths: SshPaths,
     /// The connection a server was probed over, waiting for its pairing: at most one.
     probe: Mutex<Option<(Target, Arc<dyn HostLink>)>>,
@@ -129,6 +132,7 @@ impl DeviceState {
                 binary: binary.to_owned(),
                 changed_prompts: Arc::default(),
                 connections: Mutex::default(),
+                disconnects: std::sync::atomic::AtomicU64::new(0),
                 paths: SshPaths::under(data_dir, sandbox::home().as_deref()),
                 probe: Mutex::default(),
             },

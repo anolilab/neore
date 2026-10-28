@@ -202,6 +202,22 @@ fn private_dir(dir: &Path) -> io::Result<()> {
 
 /// A path as an ssh option value: quoted, because a path with a space (`Application Support`) would otherwise
 /// end the value, and with `%` escaped, which ssh would read as a token.
+/// A short tag for the key file a target logs in with, empty when it uses none, so two servers with one
+/// destination and different keys never share a multiplexed master (and its authenticated session).
+fn identity_tag(target: &Target) -> String {
+    target
+        .identity_file
+        .as_ref()
+        .map_or_else(String::new, |file| {
+            let digest = Sha256::digest(file.as_bytes());
+
+            format!(
+                "k{:02x}{:02x}{:02x}{:02x}-",
+                digest[0], digest[1], digest[2], digest[3]
+            )
+        })
+}
+
 fn quoted(path: &str, suffix: &str) -> String {
     format!("\"{}{suffix}\"", path.replace('%', "%%"))
 }
@@ -242,10 +258,15 @@ pub fn ssh_args(target: &Target, paths: &SshPaths) -> Vec<String> {
     // Windows' OpenSSH has no multiplexing.
     if cfg!(unix) {
         option("ControlMaster=auto".into());
-        // `%C` is ssh's own token (a hash of the connection), so it is added after the escaping.
+        // `%C` is ssh's own token (a hash of the connection), so it is added after the escaping. It does not
+        // cover the key file, so a server using another key must not land on this master: the key file's own
+        // tag goes in front.
         option(format!(
             "ControlPath={}",
-            quoted(&paths.control_dir.to_string_lossy(), "/%C")
+            quoted(
+                &paths.control_dir.to_string_lossy(),
+                &format!("/{}%C", identity_tag(target))
+            )
         ));
         option("ControlPersist=10m".into());
     }
@@ -697,6 +718,15 @@ impl Drop for Askpass {
 }
 
 #[cfg(unix)]
+fn next_temporary() -> u64 {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
+#[cfg(unix)]
 fn write_script(paths: &SshPaths) -> io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
 
@@ -704,7 +734,12 @@ fn write_script(paths: &SshPaths) -> io::Result<()> {
         return Ok(());
     }
 
-    let temporary = paths.askpass_script.with_extension("tmp");
+    // A name of its own per installation: two connections starting together must not write and rename one file.
+    let temporary = paths.askpass_script.with_extension(format!(
+        "{}.{}.tmp",
+        std::process::id(),
+        next_temporary()
+    ));
 
     fs::write(&temporary, ASKPASS_SCRIPT)?;
     fs::set_permissions(&temporary, fs::Permissions::from_mode(0o700))?;
@@ -1085,6 +1120,28 @@ mod tests {
 
     fn paths() -> SshPaths {
         SshPaths::under(Path::new("/data"), None)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn servers_with_one_destination_and_two_keys_do_not_share_a_master() {
+        let control_path = |identity: Option<&str>| {
+            let mut one = target();
+
+            one.identity_file = identity.map(str::to_owned);
+
+            option_values(&ssh_args(&one, &paths()))
+                .into_iter()
+                .find(|option| option.starts_with("ControlPath="))
+                .map(str::to_owned)
+                .unwrap()
+        };
+        let first = control_path(Some("/home/me/.ssh/one"));
+        let second = control_path(Some("/home/me/.ssh/two"));
+
+        assert_ne!(first, second);
+        assert_ne!(first, control_path(None));
+        assert_eq!(first, control_path(Some("/home/me/.ssh/one")));
     }
 
     fn option_values(args: &[String]) -> Vec<&str> {
