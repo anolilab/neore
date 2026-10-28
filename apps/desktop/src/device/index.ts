@@ -413,12 +413,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         // Read first: the replay opens channels, and the first of them rewrites the file of running turns.
         const leftovers = await host.readLeftovers();
 
-        try {
-            await requireCommands().recover();
-        } catch (error) {
-            console.error("[neore-desktop] commands left from the last run could not be replayed:", (error as Error).message);
-        }
-
+        await requireCommands().recover();
         await host.recover(leftovers);
     };
 
