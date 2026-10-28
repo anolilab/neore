@@ -656,6 +656,33 @@ written here is what is not.
   preload bridge; `NEORE_E2E_MICROPHONE=1` uses the (fake) microphone, and `NEORE_WHISPER_CLI` / `_MODEL` / `_CLIP` run
   a real recogniser.
 
+- **Host-run threads** (`backend/lunora/acp/`, `apps/desktop/src/acp/`,
+  plans/acp-agent-host.md) — a coding agent runs on a paired computer and the
+  thread is `threads.runner = "host"` (`acp/lib/host-thread.ts`; deliberately
+  not a create field, so a client cannot mint one). The desktop MAIN process
+  posts the output to `POST /hosts/ingest` (signed with the device secret under
+  the `turn` domain, `Rust DeviceCore.signTurn`, which signs nothing but a turn
+  post for this device); the page is not in that path, and the backend origin
+  is baked in at build time (`NEORE_BACKEND_URL`), never taken from the page.
+  Non-obvious: every event takes one `(turnId, seq)` slot and writes one
+  `persistentChunks` row (tool, permission and the end of the turn too), because
+  `lastSeq` is read off `by_streamId_seq` and never kept as a counter on the
+  stream row — a write per post would re-run `getActiveStreamForThread` for
+  every viewer. The reaper window moves forward only after half of it is gone
+  for the same reason. The device owner comes from the `.global()` `shardRoutes`
+  row `device:<id>` (cached per isolate), the signature is checked on the
+  owner's shard, and the per-device limit sits AFTER that, inside
+  `applyHostEvents`, so a forged post never spends a victim's budget. The
+  harness is one database for every shard, so "a post into another user's
+  thread is refused" is proved by the explicit owner comparisons in
+  `applyHostEvents`, not by shard isolation. A host stream ends through
+  `endHostStream` from every path (the host's `turn_end`, the reaper, a revoked
+  device, Stop), which sets the status and `hostState: ended` in one write.
+  Host turns write no usage row and charge no credit. `acp_*` device calls have
+  their own claim window (60 s) and open-call budget (3 per device); the backend
+  queues `acp_cancel` itself (`devices/lib/acp-call.ts`) because
+  `createDeviceCall` refuses anything the manifest does not list.
+
 - **Public v1 API + `neore` CLI** (`backend/lunora/public-api/`, `apps/cli`) —
   one route table (`routes.ts`) feeds both the hono router and
   `/api/v1/openapi.json`; every handler calls an EXISTING public procedure

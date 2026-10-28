@@ -22,6 +22,11 @@ export declare class DeviceCore {
    */
   manifest(deviceId?: string | undefined | null): Promise<string>
   /**
+   * Signs one turn post for the backend's ingest route (hex HMAC under the `turn` domain). Refuses a payload
+   * that is not a turn post for this paired computer, so it cannot sign anything else.
+   */
+  signTurn(payload: string): string
+  /**
    * Verifies, asks about (through `onEvent`), runs and signs one relayed call.
    * Resolves the signed result (`{ payload, signature }`, JSON).
    */

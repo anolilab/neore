@@ -12,9 +12,10 @@
  */
 import { randomUUID } from "node:crypto";
 
+import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate, PermissionOutcome } from "./permission";
-import { offeredOptions } from "./permission";
+import { describePermission, offeredOptions } from "./permission";
 import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
 import { initialize, METHOD, newSession, promptParams } from "./protocol";
@@ -41,6 +42,17 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 
 const text = (value: unknown): string => typeof value === "string" ? value : "";
 
+/** How the backend is told a request ended: an allow option, a reject option, or neither. */
+const resolutionOf = (params: Record<string, unknown>, outcome: PermissionOutcome): "allowed" | "cancelled" | "declined" => {
+    if (outcome.outcome === "cancelled") {
+        return "cancelled";
+    }
+
+    const option = offeredOptions(params).find((candidate) => candidate.optionId === outcome.optionId);
+
+    return option?.kind.startsWith("allow") === true ? "allowed" : "declined";
+};
+
 /** The text of a content block; anything that is not text shows as its type, in brackets. */
 const contentText = (content: unknown): string => {
     if (!isRecord(content)) {
@@ -59,6 +71,10 @@ export interface SessionOptions {
     cancelGraceMs?: number;
     folder: string;
     gate: PermissionGate;
+    /** What the backend shows for this session (labels only). With `observer`, opening the session makes its thread. */
+    hostInfo?: HostSessionInfo;
+    /** Told what the session and its turns do, so they can be saved on the backend (`ingest.ts`). */
+    observer?: SessionObserver;
     /** Called when anything the window shows changed. Coalescing is the caller's. */
     onChange: () => void;
     process: AgentProcess;
@@ -86,6 +102,11 @@ export class AgentSession {
     private stopping: Promise<void> = Promise.resolve();
 
     private readonly queue: string[] = [];
+
+    /** How much of each turn's text has been handed to the observer, in characters of the scrubbed text. */
+    private readonly sent = new WeakMap<Turn, { text: number; thought: number }>();
+
+    private readonly toolOwner = new Map<string, Turn>();
 
     private readonly tools = new Map<string, ToolState>();
 
@@ -136,6 +157,12 @@ export class AgentSession {
 
         this.status = "idle";
         this.options.onChange();
+
+        const { hostInfo } = this.options;
+
+        if (hostInfo !== undefined) {
+            this.observe((observer) => observer.sessionOpened(this.id, hostInfo));
+        }
     }
 
     public send(prompt: string): SendResult {
@@ -167,6 +194,17 @@ export class AgentSession {
         return { status: "started" };
     }
 
+    /** Stops the turn with this id if it is the one running: a stop the backend asked for names the turn it means. */
+    public cancelTurn(turnId: string): boolean {
+        if (this.current?.id !== turnId) {
+            return false;
+        }
+
+        this.cancel();
+
+        return true;
+    }
+
     /** Stops the running turn. Prompts still waiting are dropped, so a stop releases nothing later. */
     public cancel(): void {
         if (this.status !== "busy" || this.current === undefined) {
@@ -183,9 +221,12 @@ export class AgentSession {
         this.options.gate.cancelSession(this.id);
 
         for (const tool of this.tools.values()) {
-            if (tool.status === "pending" || tool.status === "in_progress") {
-                tool.status = "cancelled";
+            if (!(tool.status === "pending" || tool.status === "in_progress")) {
+                continue;
             }
+
+            tool.status = "cancelled";
+            this.observeTool(tool);
         }
 
         this.cancelTimer ??= setTimeout(() => {
@@ -236,6 +277,7 @@ export class AgentSession {
         this.current = turn;
         this.status = "busy";
         this.cancelRequested = false;
+        this.observe((observer) => observer.turnStarted(this.id, turn.id, prompt));
         this.options.onChange();
         this.prompt(turn);
     }
@@ -253,6 +295,7 @@ export class AgentSession {
             if (this.status !== "ended") {
                 turn.end("failed");
                 this.current = undefined;
+                this.observeEnd(turn, this.options.process.scrub((error as Error).message));
                 await this.exitStatus();
                 this.end((error as Error).message);
             }
@@ -286,6 +329,7 @@ export class AgentSession {
         }
 
         turn.end(this.cancelRequested ? "cancelled" : reason);
+        this.observeEnd(turn);
         // A request the agent made during this turn and left unanswered must not stay answerable: an Allow now
         // would authorize something for a turn that is over. A queued turn asks for its own once it starts.
         this.options.gate.cancelSession(this.id);
@@ -326,12 +370,19 @@ export class AgentSession {
         this.stopping = this.stopProcess();
 
         for (const tool of this.tools.values()) {
-            if (tool.status === "pending" || tool.status === "in_progress") {
-                tool.status = this.cancelRequested ? "cancelled" : "failed";
+            if (!(tool.status === "pending" || tool.status === "in_progress")) {
+                continue;
             }
+
+            tool.status = this.cancelRequested ? "cancelled" : "failed";
+            this.observeTool(tool);
         }
 
         wasRunning?.end(this.cancelRequested ? "cancelled" : "failed");
+
+        if (wasRunning !== undefined) {
+            this.observeEnd(wasRunning, said);
+        }
 
         this.current = undefined;
         this.options.onChange();
@@ -357,7 +408,87 @@ export class AgentSession {
         }
 
         tool.status = "declined";
+        this.observeTool(tool);
         this.options.onChange();
+    }
+
+    // ─── To the observer ───────────────────────────────────────────────────
+
+    /** Persistence never changes what the session does: an observer that throws is ignored. */
+    private observe(call: (observer: SessionObserver) => void): void {
+        const { observer } = this.options;
+
+        if (observer === undefined) {
+            return;
+        }
+
+        try {
+            call(observer);
+        } catch {
+            // The session carries on; the poster logs its own failures.
+        }
+    }
+
+    /**
+     * Hands the observer the text added since the last call. Text that would be scrubbed is held back by the
+     * longest value's length until the turn ends, since a value split across two chunks is only recognised once
+     * both have arrived; nothing the user asked to mask is posted.
+     */
+    private observeDelta(turn: Turn | undefined, field: "text" | "thought", final: boolean): void {
+        if (turn === undefined || this.options.observer === undefined) {
+            return;
+        }
+
+        const { scrub, secretLength } = this.options.process;
+        const sent = this.sent.get(turn) ?? { text: 0, thought: 0 };
+        const scrubbed = secretLength === 0 ? turn[field] : scrub(turn[field]);
+        const end = final || secretLength === 0 ? scrubbed.length : Math.max(0, scrubbed.length - (secretLength - 1));
+
+        this.sent.set(turn, sent);
+
+        if (end <= sent[field]) {
+            return;
+        }
+
+        const delta = scrubbed.slice(sent[field], end);
+
+        sent[field] = end;
+        this.observe((observer) => field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta));
+    }
+
+    private observeTool(tool: ToolState): void {
+        const turn = this.toolOwner.get(tool.id);
+
+        if (turn !== undefined) {
+            this.observe((observer) => observer.tool(this.id, turn.id, { id: tool.id, kind: tool.kind, status: tool.status, title: tool.title }));
+        }
+    }
+
+    private observeEnd(turn: Turn, error?: string): void {
+        this.observeDelta(turn, "text", true);
+        this.observeDelta(turn, "thought", true);
+
+        const reason = turn.stopReason ?? "failed";
+
+        this.observe((observer) => observer.turnEnded(this.id, turn.id, reason, reason === "failed" ? error : undefined));
+    }
+
+    /** What the backend is told of a request: the tool, target and command as the user sees them, and the options the agent offered, never an "always" one. */
+    private observePermission(turn: Turn, requestId: string, request: Parameters<typeof describePermission>[0]): void {
+        const described = describePermission(request);
+
+        this.observe((observer) =>
+            observer.permissionRequested(this.id, turn.id, {
+                kind: "permission_request",
+                options: described.options.filter((option) => !option.kind.includes("always")),
+                requestId,
+                tool: described.tool,
+                // The label the user chose for the folder, never its path.
+                ...this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel },
+                ...described.command !== undefined && { command: described.command },
+                ...described.target !== undefined && { target: described.target },
+            }),
+        );
     }
 
     // ─── From the agent ────────────────────────────────────────────────────
@@ -373,10 +504,12 @@ export class AgentSession {
         switch (update.sessionUpdate) {
             case "agent_message_chunk": {
                 turn?.append("text", contentText(update.content));
+                this.observeDelta(turn, "text", false);
                 break;
             }
             case "agent_thought_chunk": {
                 turn?.append("thought", contentText(update.content));
+                this.observeDelta(turn, "thought", false);
                 break;
             }
             case "tool_call":
@@ -409,6 +542,7 @@ export class AgentSession {
 
             tool = { id, kind: "other", status: "pending", title: this.options.process.scrub(id) };
             this.tools.set(id, tool);
+            this.toolOwner.set(id, turn);
             turn.tools.push(tool);
         }
 
@@ -424,6 +558,8 @@ export class AgentSession {
         if (!isFinal(tool) && TOOL_STATUSES.has(update.status as ToolStatus)) {
             tool.status = update.status as ToolStatus;
         }
+
+        this.observeTool(tool);
     }
 
     private async onRequest(method: string, params: unknown): Promise<unknown> {
@@ -441,14 +577,19 @@ export class AgentSession {
             return { outcome: { outcome: "cancelled" } };
         }
 
-        const turn = this.current;
-        const outcome = await this.options.gate.ask({
+        const request = {
             agentLabel: this.options.agentLabel,
             folder: this.options.folder,
             params,
             scrub: this.options.process.scrub,
             sessionId: this.id,
-        });
+        };
+        const requestId = randomUUID();
+        const turn = this.current;
+
+        this.observePermission(turn, requestId, request);
+
+        const outcome = await this.options.gate.ask(request);
 
         // The request reaches the core's queue a moment after it is sent, so a turn's end can slip between the two:
         // an answer for a turn that is no longer the running one authorizes nothing.
@@ -459,6 +600,8 @@ export class AgentSession {
         if (this.wasDeclined(params, outcome)) {
             this.markDeclined(params);
         }
+
+        this.observe((observer) => observer.permissionResolved(this.id, turn.id, requestId, resolutionOf(params, outcome)));
 
         return { outcome };
     }

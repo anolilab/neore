@@ -82,6 +82,11 @@ export const steerRun = authMutation
             throw new LunoraError("CONFLICT", "This reply is no longer running");
         }
 
+        // A coding agent on a paired device takes no steer into a running turn: nothing reads the queue.
+        if (stream.producer === "host") {
+            throw new LunoraError("CONFLICT", "A coding agent's turn cannot be steered");
+        }
+
         // A repeat of a steer the run already holds (queued or taken) is answered, not queued again.
         if (requestedId && stream.steers?.some((entry) => entry.id === requestedId)) {
             return { steerId: requestedId };

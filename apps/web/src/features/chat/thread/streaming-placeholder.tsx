@@ -43,8 +43,10 @@ const formatDuration = (ms: number): string => `${(ms / 1000).toFixed(2)}s`;
 // Types from local streaming implementation
 type StreamId = string & { __isStreamId: true };
 type StreamStatus = "pending" | "streaming" | "done" | "error" | "timeout";
+/** A coding agent's turn on a paired computer (`backend/lunora/acp/`): where the host is with it. */
+type HostState = "accepted" | "ended" | "received" | "running";
 /** `speaker`: group chat — the participant talking now; `text`/`reasoning` are theirs only. */
-type StreamBody = { reasoning: string; speaker?: StreamSpeaker; status: StreamStatus; text: string };
+type StreamBody = { hostState?: HostState; reasoning: string; speaker?: StreamSpeaker; status: StreamStatus; text: string };
 /** `restart`: steering — the reply continues below a message the user sent into it. */
 type StreamDelta = { reasoning: string; restart?: true; speaker?: StreamSpeaker; text: string };
 
@@ -572,6 +574,40 @@ interface StreamingPlaceholderProps {
     streamToken?: string;
 }
 
+/**
+ * Where a coding agent's turn is, for a reply that runs on a paired computer. "Sending" until the computer has
+ * received the turn, "Working" only once the agent has started; nothing is shown before the computer has
+ * acknowledged it that would look like the agent at work.
+ */
+const HostStateLine: FC<{ state: HostState | undefined }> = ({ state }) => {
+    switch (state) {
+        case "accepted": {
+            return (
+                <p aria-live="polite" className="text-muted-foreground text-xs" role="status">
+                    <Trans>Sending…</Trans>
+                </p>
+            );
+        }
+        case "received": {
+            return (
+                <p aria-live="polite" className="text-muted-foreground text-xs" role="status">
+                    <Trans>Waiting for the agent…</Trans>
+                </p>
+            );
+        }
+        case "running": {
+            return (
+                <p aria-live="polite" className="text-muted-foreground text-xs" role="status">
+                    <Trans>Working…</Trans>
+                </p>
+            );
+        }
+        default: {
+            return null;
+        }
+    }
+};
+
 export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ className, compact, gatewayUrl, maxWidth = "65ch", streamId, streamToken }) => {
     // Gateway edge streaming URL. Absent when the caller has no stream token for this
     // stream (comparison columns), in which case the persisted body is polled instead.
@@ -609,7 +645,7 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
     }, []);
 
     // Use the streaming hook - isDriven=true to trigger the gateway SSE connection
-    const { isReconnecting, reasoning, speaker, status, text } = useStream(sseUrl, isDriven, streamId as StreamId, {
+    const { hostState, isReconnecting, reasoning, speaker, status, text } = useStream(sseUrl, isDriven, streamId as StreamId, {
         onFirstToken: handleFirstToken,
         streamToken,
     });
@@ -691,6 +727,7 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
                     <div className="message-text leading-7">
                         <MessageContent isStreaming={isStreaming} message={streamingMessage} />
                     </div>
+                    {isStreaming && <HostStateLine state={hostState} />}
                     {metricsBar}
                 </MessageContentWrapper>
             </Message>

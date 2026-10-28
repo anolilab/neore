@@ -13,6 +13,7 @@ import { paymentExtension } from "@lunora/payment";
 import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { defineSchema, defineTable, v } from "lunorash/server";
 
+import { vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vGroupChat } from "./chat/group/validators";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
 import { vCodingAgentAssignment, vCodingAgentId, vCodingAgentRunStatus } from "./coding-agents/validators";
@@ -31,6 +32,7 @@ import {
     vRetrievalMetrics,
 } from "./evals/validators";
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
+import { vCapabilityReport } from "./lib/capability-report";
 import { notificationInputFields } from "./notifications/validators";
 import { vSkillConfig } from "./skills/validators";
 import { vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus } from "./sub-agents/validators";
@@ -124,6 +126,32 @@ export const schema = defineSchema({
         .index("providerId_userId", ["providerId", "userId"])
         .index("userId", ["userId"])
         .triggers((t) => auditTriggersFor(t, "account", AUDIT_TABLES["account"]!)),
+
+    // One coding-agent session on a paired device (`acp/`): the thread it runs
+    // in, which agent and folder (labels only; paths never leave the desktop) and
+    // what it reported at the handshake. `hostSessionId` is the desktop's own id
+    // for the session, which makes `session_open` idempotent on redelivery.
+    acpSessions: defineTable({
+        agentKey: v.string(),
+        agentLabel: v.string(),
+        capabilities: v.optional(vCapabilityReport),
+        createdAt: v.number(),
+        deviceId: v.id("devices"),
+        folderId: v.string(),
+        folderLabel: v.string(),
+        hostSessionId: v.string(),
+        lastEventAt: v.optional(v.number()),
+        nativeSessionId: v.optional(v.string()),
+        status: vAcpSessionStatus,
+        threadId: v.id("threads"),
+        updatedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_threadId", ["threadId"])
+        .index("by_userId_status", ["userId", "status"])
+        // Also serves "every session of a device" (a revoke reads the prefix).
+        .index("by_deviceId_hostSessionId", ["deviceId", "hostSessionId"]),
 
     actionCache: defineTable({
         expiresAt: v.number(),
@@ -541,7 +569,6 @@ export const schema = defineSchema({
         lastSlot: v.number(),
         name: v.string(),
     }).index("by_name", ["name"]),
-
     // Per-user scheduling state for the opt-in Daily Brief. See `notifications/daily-brief.ts`.
     dailyBriefState: defineTable({
         lastActiveAt: v.number(),
@@ -1675,6 +1702,9 @@ export const schema = defineSchema({
         .triggers((t) => auditTriggersFor(t, "passkey", AUDIT_TABLES["passkey"]!)),
 
     persistentChunks: defineTable({
+        // A host stream's event that carries no text (a tool call, a permission request, the end of the
+        // turn). It still takes its `seq`, so the host's `(turnId, seq)` claim covers every event.
+        event: v.optional(vHostEvent),
         reasoning: v.optional(v.string()),
         // Steering (`chat/steering.ts`): the reply continues below a message the
         // user sent into it. The text before this chunk is a saved message by
@@ -1700,7 +1730,17 @@ export const schema = defineSchema({
 
     persistentStreams: defineTable({
         expiresAt: v.number(),
+        // Host-run turns (`acp/`; unset = a cloud turn). `hostTurnId` is the UUID the starter minted;
+        // `hostState` drives "Sending" versus "Working"; the permission ids are the requests the agent is
+        // waiting on, which keep the reaper off the stream.
+        hostEndReason: v.optional(vHostEndReason),
+        hostPendingPermissions: v.optional(v.array(v.string())),
+        // A regenerate: the reply is saved beside the earlier one, as a sibling (`acp/lib/finish.ts`).
+        hostRegenerate: v.optional(v.boolean()),
+        hostState: v.optional(vHostState),
+        hostTurnId: v.optional(v.string()),
         messageId: v.string(),
+        producer: v.optional(v.literal("host")),
         // Set once, by the ONE run that may write this stream (`claimStreamRun`).
         // The run arrives on the jobs queue, which delivers at least once; a
         // redelivery finds this set and does nothing.
@@ -1743,6 +1783,7 @@ export const schema = defineSchema({
         .index("by_userId_status", ["userId", "status"])
         .index("by_threadId", ["threadId"])
         .index("by_threadId_status", ["threadId", "status"])
+        .index("by_hostTurnId", ["hostTurnId"])
         .relations((r) => {
             return {
                 chunks: r.many("persistentChunks", { field: "streamId" }),
@@ -2608,6 +2649,9 @@ export const schema = defineSchema({
         projectId: v.optional(v.id("projects")),
         publicAccessToken: v.optional(v.string()),
         reasoningEffort: v.optional(v.number()),
+        // Where this thread's turns run (`acp/lib/host-thread.ts`): "host" = a coding agent on a paired
+        // device. Unset = the cloud. Set at creation, never changed.
+        runner: v.optional(v.literal("host")),
         source: v.optional(v.string()),
         statelessMode: v.optional(v.boolean()),
         status: v.string(),

@@ -27,6 +27,8 @@ export interface AgentProcess {
     readonly pid: number | undefined;
     /** The text with the values of the variables the user set replaced: safe to put in an error or show in the window. */
     scrub: (text: string) => string;
+    /** Length of the longest value `scrub` replaces; 0 when it replaces nothing. A value split across two chunks of text is caught by holding back this much of the tail. */
+    readonly secretLength: number;
     stderrTail: () => string;
     readonly stdin: Writable;
     readonly stdout: Readable;
@@ -151,6 +153,7 @@ export const spawnAgent: Spawner = (plan) => {
         },
         pid: child.pid,
         scrub: (text) => scrub(text, plan),
+        secretLength: Math.max(0, ...plan.secretNames.map((name) => plan.env[name]?.length ?? 0).filter((length) => length >= MIN_SCRUBBED_LENGTH)),
         stderrTail: () => scrub(stderr, plan),
         stdin: child.stdin as Writable,
         stdout: child.stdout as Readable,

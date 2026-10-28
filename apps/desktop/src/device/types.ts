@@ -101,6 +101,7 @@ export type CoreEvent
     = | { agent: string; tool: string; type: "acpPermission" }
         | { callId: string; deviceId: string; payload: string; signature: string; type: "progress" }
         | { prompt: Prompt; type: "prompt" }
+        | { sessionId: string; turnId: string; type: "acpCancel" }
         | { type: "changed" };
 
 /** The surface of the native `DeviceCore` class. */
@@ -134,6 +135,8 @@ export interface DeviceCore {
     reapIdleServers: () => Promise<boolean>;
     settingsGet: () => string;
     settingsUpdate: (update: string) => string;
+    /** Signs one turn post for the backend's ingest route; refuses anything that is not a turn post for this computer. */
+    signTurn: (payload: string) => string;
     status: () => string;
     stop: () => void;
 }

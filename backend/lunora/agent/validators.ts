@@ -682,6 +682,9 @@ export const vThreadDocFields = {
     // Written only by `agent/thread-passcode.ts` (set on lock, cleared on removal).
     lockedAt: v.optional(v.number()),
     order: v.optional(v.number()),
+    // Written once by `acp/ingest.ts` when a host session opens, so deliberately not a create field: a client
+    // that could set it could mint a host thread, or turn a cloud thread into one.
+    runner: v.optional(v.literal("host")),
     status: vThreadStatus,
     // Written only by `chat/tags/functions.ts`, which checks the ids belong to
     // the caller — so it is deliberately not a create field.
