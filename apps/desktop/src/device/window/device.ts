@@ -849,7 +849,9 @@ $("files-download").addEventListener("click", async () => {
 
     try {
         const done = await globalThis.neoreDevice.hostDownload(host.deviceId, files.folder);
-        const left = done !== null && done.skipped > 0 ? ` ${String(done.skipped)} links or special files were left out.` : "";
+        const skipped = done !== null && done.skipped > 0 ? ` ${String(done.skipped)} links or special files were left out.` : "";
+        const missing = done !== null && done.unreadable > 0 ? ` ${String(done.unreadable)} files or folders could not be read and are missing.` : "";
+        const left = `${skipped}${missing}`;
 
         status(done === null ? "" : `Saved ${String(done.files)} files (${String(done.bytes)} bytes) from ${done.host}.${left}`);
     } catch (error) {

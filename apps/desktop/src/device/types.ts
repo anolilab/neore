@@ -98,7 +98,10 @@ export interface Download {
     files: number;
     folders: number;
     host: string;
+    /** Links and special files, left out on purpose. */
     skipped: number;
+    /** Files and folders that should be in the archive and are not: unreadable, or too deep. */
+    unreadable: number;
 }
 
 /** A server as the local window lists it (`HostView`). */

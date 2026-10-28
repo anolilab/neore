@@ -28,9 +28,11 @@ pub struct Summary {
     pub bytes: u64,
     pub files: u64,
     pub folders: u64,
-    /// Entries left out: symlinks, hard-linked files, devices, FIFOs and sockets, and anything that could not be
-    /// opened.
+    /// Entries left out on purpose: symlinks, hard-linked files, devices, FIFOs and sockets.
     pub skipped: u64,
+    /// Files and folders that should be in the archive and are not: they could not be read, or lie deeper than
+    /// the walk goes.
+    pub unreadable: u64,
 }
 
 #[cfg(not(unix))]
@@ -122,7 +124,31 @@ mod unix {
         Ok(unsafe { OwnedFd::from_raw_fd(fd) })
     }
 
-    /// The names in a folder, sorted, read through a duplicate of its descriptor.
+    /// The thread's `errno`, which `readdir` leaves alone at the end of a folder and sets on an error.
+    fn errno() -> *mut libc::c_int {
+        // SAFETY: each of these returns the address of the calling thread's `errno`.
+        #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
+        unsafe {
+            libc::__errno_location()
+        }
+        #[cfg(any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "freebsd",
+            target_os = "dragonfly"
+        ))]
+        unsafe {
+            libc::__error()
+        }
+        #[cfg(any(target_os = "netbsd", target_os = "openbsd"))]
+        unsafe {
+            libc::__errno()
+        }
+    }
+
+    /// The names in a folder, sorted, read through a duplicate of its descriptor. A folder with more than
+    /// [`MAX_ENTRIES`] names is an error: the archive could not hold them, and they are not all read into memory
+    /// first.
     fn names(dir: &OwnedFd) -> io::Result<Vec<Vec<u8>>> {
         // SAFETY: `dir` is open; the duplicate is handed to `fdopendir`, which owns it until `closedir`.
         let fd = unsafe { libc::dup(dir.as_raw_fd()) };
@@ -146,27 +172,47 @@ mod unix {
         let mut found = Vec::new();
 
         loop {
-            // SAFETY: `stream` is live until `closedir`; the entry is only read before the next call.
-            let entry = unsafe { libc::readdir(stream) };
+            // SAFETY: `errno` is the calling thread's own; `stream` is live until `closedir`, and the entry is only
+            // read before the next call.
+            let entry = unsafe {
+                *errno() = 0;
+
+                libc::readdir(stream)
+            };
 
             if entry.is_null() {
-                break;
+                // The end of the folder leaves `errno` alone; a failed read sets it and the names so far are not all.
+                let error = io::Error::last_os_error();
+
+                // SAFETY: `stream` came from `fdopendir` and is closed exactly once.
+                unsafe { libc::closedir(stream) };
+
+                return match error.raw_os_error() {
+                    Some(0) | None => {
+                        found.sort();
+
+                        Ok(found)
+                    }
+                    Some(_) => Err(error),
+                };
             }
 
             // SAFETY: `d_name` is a NUL-terminated string inside the entry returned above.
             let name = unsafe { CStr::from_ptr((*entry).d_name.as_ptr()) }.to_bytes();
 
             if !matches!(name, b"." | b"..") {
+                if found.len() as u64 >= MAX_ENTRIES {
+                    // SAFETY: `stream` came from `fdopendir` and is closed exactly once.
+                    unsafe { libc::closedir(stream) };
+
+                    return Err(io::Error::other(format!(
+                        "the folder has more than {MAX_ENTRIES} entries"
+                    )));
+                }
+
                 found.push(name.to_vec());
             }
         }
-
-        // SAFETY: `stream` came from `fdopendir` and is closed exactly once.
-        unsafe { libc::closedir(stream) };
-
-        found.sort();
-
-        Ok(found)
     }
 
     /// What an entry is, read without following it (or from an open descriptor).
@@ -188,7 +234,8 @@ mod unix {
             kind: stat.st_mode & libc::S_IFMT,
             links: u64::from(stat.st_nlink),
             perm: u32::from(stat.st_mode & 0o777),
-            mtime: stat.st_mtime.max(0) as u64,
+            // A ustar time field holds 11 octal digits (until the year 2242); a later time is written as that.
+            mtime: (stat.st_mtime.max(0) as u64).min(0o77_777_777_777),
             size: stat.st_size.max(0) as u64,
         }
     }
@@ -393,7 +440,7 @@ mod unix {
                 path.extend_from_slice(&name);
 
                 let Some(stat) = stat_at(&dir, &c_name) else {
-                    self.summary.skipped += 1;
+                    self.summary.unreadable += 1;
 
                     continue;
                 };
@@ -404,7 +451,7 @@ mod unix {
                         let Ok(child) =
                             openat(dir.as_raw_fd(), &c_name, libc::O_RDONLY | libc::O_DIRECTORY)
                         else {
-                            self.summary.skipped += 1;
+                            self.summary.unreadable += 1;
 
                             continue;
                         };
@@ -413,6 +460,7 @@ mod unix {
                         self.folder(child, &path, depth + 1)?;
                     }
                     libc::S_IFREG => self.file(&dir, &c_name, &path)?,
+                    libc::S_IFDIR => self.summary.unreadable += 1,
                     _ => self.summary.skipped += 1,
                 }
             }
@@ -426,16 +474,22 @@ mod unix {
             let Some((fd, stat)) = opened
                 .ok()
                 .and_then(|fd| stat_fd(&fd).map(|stat| (fd, stat)))
-                .filter(|(_, stat)| stat.kind == libc::S_IFREG && stat.links == 1)
             else {
-                self.summary.skipped += 1;
+                self.summary.unreadable += 1;
 
                 return Ok(());
             };
 
+            if stat.kind != libc::S_IFREG || stat.links != 1 {
+                self.summary.skipped += 1;
+
+                return Ok(());
+            }
+
             self.entry(path, Kind::File, stat.size, stat.perm, stat.mtime)?;
 
-            // The header promised `size` bytes: a file that shrank is padded, one that grew is cut.
+            // The header promised `size` bytes: a file that grew is cut, and one that shrank fails the archive, which
+            // must not hold bytes the server never had.
             let mut file = File::from(fd);
             let mut buffer = vec![0u8; COPY_BYTES];
             let mut left = stat.size;
@@ -446,9 +500,10 @@ mod unix {
                 let want = buffer.len().min(left as usize);
                 let read = match file.read(&mut buffer[..want]) {
                     Ok(0) => {
-                        buffer[..want].fill(0);
-
-                        want
+                        return Err(format!(
+                            "{}: the file changed while it was archived",
+                            OsStr::from_bytes(path).display()
+                        ));
                     }
                     Ok(read) => read,
                     Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
@@ -540,7 +595,8 @@ mod tests {
                 bytes: 1005,
                 files: 2,
                 folders: 2,
-                skipped: 0
+                skipped: 0,
+                unreadable: 0
             }
         );
         assert_eq!(
@@ -582,6 +638,50 @@ mod tests {
         );
         assert_eq!(summary.skipped, 5);
         assert!(!text.contains("nope") && !text.contains("outside-content"));
+    }
+
+    #[test]
+    fn a_time_too_late_for_the_header_is_clamped_not_a_panic() {
+        let dir = scratch("late");
+        let file = dir.join("root/late.txt");
+
+        fs::create_dir_all(dir.join("root")).unwrap();
+        fs::write(&file, "x").unwrap();
+        // Year 2300, which needs twelve octal digits.
+        fs::File::options()
+            .write(true)
+            .open(&file)
+            .unwrap()
+            .set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(10_413_792_000))
+            .unwrap();
+
+        let roots = roots(&dir);
+        let (bytes, summary) = archive(&roots, &roots[0]).unwrap();
+
+        assert!(summary.files >= 1);
+        assert_eq!(bytes.len() % 512, 0);
+    }
+
+    #[test]
+    fn what_could_not_be_read_is_counted_apart_from_what_is_left_out_on_purpose() {
+        let dir = scratch("unreadable");
+
+        fs::create_dir_all(dir.join("root")).unwrap();
+        // Deeper than the walk goes.
+        let mut deep = dir.join("root");
+
+        for _ in 0..70 {
+            deep.push("d");
+        }
+
+        fs::create_dir_all(&deep).unwrap();
+        std::os::unix::fs::symlink("root", dir.join("root/link")).unwrap();
+
+        let roots = roots(&dir);
+        let (_, summary) = archive(&roots, &roots[0]).unwrap();
+
+        assert_eq!(summary.skipped, 1);
+        assert_eq!(summary.unreadable, 1);
     }
 
     #[test]
