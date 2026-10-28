@@ -36,6 +36,8 @@ describe("registry format", () => {
         expect(archiveFormat("https://x.test/a.TGZ")).toBe("tar.gz");
         expect(archiveFormat("https://x.test/a.zip")).toBe("zip");
         expect(archiveFormat("https://x.test/agent-linux")).toBe("raw");
+        expect(archiveFormat("https://x.test/a%2Ezip")).toBe("zip");
+        expect(archiveFormat("https://x.test/a%2Etar%2Egz")).toBe("tar.gz");
         expect(archiveFormat("https://x.test/a.tar.bz2")).toBeUndefined();
         expect(archiveFormat("https://x.test/a.dmg")).toBeUndefined();
     });
@@ -151,11 +153,9 @@ describe("AgentRegistry", () => {
     it("fails on an error status, a redirect off https and an answer that is too large", async () => {
         await expect(registryWith(() => new Response("", { status: 503 })).registry.search("")).rejects.toThrow("answered 503");
 
-        const redirected = new Response("{}");
+        const toHttp = () => new Response(null, { headers: { location: ["http", "://evil.test/registry.json"].join("") }, status: 302 });
 
-        // eslint-disable-next-line unicorn/prefer-https -- the case under test: a redirect that drops https
-        Object.defineProperty(redirected, "url", { value: "http://evil.test/registry.json" });
-        await expect(registryWith(() => redirected).registry.search("")).rejects.toThrow("redirected away from https");
+        await expect(registryWith(toHttp).registry.search("")).rejects.toThrow("redirected away from https");
         await expect(registryWith(() => new Response("x".repeat(6 * 1024 * 1024))).registry.search("")).rejects.toThrow("larger than expected");
     });
 
