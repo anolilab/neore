@@ -6,7 +6,7 @@ const MAX_TURN_TEXT = 256_000;
 
 /** One turn as the window shows it. A class so its own mutations stay on `this`. */
 export class Turn implements TurnState {
-    public readonly id = randomUUID();
+    public readonly id: string;
 
     public stopReason: StopReason | undefined;
 
@@ -22,7 +22,11 @@ export class Turn implements TurnState {
     public constructor(
         public readonly user: string,
         private readonly scrub: (text: string) => string = (text) => text,
-    ) {}
+        /** A turn the backend queued names its own id (`acp_send`); a local one is minted here. */
+        id: string = randomUUID(),
+    ) {
+        this.id = id;
+    }
 
     public append(field: "text" | "thought", chunk: string): void {
         // Already at the cap: later chunks are dropped without re-scrubbing the whole text for each one.

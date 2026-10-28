@@ -4,10 +4,12 @@
  * relay, who may call the local window's commands, where events go, and what
  * happens to a prompt when its window closes.
  */
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SshTerminal } from "../terminal/index";
 import { isTrustedUrl } from "../trust.js";
@@ -32,6 +34,8 @@ const fake = vi.hoisted(() => {
         coreThrows: false,
         handlers: new Map<string, (...args: unknown[]) => unknown>(),
         notifications: [] as { body?: string; title: string }[],
+        /** `app.getPath("userData")`: a real folder, since coding-agent commands write their receipts there. */
+        userData: "",
         windows: [] as { close: () => void; webContents: WebContents }[],
     };
 });
@@ -84,7 +88,7 @@ vi.mock("electron", () => {
 
     return {
         app: {
-            getPath: () => "/user-data",
+            getPath: () => fake.userData,
             getVersion: () => "1.2.3",
             on: (event: string, listener: () => void) => fake.appListeners.set(event, listener),
         },
@@ -192,10 +196,13 @@ const makeCore = () => {
     return {
         acpPermissionAnswer: vi.fn(),
         acpPermissionAnswerBatch: vi.fn(() => 2),
+        acpPermissionAnswerRemote: vi.fn(),
         acpPermissionAsk: vi.fn(async () => "{\"outcome\":\"cancelled\"}"),
         acpPermissionCancelSession: vi.fn(),
         acpPermissionDecline: vi.fn(),
         acpPermissions: vi.fn(() => "[]"),
+        acpPrepare: vi.fn((): string => JSON.stringify({ callId: "c1", command: null, expiresAt: Date.now() + 60_000, refusal: "not approved on this computer" })),
+        acpSign: vi.fn((_envelope: string, _signature: string, outcome: string) => JSON.stringify({ payload: JSON.stringify({ outcome }), signature: "signed" })),
         acpSpawnPlan: vi.fn((): string => {
             throw new Error("that folder is not allowed");
         }),
@@ -229,6 +236,7 @@ const makeCore = () => {
 let core: ReturnType<typeof makeCore>;
 
 beforeEach(() => {
+    fake.userData = mkdtempSync(path.join(tmpdir(), "neore-device-index-"));
     fake.handlers.clear();
     fake.windows.length = 0;
     fake.notifications.length = 0;
@@ -240,6 +248,13 @@ beforeEach(() => {
     siteContents = siteWebContents("https://neore.example/chat");
     registerDeviceIpc(options);
 });
+
+afterEach(() => {
+    rmSync(fake.userData, { force: true, recursive: true });
+});
+
+const ACP_ENVELOPE = JSON.stringify({ callId: "c1", tool: "acp_permission_answer" });
+const ACP_SIGNATURE = "a".repeat(64);
 
 describe("relay channels (the site window)", () => {
     it("refuse every sender but the site", () => {
@@ -258,6 +273,46 @@ describe("relay channels (the site window)", () => {
 
         expect(core.execute).toHaveBeenCalledWith("{}", "a".repeat(64));
         expect(result).toEqual({ payload: "{}", signature: "s" });
+    });
+
+    it("route a coding-agent command to its own steps, never to the tool runner", async () => {
+        const result = await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+
+        expect(core.execute).not.toHaveBeenCalled();
+        expect(core.acpPrepare).toHaveBeenCalledWith(ACP_ENVELOPE, ACP_SIGNATURE);
+        // The core would not allow it: nothing is acted on, and the refusal is what gets signed.
+        expect(core.acpSign).toHaveBeenCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "not approved on this computer");
+        expect(result).toEqual({ payload: JSON.stringify({ outcome: "not approved on this computer" }), signature: "signed" });
+    });
+
+    it("answer a coding-agent request from the web through the core, and report a request that is gone", async () => {
+        const command = { kind: "permissionAnswer", optionId: "allow", requestId: "r1", sessionId: "s1" };
+
+        core.acpPrepare.mockReturnValue(JSON.stringify({ callId: "c2", command, expiresAt: Date.now() + 60_000, refusal: null }));
+
+        await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+
+        expect(core.acpPermissionAnswerRemote).toHaveBeenCalledWith("s1", "r1", "allow");
+        expect(core.acpSign).toHaveBeenLastCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "accepted");
+
+        // Another delivery of the same call is acknowledged, not answered twice.
+        await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+        expect(core.acpPermissionAnswerRemote).toHaveBeenCalledTimes(1);
+
+        core.acpPrepare.mockReturnValue(JSON.stringify({ callId: "c3", command, expiresAt: Date.now() + 60_000, refusal: null }));
+        core.acpPermissionAnswerRemote.mockImplementation(() => {
+            throw new Error("already_answered");
+        });
+        await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+        expect(core.acpSign).toHaveBeenLastCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "already_answered");
+    });
+
+    it("close the device window's prompt list when a remote answer takes a request", () => {
+        fake.coreEmit?.(JSON.stringify({ agent: "Claude", tool: "Run tests", type: "acpPermission" }));
+        deviceWindow().webContents.send.mockClear();
+        fake.coreEmit?.(JSON.stringify({ type: "acpPermissionsChanged" }));
+
+        expect(deviceWindow().webContents.send).toHaveBeenCalledWith(LOCAL_EVENT.acp, undefined);
     });
 
     it("pass the pairing through and reject a malformed one before the core", async () => {

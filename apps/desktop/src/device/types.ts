@@ -108,7 +108,7 @@ export type CoreEvent
     = | { agent: string; tool: string; type: "acpPermission" }
         | { callId: string; deviceId: string; payload: string; signature: string; type: "progress" }
         | { prompt: Prompt; type: "prompt" }
-        | { sessionId: string; turnId: string; type: "acpCancel" }
+        | { type: "acpPermissionsChanged" }
         | { type: "changed" };
 
 /** The surface of the native `DeviceCore` class. */
@@ -116,10 +116,14 @@ export interface DeviceCore {
     /** Coding agents (ACP): JSON strings, parsed by `acp/`. The spawn plan holds secrets and never leaves the main process. */
     acpPermissionAnswer: (id: number, optionId: string) => void;
     acpPermissionAnswerBatch: (ids: number[]) => number;
+    acpPermissionAnswerRemote: (sessionId: string, requestId: string, optionId: string) => void;
     acpPermissionAsk: (request: string) => Promise<string>;
     acpPermissionCancelSession: (sessionId: string) => void;
     acpPermissionDecline: (id: number) => void;
     acpPermissions: () => string;
+    /** A relayed coding-agent command, checked but not acted on (`acp/commands.ts`). */
+    acpPrepare: (envelope: string, signature: string) => string;
+    acpSign: (envelope: string, signature: string, outcome: string) => string;
     acpSpawnPlan: (agentKey: string, folder: string | null) => string;
     acpUpdate: (update: string) => string;
     acpView: () => string;

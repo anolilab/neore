@@ -111,7 +111,8 @@ export class AcpManager {
         }
     }
 
-    public async startSession(agentKey: string, agentLabel: string, folder: string): Promise<string> {
+    /** `remote` is set for a session the backend started (`acp_start`): it goes by the id and thread the backend made. */
+    public async startSession(agentKey: string, agentLabel: string, folder: string, remote?: { sessionId: string; threadId: string }): Promise<string> {
         requireSupported();
 
         if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
@@ -132,6 +133,7 @@ export class AcpManager {
             onChange: () => this.changed(),
             process: child,
             startupTimeoutMs: this.options.startupTimeoutMs,
+            ...remote !== undefined && remote,
             ...folderInfo !== undefined && this.options.observer !== undefined && { hostInfo: { agentKey, agentLabel, ...folderInfo }, observer: this.options.observer },
         });
 
@@ -141,8 +143,8 @@ export class AcpManager {
         return session.id;
     }
 
-    public send(sessionId: string, prompt: string): SendResult {
-        return this.require(sessionId).send(prompt);
+    public send(sessionId: string, prompt: string, turnId?: string): SendResult {
+        return this.require(sessionId).send(prompt, turnId);
     }
 
     public cancel(sessionId: string): void {
