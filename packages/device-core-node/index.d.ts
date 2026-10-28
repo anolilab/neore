@@ -69,7 +69,7 @@ export declare class DeviceCore {
   hostFileRead(deviceId: string, path: string): Promise<string>
   /**
    * Downloads a folder of a connected server as one tar archive into `destination`, a file path the person chose.
-   * Resolves what the archive holds (`{ files, folders, bytes, skipped, host }`, JSON).
+   * Resolves what the archive holds (`{ files, folders, bytes, skipped, unreadable, host }`, JSON).
    */
   hostDownload(deviceId: string, path: string, destination: string): Promise<string>
   hostDisconnect(deviceId: string): void

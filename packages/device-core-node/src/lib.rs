@@ -312,7 +312,7 @@ impl DeviceCore {
     }
 
     /// Downloads a folder of a connected server as one tar archive into `destination`, a file path the person chose.
-    /// Resolves what the archive holds (`{ files, folders, bytes, skipped, host }`, JSON).
+    /// Resolves what the archive holds (`{ files, folders, bytes, skipped, unreadable, host }`, JSON).
     #[napi]
     pub fn host_download<'env>(
         &self,
