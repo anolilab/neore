@@ -1,4 +1,5 @@
 import type { ImageModelV2, JSONValue, LanguageModelV3 } from "@ai-sdk/provider";
+import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -727,17 +728,18 @@ export const createThreadWithInitialMessage = internalMutation
 export const gateThreadActionHandler = async (
     context: Pick<QueryContext, "db">,
     args: { level: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
-): Promise<{ botId?: Id<"bots">; outcome: ThreadGateOutcome }> => {
+): Promise<{ activeAgent?: AgentRef; botId?: Id<"bots">; outcome: ThreadGateOutcome }> => {
     const outcome = await threadGateOutcome(context, args);
 
     if (outcome !== "ok") {
         return { outcome };
     }
 
-    // A bot thread runs on its bot's model, so a granted caller also learns which bot, if any.
+    // A bot thread runs on its bot's model, so a granted caller also learns which bot, if any. A switched
+    // thread runs on its path's agent (`agent/agent-switch.ts`); the send only looks that up for one that was.
     const thread = await context.db.get(args.threadId);
 
-    return { botId: thread?.botId, outcome };
+    return { activeAgent: thread?.activeAgent, botId: thread?.botId, outcome };
 };
 
 export const gateThreadAction = internalQuery
@@ -747,7 +749,13 @@ export const gateThreadAction = internalQuery
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         userId: v.string(),
     })
-    .output(v.object({ botId: v.optional(v.id("bots")), outcome: v.union(v.literal("denied"), v.literal("locked"), v.literal("ok")) }))
+    .output(
+        v.object({
+            activeAgent: v.optional(vAgentRef),
+            botId: v.optional(v.id("bots")),
+            outcome: v.union(v.literal("denied"), v.literal("locked"), v.literal("ok")),
+        }),
+    )
     .query(async ({ args, ctx: context }) => await gateThreadActionHandler(context, args));
 
 export const getThreadTemporaryStatus = liteAuthQuery

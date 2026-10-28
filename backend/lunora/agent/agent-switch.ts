@@ -15,11 +15,11 @@ import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
-import { lastAgentSwitch, sameAgent } from "./agent-switch-logic";
+import { agentSwitchOf, lastAgentSwitch, sameAgent } from "./agent-switch-logic";
 import type { AgentRef, AgentSwitchPart } from "./agent-switch-validators";
 import { getThreadRow, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
 import { getMaxMessage } from "./messages";
-import { patchThread } from "./table-writes";
+import { patchAgentSwitchRow, patchThread } from "./table-writes";
 
 type Row = Doc<"messages">;
 type Reader = Pick<QueryCtx, "db">;
@@ -49,13 +49,35 @@ const findPathSwitch = async (context: Reader, threadId: Id<"threads">, from: Ro
     return undefined;
 };
 
+/** Every switch row of the path ending at `from` (inclusive) with its part, newest first. */
+const findPathSwitchRows = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<{ part: AgentSwitchPart; row: Row }[]> => {
+    const found: { part: AgentSwitchPart; row: Row }[] = [];
+    let cursor = from;
+
+    while (cursor) {
+        const { next, rows } = await walkPath(context, threadId, cursor, { limit: PATH_PAGE_ROWS });
+
+        for (const row of rows) {
+            const part = agentSwitchOf(row);
+
+            if (part) {
+                found.push({ part, row });
+            }
+        }
+
+        cursor = next;
+    }
+
+    return found;
+};
+
 /**
  * The agent the path ending at `from` (inclusive) runs on, or `null` when it has no switch and the
- * thread has no creation model. An unswitched path costs its whole length — which is why callers
- * check `activeAgent` first.
+ * thread has no creation model. A thread without `activeAgent` was never switched — no divider
+ * exists on any path — so it skips the walk, which would cost an unswitched path its whole length.
  */
 export const resolvePathAgent = async (context: Reader, thread: Doc<"threads">, from: Row | null): Promise<AgentRef | null> => {
-    const found = await findPathSwitch(context, thread._id, from);
+    const found = thread.activeAgent ? await findPathSwitch(context, thread._id, from) : undefined;
 
     if (found) {
         return found.to;
@@ -148,15 +170,29 @@ export const getRunAgentModel = internalQuery
 
 /**
  * A fork copies the switch dividers of the path it takes, but not the `activeAgent` cache that makes
- * the fork run on what they say. Sets it from the copied rows when one of them is a switch; a fork cut
- * before the first switch has none to keep in step.
+ * the fork run on what they say, and a copied divider still names a row of the SOURCE as the one it
+ * follows. Points each at the row before it in the fork (the copy is a straight line, so that is its
+ * parent) and sets the cache from the newest; a fork cut before the first switch has neither to fix.
  */
 export const adoptForkAgentOf = async (context: MutationCtx, threadId: Id<"threads">): Promise<void> => {
     const thread = await context.db.get(threadId);
-    const found = thread && !thread.activeAgent ? await findPathSwitch(context, threadId, await leafRowOf(context, thread)) : undefined;
 
-    if (found) {
-        await patchThread(context.db, threadId, { activeAgent: found.to });
+    if (!thread || thread.activeAgent) {
+        return;
+    }
+
+    const switches = await findPathSwitchRows(context, threadId, await leafRowOf(context, thread));
+
+    for (const { part, row } of switches) {
+        const parent = await parentOf(context, threadId, row);
+
+        if (parent && parent._id !== part.startMessageId) {
+            await patchAgentSwitchRow(context.db, row._id, { ...part, startMessageId: parent._id });
+        }
+    }
+
+    if (switches[0]) {
+        await patchThread(context.db, threadId, { activeAgent: switches[0].part.to });
     }
 };
 

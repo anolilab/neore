@@ -19,6 +19,7 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx as MutationContext } from "../_generated/server";
+import { syncActiveAgent } from "../agent/agent-switch";
 import { getThreadRow } from "../agent/branch-rows";
 import { saveEditedSiblingHandler } from "../agent/branches";
 import { addMessagesHandler } from "../agent/messages";
@@ -164,6 +165,7 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
             // As the gateway's regenerate: the new reply is then the prompt's latest
             // child, and `addMessagesHandler` advances the leaf onto it.
             await patchThread(ctx.db, threadId, { activeLeafMessageId: promptId });
+            await syncActiveAgent(ctx, threadId, promptId);
         }
 
         // `failPendingSteps` marks a fresh reply to an existing prompt — what makes

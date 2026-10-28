@@ -190,6 +190,8 @@ verbatim tail, and delta on switching back.
   bytes in the context are identical on the first and the third turn after a
   switch (test), and on a provider that caches, the second turn's usage reports
   cache reads; above the threshold a cloud-to-cloud switch defaults to `portable`.
+- Still to do from S1: the cost notice shows only a "long conversation" flag, after the switch. S2 adds the
+  credit estimate to it and a confirm-before-switch step, so the user sees the cost before the divider is written.
 
 **S3 — Host handoff.** Host to host, in the same thread, using the `portable` mode.
 Cloud to host, and host to cloud, create a new thread linked to the source through

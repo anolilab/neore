@@ -1568,6 +1568,11 @@
     {
       "from": "function:chat_functions:branchThread",
       "kind": "call",
+      "to": "function:agent_agent_switch:adoptForkAgent"
+    },
+    {
+      "from": "function:chat_functions:branchThread",
+      "kind": "call",
       "to": "function:agent_branches:resolveForkEnd"
     },
     {
@@ -7078,6 +7083,13 @@
       "kind": "function",
       "name": "admin.gateway_analytics.getGatewayAnalytics",
       "module": "admin"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:agent_agent_switch:adoptForkAgent",
+      "kind": "function",
+      "name": "agent.agent_switch.adoptForkAgent",
+      "module": "agent"
     },
     {
       "detail": "query",
@@ -16852,43 +16864,49 @@
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 89,
+      "line": 90,
+      "reason": "\"patchAgentSwitchRow\" is not a registered function"
+    },
+    {
+      "file": "agent/table-writes",
+      "kind": "write",
+      "line": 94,
       "reason": "\"patchMessage\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 93,
+      "line": 98,
       "reason": "\"patchTemporaryThread\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 97,
+      "line": 102,
       "reason": "\"insertThreadRelationship\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "read",
-      "line": 106,
-      "reason": "\"leaseTemporaryThreadMarkers\" is not a registered function"
-    },
-    {
-      "file": "agent/table-writes",
-      "kind": "write",
       "line": 111,
       "reason": "\"leaseTemporaryThreadMarkers\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 115,
-      "reason": "\"insertChatFileAccess\" is not a registered function"
+      "line": 116,
+      "reason": "\"leaseTemporaryThreadMarkers\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
       "line": 120,
+      "reason": "\"insertChatFileAccess\" is not a registered function"
+    },
+    {
+      "file": "agent/table-writes",
+      "kind": "write",
+      "line": 125,
       "reason": "\"deleteVectorRow\" is not a registered function"
     },
     {
@@ -17494,103 +17512,103 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 572,
+      "line": 574,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 578,
+      "line": 581,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 596,
+      "line": 600,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 678,
+      "line": 682,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 690,
+      "line": 694,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 695,
+      "line": 699,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 704,
+      "line": 708,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 742,
+      "line": 746,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 771,
+      "line": 775,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 884,
+      "line": 888,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 899,
+      "line": 903,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 908,
+      "line": 912,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 934,
+      "line": 938,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1026,
+      "line": 1030,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1034,
+      "line": 1038,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1175,
+      "line": 1179,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1201,
+      "line": 1205,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
@@ -17968,19 +17986,19 @@
     {
       "file": "chat/local-models",
       "kind": "read",
-      "line": 74,
+      "line": 75,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {
       "file": "chat/local-models",
       "kind": "read",
-      "line": 132,
+      "line": 133,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {
       "file": "chat/local-models",
       "kind": "call",
-      "line": 138,
+      "line": 139,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {

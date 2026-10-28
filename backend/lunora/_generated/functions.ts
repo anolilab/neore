@@ -8406,7 +8406,7 @@ export interface Caller {
             deleteThreadRelationship: (args: { threadId: string }) => Promise<null>;
             deleteThreads: (args: { threadIds: Array<string> }) => Promise<{ deletedCount: number; success: boolean }>;
             editImage: (args: { imageUrl: string; mask?: string; operation: string; prompt?: string }) => Promise<{ resultUrl: string; }>;
-            gateThreadAction: (args: { level: "read" | "write" | "admin"; threadId: Id<"threads">; unlockProof?: string; userId: string }) => Promise<{ botId?: Id<"bots">; outcome: "denied" | "locked" | "ok" }>;
+            gateThreadAction: (args: { level: "read" | "write" | "admin"; threadId: Id<"threads">; unlockProof?: string; userId: string }) => Promise<{ activeAgent?: { kind: "model"; model: string }; botId?: Id<"bots">; outcome: "denied" | "locked" | "ok" }>;
             generateAudio: (args: { jobId?: string; model: string; prompt: string; promptMessageId?: Id<"messages">; threadId: string; userId: string; voice?: string }) => Promise<{ assets: Array<{ audioUrl: string; mimeType: string }>; modelId: string; prompt: string }>;
             generateBackgroundRemoval: (args: { backgroundColor?: string; imageUrl: string; model?: string; outputFormat?: string; refineMask?: boolean; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; model: string }>;
             generateCharacterRef: (args: { aspectRatio?: string; mode: string; model?: string; negativePrompt?: string; prompt?: string; referenceImages: Array<string>; strength?: number; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; mode: string; model: string }>;
