@@ -2,7 +2,7 @@
 
 /**
  * The workers a conversation started, under its messages: name, whether one is working, a link to
- * its thread and archive (the ordinary thread archive, so an archived worker refuses new messages).
+ * its thread and, while it is idle, archive (the ordinary thread archive, so an archived worker refuses new messages).
  * Renders nothing for a conversation with no workers.
  */
 
@@ -55,7 +55,7 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                                 {worker.archived ? t`Archived` : stateLabels[worker.state]}
                             </span>
                         </Badge>
-                        {!worker.archived && (
+                        {!worker.archived && worker.state === "idle" && (
                             <Button
                                 aria-label={t`Archive ${worker.name}`}
                                 onClick={() => {
