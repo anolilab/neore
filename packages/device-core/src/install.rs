@@ -260,6 +260,7 @@ cat > "$t"
 actual=$(sum_of "$t")
 if [ "$actual" != "{sha256}" ]; then echo "checksum mismatch: got $actual" >&2; exit 3; fi
 chmod 700 "$t"
+if [ -d "$d/neore-host" ]; then echo "neore-host is a directory" >&2; exit 4; fi
 mv -f "$t" "$d/neore-host"
 "#,
         root = root.text()
@@ -538,6 +539,39 @@ mod tests {
         assert!(!dir.join("0.0.1").exists());
         assert!(dir.join("2025-backup").exists());
         assert!(dir.join("run").exists());
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn an_upload_does_not_land_inside_a_directory_named_like_the_binary() {
+        use std::io::Write;
+        use std::process::Stdio;
+
+        let dir = std::env::temp_dir().join(format!("neore-upload-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join(HOST_VERSION).join("neore-host")).unwrap();
+
+        let bytes = b"a host binary";
+        let sum = hex(&Sha256::digest(bytes));
+        let root = Root::dir(dir.to_str().unwrap()).unwrap();
+        let mut child = std::process::Command::new("/bin/sh")
+            .args(["-c", &upload_script(&root, HOST_VERSION, &sum, &nonce())])
+            .stdin(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+
+        child.stdin.take().unwrap().write_all(bytes).unwrap();
+
+        assert!(!child.wait().unwrap().success());
+        assert_eq!(
+            fs::read_dir(dir.join(HOST_VERSION).join("neore-host"))
+                .unwrap()
+                .count(),
+            0
+        );
 
         let _ = fs::remove_dir_all(dir);
     }

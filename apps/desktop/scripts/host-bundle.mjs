@@ -126,6 +126,8 @@ const sign = () => {
     const password = randomUUID();
     const run = (command, args) => execFileSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
 
+    let failure;
+
     try {
         const p12 = existsSync(link) ? link : path.join(scratch, "certificate.p12");
 
@@ -147,7 +149,7 @@ const sign = () => {
             .find((found) => found && (wanted ? found[2].includes(wanted) : found[2].startsWith("Developer ID Application")));
 
         if (!identity) {
-            fail(`no ${wanted ?? "Developer ID Application"} identity in the certificate`);
+            throw new Error(`no ${wanted ?? "Developer ID Application"} identity in the certificate`);
         }
 
         for (const binary of binaries) {
@@ -155,8 +157,15 @@ const sign = () => {
             run("codesign", ["--verify", "--strict", binary]);
             console.log(`host-bundle: signed ${path.basename(binary)}`);
         }
+    } catch (error) {
+        failure = error;
     } finally {
+        // `fail` exits the process, which skips a `finally`: the key and the keychain are removed before it runs.
         rmSync(scratch, { force: true, recursive: true });
+    }
+
+    if (failure !== undefined) {
+        fail(failure instanceof Error ? failure.message : String(failure));
     }
 };
 

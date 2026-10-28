@@ -725,8 +725,10 @@ impl DeviceState {
                 }
             };
 
-            if let Some((_, link)) = earlier {
-                self.retire(&link);
+            let earlier = earlier.map(|(_, link)| link);
+
+            if let Some(link) = &earlier {
+                self.retire(link);
             }
 
             let interact = self.ask_user();
@@ -736,7 +738,15 @@ impl DeviceState {
                 target: &target,
             };
 
-            install::install(&remote, bundle, &self.ssh.root)?;
+            if let Err(error) = install::install(&remote, bundle, &self.ssh.root) {
+                // The retired probe left its master up for the install; with the install over, nothing else holds it.
+                if let Some(link) = &earlier {
+                    link.exit_master();
+                }
+
+                return Err(error);
+            }
+
             drop(marked);
         }
 
