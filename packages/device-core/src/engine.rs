@@ -433,6 +433,11 @@ impl DeviceState {
         })?;
         self.drop_stale_connections();
 
+        // A probe belongs to the pairing that is gone: the next account must not inherit an open connection.
+        if update.unpair {
+            self.close_probe();
+        }
+
         // Forwarding is chosen when the master starts, so the master it changes for is ended, whoever else rides it.
         if let Some(host) = update.host.filter(|host| host.forward_agent.is_some()) {
             self.host_restart(&host.device_id);

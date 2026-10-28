@@ -35,8 +35,10 @@ impl HostSpec {
     fn target(&self) -> Result<Target, String> {
         let name = self.name.trim();
 
-        if name.is_empty() || name.chars().count() > 80 {
-            return Err("the server's name must be 1-80 characters".into());
+        if name.is_empty() || name.chars().count() > 80 || name.chars().any(char::is_control) {
+            return Err(
+                "the server's name must be 1-80 characters without control characters".into(),
+            );
         }
 
         let target = Target {
@@ -480,6 +482,14 @@ impl DeviceState {
         };
 
         for link in stale {
+            self.retire(&link);
+        }
+    }
+
+    pub(super) fn close_probe(&self) {
+        let probe = self.ssh.probe.lock().unwrap().take();
+
+        if let Some((_, link)) = probe {
             self.retire(&link);
         }
     }
@@ -1742,6 +1752,32 @@ mod tests {
             "pair this computer first"
         );
         assert!(state.prompts.current().is_none());
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_server_name_with_a_control_character_is_refused() {
+        let mut spec = spec_for(22);
+        spec.name = "prod\n\nApprove?".into();
+
+        assert!(spec.target().is_err());
+        assert!(spec_for(22).target().is_ok());
+    }
+
+    #[test]
+    fn unpairing_closes_the_probe_connection() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("unpair-probe", &link);
+
+        *state.ssh.probe.lock().unwrap() = Some((
+            spec_for(22).target().unwrap(),
+            Arc::clone(&link) as Arc<dyn HostLink>,
+        ));
+        state.close_probe();
+
+        assert!(state.ssh.probe.lock().unwrap().is_none());
+        assert_eq!(link.closed.load(Ordering::SeqCst), 1);
 
         let _ = stdfs::remove_dir_all(dir);
     }

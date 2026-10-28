@@ -18,6 +18,8 @@ const MAX_SECRET_LENGTH = 1024;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
+const CONTROL_CHARACTER = /\p{Cc}/u;
+
 const text = (value: unknown, name: string, max: number): string => {
     if (typeof value !== "string" || value.length === 0 || value.length > max) {
         throw new Error(`device: ${name} is invalid`);
@@ -63,10 +65,16 @@ export const readHostSpec = (value: unknown): HostSpec => {
     }
 
     const identityFile = optionalText(value.identityFile, "identityFile", 1000);
+    const name = text(value.name, "name", 80);
+
+    // The name is shown in approval prompts: a control character could rewrite what the user reads.
+    if (CONTROL_CHARACTER.test(name)) {
+        throw new Error("device: name is invalid");
+    }
 
     return {
         address: text(value.address, "address", 253),
-        name: text(value.name, "name", 80),
+        name,
         port,
         user: text(value.user, "user", 32),
         ...identityFile !== undefined && { identityFile },

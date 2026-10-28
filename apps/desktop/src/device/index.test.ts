@@ -310,6 +310,7 @@ describe("servers over SSH", () => {
         await expect(invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), { ...spec, port: 70_000 })).rejects.toThrow("device: port is invalid");
         await expect(invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), { ...spec, address: "" })).rejects.toThrow("device: address is invalid");
         await expect(invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), { ...spec, user: 7 })).rejects.toThrow("device: user is invalid");
+        await expect(invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), { ...spec, name: "prod\n\nApprove?" })).rejects.toThrow("device: name is invalid");
         await expect(invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), "build-box")).rejects.toThrow("device: server is invalid");
         await expect(invoke(DEVICE_CHANNEL.hostPair, siteEvent(), { deviceId: "host-1", secret: "x", spec: {} })).rejects.toThrow("is invalid");
         expect(core.hostProbe).not.toHaveBeenCalled();
