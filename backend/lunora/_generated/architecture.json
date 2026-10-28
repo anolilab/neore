@@ -16421,13 +16421,13 @@
     {
       "file": "acp/lib/calls",
       "kind": "write",
-      "line": 58,
+      "line": 67,
       "reason": "\"endStartingSession\" is not a registered function"
     },
     {
       "file": "acp/lib/calls",
       "kind": "schedule",
-      "line": 93,
+      "line": 110,
       "reason": "\"onAcpCallEnded\" is not a registered function"
     },
     {
@@ -16463,13 +16463,13 @@
     {
       "file": "acp/lib/sessions",
       "kind": "write",
-      "line": 21,
+      "line": 25,
       "reason": "\"touchSession\" is not a registered function"
     },
     {
       "file": "acp/send",
       "kind": "call",
-      "line": 187,
+      "line": 182,
       "reason": "\"hostSendHttpAction\" is not a registered function"
     },
     {

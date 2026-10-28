@@ -12,7 +12,13 @@
  */
 import { randomUUID } from "node:crypto";
 
+import type { CapabilityReport } from "@neore/ai/capabilities";
+import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
+
 import { reportFromHandshake } from "./capabilities";
+import { childEventOf, childParentOf, completionText, contentText, isRecord, text } from "./child-updates";
+import type { ChildEvent } from "./children";
+import { ChildLedger } from "./children";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate, PermissionOutcome } from "./permission";
@@ -39,10 +45,6 @@ const isFinal = (tool: ToolState): boolean => tool.status === "cancelled" || too
 const TOOL_STATUSES = new Set<ToolStatus>(["completed", "failed", "in_progress", "pending"]);
 const STOP_REASONS = new Set<StopReason>(["cancelled", "end_turn", "max_tokens", "max_turn_requests", "refusal"]);
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-
-const text = (value: unknown): string => typeof value === "string" ? value : "";
-
 /** How the backend is told a request ended: an allow option, a reject option, or neither. */
 const resolutionOf = (params: Record<string, unknown>, outcome: PermissionOutcome): "allowed" | "cancelled" | "declined" => {
     if (outcome.outcome === "cancelled") {
@@ -52,15 +54,6 @@ const resolutionOf = (params: Record<string, unknown>, outcome: PermissionOutcom
     const option = offeredOptions(params).find((candidate) => candidate.optionId === outcome.optionId);
 
     return option?.kind.startsWith("allow") === true ? "allowed" : "declined";
-};
-
-/** The text of a content block; anything that is not text shows as its type, in brackets. */
-const contentText = (content: unknown): string => {
-    if (!isRecord(content)) {
-        return "";
-    }
-
-    return content.type === "text" ? text(content.text) : `[${text(content.type) || "content"}]`;
 };
 
 export type SendResult = { position: number; status: "queued" } | { status: "started" };
@@ -76,10 +69,14 @@ export interface SessionOptions {
     agentLabel: string;
     appVersion: string;
     cancelGraceMs?: number;
+    /** Says what this agent reports it can do. Defaults to the handshake's own (`capabilities.ts`); tests stand in for an agent that reports more. */
+    capabilityReport?: (handshake: Handshake) => CapabilityReport;
     folder: string;
     gate: PermissionGate;
     /** What the backend shows for this session (labels only). With `observer`, opening the session makes its thread. */
     hostInfo?: HostSessionInfo;
+    /** Where the session says what it measured (child buffering). */
+    log?: (message: string) => void;
     /** Told what the session and its turns do, so they can be saved on the backend (`ingest.ts`). */
     observer?: SessionObserver;
     /** Called when anything the window shows changed. Coalescing is the caller's. */
@@ -125,8 +122,20 @@ export class AgentSession {
 
     private agent: Handshake | undefined;
 
+    /** What the agent reported at the handshake. Unset until it has. */
+    private report: CapabilityReport | undefined;
+
+    /** The agent's own children, by the tool call that spawned each (§4.7). */
+    private readonly children: ChildLedger;
+
     public constructor(private readonly options: SessionOptions) {
         this.sessionId = options.sessionId ?? randomUUID();
+        this.children = new ChildLedger({
+            emit: (spawnId, event) => this.emitChild(spawnId, event),
+            log: options.log,
+            scrub: options.process.scrub,
+            secretLength: options.process.secretLength,
+        });
         this.connection = new JsonRpcConnection(options.process.stdout, options.process.stdin, {
             notification: (method, params) => this.onNotification(method, params),
             request: (method, params) => this.onRequest(method, params),
@@ -147,6 +156,7 @@ export class AgentSession {
     public async start(): Promise<void> {
         try {
             this.agent = await initialize(this.connection, this.options.appVersion, this.options.startupTimeoutMs);
+            this.report = this.options.capabilityReport?.(this.agent) ?? reportFromHandshake(this.agent.capabilities, Date.now());
             this.agentSessionId = await newSession(this.connection, this.options.folder, this.options.startupTimeoutMs);
 
             // The agent can exit while the last answer is on its way; that session is over, not ready.
@@ -177,7 +187,7 @@ export class AgentSession {
             const opened = {
                 ...hostInfo,
                 nativeSessionId: this.agentSessionId,
-                ...this.agent !== undefined && { capabilities: reportFromHandshake(this.agent.capabilities, Date.now()) },
+                ...this.report !== undefined && { capabilities: this.report },
             };
 
             this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
@@ -263,6 +273,8 @@ export class AgentSession {
             tool.status = "cancelled";
             this.observeTool(tool);
         }
+
+        this.children.endAll("cancelled");
 
         this.cancelTimer ??= setTimeout(() => {
             if (this.status !== "busy") {
@@ -388,6 +400,7 @@ export class AgentSession {
         clearTimeout(this.cancelTimer);
         this.cancelTimer = undefined;
         this.current = undefined;
+        this.children.discardUnclaimed();
 
         if (this.status === "ended") {
             return;
@@ -430,6 +443,9 @@ export class AgentSession {
             this.observeTool(tool);
         }
 
+        this.children.endAll(this.cancelRequested ? "cancelled" : "failed");
+        this.finishChildren();
+
         wasRunning?.end(this.cancelRequested ? "cancelled" : "failed");
 
         if (wasRunning !== undefined) {
@@ -441,6 +457,17 @@ export class AgentSession {
 
         this.current = undefined;
         this.options.onChange();
+    }
+
+    /** What no spawn call claimed is dropped, and the session says what buffering cost it. */
+    private finishChildren(): void {
+        this.children.discardUnclaimed();
+
+        const { dropped, peakBytes } = this.children.stats();
+
+        if (peakBytes > 0 || dropped > 0) {
+            this.options.log?.(`[acp-host] child output buffered before its parent: peak ${String(peakBytes)} bytes, ${String(dropped)} dropped`);
+        }
     }
 
     /** A "no": the agent's reject option, or a cancel that did not come from stopping the turn. */
@@ -556,6 +583,14 @@ export class AgentSession {
 
         const { update } = params;
         const turn = this.current ?? this.turns.at(-1);
+        const parent = childParentOf(update);
+
+        // What a child says is not the agent's reply: kept out of the turn's text and tools whether or not it is shown.
+        if (parent !== undefined) {
+            this.onChildUpdate(parent, update);
+
+            return;
+        }
 
         switch (update.sessionUpdate) {
             case "agent_message_chunk": {
@@ -581,6 +616,27 @@ export class AgentSession {
         this.options.onChange();
     }
 
+    /** A child's update. With no report of children, they stay inside the agent and nothing is shown. */
+    private onChildUpdate(spawnId: string, update: Record<string, unknown>): void {
+        if (!isAvailable(capabilityOf(this.report, "subagents.ownChildren"))) {
+            return;
+        }
+
+        const event = childEventOf(update, this.options.process.scrub);
+
+        if (event !== undefined) {
+            this.children.receive(spawnId, event);
+        }
+    }
+
+    private emitChild(spawnId: string, event: ChildEvent): void {
+        const turn = this.toolOwner.get(spawnId);
+
+        if (turn !== undefined) {
+            this.observe((observer) => observer.child?.(this.id, turn.id, spawnId, event));
+        }
+    }
+
     private upsertTool(turn: Turn | undefined, update: Record<string, unknown>): void {
         const id = text(update.toolCallId);
 
@@ -589,6 +645,7 @@ export class AgentSession {
         }
 
         let tool = this.tools.get(id);
+        let created = false;
 
         if (tool === undefined) {
             // An update for a call we never saw starts one; it belongs to the turn it arrived in.
@@ -600,6 +657,7 @@ export class AgentSession {
             this.tools.set(id, tool);
             this.toolOwner.set(id, turn);
             turn.tools.push(tool);
+            created = true;
         }
 
         if (typeof update.title === "string" && update.title !== "") {
@@ -616,6 +674,16 @@ export class AgentSession {
         }
 
         this.observeTool(tool);
+
+        // The card is on the wire now: whatever a child said about this call before it appeared follows it.
+        if (created) {
+            this.children.spawn(id);
+        }
+
+        // A spawn call that finished ends its child's card, and its result is what a child that streamed nothing said.
+        if (tool.status === "completed" || tool.status === "failed") {
+            this.children.settle(id, tool.status, completionText(update.content));
+        }
     }
 
     private async onRequest(method: string, params: unknown): Promise<unknown> {

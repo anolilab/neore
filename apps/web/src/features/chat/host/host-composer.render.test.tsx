@@ -167,11 +167,11 @@ describe("the coding-agent composer", () => {
         expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
     });
 
-    it("says the agent is starting and takes no message until it has started", async () => {
+    it("says the agent is starting and still takes a message, which goes out once it is up", async () => {
         mount(session({ status: "starting" }));
 
-        expect(await screen.findByText("Starting the agent on your computer…")).toBeTruthy();
-        expect((screen.getByLabelText("Message to the coding agent") as HTMLTextAreaElement).disabled).toBe(true);
+        expect(await screen.findByText("Starting the agent on your computer. A message you send now goes out once it is up.")).toBeTruthy();
+        expect((screen.getByLabelText("Message to the coding agent") as HTMLTextAreaElement).disabled).toBe(false);
     });
 
     it("takes no message once the session has ended", async () => {

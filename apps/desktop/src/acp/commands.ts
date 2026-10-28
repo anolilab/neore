@@ -17,6 +17,14 @@
  *
  * The receipt log is the replay defence for these calls: a captured envelope can be delivered again, and finds
  * its receipt, until the envelope expires. Receipts are kept for that long and a little more.
+ *
+ * **A command that is not carried out yet stays in the log.** `start` and `send` are kept with their signed envelope
+ * until they are acted on (plans/acp-agent-host.md §4.6): a `send` for a session that is still opening is held by the
+ * caller (`early-sends.ts`) and the receipt says so (`apply` answers {@link HELD}); a `start` is acted on when its
+ * agent has opened, or failed to. {@link HostCommands.recover}, at app start, runs the ones a dead process left in
+ * that state, once: it checks the envelope with the core again (consent revoked meanwhile, expiry), and a command
+ * that has been acted on has its envelope removed, so the prompt text does not stay on disk. The window between a
+ * command being acted on and that write is not atomic: a process killed inside it acts on the command twice.
  */
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -47,16 +55,43 @@ export interface CommandCore {
     acpSign: (envelope: string, signature: string, outcome: string) => string;
 }
 
+/** What a command's `apply` is told about its call. */
+export interface AppliedCall {
+    callId: string;
+    expiresAt: number;
+    /** The thread the backend made the call for; absent only for an envelope that carried none. */
+    threadId?: string;
+}
+
+/** `apply` kept the command for later (a send for a session that is not open yet): the call is acknowledged, the receipt stays open until {@link HostCommands.finished}. */
+export interface Held {
+    held: true;
+}
+
+/** A `send` that was held past its envelope's expiry, found by {@link HostCommands.recover}: its stream must end with an error. */
+export interface LapsedSend {
+    sessionId: string;
+    threadId: string;
+    turnId: string;
+}
+
 export interface CommandOptions {
     /** Acts on a command and answers `accepted`, or the reason it was not carried out. Throws to refuse with the error's message. */
-    apply: (command: AcpCommand) => Promise<string> | string;
+    apply: (command: AcpCommand, call: AppliedCall) => Held | Promise<Held | string> | string;
     core: CommandCore;
+    /** Told of a held `send` that expired while the app was down. */
+    lapsed?: (send: LapsedSend) => void;
+    log?: (message: string) => void;
     now?: () => number;
     /** Under the app's data folder. */
     receiptFile: string;
 }
 
 export const ACCEPTED = "accepted";
+export const HELD: Held = { held: true };
+
+/** The commands worth running after a restart: the others (a cancel, an answer) belong to a turn or request that did not survive it. */
+const isReplayable = (command: AcpCommand): boolean => command.kind === "start" || command.kind === "send";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -80,11 +115,48 @@ const settle = async (write: Promise<void>): Promise<void> => {
     }
 };
 
-/** What the log keeps of a call: when its envelope expires, and why the command was refused if it was. */
+/** What the log keeps of a call: when its envelope expires, why the command was refused if it was, and the signed envelope while it has not been acted on. */
 interface Receipt {
     expiresAt: number;
+    /** Set from the receipt until the command is acted on. */
+    held?: { envelope: string; signature: string };
     refusal?: string;
 }
+
+const parsedEnvelope = (envelope: string): Record<string, unknown> => {
+    try {
+        const parsed: unknown = JSON.parse(envelope);
+
+        return isRecord(parsed) ? parsed : {};
+    } catch {
+        return {};
+    }
+};
+
+const threadOf = (envelope: string): string | undefined => {
+    const { threadId } = parsedEnvelope(envelope);
+
+    return typeof threadId === "string" && threadId !== "" ? threadId : undefined;
+};
+
+/** A held `send`'s ids, from its stored envelope. */
+const sendOf = (envelope: string): LapsedSend | undefined => {
+    const { input, threadId, tool } = parsedEnvelope(envelope);
+    const fields = isRecord(input) ? input : {};
+
+    return tool === "acp_send" && typeof threadId === "string" && typeof fields.sessionId === "string" && typeof fields.turnId === "string"
+        ? { sessionId: fields.sessionId, threadId, turnId: fields.turnId }
+        : undefined;
+};
+
+/** One receipt as the file holds it: `[id, expiresAt]`, plus the refusal, or `[id, expiresAt, null, envelope, signature]` while it is held. */
+const entryOf = (callId: string, { expiresAt, held, refusal }: Receipt): (number | string | null)[] => {
+    if (held !== undefined) {
+        return [callId, expiresAt, null, held.envelope, held.signature];
+    }
+
+    return refusal === undefined ? [callId, expiresAt] : [callId, expiresAt, refusal];
+};
 
 export class HostCommands {
     /** callId → receipt. In memory first, so two deliveries at once cannot both run. */
@@ -95,6 +167,9 @@ export class HostCommands {
 
     private loaded: Promise<void> | undefined;
 
+    /** Set while `recover` runs: a delivery waits for it, so a redelivered call cannot be acted on twice. */
+    private replaying: Promise<void> | undefined;
+
     /** Serialises writes of the receipt file; a write never overtakes the one before it. */
     private writing: Promise<void> = Promise.resolve();
 
@@ -102,15 +177,43 @@ export class HostCommands {
 
     public async execute(envelope: string, signature: string): Promise<Signed> {
         await this.load();
+        await this.replaying;
 
         const { core } = this.options;
         const prepared = JSON.parse(core.acpPrepare(envelope, signature)) as Prepared;
-        const outcome = await this.outcomeOf(prepared);
+        const outcome = await this.outcomeOf(prepared, envelope, signature);
 
         return JSON.parse(core.acpSign(envelope, signature, outcome)) as Signed;
     }
 
-    private async outcomeOf(prepared: Prepared): Promise<string> {
+    /** A held command has been acted on (or failed to be): its envelope leaves the log. */
+    public async finished(callId: string): Promise<void> {
+        const receipt = this.receipts.get(callId);
+
+        if (receipt?.held === undefined) {
+            return;
+        }
+
+        delete receipt.held;
+
+        try {
+            await this.persist();
+        } catch {
+            // The next write carries it; at worst a restart acts on the command once more, within its expiry.
+        }
+    }
+
+    /**
+     * Acts on the commands a previous run left unfinished, once, starts before sends. Call at app start, before the
+     * relay delivers anything: a delivery waits for this.
+     */
+    public async recover(): Promise<void> {
+        this.replaying = this.replay();
+
+        await this.replaying;
+    }
+
+    private async outcomeOf(prepared: Prepared, envelope: string, signature: string): Promise<string> {
         if (prepared.command === null) {
             // The core would not allow it: nothing was acted on, so there is nothing to remember.
             return prepared.refusal ?? "refused";
@@ -131,7 +234,7 @@ export class HostCommands {
             return known.refusal ?? ACCEPTED;
         }
 
-        const first = this.receive(prepared.command, callId, prepared.expiresAt);
+        const first = this.receive(prepared.command, { callId, expiresAt: prepared.expiresAt, threadId: threadOf(envelope) }, { envelope, signature });
 
         this.handling.set(callId, first);
 
@@ -142,9 +245,13 @@ export class HostCommands {
         }
     }
 
-    /** The receipt is on disk before the command is acted on; a refusal is written beside it, so it stays a refusal. */
-    private async receive(command: AcpCommand, callId: string, expiresAt: number): Promise<string> {
-        const receipt: Receipt = { expiresAt };
+    /**
+     * The receipt is on disk before the command is acted on; a refusal is written beside it, so it stays a refusal. A
+     * command that can be replayed carries its envelope in the receipt until it has been acted on.
+     */
+    private async receive(command: AcpCommand, call: AppliedCall, signed: { envelope: string; signature: string }): Promise<string> {
+        const { callId } = call;
+        const receipt: Receipt = { expiresAt: call.expiresAt, ...isReplayable(command) && { held: signed } };
 
         this.receipts.set(callId, receipt);
 
@@ -156,25 +263,119 @@ export class HostCommands {
             throw error;
         }
 
-        let outcome: string;
+        return await this.act(command, call);
+    }
+
+    /** Acts on a command whose receipt is on disk, and records what came of it. */
+    private async act(command: AcpCommand, call: AppliedCall): Promise<string> {
+        const receipt = this.receipts.get(call.callId) as Receipt;
+        let outcome: Held | string;
 
         try {
-            outcome = await this.options.apply(command);
+            outcome = await this.options.apply(command, call);
         } catch (error) {
             outcome = (error as Error).message.slice(0, 200) || "refused";
         }
 
+        if (typeof outcome !== "string") {
+            // Kept by the caller: the call is acknowledged and the receipt stays open until `finished`.
+            return ACCEPTED;
+        }
+
+        delete receipt.held;
+
         if (outcome !== ACCEPTED) {
             receipt.refusal = outcome;
+        }
 
-            try {
-                await this.persist();
-            } catch {
-                // The refusal is still signed. Without it on disk, a redelivery after a restart reads as carried out.
-            }
+        try {
+            await this.persist();
+        } catch {
+            // The outcome is still signed. Without it on disk, a redelivery after a restart reads as carried out
+            // (or, for a command acted on, runs again from its envelope: see the header on the window).
         }
 
         return outcome;
+    }
+
+    /** A held command the core will not allow any more: it leaves the log as a refusal, so a redelivery is refused the same way. */
+    private async refuse(callId: string, reason: string): Promise<void> {
+        const receipt = this.receipts.get(callId);
+
+        if (receipt === undefined) {
+            return;
+        }
+
+        delete receipt.held;
+        receipt.refusal = reason;
+
+        try {
+            await this.persist();
+        } catch {
+            // The next write carries it.
+        }
+    }
+
+    private async replay(): Promise<void> {
+        await this.load();
+
+        const open = [...this.receipts].filter(([, receipt]) => receipt.held !== undefined);
+
+        // A session must exist before the message waiting for it is held against it.
+        open.sort(([, first], [, second]) => Number(parsedEnvelope(second.held?.envelope ?? "").tool === "acp_start") - Number(parsedEnvelope(first.held?.envelope ?? "").tool === "acp_start"));
+
+        for (const [callId, receipt] of open) {
+            const { envelope, signature } = receipt.held as { envelope: string; signature: string };
+
+            if (receipt.expiresAt <= this.now()) {
+                const send = sendOf(envelope);
+
+                if (send !== undefined) {
+                    this.options.lapsed?.(send);
+                }
+
+                // eslint-disable-next-line no-await-in-loop -- one command at a time, starts first
+                await this.finished(callId);
+
+                continue;
+            }
+
+            // eslint-disable-next-line no-await-in-loop -- one command at a time, starts first
+            await this.replayOne(callId, envelope, signature);
+        }
+    }
+
+    private async replayOne(callId: string, envelope: string, signature: string): Promise<void> {
+        let prepared: Prepared;
+
+        try {
+            // The core checks again what it checked the first time, and consent too: the user may have revoked it since.
+            prepared = JSON.parse(this.options.core.acpPrepare(envelope, signature)) as Prepared;
+        } catch (error) {
+            this.options.log?.(`[acp-host] a command left from the last run was not valid any more and was dropped: ${(error as Error).message}`);
+            await this.finished(callId);
+
+            return;
+        }
+
+        if (prepared.command === null) {
+            const reason = prepared.refusal ?? "refused";
+
+            this.options.log?.(`[acp-host] a command left from the last run is not allowed any more and was dropped: ${reason}`);
+            await this.refuse(callId, reason);
+
+            return;
+        }
+
+        const running = this.act(prepared.command, { callId, expiresAt: prepared.expiresAt, threadId: threadOf(envelope) });
+
+        this.handling.set(callId, running);
+
+        try {
+            await running;
+        } finally {
+            this.handling.delete(callId);
+        }
     }
 
     private now(): number {
@@ -194,7 +395,11 @@ export class HostCommands {
 
             for (const entry of entries) {
                 if (Array.isArray(entry) && typeof entry[0] === "string" && typeof entry[1] === "number") {
-                    this.receipts.set(entry[0], { expiresAt: entry[1], ...typeof entry[2] === "string" && { refusal: entry[2] } });
+                    this.receipts.set(entry[0], {
+                        expiresAt: entry[1],
+                        ...typeof entry[2] === "string" && { refusal: entry[2] },
+                        ...typeof entry[3] === "string" && typeof entry[4] === "string" && { held: { envelope: entry[3], signature: entry[4] } },
+                    });
                 }
             }
         } catch {
@@ -234,7 +439,7 @@ export class HostCommands {
         const { receiptFile } = this.options;
 
         await mkdir(path.dirname(receiptFile), { recursive: true });
-        await writeFile(`${receiptFile}.tmp`, JSON.stringify({ receipts: [...this.receipts].map(([callId, { expiresAt, refusal }]) => refusal === undefined ? [callId, expiresAt] : [callId, expiresAt, refusal]) }), { mode: 0o600 });
+        await writeFile(`${receiptFile}.tmp`, JSON.stringify({ receipts: [...this.receipts].map(([callId, receipt]) => entryOf(callId, receipt)) }), { mode: 0o600 });
         await rename(`${receiptFile}.tmp`, receiptFile);
     }
 }

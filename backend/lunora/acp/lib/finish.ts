@@ -9,7 +9,7 @@ import { addMessagesHandler } from "../../agent/messages";
 import { patchThread } from "../../agent/table-writes";
 import { endHostStream, isLiveStream } from "../../chat/streaming/persistent/host";
 import { createAcpCancelCall } from "../../devices/lib/acp-call";
-import { appendToTranscript, buildHostReply, emptyTranscript, isTranscriptFull, type HostReplyReason } from "./reply";
+import { appendChildEvent, appendToTranscript, buildHostReply, emptyTranscript, isChildEvent, isTranscriptFull, type HostReplyReason } from "./reply";
 import { sessionOfThread, touchSession } from "./sessions";
 import { withdrawPermissionAnswers } from "./withdraw";
 
@@ -29,6 +29,8 @@ export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId:
             // Tool and permission events ride as `event` with no text of their own.
             if (chunk.text.length > 0 || chunk.reasoning) {
                 appendToTranscript(transcript, chunk);
+            } else if (isChildEvent(chunk.event)) {
+                appendChildEvent(transcript, chunk.event);
             }
         }
 

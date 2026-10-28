@@ -96,7 +96,8 @@ export class TurnChannel {
 
         const isText = event.kind === "text" || event.kind === "reasoning";
 
-        if (isText && this.pendingJson > MAX_PENDING_JSON) {
+        // A child's streamed text is output like the agent's own: past the cap it is dropped, not the turn.
+        if ((isText || event.kind === "child_text") && this.pendingJson > MAX_PENDING_JSON) {
             this.dropped += 1;
 
             return;

@@ -10,8 +10,8 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AcpCommand } from "./commands";
-import { HostCommands, isAcpEnvelope } from "./commands";
+import type { AcpCommand, AppliedCall, Held } from "./commands";
+import { HELD, HostCommands, isAcpEnvelope } from "./commands";
 
 const SEND: AcpCommand = { kind: "send", sessionId: "s1", text: "fix it", turnId: "u1" };
 
@@ -33,7 +33,10 @@ const outcomeOf = (signed: { payload: string }): string => (JSON.parse(signed.pa
 /** One delivery of a call, and the outcome that came back signed. */
 const deliver = async (target: HostCommands, callId: string): Promise<string> => outcomeOf(await target.execute(envelopeFor(callId), "sig"));
 
-const make = (applied: AcpCommand[], overrides: { apply?: (command: AcpCommand) => Promise<string> | string; file?: string; now?: () => number } = {}) =>
+const make = (
+    applied: AcpCommand[],
+    overrides: { apply?: (command: AcpCommand, call: AppliedCall) => Held | Promise<Held | string> | string; file?: string; lapsed?: (send: { sessionId: string; threadId: string; turnId: string }) => void; now?: () => number } = {},
+) =>
     new HostCommands({
         apply:
             overrides.apply
@@ -43,6 +46,8 @@ const make = (applied: AcpCommand[], overrides: { apply?: (command: AcpCommand) 
                 return "accepted";
             }),
         core: fakeCore({}),
+        lapsed: overrides.lapsed,
+        log: () => undefined,
         now: overrides.now,
         receiptFile: overrides.file ?? receiptFile,
     });
@@ -176,6 +181,218 @@ describe("a coding-agent command", () => {
         const stored = (JSON.parse(readFileSync(receiptFile, "utf8")) as { receipts: [string, number][] }).receipts.map(([callId]) => callId);
 
         expect(stored).toEqual(["new"]);
+    });
+});
+
+const START: AcpCommand = { agentKey: "claude", agentLabel: "Claude", folderId: "f1", folderLabel: "neore", folderPath: "/work/neore", kind: "start", sessionId: "s1", threadId: "t1" };
+
+/** An envelope as the backend signs it: the tool, the thread and the ids a held send needs. */
+const heldEnvelope = (callId: string, command: AcpCommand, expiresAt?: number): string =>
+    JSON.stringify({
+        callId,
+        command,
+        expiresAt,
+        input: command.kind === "send" ? { sessionId: command.sessionId, text: command.text, turnId: command.turnId } : {},
+        refusal: null,
+        threadId: "t1",
+        tool: command.kind === "start" ? "acp_start" : "acp_send",
+    });
+
+const open = (file = receiptFile): string => readFileSync(file, "utf8");
+
+/** One delivery of a call whose envelope names its tool, thread and ids, and the outcome that came back signed. */
+const deliverHeld = async (target: HostCommands, callId: string, command: AcpCommand, expiresAt?: number): Promise<string> =>
+    outcomeOf(await target.execute(heldEnvelope(callId, command, expiresAt), "sig"));
+
+/** An `apply` that never returns: the process died inside it. */
+const killedInside = (): Promise<string> =>
+    new Promise<string>(() => {
+        // Settles never.
+    });
+
+describe("a command held until its session opens", () => {
+    it("is acknowledged with its envelope in the log, and the envelope leaves the log once it has been acted on", async () => {
+        const commands = make([], { apply: () => HELD });
+
+        expect(await deliverHeld(commands, "c1", SEND)).toBe("accepted");
+        expect(open()).toContain("fix it");
+
+        await commands.finished("c1");
+
+        expect(open()).not.toContain("fix it");
+        // Still acknowledged, not run again, when the call comes back.
+        expect(await deliverHeld(commands, "c1", SEND)).toBe("accepted");
+    });
+
+    it("tells apply the call's id, thread and expiry", async () => {
+        const seen: AppliedCall[] = [];
+        const commands = make([], {
+            apply: (_command, call) => {
+                seen.push(call);
+
+                return "accepted";
+            },
+        });
+
+        await commands.execute(heldEnvelope("c1", SEND, 4_000_000_000_000), "sig");
+        expect(seen).toEqual([{ callId: "c1", expiresAt: 4_000_000_000_000, threadId: "t1" }]);
+    });
+
+    it("drops the envelope as soon as the command was acted on, so a prompt that was sent does not stay on disk", async () => {
+        await make([]).execute(heldEnvelope("c1", SEND), "sig");
+
+        expect(open()).not.toContain("fix it");
+    });
+
+    it("loses no command when the process dies after the receipt: the next start acts on it once", async () => {
+        // The first process writes the receipt and is killed before it acts: its apply never returns.
+        const killed = make([], { apply: killedInside });
+
+        killed.execute(heldEnvelope("c1", SEND), "sig");
+        await vi.waitFor(() => expect(open()).toContain("fix it"));
+
+        const applied: AcpCommand[] = [];
+        const restarted = make(applied);
+
+        await restarted.recover();
+        expect(applied).toEqual([SEND]);
+
+        // The call comes back as well (its lease lapsed): acknowledged, not run again.
+        expect(await deliverHeld(restarted, "c1", SEND)).toBe("accepted");
+        expect(applied).toEqual([SEND]);
+
+        // And a start after that finds nothing left to do.
+        const again: AcpCommand[] = [];
+
+        await make(again).recover();
+        expect(again).toEqual([]);
+        expect(open()).not.toContain("fix it");
+    });
+
+    it("keeps a command that is still held across a restart, until it is acted on", async () => {
+        const first = make([], { apply: () => HELD });
+
+        await first.execute(heldEnvelope("c1", SEND), "sig");
+
+        const calls: string[] = [];
+        const second = make([], {
+            apply: (_command, call) => {
+                calls.push(call.callId);
+
+                return HELD;
+            },
+        });
+
+        await second.recover();
+        await second.recover();
+        // Held again by the new process, which replays it each time it starts until it is finished.
+        expect(calls).toEqual(["c1", "c1"]);
+        await second.finished("c1");
+
+        const third: AcpCommand[] = [];
+
+        await make(third).recover();
+        expect(third).toEqual([]);
+    });
+
+    it("replays a start before the message that waits for its session, whatever order they were received in", async () => {
+        const order: string[] = [];
+        const first = make([], { apply: () => HELD });
+
+        await first.execute(heldEnvelope("send", SEND), "sig");
+        await first.execute(heldEnvelope("start", START), "sig");
+
+        await make([], {
+            apply: (command) => {
+                order.push(command.kind);
+
+                return "accepted";
+            },
+        }).recover();
+        expect(order).toEqual(["start", "send"]);
+    });
+
+    it("checks the envelope with the core again, so consent revoked meanwhile stops a start", async () => {
+        const first = make([], { apply: () => HELD });
+
+        await first.execute(heldEnvelope("c1", START), "sig");
+
+        const applied: AcpCommand[] = [];
+        const revoking = new HostCommands({
+            apply: (command) => {
+                applied.push(command);
+
+                return "accepted";
+            },
+            core: fakeCore({ command: null, refusal: "not approved on this computer" }),
+            log: () => undefined,
+            receiptFile,
+        });
+
+        await revoking.recover();
+        expect(applied).toEqual([]);
+        expect(await deliverHeld(revoking, "c1", START)).toBe("not approved on this computer");
+    });
+
+    it("does not act on a held command whose envelope has expired, and says so for a message", async () => {
+        const clock = { now: 1_000_000 };
+        const first = make([], { apply: () => HELD, now: () => clock.now });
+
+        await first.execute(heldEnvelope("c1", SEND, 1_000_000 + 60_000), "sig");
+        clock.now += 61_000;
+
+        const applied: AcpCommand[] = [];
+        const lapsed: unknown[] = [];
+
+        await make(applied, { lapsed: (held) => {
+            lapsed.push(held);
+        }, now: () => clock.now }).recover();
+        expect(applied).toEqual([]);
+        expect(lapsed).toEqual([{ sessionId: "s1", threadId: "t1", turnId: "u1" }]);
+        expect(open()).not.toContain("fix it");
+    });
+
+    it("makes a delivery wait for the replay, so a call that comes back during it is not acted on twice", async () => {
+        const first = make([], { apply: () => HELD });
+
+        await first.execute(heldEnvelope("c1", SEND), "sig");
+
+        const release: { go?: () => void } = {};
+        const applied: AcpCommand[] = [];
+        const restarted = make(applied, {
+            apply: async (command) => {
+                applied.push(command);
+                await new Promise<void>((resolve) => {
+                    release.go = resolve;
+                });
+
+                return "accepted";
+            },
+        });
+        const replay = restarted.recover();
+
+        await vi.waitFor(() => expect(release.go).toBeDefined());
+
+        const delivery = restarted.execute(heldEnvelope("c1", SEND), "sig");
+
+        release.go?.();
+        await replay;
+        expect(outcomeOf(await delivery)).toBe("accepted");
+        expect(applied).toHaveLength(1);
+    });
+
+    it("does not replay a cancel or an answer: the turn or request they belong to did not survive", async () => {
+        const first = make([], {
+            apply: killedInside,
+        });
+
+        first.execute(JSON.stringify({ callId: "c1", command: { kind: "cancel", sessionId: "s1", turnId: "u1" }, refusal: null, tool: "acp_cancel" }), "sig");
+        await vi.waitFor(() => expect(open()).toContain("c1"));
+
+        const applied: AcpCommand[] = [];
+
+        await make(applied).recover();
+        expect(applied).toEqual([]);
     });
 });
 

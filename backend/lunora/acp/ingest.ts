@@ -103,13 +103,15 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         const opened = existing.status === "starting";
         // The agent's own session id, kept for an import to find and a later reattach to use (S6); set once.
         const learnedNativeId = existing.nativeSessionId === undefined ? open.nativeSessionId : undefined;
+        // A message sent while the agent was still starting (§4.6) is waiting for it: the session opens already busy.
+        const opening = opened && (await ctx.db.persistentStreams.findFirst({ where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId: existing.threadId } })) !== null;
 
         if (existing.status !== "ended" && (opened || open.capabilities || learnedNativeId !== undefined)) {
             await ctx.db.patch(existing._id, {
                 updatedAt: now,
                 ...(open.capabilities && { capabilities: open.capabilities }),
                 ...(learnedNativeId !== undefined && { nativeSessionId: learnedNativeId }),
-                ...(opened && { lastEventAt: now, status: "idle" as const }),
+                ...(opened && { lastEventAt: now, status: opening ? ("busy" as const) : ("idle" as const) }),
             });
         }
 

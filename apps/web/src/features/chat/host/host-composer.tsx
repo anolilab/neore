@@ -92,7 +92,6 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
         offline: t`Your computer is offline. Open Neore on it and try again.`,
         rate_limited: t`You are sending too fast. Wait a moment.`,
         session_ended: t`This session has ended. Start a new one from the desktop app.`,
-        session_starting: t`The agent is still starting. Try again in a moment.`,
         too_large: t`That message is too long to send from here.`,
         turn_running: t`The agent is still working on the last message.`,
         unreachable: t`Could not reach the server. Try again.`,
@@ -124,7 +123,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
     const trimmed = text.trim();
     const status = session?.status;
-    const blocked = status === "ended" || status === "starting";
+    const blocked = status === "ended";
     const canSend = trimmed !== "" && trimmed.length <= MAX_HOST_PROMPT_CHARS && !sending && !running && !blocked;
     const lastEnd = session?.lastEndReason;
     const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd);
@@ -164,7 +163,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
             {status === "starting" && (
                 <p aria-live="polite" className="text-muted-foreground flex items-center gap-2 text-sm" role="status">
                     <Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
-                    {t`Starting the agent on your computer…`}
+                    {t`Starting the agent on your computer. A message you send now goes out once it is up.`}
                 </p>
             )}
             {status === "ended" && (

@@ -41,7 +41,6 @@ const vSendResult = v.union(
             v.literal("offline"),
             v.literal("rate_limited"),
             v.literal("session_ended"),
-            v.literal("session_starting"),
             v.literal("too_large"),
             v.literal("turn_running"),
         ),
@@ -82,10 +81,6 @@ export const sendToHost = internalMutation
             return { outcome: "session_ended" as const };
         }
 
-        if (session.status === "starting") {
-            return { outcome: "session_starting" as const };
-        }
-
         // One turn at a time from here: a second prompt would queue on the computer behind a turn nobody can stop from the thread.
         if (await liveHostStream(ctx, threadId)) {
             return { outcome: "turn_running" as const };
@@ -119,6 +114,7 @@ export const sendToHost = internalMutation
 
         const streamId = await createHostStream(ctx, { hostState: "accepted", messageId: prompt._id, threadId, turnId, userId }, now);
 
+        // A session still `starting` stays so (`touchSession`): the computer holds the message until the agent opens it.
         await touchSession(ctx, session, "busy", now);
         await claimOnce(ctx, "host-send", key, SEND_CLAIM_TTL_MS, userId);
 
@@ -133,7 +129,6 @@ const STATUS: Record<string, number> = {
     offline: 409,
     rate_limited: 429,
     session_ended: 409,
-    session_starting: 409,
     too_large: 413,
     turn_running: 409,
 };

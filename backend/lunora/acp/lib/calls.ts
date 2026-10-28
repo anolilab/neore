@@ -50,12 +50,29 @@ const reasonOf = (end: AcpCallEnd): string => {
     return reason === "" ? "The host did not carry out the message." : `The host did not carry out the message: ${reason.slice(0, 300)}.`;
 };
 
-/** A session still waiting for its agent to open ends. One that opened meanwhile is left alone. */
-export const endStartingSession = async (ctx: Pick<MutationCtx, "db">, deviceId: Id<"devices">, hostSessionId: string, now: number): Promise<void> => {
+export const SESSION_NEVER_OPENED = "The agent did not start, so the message was not sent.";
+
+/**
+ * A session still waiting for its agent to open ends, and so does a message held for it (`acp_send` is accepted
+ * while the session is `starting`): its stream fails with the reason instead of waiting for the reaper. One that
+ * opened meanwhile is left alone.
+ */
+export const endStartingSession = async (ctx: MutationCtx, deviceId: Id<"devices">, hostSessionId: string, now: number): Promise<void> => {
     const session = await ctx.db.acpSessions.findFirst({ where: { deviceId, hostSessionId } });
 
-    if (session?.status === "starting") {
-        await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+    if (session?.status !== "starting") {
+        return;
+    }
+
+    await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+
+    const held = await ctx.db.persistentStreams.findFirst({
+        orderBy: [{ _creationTime: "desc" }],
+        where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId: session.threadId },
+    });
+
+    if (held) {
+        await finishHostTurn(ctx, held, { error: SESSION_NEVER_OPENED, reason: "failed" }, now);
     }
 };
 
