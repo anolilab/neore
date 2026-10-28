@@ -112,9 +112,11 @@ describe("a running session", () => {
     });
 
     it("reports a host that vanished as a crash", async () => {
+        const platform = asPlatform("linux");
         const { host, onExit } = await started();
 
         host.stop();
+        platform.mockRestore();
 
         expect(onExit).toHaveBeenCalledWith({ crashed: true, exitCode: null });
         // A POSIX shell hangs up by itself when its pty goes.

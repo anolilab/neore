@@ -102,7 +102,11 @@ if (process.platform === "win32") {
     for (const dir of unpacked) {
         const files = readdirSync(dir, { recursive: true }).map((entry) => String(entry).replaceAll("\\", "/"));
 
-        for (const needed of ["node-pty/lib/worker/conoutSocketWorker.js", "node-pty/prebuilds/win32-x64/conpty.node", "node-pty/prebuilds/win32-arm64/conpty.node"]) {
+        for (const needed of [
+            "node-pty/lib/worker/conoutSocketWorker.js",
+            "node-pty/prebuilds/win32-x64/conpty.node",
+            "node-pty/prebuilds/win32-arm64/conpty.node",
+        ]) {
             if (!files.some((file) => file.endsWith(needed))) {
                 fail(`no ${needed} in ${dir}; asarUnpack did not pick it up, and the terminal could not start a shell`);
             }
@@ -114,4 +118,6 @@ if (!unpackedOnly && !names.some((name) => /^latest.*\.yml$/.test(name))) {
     fail(`no latest*.yml update feed in ${release}`);
 }
 
-console.log(`smoke-artifacts: ok (${process.platform}: ${unpackedOnly ? "" : "installer, "}${unpacked.length} unpacked app(s)${unpackedOnly ? "" : ", update feed"})`);
+console.log(
+    `smoke-artifacts: ok (${process.platform}: ${unpackedOnly ? "" : "installer, "}${unpacked.length} unpacked app(s)${unpackedOnly ? "" : ", update feed"})`,
+);

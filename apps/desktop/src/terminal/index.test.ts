@@ -15,6 +15,7 @@ import { isTrustedUrl } from "../trust.js";
 import { hangUp } from "./hang-up";
 import type { HostEvent, HostRequest } from "./protocol";
 import type { HostHandle } from "./session";
+import { resolveShell } from "./shell";
 
 type Frame = { url: string };
 type Contents = {
@@ -285,7 +286,7 @@ describe("a session", () => {
         const spawn = hosts[0]?.posted[0];
 
         expect(result).toMatchObject({ cwd: folder });
-        expect(spawn).toMatchObject({ args: ["-l"], cols: 80, cwd: folder, rows: 24, type: "spawn" });
+        expect(spawn).toMatchObject({ args: resolveShell().args, cols: 80, cwd: folder, rows: 24, type: "spawn" });
         expect(spawn?.type === "spawn" && Object.keys(spawn.env)).not.toContain("ELECTRON_RUN_AS_NODE");
         expect(spawn?.type === "spawn" && Object.keys(spawn.env)).not.toContain("NEORE_SITE_URL");
         expect(terminals.pids()).toEqual([9000]);

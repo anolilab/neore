@@ -28,7 +28,7 @@ asar: true
 npmRebuild: false
 # A `.node` binary is dlopen'd from disk and cannot be loaded from inside the asar archive. node-pty also
 # executes its `spawn-helper` to start a shell, and an executable cannot run from inside the archive either. On
-# Windows its worker thread script is better a real file too, so the host loads node-pty from the unpacked copy
+# Windows its worker thread script path would otherwise point inside the archive, so the host loads node-pty from the unpacked copy
 # (`loadableDirectory` in `src/terminal/spawn-helper.ts`); the whole folder is unpacked for that.
 asarUnpack:
     - "**/*.node"
