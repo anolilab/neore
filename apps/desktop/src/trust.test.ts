@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyUrl, isArtifactPreview, isDraftTarget, isLocalPage, isTrustedUrl } from "./trust";
+import { classifyUrl, isArtifactPreview, isDraftTarget, isLocalPage, isOwnFrame, isTrustedUrl } from "./trust";
 
 const SITE = new URL("https://app.example.com/");
 const COMPOSER = new URL("file:///Applications/Neore.app/Contents/Resources/app.asar/dist/quick-composer/index.html");
@@ -78,5 +78,30 @@ describe("classifyUrl", () => {
     it("calls an unparseable string external", () => {
         expect(classifyUrl(SITE, "not a url")).toBe("external");
         expect(classifyUrl(SITE, "")).toBe("external");
+    });
+});
+
+describe("isOwnFrame", () => {
+    const PAGE = "file:///app/dist/dictation-settings-window/settings.html";
+    const mainFrame = { url: PAGE };
+    const contents = { mainFrame };
+
+    it("accepts the top frame of the window, on its own page", () => {
+        expect(isOwnFrame({ sender: contents, senderFrame: mainFrame }, contents, PAGE)).toBe(true);
+    });
+
+    it.each([
+        ["another window", { sender: { mainFrame }, senderFrame: mainFrame }],
+        ["an iframe of the same page", { sender: contents, senderFrame: { url: PAGE } }],
+        ["the site's page in this window", { sender: contents, senderFrame: { url: "https://app.example.com/" } }],
+        ["a frame that is gone", { sender: contents, senderFrame: null }],
+    ])("refuses %s", (_name, event) => {
+        const own = _name === "the site's page in this window" ? { mainFrame: event.senderFrame } : contents;
+
+        expect(isOwnFrame(event, own, PAGE)).toBe(false);
+    });
+
+    it("refuses everything while the window is closed", () => {
+        expect(isOwnFrame({ sender: contents, senderFrame: mainFrame }, undefined, PAGE)).toBe(false);
     });
 });

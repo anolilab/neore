@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import type { Dirent } from "node:fs";
-import { mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -11,13 +11,14 @@ import { _electron as electron, expect, test } from "@playwright/test";
 
 import { wavBytes } from "../src/dictation/wav";
 
-/** The probe the main process publishes when the dictation flag is on (`src/dictation/index.ts`). */
+/** The probe the main process publishes in an unpackaged build (`src/dictation/index.ts`). */
 interface Probe {
     audioBytes: number;
     begin: () => void;
     cancel: () => void;
     end: () => void;
     helperPid: () => number | undefined;
+    openSettings: () => void;
     outcome: () => string | undefined;
     state: () => string;
     useTestEngine: (engine: { args: string[]; command: string; modelPath: string }) => void;
@@ -64,7 +65,7 @@ test.beforeAll(async () => {
     });
     execFileSync(process.execPath, ["scripts/build.mjs"], {
         cwd: appDirectory,
-        env: { ...process.env, NEORE_DICTATION: "1", NEORE_SITE_URL: SITE },
+        env: { ...process.env, NEORE_SITE_URL: SITE },
         stdio: "inherit",
     });
     scratch = await mkdtemp(path.join(os.tmpdir(), "neore-dictation-e2e-"));
@@ -83,9 +84,18 @@ interface Launched {
     userData: string;
 }
 
-/** A fresh app with a fake microphone, its own user-data and temp folders (so a scan of them is clean), and a model file for the fake recogniser. */
-const launch = async (clip = tone): Promise<Launched> => {
+/**
+ * A fresh app with a fake microphone, its own user-data and temp folders (so a scan of them is clean), and a model file for the fake recogniser.
+ * Dictation is opt-in: the settings file in the new user-data folder turns it on, unless `enabled` is false (a first run).
+ */
+const launch = async (clip = tone, enabled = true): Promise<Launched> => {
     const userData = await mkdtemp(path.join(scratch, "user-"));
+
+    if (enabled) {
+        await mkdir(path.join(userData, "dictation"), { recursive: true });
+        await writeFile(path.join(userData, "dictation", "settings.json"), JSON.stringify({ enabled: true }));
+    }
+
     const temporary = await mkdtemp(path.join(scratch, "tmp-"));
     const app = await electron.launch({
         args: [
@@ -358,6 +368,82 @@ test("only the dictation window is given the microphone", async () => {
         // And the window goes away with the dictation: the grant does not outlive it.
         await call(app, "cancel");
         await expect.poll(() => app.windows().filter((window) => DICTATION_PAGE.test(window.url())).length).toBe(0);
+    } finally {
+        await app.close();
+    }
+});
+
+const SETTINGS_PAGE = /\/dictation-settings-window\/settings\.html$/u;
+const DICTATION_KEY = /dictation|settings/iu;
+const MODEL_FILES = ["ggml-small.bin", "ggml-large-v3-turbo-q5_0.bin"];
+
+test("on a first run the switch is off: a press opens no window and downloads nothing", async () => {
+    const { app, userData } = await launch(tone, false);
+
+    try {
+        await siteWindow(app);
+        await call(app, "begin");
+
+        await expect.poll(() => call<string | undefined>(app, "outcome")).toBe("disabled");
+        expect(await call<string>(app, "state")).toBe("idle");
+        expect(app.windows().filter((window) => DICTATION_PAGE.test(window.url()))).toHaveLength(0);
+        expect(await walk(path.join(userData, "dictation", "models"))).toStrictEqual([]);
+    } finally {
+        await app.close();
+    }
+});
+
+test("the settings window turns dictation on, deletes a model file, and is out of the site's reach", async () => {
+    const { app, userData } = await launch(tone, false);
+
+    try {
+        const site = await siteWindow(app);
+        const models = path.join(userData, "dictation", "models");
+
+        await mkdir(models, { recursive: true });
+        await Promise.all(MODEL_FILES.map((file) => writeFile(path.join(models, file), "weights")));
+
+        // The site has no way to open it or to reach it: nothing about dictation settings on its bridge.
+        const siteKeys = await site.evaluate(() => Object.keys((globalThis as { neoreNative?: object }).neoreNative ?? {}));
+
+        expect(siteKeys.filter((key) => DICTATION_KEY.test(key))).toStrictEqual([]);
+
+        // The page offers the switch only where the speech helper exists; the fake recogniser stands in for it.
+        await useFakeRecogniser(app);
+        await app.evaluate(() => (globalThis as unknown as { neoreShell: { dictation: Probe } }).neoreShell.dictation.openSettings());
+
+        const page = await findPage(app, (url) => SETTINGS_PAGE.test(url));
+        const switchControl = page.getByRole("switch", { name: "Dictate on this computer" });
+
+        await expect(switchControl).not.toBeChecked();
+        expect(new Set(await page.evaluate(() => Object.keys((globalThis as { neoreDictationSettings?: object }).neoreDictationSettings ?? {})))).toStrictEqual(
+            new Set(["download", "get", "onChanged", "remove", "update"]),
+        );
+        expect(await page.evaluate(() => [typeof (globalThis as { neoreNative?: unknown }).neoreNative, typeof (globalThis as { require?: unknown }).require])).toStrictEqual(["undefined", "undefined"]);
+
+        await switchControl.check();
+        await expect.poll(async () => JSON.parse(await readFile(path.join(userData, "dictation", "settings.json"), "utf8")).enabled).toBe(true);
+
+        await page.getByLabel("Language").selectOption("de");
+        await expect.poll(async () => JSON.parse(await readFile(path.join(userData, "dictation", "settings.json"), "utf8")).language).toBe("de");
+
+        await page.getByRole("button", { name: "Delete Small from this computer" }).click();
+        await expect.poll(() => readdir(models)).not.toContain("ggml-small.bin");
+        expect(await readdir(models)).toStrictEqual(["ggml-large-v3-turbo-q5_0.bin"]);
+        await expect(page.getByRole("status").filter({ hasText: "was deleted from this computer" })).toBeVisible();
+
+        // The window cannot reach the network either.
+        const reached = await page.evaluate(async (site_) => {
+            try {
+                await fetch(site_);
+
+                return "reached";
+            } catch {
+                return "blocked";
+            }
+        }, SITE);
+
+        expect(reached).toBe("blocked");
     } finally {
         await app.close();
     }

@@ -14,11 +14,12 @@ const ONE_SECOND = Buffer.alloc(32_000, 3);
 const buildDependencies = (window: CaptureWindow, recognizer: Recognizer, notices: string[]) => {
     return {
         confirmDownload: vi.fn(async (_spec: ModelSpec) => true),
+        enabled: vi.fn(() => true),
         hasHelper: vi.fn(() => true),
         insert: vi.fn((_text: string) => {}),
         log: vi.fn((_message: string) => {}),
         microphoneAllowed: vi.fn(async () => true),
-        model: MODEL,
+        model: () => MODEL,
         models: {
             download: vi.fn(async (_spec: ModelSpec) => "/models/m.bin"),
             ensureVerified: vi.fn(async (_spec: ModelSpec) => "/models/m.bin"),
@@ -448,5 +449,88 @@ describe("before a window opens", () => {
         await settled();
 
         expect(h.deps.openWindow).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("with the switch off", () => {
+    it("does nothing at all: no status check, no question, no download, no window, no helper", async () => {
+        const h = harness({ enabled: () => false });
+
+        h.controller.press();
+        await settled();
+
+        expect(h.controller.lastOutcome()).toBe("disabled");
+        expect(h.controller.state()).toBe("idle");
+        expect(h.deps.models.status).not.toHaveBeenCalled();
+        expect(h.deps.models.isDownloading).not.toHaveBeenCalled();
+        expect(h.deps.confirmDownload).not.toHaveBeenCalled();
+        expect(h.deps.models.download).not.toHaveBeenCalled();
+        expect(h.deps.microphoneAllowed).not.toHaveBeenCalled();
+        expect(h.deps.openWindow).not.toHaveBeenCalled();
+        expect(h.deps.models.ensureVerified).not.toHaveBeenCalled();
+        expect(h.deps.startRecognizer).not.toHaveBeenCalled();
+        expect(h.notices).toStrictEqual([]);
+    });
+
+    it("stays silent for a press made before the switch was turned on", async () => {
+        let on = false;
+        const h = harness({ enabled: () => on });
+
+        h.controller.press();
+        await settled();
+        on = true;
+        h.controller.press();
+        await settled();
+
+        expect(h.deps.openWindow).toHaveBeenCalledTimes(1);
+    });
+
+    it("downloads nothing when the switch went off while the download question was open", async () => {
+        let on = true;
+        let answer: (accepted: boolean) => void = () => {};
+        const question = {
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the tsconfig lib predates `Promise.withResolvers`
+            promise: new Promise<boolean>((resolve) => {
+                answer = resolve;
+            }),
+        };
+        const h = harness({ confirmDownload: vi.fn(async () => question.promise), enabled: () => on });
+
+        h.deps.models.status.mockResolvedValue({ state: "missing" });
+        h.controller.press();
+        await settled();
+        on = false;
+        answer(true);
+        await settled();
+
+        expect(h.deps.models.download).not.toHaveBeenCalled();
+        expect(h.controller.lastOutcome()).toBe("disabled");
+    });
+});
+
+describe("the chosen model", () => {
+    it("is read at each press, and the helper loads the one this dictation began with", async () => {
+        const other = { ...MODEL, file: "o.bin", id: "o" };
+        let current = MODEL;
+        const h = harness({ model: () => current });
+
+        await speak(h);
+        current = other;
+        h.controller.release();
+        await settled();
+
+        expect(h.deps.models.status).toHaveBeenCalledWith(MODEL);
+        expect(h.deps.models.ensureVerified).toHaveBeenCalledWith(MODEL);
+    });
+
+    it("says nothing about a download that was cancelled by turning dictation off", async () => {
+        const h = harness();
+
+        h.deps.models.status.mockResolvedValue({ state: "missing" });
+        h.deps.models.download.mockRejectedValue(new ModelError("cancelled", "The model download was cancelled"));
+        h.controller.press();
+        await settled();
+
+        expect(h.notices).toStrictEqual(["Dictation: Downloading the speech model. You will be told when it is ready."]);
     });
 });

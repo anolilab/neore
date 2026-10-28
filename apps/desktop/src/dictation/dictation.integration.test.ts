@@ -86,13 +86,14 @@ const run = async (): Promise<{ inserted: string[]; notices: string[]; windowClo
     const models = createModelStore({ directory: path.join(appData, "dictation", "models") });
     const controller = createDictationController({
         confirmDownload: async () => false,
+        enabled: () => true,
         hasHelper: () => true,
         insert: (text) => {
             inserted.push(text);
         },
         log: () => {},
         microphoneAllowed: async () => true,
-        model: spec,
+        model: () => spec,
         models,
         notify: (_title, body) => {
             notices.push(body);
@@ -100,7 +101,7 @@ const run = async (): Promise<{ inserted: string[]; notices: string[]; windowClo
         now: () => Date.now(),
         openWindow: () => window,
         startRecognizer: (modelPath) =>
-            startRecognizer({ cwd: path.join(appData, "dictation"), helper: { args: [FAKE], command: process.execPath }, modelPath }),
+            startRecognizer({ cwd: path.join(appData, "dictation"), helper: { args: [FAKE], command: process.execPath }, language: "auto", modelPath }),
     });
 
     controller.press();
@@ -136,6 +137,60 @@ describe("a dictation with the network refused", () => {
     });
 });
 
+describe("with the switch off", () => {
+    it("opens no window, downloads nothing and writes nothing, with the network watched", async () => {
+        const attempts: unknown[] = [];
+
+        vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+            attempts.push(input);
+            throw new TypeError("network is blocked");
+        });
+        vi.spyOn(net.Socket.prototype, "connect").mockImplementation((...args: unknown[]) => {
+            attempts.push(args);
+            throw new Error("network is blocked");
+        });
+
+        const directory = path.join(appData, "dictation", "models");
+
+        await rm(directory, { force: true, recursive: true });
+
+        const opened: unknown[] = [];
+        const asked: unknown[] = [];
+        const controller = createDictationController({
+            confirmDownload: async (model) => {
+                asked.push(model);
+
+                return true;
+            },
+            enabled: () => false,
+            hasHelper: () => true,
+            insert: () => {},
+            log: () => {},
+            microphoneAllowed: async () => true,
+            model: () => spec,
+            models: createModelStore({ directory }),
+            notify: () => {},
+            now: () => Date.now(),
+            openWindow: () => {
+                opened.push(1);
+
+                throw new Error("must not open");
+            },
+            startRecognizer: () => {
+                throw new Error("must not start");
+            },
+        });
+
+        controller.press();
+        await vi.waitFor(() => expect(controller.lastOutcome()).toBe("disabled"));
+
+        expect(opened).toStrictEqual([]);
+        expect(asked).toStrictEqual([]);
+        expect(attempts).toStrictEqual([]);
+        expect(await walk(appData)).toStrictEqual([]);
+    });
+});
+
 describe("after a dictation", () => {
     it("leaves no audio in the temp or the app data folder", async () => {
         const before = new Set([...await walk(temporary), ...await walk(appData)]);
@@ -162,6 +217,7 @@ describe("after a dictation", () => {
         const recognizer = startRecognizer({
             cwd: path.join(appData, "dictation"),
             helper: { args: [FAKE], command: process.execPath },
+            language: "auto",
             modelPath: await models.ensureVerified(small),
         });
 

@@ -1,6 +1,9 @@
-/** The shortcut that starts a dictation (temporary, with the `NEORE_DICTATION` flag). It is held down while speaking. */
+/** The shortcut that starts a dictation, registered only while the switch in settings is on. It is held down while speaking. */
 // eslint-disable-next-line no-secrets/no-secrets -- a keyboard accelerator, not a credential
 export const DICTATION_SHORTCUT = "CommandOrControl+Shift+D";
+
+/** The same shortcut as the settings page words it for a person. */
+export const DICTATION_SHORTCUT_LABEL = process.platform === "darwin" ? "⌘ Shift D" : "Ctrl Shift D";
 
 /** The keys of the chord, as `KeyboardEvent.key` values lower-cased. Letting go of any of them is the release. */
 const CHORD_KEYS = new Set(["control", "d", "meta", "shift"]);
