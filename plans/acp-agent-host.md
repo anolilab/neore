@@ -602,7 +602,9 @@ directory, local consent for each install.
 - No update path: the registry is not compared with installed agents, there is no timer, and a newer version is
   a new install the user confirms. Tests: no fetch from registering the handlers, loading the view or waiting a
   week; the spawn plan keeps the recorded command and version until an install changes it.
-- Not built: re-hashing the installed binary at spawn, `.tar.bz2`, uninstalling an old version separately.
+- Not built: re-hashing the installed binary at spawn, `.tar.bz2`, uninstalling an old version separately, and
+  archives that contain links: on `darwin-aarch64`, 2 of the 11 installable agents (a tar.gz with 2 link entries,
+  another with 4) are refused by the unpacker until links are handled safely.
 
 **S6 — Native session import and capability-driven controls.** Import an agent's
 saved sessions as threads, with ids derived from (agent key, native session id).
