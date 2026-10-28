@@ -275,6 +275,62 @@ impl DeviceCore {
         })
     }
 
+    /// One page of a folder on a connected server (`{ entries, next, host, … }`, JSON), for the file tree of the
+    /// local window. `after` is the `next` of the page before.
+    #[napi]
+    pub fn host_files_list<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+        path: String,
+        after: Option<String>,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let page = state.host_files_list(&device_id, &path, after.as_deref())?;
+
+            serde_json::to_string(&page).map_err(|error| error.to_string())
+        })
+    }
+
+    /// A file of a connected server as text (`{ text, truncated, host, path }`, JSON).
+    #[napi]
+    pub fn host_file_read<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+        path: String,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let read = state.host_file_read(&device_id, &path)?;
+
+            serde_json::to_string(&read).map_err(|error| error.to_string())
+        })
+    }
+
+    /// Downloads a folder of a connected server as one tar archive into `destination`, a file path the person chose.
+    /// Resolves what the archive holds (`{ files, folders, bytes, skipped, host }`, JSON).
+    #[napi]
+    pub fn host_download<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+        path: String,
+        destination: String,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let summary =
+                state.host_download(&device_id, &path, std::path::Path::new(&destination))?;
+
+            serde_json::to_string(&summary).map_err(|error| error.to_string())
+        })
+    }
+
     #[napi]
     pub fn host_disconnect(&self, device_id: String) {
         self.state.host_disconnect(&device_id);

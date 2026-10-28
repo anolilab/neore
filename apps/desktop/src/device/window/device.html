@@ -78,6 +78,24 @@
                 </p>
                 <div id="hosts" aria-labelledby="hosts-heading"></div>
 
+                <h2 id="files-heading">Files on a server</h2>
+                <p class="muted">
+                    Browse the shared folders of a connected server, or download one as a tar archive (links are left out). What a server
+                    lists or holds is shown as plain text, and none of this goes to the agent.
+                </p>
+                <div id="files" role="group" aria-labelledby="files-heading">
+                    <label for="files-host">Server</label>
+                    <select id="files-host"></select>
+                    <p id="files-path" class="muted"></p>
+                    <div class="row">
+                        <button type="button" id="files-up">Up</button>
+                        <button type="button" id="files-download">Download this folder…</button>
+                    </div>
+                    <ul id="files-list" aria-label="Contents"></ul>
+                    <button type="button" id="files-more" hidden>Load more</button>
+                    <pre id="files-preview" tabindex="0" aria-label="File contents" hidden></pre>
+                </div>
+
                 <h2 id="servers-heading">Local MCP servers</h2>
                 <p class="muted">Started on this computer when the agent first uses them. Only add commands you trust.</p>
                 <ul id="servers" aria-labelledby="servers-heading"></ul>

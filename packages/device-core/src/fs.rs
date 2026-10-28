@@ -22,6 +22,10 @@ use serde_json::{json, Value};
 pub const MAX_FILE_BYTES: u64 = 1024 * 1024;
 /// Directory entries `fs_list` returns.
 pub const MAX_LIST_ENTRIES: usize = 1000;
+/// Entries one page of [`list_page`] returns at most.
+pub const MAX_PAGE_ENTRIES: usize = 2000;
+/// Entries of one folder [`list_page`] reads before it says the folder was cut.
+const MAX_FOLDER_ENTRIES: usize = 1_000_000;
 
 /// The roots that still exist, canonicalised. Missing folders are skipped.
 pub fn canonical_roots(roots: &[String]) -> Vec<PathBuf> {
@@ -612,6 +616,12 @@ mod confined {
     }
 }
 
+/// A folder opened for reading through the same walk as [`list`], for a caller that goes on by descriptor.
+#[cfg(unix)]
+pub(crate) fn open_folder(roots: &[PathBuf], path: &Path) -> io::Result<std::os::fd::OwnedFd> {
+    confined::open_dir(roots, path, true)
+}
+
 pub fn list(roots: &[PathBuf], path: &Path) -> Result<Value, String> {
     let (mut listed, truncated) =
         confined::entries(roots, path, MAX_LIST_ENTRIES).map_err(|error| error.to_string())?;
@@ -624,6 +634,39 @@ pub fn list(roots: &[PathBuf], path: &Path) -> Result<Value, String> {
         .collect();
 
     Ok(json!({ "path": path.to_string_lossy(), "entries": entries, "truncated": truncated }))
+}
+
+/// One page of a folder, name-sorted: the entries after `after` (a name from the previous page's `next`), at most
+/// `limit` of them. A folder is read whole for each page, so a page costs the folder's size, not the page's;
+/// `fs_list` keeps its 1000-entry cut for the agent.
+pub fn list_page(
+    roots: &[PathBuf],
+    path: &Path,
+    after: Option<&str>,
+    limit: usize,
+) -> Result<Value, String> {
+    let (mut listed, cut) =
+        confined::entries(roots, path, MAX_FOLDER_ENTRIES).map_err(|error| error.to_string())?;
+
+    listed.sort();
+
+    let start = after.map_or(0, |after| {
+        listed.partition_point(|(name, _, _)| name.as_str() <= after)
+    });
+    let page = &listed[start..];
+    let more = page.len() > limit;
+    let page = &page[..page.len().min(limit)];
+    let entries: Vec<Value> = page
+        .iter()
+        .map(|(name, kind, size)| json!({ "name": name, "type": kind, "size": size }))
+        .collect();
+    let next = more
+        .then(|| page.last().map(|(name, _, _)| name.as_str()))
+        .flatten();
+
+    Ok(
+        json!({ "path": path.to_string_lossy(), "entries": entries, "next": next, "truncated": cut }),
+    )
 }
 
 /// Up to [`MAX_FILE_BYTES`] of a file as text. Binary files are described, not dumped.
@@ -899,5 +942,35 @@ mod tests {
         assert!(!is_name_surrogate(0x9000_001A), "cloud files placeholder");
         assert!(!is_name_surrogate(0x8000_0013), "deduplicated file");
         assert!(!is_name_surrogate(0));
+    }
+
+    #[test]
+    fn a_folder_pages_in_name_order_without_repeating_or_skipping() {
+        let dir = scratch("pages");
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+
+        for name in ["d", "b", "c", "e"] {
+            fs::write(dir.join("root").join(name), name).unwrap();
+        }
+
+        let names = |page: &Value| -> Vec<String> {
+            page["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["name"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let first = list_page(&roots, &roots[0], None, 3).unwrap();
+        let second = list_page(&roots, &roots[0], first["next"].as_str(), 3).unwrap();
+        let past_the_end = list_page(&roots, &roots[0], Some("sub"), 3).unwrap();
+
+        assert_eq!(names(&first), ["a.txt", "b", "c"]);
+        assert_eq!(first["next"], "c");
+        assert_eq!(names(&second), ["d", "e", "sub"]);
+        // Exactly the last page: nothing follows it, so there is no cursor.
+        assert!(second["next"].is_null());
+        assert!(names(&past_the_end).is_empty());
+        assert!(list_page(&roots, &roots[0].join("a.txt"), None, 3).is_err());
     }
 }

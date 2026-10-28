@@ -7,7 +7,7 @@
  * with textContent only — never as HTML.
  */
 import { describeLink, multiplexingNote } from "../link-status";
-import type { HostView, Prompt, SettingsView } from "../types";
+import type { FileEntry, HostView, Prompt, SettingsView } from "../types";
 import { initAcp } from "./acp-page";
 
 /** Buttons stay disabled this long after a prompt appears, so a click meant for another window cannot land on "Allow". */
@@ -660,6 +660,7 @@ const renderSettings = (): void => {
             : view.allowRules.map((rule) => listItem(rule, "Remove", () => removeRule(rule))),
     );
     setText("audit-path", `Full log: ${view.auditPath}`);
+    renderFilesHosts();
 };
 
 const loadAudit = async (): Promise<void> => {
@@ -690,6 +691,169 @@ const loadTerminalAvailability = async (): Promise<void> => {
 
     state.terminalServerReason = server.available ? null : server.reason;
 };
+
+// ─── Files on a server ──────────────────────────────────────────────────────
+
+/** Where the file tree is: a server and one of its folders, or `null` for the list of its shared folders. */
+const files: { folder: string | null; next: string | null; request: number } = { folder: null, next: null, request: 0 };
+
+const filesHost = (): HostView | undefined => state.settings?.hosts.find((host) => host.deviceId === ($("files-host") as HTMLSelectElement).value);
+
+const TRAILING_SLASH = /\/$/u;
+
+const joinPath = (folder: string, name: string): string => `${folder.replace(TRAILING_SLASH, "")}/${name}`;
+
+const renderFilesHosts = (): void => {
+    const select = $("files-host") as HTMLSelectElement;
+    const hosts = (state.settings?.hosts ?? []).filter((host) => host.connected);
+    const kept = select.value;
+
+    select.replaceChildren(
+        ...hosts.map((host) => {
+            const option = document.createElement("option");
+
+            option.value = host.deviceId;
+            option.textContent = host.name;
+
+            return option;
+        }),
+    );
+
+    if (hosts.some((host) => host.deviceId === kept)) {
+        select.value = kept;
+    } else {
+        showFolder(null);
+    }
+
+    select.disabled = hosts.length === 0;
+    setText("files-path", hosts.length === 0 ? "Connect a server to browse it." : files.folder ?? "Shared folders");
+};
+
+const fileRow = (label: string, onOpen?: () => void): HTMLLIElement => {
+    const item = document.createElement("li");
+
+    if (onOpen === undefined) {
+        item.textContent = label;
+    } else {
+        item.append(button(label, onOpen));
+    }
+
+    return item;
+};
+
+const entryRow = (host: HostView, folder: string, entry: FileEntry): HTMLLIElement => {
+    const path = joinPath(folder, entry.name);
+
+    if (entry.type === "dir") {
+        return fileRow(`${entry.name}/`, () => showFolder(path));
+    }
+
+    if (entry.type === "file") {
+        return fileRow(`${entry.name} (${String(entry.size)} bytes)`, async () => {
+            const preview = $("files-preview");
+
+            try {
+                const read = await globalThis.neoreDevice.hostFileRead(host.deviceId, path);
+
+                preview.textContent = read.text;
+                preview.hidden = false;
+            } catch (error) {
+                status(String(error));
+            }
+        });
+    }
+
+    // A link or a special file is named and not opened: what it points at is the server's word.
+    return fileRow(`${entry.name} (${entry.type})`);
+};
+
+/** Loads the next page of the current folder, or the first when `reset`. A slower, older answer is dropped. */
+const loadFiles = async (reset: boolean): Promise<void> => {
+    const host = filesHost();
+    const { folder } = files;
+
+    if (host === undefined || folder === null) {
+        return;
+    }
+
+    files.request += 1;
+
+    const { request } = files;
+
+    try {
+        const page = await globalThis.neoreDevice.hostFilesList(host.deviceId, folder, reset ? undefined : files.next ?? undefined);
+
+        if (request !== files.request) {
+            return;
+        }
+
+        const rows = page.entries.map((entry) => entryRow(host, folder, entry));
+
+        if (reset) {
+            setText("files-path", `${page.host}: ${page.path}`);
+            $("files-list").replaceChildren(...rows);
+        } else {
+            $("files-list").append(...rows);
+        }
+
+        files.next = page.next;
+        setHidden("files-more", page.next === null);
+        status(page.truncated ? "This folder is larger than the server reads; the list is cut." : "");
+    } catch (error) {
+        if (request === files.request) {
+            status(String(error));
+            // Above the shared folders, or gone: back to the list of shared folders.
+            showFolder(null);
+        }
+    }
+};
+
+const showFolder = (folder: string | null): void => {
+    const host = filesHost();
+
+    files.folder = folder;
+    files.next = null;
+    files.request += 1;
+    setHidden("files-preview", true);
+    setHidden("files-more", true);
+    ($("files-up") as HTMLButtonElement).disabled = folder === null;
+    ($("files-download") as HTMLButtonElement).disabled = folder === null;
+
+    if (folder === null) {
+        setText("files-path", host === undefined ? "Connect a server to browse it." : "Shared folders");
+        $("files-list").replaceChildren(...(host?.roots ?? []).map((root) => fileRow(root, () => showFolder(root))));
+
+        return;
+    }
+
+    loadFiles(true);
+};
+
+$("files-host").addEventListener("change", () => showFolder(null));
+$("files-more").addEventListener("click", () => loadFiles(false));
+$("files-up").addEventListener("click", () => {
+    const { folder } = files;
+
+    showFolder(folder === null || folder.lastIndexOf("/") <= 0 ? null : folder.slice(0, folder.lastIndexOf("/")));
+});
+$("files-download").addEventListener("click", async () => {
+    const host = filesHost();
+
+    if (host === undefined || files.folder === null) {
+        return;
+    }
+
+    status("Downloading…");
+
+    try {
+        const done = await globalThis.neoreDevice.hostDownload(host.deviceId, files.folder);
+        const left = done !== null && done.skipped > 0 ? ` ${String(done.skipped)} links or special files were left out.` : "";
+
+        status(done === null ? "" : `Saved ${String(done.files)} files (${String(done.bytes)} bytes) from ${done.host}.${left}`);
+    } catch (error) {
+        status(String(error));
+    }
+});
 
 const loadSettings = async (): Promise<void> => {
     await loadTerminalAvailability();

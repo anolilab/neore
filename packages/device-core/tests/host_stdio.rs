@@ -13,7 +13,7 @@ use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::Duration;
 
-use device_core::frame::{read_frame, write_frame};
+use device_core::frame::{chunk_of, read_frame, write_frame};
 use device_core::host::{run_request, RunParams};
 use serde_json::{json, Value};
 use vectors::{Observed, Sandbox};
@@ -87,10 +87,13 @@ impl Host {
 
         thread::spawn(move || {
             while let Ok(Some(bytes)) = read_frame(&mut stdout) {
-                if sender
-                    .send(serde_json::from_slice(&bytes).unwrap())
-                    .is_err()
-                {
+                // A chunk is raw bytes; the tests see it as `{ kind: "chunk", id, bytes: [..] }`.
+                let frame = chunk_of(&bytes).map_or_else(
+                    || serde_json::from_slice(&bytes).unwrap(),
+                    |(id, data)| json!({ "kind": "chunk", "id": id, "bytes": data }),
+                );
+
+                if sender.send(frame).is_err() {
                     break;
                 }
             }
@@ -172,7 +175,7 @@ fn the_host_says_what_it_can_sandbox_before_anything_else() {
     let confines = device_core::sandbox::policy_for_call(&support, false, false, &[], None).is_ok();
 
     assert_eq!(hello["kind"], "hello");
-    assert_eq!(hello["protocol"], 2);
+    assert_eq!(hello["protocol"], 3);
     assert_eq!(hello["platform"], device_core::actions::platform());
     assert_eq!(hello["sandbox"]["available"], confines);
 }
@@ -489,5 +492,179 @@ fn the_host_sees_only_the_clean_environment() {
                 "the host inherited {name}"
             );
         }
+    }
+}
+
+/// A folder of `names`, each holding its own name, to list and archive.
+fn folder_of(label: &str, names: &[&str]) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("neore-host-files-{label}-{}", std::process::id()));
+
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("root")).unwrap();
+
+    for name in names {
+        std::fs::write(dir.join("root").join(name), name).unwrap();
+    }
+
+    std::fs::canonicalize(dir.join("root")).unwrap()
+}
+
+fn files(root: &Path, path: &str) -> Value {
+    json!({ "roots": [root], "path": path })
+}
+
+#[test]
+fn a_folder_is_listed_a_page_at_a_time_inside_the_shared_folders() {
+    let root = folder_of("list", &["e", "b", "d", "a", "c"]);
+    let mut host = Host::start();
+
+    host.next();
+
+    let mut seen = Vec::new();
+    let mut after = Value::Null;
+
+    for id in 1..=5 {
+        let mut params = files(&root, "");
+
+        params["after"] = after.clone();
+        params["limit"] = json!(2);
+        host.request(id, "list", params);
+
+        let response = host.next();
+
+        assert_eq!(response["ok"], true, "{response}");
+
+        let page = &response["result"];
+
+        seen.extend(
+            page["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["name"].as_str().unwrap().to_owned()),
+        );
+
+        if page["next"].is_null() {
+            break;
+        }
+
+        after = page["next"].clone();
+    }
+
+    assert_eq!(seen, ["a", "b", "c", "d", "e"]);
+
+    host.request(9, "list", files(&root, ".."));
+    host.request(10, "list", files(&root, "/"));
+
+    for _ in 0..2 {
+        let response = host.next();
+
+        assert_eq!(response["ok"], false, "{response}");
+        assert!(response["error"]
+            .as_str()
+            .unwrap()
+            .contains("outside the shared folders"));
+    }
+}
+
+#[cfg(unix)]
+mod tar {
+    use super::*;
+
+    /// Sends `tar` and collects its chunks and response.
+    fn download(host: &mut Host, id: u64, params: Value) -> (Vec<u8>, Value) {
+        host.request(id, "tar", params);
+
+        let mut archive = Vec::new();
+
+        loop {
+            let frame = host.next();
+
+            match frame["kind"].as_str() {
+                Some("chunk") => {
+                    assert_eq!(frame["id"], id);
+                    archive.extend(
+                        frame["bytes"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|byte| byte.as_u64().unwrap() as u8),
+                    );
+                }
+                _ => return (archive, frame),
+            }
+        }
+    }
+
+    #[test]
+    fn a_folder_streams_as_chunks_then_a_response_that_says_what_it_holds() {
+        let root = folder_of("tar", &["one", "two"]);
+        let mut host = Host::start();
+
+        host.next();
+
+        let (archive, response) = download(&mut host, 3, files(&root, ""));
+        let tar = root.parent().unwrap().join("out.tar");
+
+        std::fs::write(&tar, &archive).unwrap();
+
+        let listed = Command::new("tar").arg("-tf").arg(&tar).output().unwrap();
+        let mut names: Vec<_> = String::from_utf8_lossy(&listed.stdout)
+            .lines()
+            .map(str::to_owned)
+            .collect();
+
+        names.sort();
+
+        assert_eq!(response["ok"], true, "{response}");
+        assert_eq!(response["id"], 3);
+        assert_eq!(
+            response["result"],
+            json!({ "bytes": 6, "files": 2, "folders": 1, "skipped": 0 })
+        );
+        assert_eq!(names.len(), 3, "{names:?}");
+        assert!(names[0].ends_with("root/") && names[1].ends_with("/one"));
+
+        // A folder outside the shared ones is refused before a byte is sent.
+        let (archive, response) = download(&mut host, 4, files(&root, ".."));
+
+        assert!(archive.is_empty());
+        assert_eq!(response["ok"], false);
+    }
+
+    /// The host stalls on a stdout nobody reads; a `cancel` is read all the same and ends the archive.
+    #[test]
+    fn a_cancel_stops_an_archive_that_is_still_being_written() {
+        let root = folder_of("cancel", &[]);
+
+        std::fs::write(root.join("big"), vec![7u8; 24 * 1024 * 1024]).unwrap();
+
+        let mut host = Host::start();
+
+        host.next();
+        host.request(5, "tar", files(&root, ""));
+        thread::sleep(Duration::from_millis(500));
+        host.request(6, "cancel", json!({ "target": 5 }));
+
+        let (mut archive, mut answers) = (0usize, Vec::new());
+
+        while answers.len() < 2 {
+            let frame = host.next();
+
+            if frame["kind"] == "chunk" {
+                archive += frame["bytes"].as_array().unwrap().len();
+            } else {
+                answers.push(frame);
+            }
+        }
+
+        let tar = answers.iter().find(|frame| frame["id"] == 5).unwrap();
+
+        assert!(answers
+            .iter()
+            .any(|frame| frame["id"] == 6 && frame["ok"] == true));
+        assert_eq!(tar["ok"], false, "{tar}");
+        assert_eq!(tar["error"], "the download was stopped");
+        assert!(archive < 24 * 1024 * 1024, "{archive} bytes were sent");
     }
 }

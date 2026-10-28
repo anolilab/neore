@@ -9,10 +9,14 @@ use std::thread;
 use super::reconnect::{Attempt, AttemptGuard, ConnectError, ReconnectView};
 use super::*;
 use crate::install::{self, Installed, Remote};
-use crate::ssh::{Hello, HostConnection, HostKey, Interact, HOST_VERSION, MULTIPLEXING};
+use crate::ssh::{
+    Hello, HostConnection, HostKey, Interact, DOWNLOAD_IDLE, HOST_VERSION, MULTIPLEXING,
+};
 
 /// At most as many servers as the backend lets one account pair devices.
 const MAX_HOSTS: usize = 10;
+/// How long a page of a folder or a file may take.
+const FILES_WAIT: Duration = Duration::from_secs(30);
 
 /// What a page asks to connect to. Validated here: it is the only thing of the connection a page supplies. Agent
 /// forwarding is not part of it: that is turned on for a paired server in the local window alone.
@@ -1334,6 +1338,119 @@ impl DeviceState {
         })
     }
 
+    /// The server and its live connection, for what the local window asks of it directly.
+    fn files_link(&self, device_id: &str) -> Result<(Host, Arc<dyn HostLink>), String> {
+        let host = self
+            .settings()
+            .hosts
+            .into_iter()
+            .find(|host| host.device_id == device_id)
+            .ok_or("that server is not paired with this computer")?;
+        let link = self
+            .connection(device_id)
+            .filter(|link| link.is_alive())
+            .ok_or_else(|| format!("this computer is not connected to {}", host.name))?;
+
+        Ok((host, link))
+    }
+
+    /// One page of a folder on a connected server, for the file tree of the local window: `path` empty is its
+    /// first shared folder, `after` the last name of the page before. Nothing is prompted, because the person at
+    /// the window is the one asking, and it is not reachable from a page. The server keeps the paths inside the
+    /// folders shared for it. What comes back is the server's word and is labelled with its name; the window shows
+    /// it as text and an agent never sees it.
+    pub fn host_files_list(
+        &self,
+        device_id: &str,
+        path: &str,
+        after: Option<&str>,
+    ) -> Result<Value, String> {
+        let (host, link) = self.files_link(device_id)?;
+        let params = json!({ "after": after, "path": path, "roots": host.roots });
+        let mut page = link.list_files(&params, FILES_WAIT)?;
+
+        page["host"] = json!(host.name);
+
+        Ok(page)
+    }
+
+    /// A file of a connected server as text (the first megabyte), by the same action an agent's `fs_read` runs.
+    pub fn host_file_read(&self, device_id: &str, path: &str) -> Result<Value, String> {
+        let (host, link) = self.files_link(device_id)?;
+        let params = json!({
+            "input": { "path": path },
+            "remainingMs": FILES_WAIT.as_millis() as u64,
+            "roots": host.roots,
+            "tool": "fs_read",
+        });
+        let remote = link.run(&params, FILES_WAIT + Duration::from_secs(10))?;
+
+        if remote.status != "completed" {
+            return Err(remote
+                .error
+                .unwrap_or_else(|| "the file cannot be read".into()));
+        }
+
+        Ok(json!({
+            "host": host.name,
+            "path": path,
+            "text": remote.output.unwrap_or_default(),
+            "truncated": remote.truncated,
+        }))
+    }
+
+    /// Downloads a folder of a connected server as one tar archive into `destination`, a path the person chose.
+    /// The archive is written beside it and moved into place only when complete, and is never unpacked here: it is
+    /// the server's content, and a symlink or a `..` in it would be the server's to plant. The server leaves
+    /// symlinks and special files out.
+    pub fn host_download(
+        &self,
+        device_id: &str,
+        path: &str,
+        destination: &Path,
+    ) -> Result<Value, String> {
+        let (host, link) = self.files_link(device_id)?;
+        let name = destination
+            .file_name()
+            .filter(|_| destination.is_absolute())
+            .ok_or("the destination is not a file path")?;
+        let partial = destination.with_file_name({
+            let mut partial = name.to_owned();
+
+            partial.push(".part");
+            partial
+        });
+        let file = stdfs::File::create(&partial).map_err(|error| error.to_string())?;
+        let mut file = std::io::BufWriter::with_capacity(256 * 1024, file);
+        let params = json!({ "path": path, "roots": host.roots });
+        let result = link
+            .download(&params, &mut file, DOWNLOAD_IDLE)
+            .and_then(|summary| {
+                file.into_inner()
+                    .map_err(|error| error.to_string())?
+                    .sync_all()
+                    .and_then(|()| stdfs::rename(&partial, destination))
+                    .map_err(|error| error.to_string())?;
+
+                Ok(summary)
+            });
+
+        if result.is_err() {
+            let _ = stdfs::remove_file(&partial);
+        }
+
+        self.audit(json!({
+            "at": now_ms(), "host": host.name, "path": path, "tool": "files_download",
+            "status": if result.is_ok() { "completed" } else { "failed" },
+        }));
+
+        result.map(|mut summary| {
+            summary["host"] = json!(host.name);
+
+            summary
+        })
+    }
+
     /// A server's signed tool list: its built-in tools over ITS folders, worded for it, signed with its secret.
     /// Only while connected, so the backend never offers a server this computer cannot reach.
     pub(super) fn host_manifest(
@@ -1513,6 +1630,7 @@ mod tests {
     use crate::lifecycle::Phase;
     use crate::ssh::{RemoteOutcome, RemoteSandbox};
     use crate::store::test_keychain;
+    use std::io::Write;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
     use std::sync::Barrier;
     use std::time::Instant;
@@ -1533,6 +1651,11 @@ mod tests {
         reaped: Mutex<Vec<Vec<String>>>,
         /// What `master_suspect` answers.
         suspect: AtomicBool,
+        /// What `list_files` answers, and what it was asked.
+        listing: Mutex<Result<Value, String>>,
+        listed: Mutex<Vec<Value>>,
+        /// What `download` writes, or why it fails after writing `partial`.
+        archive: Mutex<Result<Vec<u8>, String>>,
         /// Makes the first `hello()` rendezvous twice with the test, which acts in between.
         gate: Mutex<Option<Arc<Barrier>>>,
         target: Option<Target>,
@@ -1547,6 +1670,9 @@ mod tests {
         fn launched(sandbox: bool, launch: Option<&str>) -> Arc<FakeLink> {
             Arc::new(FakeLink {
                 alive: AtomicBool::new(true),
+                archive: Mutex::new(Ok(b"TAR".to_vec())),
+                listed: Mutex::default(),
+                listing: Mutex::new(Ok(json!({ "entries": [], "next": null }))),
                 closed: AtomicUsize::new(0),
                 gate: Mutex::default(),
                 launch: launch.map(str::to_owned),
@@ -1624,6 +1750,33 @@ mod tests {
         fn run(&self, params: &Value, _wait: Duration) -> Result<RemoteOutcome, String> {
             self.runs.lock().unwrap().push(params.clone());
             self.outcome.lock().unwrap().clone()
+        }
+
+        fn list_files(&self, params: &Value, _wait: Duration) -> Result<Value, String> {
+            self.listed.lock().unwrap().push(params.clone());
+            self.listing.lock().unwrap().clone()
+        }
+
+        fn download(
+            &self,
+            params: &Value,
+            out: &mut dyn Write,
+            _idle: Duration,
+        ) -> Result<Value, String> {
+            self.listed.lock().unwrap().push(params.clone());
+
+            match self.archive.lock().unwrap().clone() {
+                Ok(bytes) => {
+                    out.write_all(&bytes).map_err(|error| error.to_string())?;
+
+                    Ok(json!({ "files": 1 }))
+                }
+                Err(error) => {
+                    out.write_all(b"HALF").map_err(|error| error.to_string())?;
+
+                    Err(error)
+                }
+            }
         }
     }
 
@@ -3334,5 +3487,90 @@ mod tests {
         assert_eq!(state.disconnects_of(&id), before + 1);
 
         let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn the_file_tree_asks_the_server_for_a_page_inside_the_folders_set_for_it() {
+        let link = FakeLink::new(true);
+        let (state, _, _) = engine("files-list", &link);
+        let page = state
+            .host_files_list(&host_id("files-list"), "src", Some("m"))
+            .unwrap();
+
+        assert_eq!(page["host"], "build-box");
+        assert_eq!(
+            link.listed.lock().unwrap().as_slice(),
+            [json!({ "after": "m", "path": "src", "roots": ["/srv/app"] })]
+        );
+
+        link.close();
+
+        assert!(state
+            .host_files_list(&host_id("files-list"), "", None)
+            .unwrap_err()
+            .contains("not connected"));
+        assert!(state.host_files_list("nobody", "", None).is_err());
+    }
+
+    #[test]
+    fn a_file_is_read_through_the_same_action_an_agent_would_run() {
+        let link = FakeLink::new(true);
+        let (state, _, _) = engine("files-read", &link);
+        let read = state
+            .host_file_read(&host_id("files-read"), "a.txt")
+            .unwrap();
+
+        assert_eq!(read["host"], "build-box");
+        assert_eq!(read["text"], "from the server");
+
+        let run = link.runs.lock().unwrap()[0].clone();
+
+        assert_eq!(run["tool"], "fs_read");
+        assert_eq!(run["roots"], json!(["/srv/app"]));
+
+        *link.outcome.lock().unwrap() = Ok(RemoteOutcome {
+            error: Some("a.txt: outside the shared folders".into()),
+            exit_code: None,
+            output: None,
+            status: "failed".into(),
+            truncated: false,
+        });
+
+        assert_eq!(
+            state
+                .host_file_read(&host_id("files-read"), "a.txt")
+                .unwrap_err(),
+            "a.txt: outside the shared folders"
+        );
+    }
+
+    #[test]
+    fn a_download_lands_complete_or_not_at_all() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("files-download", &link);
+        let destination = dir.join("app.tar");
+        let id = host_id("files-download");
+        let summary = state.host_download(&id, "", &destination).unwrap();
+
+        assert_eq!(summary["host"], "build-box");
+        assert_eq!(stdfs::read(&destination).unwrap(), b"TAR");
+        assert!(!dir.join("app.tar.part").exists());
+
+        // A failure part way leaves the earlier file as it was and no part file.
+        *link.archive.lock().unwrap() = Err("the server stopped sending".into());
+
+        assert_eq!(
+            state.host_download(&id, "", &destination).unwrap_err(),
+            "the server stopped sending"
+        );
+        assert_eq!(stdfs::read(&destination).unwrap(), b"TAR");
+        assert!(!dir.join("app.tar.part").exists());
+        assert!(state
+            .host_download(&id, "", Path::new("relative.tar"))
+            .is_err());
+
+        let audit = state.audit_tail().join("\n");
+
+        assert!(audit.contains("files_download") && audit.contains("failed"));
     }
 }

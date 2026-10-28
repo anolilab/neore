@@ -92,6 +92,18 @@ export const readHostPairing = (value: unknown): { deviceId: string; secret: str
 
 export const readDeviceId = (value: unknown): string => text(value, "deviceId", 64);
 
+/** A path on a server: empty is its first shared folder. The server decides whether it is inside the shared folders. */
+export const readServerPath = (value: unknown): string => {
+    if (value === "") {
+        return "";
+    }
+
+    return text(value, "path", 4096);
+};
+
+/** The last name of the page before. */
+export const readAfter = (value: unknown): string | undefined => optionalText(value, "after", 4096);
+
 /** The device a manifest is for: this computer's when absent. */
 export const readOptionalDeviceId = (value: unknown): string | undefined => value === undefined ? undefined : text(value, "deviceId", 64);
 
