@@ -1,6 +1,6 @@
 /**
  * Coding-agent sessions, as the web app reads them. Both are the caller's own; a host thread is never shared.
- * Starting, cancelling and answering are the remote-control slice (plans/acp-agent-host.md §8, S4).
+ * Starting, cancelling and answering are in `remote.ts`.
  */
 import type { Infer } from "lunorash/server";
 import { v } from "lunorash/server";

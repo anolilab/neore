@@ -30,9 +30,9 @@ const MAX_RECEIPTS = 1000;
 
 export type AcpCommand
     = | { kind: "cancel"; sessionId: string; turnId: string }
-      | { kind: "permissionAnswer"; optionId: string; requestId: string; sessionId: string }
-      | { kind: "send"; sessionId: string; text: string; turnId: string }
-      | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; folderPath: string; kind: "start"; sessionId: string; threadId: string };
+        | { kind: "permissionAnswer"; optionId: string; requestId: string; sessionId: string }
+        | { kind: "send"; sessionId: string; text: string; turnId: string }
+        | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; folderPath: string; kind: "start"; sessionId: string; threadId: string };
 
 interface Prepared {
     callId: string;
@@ -68,6 +68,15 @@ export const isAcpEnvelope = (envelope: string): boolean => {
         return isRecord(parsed) && typeof parsed.tool === "string" && parsed.tool.startsWith("acp_");
     } catch {
         return false;
+    }
+};
+
+/** A failed write must not stop the writes queued behind it. */
+const settle = async (write: Promise<void>): Promise<void> => {
+    try {
+        await write;
+    } catch {
+        // The caller of that write sees the error.
     }
 };
 
@@ -126,7 +135,12 @@ export class HostCommands {
         // reached the backend) is looked at again, not acknowledged as if it had been carried out.
         if (outcome !== ACCEPTED) {
             this.receipts.delete(prepared.callId);
-            await this.persist().catch(() => {});
+
+            try {
+                await this.persist();
+            } catch {
+                // The refusal is still signed; a receipt left behind only makes a redelivery an acknowledgement.
+            }
         }
 
         return outcome;
@@ -174,10 +188,15 @@ export class HostCommands {
             this.receipts.delete(oldest as string);
         }
 
-        const write = this.writing.then(async () => await this.write());
+        const write = this.writeAfter(this.writing);
 
-        this.writing = write.catch(() => {});
+        this.writing = settle(write);
         await write;
+    }
+
+    private async writeAfter(previous: Promise<void>): Promise<void> {
+        await previous;
+        await this.write();
     }
 
     private async write(): Promise<void> {

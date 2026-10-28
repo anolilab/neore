@@ -42,13 +42,15 @@ const inputOf = (call: Call): Record<string, unknown> => {
     }
 };
 
+const REFUSAL_PREFIX = /^(The device refused the request|refused): ?/u;
+
 /** The words a thread shows for a command that was not carried out. */
 const reasonOf = (end: AcpCallEnd): string => {
     if (end.status === "expired") {
         return "The host did not answer.";
     }
 
-    const reason = (end.error ?? "").replace(/^(The device refused the request|refused): ?/u, "").trim();
+    const reason = (end.error ?? "").replace(REFUSAL_PREFIX, "").trim();
 
     return reason === "" ? "The host did not carry out the message." : `The host did not carry out the message: ${reason.slice(0, 300)}.`;
 };

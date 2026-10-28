@@ -25044,6 +25044,9 @@
                       "_id": {
                         "type": "string"
                       },
+                      "claimedAt": {
+                        "type": "number"
+                      },
                       "completedAt": {
                         "type": "number"
                       },
@@ -25208,6 +25211,32 @@
                     "properties": {
                       "_id": {
                         "type": "string"
+                      },
+                      "acpOffers": {
+                        "items": {
+                          "properties": {
+                            "agentKey": {
+                              "type": "string"
+                            },
+                            "agentLabel": {
+                              "type": "string"
+                            },
+                            "folderId": {
+                              "type": "string"
+                            },
+                            "folderLabel": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "agentKey",
+                            "agentLabel",
+                            "folderId",
+                            "folderLabel"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
                       },
                       "createdAt": {
                         "type": "number"

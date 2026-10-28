@@ -86,9 +86,9 @@ export interface SessionOptions {
     process: AgentProcess;
     /** The id this session goes by on the backend, when the backend started it (`acp_start`); otherwise one is minted. */
     sessionId?: string;
+    startupTimeoutMs?: number;
     /** The thread the backend made for a session it started. */
     threadId?: string;
-    startupTimeoutMs?: number;
 }
 
 export class AgentSession {
@@ -269,19 +269,6 @@ export class AgentSession {
         this.options.onChange();
     }
 
-    /** Drops the prompts still waiting. The ones the backend queued are told their turn was cancelled, so no stream waits on them. */
-    private dropQueue(reason: StopReason | "failed" = "cancelled", error?: string): void {
-        const dropped = this.queue.splice(0);
-
-        for (const entry of dropped) {
-            if (entry.turnId !== undefined) {
-                const { turnId } = entry;
-
-                this.observe((observer) => observer.turnEnded(this.id, turnId, reason, error));
-            }
-        }
-    }
-
     /** Ends the session and its process. */
     public async close(): Promise<void> {
         this.end("closed");
@@ -311,6 +298,23 @@ export class AgentSession {
             status: this.status,
             turns: this.turns.map((turn) => turn.toState()),
         };
+    }
+
+    /** Drops the prompts still waiting. The ones the backend queued are told their turn was cancelled, so no stream waits on them. */
+    private dropQueue(reason: StopReason | "failed" = "cancelled", error?: string): void {
+        const dropped = [...this.queue];
+
+        this.queue.length = 0;
+
+        for (const entry of dropped) {
+            if (entry.turnId === undefined) {
+                continue;
+            }
+
+            const { turnId } = entry;
+
+            this.observe((observer) => observer.turnEnded(this.id, turnId, reason, error));
+        }
     }
 
     private run(prompt: string, turnId?: string): void {

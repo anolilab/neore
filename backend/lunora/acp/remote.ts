@@ -51,7 +51,7 @@ const REQUEST_SCAN_CHUNKS = 400;
  * reject-once options are listed, in the agent's own order: an "always" option can neither be shown nor sent.
  */
 const waitingRequests = async (ctx: Pick<QueryCtx, "db">, stream: Doc<"persistentStreams">): Promise<Pending[]> => {
-    const waiting = new Set(stream.hostPendingPermissions ?? []);
+    const waiting = new Set(stream.hostPendingPermissions);
 
     if (waiting.size === 0) {
         return [];
@@ -61,7 +61,7 @@ const waitingRequests = async (ctx: Pick<QueryCtx, "db">, stream: Doc<"persisten
     const found = new Map<string, Pending>();
 
     for (const chunk of page) {
-        const event = chunk.event;
+        const {event} = chunk;
 
         if (event?.kind !== "permission_request" || !waiting.has(event.requestId) || found.has(event.requestId)) {
             continue;
@@ -78,7 +78,7 @@ const waitingRequests = async (ctx: Pick<QueryCtx, "db">, stream: Doc<"persisten
     }
 
     // Oldest first, the order the agent asked in.
-    return [...found.values()].reverse();
+    return [...found.values()].toReversed();
 };
 
 /**
@@ -221,7 +221,8 @@ export const answerHostPermission = authMutation
         }
 
         const stream = await liveHostStream(ctx, args.threadId);
-        const request = stream ? (await waitingRequests(ctx, stream)).find((candidate) => candidate.requestId === args.requestId) : undefined;
+        const requests = stream ? await waitingRequests(ctx, stream) : [];
+        const request = requests.find((candidate) => candidate.requestId === args.requestId);
         const session = await sessionOfThread(ctx, args.threadId);
 
         if (!request || !session || session.status === "ended") {
@@ -229,7 +230,7 @@ export const answerHostPermission = authMutation
         }
 
         // Only an option the agent offered, and only allow-once or reject-once: `waitingRequests` lists no other.
-        if (!request.options.some((option) => option.optionId === args.optionId)) {
+        if (request.options.every((option) => option.optionId !== args.optionId)) {
             throw new LunoraError("BAD_REQUEST", "The agent did not offer that option.");
         }
 

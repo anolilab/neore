@@ -102,12 +102,15 @@ export declare class DeviceCore {
   /** Answers every waiting request of one session cancelled. Call when the session is cancelled or ends. */
   acpPermissionCancelSession(sessionId: string): void
   /**
-   * Checks one relayed coding-agent command without acting on it or spending its nonce (JSON
-   * `{ callId, expiresAt, command, refusal }`). The main process writes its receipt, acts on `command`, then asks
-   * for the result with `acpSign`.
+   * Checks one relayed coding-agent command (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`)
+   * without acting on it or spending its nonce (JSON `{ callId, expiresAt, command, refusal }`). The main process
+   * writes its receipt, acts on `command`, then asks for the result with `acp_sign`.
    */
   acpPrepare(envelope: string, signature: string): string
-  /** The signed result of a coding-agent command: `accepted`, or the reason it was not carried out (JSON). */
+  /**
+   * The signed result of a coding-agent command: `accepted`, or the reason it was not carried out
+   * (`{ payload, signature }`, JSON).
+   */
   acpSign(envelope: string, signature: string, outcome: string): string
   /**
    * Answers the coding-agent request the backend named, under the device window's rules. Throws
