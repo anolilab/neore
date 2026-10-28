@@ -13,15 +13,17 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { ACP_CLEARED, onAcpCallEnded } from "../acp/lib/calls";
 import { endHostSessionsOfDevice } from "../acp/lib/revoke";
+import { internal } from "../_generated/internal";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { deleteShardRoute, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
 import { decryptKey, encryptKey } from "../lib/encryption";
-import { DEVICE_SIGNATURE_WINDOW_MS, MAX_DEVICE_OUTPUT_BYTES, MAX_DEVICES_PER_USER, MAX_MANIFEST_BYTES } from "./lib/constants";
-import { parseManifestTools } from "./lib/manifest";
-import { claimWindowMs, expireOpenCalls, isForwardPhase } from "./lib/state";
+import { ACP_CLAIM_LEASE_MS, DEVICE_SIGNATURE_WINDOW_MS, MAX_DEVICE_OUTPUT_BYTES, MAX_DEVICES_PER_USER, MAX_MANIFEST_BYTES } from "./lib/constants";
+import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
+import { claimWindowMs, expireOpenCalls, isAcpTool, isForwardPhase } from "./lib/state";
 import { capUtf8, generateDeviceSecret, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
 import { vDeviceCallView, vDevicePlatform, vDeviceView, vDeviceCallStatusView } from "./validators";
 
@@ -291,12 +293,13 @@ export const updateDeviceManifest = authMutation
         }
 
         const tools = parseManifestTools(manifest.tools);
+        const offers = parseAcpOffers(manifest.acpOffers);
 
-        if (!tools) {
+        if (!tools || !offers) {
             throw new LunoraError("BAD_REQUEST", "Manifest tools are invalid");
         }
 
-        await ctx.db.patch(device._id, { lastSeenAt: now, manifest: tools, manifestIssuedAt: issuedAt });
+        await ctx.db.patch(device._id, { acpOffers: offers, lastSeenAt: now, manifest: tools, manifestIssuedAt: issuedAt });
 
         ctx.log.event("devices.update_device_manifest", { toolCount: tools.length });
 
@@ -346,6 +349,10 @@ export const listPendingDeviceCalls = authQuery
 /**
  * Claim-once: the first relay to claim a call runs it; a second window, a
  * stale page or a late claim past the claim window gets `claimed: false`.
+ *
+ * A coding-agent command is claimed on a lease (plans/acp-agent-host.md §4.1): one that is not completed in time
+ * goes back to `pending` (`acp/calls.ts`) and is claimed again, until its deadline, however long ago it was first
+ * taken. The claim window only decides whether it is ever taken.
  */
 export const claimDeviceCall = authMutation
     .use(rateLimit("devices/relay"))
@@ -356,13 +363,24 @@ export const claimDeviceCall = authMutation
         const call = await ctx.db.deviceCalls.findFirst({ where: { _id: args.callId, deviceId: args.deviceId, userId } });
         const { now } = ctx;
 
-        if (call?.status !== "pending" || now - call.createdAt > claimWindowMs(call.toolName)) {
+        if (call?.status !== "pending" || now >= call.deadline) {
+            return { claimed: false };
+        }
+
+        // `claimedAt` on a pending call means it was claimed before and its lease lapsed.
+        const withinWindow = call.claimedAt === undefined ? now - call.createdAt <= claimWindowMs(call.toolName) : isAcpTool(call.toolName);
+
+        if (!withinWindow) {
             return { claimed: false };
         }
 
         await requireOwnDevice(ctx, args.deviceId, userId, args.viaDeviceId);
 
         await ctx.db.patch(call._id, { claimedAt: now, status: "claimed" });
+
+        if (isAcpTool(call.toolName)) {
+            await ctx.scheduler.runAfter(ACP_CLAIM_LEASE_MS + 1000, internal.acp.calls.checkAcpCall, { callId: call._id });
+        }
 
         ctx.log.event("devices.claim_device_call", { claimed: true });
 
@@ -404,14 +422,18 @@ export const completeDeviceCall = authMutation
         const decision = typeof result.decision === "string" && DECISIONS.has(result.decision) ? result.decision : undefined;
         const exitCode = typeof result.exitCode === "number" && Number.isSafeInteger(result.exitCode) ? result.exitCode : undefined;
 
+        const status = result.status as "completed" | "denied" | "failed";
+
         await ctx.db.patch(call._id, {
             completedAt: now,
-            status: result.status as "completed" | "denied" | "failed",
+            status,
             ...(output && { output: output.text, truncated: output.truncated || result.truncated === true }),
             ...(error !== undefined && { error }),
             ...(decision !== undefined && { decision }),
             ...(exitCode !== undefined && { exitCode }),
+            ...(isAcpTool(call.toolName) && ACP_CLEARED),
         });
+        await onAcpCallEnded(ctx, call, { status, ...(error !== undefined && { error }) }, now);
 
         ctx.log.event("devices.complete_device_call", { accepted: true, status: result.status });
 
@@ -488,7 +510,10 @@ export const releaseDeviceCall = authMutation
         const released = call?.status === "claimed" && device !== null && device.viaDeviceId === args.viaDeviceId;
 
         if (released) {
-            await ctx.db.patch(call._id, { completedAt: ctx.now, error: `The device refused the request: ${args.reason}`, status: "failed" });
+            const error = `The device refused the request: ${args.reason}`;
+
+            await ctx.db.patch(call._id, { completedAt: ctx.now, error, status: "failed", ...(isAcpTool(call.toolName) && ACP_CLEARED) });
+            await onAcpCallEnded(ctx, call, { error, status: "failed" }, ctx.now);
         }
 
         ctx.log.event("devices.release_device_call", { released });

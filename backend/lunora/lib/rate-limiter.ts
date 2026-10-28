@@ -266,6 +266,14 @@ export const RATE_LIMIT_CONFIGS = {
     // and a device runs a handful of sessions.
     "hosts/ingest:free": Ratelimit.fixedWindow(3000, MINUTE),
     "hosts/ingest:premium": Ratelimit.fixedWindow(3000, MINUTE),
+    // Remote control of a coding agent (`acp/remote.ts`, `acp/send.ts`): each one queues a signed command for a
+    // computer that holds three open ones, so a person gets a burst, not a stream.
+    "hosts/answer:free": Ratelimit.fixedWindow(60, MINUTE),
+    "hosts/answer:premium": Ratelimit.fixedWindow(60, MINUTE),
+    "hosts/send:free": Ratelimit.fixedWindow(30, MINUTE),
+    "hosts/send:premium": Ratelimit.fixedWindow(30, MINUTE),
+    "hosts/start:free": Ratelimit.fixedWindow(10, MINUTE),
+    "hosts/start:premium": Ratelimit.fixedWindow(10, MINUTE),
     // Adding a file to the knowledge base schedules its ingestion.
     "knowledge/add:free": Ratelimit.fixedWindow(20, MINUTE),
     "knowledge/add:premium": Ratelimit.fixedWindow(60, MINUTE),

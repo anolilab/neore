@@ -105,9 +105,12 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
             return { ended: true, next: 0, outcome: "applied", threadId: existing.threadId as string };
         }
 
-        // The agent can report more once it has been used; the thread and session stay as they are.
-        if (open.capabilities && existing.status !== "ended") {
-            await ctx.db.patch(existing._id, { capabilities: open.capabilities, updatedAt: now });
+        // A session started from the web (`startHostSession`) waits as `starting` for this: the agent is up. The agent
+        // can also report more once it has been used; the thread and session stay as they are.
+        const opened = existing.status === "starting";
+
+        if (existing.status !== "ended" && (opened || open.capabilities)) {
+            await ctx.db.patch(existing._id, { updatedAt: now, ...(open.capabilities && { capabilities: open.capabilities }), ...(opened && { lastEventAt: now, status: "idle" as const }) });
         }
 
         return { ended: existing.status === "ended", next: 0, outcome: "applied", threadId: existing.threadId as string };

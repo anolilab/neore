@@ -18,7 +18,7 @@ import { vGroupChat } from "./chat/group/validators";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
 import { vCodingAgentAssignment, vCodingAgentId, vCodingAgentRunStatus } from "./coding-agents/validators";
 import { vOAuthClientRecord, vOAuthFlow, vOAuthTarget } from "./connectors/lib/validators";
-import { vDeviceCallPhase, vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource, vDeviceTransport } from "./devices/validators";
+import { vAcpOffer, vDeviceCallPhase, vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource, vDeviceTransport } from "./devices/validators";
 import { embed } from "./embed";
 import {
     vEvalCheck,
@@ -625,6 +625,9 @@ export const schema = defineSchema({
     // A server reached over SSH is a row of its own (`transport: "ssh"`) held by
     // the desktop in `viaDeviceId`; only that desktop knows its secret.
     devices: defineTable({
+        // The (agent, folder) pairs the user approved for coding agents, from the signed manifest
+        // (`updateDeviceManifest`); unset until a shell that knows coding agents has sent one.
+        acpOffers: v.optional(v.array(vAcpOffer)),
         createdAt: v.number(),
         encryptedSecret: v.optional(v.string()),
         lastSeenAt: v.optional(v.number()),
