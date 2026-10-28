@@ -1206,6 +1206,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     createdAt: real("createdAt").notNull(),
     depth: real("depth").notNull(),
     error: text("error"),
+    loopExitedAt: real("loopExitedAt"),
     mode: text("mode", { mode: "json" }).$type<"run" | "worker">(),
     organizationId: text("organizationId"),
     parentModel: text("parentModel"),

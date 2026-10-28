@@ -1460,6 +1460,7 @@ export interface Doc_subAgentRuns {
     createdAt: number;
     depth: number;
     error?: string;
+    loopExitedAt?: number;
     mode?: "run" | "worker";
     organizationId?: string;
     parentModel?: string;
@@ -4204,6 +4205,7 @@ export interface Insert_subAgentRuns {
     createdAt: number;
     depth: number;
     error?: string;
+    loopExitedAt?: number;
     mode?: "run" | "worker";
     organizationId?: string;
     parentModel?: string;

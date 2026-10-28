@@ -258,6 +258,37 @@ describe("a busy worker", () => {
         expect(startedRuns()).toStrictEqual([a!.runId, b!.runId]);
     });
 
+    it("queues a message sent while a stopped run's loop is still unwinding, and starts it once the loop exits", async () => {
+        const workerId = await idleWorker();
+        const a = (await message(workerId, "c-a")) as { runId: string };
+
+        await claim(a.runId);
+        expect(await run(async (context) => await cancelSubAgentRunsForStop(context, workerId, OWNER))).toBe(1);
+
+        // The stopped loop is mid-step and still writes into the thread: a new message is not first in line.
+        const b = (await message(workerId, "c-b")) as { runId: string; state: string };
+
+        expect(b.state).toBe("queued");
+        expect(startedRuns()).toStrictEqual([a.runId]);
+        expect(await claim(b.runId)).toBeNull();
+        expect(await as(OWNER).query(getWorker as never, { workerId } as never)).toMatchObject({ activeRunId: b.runId, state: "queued" });
+        // The stopped run takes no slot of the lead's cap: only the queued message counts.
+        const rows = await runRows();
+
+        expect(rows.filter((row) => row.status === "queued" || row.status === "running")).toHaveLength(1);
+
+        // The loop exits (its late report finds the run already ended), and the message starts.
+        expect(await run(async (context) => await finishRunFromLoop(context, a.runId as never, { kind: "succeeded", result: "late" }))).toBe(false);
+        expect(startedRuns()).toStrictEqual([a.runId, b.runId]);
+        expect(await claim(b.runId)).toMatchObject({ _id: b.runId });
+
+        // A message sent once the loop is gone finds nothing to wait for but the new head.
+        await finish(b.runId);
+        const c = (await message(workerId, "c-c")) as { runId: string; state: string };
+
+        expect(startedRuns()).toStrictEqual([a.runId, b.runId, c.runId]);
+    });
+
     it("starts the next message when the head ends, though both were sent in the same millisecond", async () => {
         vi.useFakeTimers({ toFake: ["Date"] });
         vi.setSystemTime(Date.now());

@@ -231,12 +231,21 @@ export const stopWhenRequested = (isStopRequested: () => Promise<boolean>): Stop
 };
 
 /**
+ * Whether a run's loop may still write into the worker's thread: it is running, or it was stopped
+ * while running and has not exited yet (`loopExitedAt` is set when `completeRun` or the reaper sees it
+ * gone). A run cancelled while queued never started a loop.
+ */
+export const isWorkerLoopLive = (run: { loopExitedAt?: number; startedAt?: number; status: SubAgentStatus }): boolean =>
+    run.status === "running" || (run.status === "cancelled" && run.startedAt !== undefined && run.loopExitedAt === undefined);
+
+/**
  * The run that starts next on a worker, from its runs newest first: the oldest queued one, or none
- * while a run is going. A worker runs one message at a time, in the order they were sent
+ * while a loop is live. A worker runs one message at a time, in the order they were sent
  * (`latestWorkerRuns` sorts by `createdAt`, which admission makes strictly increasing per worker).
  */
-export const nextQueuedWorkerRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>
-    newestFirst.some((run) => run.status === "running") ? undefined : newestFirst.findLast((run) => run.status === "queued");
+export const nextQueuedWorkerRun = <T extends { loopExitedAt?: number; startedAt?: number; status: SubAgentStatus }>(
+    newestFirst: ReadonlyArray<T>,
+): T | undefined => (newestFirst.some((run) => isWorkerLoopLive(run)) ? undefined : newestFirst.findLast((run) => run.status === "queued"));
 
 /** The run a worker is on, from its runs newest first: the one going, else the next in line. A Stop in its thread means this one. */
 export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>

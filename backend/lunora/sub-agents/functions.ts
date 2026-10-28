@@ -54,6 +54,7 @@ import {
     distinctChildCount,
     intersectWithLeadTools,
     isActiveSubAgentStatus,
+    isWorkerLoopLive,
     nextQueuedWorkerRun,
     normalizeToolAllowlist,
     postRetryDelayMs,
@@ -431,7 +432,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
 
         const recent = await latestWorkerRuns(ctx, child._id);
 
-        idle = recent.every((run) => !isActiveSubAgentStatus(run.status));
+        idle = recent.every((run) => !isActiveSubAgentStatus(run.status) && !isWorkerLoopLive(run));
         newestRunAt = recent[0]?.createdAt ?? 0;
     }
 
@@ -789,13 +790,17 @@ const startNextWorkerRun = async (ctx: MutationCtx, childThreadId: string): Prom
 
 /**
  * Moves a worker's line on after a run that was cancelled while running: its loop stops at the next
- * step boundary, and until then it still writes into the thread, so the next message waits for the
- * loop to exit ({@link completeRun}) or, if it died, for the reaper. A no-op for any other run.
+ * step boundary, and until then it still writes into the thread, so the worker counts as busy (a new
+ * message queues) until the loop exits ({@link completeRun}) or, if it died, the reaper fires. A no-op
+ * for any other run, and for a stopped one already marked gone.
  */
 const resumeLineAfterStoppedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<void> => {
     const run = await ctx.db.get(runId);
 
-    if (run?.mode === "worker" && run.status === "cancelled" && run.startedAt !== undefined && run.childThreadId !== undefined) {
+    if (run?.mode === "worker" && isWorkerLoopLive(run) && run.status === "cancelled" && run.childThreadId !== undefined) {
+        const now = Date.now();
+
+        await patchById(ctx.db, run._id, { loopExitedAt: now, updatedAt: now });
         await startNextWorkerRun(ctx, run.childThreadId);
     }
 };

@@ -2269,6 +2269,9 @@ export const schema = defineSchema({
         error: v.optional(v.string()),
         // Unset = a one-shot run. A worker's child thread is created with its first run and every later
         // dispatch is one more row on it; the worker is the thread, not a table.
+        // Set when the loop of a run that was stopped while running is known to be gone (it reported, or the
+        // reaper fired): until then it may still write into the worker's thread, so the next message waits.
+        loopExitedAt: v.optional(v.number()),
         mode: v.optional(vSubAgentRunMode),
         organizationId: v.optional(v.string()),
         // The delegating run's model, inherited when still allowed.

@@ -175,6 +175,30 @@ describe("a worker's line of messages", () => {
         expect(nextQueuedWorkerRun(newestFirst("succeeded", "cancelled"))).toBeUndefined();
     });
 
+    it("holds the line while a stopped run's loop has not exited, and releases it once it has", () => {
+        const stopped = { startedAt: 1, status: "cancelled" as const };
+
+        expect(
+            nextQueuedWorkerRun([
+                { id: 1, status: "queued" as const },
+                { id: 0, ...stopped },
+            ]),
+        ).toBeUndefined();
+        expect(
+            nextQueuedWorkerRun([
+                { id: 1, status: "queued" as const },
+                { id: 0, ...stopped, loopExitedAt: 2 },
+            ]),
+        ).toMatchObject({ id: 1 });
+        // Cancelled while queued: it never had a loop.
+        expect(
+            nextQueuedWorkerRun([
+                { id: 1, status: "queued" as const },
+                { id: 0, status: "cancelled" as const },
+            ]),
+        ).toMatchObject({ id: 1 });
+    });
+
     it("names the running run as the current one, else the next in line", () => {
         expect(workerCurrentRun(newestFirst("queued", "queued", "running"))).toMatchObject({ id: 2 });
         expect(workerCurrentRun(newestFirst("queued", "queued", "succeeded"))).toMatchObject({ id: 1 });
