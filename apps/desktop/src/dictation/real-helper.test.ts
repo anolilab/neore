@@ -6,7 +6,7 @@
  * Environment: `NEORE_WHISPER_CLI` is the built `whisper-cli`; `NEORE_WHISPER_CLIP` a 16 kHz mono WAV of speech (whisper.cpp's own
  * `samples/jfk.wav`); `NEORE_WHISPER_EXPECT` a word the clip says ("country"); `NEORE_WHISPER_MODELS` comma-separated `name=path`
  * model files, of which the one named `small` is the default model of every supported platform; `NEORE_DICTATION_EXPECT` is
- * `supported` or `unsupported`, as for `catalog.test.ts`.
+ * `supported` or `unsupported`, as for `catalog.test.ts`; `NEORE_WHISPER_TIMINGS` a file each run appends a table row to.
  */
 import { appendFileSync, readFileSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
@@ -52,20 +52,23 @@ describe.runIf(cli !== undefined && clip !== undefined && models.length > 0)("th
         const { text } = await startRecognizer({ cwd: directory, helper: { args: [], command: cli as string }, language: "en", modelPath }).transcribe(pcm);
         const seconds = (performance.now() - started) / 1000;
         const factor = seconds / clipSeconds;
+
+        // Before anything is recorded: a run that returned no text in four seconds is not a measurement.
+        expect(text.toLowerCase()).toContain(process.env.NEORE_WHISPER_EXPECT ?? "");
+        // The helper's working folder is where it would leave a transcript if the output name ever opened a file.
+        expect(await readdir(directory)).toStrictEqual([]);
+
         const inside = factor <= BUDGET;
 
         process.stdout.write(`real helper: ${os.platform()} ${os.arch()} ${name}: ${seconds.toFixed(1)} s for a ${clipSeconds.toFixed(1)} s clip (${factor.toFixed(2)}x, budget ${BUDGET}x)\n`);
 
-        if (process.env.GITHUB_STEP_SUMMARY !== undefined) {
+        // A file of its own: the step summary is per step, and the workflow's last step needs to know a measurement was made.
+        if (process.env.NEORE_WHISPER_TIMINGS !== undefined) {
             appendFileSync(
-                process.env.GITHUB_STEP_SUMMARY,
+                process.env.NEORE_WHISPER_TIMINGS,
                 `| ${os.platform()} ${os.arch()} | ${name} | ${seconds.toFixed(1)} s | ${clipSeconds.toFixed(1)} s | ${factor.toFixed(2)}x | ${inside ? "inside" : "outside"} |\n`,
             );
         }
-
-        expect(text.toLowerCase()).toContain(process.env.NEORE_WHISPER_EXPECT ?? "");
-        // The helper's working folder is where it would leave a transcript if the output name ever opened a file.
-        expect(await readdir(directory)).toStrictEqual([]);
 
         if (name === "small" && process.env.NEORE_DICTATION_EXPECT === "supported") {
             expect(factor, `the default model took ${factor.toFixed(2)} times the clip; this platform is too slow to be offered`).toBeLessThanOrEqual(BUDGET);
