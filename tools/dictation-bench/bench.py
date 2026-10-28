@@ -14,6 +14,7 @@ import platform
 import re
 import subprocess
 import sys
+import threading
 import time
 import unicodedata
 
@@ -43,17 +44,28 @@ def _run_measured_windows(cmd):
 
     start = time.monotonic()
     proc = psutil.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", errors="replace")
+    # Drain both pipes while sampling, or a chatty recogniser blocks on a full pipe and never exits.
+    output = {}
+    reader = threading.Thread(target=lambda: output.update(zip(("out", "err"), proc.communicate())))
+    reader.start()
     peak = cpu = 0.0
-    while proc.poll() is None:
+
+    def sample():
+        nonlocal peak, cpu
         try:
             peak = max(peak, proc.memory_info().peak_wset / 1048576)
             times = proc.cpu_times()
-            cpu = times.user + times.system
+            cpu = max(cpu, times.user + times.system)
         except psutil.Error:
             pass
+
+    while proc.poll() is None:
+        sample()
         time.sleep(0.02)
-    out, _err = proc.communicate()
-    return out or "", time.monotonic() - start, peak, cpu, proc.returncode
+    # The exited process's handle stays open until it is reaped, so one last sample still counts its final work.
+    sample()
+    reader.join()
+    return output.get("out") or "", time.monotonic() - start, peak, cpu, proc.returncode
 
 
 def peak_rss_and_cpu(cmd):
@@ -89,6 +101,12 @@ def main():
     models = sys.argv[5:] or ["tiny", "base", "small"]
     prompts = [line.rstrip("\n").split("\t") for line in open(prompts_path, encoding="utf-8") if line.strip()]
     clips = sorted(f for f in os.listdir(clips_dir) if f.endswith((".flac", ".wav")) and not f.startswith("00-"))
+    # Clip NN-<lang> is prompt row NN; pair by name, never by position, so a missing or extra clip fails loudly.
+    if len(clips) != len(prompts):
+        sys.exit(f"{len(clips)} clips for {len(prompts)} prompts")
+    for index, (clip, (lang, _voice, _text)) in enumerate(zip(clips, prompts), 1):
+        if not clip.startswith(f"{index:02d}-{lang}."):
+            sys.exit(f"clip {clip} does not match prompt row {index} ({lang})")
     results = []
     for model in models:
         path = os.path.join(models_dir, f"ggml-{model}.bin")
@@ -98,6 +116,8 @@ def main():
         walls, rsss, cpus = [], [], []
         for clip, (lang, _voice, text) in zip(clips, prompts):
             out, wall, rss, cpu, code = peak_rss_and_cpu([cli, "-m", path, "-f", os.path.join(clips_dir, clip), "-l", lang, "-nt", "-np", "-t", "4"])
+            if code != 0:
+                sys.exit(f"{model} failed on {clip} (exit {code})")
             ref, hyp = normalise(text, lang), normalise(out, lang)
             err = edit_distance(ref, hyp)
             errors += err
@@ -109,7 +129,9 @@ def main():
             rsss.append(rss or 0)
             cpus.append(cpu or 0)
         ten = next(os.path.join(clips_dir, f) for f in os.listdir(clips_dir) if f.startswith("00-en-10s"))
-        _out, ten_wall, ten_rss, ten_cpu, _code = peak_rss_and_cpu([cli, "-m", path, "-f", ten, "-l", "en", "-nt", "-np", "-t", "4"])
+        _out, ten_wall, ten_rss, ten_cpu, code = peak_rss_and_cpu([cli, "-m", path, "-f", ten, "-l", "en", "-nt", "-np", "-t", "4"])
+        if code != 0:
+            sys.exit(f"{model} failed on the ten-second clip (exit {code})")
         results.append(
             {
                 "model": model,
