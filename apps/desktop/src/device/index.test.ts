@@ -504,11 +504,14 @@ describe("coding-agent channels", () => {
         LOCAL_CHANNEL.acpCancel,
         LOCAL_CHANNEL.acpClose,
         LOCAL_CHANNEL.acpForget,
+        LOCAL_CHANNEL.acpImport,
+        LOCAL_CHANNEL.acpImportList,
         LOCAL_CHANNEL.acpPermissionAnswer,
         LOCAL_CHANNEL.acpPermissionAnswerBatch,
         LOCAL_CHANNEL.acpPermissionDecline,
         LOCAL_CHANNEL.acpPermissions,
         LOCAL_CHANNEL.acpProbe,
+        LOCAL_CHANNEL.acpReports,
         LOCAL_CHANNEL.acpRegistryInstall,
         LOCAL_CHANNEL.acpRegistrySearch,
         LOCAL_CHANNEL.acpSend,
@@ -588,6 +591,24 @@ describe("coding-agent channels", () => {
 
         expect(core.acpSpawnPlan).toHaveBeenCalledWith("alpha", "/not/allowed");
         expect(spawnAgent).not.toHaveBeenCalled();
+    });
+
+    it("start no agent to list or import a session in a folder the core refuses, or for an agent that is not registered", async () => {
+        await expect(invoke(LOCAL_CHANNEL.acpImportList, localEvent(), "alpha", "/not/allowed")).rejects.toThrow("that folder is not allowed");
+        await expect(invoke(LOCAL_CHANNEL.acpImport, localEvent(), "nobody", "/work", "s1")).rejects.toThrow("that agent is not registered");
+
+        expect(core.acpSpawnPlan).toHaveBeenCalledTimes(1);
+        expect(spawnAgent).not.toHaveBeenCalled();
+    });
+
+    it("check the shape of an import request before it reaches the agent", () => {
+        expect(() => invoke(LOCAL_CHANNEL.acpImport, localEvent(), "alpha", "/work", 7)).toThrow("device: saved session is invalid");
+        expect(() => invoke(LOCAL_CHANNEL.acpImportList, localEvent(), "alpha", 7)).toThrow("device: folder is invalid");
+        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+    });
+
+    it("report what no agent has said yet as nothing", () => {
+        expect(invoke(LOCAL_CHANNEL.acpReports, localEvent())).toEqual({});
     });
 
     it("refuse an unregistered agent before asking for a plan", async () => {

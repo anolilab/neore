@@ -40,3 +40,9 @@ export const START_GRACE_MS = 2 * 60_000;
 
 /** Written on every terminal path of a coding-agent call, beside its status: the prompt does not outlive the call. */
 export const ACP_CLEARED = { envelope: "", input: "" } as const;
+
+/** An imported transcript (S6) takes at most this many turns; the host keeps the first ones and says it cut the rest. */
+export const MAX_IMPORT_TURNS = 1000;
+
+/** Turns in one import post. Each is written as messages in the same mutation, so a post is kept small. */
+export const MAX_IMPORT_TURNS_PER_POST = 25;

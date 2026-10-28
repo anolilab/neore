@@ -1,0 +1,199 @@
+/**
+ * Importing an agent's saved session as a host thread (plans/acp-agent-host.md S6).
+ *
+ * - {@link openImport} finds the session an agent session already has here, or makes the thread and a session
+ *   that waits for its transcript. The lookup is by `(user, agentKey, nativeSessionId)` in the same mutation that
+ *   inserts, and a shard runs one mutation at a time, so two imports of one session, however they interleave,
+ *   leave one thread. It is also found when the session ran here (a live session records its native id).
+ * - {@link applyImportTurns} writes the transcript a turn at a time. The claim is `importedTurns`, as `(turnId,
+ *   seq)` is for a live turn: a turn at or below it is dropped, a post that starts past it answers `gap`, so a
+ *   resend or a second importer writes nothing twice.
+ *
+ * The imported session is `ended`: no agent runs on this computer for it. The native id stays on the row for the
+ * reattach that comes later. Rows are written through the same surface a live turn uses (`addMessagesHandler`,
+ * `buildHostReply`); like a live turn, an import creates no usage row and charges no credit.
+ */
+import type { Infer } from "lunorash/server";
+
+import type { Doc, Id } from "../../_generated/dataModel";
+import type { MutationCtx } from "../../_generated/server";
+import { addMessagesHandler } from "../../agent/messages";
+import { insertThread } from "../../agent/table-writes";
+import { MAX_LENGTH } from "../../lib/validators";
+import type { vHostEvent } from "../validators";
+import { MAX_IMPORT_TURNS, MAX_IMPORT_TURNS_PER_POST } from "./constants";
+import { isHostRunThread } from "./host-thread";
+import { buildHostReply } from "./reply";
+import { sessionOfThread } from "./sessions";
+
+type Event = Infer<typeof vHostEvent>;
+type ImportOpen = Extract<Event, { kind: "import_open" }>;
+type ImportTurn = Extract<Event, { kind: "import_turn" }>;
+
+export type ImportResult =
+    { ended: boolean; existing?: boolean; next: number; outcome: "applied"; threadId?: string } | { next: number; outcome: "gap" } | { outcome: "refused" };
+
+const REFUSED: ImportResult = { outcome: "refused" };
+
+const IMPORT_KINDS = new Set<string>(["import_end", "import_open", "import_turn"]);
+
+export const isImportEvent = (event: Event): boolean => IMPORT_KINDS.has(event.kind);
+
+/** The thread's title: what the agent called the session, else the agent and the folder, never a path. */
+const importTitle = (open: ImportOpen): string => {
+    const named = open.title?.trim() || `${open.agentLabel} · ${open.folderLabel}`;
+
+    return named.slice(0, MAX_LENGTH.short);
+};
+
+/** `ended: true` = nothing more to send (done, or the session ran here); `next` = turns the backend holds. */
+export const openImport = async (ctx: MutationCtx, device: Doc<"devices">, hostSessionId: string, events: Event[], now: number): Promise<ImportResult> => {
+    const [open] = events;
+
+    if (events.length !== 1 || open?.kind !== "import_open") {
+        return REFUSED;
+    }
+
+    const found = await ctx.db.acpSessions.findFirst({
+        where: { agentKey: open.agentKey, nativeSessionId: open.nativeSessionId, userId: device.userId },
+    });
+
+    if (found) {
+        return {
+            ended: found.importState !== "importing",
+            existing: true,
+            next: found.importedTurns ?? 0,
+            outcome: "applied",
+            threadId: found.threadId as string,
+        };
+    }
+
+    const threadId = await insertThread(ctx.db, {
+        createdBy: device.userId,
+        mode: "text",
+        model: open.agentKey,
+        runner: "host",
+        status: "active",
+        tags: ["chat", "host"],
+        title: importTitle(open),
+        updatedAt: now,
+        userId: device.userId,
+    });
+
+    await ctx.db.insert("acpSessions", {
+        agentKey: open.agentKey,
+        agentLabel: open.agentLabel,
+        createdAt: now,
+        deviceId: device._id,
+        folderId: open.folderId,
+        folderLabel: open.folderLabel,
+        hostSessionId,
+        importedTurns: 0,
+        importState: "importing",
+        lastEventAt: now,
+        nativeSessionId: open.nativeSessionId,
+        status: "ended",
+        threadId,
+        updatedAt: now,
+        userId: device.userId,
+        ...(open.capabilities && { capabilities: open.capabilities }),
+    });
+
+    return { ended: false, existing: false, next: 0, outcome: "applied", threadId: threadId as string };
+};
+
+/** One turn of the transcript: the prompt as a user message, the reply under it. Either may be empty, never both. */
+const writeTurn = async (ctx: MutationCtx, session: Doc<"acpSessions">, threadId: Id<"threads">, turn: ImportTurn): Promise<void> => {
+    let promptMessageId: Id<"messages"> | undefined;
+
+    if (turn.user.trim() !== "") {
+        const { messages } = await addMessagesHandler(ctx, {
+            fromUser: true,
+            messages: [{ message: { content: turn.user, role: "user" }, status: "success" }],
+            threadId,
+            userId: session.userId,
+        });
+
+        promptMessageId = messages[0]?._id as Id<"messages"> | undefined;
+    }
+
+    const reply = buildHostReply({ agentKey: session.agentKey, reason: "finished", transcript: { reasoning: turn.reasoning ?? "", text: turn.text } });
+
+    if (reply) {
+        await addMessagesHandler(ctx, { messages: [reply], ...(promptMessageId && { promptMessageId }), threadId, userId: session.userId });
+    }
+};
+
+export const applyImportTurns = async (
+    ctx: MutationCtx,
+    device: Doc<"devices">,
+    args: { events: Event[]; firstSeq: number | undefined; hostSessionId: string; threadId: string },
+    now: number,
+): Promise<ImportResult> => {
+    const { events, firstSeq } = args;
+    const threadId = ctx.db.normalizeId("threads", args.threadId);
+    const turnCount = events.filter((event) => event.kind === "import_turn").length;
+
+    if (
+        !threadId ||
+        firstSeq === undefined ||
+        !Number.isSafeInteger(firstSeq) ||
+        firstSeq < 0 ||
+        turnCount > MAX_IMPORT_TURNS_PER_POST ||
+        events.some((event) => event.kind !== "import_turn" && event.kind !== "import_end")
+    ) {
+        return REFUSED;
+    }
+
+    const thread = await ctx.db.threads.findFirst({ where: { _id: threadId } });
+    const session = thread ? await sessionOfThread(ctx, threadId) : null;
+
+    // The same owner comparisons a live turn gets: a verified device writes only into a host thread its own user
+    // owns and that this device opened. A session that ran here (no `importState`) takes no import.
+    if (
+        !thread ||
+        thread.deleted === true ||
+        thread.userId !== device.userId ||
+        !isHostRunThread(thread) ||
+        session?.deviceId !== device._id ||
+        session.hostSessionId !== args.hostSessionId ||
+        session.importState === undefined
+    ) {
+        return REFUSED;
+    }
+
+    const held = session.importedTurns ?? 0;
+
+    if (session.importState === "done") {
+        return { ended: true, next: held, outcome: "applied" };
+    }
+
+    if (firstSeq > held) {
+        return { next: held, outcome: "gap" };
+    }
+
+    let count = held;
+    let done = false;
+
+    const unseen = events.slice(held - firstSeq);
+
+    for (const event of unseen) {
+        if (event.kind === "import_end") {
+            done = true;
+            break;
+        }
+
+        if (event.kind === "import_turn") {
+            if (count >= MAX_IMPORT_TURNS) {
+                return REFUSED;
+            }
+
+            await writeTurn(ctx, session, threadId, event);
+            count += 1;
+        }
+    }
+
+    await ctx.db.patch(session._id, { importedTurns: count, importState: done ? "done" : "importing", lastEventAt: now, updatedAt: now });
+
+    return { ended: done, next: count, outcome: "applied" };
+};

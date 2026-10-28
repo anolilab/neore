@@ -468,6 +468,187 @@ describe("capability reports", () => {
     });
 });
 
+const IMPORT_OPEN = {
+    agentKey: "claude",
+    agentLabel: "Claude Code",
+    folderId: "f1",
+    folderLabel: "neore",
+    kind: "import_open",
+    nativeSessionId: "native-1",
+};
+const IMPORT_TURN = (user: string, text: string, reasoning?: string) => {
+    return { kind: "import_turn", text, user, ...(reasoning !== undefined && { reasoning }) };
+};
+const IMPORT_END = { kind: "import_end" };
+
+/** What a host does for one saved session: open, post its turns in batches, end. Returns the thread and what the open said. */
+const importSession = async (device: Paired, turns: ReturnType<typeof IMPORT_TURN>[], open: Record<string, unknown> = {}) => {
+    const sessionId = "import-1";
+    const opened = await ingest(device, { events: [{ ...IMPORT_OPEN, ...open }], sessionId });
+
+    if (opened.status !== 200 || opened.json.ended === true) {
+        return { opened, threadId: opened.json.threadId as string };
+    }
+
+    const threadId = opened.json.threadId as string;
+    const sent = await ingest(device, { events: [...turns.slice(opened.json.next), IMPORT_END], firstSeq: opened.json.next, sessionId, threadId });
+
+    return { opened, sent, threadId };
+};
+
+const transcriptOf = async (threadId: string) => {
+    const rows = await messagesOf(threadId);
+
+    return rows
+        .toSorted((a, b) => a.order - b.order || a.stepOrder - b.stepOrder)
+        .map((message) => {
+            const content = message.message.content as string | { text: string }[];
+
+            return [message.message.role, typeof content === "string" ? content : content.map((part) => part.text).join("")];
+        });
+};
+
+const sessionRows = async () => await pageOf(async (ctx) => await ctx.db.acpSessions.findMany({}));
+
+const threadRows = async () => await pageOf(async (ctx) => await ctx.db.threads.findMany({}));
+
+describe("importing an agent's saved session", () => {
+    const TURNS = [IMPORT_TURN("fix the bug", "Done.", "thinking"), IMPORT_TURN("and the tests", "Tests too.")];
+
+    it("writes the transcript as a host thread, in order, with the native id on the session", async () => {
+        const device = await pair(ownerId);
+        const { opened, sent, threadId } = await importSession(device, TURNS, { title: "Fix the bug" });
+
+        expect(opened.json).toMatchObject({ ended: false, existing: false, next: 0 });
+        expect(sent?.json).toMatchObject({ ended: true, next: 2 });
+        await expect(row(threadId)).resolves.toMatchObject({ runner: "host", title: "Fix the bug", userId: ownerId });
+        await expect(transcriptOf(threadId)).resolves.toEqual([
+            ["user", "fix the bug"],
+            ["assistant", "Done."],
+            ["user", "and the tests"],
+            ["assistant", "Tests too."],
+        ]);
+        expect(await sessionRows()).toMatchObject([
+            { agentKey: "claude", importedTurns: 2, importState: "done", nativeSessionId: "native-1", status: "ended", threadId },
+        ]);
+        expect(await assistantRepliesOf(threadId)).toHaveLength(2);
+    });
+
+    it("yields one thread when the same session is imported twice", async () => {
+        const device = await pair(ownerId);
+        const first = await importSession(device, TURNS);
+        const again = await importSession(device, TURNS);
+
+        expect(again.opened.json).toMatchObject({ ended: true, existing: true, next: 2, threadId: first.threadId });
+        expect(await threadRows()).toHaveLength(1);
+        expect(await sessionRows()).toHaveLength(1);
+        expect(await messagesOf(first.threadId)).toHaveLength(4);
+    });
+
+    it("yields one thread and one copy of the transcript when two imports run at once", async () => {
+        const device = await pair(ownerId);
+        const [a, b] = await Promise.all([importSession(device, TURNS), importSession(device, TURNS)]);
+
+        expect(a.threadId).toBe(b.threadId);
+        expect(await threadRows()).toHaveLength(1);
+        expect(await sessionRows()).toHaveLength(1);
+        await expect(transcriptOf(a.threadId)).resolves.toHaveLength(4);
+    });
+
+    it("finds a session that ran here, and writes nothing into it", async () => {
+        const device = await pair(ownerId);
+        const live = await ingest(device, { events: [{ ...SESSION_OPEN, nativeSessionId: "native-1" }], sessionId: "live-1" });
+        const imported = await importSession(device, TURNS);
+
+        expect(imported.opened.json).toMatchObject({ ended: true, existing: true, threadId: live.json.threadId });
+        expect(await threadRows()).toHaveLength(1);
+        expect(await messagesOf(live.json.threadId)).toHaveLength(0);
+        await expect(
+            ingest(device, { events: [IMPORT_TURN("x", "y")], firstSeq: 0, sessionId: "live-1", threadId: live.json.threadId }),
+        ).resolves.toMatchObject({ status: 403 });
+    });
+
+    it("learns the native id of a session the web started, when the host opens it", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await ingest(device, { events: [{ ...SESSION_OPEN, nativeSessionId: "native-1" }] });
+
+        expect(await sessionRows()).toMatchObject([{ nativeSessionId: "native-1", threadId }]);
+        await expect(importSession(device, TURNS)).resolves.toMatchObject({ opened: { json: { existing: true, threadId } } });
+    });
+
+    it("gives each user their own thread for the same agent session id", async () => {
+        const other = await insertUser();
+        const mine = await importSession(await pair(ownerId), TURNS);
+        const theirs = await importSession(await pair(other), TURNS);
+
+        expect(mine.threadId).not.toBe(theirs.threadId);
+        expect(await threadRows()).toHaveLength(2);
+    });
+
+    it("keeps an agent's two sessions apart", async () => {
+        const device = await pair(ownerId);
+        const one = await importSession(device, TURNS);
+        const two = await importSession(device, TURNS, { nativeSessionId: "native-2" });
+
+        expect(one.threadId).not.toBe(two.threadId);
+    });
+
+    it("drops turns it holds and answers a gap with where to send from", async () => {
+        const device = await pair(ownerId);
+        const sessionId = "import-1";
+        const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId });
+        const { threadId } = json;
+
+        await expect(ingest(device, { events: [IMPORT_TURN("c", "d")], firstSeq: 1, sessionId, threadId })).resolves.toMatchObject({
+            json: { next: 0 },
+            status: 409,
+        });
+        await ingest(device, { events: [IMPORT_TURN("a", "b")], firstSeq: 0, sessionId, threadId });
+        // A resend that overlaps what is held writes only the new turn.
+        await expect(
+            ingest(device, { events: [IMPORT_TURN("a", "b"), IMPORT_TURN("c", "d"), IMPORT_END], firstSeq: 0, sessionId, threadId }),
+        ).resolves.toMatchObject({
+            json: { ended: true, next: 2 },
+            status: 200,
+        });
+        await expect(transcriptOf(threadId)).resolves.toHaveLength(4);
+    });
+
+    it("refuses a post that mixes a turn's events with an import's, and one into another user's thread", async () => {
+        const device = await pair(ownerId);
+        const { threadId } = await importSession(device, TURNS);
+        const stranger = await pair(await insertUser());
+
+        await expect(ingest(device, { events: [IMPORT_TURN("a", "b"), TEXT("x")], firstSeq: 0, sessionId: "import-1", threadId })).resolves.toMatchObject({
+            status: 403,
+        });
+        await expect(ingest(stranger, { events: [IMPORT_TURN("a", "b")], firstSeq: 2, sessionId: "import-1", threadId })).resolves.toMatchObject({
+            status: 403,
+        });
+        await expect(ingest(device, { events: [IMPORT_TURN("a", "b")], firstSeq: 0, sessionId: "import-1", threadId, turnId: "t1" })).resolves.toMatchObject({
+            status: 200,
+        });
+        await expect(messagesOf(threadId)).resolves.toHaveLength(4);
+    });
+
+    it("keeps a turn post from writing into an imported thread", async () => {
+        const device = await pair(ownerId);
+        const { threadId } = await importSession(device, TURNS);
+
+        await expect(turn(device, threadId, "t9", 0, [START()])).resolves.toMatchObject({ status: 403 });
+    });
+
+    it("takes no more turns than the cap", async () => {
+        const device = await pair(ownerId);
+        const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId: "import-1" });
+        const batch = Array.from({ length: 26 }, () => IMPORT_TURN("a", "b"));
+
+        await expect(ingest(device, { events: batch, firstSeq: 0, sessionId: "import-1", threadId: json.threadId })).resolves.toMatchObject({ status: 403 });
+    });
+});
+
 describe("a host turn", () => {
     it("shows the text so far to a second client, with the host states", async () => {
         const device = await pair(ownerId);

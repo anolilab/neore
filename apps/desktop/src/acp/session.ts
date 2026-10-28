@@ -12,6 +12,7 @@
  */
 import { randomUUID } from "node:crypto";
 
+import { reportFromHandshake } from "./capabilities";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate, PermissionOutcome } from "./permission";
@@ -175,7 +176,14 @@ export class AgentSession {
         const { hostInfo } = this.options;
 
         if (hostInfo !== undefined) {
-            this.observe((observer) => observer.sessionOpened(this.id, hostInfo, this.options.threadId));
+            // What the agent advertised and its own id for the session ride along: the backend keeps both on the session row.
+            const opened = {
+                ...hostInfo,
+                nativeSessionId: this.agentSessionId,
+                ...this.agent !== undefined && { capabilities: reportFromHandshake(this.agent.capabilities, Date.now()) },
+            };
+
+            this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
         }
     }
 

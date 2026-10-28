@@ -619,6 +619,36 @@ saved sessions as threads, with ids derived from (agent key, native session id).
 - Acceptance: importing twice yields one thread; a missing capability hides its
   control.
 
+**S6 as built:**
+- Started from the local device window only (no `acp_*` kind, no public procedure, so no authz-matrix row). Each approved
+  (agent, folder) row shows **Import sessions…** only when the agent's last handshake reported both `sessions.listNative`
+  and `sessions.load` (`device/window/import-control.ts`, through `isAvailable`/`capabilityOf` of `@neore/ai/capabilities`).
+  A report is kept per agent key in the main process (`AcpManager.allReports`), filled by every handshake (Check version, a
+  started session), dropped when the agent's command changes or it is reinstalled. **No report hides the control**: the user
+  runs **Check version** once per app start. The main process checks the report again and sends no `session/list` or
+  `session/load` for an agent that did not advertise it (`acp/import.ts`).
+- The mapping is `acp/capabilities.ts#reportFromHandshake` and covers the `sessions` group only: `loadSession === true` and a
+  non-null `sessionCapabilities.list`. What the agent left out is `not_offered`; every other member stays unknown. It is also sent
+  with every `session_open`, together with the agent's own session id (`nativeSessionId`).
+- `session/list` is asked with the approved folder as `cwd`, and any entry for another working directory is dropped (the agent may
+  ignore the filter). At most 10 pages and 200 sessions.
+- `session/load` replays the history as `session/update`s (`acp/replay.ts`): each user message starts a turn, the agent's text and
+  reasoning that follow belong to it. Tool calls are not kept, as for a live turn (a reply row holds text and reasoning). Text is
+  masked with the user's variable values, cut to the backend's limits, and the first 1000 turns are kept. The window is told how many
+  were dropped or shortened.
+- **One thread per (user, agent key, native session id).** `import_open` (a session-level post) looks the triple up through
+  `acpSessions.by_userId_agentKey_nativeSessionId` in the same mutation that inserts, and a shard runs one mutation at a time, so two
+  imports, concurrent or a week apart, leave one thread. A session that ran here is found the same way, because a live session records
+  its native id. The answer says `existing`, and `ended` when nothing more is wanted; the host then posts nothing else.
+- The transcript follows as `import_turn` posts, 25 turns and about 150 KB at most, claimed by `importedTurns` (the position of the
+  first turn in the post, as `(turnId, seq)` claims a live event): turns the backend holds are dropped, a post that starts past it
+  answers 409 with `next`. `import_end` closes it. Rows go through `addMessagesHandler` and `buildHostReply`. An interrupted import
+  resumes from `next`; the transcript is collected before the open, so a session that cannot be loaded leaves no empty thread.
+- The imported session is `ended` (no agent runs for it) and keeps `nativeSessionId` for the native reattach of harness S4.
+  `importState` (`importing` | `done`) is unset on a session that ran here, and such a session takes no import turns.
+- Not built: import started from the web (a signed `acp_*` call), a re-import that refreshes a changed session, tool parts in
+  imported replies, and discovery without **Check version** (the app never starts an agent on its own).
+
 **S7 — Native child agents and early commands.** Early commands (§4.6) and §4.7
 (child ownership, buffering, settling). Needs S4 and the subagents group of the
 capability report. The host states and the retry rule moved to S3 and S4, because

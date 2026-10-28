@@ -6,12 +6,16 @@
  */
 import { rm } from "node:fs/promises";
 
+import type { CapabilityReport } from "@neore/ai/capabilities";
+
+import { reportFromHandshake } from "./capabilities";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate } from "./permission";
 import { declineGate } from "./permission";
 import type { AgentProcess, Spawner } from "./process";
 import { acpSupported } from "./process";
+import type { Handshake } from "./protocol";
 import { initialize } from "./protocol";
 import type { SendResult } from "./session";
 import { AgentSession } from "./session";
@@ -57,6 +61,9 @@ export class AcpManager {
 
     private readonly processes = new Set<AgentProcess>();
 
+    /** What each agent reported at its last handshake, by key. Forgotten when the agent's command may have changed. */
+    private readonly reports = new Map<string, CapabilityReport>();
+
     private readonly sessions = new Map<string, AgentSession>();
 
     public constructor(private readonly options: ManagerOptions) {}
@@ -66,9 +73,25 @@ export class AcpManager {
      * own history and needs no folder.
      */
     public async probe(agentKey: string): Promise<ProbeResult> {
+        return await this.withAgent(agentKey, null, {}, async ({ handshake }) => {
+            return { agentName: handshake.agentName, agentVersion: handshake.agentVersion, protocolVersion: handshake.protocolVersion };
+        });
+    }
+
+    /**
+     * Starts the agent, runs the handshake, hands `use` the open connection, and stops the agent however that ends. No
+     * session is opened unless `use` opens one. `folder` is null for a probe (a scratch folder stands in). Agent output
+     * that reaches an error is masked with the values the user set.
+     */
+    public async withAgent<Result>(
+        agentKey: string,
+        folder: string | null,
+        handlers: { notification?: (method: string, params: unknown) => void },
+        use: (agent: { connection: JsonRpcConnection; handshake: Handshake; plan: SpawnPlan; report: CapabilityReport; scrub: (text: string) => string }) => Promise<Result>,
+    ): Promise<Result> {
         requireSupported();
 
-        const plan = this.options.plan(agentKey, null);
+        const plan = this.options.plan(agentKey, folder);
         let child: AgentProcess;
 
         try {
@@ -83,23 +106,34 @@ export class AcpManager {
         }
 
         const connection = new JsonRpcConnection(child.stdout, child.stdin, {
-            notification: () => {},
+            notification: (method, params) => handlers.notification?.(method, params),
             request: async () => {
-                throw new Error("no requests during a probe");
+                throw new Error("no requests while the agent is not in a session");
             },
         });
 
         try {
-            const handshake = await initialize(connection, this.options.appVersion, this.options.startupTimeoutMs);
+            let handshake: Handshake;
 
-            return { agentName: handshake.agentName, agentVersion: handshake.agentVersion, protocolVersion: handshake.protocolVersion };
+            try {
+                handshake = await initialize(connection, this.options.appVersion, this.options.startupTimeoutMs);
+            } catch (error) {
+                const stderr = child.stderrTail().trim();
+
+                // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
+                throw new Error(`${(error as Error).message}${stderr === "" ? "" : `: ${stderr}`}`);
+            }
+
+            const report = reportFromHandshake(handshake.capabilities, Date.now());
+
+            this.reports.set(agentKey, report);
+
+            return await use({ connection, handshake, plan, report, scrub: child.scrub });
         } catch (error) {
-            const stderr = child.stderrTail().trim();
-
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
-            throw new Error(child.scrub(`${(error as Error).message}${stderr === "" ? "" : `: ${stderr}`}`));
+            throw new Error(child.scrub((error as Error).message));
         } finally {
-            connection.close(new Error("probe finished"));
+            connection.close(new Error("finished"));
 
             try {
                 await child.stop();
@@ -109,6 +143,17 @@ export class AcpManager {
                 }
             }
         }
+    }
+
+    /** What each agent reported the last time it was started; an agent not started since this app began has none. */
+    public allReports(): Record<string, CapabilityReport> {
+        return Object.fromEntries(this.reports);
+    }
+
+    /** The agent's command may have changed: what it reported no longer says what it can do. */
+    public forgetReport(agentKey: string): void {
+        this.reports.delete(agentKey);
+        this.changed();
     }
 
     /** `remote` is set for a session the backend started (`acp_start`): it goes by the id and thread the backend made. */
@@ -139,6 +184,10 @@ export class AcpManager {
 
         this.sessions.set(session.id, session);
         await session.start();
+
+        if (session.handshake !== undefined) {
+            this.reports.set(agentKey, reportFromHandshake(session.handshake.capabilities, Date.now()));
+        }
 
         return session.id;
     }

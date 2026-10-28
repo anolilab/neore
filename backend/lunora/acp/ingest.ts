@@ -40,6 +40,7 @@ import { isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "../de
 import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
+import { applyImportTurns, isImportEvent, openImport } from "./lib/import";
 import { reapExpiredHostStreams } from "./lib/reap";
 import { sessionOfThread, touchSession } from "./lib/sessions";
 import { vHostEvent } from "./validators";
@@ -70,7 +71,8 @@ export const verifyHostPost = internalQuery
     });
 
 const vApplyResult = v.union(
-    v.object({ ended: v.boolean(), next: v.number(), outcome: v.literal("applied"), threadId: v.optional(v.string()) }),
+    // `existing`: an import found the agent session already here (imported before, or run here).
+    v.object({ ended: v.boolean(), existing: v.optional(v.boolean()), next: v.number(), outcome: v.literal("applied"), threadId: v.optional(v.string()) }),
     v.object({ next: v.number(), outcome: v.literal("gap") }),
     v.object({ outcome: v.literal("refused") }),
     v.object({ outcome: v.literal("limited") }),
@@ -115,11 +117,14 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         const reportedAt = open.capabilities ? Math.min(open.capabilities.reportedAt, now) : 0;
         const newerReport = open.capabilities !== undefined && reportedAt > (existing.capabilities?.reportedAt ?? 0);
         const opened = existing.status === "starting";
+        // The agent's own session id, kept for an import to find and a later reattach to use (S6); set once.
+        const learnedNativeId = existing.nativeSessionId === undefined ? open.nativeSessionId : undefined;
 
-        if (existing.status !== "ended" && (opened || newerReport)) {
+        if (existing.status !== "ended" && (opened || newerReport || learnedNativeId !== undefined)) {
             await ctx.db.patch(existing._id, {
                 updatedAt: now,
                 ...(newerReport && open.capabilities && { capabilities: { ...open.capabilities, reportedAt } }),
+                ...(learnedNativeId !== undefined && { nativeSessionId: learnedNativeId }),
                 ...(opened && { lastEventAt: now, status: "idle" as const }),
             });
         }
@@ -221,7 +226,7 @@ const applyTurnPost = async (
         firstSeq === undefined ||
         !Number.isSafeInteger(firstSeq) ||
         firstSeq < 0 ||
-        events.some((event) => event.kind === "session_open")
+        events.some((event) => event.kind === "session_open" || isImportEvent(event))
     ) {
         return REFUSED;
     }
@@ -409,7 +414,18 @@ export const applyHostEvents = internalMutation
         }
 
         if (args.threadId === undefined) {
-            return await openSession(ctx, device, args.sessionId, args.events, now);
+            return args.events[0]?.kind === "import_open"
+                ? await openImport(ctx, device, args.sessionId, args.events, now)
+                : await openSession(ctx, device, args.sessionId, args.events, now);
+        }
+
+        if (args.events.some((event) => isImportEvent(event))) {
+            return await applyImportTurns(
+                ctx,
+                device,
+                { events: args.events, firstSeq: args.firstSeq, hostSessionId: args.sessionId, threadId: args.threadId },
+                now,
+            );
         }
 
         return await applyTurnPost(

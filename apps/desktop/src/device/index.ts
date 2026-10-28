@@ -17,6 +17,7 @@ import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 
 import type { AcpCommand } from "../acp/commands";
 import { HostCommands, isAcpEnvelope } from "../acp/commands";
+import { AcpImporter } from "../acp/import";
 import { HostPoster } from "../acp/ingest";
 import { AgentInstaller } from "../acp/install";
 import { AcpManager } from "../acp/manager";
@@ -38,6 +39,7 @@ import {
     readFolder,
     readHostPairing,
     readHostSpec,
+    readNativeSessionId,
     readOptionalDeviceId,
     readOptionId,
     readPairing,
@@ -48,6 +50,7 @@ import {
     readSearchQuery,
     readSecretAnswer,
     readSessionId,
+    readSessionTitle,
     readSettingsUpdate,
     readSigned,
 } from "./validate";
@@ -72,6 +75,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         core?: DeviceCore;
         coreError?: unknown;
         host?: HostPoster;
+        importer?: AcpImporter;
         installer?: AgentInstaller;
         local?: BrowserWindowInstance;
         registry?: AgentRegistry;
@@ -283,6 +287,15 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         console.error("[neore-desktop] device execution unavailable", error);
     }
 
+    /** The id and label of the folder the user approved for this agent, never its path. */
+    const approvedFolder = (core: DeviceCore, agentKey: string, folder: string): { folderId: string; folderLabel: string } | undefined => {
+        const consent = (JSON.parse(core.acpView()) as AcpView).consents.find(
+            (candidate) => candidate.agentKey === agentKey && candidate.folderPath === folder,
+        );
+
+        return consent === undefined ? undefined : { folderId: consent.folderId, folderLabel: consent.folderLabel };
+    };
+
     const requireAcp = (): AcpManager => {
         const core = requireCore();
 
@@ -292,13 +305,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         state.acp ??= new AcpManager({
             appVersion: app.getVersion(),
             gate: coreGate(core),
-            hostInfo: (agentKey, folder) => {
-                const consent = (JSON.parse(core.acpView()) as AcpView).consents.find(
-                    (candidate) => candidate.agentKey === agentKey && candidate.folderPath === folder,
-                );
-
-                return consent === undefined ? undefined : { folderId: consent.folderId, folderLabel: consent.folderLabel };
-            },
+            hostInfo: (agentKey, folder) => approvedFolder(core, agentKey, folder),
             observer: host,
             onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
             plan: (agentKey, folder) => JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan,
@@ -306,6 +313,20 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         });
 
         return state.acp;
+    };
+
+    /** Imports an agent's saved sessions: the agent is started in an approved folder, and the transcript goes to the backend from here. */
+    const requireImporter = (): AcpImporter => {
+        const core = requireCore();
+
+        state.importer ??= new AcpImporter({
+            agentLabel: (agentKey) => (JSON.parse(core.acpView()) as AcpView).agents.find((agent) => agent.key === agentKey)?.label,
+            agents: requireAcp(),
+            hostInfo: (agentKey, folder) => approvedFolder(core, agentKey, folder),
+            io: requireHost(core).importIo(),
+        });
+
+        return state.importer;
     };
 
     const startRequestedSession = async (command: Extract<AcpCommand, { kind: "start" }>): Promise<void> => {
@@ -502,6 +523,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     const updateAcp = async (update: string): Promise<AcpView> => {
         const view = JSON.parse(requireCore().acpUpdate(update)) as AcpView;
+        const { key, op } = JSON.parse(update) as { key?: string; op?: string };
+
+        // What an agent reported says nothing about a different program.
+        if (key !== undefined && (op === "saveAgent" || op === "removeAgent")) {
+            state.acp?.forgetReport(key);
+        }
 
         // A running agent was started under an approval this update may have taken away.
         await state.acp?.closeUnapproved(view);
@@ -540,6 +567,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const view = await state.installer.install(key, readAgentVersion(version));
 
         if (view !== null) {
+            state.acp?.forgetReport(key);
             // A reinstall drops the folder approvals of the old version; a running session was started under them.
             await state.acp?.closeUnapproved(view);
             // Only now, with nothing running from it, does the old version's folder go.
@@ -550,6 +578,14 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     });
 
     local(LOCAL_CHANNEL.acpProbe, (agentKey) => requireAcp().probe(readAgentKey(agentKey)));
+
+    local(LOCAL_CHANNEL.acpReports, () => requireAcp().allReports());
+
+    local(LOCAL_CHANNEL.acpImportList, (agentKey, folder) => requireImporter().list(readAgentKey(agentKey), readFolder(folder)));
+
+    local(LOCAL_CHANNEL.acpImport, (agentKey, folder, nativeSessionId, title) =>
+        requireImporter().import(readAgentKey(agentKey), readFolder(folder), readNativeSessionId(nativeSessionId), readSessionTitle(title)),
+    );
 
     local(LOCAL_CHANNEL.acpStart, async (agentKey, folder) => {
         const key = readAgentKey(agentKey);

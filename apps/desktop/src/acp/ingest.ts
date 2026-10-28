@@ -29,6 +29,7 @@ import path from "node:path";
 
 import type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver } from "./host-events";
 import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, endReasonOf } from "./host-events";
+import type { ImportIo } from "./import-post";
 import { SessionLink } from "./session-link";
 import type { ChannelHost } from "./turn-channel";
 import { TurnChannel } from "./turn-channel";
@@ -183,6 +184,16 @@ export class HostPoster implements SessionObserver {
         this.channels.get(turnId)?.end(endReasonOf(reason), error);
     }
 
+    /** What an import needs to post: the same signing, endpoint and clock the turns use. */
+    public importIo(): ImportIo {
+        return {
+            deviceId: () => this.options.deviceId(),
+            now: () => this.now(),
+            random: () => this.random(),
+            request: async (payload) => await this.request(payload),
+        };
+    }
+
     // ─── Start and stop ─────────────────────────────────────────────────────
 
     /** Ends, as `interrupted`, every turn a previous run left behind. Call once after the core is up. */
@@ -334,6 +345,7 @@ export class HostPoster implements SessionObserver {
                 ended: fields.ended === true,
                 kind: "ok",
                 next: fields.next,
+                ...typeof fields.existing === "boolean" && { existing: fields.existing },
                 ...typeof fields.threadId === "string" && { threadId: fields.threadId },
             };
         }

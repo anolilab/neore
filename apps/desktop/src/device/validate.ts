@@ -167,6 +167,11 @@ export const readAgentKey = (value: unknown): string => text(value, "agent", 40)
 
 export const readSessionId = (value: unknown): string => text(value, "session", 64);
 
+/** The agent's own id for a saved session; it comes from the agent's list and goes back to the same agent. */
+export const readNativeSessionId = (value: unknown): string => text(value, "saved session", 256);
+
+export const readSessionTitle = (value: unknown): string | undefined => value === undefined || value === "" ? undefined : text(value, "title", 200);
+
 export const readSearchQuery = (value: unknown): string => value === "" ? "" : text(value, "search", 100);
 
 export const readAgentVersion = (value: unknown): string => text(value, "version", 40);
