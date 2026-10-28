@@ -40,7 +40,9 @@ const CONNECT_PATIENCE: Duration = Duration::from_secs(6 * 60);
 
 /// A Unix socket path holds 104 bytes on macOS. ssh appends a dot and 16 random characters to the control path
 /// while it binds, and `%C` is 40 hex characters.
-const CONTROL_PATH_MARGIN: usize = 1 + 40 + 1 + 16 + 1;
+const CONTROL_PATH_MARGIN: usize = 1 + IDENTITY_TAG_LEN + 40 + 1 + 16 + 1;
+/// `identity_tag`: `k`, eight hex characters and a dash, in front of `%C` when a key file is used.
+const IDENTITY_TAG_LEN: usize = 10;
 const SOCKET_PATH_LIMIT: usize = 104;
 
 /// Key types worth pinning, best first. DSA is long dead.
@@ -440,7 +442,15 @@ pub fn pinned_keys(paths: &SshPaths, spec: &str) -> Vec<HostKey> {
     )
 }
 
+/// Serializes our own edits of the shared known-hosts file: a pin appends, a forget reads and replaces, and two
+/// at once could restore a key that was just forgotten or lose one that was just trusted.
+static KNOWN_HOSTS_EDIT: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 fn pin(paths: &SshPaths, spec: &str, key: &HostKey) -> io::Result<()> {
+    let _edit = KNOWN_HOSTS_EDIT
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
     if let Some(dir) = paths.known_hosts.parent() {
         private_dir(dir)?;
     }
@@ -467,6 +477,10 @@ fn pin(paths: &SshPaths, spec: &str, key: &HostKey) -> io::Result<()> {
 /// Drops every pinned key of `spec`, so the next connection asks again. The user's way to accept a key that
 /// changed on purpose.
 pub fn forget_keys(paths: &SshPaths, spec: &str) -> io::Result<()> {
+    let _edit = KNOWN_HOSTS_EDIT
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
     let text = match fs::read_to_string(&paths.known_hosts) {
         Ok(text) => text,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),

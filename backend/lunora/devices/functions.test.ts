@@ -497,6 +497,8 @@ describe("servers reached over SSH", () => {
         await expect(listFor(other.deviceId, [host.deviceId])).resolves.toEqual([]);
         await expect(listFor(desktop.deviceId, [])).resolves.toEqual([]);
         await expect(listFor(desktop.deviceId, [host.deviceId])).resolves.toHaveLength(1);
+        // A server's id is not a desktop: listing with it as the primary device shows nothing.
+        await expect(listFor(host.deviceId, [])).resolves.toEqual([]);
     });
 
     it("refuses a claim for a host from a desktop that does not hold it, or from none", async () => {

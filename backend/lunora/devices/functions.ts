@@ -285,6 +285,13 @@ export const listPendingDeviceCalls = authQuery
     .output(v.array(v.object({ callId: v.string(), deviceId: v.string(), envelope: v.string(), signature: v.string() })))
     .query(async ({ args, ctx }) => {
         const { userId } = ctx.user;
+        const primary = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
+
+        // The desktop is the primary device: a server's id is reached only through the desktop that holds it.
+        if (!primary || primary.viaDeviceId !== undefined) {
+            return [];
+        }
+
         const held = await Promise.all((args.hostDeviceIds ?? []).map(async (id) => await ctx.db.devices.findFirst({ where: { _id: id, userId } })));
         const deviceIds = [args.deviceId, ...held.flatMap((host) => (host?.viaDeviceId === args.deviceId ? [host._id] : []))];
         const pages = await Promise.all(
