@@ -177,13 +177,13 @@ results and calls, and approval would have to move to a machine with no window.
 
 ## 9. Slices
 
-**S1 — Transport seam.** `HostTransport` in `apps/desktop/src/device/` with one
+**S1 — Transport seam (built).** `HostTransport` in `apps/desktop/src/device/` with one
 implementation, `local` (the napi addon). Every device call in the main process
 goes through it. No behaviour change.
 - Acceptance: the existing device tests pass unchanged; the `device-core` CI job
   stays green on all three OSes.
 
-**S2 — Headless host binary.** The engine split (above), the `keychain` feature
+**S2 — Headless host binary (built).** The engine split (above), the `keychain` feature
 gate, the `neore-host` target, and the stdio frame protocol, run locally as a child
 process.
 - Acceptance: the action test vectors give identical results through stdio and
@@ -202,7 +202,9 @@ pin keys, ask for passphrases through the helper, and add `transport` and
   (test: sign a result with the wrong secret); revoking the desktop revokes its
   hosts.
 
-**S4 — Install and upgrade.** §8.
+**S4 — Install and upgrade.** §8. The release build of `neore-host` must pass
+`--no-default-features`: a plain `cargo build` links the keyring (the binary logs an error at
+startup when it does), so the packaging step is where that is enforced.
 - Acceptance: a wrong checksum and a killed upload both leave no executable at
   the final path; an architecture mismatch is refused before upload; an upgrade
   with an active session is refused.

@@ -396,9 +396,77 @@ jobs:
               shell: "bash"
               run: "cargo fmt --manifest-path packages/device-core/Cargo.toml -- --check && cargo fmt --manifest-path packages/device-core-node/Cargo.toml -- --check"
 
+            # Linux and macOS have a shell sandbox, so the sandboxed vectors must run there instead of
+            # being skipped when the runner loses it.
             - name: "Run cargo test"
               shell: "bash"
+              env:
+                  NEORE_REQUIRE_SANDBOX: "${{ matrix.os != 'windows-latest' && '1' || '' }}"
               run: "cargo test --manifest-path packages/device-core/Cargo.toml"
+
+            # `neore-host` is built without the `keychain` feature. This runs the host's own tests
+            # (the stdio protocol, the action vectors, the no-socket check) and proves the crate
+            # builds and passes without the paired side.
+            - name: "Run cargo test without the keychain feature"
+              shell: "bash"
+              env:
+                  NEORE_REQUIRE_SANDBOX: "${{ matrix.os != 'windows-latest' && '1' || '' }}"
+              run: "cargo test --manifest-path packages/device-core/Cargo.toml --no-default-features"
+
+            # The host holds no pairing, so it must not link the keyring (or libdbus, which the
+            # keyring's Secret Service backend needs). Runs after libdbus-dev is installed, so a
+            # regression would link it instead of failing to build.
+            - name: "Check neore-host links no keyring"
+              if: "matrix.os == 'ubuntu-22.04'"
+              shell: "bash"
+              run: |
+                  set -euo pipefail
+                  manifest=packages/device-core/Cargo.toml
+                  # `cargo tree -i` exits 0 when the package is in the tree and non-zero when it is not,
+                  # so the default build is the control that the command can find it at all.
+                  cargo tree --manifest-path "$manifest" --target all -e normal,build -i keyring > /dev/null
+                  if cargo tree --manifest-path "$manifest" --no-default-features --target all -e normal,build -i keyring; then
+                      echo "keyring is in the neore-host dependency tree" >&2
+                      exit 1
+                  fi
+                  cargo build --manifest-path "$manifest" --release --no-default-features --bin neore-host
+                  binary=packages/device-core/target/release/neore-host
+                  # Captured first: under pipefail an early `grep -q` exit could SIGPIPE the producer and hide a match.
+                  deps="$(ldd "$binary")"
+                  echo "$deps"
+                  if grep -qi dbus <<< "$deps"; then
+                      echo "neore-host links libdbus" >&2
+                      exit 1
+                  fi
+                  strings "$binary" > "$RUNNER_TEMP/neore-host.strings"
+                  if grep -q "dev.neore.device" "$RUNNER_TEMP/neore-host.strings"; then
+                      echo "neore-host carries the keychain service name" >&2
+                      exit 1
+                  fi
+
+            # The binary that gets copied to a remote machine must not depend on that machine's libc.
+            # A static musl build runs on any Linux of the same architecture, so it is built, checked for
+            # dynamic dependencies, and put through the stdio tests (`NEORE_HOST_BIN` points them at it).
+            - name: "Build neore-host static (musl) and run the stdio tests against it"
+              if: "matrix.os == 'ubuntu-22.04'"
+              shell: "bash"
+              env:
+                  NEORE_REQUIRE_SANDBOX: "1"
+              run: |
+                  set -euo pipefail
+                  sudo apt-get install -y musl-tools
+                  rustup target add x86_64-unknown-linux-musl
+                  manifest=packages/device-core/Cargo.toml
+                  cargo build --manifest-path "$manifest" --release --no-default-features --bin neore-host --target x86_64-unknown-linux-musl
+                  binary="$PWD/packages/device-core/target/x86_64-unknown-linux-musl/release/neore-host"
+                  file "$binary"
+                  ldd "$binary" || true
+                  # A static binary names no interpreter and no shared library. (`set -e` ignores a bare `!`.)
+                  if readelf -l "$binary" | grep -q INTERP || readelf -d "$binary" | grep -q NEEDED; then
+                      echo "neore-host is dynamically linked" >&2
+                      exit 1
+                  fi
+                  NEORE_HOST_BIN="$binary" cargo test --manifest-path "$manifest" --no-default-features --test host_stdio
 
     # Packages the desktop shell without signing, so a packager break (the xmldom override,
     # a missing addon in the asar) shows on the PR instead of at the next `desktop-v*` tag.
@@ -496,6 +564,11 @@ jobs:
 
             - name: "Smoke-test the bundles and the addon"
               run: "pnpm --filter @neore/desktop run smoke"
+
+            # Launches the real shell: a terminal opens, runs a command and survives a reload, and every
+            # shell is gone after quit. Only the terminal cases run here; the rest of the suite is not green yet.
+            - name: "Run the terminal end-to-end tests"
+              run: "pnpm --filter @neore/desktop exec playwright test --grep terminal"
 
     test-required-check:
         needs: ["files-changed", "test", "e2e", "device-core", "desktop-package", "desktop-macos-check"]

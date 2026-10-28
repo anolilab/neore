@@ -13,26 +13,24 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::acp_permission::AcpPermissions;
+use crate::actions::{
+    self, canonical_home, plan_builtin, platform, refused_root, shareable_roots, Action,
+    ShellSettings, MAX_ROOTS,
+};
 use crate::approval::{Answer, Prompt, PromptBody, Prompts, SandboxState};
 use crate::envelope::{self, Domain, NonceSet, Signed};
-use crate::fs;
 use crate::mcp::{self, McpManager, McpServerConfig};
 use crate::sandbox;
-use crate::shell;
 use crate::store::{self, Pairing, Settings};
 
-/// Output cap for every result; the backend re-caps anyway.
-pub const MAX_OUTPUT_BYTES: usize = 64 * 1024;
-const SHELL_DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
-const SHELL_MAX_TIMEOUT: Duration = Duration::from_secs(600);
-const MCP_CALL_TIMEOUT: Duration = Duration::from_secs(120);
-const MAX_ROOTS: usize = 20;
+pub use crate::actions::{cap_utf8, now_ms, MAX_OUTPUT_BYTES};
+
 const MAX_MCP_SERVERS: usize = 20;
 const AUDIT_MAX_BYTES: u64 = 5 * 1024 * 1024;
 /// How long a pairing waits for its confirmation click.
@@ -428,7 +426,7 @@ impl DeviceState {
                         allow_always: offer_always,
                         detail: detail.clone(),
                         input: serde_json::to_string_pretty(&call.input).unwrap_or_default(),
-                        sandbox: action.sandbox_state(),
+                        sandbox: sandbox_state(&action),
                         tainted_by: call.tainted_by.clone(),
                         thread_title: call.thread_title.clone(),
                         tool: call.tool.clone(),
@@ -623,28 +621,6 @@ impl DeviceState {
     }
 }
 
-pub fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_millis() as u64)
-        .unwrap_or(0)
-}
-
-/// Caps text at `max` bytes of UTF-8 without splitting a character.
-pub fn cap_utf8(text: &str, max: usize) -> (String, bool) {
-    if text.len() <= max {
-        return (text.to_owned(), false);
-    }
-
-    let mut end = max;
-
-    while !text.is_char_boundary(end) {
-        end -= 1;
-    }
-
-    (text[..end].to_owned(), true)
-}
-
 /// Names of the servers that were removed, changed or added.
 fn changed_server_names(old: &[McpServerConfig], new: &[McpServerConfig]) -> Vec<String> {
     old.iter()
@@ -716,115 +692,19 @@ fn builtin_tools(roots: &[PathBuf]) -> Vec<Value> {
     ]
 }
 
-/// One call, planned and checked before the user is asked, so the prompt shows
-/// exactly what will run (resolved paths, the command, the folder).
-#[derive(PartialEq)]
-enum Action {
-    List(PathBuf),
-    Read(PathBuf),
-    Write {
-        content: String,
-        overwrite: bool,
-        path: PathBuf,
-    },
-    Shell {
-        command: String,
-        cwd: PathBuf,
-        /// `None` = unsandboxed, which the user allowed.
-        sandbox: Option<sandbox::Policy>,
-        /// The prompt's line about the sandbox.
-        sandbox_note: String,
-        timeout: Duration,
-    },
-    Mcp {
-        arguments: Value,
-        read_only: bool,
-        server: McpServerConfig,
-        tool: String,
-    },
-}
-
-impl Action {
-    fn read_only(&self) -> bool {
-        match self {
-            Action::List(_) | Action::Read(_) => true,
-            Action::Write { .. } | Action::Shell { .. } => false,
-            Action::Mcp { read_only, .. } => *read_only,
-        }
+/// The prompt's line about the sandbox, for an action that runs a shell command.
+fn sandbox_state(action: &Action) -> Option<SandboxState> {
+    match action {
+        Action::Shell {
+            sandbox,
+            sandbox_note,
+            ..
+        } => Some(SandboxState {
+            confined: sandbox.is_some(),
+            note: sandbox_note.clone(),
+        }),
+        _ => None,
     }
-
-    fn kind(&self) -> &'static str {
-        match self {
-            Action::List(_) | Action::Read(_) | Action::Write { .. } => "fs",
-            Action::Shell { .. } => "shell",
-            Action::Mcp { .. } => "mcp",
-        }
-    }
-
-    fn sandbox_state(&self) -> Option<SandboxState> {
-        match self {
-            Action::Shell {
-                sandbox,
-                sandbox_note,
-                ..
-            } => Some(SandboxState {
-                confined: sandbox.is_some(),
-                note: sandbox_note.clone(),
-            }),
-            _ => None,
-        }
-    }
-
-    fn detail(&self) -> String {
-        match self {
-            Action::List(path) => format!("List the folder {}", path.display()),
-            Action::Read(path) => format!("Read the file {}", path.display()),
-            Action::Write {
-                content,
-                overwrite,
-                path,
-            } => format!(
-                "{} {} ({} bytes):\n{}",
-                if *overwrite { "Overwrite" } else { "Create" },
-                path.display(),
-                content.len(),
-                cap_utf8(content, 2000).0
-            ),
-            Action::Shell {
-                command,
-                cwd,
-                sandbox_note,
-                timeout,
-                ..
-            } => {
-                format!(
-                    "{sandbox_note}\n\nRun in {} (stops after {} s):\n{command}",
-                    cwd.display(),
-                    timeout.as_secs()
-                )
-            }
-            Action::Mcp {
-                arguments,
-                server,
-                tool,
-                ..
-            } => {
-                format!(
-                    "Call {tool} on the local MCP server \"{}\" ({} {})",
-                    server.name,
-                    server.command,
-                    server.args.join(" ")
-                ) + &format!(
-                    "\n{}",
-                    serde_json::to_string_pretty(arguments).unwrap_or_default()
-                )
-            }
-        }
-    }
-}
-
-fn string_arg<'a>(input: &'a Value, key: &str) -> Option<&'a str> {
-    input.get(key).and_then(Value::as_str)
 }
 
 fn plan(
@@ -834,92 +714,35 @@ fn plan(
     mcp_tools: &HashMap<String, McpToolRef>,
 ) -> Result<Action, String> {
     let roots = shareable_roots(&settings.roots);
+    let shell = ShellSettings {
+        allow_unsandboxed: settings.allow_unsandboxed_shell,
+        allow_network: settings.allow_shell_network,
+    };
 
-    match tool {
-        "fs_list" => Ok(Action::List(fs::resolve_existing(
-            string_arg(input, "path").unwrap_or(""),
-            &roots,
-        )?)),
-        "fs_read" => Ok(Action::Read(fs::resolve_existing(
-            string_arg(input, "path").ok_or("path is required")?,
-            &roots,
-        )?)),
-        "fs_write" => Ok(Action::Write {
-            content: string_arg(input, "content")
-                .ok_or("content is required")?
-                .to_owned(),
-            overwrite: input
-                .get("overwrite")
-                .and_then(Value::as_bool)
-                .unwrap_or(false),
-            path: fs::resolve_for_write(
-                string_arg(input, "path").ok_or("path is required")?,
-                &roots,
-            )?,
-        }),
-        "shell_run" => {
-            let command = string_arg(input, "command")
-                .map(str::trim)
-                .filter(|command| !command.is_empty())
-                .ok_or("command is required")?;
-
-            if command.len() > 8000 {
-                return Err("the command is too long".into());
-            }
-
-            let cwd = fs::resolve_existing(string_arg(input, "cwd").unwrap_or(""), &roots)?;
-
-            if !cwd.is_dir() {
-                return Err("cwd is not a folder".into());
-            }
-
-            let timeout = input
-                .get("timeoutSeconds")
-                .and_then(Value::as_u64)
-                .map(Duration::from_secs)
-                .unwrap_or(SHELL_DEFAULT_TIMEOUT)
-                .min(SHELL_MAX_TIMEOUT);
-
-            let support = sandbox::support();
-            let policy = sandbox::policy_for_call(
-                &support,
-                settings.allow_unsandboxed_shell,
-                settings.allow_shell_network,
-                &roots,
-                sandbox::home().as_deref(),
-            )?;
-
-            Ok(Action::Shell {
-                command: command.to_owned(),
-                cwd,
-                sandbox_note: sandbox::describe(&support, policy.as_ref()),
-                sandbox: policy,
-                timeout,
-            })
-        }
-        name => {
-            let McpToolRef {
-                server,
-                tool,
-                read_only,
-            } = mcp_tools
-                .get(name)
-                .ok_or_else(|| format!("{name} is not a tool of this device"))?;
-            let server = settings
-                .mcp_servers
-                .iter()
-                .find(|config| &config.name == server)
-                .ok_or("that MCP server was removed")?
-                .clone();
-
-            Ok(Action::Mcp {
-                arguments: input.clone(),
-                read_only: *read_only,
-                server,
-                tool: tool.clone(),
-            })
-        }
+    if let Some(planned) = plan_builtin(tool, input, &roots, shell) {
+        return planned;
     }
+
+    let McpToolRef {
+        server,
+        tool,
+        read_only,
+    } = mcp_tools
+        .get(tool)
+        .ok_or_else(|| format!("{tool} is not a tool of this device"))?;
+    let server = settings
+        .mcp_servers
+        .iter()
+        .find(|config| &config.name == server)
+        .ok_or("that MCP server was removed")?
+        .clone();
+
+    Ok(Action::Mcp {
+        arguments: input.clone(),
+        read_only: *read_only,
+        server,
+        tool: tool.clone(),
+    })
 }
 
 struct Outcome {
@@ -934,14 +757,7 @@ struct Outcome {
 
 impl Outcome {
     fn failed(decision: &'static str, error: impl Into<String>) -> Self {
-        Outcome {
-            decision,
-            error: Some(error.into()),
-            exit_code: None,
-            output: None,
-            status: "failed",
-            truncated: false,
-        }
+        Outcome::of(decision, actions::Outcome::failed(error))
     }
 
     fn denied(decision: &'static str) -> Self {
@@ -954,6 +770,17 @@ impl Outcome {
             truncated: false,
         }
     }
+
+    fn of(decision: &'static str, done: actions::Outcome) -> Self {
+        Outcome {
+            decision,
+            error: done.error,
+            exit_code: done.exit_code,
+            output: done.output,
+            status: done.status,
+            truncated: done.truncated,
+        }
+    }
 }
 
 fn run_action(
@@ -963,75 +790,11 @@ fn run_action(
     decision: &'static str,
 ) -> Outcome {
     let roots = shareable_roots(&state.settings().roots);
-    let completed = |output: String| Outcome {
-        decision,
-        error: None,
-        exit_code: None,
-        output: Some(output),
-        status: "completed",
-        truncated: false,
-    };
 
-    match action {
-        Action::List(path) => match fs::list(&roots, &path) {
-            Ok(listing) => completed(serde_json::to_string_pretty(&listing).unwrap_or_default()),
-            Err(error) => Outcome::failed(decision, error),
-        },
-        Action::Read(path) => {
-            fs::read(&roots, &path).map_or_else(|error| Outcome::failed(decision, error), completed)
-        }
-        Action::Write {
-            content,
-            overwrite,
-            path,
-        } => fs::write(&roots, &path, &content, overwrite)
-            .map_or_else(|error| Outcome::failed(decision, error), completed),
-        Action::Shell {
-            command,
-            cwd,
-            sandbox,
-            timeout,
-            ..
-        } => match shell::run(
-            &command,
-            &cwd,
-            timeout.min(remaining),
-            MAX_OUTPUT_BYTES,
-            sandbox.as_ref(),
-        ) {
-            Ok(result) if result.timed_out => Outcome {
-                output: Some(result.output),
-                truncated: result.truncated,
-                ..Outcome::failed(
-                    decision,
-                    format!("stopped after {} s", timeout.min(remaining).as_secs()),
-                )
-            },
-            Ok(result) => Outcome {
-                exit_code: result.exit_code,
-                truncated: result.truncated,
-                ..completed(result.output)
-            },
-            Err(error) => Outcome::failed(decision, error),
-        },
-        Action::Mcp {
-            arguments,
-            server,
-            tool,
-            ..
-        } => {
-            match state.mcp.with(&server, |process| {
-                process.call_tool(&tool, arguments.clone(), MCP_CALL_TIMEOUT.min(remaining))
-            }) {
-                Ok((text, false)) => completed(text),
-                Ok((text, true)) => Outcome {
-                    output: Some(text),
-                    ..Outcome::failed(decision, "the tool reported an error")
-                },
-                Err(error) => Outcome::failed(decision, error),
-            }
-        }
-    }
+    Outcome::of(
+        decision,
+        actions::run(action, &roots, remaining, Some(&state.mcp)),
+    )
 }
 
 /// What the page relays for one progress step: the call it is about and the
@@ -1070,16 +833,6 @@ pub struct StatusView {
     pub account_label: Option<String>,
     pub device_id: Option<String>,
     pub platform: &'static str,
-}
-
-fn platform() -> &'static str {
-    if cfg!(target_os = "macos") {
-        "macos"
-    } else if cfg!(windows) {
-        "windows"
-    } else {
-        "linux"
-    }
 }
 
 /// The pairing, when its secret is usable. A pairing whose keychain entry could not be read loads with an empty secret;
@@ -1135,32 +888,6 @@ pub struct SettingsUpdate {
     pub roots: Option<Vec<String>>,
     #[serde(default)]
     pub unpair: bool,
-}
-
-/// Why a canonical folder may not be shared, if it may not. The sandbox re-allows
-/// reads and writes under every root, so a root holding `$HOME` would expose
-/// `~/.ssh` and friends. A root INSIDE home is the user's choice.
-fn refused_root(path: &Path, home: Option<&Path>) -> Option<&'static str> {
-    if path.parent().is_none() {
-        return Some("sharing a whole drive is not allowed");
-    }
-
-    home.filter(|home| home.starts_with(path))
-        .map(|_| "sharing your home folder or one of its parents is not allowed")
-}
-
-fn canonical_home() -> Option<PathBuf> {
-    sandbox::home().and_then(|home| stdfs::canonicalize(home).ok())
-}
-
-/// The shared roots that still exist, canonicalised, and that the home guard allows.
-fn shareable_roots(roots: &[String]) -> Vec<PathBuf> {
-    let home = canonical_home();
-
-    fs::canonical_roots(roots)
-        .into_iter()
-        .filter(|root| refused_root(root, home.as_deref()).is_none())
-        .collect()
 }
 
 /// Validates a new folder list: existing folders, canonical, never a filesystem root
@@ -1239,6 +966,7 @@ pub fn validate_servers(servers: &[McpServerConfig]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::actions::SHELL_MAX_TIMEOUT;
 
     #[test]
     fn a_pairing_whose_secret_is_unavailable_is_not_usable() {
@@ -1716,6 +1444,87 @@ mod tests {
             }
         }
 
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// The action vectors `neore-host` is checked with (`tests/host_stdio.rs`), through the whole engine: signed,
+    /// approved by a person, run, signed again. This is the path the napi addon calls, so the host and the desktop
+    /// give the same result for the same action.
+    #[test]
+    fn the_action_vectors_give_the_results_the_host_gives() {
+        use std::sync::mpsc::channel;
+        use std::sync::Arc;
+
+        use crate::vectors::{self, Observed};
+
+        crate::store::test_keychain::install();
+
+        let sandbox = vectors::sandbox();
+        let root = vectors::fixture("engine");
+        let dir = root.parent().unwrap().to_path_buf();
+        let secret = "0123456789abcdef".repeat(4);
+
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                pairing: Some(Pairing {
+                    account_label: "me".into(),
+                    device_id: "dev1".into(),
+                    secret: secret.clone(),
+                }),
+                roots: vec![root.to_string_lossy().into_owned()],
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let (events, received) = channel();
+        let state = Arc::new(DeviceState::new(
+            &dir,
+            Box::new(move |event| {
+                let _ = events.send(event);
+            }),
+        ));
+        let person = Arc::clone(&state);
+
+        std::thread::spawn(move || {
+            while let Ok(event) = received.recv_timeout(Duration::from_secs(60)) {
+                if let Event::Prompt { prompt } = event {
+                    person.prompt_answer(prompt.id, "once").unwrap();
+                }
+            }
+        });
+
+        for (index, vector) in vectors::vectors().iter().enumerate() {
+            if !vector.applies(sandbox) {
+                continue;
+            }
+
+            let signed = envelope::sign_value(
+                &secret,
+                Domain::Call,
+                &json!({
+                    "v": 1, "kind": "call", "callId": format!("c{index}"), "deviceId": "dev1", "tool": vector.tool,
+                    "input": vector.input, "threadTitle": "T", "taintedBy": [],
+                    "issuedAt": now_ms(), "expiresAt": now_ms() + 60_000, "nonce": format!("n{index}"),
+                }),
+            );
+            let result: Value =
+                serde_json::from_str(&state.execute(&signed).unwrap().payload).unwrap();
+
+            vectors::assert_observed(
+                vector,
+                &root,
+                &Observed {
+                    error: result["error"].as_str().map(str::to_owned),
+                    exit_code: result["exitCode"].as_i64(),
+                    output: result["output"].as_str().map(str::to_owned),
+                    status: result["status"].as_str().unwrap().to_owned(),
+                },
+            );
+        }
+
+        vectors::assert_nothing_escaped(&root);
         let _ = stdfs::remove_dir_all(&dir);
     }
 

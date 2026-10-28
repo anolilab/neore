@@ -91,6 +91,44 @@ Rules:
 - Text from the transcript that begins with `/` is quoted in the handoff, so no
   agent command runs because of it. Only the user's own send starts a command.
 
+### Prompt caching across a switch
+
+A provider's prompt cache holds an exact prefix for one provider and model, so
+every switch starts cold. The first turn after a switch pays full input price for
+everything it sends, and Anthropic adds a cache-write surcharge on top. The
+gateway already counts this cost elsewhere: it caches the system prompt and the
+last tool definition (`services/llm-gateway/src/providers/adapters/prompt-cache.ts`),
+its router refuses a tier downgrade above `POLICY_THRESHOLDS.downgradeMaxContextTokens`
+(20k tokens) because the re-send costs more than the cheaper tier saves
+(`routing/policy.ts`), and momentum keeps a thread on one tier for the same reason
+(`routing/momentum.ts`). An explicit switch overrides all of that on purpose, so it
+says what it costs.
+
+- **Cost notice on long threads.** Above the router's threshold (one shared
+  constant, the same 4-characters-per-token estimate as `estimateContextTokens`),
+  the switch control says that the next reply re-reads the conversation without
+  the cache, with an estimate in credits for the target. Below it, no notice.
+- **Above the threshold, `portable` is the default for cloud to cloud too.** The
+  summary plus verbatim tail is smaller than the full history, so the cold first
+  turn costs less. The user can choose "keep full history" instead. Below the
+  threshold the new model gets the full history, as in S1.
+- **The handoff is built once and sent byte for byte.** Its text is stored on the
+  `agentSwitch` part and sits at one fixed place in the context: after the system
+  prompt, before the turns that follow the switch. Every later turn sends it
+  unchanged, so from the second turn on the new provider can cache the prefix.
+  Nothing in it varies per turn (no timestamps, no re-summarising). Only a new
+  switch builds a new handoff.
+- **Switching back does not count on the old cache.** Cache lifetimes are minutes
+  (5 by default, 60 with the extended TTL), so `delta` saves tokens but is priced
+  in the notice like any other switch.
+- **Routing never undoes a switch.** The switched-to model is what the next turns
+  run on: automatic routing does not move the thread to another provider or model
+  until the user switches again. S1 checks how routing treats an explicitly chosen
+  model and pins it if it does not already.
+- **Host agents** keep their own cache and bill their own account (roadmap trust
+  rule 9). The same byte-stable rule applies to what the desktop sends as the
+  handoff.
+
 ### Consent and trust
 
 - A switch never grants consent. Switching to a host agent is a start, so it
@@ -136,7 +174,10 @@ and the divider. No handoff yet: the new model sees the same history it always
 did.
 - Acceptance: a switch is recorded and rendered; the next turn uses the new
   model; switching to a sibling branch and back restores each branch's agent; a regenerate of an older message uses the model recorded on it; a double
-  `clientId` switches once; a switch during a stream is refused.
+  `clientId` switches once; a switch during a stream is refused; automatic
+  routing does not change the model on the turns after a switch; a switch on a
+  thread above the cache threshold shows the cost notice, and one below it does
+  not.
 
 **S2 — Portable handoff for cloud models.** Summary of older turns plus the
 verbatim tail, and delta on switching back.
@@ -144,7 +185,10 @@ verbatim tail, and delta on switching back.
   budget (test with a long thread); switching back sends only messages after the
   last one the earlier model saw; the summary call is charged once and a retry does
   not charge again (an action produces the summary first, uncharged; one mutation then takes the claim-once on `switch:<clientId>`, calls `chargeRound` and writes the switch, so a failed write rolls back the claim and the charge together and a retry is not refused); a
-  handoff that cannot fit fails with a message and nothing is charged.
+  handoff that cannot fit fails with a message and nothing is charged; the handoff
+  bytes in the context are identical on the first and the third turn after a
+  switch (test), and on a provider that caches, the second turn's usage reports
+  cache reads; above the threshold a cloud-to-cloud switch defaults to `portable`.
 
 **S3 — Host handoff.** Host to host, in the same thread, using the `portable` mode.
 Cloud to host, and host to cloud, create a new thread linked to the source through
@@ -179,6 +223,9 @@ report says it can load a saved session, and only when agent, folder and host al
   transcript.
 - **Summary cost.** Long threads cost a model call per switch. Mitigation: switches
   reuse a stored summary until the thread grows past a threshold.
+- **Cache cost.** Each switch re-sends the context uncached once. Mitigation: the
+  cost notice, `portable` by default above the threshold, and a byte-stable
+  handoff so only the first turn after a switch is cold.
 - **Prompt injection through transcript text.** Handled by the data-not-instructions
   framing and by per-action permission prompts on host agents.
 - **Confusing ownership.** After a switch, a reply has a different author. The
@@ -190,5 +237,6 @@ report says it can load a saved session, and only when agent, folder and host al
    passes the S2 quality check.
 2. **Budget size.** Measure on real threads in S2; no value is fixed here.
 3. **Switching mid-stream.** Recommendation: refuse, as stated in §3.
-4. **Stored summary.** Recommendation: store it on the `agentSwitch` part, so a
-   repeat switch reuses it, and recompute only after the thread grows.
+4. **Stored summary.** Decided: stored on the `agentSwitch` part (§3, prompt
+   caching), so the handoff is byte-stable; a repeat switch reuses it and
+   recomputes only after the thread grows.

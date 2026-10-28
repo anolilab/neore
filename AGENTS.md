@@ -553,6 +553,20 @@ written here is what is not.
   `neore://auth/callback`, opt-in in `TRUSTED_EXTENSION_REDIRECT_URIS`) and ends
   at `/api/auth/client-grant/cookie`, which sets the normal session cookie — do
   not add a second grant system. See its README.
+  **Terminal** (`apps/desktop/src/terminal/`, plans/desktop-terminal.md) is the user's
+  own interactive shell, outside the device sandbox, so it has NO site-facing
+  channel: its window (`terminal-window/`, own preload and in-memory session that
+  cancels every request but `file:`) is the only sender `index.ts` admits, and the
+  page never names the folder or the shell. The PTY runs in a utility-process host
+  (`terminal-host.cjs`), never in main: `RunAsNode` is fused off in packaged builds,
+  so a `child_process.fork` of the app would relaunch Neore. `node-pty` 1.1.0 ships
+  the macOS `spawn-helper` WITHOUT the execute bit (the first spawn is `posix_spawnp failed`):
+  `after-pack.cjs` fixes the packaged copy before signing, `spawn-helper.ts` a
+  checkout, and `npmRebuild: false` keeps electron-builder from rebuilding it for the
+  runner's arch alone (node-pty prefers `build/Release` over the right prebuild).
+  Nothing about a terminal is stored: scrollback is xterm's buffer in the window
+  (`scrollback.ts`), main and host hold counters and one batch. Windows is
+  unavailable until S4. Quit signals every shell synchronously (`killNow`).
   **Device execution** (`packages/device-core/src/{shell,sandbox}.rs`, `backend/lunora/devices/`,
   `features/devices`, plans/device-execution.md) is remote code execution
   on the user's machine, so the page is a RELAY only: the backend signs each
@@ -582,6 +596,15 @@ written here is what is not.
   crates. The HMAC vectors are pinned on BOTH sides — change one, update both.
   `tauri-plugin-dialog` is driven from Rust only; no window holds a dialog
   permission.
+  **`device-core` has two halves** (plans/ssh-environments.md). `actions.rs` plans
+  and runs `fs_*`/`shell_run` from explicit inputs (folders, shell policy) and
+  imports no pairing, envelope, approval or keychain; the desktop `engine.rs`
+  verifies, asks, then calls it. The `keychain` feature (default) is the paired
+  half (`approval`, `engine`, `envelope`, `hmac`, `store`). `neore-host --stdio`
+  (`host.rs`, `frame.rs`) is built `--no-default-features`, trusts only its pipe,
+  and re-checks the folders and the sandbox on ITS machine. Both paths share the
+  vectors in `tests/common/actions.json`; a new tool or a changed result goes there.
+  Desktop main-process calls go through `HostTransport` (`apps/desktop/src/device/transport.ts`).
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay

@@ -402,6 +402,47 @@ describe("coding-agent channels", () => {
     });
 });
 
+describe("opening a terminal", () => {
+    const terminal = { availability: { available: true } as const, open: vi.fn(async (_folder: string | null) => {}) };
+
+    beforeEach(() => {
+        terminal.open.mockClear();
+        fake.handlers.clear();
+        registerDeviceIpc({ ...options, terminal });
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+    });
+
+    it("is refused from the site, which has no way to open one", () => {
+        expect(() => invoke(LOCAL_CHANNEL.openTerminal, siteEvent(), "/work")).toThrow("device: not the device window");
+        expect(() => invoke(LOCAL_CHANNEL.terminalAvailability, siteEvent())).toThrow("device: not the device window");
+        expect(terminal.open).not.toHaveBeenCalled();
+    });
+
+    it("opens the folder the device window names, or asks for one", async () => {
+        await invoke(LOCAL_CHANNEL.openTerminal, localEvent(), "/work");
+        await invoke(LOCAL_CHANNEL.openTerminal, localEvent(), null);
+
+        expect(terminal.open).toHaveBeenNthCalledWith(1, "/work");
+        expect(terminal.open).toHaveBeenNthCalledWith(2, null);
+        expect(invoke(LOCAL_CHANNEL.terminalAvailability, localEvent())).toEqual({ available: true });
+    });
+
+    it("rejects a folder that is not text", async () => {
+        await expect(invoke(LOCAL_CHANNEL.openTerminal, localEvent(), { path: "/work" })).rejects.toThrow("device: folder is invalid");
+        expect(terminal.open).not.toHaveBeenCalled();
+    });
+
+    it("says it is unavailable when the shell offers none", async () => {
+        fake.handlers.clear();
+        fake.windows.length = 0;
+        registerDeviceIpc(options);
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+
+        expect(invoke(LOCAL_CHANNEL.terminalAvailability, localEvent())).toMatchObject({ available: false });
+        await expect(invoke(LOCAL_CHANNEL.openTerminal, localEvent(), "/work")).rejects.toThrow("not available");
+    });
+});
+
 describe("events", () => {
     it("send a progress report to the site that made the call, never to the device window", async () => {
         invoke(DEVICE_CHANNEL.openSettings, siteEvent());

@@ -23,7 +23,6 @@ import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 
-import type { SettingsTab } from "@/components/settings/settings-modal";
 import ImpersonationBanner from "@/features/admin/components/impersonation-banner";
 import AppearanceSync from "@/features/appearance/components/appearance-sync";
 import { ACCENT_BOOT_SCRIPT } from "@/features/appearance/lib/accent-boot-script";
@@ -33,6 +32,7 @@ import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provide
 import ConnectionProvider from "@/features/connection/components/connection-provider";
 import OfflineScreen from "@/features/connection/components/offline-screen";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
+import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
 import usePostHogIdentity from "@/hooks/use-posthog-identity";
 import { authClient } from "@/lib/auth/client";
 import getSessionToken, { getSessionAuthState } from "@/lib/auth/server-functions";

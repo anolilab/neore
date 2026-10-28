@@ -13,6 +13,7 @@ const HAS_VARIABLE_PATTERN = /\{\{[\w-]+\}\}/;
 const COUNTRY_CODE_PATTERN = /^([A-Z]{2})$/;
 
 const GMT_OFFSET_PATTERN = /GMT([+-]\d+)/;
+const MINUTES_PATTERN = /:\d{2}$/;
 
 /**
  * Prompt variable interface
@@ -210,6 +211,7 @@ const buildContextStrings = (
     timezone?: string,
     location?: string,
     language?: string,
+    precision: "hour" | "minute" = "minute",
 ): {
     dateTimeContext: string;
     languageContext: string;
@@ -281,7 +283,10 @@ const buildContextStrings = (
             }
         }
 
-        const currentDateTime = `${dateString}, ${timeString}${timezoneAbbr}`;
+        // The chat system prompt asks for the hour only: a minute in it changes the prompt on every turn,
+        // and a provider's prompt cache keyed on that text would miss each time.
+        const shownTime = precision === "hour" ? timeString.replace(MINUTES_PATTERN, ":00") : timeString;
+        const currentDateTime = `${dateString}, ${shownTime}${timezoneAbbr}`;
 
         dateTimeContext = currentDateTime;
     }
@@ -547,7 +552,7 @@ export const getSystemPrompt = (
     agentMode?: AgentModeConfig,
     searchMode?: string,
 ): string => {
-    const { dateTimeContext, languageContext, locationContext } = buildContextStrings(timezone, location, language);
+    const { dateTimeContext, languageContext, locationContext } = buildContextStrings(timezone, location, language, "hour");
     const currency = getCurrencyFromLocation(location);
     const personalizationContext = buildPersonalizationContext(personalization);
     const skillsContext = buildSkillsMetadataContext(enabledSkills);
@@ -566,10 +571,12 @@ export const getSystemPrompt = (
     const SEARCH_MODES = new Set(["academic", "code", "github", "reddit", "spotify", "web", "x", "youtube"]);
     const isUseNumberedCitations = searchMode !== undefined && SEARCH_MODES.has(searchMode);
 
+    // The date comes last: providers cache the longest unchanged start of a prompt, so the text that
+    // changes every hour must not sit in front of the text that never does.
     return `CORE IDENTITY AND ROLE:
 - You are Neore Chat, a capable assistant designed to help with a wide range of tasks.
 - Your role is to assist and engage in conversation while being helpful, accurate, and efficient.
-${formattedDateTimeContext}${formattedLocationContext}${formattedLanguageContext}
+${formattedLocationContext}${formattedLanguageContext}
 
 ## Your Goals
 - Understand user needs thoroughly before taking action
@@ -633,7 +640,9 @@ CODE FORMATTING:
 ${agentLoopContext}${toolUsageContext}
 
 ${skillsContext}
-${personalizationContext}`.trim();
+${personalizationContext}
+
+${formattedDateTimeContext}`.trim();
 };
 
 /**

@@ -15,8 +15,8 @@ Decisions:
 - **Translated text.** Labels are translated at render time, so the index is built
   from the translated strings the user sees, and a search works in every locale.
 - **Two levels.** Tabs are searchable from the navigation data. Individual settings
-  inside a tab are searchable from a keyword list each tab declares next to its
-  component.
+  inside a tab are searchable from a keyword list the tab declares in the central
+  registry (see section 3), outside the lazy tab chunks.
 
 ## 2. Current state (checked)
 
@@ -37,9 +37,11 @@ Decisions:
 - **Index.** Built when the search opens: one entry per tab from the navigation
   data, plus one entry per keyword in a tab's keyword list. Each entry holds the
   tab, its section heading if any, and the translated label.
-- **Keyword lists.** Each tab that has settings declares its own list beside its
-  component, as data: an array of `{ tab, section, label, keywords }`. Labels are
-  `t` strings. A test fails when a tab in the navigation data has no keyword list.
+- **Keyword lists.** One registry keyed by tab
+  (`features/settings/lib/settings-keywords.ts`), as data: per tab an array of
+  `{ section, label, keywords }`. It is not kept beside each tab's component because
+  the tabs are lazy-loaded, and importing a list from one would load its chunk with
+  the modal. Labels are `t` strings. A test fails when a tab in the navigation data has no keyword list.
 - **Matching.** Case-insensitive, accent-insensitive substring match over label and
   keywords. Results are grouped by tab, in navigation order.
 - **Opening a result.** Switches the modal's own tab state (`currentTab` in

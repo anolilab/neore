@@ -1,5 +1,6 @@
 /** What the local device window's preload exposes as `window.neoreDevice`. */
 import type { AcpUpdate, AcpView, PermissionView, ProbeResult, SessionSnapshot, SessionSummary } from "../../acp/types";
+import type { Availability } from "../../terminal/shell";
 import type { Prompt, SettingsView } from "../types";
 
 declare global {
@@ -27,9 +28,12 @@ export interface DeviceWindowApi {
     confirm: (message: string) => Promise<boolean>;
     onAcpChanged: (handler: () => void) => () => void;
     onPromptQueued: (handler: () => void) => () => void;
+    /** Opens a terminal for the folder; `null` asks for one. */
+    openTerminal: (folder: string | null) => Promise<void>;
     pickFolder: () => Promise<string | null>;
     promptAnswer: (id: number, answer: "always" | "deny" | "once") => Promise<void>;
     promptCurrent: () => Promise<Prompt | null>;
     settingsGet: () => Promise<SettingsView>;
     settingsUpdate: (update: Record<string, unknown>) => Promise<SettingsView>;
+    terminalAvailability: () => Promise<Availability>;
 }

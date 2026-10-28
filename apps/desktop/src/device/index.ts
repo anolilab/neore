@@ -19,9 +19,11 @@ import { AcpManager } from "../acp/manager";
 import { coreGate } from "../acp/permission";
 import { spawnAgent } from "../acp/process";
 import type { AcpView, PermissionView, SpawnPlan } from "../acp/types";
-import { loadDeviceCore } from "./addon";
+import type { TerminalOpener } from "../terminal/index";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
-import type { CoreEvent, DeviceCore, Prompt, Signed } from "./types";
+import type { HostTransport } from "./transport";
+import { createLocalTransport } from "./transport";
+import type { CoreEvent, DeviceCore, Prompt } from "./types";
 import {
     readAcpUpdate,
     readAgentKey,
@@ -53,11 +55,21 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         core?: DeviceCore;
         coreError?: unknown;
         local?: BrowserWindowInstance;
+        transport?: HostTransport;
     } = {};
     /** Every site window that has made a trusted relay call and is still open: progress and changes go to each. */
     const sites = new Set<WebContents>();
     const localUrl = pathToFileURL(LOCAL_PAGE).href;
 
+    const requireTransport = (): HostTransport => {
+        if (state.transport === undefined) {
+            throw new Error(`device execution is unavailable: ${String(state.coreError)}`);
+        }
+
+        return state.transport;
+    };
+
+    /** The coding-agent handlers drive the local core directly: agents run on this computer only. */
     const requireCore = (): DeviceCore => {
         if (state.core === undefined) {
             throw new Error(`device execution is unavailable: ${String(state.coreError)}`);
@@ -123,7 +135,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         win.on("closed", () => {
             // Closing the window is a "no" to everything it was asking.
             state.local = undefined;
-            state.core?.denyPrompts();
+            state.transport?.denyPrompts();
         });
         win.loadFile(LOCAL_PAGE);
         state.local = win;
@@ -188,9 +200,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         }
     };
 
-    const onEvent = (json: string): void => {
-        const event = JSON.parse(json) as CoreEvent;
-
+    const onEvent = (event: CoreEvent): void => {
         switch (event.type) {
             case "acpPermission": {
                 showAgentRequest(event.agent, event.tool);
@@ -222,9 +232,10 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     };
 
     try {
-        const DeviceCoreClass = loadDeviceCore();
+        const created = createLocalTransport(app.getPath("userData"), onEvent);
 
-        state.core = new DeviceCoreClass(app.getPath("userData"), onEvent);
+        state.transport = created;
+        state.core = created.core;
     } catch (error) {
         // Register the handlers anyway: they reject with the reason, and the shell keeps running.
         state.coreError = error;
@@ -247,7 +258,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     };
 
     const reap = setInterval(() => {
-        state.core?.reapIdleServers();
+        state.transport?.reapIdleServers();
     }, REAP_INTERVAL_MS);
 
     reap.unref();
@@ -255,25 +266,25 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         clearInterval(reap);
         // Synchronous: `will-quit` cannot await, and an agent left behind would outlive the app.
         state.acp?.killAll();
-        state.core?.stop();
+        state.transport?.stop();
     });
 
     // ─── Relay (site window) ───────────────────────────────────────────────
 
-    relay(DEVICE_CHANNEL.status, () => JSON.parse(requireCore().status()) as unknown);
+    relay(DEVICE_CHANNEL.status, () => requireTransport().status());
 
     relay(DEVICE_CHANNEL.pair, (_event, pairing) => {
         const { accountLabel, deviceId, secret } = readPairing(pairing);
 
-        return requireCore().pair(deviceId, secret, accountLabel);
+        return requireTransport().pair(deviceId, secret, accountLabel);
     });
 
-    relay(DEVICE_CHANNEL.manifest, async () => JSON.parse(await requireCore().manifest()) as Signed);
+    relay(DEVICE_CHANNEL.manifest, async () => requireTransport().manifest());
 
     relay(DEVICE_CHANNEL.execute, async (_event, call) => {
         const { envelope, signature } = readSigned(call);
 
-        return JSON.parse(await requireCore().execute(envelope, signature)) as Signed;
+        return requireTransport().execute(envelope, signature);
     });
 
     relay(DEVICE_CHANNEL.openSettings, () => {
@@ -282,25 +293,21 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     // ─── Local window (approvals, folders, MCP servers, audit) ─────────────
 
-    local(LOCAL_CHANNEL.promptCurrent, () => {
-        const json = requireCore().promptCurrent();
-
-        return json === null ? null : (JSON.parse(json) as Prompt);
-    });
+    local(LOCAL_CHANNEL.promptCurrent, () => requireTransport().promptCurrent());
 
     local(LOCAL_CHANNEL.promptAnswer, (id, answer) => {
         const checked = readPromptAnswer(id, answer);
 
-        requireCore().promptAnswer(checked.id, checked.answer);
+        requireTransport().promptAnswer(checked.id, checked.answer);
     });
 
-    local(LOCAL_CHANNEL.settingsGet, () => JSON.parse(requireCore().settingsGet()) as unknown);
+    local(LOCAL_CHANNEL.settingsGet, () => requireTransport().settingsGet());
 
     local(
         LOCAL_CHANNEL.settingsUpdate,
         (update) =>
             // The core emits `changed` itself, so the site resends its manifest.
-            JSON.parse(requireCore().settingsUpdate(readSettingsUpdate(update))) as unknown,
+            requireTransport().settingsUpdate(readSettingsUpdate(update)),
     );
 
     local(LOCAL_CHANNEL.pickFolder, async () => {
@@ -325,7 +332,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return result.response === 1;
     });
 
-    local(LOCAL_CHANNEL.auditTail, () => requireCore().auditTail());
+    local(LOCAL_CHANNEL.auditTail, () => requireTransport().auditTail());
 
     // ─── Coding agents (ACP): registered, started and driven from this window only ─────
 
@@ -377,10 +384,27 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     local(LOCAL_CHANNEL.acpForget, (id) => requireAcp().remove(readSessionId(id)));
 
-    return state.core !== undefined;
+    // The terminal is the user's own shell, opened by a click in this window. The folder is checked by the terminal module.
+    local(LOCAL_CHANNEL.terminalAvailability, () => options.terminal?.availability ?? { available: false, reason: "The terminal is not available." });
+
+    local(LOCAL_CHANNEL.openTerminal, async (folder) => {
+        if (options.terminal === undefined) {
+            throw new Error("The terminal is not available.");
+        }
+
+        if (folder !== null && typeof folder !== "string") {
+            throw new Error("device: folder is invalid");
+        }
+
+        await options.terminal.open(folder);
+    });
+
+    return state.transport !== undefined;
 };
 
 export interface DeviceIpcOptions {
     /** True when the sender is the site's main window (see `trust.ts`). */
     isTrusted: (event: IpcMainInvokeEvent) => boolean;
+    /** Opens a terminal from the device window. Absent in tests that do not cover it. */
+    terminal?: TerminalOpener;
 }

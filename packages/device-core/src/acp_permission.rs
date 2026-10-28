@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::engine::cap_utf8;
+use crate::actions::cap_utf8;
 
 /// How long a request waits for an answer before the agent is told it was cancelled.
 const WAIT: Duration = Duration::from_secs(30 * 60);

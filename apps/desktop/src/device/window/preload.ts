@@ -40,11 +40,13 @@ const api: DeviceWindowApi = {
 
         return () => ipcRenderer.removeListener(LOCAL_EVENT.prompt, listener);
     },
+    openTerminal: (folder) => ipcRenderer.invoke(LOCAL_CHANNEL.openTerminal, folder),
     pickFolder: () => ipcRenderer.invoke(LOCAL_CHANNEL.pickFolder),
     promptAnswer: (id, answer) => ipcRenderer.invoke(LOCAL_CHANNEL.promptAnswer, id, answer),
     promptCurrent: () => ipcRenderer.invoke(LOCAL_CHANNEL.promptCurrent),
     settingsGet: () => ipcRenderer.invoke(LOCAL_CHANNEL.settingsGet),
     settingsUpdate: (update) => ipcRenderer.invoke(LOCAL_CHANNEL.settingsUpdate, update),
+    terminalAvailability: () => ipcRenderer.invoke(LOCAL_CHANNEL.terminalAvailability),
 };
 
 contextBridge.exposeInMainWorld("neoreDevice", api);

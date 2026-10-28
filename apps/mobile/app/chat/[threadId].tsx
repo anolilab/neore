@@ -13,6 +13,7 @@ import { relayReply } from "@/chat/stream";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
 import { getClient } from "@/lib/lunora";
+import { streamingFetch } from "@/lib/streaming-fetch";
 
 interface Row {
     id: string;
@@ -168,7 +169,7 @@ const ChatScreen = () => {
             }
 
             const outcome = await relayReply({
-                fetch,
+                fetch: streamingFetch,
                 gatewayUrl: config.gatewayUrl,
                 onDelta: ({ text }) => setRows((current) => appendToRow(current, assistantId, text)),
                 signal: controller.signal,

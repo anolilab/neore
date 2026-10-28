@@ -9,6 +9,13 @@ export interface Signed {
     signature: string;
 }
 
+/** Who this computer is paired as (`StatusView` in `device-core/src/engine.rs`). */
+export interface DeviceStatus {
+    accountLabel: string | null;
+    deviceId: string | null;
+    platform: string;
+}
+
 export interface Prompt {
     body:
         | { accountLabel: string; kind: "pairing" }
