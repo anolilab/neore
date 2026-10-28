@@ -312,7 +312,7 @@ export interface InternalApiTypes {
             createTitleChat: FunctionReference<"action", { prompt: string; threadId: string }, void>;
             deleteThreadRelationship: FunctionReference<"mutation", { threadId: string }, null>;
             editImage: FunctionReference<"action", { imageUrl: string; mask?: string; operation: string; prompt?: string }, { resultUrl: string; }>;
-            gateThreadAction: FunctionReference<"query", { level: "read" | "write" | "admin"; threadId: Id<"threads">; unlockProof?: string; userId: string }, { botId?: Id<"bots">; hostRun?: boolean; outcome: "denied" | "locked" | "ok" }>;
+            gateThreadAction: FunctionReference<"query", { level: "read" | "write" | "admin"; threadId: Id<"threads">; unlockProof?: string; userId: string }, { botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: "denied" | "locked" | "ok" }>;
             generateAudio: FunctionReference<"action", { jobId?: string; model: string; prompt: string; promptMessageId?: Id<"messages">; threadId: string; userId: string; voice?: string }, { assets: Array<{ audioUrl: string; mimeType: string }>; modelId: string; prompt: string }>;
             generateBackgroundRemoval: FunctionReference<"action", { backgroundColor?: string; imageUrl: string; model?: string; outputFormat?: string; refineMask?: boolean; threadId: string; userId: string }, { imageUrl: string; mimeType: string; model: string }>;
             generateCharacterRef: FunctionReference<"action", { aspectRatio?: string; mode: string; model?: string; negativePrompt?: string; prompt?: string; referenceImages: Array<string>; strength?: number; threadId: string; userId: string }, { imageUrl: string; mimeType: string; mode: string; model: string }>;
@@ -955,9 +955,10 @@ export interface InternalApiTypes {
         };
         functions: {
             attachChildThread: FunctionReference<"mutation", { childThreadId: string; runId: Id<"subAgentRuns"> }, boolean>;
-            claimRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, { depth: number; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
+            claimRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, { childThreadId?: string; clientId?: string; depth: number; mode?: "run" | "worker"; model?: string; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
             completeRun: FunctionReference<"mutation", { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }, boolean>;
-            createRun: FunctionReference<"mutation", { parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }, { runId: Id<"subAgentRuns"> } | { error: string }>;
+            createRun: FunctionReference<"mutation", { leadTools?: Array<string>; model?: string; name?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }, { runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
+            messageWorker: FunctionReference<"mutation", { message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: FunctionReference<"mutation", { attempt: number; runId: Id<"subAgentRuns"> }, null>;
             reapRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
             shouldRunStop: FunctionReference<"query", { runId: Id<"subAgentRuns"> }, boolean>;
@@ -2000,6 +2001,7 @@ export const internal: InternalApiTypes = {
             claimRun: { __lunoraRef: "sub_agents_functions:claimRun" },
             completeRun: { __lunoraRef: "sub_agents_functions:completeRun" },
             createRun: { __lunoraRef: "sub_agents_functions:createRun" },
+            messageWorker: { __lunoraRef: "sub_agents_functions:messageWorker" },
             postResult: { __lunoraRef: "sub_agents_functions:postResult" },
             reapRun: { __lunoraRef: "sub_agents_functions:reapRun" },
             shouldRunStop: { __lunoraRef: "sub_agents_functions:shouldRunStop" },
