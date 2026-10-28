@@ -28,11 +28,12 @@ describe("hangUp", () => {
         expect(signal).not.toHaveBeenCalled();
         expect(run).toHaveBeenCalledTimes(1);
 
-        const [file, args, options] = run.mock.calls[0] as [string, string[], Record<string, unknown>];
+        const [file, args, options, callback] = run.mock.calls[0] as [string, string[], Record<string, unknown>, unknown];
 
         expect(file.replaceAll("\\", "/")).toMatch(TASKKILL);
         expect(args).toEqual(["/pid", "4242", "/t", "/f"]);
         expect(options).toMatchObject({ timeout: 3000, windowsHide: true });
+        expect(callback).toBeTypeOf("function");
     });
 
     it("does not fail when the shell is already gone", () => {

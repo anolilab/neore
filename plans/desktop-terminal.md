@@ -51,7 +51,7 @@ Decisions:
   older builds get the "needs Windows 10 version 1903 or later" message instead of a button. The shell is
   Windows PowerShell by absolute path under `%SystemRoot%` (`-NoLogo`, so the profile still loads), else
   `%ComSpec%`; `$SHELL` is ignored. There is no hangup signal and `process.kill` ends one process, so a shell
-  is ended with `taskkill /t /f` (`hang-up.ts`), also when the host dies, because nothing else would.
+  is ended with `taskkill /t /f` (`hang-up.ts`, started without waiting, so shells end in parallel at quit), also when the host dies, because nothing else would. Without a Job Object `/t` follows parent links only, so a grandchild whose parent has already exited (an `npm run dev` wrapper that left its server behind) is missed; a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` is the follow-up.
   `node-pty`'s own `kill` forks a helper script that a packaged app (RunAsNode fuse off) cannot run, so it is
   not used there. `node-pty` is loaded from the unpacked copy of a packaged app (`asarUnpack`), since its
   worker thread cannot start from inside `app.asar`. Like `shell_run`, the terminal has no sandbox on

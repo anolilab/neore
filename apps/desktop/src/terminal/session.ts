@@ -41,7 +41,7 @@ export interface TerminalSession {
     ack: (chars: number) => void;
     /** Hangs up the shell and ends the host. Safe to call twice. */
     kill: () => void;
-    /** Like `kill`, but the shell is signalled before this returns: for the app quitting. */
+    /** Like `kill`, but the shell is signalled (on Windows, its `taskkill` started) before this returns: for the app quitting. */
     killNow: () => void;
     readonly pid: number;
     resize: (cols: number, rows: number) => void;

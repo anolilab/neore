@@ -32,24 +32,33 @@ const SHELL_WAIT_MS = windows ? 40_000 : 10_000;
 const dialect = windows
     ? {
         args: ["-NoLogo", "-NoProfile"],
+        // A real child of the shell, which only a tree kill reaches. The typed text holds no digits after `child-`, so only the shell's answer matches.
+        child: `$p = Start-Process -PassThru -NoNewWindow ping -ArgumentList '-n','1000','127.0.0.1'; echo "child-$($p.Id)"`,
         // The upper-cased path cannot be the prompt's (`PS C:\...>`), which already names the folder before any command runs.
         describe: "(Get-Location).Path.ToUpper(); echo marker-$(6*7)",
         enter: "\r",
         file: path.win32.join(process.env.SystemRoot ?? String.raw`C:\Windows`, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
         folderShown: (folder: string) => path.basename(folder).toUpperCase(),
         missingFolder: String.raw`C:\definitely\not\a\folder`,
-        sleep: "Start-Sleep 1000",
+        // The typed text names no number, so only the shell's answer holds the width and height.
+        size: `echo "size-$($Host.UI.RawUI.WindowSize.Width)x$($Host.UI.RawUI.WindowSize.Height)"`,
+        // The typed text splits the word, so only the shell's answer holds it whole.
+        unicode: `echo ("ä€" + "x")`,
     }
     : {
         args: [] as string[],
+        child: "sleep 1000 & echo child-$!",
         describe: "pwd; echo marker-$((6*7))",
         enter: "\n",
         file: "/bin/sh",
         // macOS resolves /var to /private/var, so only the folder's own name is compared.
         folderShown: (folder: string) => path.basename(folder),
         missingFolder: "/definitely/not/a/folder",
-        sleep: "sleep 1000",
+        size: "set -- $(stty size); echo size-$2x$1",
+        unicode: "echo ä€''x",
     };
+
+const CHILD_PID = /child-(\d+)/u;
 
 const processes: ReturnType<typeof fork>[] = [];
 
@@ -198,21 +207,41 @@ describe.skipIf(!supported)("terminal host (real pty)", { timeout: windows ? 120
         await waitFor(() => host?.exitCode !== null || host?.signalCode !== null, "the host to end");
     });
 
-    it("ends the shell and its foreground job when the session is killed", async () => {
+    it("ends the shell and a process it started when the session is killed", async () => {
         const run = await open(tmpdir());
 
-        run.session.write(`${dialect.sleep}${dialect.enter}`);
-        await new Promise((resolve) => {
-            setTimeout(resolve, 300);
-        });
+        run.session.write(`${dialect.child}${dialect.enter}`);
+        await waitFor(() => CHILD_PID.test(run.output()), "the child to start");
 
+        const childPid = Number(CHILD_PID.exec(run.output())?.[1]);
         const shellPid = run.session.pid;
 
         expect(isAlive(shellPid)).toBe(true);
+        expect(isAlive(childPid)).toBe(true);
         run.session.kill();
         await waitFor(() => !isAlive(shellPid), "the shell to end");
+        await waitFor(() => !isAlive(childPid), "the child to end");
         await waitFor(() => run.exits.length > 0, "the exit to be reported");
         expect(run.exits).toHaveLength(1);
+    });
+
+    it("passes a resize on to the shell", async () => {
+        const run = await open(tmpdir());
+
+        run.session.resize(100, 30);
+        run.session.write(`${dialect.size}${dialect.enter}`);
+        await waitFor(() => run.output().includes("size-100x30"), "the shell to report its new size");
+        expect(run.output()).toContain("size-100x30");
+        run.session.kill();
+    });
+
+    it("carries non-ASCII text both ways", async () => {
+        const run = await open(tmpdir());
+
+        run.session.write(`${dialect.unicode}${dialect.enter}`);
+        await waitFor(() => run.output().includes("ä€x"), "the shell to answer in the same characters");
+        expect(run.output()).toContain("ä€x");
+        run.session.kill();
     });
 
     it("ends the shell at once when the app quits (killNow)", async () => {
