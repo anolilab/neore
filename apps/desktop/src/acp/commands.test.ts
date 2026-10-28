@@ -35,7 +35,7 @@ const deliver = async (target: HostCommands, callId: string): Promise<string> =>
 
 const make = (
     applied: AcpCommand[],
-    overrides: { apply?: (command: AcpCommand, call: AppliedCall) => Held | Promise<Held | string> | string; file?: string; lapsed?: (send: { sessionId: string; threadId: string; turnId: string }) => void; now?: () => number } = {},
+    overrides: { apply?: (command: AcpCommand, call: AppliedCall) => Held | Promise<Held | string> | string; file?: string; interrupted?: (send: { sessionId: string; threadId: string; turnId: string }) => void; lapsed?: (send: { sessionId: string; threadId: string; turnId: string }) => void; now?: () => number } = {},
 ) =>
     new HostCommands({
         apply:
@@ -46,6 +46,7 @@ const make = (
                 return "accepted";
             }),
         core: fakeCore({}),
+        interrupted: overrides.interrupted,
         lapsed: overrides.lapsed,
         log: () => undefined,
         now: overrides.now,
@@ -192,7 +193,7 @@ const heldEnvelope = (callId: string, command: AcpCommand, expiresAt?: number): 
         callId,
         command,
         expiresAt,
-        input: command.kind === "send" ? { sessionId: command.sessionId, text: command.text, turnId: command.turnId } : {},
+        input: command.kind === "send" ? { sessionId: command.sessionId, text: command.text, turnId: command.turnId } : { sessionId: command.sessionId },
         refusal: null,
         threadId: "t1",
         tool: command.kind === "start" ? "acp_start" : "acp_send",
@@ -245,34 +246,60 @@ describe("a command held until its session opens", () => {
     });
 
     it("loses no command when the process dies after the receipt: the next start acts on it once", async () => {
-        // The first process writes the receipt and is killed before it acts: its apply never returns.
+        // The first process writes the receipt and is killed before it acts. The `apply` that never returns stands in for
+        // the kill: the receipt is on disk and nothing after it ran, which is all a killed process leaves.
         const killed = make([], { apply: killedInside });
 
-        killed.execute(heldEnvelope("c1", SEND), "sig");
-        await vi.waitFor(() => expect(open()).toContain("fix it"));
+        killed.execute(heldEnvelope("c1", START), "sig");
+        await vi.waitFor(() => expect(open()).toContain("acp_start"));
 
         const applied: AcpCommand[] = [];
         const restarted = make(applied);
 
         await restarted.recover();
-        expect(applied).toEqual([SEND]);
+        expect(applied).toEqual([START]);
 
         // The call comes back as well (its lease lapsed): acknowledged, not run again.
-        expect(await deliverHeld(restarted, "c1", SEND)).toBe("accepted");
-        expect(applied).toEqual([SEND]);
+        expect(await deliverHeld(restarted, "c1", START)).toBe("accepted");
+        expect(applied).toEqual([START]);
 
         // And a start after that finds nothing left to do.
         const again: AcpCommand[] = [];
 
         await make(again).recover();
         expect(again).toEqual([]);
+        expect(open()).not.toContain("acp_start");
+    });
+
+    it("ends a held message as interrupted, never runs it, when no replayed start will open its session", async () => {
+        const killed = make([], { apply: killedInside });
+
+        killed.execute(heldEnvelope("c1", SEND), "sig");
+        await vi.waitFor(() => expect(open()).toContain("fix it"));
+
+        const applied: AcpCommand[] = [];
+        const interrupted: unknown[] = [];
+        const lapsed: unknown[] = [];
+
+        await make(applied, {
+            interrupted: (held) => {
+                interrupted.push(held);
+            },
+            lapsed: (held) => {
+                lapsed.push(held);
+            },
+        }).recover();
+
+        expect(applied).toEqual([]);
+        expect(lapsed).toEqual([]);
+        expect(interrupted).toEqual([{ sessionId: "s1", threadId: "t1", turnId: "u1" }]);
         expect(open()).not.toContain("fix it");
     });
 
     it("keeps a command that is still held across a restart, until it is acted on", async () => {
         const first = make([], { apply: () => HELD });
 
-        await first.execute(heldEnvelope("c1", SEND), "sig");
+        await first.execute(heldEnvelope("c1", START), "sig");
 
         const calls: string[] = [];
         const second = make([], {
@@ -293,6 +320,42 @@ describe("a command held until its session opens", () => {
 
         await make(third).recover();
         expect(third).toEqual([]);
+    });
+
+    it("does not let a replay that fails block the commands that follow", async () => {
+        const first = make([], { apply: () => HELD });
+
+        await first.execute(heldEnvelope("c1", START), "sig");
+
+        const logs: string[] = [];
+        const applied: AcpCommand[] = [];
+        const broken = new HostCommands({
+            apply: (command) => {
+                applied.push(command);
+
+                return "accepted";
+            },
+            core: {
+                acpPrepare: (envelope: string): string => {
+                    if ((JSON.parse(envelope) as { callId: string }).callId === "c1") {
+                        throw new Error("core unavailable");
+                    }
+
+                    return fakeCore({}).acpPrepare(envelope);
+                },
+                acpSign: fakeCore({}).acpSign,
+            },
+            log: (message) => {
+                logs.push(message);
+            },
+            receiptFile,
+        });
+
+        await broken.recover();
+        // The one that could not be checked was dropped; a new call still gets its answer.
+        expect(await deliverHeld(broken, "c2", SEND)).toBe("accepted");
+        expect(applied).toEqual([SEND]);
+        expect(logs.join("\n")).toContain("was not valid any more");
     });
 
     it("replays a start before the message that waits for its session, whatever order they were received in", async () => {
@@ -355,7 +418,7 @@ describe("a command held until its session opens", () => {
     it("makes a delivery wait for the replay, so a call that comes back during it is not acted on twice", async () => {
         const first = make([], { apply: () => HELD });
 
-        await first.execute(heldEnvelope("c1", SEND), "sig");
+        await first.execute(heldEnvelope("c1", START), "sig");
 
         const release: { go?: () => void } = {};
         const applied: AcpCommand[] = [];
@@ -373,7 +436,7 @@ describe("a command held until its session opens", () => {
 
         await vi.waitFor(() => expect(release.go).toBeDefined());
 
-        const delivery = restarted.execute(heldEnvelope("c1", SEND), "sig");
+        const delivery = restarted.execute(heldEnvelope("c1", START), "sig");
 
         release.go?.();
         await replay;

@@ -336,7 +336,11 @@ describe("a message held for a session that is not open yet", () => {
         host.turnHeld("s1", "t1", "fix it", "thread-7");
         await settle(POST_INTERVAL_MS);
 
-        expect(backend.posts.find(({ post }) => post.turnId === "t1")?.post).toMatchObject({ events: [{ kind: "turn_start", text: "fix it" }], firstSeq: 0, threadId: "thread-7" });
+        expect(backend.posts.find(({ post }) => post.turnId === "t1")?.post).toMatchObject({
+            events: [{ kind: "turn_start", text: "fix it" }],
+            firstSeq: 0,
+            threadId: "thread-7",
+        });
 
         // The session opens and the held message runs: the same turn goes on, with no second `turn_start`.
         await open(host);
@@ -391,7 +395,7 @@ describe("a message held for a session that is not open yet", () => {
 
         const host = poster();
 
-        host.endLapsedTurn("s1", "t1", "thread-7", "the agent did not open its session in time");
+        host.endLapsedTurn("s1", "t1", "thread-7", { error: "the agent did not open its session in time", reason: "failed" });
         await settle(POST_INTERVAL_MS * 2);
 
         expect(backend.chunks.get("t1")?.at(-1)).toEqual({ error: "the agent did not open its session in time", kind: "turn_end", reason: "failed" });
@@ -1015,6 +1019,33 @@ describe("a restart", () => {
         await settle(60_000);
 
         expect(backend.chunks.get("t-old")?.at(-1)).toEqual({ kind: "turn_end", reason: "interrupted" });
+    });
+
+    it("still ends a turn the last run left when a replayed message rewrites the file first", async () => {
+        await writeFile(path.join(scratch, "acp-host-turns.json"), JSON.stringify({ turns: [{ sessionId: "old", threadId: "thread-9", turnId: "t-old" }] }));
+        backend.chunks.set("t-old", [{ kind: "turn_start", text: "x" }]);
+
+        const host = poster();
+        const leftovers = await host.readLeftovers();
+
+        // The replay of a held message opens a channel, which rewrites the file of running turns.
+        host.turnHeld("s2", "t-held", "go", "thread-2");
+        await host.persisted();
+
+        // The file keeps the turn that is still to be ended, beside the new one.
+        expect(await runningTurns()).toEqual({
+            turns: [
+                { sessionId: "s2", threadId: "thread-2", turnId: "t-held" },
+                { sessionId: "old", threadId: "thread-9", turnId: "t-old" },
+            ],
+        });
+
+        await host.recover(leftovers);
+        await settle(POST_INTERVAL_MS * 2);
+
+        expect(backend.chunks.get("t-old")?.at(-1)).toEqual({ kind: "turn_end", reason: "interrupted" });
+        // The held message's own turn is not ended: it has a channel, and runs when its session opens.
+        expect(backend.chunks.get("t-held")?.some((event) => event.kind === "turn_end")).toBe(false);
     });
 
     it("records a running turn on disk once its thread is known", async () => {

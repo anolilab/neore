@@ -130,6 +130,7 @@ export class EarlySends {
             return false;
         }
 
+        this.forgetIfEmpty(sessionId, waiting);
         clearTimeout(entry.timer);
         this.options.observer.turnEnded(sessionId, turnId, "cancelled");
         this.options.finished(entry.callId);
@@ -153,7 +154,15 @@ export class EarlySends {
         }
 
         waiting.splice(index, 1);
+        this.forgetIfEmpty(entry.sessionId, waiting);
         this.end(entry, reason);
+    }
+
+    /** A session with nothing held leaves no key behind. */
+    private forgetIfEmpty(sessionId: string, waiting: HeldSend[]): void {
+        if (waiting.length === 0) {
+            this.held.delete(sessionId);
+        }
     }
 
     private now(): number {

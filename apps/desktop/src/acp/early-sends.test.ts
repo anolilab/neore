@@ -173,6 +173,28 @@ describe("a message for a session that is not open", () => {
     });
 });
 
+describe("what is held", () => {
+    const heldSessions = (subject: Rig): number => (subject.early as unknown as { held: Map<string, unknown> }).held.size;
+
+    it("leaves no key behind for a session once its last message is gone", () => {
+        const subject = rig();
+
+        subject.early.submit(message("u1"), call("c1"));
+        subject.early.submit({ ...message("u2"), sessionId: "s2" }, call("c2"));
+        expect(heldSessions(subject)).toBe(2);
+
+        subject.early.cancel("s1", "u1");
+        expect(heldSessions(subject)).toBe(1);
+
+        vi.advanceTimersByTime(61_000);
+        expect(heldSessions(subject)).toBe(0);
+
+        subject.early.submit(message("u3"), call("c3"));
+        subject.early.opened("s1");
+        expect(heldSessions(subject)).toBe(0);
+    });
+});
+
 describe("a message for a session that is open or over", () => {
     it("is sent at once to an open session, held for none", () => {
         const subject = rig();

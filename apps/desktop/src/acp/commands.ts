@@ -79,6 +79,8 @@ export interface CommandOptions {
     /** Acts on a command and answers `accepted`, or the reason it was not carried out. Throws to refuse with the error's message. */
     apply: (command: AcpCommand, call: AppliedCall) => Held | Promise<Held | string> | string;
     core: CommandCore;
+    /** Told of a held `send` whose session no replayed start will open: it may have run before the app went down. */
+    interrupted?: (send: LapsedSend) => void;
     /** Told of a held `send` that expired while the app was down. */
     lapsed?: (send: LapsedSend) => void;
     log?: (message: string) => void;
@@ -154,6 +156,13 @@ const threadOf = (envelope: string): string | undefined => {
     return typeof threadId === "string" && threadId !== "" ? threadId : undefined;
 };
 
+/** The session a held `start` opens, from its stored envelope; "" for anything else. */
+const startedSessionOf = (envelope: string): string => {
+    const { input, tool } = parsedEnvelope(envelope);
+
+    return tool === "acp_start" && isRecord(input) && typeof input.sessionId === "string" ? input.sessionId : "";
+};
+
 /** A held `send`'s ids, from its stored envelope. */
 const sendOf = (envelope: string): LapsedSend | undefined => {
     const { input, threadId, tool } = parsedEnvelope(envelope);
@@ -223,7 +232,7 @@ export class HostCommands {
      * relay delivers anything: a delivery waits for this.
      */
     public async recover(): Promise<void> {
-        this.replaying = this.replay();
+        this.replaying = this.replayAll();
 
         await this.replaying;
     }
@@ -313,6 +322,15 @@ export class HostCommands {
         return outcome;
     }
 
+    /** A replay that fails is logged, not kept: a delivery waits for it and must not wait for ever. */
+    private async replayAll(): Promise<void> {
+        try {
+            await this.replay();
+        } catch (error) {
+            this.options.log?.(`[acp-host] commands left from the last run could not be replayed: ${(error as Error).message}`);
+        }
+    }
+
     private async replay(): Promise<void> {
         await this.load();
 
@@ -325,6 +343,10 @@ export class HostCommands {
                 Number(parsedEnvelope(first.held?.envelope ?? "").tool === "acp_start"),
         );
 
+        // The sessions a replayed start will open. A held message for any other session is for one that died with the
+        // process or whose start has not come back yet: it may already have run, so its turn is interrupted.
+        const opening = new Set(open.flatMap(([, receipt]) => receipt.expiresAt > this.now() ? [startedSessionOf(receipt.held?.envelope ?? "")] : []));
+
         for (const [callId, receipt] of open) {
             const { envelope, signature } = receipt.held as { envelope: string; signature: string };
 
@@ -334,6 +356,17 @@ export class HostCommands {
                 if (send !== undefined) {
                     this.options.lapsed?.(send);
                 }
+
+                // eslint-disable-next-line no-await-in-loop -- one command at a time, starts first
+                await this.finished(callId);
+
+                continue;
+            }
+
+            const send = sendOf(envelope);
+
+            if (send !== undefined && !opening.has(send.sessionId)) {
+                this.options.interrupted?.(send);
 
                 // eslint-disable-next-line no-await-in-loop -- one command at a time, starts first
                 await this.finished(callId);

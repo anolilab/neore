@@ -680,8 +680,11 @@ mobile M2 needs them.
   kept (a send for a session that is starting or not known yet; a start, until its agent has opened or failed); the call is
   acknowledged at once and `HostCommands.finished` removes the envelope later, so a sent prompt does not stay on disk.
   `HostCommands.recover()` runs at app start, before the poster's own recovery: it re-runs `acpPrepare` on each held envelope
-  (consent revoked meanwhile, expiry), acts on starts first and sends after, and a delivery waits for it. A held send past its
-  `expiresAt` ends its stream with an error (`endLapsedTurn`). The window between acting on a command and writing "acted on"
+  (consent revoked meanwhile, expiry), acts on starts first and sends after, and a delivery waits for it (a replay that fails is logged and does not
+  hold the commands behind it). A held send past its `expiresAt` ends its stream with an error (`endLapsedTurn`); one whose
+  session no replayed start will open ends `interrupted`, never runs (the session died with the process, and the message may have
+  run before it). The poster reads the running turns left on disk BEFORE the replay, which opens channels and rewrites that
+  file, and keeps them in the file until it has ended them. The window between acting on a command and writing "acted on"
   is not atomic: a process killed inside it acts twice.
 - **`acp/early-sends.ts`** holds the message against its session (open sessions take it at once, ended ones refuse it). The
   thread comes from the signed envelope (`threadId`), so the turn's channel opens at once (`HostPoster.turnHeld`): the
@@ -702,7 +705,7 @@ mobile M2 needs them.
   (it was appended to the reply before), whether or not children are shown.
   The ledger: a card exists once the spawn call was seen (the first sight of a tool call, after its own event is on the wire);
   an event that names a call that never appears makes no card; events before the card wait in one per-session buffer
-  (provisional budget `CHILD_BUFFER_BUDGET_BYTES`, 512 KiB, **not measured**: see [acp-s7-children.md](acp-s7-children.md)); past
+  (provisional budget `CHILD_BUFFER_BUDGET_BYTES`, 512 KiB per session, at most 8 sessions: **pending measurement**, see [acp-s7-children.md](acp-s7-children.md) for the one real session measured, which never used the buffer); past
   it an event is dropped and logged, never stored; a spawn's terminal update ends its card once (a repeat and anything later
   are ignored), and its text is kept only when the child streamed none; text is masked with the user's variable values and
   held back like the agent's own.
@@ -715,7 +718,9 @@ mobile M2 needs them.
   leave one transcript.
 - **Not built:** rendering `subagentTranscripts` in the thread (nothing reads the metadata yet); the resume rule of §4.7
   (rebuilding ownership from stored spawn parts on session load needs the reattach of harness S4, which nothing does yet);
-  a source for the `subagents.ownChildren` report; the byte budget measured on a real child-heavy session.
+  a source for the `subagents.ownChildren` report; the byte budget measured on a real child-heavy session (S7's acceptance
+  item for it is **pending measurement**: one run of three short children was recorded, peak 0; the live log line of a
+  session's peak exists only for an agent that reports its children, so today the offline harness is the way to measure).
 
 **S8 — Images and files from host agents.** §4.8. Needs S3 (persistence), the
 device file operation, and the device-signed create on the upload route (new

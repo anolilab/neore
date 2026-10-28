@@ -408,7 +408,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         state.commands ??= new HostCommands({
             apply: applyCommand,
             core: requireCore(),
-            lapsed: (held) => requireHost(requireCore()).endLapsedTurn(held.sessionId, held.turnId, held.threadId, NEVER_OPENED),
+            interrupted: (held) => requireHost(requireCore()).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { reason: "interrupted" }),
+            lapsed: (held) => requireHost(requireCore()).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { error: NEVER_OPENED, reason: "failed" }),
             log: (message) => console.error(message),
             receiptFile: path.join(app.getPath("userData"), "acp-host-receipts.json"),
         });
@@ -421,13 +422,17 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
      * was cut off in ends as `interrupted`, whether or not an agent is started this time.
      */
     const recoverFromRestart = async (core: DeviceCore): Promise<void> => {
+        const host = requireHost(core);
+        // Read first: the replay opens channels, and the first of them rewrites the file of running turns.
+        const leftovers = await host.readLeftovers();
+
         try {
             await requireCommands().recover();
         } catch (error) {
             console.error("[neore-desktop] commands left from the last run could not be replayed:", (error as Error).message);
         }
 
-        await requireHost(core).recover();
+        await host.recover(leftovers);
     };
 
     if (state.core !== undefined) {

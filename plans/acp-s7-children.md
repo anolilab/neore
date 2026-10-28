@@ -4,10 +4,26 @@ Status: 2026-10-28. Part of [acp-agent-host.md](acp-agent-host.md) §4.7 and S7'
 
 ## Result
 
-**Not measured.** The slice was built in a session with no signed-in desktop and no way to run a real agent through a
-child-heavy task, so no session could be recorded. The budget in the code is a provisional figure:
+**One real session was measured; the budget is still provisional.** On 2026-10-28 the Claude Code ACP adapter
+(`@agentclientprotocol/claude-agent-acp` 0.98.0, installed in a scratch folder, driven over stdio as the desktop drives
+an agent: no subagent capability declared) ran one prompt that started three subagents in parallel in an empty folder.
+Replayed through `child-buffer-cli.ts`:
 
-`CHILD_BUFFER_BUDGET_BYTES = 512 * 1024` (`apps/desktop/src/acp/children.ts`), per session.
+```
+{"updates":68,"childEvents":18,"dropped":0,"peakBytes":0}
+```
+
+- 18 of the 68 updates were stamped with a parent tool call (6 `tool_call`, 12 `tool_call_update`, all tool events:
+  no child text reached the feed from a client that declares nothing).
+- The spawn call of each child was announced before any of its children's events, so the buffer was never used: peak 0.
+- What a child event costs in the ledger's own terms: 2,082 bytes for all 18, at most 127 bytes each.
+
+That is one run of three short children with the parent first every time. It shows the ordering the buffer guards
+against did not occur and that real events are small; it does not set a number, and it says nothing about long children
+with streamed text (which this adapter only forwards to a client that declares support, and no agent reports yet).
+`CHILD_BUFFER_BUDGET_BYTES` stays at the provisional `512 * 1024` (`apps/desktop/src/acp/children.ts`), per session, with
+at most 8 sessions at once. **S7's acceptance item "budget measured on a real child-heavy session" is pending**: it needs
+several runs, children that stream text, and an agent that reports its children.
 
 ## Why that figure
 
@@ -27,22 +43,26 @@ reach. If a real session shows a peak far below it, lower it; if one drops event
 
 ## The harness
 
-- The live path: every session logs `child output buffered before its parent: peak <bytes> bytes, <n> dropped` when it ends,
-  and `child output arrived before its parent and passed the <bytes>-byte buffer` on the first drop (`session.ts`,
-  `children.ts`). Running a child-heavy task with the desktop open is a measurement; read the line in the app's log.
-- The offline path: `apps/desktop/src/acp/child-buffer.ts` replays a log of an agent's output through the same ledger and
-  reports the child events seen, the peak bytes held and what a given budget would drop. `child-buffer-cli.ts` runs it:
+- **Offline, the only path that measures today.** `apps/desktop/src/acp/child-buffer.ts` replays a log of an agent's
+  output through the same ledger and reports the child events seen, the peak bytes held and what a given budget would
+  drop. `child-buffer-cli.ts` runs it:
 
   ```
   pnpm --filter @neore/desktop exec tsx src/acp/child-buffer-cli.ts agent-output.jsonl [budgetBytes]
   ```
 
-  The log is the agent's stdout (one JSON-RPC frame per line), captured by starting the agent through a wrapper that `tee`s it.
+  The log is the agent's stdout (one JSON-RPC frame per line). It reads children whether or not the host would show them.
+- **Live, not yet.** A session logs `child output buffered before its parent: peak <bytes> bytes, <n> dropped` when it
+  ends, but only for an agent that reports its children: `session.ts` drops a child's update before the ledger when
+  `subagents.ownChildren` is unsupported, and every real agent is unsupported until something reports it. So running the
+  desktop on a real agent logs nothing about children today.
 
 ## How to measure
 
-1. Use an agent that reports its children (none does yet: see the S7 section of the plan). Until then, replay a recorded log
-   from an adapter that stamps children with `_meta.claudeCode.parentToolUseId` and flatten-forwards them, which the offline
-   path reads whether or not the host would show them.
-2. Give it a task that starts several children at once, each with long output and many tool calls.
-3. Repeat three times. The budget is the largest peak with headroom, rounded to a power of two; record the runs here.
+1. Install the adapter in a scratch folder (`npm install @agentclientprotocol/claude-agent-acp`), start it with an empty
+   working folder, speak ACP to it over stdio as the host does (`initialize`, `session/new`, `session/prompt`; answer
+   `session/request_permission` with the first allow-once option; the folder is empty and the prompt read-only), and
+   save its stdout.
+2. Give it a task that starts several children at once, each with long output and many tool calls. Repeat three times.
+3. Feed each log to the offline path. The budget is the largest peak with headroom, rounded to a power of two; record
+   the runs here.
