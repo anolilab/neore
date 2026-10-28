@@ -1,0 +1,118 @@
+{
+    "fixture": { "a.txt": "hello", "sub/b.txt": "nested", "../outside.txt": "secret" },
+    "vectors": [
+        {
+            "name": "list the shared folder",
+            "tool": "fs_list",
+            "input": {},
+            "expect": { "status": "completed", "output": "{\n  \"entries\": [\n    {\n      \"name\": \"a.txt\",\n      \"size\": 5,\n      \"type\": \"file\"\n    },\n    {\n      \"name\": \"sub\",\n      \"size\": 0,\n      \"type\": \"dir\"\n    }\n  ],\n  \"path\": \"{root}\",\n  \"truncated\": false\n}" }
+        },
+        {
+            "name": "read a file",
+            "tool": "fs_read",
+            "input": { "path": "a.txt" },
+            "expect": { "status": "completed", "output": "hello" }
+        },
+        {
+            "name": "read a nested file by a relative path",
+            "tool": "fs_read",
+            "input": { "path": "sub/b.txt" },
+            "expect": { "status": "completed", "output": "nested" }
+        },
+        {
+            "name": "read needs a path",
+            "tool": "fs_read",
+            "input": {},
+            "expect": { "status": "failed", "error": "path is required" }
+        },
+        {
+            "name": "read a file that does not exist",
+            "tool": "fs_read",
+            "input": { "path": "missing.txt" },
+            "expect": { "status": "failed", "error": "missing.txt: not found" }
+        },
+        {
+            "name": "read outside the shared folders",
+            "tool": "fs_read",
+            "input": { "path": "../outside.txt" },
+            "expect": { "status": "failed", "error": "../outside.txt: outside the shared folders" }
+        },
+        {
+            "name": "write a new file",
+            "tool": "fs_write",
+            "input": { "path": "new.txt", "content": "fresh" },
+            "expect": { "status": "completed", "output": "wrote 5 bytes to {root}/new.txt" }
+        },
+        {
+            "name": "read back what was written",
+            "tool": "fs_read",
+            "input": { "path": "new.txt" },
+            "expect": { "status": "completed", "output": "fresh" }
+        },
+        {
+            "name": "write refuses to replace a file unasked",
+            "tool": "fs_write",
+            "input": { "path": "a.txt", "content": "replaced" },
+            "expect": { "status": "failed", "error": "the file exists; pass overwrite: true to replace it" }
+        },
+        {
+            "name": "write replaces a file when asked",
+            "tool": "fs_write",
+            "input": { "path": "a.txt", "content": "replaced", "overwrite": true },
+            "expect": { "status": "completed", "output": "wrote 8 bytes to {root}/a.txt" }
+        },
+        {
+            "name": "write needs content",
+            "tool": "fs_write",
+            "input": { "path": "x.txt" },
+            "expect": { "status": "failed", "error": "content is required" }
+        },
+        {
+            "name": "an unknown tool",
+            "tool": "fs_delete",
+            "input": {},
+            "expect": { "status": "failed", "error": "fs_delete is not a tool of this device" }
+        },
+        {
+            "name": "shell needs a command",
+            "tool": "shell_run",
+            "input": {},
+            "expect": { "status": "failed", "error": "command is required" }
+        },
+        {
+            "name": "a shell command runs sandboxed",
+            "tool": "shell_run",
+            "input": { "command": "echo vector-ok" },
+            "only": "sandboxed",
+            "expect": { "status": "completed", "output": "vector-ok\n", "exitCode": 0 }
+        },
+        {
+            "name": "a shell command writes inside the shared folder",
+            "tool": "shell_run",
+            "input": { "command": "echo inside > made.txt && cat made.txt" },
+            "only": "sandboxed",
+            "expect": { "status": "completed", "output": "inside\n", "exitCode": 0 }
+        },
+        {
+            "name": "a shell command cannot write outside the shared folder",
+            "tool": "shell_run",
+            "input": { "command": "if { echo out > ../escaped.txt; } 2>/dev/null; then echo wrote; else echo blocked; fi" },
+            "only": "sandboxed",
+            "expect": { "status": "completed", "output": "blocked\n", "exitCode": 0 }
+        },
+        {
+            "name": "a shell command reports its exit code",
+            "tool": "shell_run",
+            "input": { "command": "exit 3" },
+            "only": "sandboxed",
+            "expect": { "status": "completed", "output": "", "exitCode": 3 }
+        },
+        {
+            "name": "a shell command is refused where there is no sandbox",
+            "tool": "shell_run",
+            "input": { "command": "echo ran > refused-marker.txt" },
+            "only": "unsandboxed",
+            "expect": { "status": "failed", "errorContains": ["must run sandboxed"] }
+        }
+    ]
+}

@@ -582,6 +582,15 @@ written here is what is not.
   crates. The HMAC vectors are pinned on BOTH sides — change one, update both.
   `tauri-plugin-dialog` is driven from Rust only; no window holds a dialog
   permission.
+  **`device-core` has two halves** (plans/ssh-environments.md). `actions.rs` plans
+  and runs `fs_*`/`shell_run` from explicit inputs (folders, shell policy) and
+  imports no pairing, envelope, approval or keychain; the desktop `engine.rs`
+  verifies, asks, then calls it. The `keychain` feature (default) is the paired
+  half (`approval`, `engine`, `envelope`, `hmac`, `store`). `neore-host --stdio`
+  (`host.rs`, `frame.rs`) is built `--no-default-features`, trusts only its pipe,
+  and re-checks the folders and the sandbox on ITS machine. Both paths share the
+  vectors in `tests/common/actions.json`; a new tool or a changed result goes there.
+  Desktop main-process calls go through `HostTransport` (`apps/desktop/src/device/transport.ts`).
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay
