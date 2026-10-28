@@ -938,6 +938,7 @@ export const resumeApprovedRun = async (
             // A person just answered in the chat, so this run is interactive.
             deviceThreadId: threadId,
             model: config.model,
+            origin: config.origin,
             searchMode: config.searchMode as SearchMode,
             snapshot: { mcpServerNames: config.mcpServerNames, toolNames: config.toolNames },
             userId,

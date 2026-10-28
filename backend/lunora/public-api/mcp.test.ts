@@ -480,7 +480,8 @@ describe("MCP write tools", () => {
         const { calls } = await send({}, { prompt: "hello", threadId: "t1" });
 
         expect(chatStart).toHaveBeenCalledOnce();
-        expect(chatStart.mock.calls[0]?.[1]).toMatchObject({ mode: "text", prompt: "hello", threadId: "t1" });
+        // The run is capped at ask-mode tools with no device tools (`origin`).
+        expect(chatStart.mock.calls[0]?.[1]).toMatchObject({ mode: "text", origin: "api-key", prompt: "hello", threadId: "t1" });
         expect(rateLimitCalls(calls)).toEqual([
             { args: { identifier: "key1", key: "publicApi/write:free" }, name: "lib_rate_limiter_mutations:applyRateLimit" },
         ]);

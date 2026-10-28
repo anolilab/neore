@@ -33,6 +33,11 @@ export const vToolRunConfig = v.object({
      */
     memory: v.optional(v.object({ botId: v.optional(v.string()) })),
     model: v.string(),
+    /**
+     * Set when the run was started over the public API with a key (`POST /api/v1/chat`, the MCP tools):
+     * the continuation rebuilds its tools under the same ceiling (`RunOrigin`).
+     */
+    origin: v.optional(v.literal("api-key")),
     reasoningEffort: v.optional(v.number()),
     researchDepth: v.union(v.literal("speed"), v.literal("balanced"), v.literal("thorough")),
     searchMode: v.string(),
@@ -47,3 +52,9 @@ export const vToolRunConfig = v.object({
 });
 
 export type ToolRunConfig = Infer<typeof vToolRunConfig>;
+
+/**
+ * Who started a run, when that is not the person at the app. A run started with an API key never gets more than
+ * `ask` for its tools and no device tools, whatever the user's own overrides say (`resolveToolPermission`).
+ */
+export type RunOrigin = NonNullable<ToolRunConfig["origin"]>;

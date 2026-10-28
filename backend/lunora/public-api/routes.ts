@@ -214,7 +214,14 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
 
     const response = await runChatStart(
         input.ctx,
-        { mode: "text", model: resolveChatModel(request.model), prompt: request.prompt, ...(request.threadId && { threadId: request.threadId }) },
+        {
+            mode: "text",
+            model: resolveChatModel(request.model),
+            // The run's tools never go past `ask` and no device tool is offered: the outside agent cannot answer a prompt.
+            origin: "api-key",
+            prompt: request.prompt,
+            ...(request.threadId && { threadId: request.threadId }),
+        },
         signingSecret,
         "outside_agent",
     );

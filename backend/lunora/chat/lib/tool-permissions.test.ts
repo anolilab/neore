@@ -124,6 +124,41 @@ describe("device tools", () => {
     });
 });
 
+describe("a run started with an API key", () => {
+    const apiKey = { apiKeyOrigin: true };
+    const builtin = { key: toolPermissionKey("builtin", "webSearch"), source: "builtin" as const };
+    const device = { key: toolPermissionKey("device", "shell_run", "dev1"), source: "device" as const };
+    const readOnlyMcp = { annotations: { readOnlyHint: true }, key: toolPermissionKey("mcp", "read", "Files"), source: "mcp" as const };
+
+    it("turns every auto tool into ask, whatever the user set", () => {
+        expect(resolveToolPermission(builtin, undefined, apiKey)).toBe("ask");
+        expect(resolveToolPermission(builtin, { [builtin.key]: "auto" }, apiKey)).toBe("ask");
+        expect(resolveToolPermission(readOnlyMcp, undefined, apiKey)).toBe("ask");
+    });
+
+    it("drops device tools, even ones the user set to auto", () => {
+        expect(resolveToolPermission(device, undefined, apiKey)).toBe("off");
+        expect(resolveToolPermission(device, { [device.key]: "auto" }, apiKey)).toBe("off");
+    });
+
+    it("keeps off tools off and ask tools ask", () => {
+        expect(resolveToolPermission(builtin, { [builtin.key]: "off" }, apiKey)).toBe("off");
+        expect(resolveToolPermission(builtin, { [builtin.key]: "ask" }, apiKey)).toBe("ask");
+    });
+
+    it("leaves an app run alone", () => {
+        expect(resolveToolPermission(builtin, { [builtin.key]: "auto" })).toBe("auto");
+        expect(resolveToolPermission(device, { [device.key]: "auto" })).toBe("auto");
+    });
+
+    it("leaves no auto tool in the set", () => {
+        const tools = { datetime: { description: "d" }, webSearch: { description: "s" } } as unknown as ToolSet;
+        const result = applyToolPermissions(tools, () => undefined, { "builtin:datetime": "auto", "builtin:webSearch": "auto" }, apiKey);
+
+        expect(result.requiresApproval.toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["datetime", "webSearch"]);
+    });
+});
+
 describe("resolveToolPermission", () => {
     const mcpWrite = { key: "mcp:Files:write", source: "mcp" as const };
     const builtin = { key: "builtin:webSearch", source: "builtin" as const };

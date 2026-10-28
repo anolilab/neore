@@ -20911,6 +20911,13 @@
               "optional": false,
               "unique": false
             },
+            "origin": {
+              "kind": "literal",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "literal": "\"api-key\""
+            },
             "reasoningEffort": {
               "kind": "number",
               "nullable": false,

@@ -112,6 +112,11 @@ export const defaultToolPermission = (source: ToolSource, annotations?: ToolAnno
 };
 
 export interface ToolPermissionOptions {
+    /**
+     * The run was started with an API key: no device tool, and nothing above `ask`, whatever the user's
+     * overrides say. A person approves in the app; the outside agent cannot.
+     */
+    apiKeyOrigin?: boolean;
     headless?: boolean;
     /**
      * Built-in names whose `ask` this headless run already has an answer to,
@@ -133,7 +138,13 @@ export const resolveToolPermission = (
 ): ToolPermissionMode => {
     const override = overrides?.[descriptor.key];
     const builtinName = descriptor.source === "builtin" ? descriptor.key.slice("builtin:".length) : undefined;
-    const mode = isToolPermissionMode(override) ? override : defaultToolPermission(descriptor.source, descriptor.annotations, builtinName);
+    const chosen = isToolPermissionMode(override) ? override : defaultToolPermission(descriptor.source, descriptor.annotations, builtinName);
+
+    if (options.apiKeyOrigin && descriptor.source === "device") {
+        return "off";
+    }
+
+    const mode = options.apiKeyOrigin && chosen === "auto" ? "ask" : chosen;
 
     if (!options.headless) {
         return mode;
