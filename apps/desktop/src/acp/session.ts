@@ -550,6 +550,7 @@ export class AgentSession {
 
         this.observe((observer) =>
             observer.permissionRequested(this.id, turn.id, {
+                complete: described.detailsComplete,
                 kind: "permission_request",
                 options: described.options
                     .filter((option) => !option.kind.includes("always"))

@@ -11,7 +11,8 @@ import { internalMutation } from "../_generated/server";
 import { ACP_CLAIM_LEASE_MS, ACP_CLAIM_WINDOW_MS } from "../devices/lib/constants";
 import { patchDeviceCall } from "../devices/lib/call-writes";
 import { isAcpTool, isTerminalCallStatus } from "../devices/lib/state";
-import { ACP_CLEARED, endStartingSession, HOST_DID_NOT_ANSWER, onAcpCallEnded } from "./lib/calls";
+import { ACP_CLEARED } from "./lib/constants";
+import { endStartingSession, HOST_DID_NOT_ANSWER, onAcpCallEnded } from "./lib/calls";
 
 const CHECK_SLACK_MS = 1000;
 

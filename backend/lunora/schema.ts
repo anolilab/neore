@@ -586,6 +586,9 @@ export const schema = defineSchema({
     // record. `envelope`/`signature` are what the device verifies; `input` and
     // `output` are capped copies for the activity list. Pruned after 30 days.
     deviceCalls: defineTable({
+        // Who holds the claim: the relay window that took it names itself, so its own retry (the answer was lost)
+        // is told it still holds it, and another window is not.
+        claimId: v.optional(v.string()),
         claimedAt: v.optional(v.number()),
         completedAt: v.optional(v.number()),
         createdAt: v.number(),

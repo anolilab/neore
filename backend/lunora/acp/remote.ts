@@ -18,7 +18,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { createAcpCall } from "../devices/lib/acp-call";
 import { isDeviceOnline } from "../devices/lib/state";
-import { withdrawSend } from "./lib/calls";
+import { withdrawSend } from "./lib/withdraw";
 import { isHostRunThread } from "./lib/host-thread";
 import { sessionOfThread } from "./lib/sessions";
 import { vPendingPermission } from "./validators";
@@ -67,10 +67,14 @@ const waitingRequests = async (ctx: Pick<QueryCtx, "db">, stream: Doc<"persisten
             continue;
         }
 
+        const incomplete = event.complete === false;
+
         found.set(event.requestId, {
-            options: event.options.filter((option) => option.kind === "allow_once" || option.kind === "reject_once"),
+            // A request that was cut is declined or answered on the computer, never allowed from here.
+            options: event.options.filter((option) => option.kind === "reject_once" || (option.kind === "allow_once" && !incomplete)),
             requestId: event.requestId,
             tool: event.tool,
+            ...(incomplete && { incomplete: true }),
             ...(event.command !== undefined && { command: event.command }),
             ...(event.folder !== undefined && { folder: event.folder }),
             ...(event.target !== undefined && { target: event.target }),

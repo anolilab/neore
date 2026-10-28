@@ -5395,6 +5395,9 @@
                       "folder": {
                         "type": "string"
                       },
+                      "incomplete": {
+                        "type": "boolean"
+                      },
                       "options": {
                         "items": {
                           "properties": {
@@ -26564,6 +26567,9 @@
                         "description": "Id<\"deviceCalls\">",
                         "type": "string",
                         "x-lunora-table": "deviceCalls"
+                      },
+                      "claimId": {
+                        "type": "string"
                       },
                       "deviceId": {
                         "description": "Id<\"devices\">",

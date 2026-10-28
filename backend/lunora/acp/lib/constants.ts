@@ -37,3 +37,6 @@ export const SESSION_TOUCH_MS = 30_000;
  * other way to say so, so a session still `starting` this long after its command was accepted ends.
  */
 export const START_GRACE_MS = 2 * 60_000;
+
+/** Written on every terminal path of a coding-agent call, beside its status: the prompt does not outlive the call. */
+export const ACP_CLEARED = { envelope: "", input: "" } as const;

@@ -16,6 +16,8 @@ export const DEVICE_CLAIM_WINDOW_MS = 20_000;
  */
 export const ACP_CLAIM_WINDOW_MS = 60_000;
 export const MAX_OPEN_ACP_CALLS_PER_DEVICE = 3;
+/** `acp_cancel` is counted apart: Stop must go out however many sends and answers are waiting. */
+export const MAX_OPEN_ACP_CANCELS_PER_DEVICE = 3;
 
 /** The coding-agent call kinds, and the only names `isAcpTool` takes for one. A device cannot advertise any of them as a tool. */
 export const ACP_TOOLS: ReadonlyArray<string> = ["acp_start", "acp_send", "acp_cancel", "acp_permission_answer"];
