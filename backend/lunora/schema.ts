@@ -1731,7 +1731,8 @@ export const schema = defineSchema({
         // waiting on, which keep the reaper off the stream.
         hostEndReason: v.optional(vHostEndReason),
         hostPendingPermissions: v.optional(v.array(v.string())),
-        // A regenerate: the reply is saved beside the earlier one, as a sibling (`acp/lib/finish.ts`).
+        // A regenerate: the reply is saved beside the earlier one, as a sibling (`acp/lib/finish.ts`). Nothing sets it
+        // yet: only the tests do, until S4's remote send starts a regenerate.
         hostRegenerate: v.optional(v.boolean()),
         hostState: v.optional(vHostState),
         hostTurnId: v.optional(v.string()),

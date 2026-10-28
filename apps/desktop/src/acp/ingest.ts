@@ -6,8 +6,13 @@
  * are merged. A batch that is out is never changed: a retry carries exactly the events the first try did, since
  * the backend claims each by `(turnId, seq)` and drops one it already has.
  * - **Signed in Rust.** `sign` is `DeviceCore.signTurn`; the device secret never leaves it.
- * - **A 409 is a request to resend.** The backend answers `{ next }` when a post starts past the next free
- * `seq`; the same batch goes again and the backend writes what it lacks.
+ * - **A 409 answers `{ next }` when a post starts past the backend's next free `seq`.** Only a restart's probe
+ * (which starts far past on purpose) expects it: it learns where the backend is and sends from there, after the
+ * same 250 ms. On an ordinary batch it means the backend lost output the host had already had acknowledged, and
+ * the turn is no longer posted.
+ * - **A post the backend will never take** (403 not ours, 400 a field past its limits, 413 a body past its cap) ends
+ * the turn's posting. The host cuts every field to the backend's limits and every batch to its byte cap first,
+ * so these mean version skew, not a long prompt.
  * - **Backoff, jittered and capped**, for anything that is not an answer: a network error, a 5xx, a 429, a 401
  * (a skewed clock or a revoked device looks like this). The batch is kept; the queue behind it is bounded.
  * - **A keepalive** (a post with no events) while a turn runs, so a long tool call is not mistaken for a dead host.
@@ -18,7 +23,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver } from "./host-events";
-import { endReasonOf } from "./host-events";
+import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, endReasonOf } from "./host-events";
 import { SessionLink } from "./session-link";
 import type { ChannelHost } from "./turn-channel";
 import { TurnChannel } from "./turn-channel";
@@ -28,6 +33,7 @@ export type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionReque
 export { KEEPALIVE_MS, POST_INTERVAL_MS } from "./turn-channel";
 
 const REQUEST_TIMEOUT_MS = 20_000;
+const REFUSED_STATUSES = new Set([400, 403, 413]);
 
 export interface PosterOptions {
     /** This computer's paired device id; undefined while it is not paired. */
@@ -75,7 +81,7 @@ export class HostPoster implements SessionObserver {
     // ─── From the sessions ──────────────────────────────────────────────────
 
     public sessionOpened(sessionId: string, info: HostSessionInfo): void {
-        const link = new SessionLink(sessionId, info, {
+        const link = new SessionLink(sessionId, capSessionInfo(info), {
             bound: (id, threadId) => this.bindThread(id, threadId),
             deviceId: () => this.options.deviceId(),
             now: () => this.now(),
@@ -105,7 +111,7 @@ export class HostPoster implements SessionObserver {
         const channel = new TurnChannel(this.channelHost, sessionId, turnId, link.threadId, false);
 
         this.channels.set(turnId, channel);
-        channel.enqueue({ kind: "turn_start", text: user.slice(0, 100_000) });
+        channel.enqueue({ kind: "turn_start", text: capPrompt(user) });
         this.persist();
     }
 
@@ -122,11 +128,11 @@ export class HostPoster implements SessionObserver {
     }
 
     public permissionRequested(_sessionId: string, turnId: string, request: PermissionRequestEvent): void {
-        this.channels.get(turnId)?.enqueue(request);
+        this.channels.get(turnId)?.enqueue(capPermissionRequest(request));
     }
 
     public permissionResolved(_sessionId: string, turnId: string, requestId: string, outcome: PermissionOutcomeKind): void {
-        this.channels.get(turnId)?.enqueue({ kind: "permission_resolved", outcome, requestId });
+        this.channels.get(turnId)?.enqueue({ kind: "permission_resolved", outcome, requestId: capRequestId(requestId) });
     }
 
     public turnEnded(_sessionId: string, turnId: string, reason: StopReason | "failed", error?: string): void {
@@ -245,8 +251,9 @@ export class HostPoster implements SessionObserver {
             };
         }
 
-        // 403 is the backend saying this turn is not ours to write; every other failure is worth another try.
-        return response.status === 403 ? { kind: "refused" } : { kind: "retry" };
+        // 403, 400 and 413 are the backend saying it will never take this post (not our turn, a field past its limits,
+        // a body past its cap); sending the same batch again would loop for ever. Every other failure is worth another try.
+        return REFUSED_STATUSES.has(response.status) ? { kind: "refused" } : { kind: "retry" };
     }
 
     // ─── The turns that are running, on disk ────────────────────────────────

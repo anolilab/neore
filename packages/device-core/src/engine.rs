@@ -34,11 +34,11 @@ pub use crate::actions::{cap_utf8, now_ms, MAX_OUTPUT_BYTES};
 
 const MAX_MCP_SERVERS: usize = 20;
 const AUDIT_MAX_BYTES: u64 = 5 * 1024 * 1024;
-/// How long a pairing waits for its confirmation click.
 /// The one `acp_*` call kind handled here: stopping a turn needs no prompt. Starting, sending and answering come
 /// with the remote-control slice.
 const ACP_CANCEL_TOOL: &str = "acp_cancel";
 const ACP_ID_MAX: usize = 128;
+/// How long a pairing waits for its confirmation click.
 const PAIRING_WAIT: Duration = Duration::from_secs(5 * 60);
 
 /// What the engine tells its host.

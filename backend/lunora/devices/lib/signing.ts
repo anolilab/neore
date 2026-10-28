@@ -24,11 +24,14 @@ export const generateDeviceSecret = (): string => bytesToHex(crypto.getRandomVal
 
 export const isDeviceSecret = (value: string): boolean => HEX_64.test(value);
 
+/** The shape of every signature (`hex(HMAC-SHA256)`); a caller checks it before anything is looked up. */
+export const isDeviceSignature = (value: string): boolean => HEX_64.test(value);
+
 export const signDevicePayload = async (secret: string, domain: DeviceSigningDomain, payload: string): Promise<string> =>
     await hmacSha256Hex(secret, domainPrefix(domain) + payload);
 
 export const verifyDevicePayload = async (secret: string, domain: DeviceSigningDomain, payload: string, signature: string): Promise<boolean> => {
-    if (!HEX_64.test(signature)) {
+    if (!isDeviceSignature(signature)) {
         return false;
     }
 

@@ -234,6 +234,10 @@ dropped by `seq`, so the stored `seq` outlives every replay that could pass.
 - On a desktop restart or update, in-flight host turns end at once, and their pending
   requests become not resumable. Before an update installs, the app counts running
   turns and says so.
+- A restart that comes after the reaper has already timed the turn out still ends as
+  `interrupted`: the backend moves `persistentStreams.hostEndReason` from `timeout` to
+  `interrupted` and writes no second reply. The Continue offer (S4) reads
+  `hostEndReason` of the thread's last stream, not the reply row.
 - Reconnects use jittered exponential backoff with a cap, reset only after a
   connection stays up. After a long suspension, the relay replaces its connection
   instead of probing it.
@@ -494,8 +498,7 @@ throttling measurement.
   sees the same thread; a redelivered post is dropped; a gap answers 409 and the
   resend fills it; an unknown or revoked device, a bad signature or a stale
   `issuedAt` all answer 401 without the per-device limit moving; a post into another user's thread is refused; a turn keeps
-  streaming with the window hidden for an hour, or the measurement is recorded
-  and §10 Q4 decided; a turn whose events stop times out within the reaper window
+  streaming with the window hidden for an hour (moved to S4, below); a turn whose events stop times out within the reaper window
   and the host is sent a cancel; a regenerate saves as a sibling; `runChatStart`
   refuses a host thread; the host states (§4.6: `accepted`, `received`, `running`,
   `ended`) are stored and read back by a second client.
@@ -512,6 +515,13 @@ deadline, whatever the error).
   none for a request that arrived after the bar was drawn (test); the phone shows "Sending" until `received` and "Working" only from
   `running` (UI test); a claim failing with a server error and then a network reset
   is retried until it succeeds; killing the main process between claim and receipt returns the call to `pending` and it runs once when re-claimed, and killing it after the receipt but before completion acknowledges the call without running it twice.
+- Acceptance (moved from S3): with the main window hidden for an hour, a relay claim
+  is under 10 s at the 95th percentile and no heartbeat gap passes 60 s, or the
+  numbers are recorded and §10 Q4 decided. S3 could not measure it: the thing that
+  slips when hidden is the page relay that claims `acp_cancel`, and S3 adds no
+  remote path that sends one to a turn the user is waiting on. S4 adds those paths
+  and measures there; `plans/acp-s3-throttling.md` stays the record of the method
+  and the safe default (throttling on).
 
 **S5 — Registry.** Search and install from the official ACP registry, queried by
 the desktop. Pinned versions, checksum verification, installs under the app data

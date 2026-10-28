@@ -1,15 +1,15 @@
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { endHostStream } from "../../chat/streaming/persistent/host";
+import { endHostTurn } from "./finish";
 
 const SESSION_BATCH = 200;
 
 /**
  * A device was removed: its sessions end, and so does every open host stream on them, in the same mutation as
- * the revoke (`devices/functions.ts#revokeDevice`). The stream ends as an error with `hostState: ended`, so no
- * client keeps a "Working" turn that nothing will finish. The host cannot be told to cancel: its secret is gone.
+ * the revoke (`devices/functions.ts#revokeDevice`). The stream ends as an error with `hostState: ended` and what
+ * the host wrote is saved as a failed reply, so no client keeps a "Working" turn that nothing will finish. The host cannot be told to cancel: its secret is gone.
  */
-export const endHostSessionsOfDevice = async (ctx: Pick<MutationCtx, "db">, deviceId: Id<"devices">, now: number): Promise<void> => {
+export const endHostSessionsOfDevice = async (ctx: MutationCtx, deviceId: Id<"devices">, now: number): Promise<void> => {
     const { page: sessions } = await ctx.db.acpSessions.findMany({ limit: SESSION_BATCH, where: { deviceId } });
 
     for (const session of sessions) {
@@ -22,7 +22,7 @@ export const endHostSessionsOfDevice = async (ctx: Pick<MutationCtx, "db">, devi
         });
 
         for (const stream of live) {
-            await endHostStream(ctx, stream, { reason: "revoked", status: "error" }, now);
+            await endHostTurn(ctx, stream, { reason: "revoked" }, now);
         }
     }
 };
