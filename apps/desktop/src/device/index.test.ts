@@ -276,7 +276,12 @@ describe("servers over SSH", () => {
 
     it("pass a validated server and its secret to the core as JSON", async () => {
         await expect(invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), spec)).resolves.toMatchObject({ platform: "linux" });
-        expect(JSON.parse(core.hostProbe.mock.calls[0]?.[0] as string)).toEqual({ ...spec, forwardAgent: false });
+        expect(JSON.parse(core.hostProbe.mock.calls[0]?.[0] as string)).toEqual(spec);
+
+        // Agent forwarding is not the page's to ask for: it never reaches the core.
+        await invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), { ...spec, forwardAgent: true });
+
+        expect(core.hostProbe.mock.calls[1]?.[0]).not.toContain("forwardAgent");
 
         await invoke(DEVICE_CHANNEL.hostPair, siteEvent(), { deviceId: "host-1", secret: "c".repeat(64), spec: { ...spec, identityFile: "/home/me/.ssh/id" } });
 

@@ -361,6 +361,8 @@ const hostCard = (host: HostView): HTMLElement => {
     const network = document.createElement("label");
     const sandboxBox = document.createElement("input");
     const networkBox = document.createElement("input");
+    const forward = document.createElement("label");
+    const forwardBox = document.createElement("input");
 
     card.setAttribute("aria-label", host.name);
     heading.textContent = host.name;
@@ -445,11 +447,30 @@ const hostCard = (host: HostView): HTMLElement => {
     network.className = "check";
     network.append(networkBox, " Allow network for shell commands");
 
+    forwardBox.type = "checkbox";
+    forwardBox.checked = host.forwardAgent;
+    forwardBox.addEventListener("change", async () => {
+        if (
+            forwardBox.checked
+            && !await globalThis.neoreDevice.confirm(
+                `Let ${host.name} use your SSH agent? Anyone with root on that server could use your keys for as long as the connection is open.`,
+            )
+        ) {
+            forwardBox.checked = false;
+
+            return;
+        }
+
+        await updateHost(host.deviceId, { forwardAgent: forwardBox.checked });
+    });
+    forward.className = "check";
+    forward.append(forwardBox, " Forward my SSH agent to this server (takes effect on the next connection)");
+
     const row = document.createElement("div");
 
     row.className = "row";
     row.append(label, typed, addFolder);
-    card.append(heading, where, actions, folders, row, sandbox, network);
+    card.append(heading, where, actions, folders, row, sandbox, network, forward);
 
     if (host.sandboxDetail !== null) {
         const detail = document.createElement("p");

@@ -27,7 +27,6 @@ export interface DeviceStatus {
 /** Where a server is and how to log in (`HostSpec` in `engine/hosts.rs`). The page supplies it. */
 export interface HostSpec {
     address: string;
-    forwardAgent?: boolean;
     identityFile?: string;
     name: string;
     port?: number;

@@ -66,7 +66,6 @@ export const readHostSpec = (value: unknown): HostSpec => {
 
     return {
         address: text(value.address, "address", 253),
-        forwardAgent: value.forwardAgent === true,
         name: text(value.name, "name", 80),
         port,
         user: text(value.user, "user", 32),
