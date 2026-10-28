@@ -30,3 +30,10 @@ export const INGEST_FLOOD_LIMIT_PER_MINUTE = 1200;
 
 /** `lastEventAt` on a session moves at most this often, so a live session list is not re-run per post. */
 export const SESSION_TOUCH_MS = 30_000;
+
+/**
+ * A session the backend started (`acp_start`) is `starting` until the computer's agent opens it. The computer
+ * accepts the command when it has it, well before the agent has started; an agent that then fails to start has no
+ * other way to say so, so a session still `starting` this long after its command was accepted ends.
+ */
+export const START_GRACE_MS = 2 * 60_000;

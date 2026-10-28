@@ -11,7 +11,7 @@ import { internalMutation } from "../_generated/server";
 import { ACP_CLAIM_LEASE_MS, ACP_CLAIM_WINDOW_MS } from "../devices/lib/constants";
 import { patchDeviceCall } from "../devices/lib/call-writes";
 import { isAcpTool, isTerminalCallStatus } from "../devices/lib/state";
-import { ACP_CLEARED, HOST_DID_NOT_ANSWER, onAcpCallEnded } from "./lib/calls";
+import { ACP_CLEARED, endStartingSession, HOST_DID_NOT_ANSWER, onAcpCallEnded } from "./lib/calls";
 
 const CHECK_SLACK_MS = 1000;
 
@@ -43,6 +43,16 @@ export const checkAcpCall = internalMutation
             await patchDeviceCall(ctx, call._id, { status: "pending" });
             await ctx.scheduler.runAfter(Math.max(0, call.deadline - now) + CHECK_SLACK_MS, internal.acp.calls.checkAcpCall, { callId: call._id });
         }
+
+        return null;
+    });
+
+/** The computer accepted an `acp_start` and its agent never opened the session (`acp/lib/calls.ts`): it ends. */
+export const endUnopenedSession = internalMutation
+    .input({ deviceId: v.id("devices"), hostSessionId: v.string().max(128) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await endStartingSession(ctx, args.deviceId, args.hostSessionId, ctx.now);
 
         return null;
     });

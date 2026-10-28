@@ -64,6 +64,12 @@ const contentText = (content: unknown): string => {
 
 export type SendResult = { position: number; status: "queued" } | { status: "started" };
 
+/** A prompt waiting behind a running turn. `turnId` is set when the backend queued it (`acp_send`). */
+interface QueuedPrompt {
+    prompt: string;
+    turnId?: string;
+}
+
 export interface SessionOptions {
     agentKey: string;
     agentLabel: string;
@@ -78,11 +84,15 @@ export interface SessionOptions {
     /** Called when anything the window shows changed. Coalescing is the caller's. */
     onChange: () => void;
     process: AgentProcess;
+    /** The id this session goes by on the backend, when the backend started it (`acp_start`); otherwise one is minted. */
+    sessionId?: string;
+    /** The thread the backend made for a session it started. */
+    threadId?: string;
     startupTimeoutMs?: number;
 }
 
 export class AgentSession {
-    private readonly sessionId = randomUUID();
+    private readonly sessionId: string;
 
     private agentSessionId = "";
 
@@ -101,7 +111,7 @@ export class AgentSession {
     /** The process stop that `end` started; `close` and a failed start wait for it. */
     private stopping: Promise<void> = Promise.resolve();
 
-    private readonly queue: string[] = [];
+    private readonly queue: QueuedPrompt[] = [];
 
     /** How much of each turn's text has been handed to the observer, in characters of the scrubbed text. */
     private readonly sent = new WeakMap<Turn, { text: number; thought: number }>();
@@ -115,6 +125,7 @@ export class AgentSession {
     private agent: Handshake | undefined;
 
     public constructor(private readonly options: SessionOptions) {
+        this.sessionId = options.sessionId ?? randomUUID();
         this.connection = new JsonRpcConnection(options.process.stdout, options.process.stdin, {
             notification: (method, params) => this.onNotification(method, params),
             request: (method, params) => this.onRequest(method, params),
@@ -161,11 +172,12 @@ export class AgentSession {
         const { hostInfo } = this.options;
 
         if (hostInfo !== undefined) {
-            this.observe((observer) => observer.sessionOpened(this.id, hostInfo));
+            this.observe((observer) => observer.sessionOpened(this.id, hostInfo, this.options.threadId));
         }
     }
 
-    public send(prompt: string): SendResult {
+    /** `turnId` is the id the backend gave the turn (`acp_send`): the turn keeps it, and the backend hears it was received. */
+    public send(prompt: string, turnId?: string): SendResult {
         if (this.status === "ended") {
             throw new Error("this session has ended");
         }
@@ -178,29 +190,44 @@ export class AgentSession {
             throw new Error("a prompt is 1 to 100000 characters");
         }
 
-        if (this.status === "busy") {
-            if (this.queue.length >= MAX_QUEUED_PROMPTS) {
-                throw new Error(`${String(MAX_QUEUED_PROMPTS)} prompts are already waiting; wait for the agent or stop it`);
-            }
+        if (this.status === "busy" && this.queue.length >= MAX_QUEUED_PROMPTS) {
+            throw new Error(`${String(MAX_QUEUED_PROMPTS)} prompts are already waiting; wait for the agent or stop it`);
+        }
 
-            this.queue.push(prompt);
+        if (turnId !== undefined) {
+            this.observe((observer) => observer.turnReceived?.(this.id, turnId, prompt));
+        }
+
+        if (this.status === "busy") {
+            this.queue.push({ prompt, turnId });
             this.options.onChange();
 
             return { position: this.queue.length, status: "queued" };
         }
 
-        this.run(prompt);
+        this.run(prompt, turnId);
 
         return { status: "started" };
     }
 
     /** Stops the turn with this id if it is the one running: a stop the backend asked for names the turn it means. */
     public cancelTurn(turnId: string): boolean {
-        if (this.current?.id !== turnId) {
+        if (this.current?.id === turnId) {
+            this.cancel();
+
+            return true;
+        }
+
+        // A turn still waiting behind the running one is withdrawn, and its stream told it ended.
+        const waiting = this.queue.findIndex((entry) => entry.turnId === turnId);
+
+        if (waiting === -1) {
             return false;
         }
 
-        this.cancel();
+        this.queue.splice(waiting, 1);
+        this.observe((observer) => observer.turnEnded(this.id, turnId, "cancelled"));
+        this.options.onChange();
 
         return true;
     }
@@ -208,13 +235,13 @@ export class AgentSession {
     /** Stops the running turn. Prompts still waiting are dropped, so a stop releases nothing later. */
     public cancel(): void {
         if (this.status !== "busy" || this.current === undefined) {
-            this.queue.length = 0;
+            this.dropQueue();
             this.options.onChange();
 
             return;
         }
 
-        this.queue.length = 0;
+        this.dropQueue();
         this.cancelRequested = true;
         this.connection.notify(METHOD.cancel, { sessionId: this.agentSessionId });
         // The spec requires pending permission requests to be answered `cancelled`.
@@ -237,6 +264,19 @@ export class AgentSession {
             this.end("the agent did not stop after you cancelled, so it was ended");
         }, this.options.cancelGraceMs ?? DEFAULT_CANCEL_GRACE_MS);
         this.options.onChange();
+    }
+
+    /** Drops the prompts still waiting. The ones the backend queued are told their turn was cancelled, so no stream waits on them. */
+    private dropQueue(reason: StopReason | "failed" = "cancelled", error?: string): void {
+        const dropped = this.queue.splice(0);
+
+        for (const entry of dropped) {
+            if (entry.turnId !== undefined) {
+                const { turnId } = entry;
+
+                this.observe((observer) => observer.turnEnded(this.id, turnId, reason, error));
+            }
+        }
     }
 
     /** Ends the session and its process. */
@@ -264,14 +304,14 @@ export class AgentSession {
             endReason: this.endReason,
             folder: this.options.folder,
             id: this.sessionId,
-            queued: [...this.queue],
+            queued: this.queue.map((entry) => entry.prompt),
             status: this.status,
             turns: this.turns.map((turn) => turn.toState()),
         };
     }
 
-    private run(prompt: string): void {
-        const turn = new Turn(prompt, this.options.process.scrub);
+    private run(prompt: string, turnId?: string): void {
+        const turn = new Turn(prompt, this.options.process.scrub, turnId);
 
         this.turns.push(turn);
         this.current = turn;
@@ -348,7 +388,7 @@ export class AgentSession {
         if (next === undefined) {
             this.options.onChange();
         } else {
-            this.run(next);
+            this.run(next.prompt, next.turnId);
         }
     }
 
@@ -383,6 +423,9 @@ export class AgentSession {
         if (wasRunning !== undefined) {
             this.observeEnd(wasRunning, said);
         }
+
+        // Prompts the backend queued behind it will never run.
+        this.dropQueue("failed", said);
 
         this.current = undefined;
         this.options.onChange();
@@ -577,14 +620,16 @@ export class AgentSession {
             return { outcome: { outcome: "cancelled" } };
         }
 
+        const requestId = randomUUID();
         const request = {
             agentLabel: this.options.agentLabel,
             folder: this.options.folder,
             params,
+            // The id the backend and the phone know this request by, so a remote answer can find it here.
+            requestId,
             scrub: this.options.process.scrub,
             sessionId: this.id,
         };
-        const requestId = randomUUID();
         const turn = this.current;
 
         this.observePermission(turn, requestId, request);

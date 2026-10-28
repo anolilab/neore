@@ -80,7 +80,7 @@ export class HostPoster implements SessionObserver {
 
     // ─── From the sessions ──────────────────────────────────────────────────
 
-    public sessionOpened(sessionId: string, info: HostSessionInfo): void {
+    public sessionOpened(sessionId: string, info: HostSessionInfo, threadId?: string): void {
         const link = new SessionLink(sessionId, capSessionInfo(info), {
             bound: (id, threadId) => this.bindThread(id, threadId),
             deviceId: () => this.options.deviceId(),
@@ -98,13 +98,20 @@ export class HostPoster implements SessionObserver {
             return;
         }
 
+        // A session the backend started already has its thread; the open still goes out, to turn it from starting to idle.
+        link.threadId = threadId;
         link.open();
     }
 
+    public turnReceived(sessionId: string, turnId: string, user: string): void {
+        this.turnStarted(sessionId, turnId, user);
+    }
+
+    /** The first call for a turn opens its channel with the user's prompt; a later one (the turn it was queued for now running) finds it open. */
     public turnStarted(sessionId: string, turnId: string, user: string): void {
         const link = this.sessions.get(sessionId);
 
-        if (link === undefined || link.threadId === null || this.stopped) {
+        if (link === undefined || link.threadId === null || this.stopped || this.channels.has(turnId)) {
             return;
         }
 

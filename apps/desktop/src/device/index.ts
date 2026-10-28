@@ -15,6 +15,8 @@ import { pathToFileURL } from "node:url";
 import type { BrowserWindow as BrowserWindowInstance, IpcMainInvokeEvent, WebContents } from "electron";
 import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 
+import type { AcpCommand } from "../acp/commands";
+import { HostCommands, isAcpEnvelope } from "../acp/commands";
 import { HostPoster } from "../acp/ingest";
 import { AcpManager } from "../acp/manager";
 import { coreGate } from "../acp/permission";
@@ -55,6 +57,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     const state: {
         acp?: AcpManager;
         core?: DeviceCore;
+        commands?: HostCommands;
         coreError?: unknown;
         host?: HostPoster;
         local?: BrowserWindowInstance;
@@ -205,13 +208,13 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     const onEvent = (event: CoreEvent): void => {
         switch (event.type) {
-            case "acpCancel": {
-                // A signed `acp_cancel` the core verified: the backend timed the turn out, or the user pressed Stop.
-                state.acp?.cancelTurn(event.sessionId, event.turnId);
-                break;
-            }
             case "acpPermission": {
                 showAgentRequest(event.agent, event.tool);
+                break;
+            }
+            case "acpPermissionsChanged": {
+                // A remote answer took a request out of the queue: the window reads the list again.
+                send(state.local?.webContents, LOCAL_EVENT.acp);
                 break;
             }
             case "changed": {
@@ -288,6 +291,52 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return state.acp;
     };
 
+    /** Carries out one command the backend sent, after its receipt is written (`acp/commands.ts`). */
+    const applyCommand = (command: AcpCommand): string => {
+        const core = requireCore();
+
+        switch (command.kind) {
+            case "cancel": {
+                // The turn may have ended already; that is not a refusal.
+                requireAcp().cancelTurn(command.sessionId, command.turnId);
+
+                return "accepted";
+            }
+            case "permissionAnswer": {
+                core.acpPermissionAnswerRemote(command.sessionId, command.requestId, command.optionId);
+
+                return "accepted";
+            }
+            case "send": {
+                requireAcp().send(command.sessionId, command.text, command.turnId);
+
+                return "accepted";
+            }
+            case "start": {
+                // The agent takes a while to start. The command is accepted now; the backend learns the session
+                // is open from its own `session_open`, and a start that fails is logged here.
+                requireAcp()
+                    .startSession(command.agentKey, command.agentLabel, command.folderPath, { sessionId: command.sessionId, threadId: command.threadId })
+                    .catch((error: unknown) => console.error("[neore-desktop] a requested coding agent did not start:", (error as Error).message));
+
+                return "accepted";
+            }
+            default: {
+                throw new Error("unknown command");
+            }
+        }
+    };
+
+    const requireCommands = (): HostCommands => {
+        state.commands ??= new HostCommands({
+            apply: applyCommand,
+            core: requireCore(),
+            receiptFile: path.join(app.getPath("userData"), "acp-host-receipts.json"),
+        });
+
+        return state.commands;
+    };
+
     const reap = setInterval(() => {
         state.transport?.reapIdleServers();
     }, REAP_INTERVAL_MS);
@@ -315,6 +364,11 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     relay(DEVICE_CHANNEL.execute, async (_event, call) => {
         const { envelope, signature } = readSigned(call);
+
+        // A coding-agent command is not a device tool: it has no prompt of its own, and its receipt is written here.
+        if (isAcpEnvelope(envelope)) {
+            return await requireCommands().execute(envelope, signature);
+        }
 
         return requireTransport().execute(envelope, signature);
     });

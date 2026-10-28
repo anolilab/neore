@@ -184,6 +184,50 @@ describe("opening a session", () => {
     });
 });
 
+describe("a session and turns the backend started", () => {
+    it("knows the thread already, so a prompt it received is posted at once, before the open is answered", async () => {
+        const host = poster();
+
+        backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "slow" }, { status: 503 }) : undefined);
+        host.sessionOpened("s1", INFO, "thread-1");
+        host.turnReceived("s1", "t1", "fix it");
+        await settle(POST_INTERVAL_MS);
+
+        const turn = backend.posts.filter(({ post }) => post.turnId === "t1");
+
+        expect(turn[0]?.post).toMatchObject({ events: [{ kind: "turn_start", text: "fix it" }], firstSeq: 0, threadId: "thread-1", turnId: "t1" });
+    });
+
+    it("posts the prompt once when the turn then starts: received and started are one turn, not two", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnReceived("s1", "t1", "fix it");
+        host.turnStarted("s1", "t1", "fix it");
+        host.text("s1", "t1", "done");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")).toEqual([
+            { kind: "turn_start", text: "fix it" },
+            { kind: "text", text: "done" },
+        ]);
+    });
+
+    it("ends a prompt that was queued and then withdrawn, so its stream does not wait for the reaper", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnReceived("s1", "t1", "later");
+        host.turnEnded("s1", "t1", "cancelled");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")).toEqual([
+            { kind: "turn_start", text: "later" },
+            { kind: "turn_end", reason: "cancelled" },
+        ]);
+    });
+});
+
 describe("a turn", () => {
     it("merges deltas into one post per 250 ms, with consecutive seqs", async () => {
         const host = poster();

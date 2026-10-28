@@ -33,11 +33,14 @@ export interface HostSessionInfo {
 export interface SessionObserver {
     permissionRequested: (sessionId: string, turnId: string, request: PermissionRequestEvent) => void;
     permissionResolved: (sessionId: string, turnId: string, requestId: string, outcome: PermissionOutcomeKind) => void;
-    sessionOpened: (sessionId: string, info: HostSessionInfo) => void;
+    /** `threadId` is known when the backend started the session (`acp_start`); otherwise opening it makes the thread. */
+    sessionOpened: (sessionId: string, info: HostSessionInfo, threadId?: string) => void;
     text: (sessionId: string, turnId: string, delta: string) => void;
     thought: (sessionId: string, turnId: string, delta: string) => void;
     tool: (sessionId: string, turnId: string, tool: { id: string; kind: string; status: string; title: string }) => void;
     turnEnded: (sessionId: string, turnId: string, reason: StopReason | "failed", error?: string) => void;
+    /** A prompt the backend queued (`acp_send`) is in this computer's hands, running or waiting its turn: the turn is `received`. */
+    turnReceived?: (sessionId: string, turnId: string, user: string) => void;
     turnStarted: (sessionId: string, turnId: string, user: string) => void;
 }
 
