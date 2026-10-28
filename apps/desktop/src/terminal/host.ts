@@ -7,6 +7,7 @@
  * beyond the batch being sent. Output is paused at the pty when the main process says the window
  * cannot keep up, so a runaway `yes` fills the kernel's buffer and not this process's memory.
  */
+import { hangUp } from "./hang-up";
 import type { HostEvent, HostRequest, SpawnRequest } from "./protocol";
 
 export interface HostTransport {
@@ -29,7 +30,7 @@ export interface Pty {
 }
 
 export interface PtyModule {
-    spawn: (file: string, args: string[], options: { cols: number; cwd: string; encoding: string; env: Record<string, string>; name: string; rows: number }) => Pty;
+    spawn: (file: string, args: string[], options: { cols: number; cwd: string; encoding: string | undefined; env: Record<string, string>; name: string; rows: number }) => Pty;
 }
 
 /** Output is sent in batches: one message per chunk would cost more than the shell's output itself. */
@@ -38,6 +39,16 @@ const FLUSH_CHARS = 64 * 1024;
 /** After a hangup the shell gets this long before it is killed outright. */
 const KILL_GRACE_MS = 1000;
 const EXIT_DELAY_MS = 50;
+
+const isAlive = (pid: number): boolean => {
+    try {
+        process.kill(pid, 0);
+
+        return true;
+    } catch {
+        return false;
+    }
+};
 
 export const runHost = (transport: HostTransport, loadPty: () => PtyModule, prepare: () => void = () => {}): void => {
     let term: Pty | undefined;
@@ -75,7 +86,11 @@ export const runHost = (transport: HostTransport, loadPty: () => PtyModule, prep
         const { pid } = term;
 
         try {
-            term.kill("SIGHUP");
+            if (process.platform === "win32") {
+                hangUp(pid);
+            } else {
+                term.kill("SIGHUP");
+            }
         } catch {
             // Already gone.
         }
@@ -104,7 +119,8 @@ export const runHost = (transport: HostTransport, loadPty: () => PtyModule, prep
             const started = loadPty().spawn(request.file, request.args, {
                 cols: request.cols,
                 cwd: request.cwd,
-                encoding: "utf8",
+                // Unix only: on Windows the option is rejected with a warning, and the output is UTF-8 there anyway.
+                encoding: process.platform === "win32" ? undefined : "utf8",
                 env: request.env,
                 name: "xterm-256color",
                 rows: request.rows,
@@ -178,7 +194,8 @@ export const runHost = (transport: HostTransport, loadPty: () => PtyModule, prep
     const parent = process.ppid;
 
     setInterval(() => {
-        if (process.ppid !== parent) {
+        // Windows never reparents a child, so `ppid` keeps naming a parent that is gone.
+        if (process.ppid !== parent || !isAlive(parent)) {
             stop();
         }
     }, 2000).unref();

@@ -501,8 +501,10 @@ test("a coding agent's requests are answered one at a time or together, never wi
     }
 });
 
-/** A login shell reads the user's profile before it answers, which on a busy machine takes longer than an assertion's default. */
-const SHELL_TIMEOUT = 20_000;
+/** A login shell reads the user's profile before it answers, which on a busy machine takes longer than an assertion's default. A cold PowerShell on a CI runner takes longer still. */
+const SHELL_TIMEOUT = process.platform === "win32" ? 60_000 : 20_000;
+/** The shell's own arithmetic: `sh` on macOS and Linux, PowerShell on Windows. The typed text never contains the result, so only the shell's answer can match it. */
+const calc = (expression: string): string => process.platform === "win32" ? `$(${expression})` : `$((${expression}))`;
 const TERMINAL_PAGE = /\/terminal-window\/terminal\.html$/u;
 const isAlive = (pid: number): boolean => {
     try {
@@ -541,7 +543,8 @@ const terminalCount = async (app: ElectronApplication): Promise<number> => {
 };
 
 test.describe("the local terminal", () => {
-    test.skip(process.platform === "win32", "the terminal is not offered on Windows"); // The Windows terminal is a separate slice.
+    // Playwright's default is 60 s; a cold PowerShell on ConPTY, started twice in the reload test, can use most of it.
+    test.setTimeout(process.platform === "win32" ? 180_000 : 60_000);
 
     test("runs a shell in the folder, sends nothing to any server, and ends every shell when the app quits", async () => {
         const marker = `marker-${String(Date.now())}`;
@@ -569,7 +572,7 @@ test.describe("the local terminal", () => {
             shells = await terminalPids(app);
 
             await terminal.locator(".xterm-helper-textarea").focus();
-            await terminal.keyboard.type(`echo ${marker.slice(0, 7)}$((6*7))${marker.slice(7)}`);
+            await terminal.keyboard.type(`echo ${marker.slice(0, 7)}${calc("6*7")}${marker.slice(7)}`);
             await terminal.keyboard.press("Enter");
 
             await expect(terminal.locator(".xterm-rows")).toContainText(`${marker.slice(0, 7)}42${marker.slice(7)}`, { timeout: SHELL_TIMEOUT });
@@ -622,7 +625,7 @@ test.describe("the local terminal", () => {
             await expect.poll(() => isAlive(before as number), { timeout: 10_000 }).toBe(false);
 
             await terminal.locator(".xterm-helper-textarea").focus();
-            await terminal.keyboard.type("echo after-$((1+2))-reload");
+            await terminal.keyboard.type(`echo after-${calc("1+2")}-reload`);
             await terminal.keyboard.press("Enter");
             await expect(terminal.locator(".xterm-rows")).toContainText("after-3-reload", { timeout: SHELL_TIMEOUT });
         } finally {

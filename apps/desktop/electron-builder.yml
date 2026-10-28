@@ -27,10 +27,12 @@ asar: true
 # dependency, `device-core-node`, is prebuilt by its own step and has nothing to rebuild.
 npmRebuild: false
 # A `.node` binary is dlopen'd from disk and cannot be loaded from inside the asar archive. node-pty also
-# executes its `spawn-helper` to start a shell, and an executable cannot run from inside the archive either.
+# executes its `spawn-helper` to start a shell, and an executable cannot run from inside the archive either. On
+# Windows its worker thread script path would otherwise point inside the archive, so the host loads node-pty from the unpacked copy
+# (`loadableDirectory` in `src/terminal/spawn-helper.ts`); the whole folder is unpacked for that.
 asarUnpack:
     - "**/*.node"
-    - "**/node-pty/**/spawn-helper"
+    - "**/node-pty/**"
 afterPack: scripts/after-pack.cjs
 # The custom scheme: installers register it (macOS from Info.plist, Windows in the installer, Linux via the .desktop file).
 protocols:

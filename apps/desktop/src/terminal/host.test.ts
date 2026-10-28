@@ -1,7 +1,8 @@
 /**
  * The terminal host and session against a REAL pseudo-terminal: the bundle `scripts/build.mjs` makes is built
  * here and forked as a plain Node child (production starts the same file as an Electron utility process).
- * macOS and Linux only; Windows has no terminal yet.
+ * On Windows the shell is PowerShell on ConPTY and the cases are the same, in its syntax, except the two flow-control
+ * cases: ConPTY re-renders what the shell prints, so a byte count through it says nothing about the pause mark.
  */
 import { fork } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
@@ -22,7 +23,43 @@ const packageRoot = fileURLToPath(new URL("../..", import.meta.url));
 // Inside node_modules so `require("node-pty")` resolves from the bundle, as it does from `dist/`.
 const bundleDirectory = path.join(packageRoot, "node_modules", ".terminal-host-test");
 const hostFile = path.join(bundleDirectory, "terminal-host.cjs");
-const supported = process.platform === "darwin" || process.platform === "linux";
+const windows = process.platform === "win32";
+const supported = process.platform === "darwin" || process.platform === "linux" || windows;
+/** A cold PowerShell on a CI runner (antivirus scanning it, no profile cache) takes seconds to show its first prompt. */
+const SHELL_WAIT_MS = windows ? 40_000 : 10_000;
+
+/** The shell under test and the commands that mean the same thing in it. Windows PowerShell, without the user's profile, or `/bin/sh`. */
+const dialect = windows
+    ? {
+        args: ["-NoLogo", "-NoProfile"],
+        // A real child of the shell, which only a tree kill reaches. The typed text holds no digits after `child-`, so only the shell's answer matches.
+        child: `$p = Start-Process -PassThru -NoNewWindow ping -ArgumentList '-n','1000','127.0.0.1'; echo "child-$($p.Id)"`,
+        // The upper-cased path cannot be the prompt's (`PS C:\...>`), which already names the folder before any command runs.
+        describe: "(Get-Location).Path.ToUpper(); echo marker-$(6*7)",
+        enter: "\r",
+        file: path.win32.join(process.env.SystemRoot ?? String.raw`C:\Windows`, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+        folderShown: (folder: string) => path.basename(folder).toUpperCase(),
+        missingFolder: String.raw`C:\definitely\not\a\folder`,
+        // The typed text names no number, so only the shell's answer holds the width and height.
+        size: `echo "size-$($Host.UI.RawUI.WindowSize.Width)x$($Host.UI.RawUI.WindowSize.Height)"`,
+        // The typed text splits the word, so only the shell's answer holds it whole.
+        unicode: `echo ("ä€" + "x")`,
+    }
+    : {
+        args: [] as string[],
+        // A foreground job: a shell does not pass a hangup on to its background jobs (dash does not), only to the one it is running.
+        child: "sh -c 'echo child-$$; exec sleep 1000'",
+        describe: "pwd; echo marker-$((6*7))",
+        enter: "\n",
+        file: "/bin/sh",
+        // macOS resolves /var to /private/var, so only the folder's own name is compared.
+        folderShown: (folder: string) => path.basename(folder),
+        missingFolder: "/definitely/not/a/folder",
+        size: "set -- $(stty size); echo size-$2x$1",
+        unicode: "echo ä€''x",
+    };
+
+const CHILD_PID = /child-(\d+)/u;
 
 const processes: ReturnType<typeof fork>[] = [];
 
@@ -57,7 +94,7 @@ const isAlive = (pid: number): boolean => {
     }
 };
 
-const waitFor = async (condition: () => boolean, what: string, timeoutMs = 10_000): Promise<void> => {
+const waitFor = async (condition: () => boolean, what: string, timeoutMs = SHELL_WAIT_MS): Promise<void> => {
     const deadline = Date.now() + timeoutMs;
 
     while (!condition()) {
@@ -78,7 +115,7 @@ interface Run {
     session: TerminalSession;
 }
 
-const open = async (cwd: string, shellArguments: string[], onChunk?: (chunk: string) => void): Promise<Run> => {
+const open = async (cwd: string, onChunk?: (chunk: string) => void): Promise<Run> => {
     let output = "";
     const exits: Run["exits"] = [];
     const session = await startSession({
@@ -89,7 +126,7 @@ const open = async (cwd: string, shellArguments: string[], onChunk?: (chunk: str
         onExit: (info) => {
             exits.push(info);
         },
-        spawn: { args: shellArguments, cols: 80, cwd, env: shellEnvironment(), file: "/bin/sh", rows: 24 },
+        spawn: { args: dialect.args, cols: 80, cwd, env: shellEnvironment(), file: dialect.file, rows: 24 },
         startHost,
     });
 
@@ -123,56 +160,93 @@ afterAll(() => {
     rmSync(bundleDirectory, { force: true, recursive: true });
 });
 
-describe.skipIf(!supported)("terminal host (real pty)", { timeout: 60_000 }, () => {
+describe.skipIf(!supported)("terminal host (real pty)", { timeout: windows ? 120_000 : 60_000 }, () => {
     it("starts a shell in the folder and returns what it prints", async () => {
         const folder = mkdtempSync(path.join(tmpdir(), "neore-term-"));
-        const run = await open(folder, []);
+        const run = await open(folder);
 
-        run.session.write("pwd; echo marker-$((6*7))\n");
+        run.session.write(`${dialect.describe}${dialect.enter}`);
         await waitFor(() => run.output().includes("marker-42"), "the shell's output");
 
-        // macOS resolves /var to /private/var, so only the folder's own name is compared.
-        expect(run.output()).toContain(path.basename(folder));
+        expect(run.output()).toContain(dialect.folderShown(folder));
 
         run.session.kill();
         await waitFor(() => run.exits.length > 0, "the shell to exit");
         rmSync(folder, { force: true, recursive: true });
     });
 
-    it("reports a shell that cannot start as an exit, and ends the host", async () => {
+    it("reports a shell that cannot start, and ends the host", async () => {
         const exits: { crashed: boolean; exitCode: number | null }[] = [];
-        const session = await startSession({
-            onData: () => {},
-            onExit: (info) => {
-                exits.push(info);
-            },
-            spawn: { args: [], cols: 80, cwd: "/definitely/not/a/folder", env: shellEnvironment(), file: "/bin/sh", rows: 24 },
-            startHost,
-        });
+        let session: TerminalSession | undefined;
 
-        await waitFor(() => exits.length > 0, "the exit");
-        expect(exits[0]?.exitCode).not.toBe(0);
-        session.kill();
+        try {
+            session = await startSession({
+                onData: () => {},
+                onExit: (info) => {
+                    exits.push(info);
+                },
+                spawn: { args: dialect.args, cols: 80, cwd: dialect.missingFolder, env: shellEnvironment(), file: dialect.file, rows: 24 },
+                startHost,
+            });
+        } catch {
+            // Refused at the start: reported below.
+        }
+
+        // A POSIX shell starts and exits with a failure; ConPTY refuses a missing folder when it creates the process.
+        if (!windows) {
+            expect(session).toBeDefined();
+        }
+
+        if (session !== undefined) {
+            await waitFor(() => exits.length > 0, "the exit");
+            expect(exits[0]?.exitCode).not.toBe(0);
+            session.kill();
+        }
+
+        const [host] = processes.slice(-1);
+
+        await waitFor(() => host?.exitCode !== null || host?.signalCode !== null, "the host to end");
     });
 
-    it("ends the shell and its foreground job when the session is killed", async () => {
-        const run = await open(tmpdir(), []);
+    it("ends the shell and a process it started when the session is killed", async () => {
+        const run = await open(tmpdir());
 
-        run.session.write("sleep 1000\n");
-        await new Promise((resolve) => {
-            setTimeout(resolve, 300);
-        });
+        run.session.write(`${dialect.child}${dialect.enter}`);
+        await waitFor(() => CHILD_PID.test(run.output()), "the child to start");
 
+        const childPid = Number(CHILD_PID.exec(run.output())?.[1]);
         const shellPid = run.session.pid;
 
         expect(isAlive(shellPid)).toBe(true);
+        expect(isAlive(childPid)).toBe(true);
         run.session.kill();
         await waitFor(() => !isAlive(shellPid), "the shell to end");
+        await waitFor(() => !isAlive(childPid), "the child to end");
+        await waitFor(() => run.exits.length > 0, "the exit to be reported");
         expect(run.exits).toHaveLength(1);
     });
 
+    it("passes a resize on to the shell", async () => {
+        const run = await open(tmpdir());
+
+        run.session.resize(100, 30);
+        run.session.write(`${dialect.size}${dialect.enter}`);
+        await waitFor(() => run.output().includes("size-100x30"), "the shell to report its new size");
+        expect(run.output()).toContain("size-100x30");
+        run.session.kill();
+    });
+
+    it("carries non-ASCII text both ways", async () => {
+        const run = await open(tmpdir());
+
+        run.session.write(`${dialect.unicode}${dialect.enter}`);
+        await waitFor(() => run.output().includes("ä€x"), "the shell to answer in the same characters");
+        expect(run.output()).toContain("ä€x");
+        run.session.kill();
+    });
+
     it("ends the shell at once when the app quits (killNow)", async () => {
-        const run = await open(tmpdir(), []);
+        const run = await open(tmpdir());
         const shellPid = run.session.pid;
 
         run.session.killNow();
@@ -182,7 +256,7 @@ describe.skipIf(!supported)("terminal host (real pty)", { timeout: 60_000 }, () 
     });
 
     it("leaves no shell behind when the host is killed without warning", async () => {
-        const run = await open(tmpdir(), []);
+        const run = await open(tmpdir());
         const shellPid = run.session.pid;
         const [host] = processes.slice(-1);
 
@@ -196,9 +270,11 @@ describe.skipIf(!supported)("terminal host (real pty)", { timeout: 60_000 }, () 
         expect(isAlive(shellPid)).toBe(false);
     });
 
-    it("pauses a flooding shell until the window confirms the output, and resumes it", async () => {
+    // The pause mark is counted in what the pty hands over, and ConPTY re-renders the shell's output into its own
+    // screen model first, so the same count of characters does not reach the host. Left to a separate measurement.
+    it.skipIf(windows)("pauses a flooding shell until the window confirms the output, and resumes it", async () => {
         let chars = 0;
-        const run = await open(tmpdir(), [], (chunk) => {
+        const run = await open(tmpdir(), (chunk) => {
             chars += chunk.length;
         });
 
@@ -226,10 +302,10 @@ describe.skipIf(!supported)("terminal host (real pty)", { timeout: 60_000 }, () 
         run.session.kill();
     });
 
-    it("moves heavy output at the rate of the pty itself", async () => {
+    it.skipIf(windows)("moves heavy output at the rate of the pty itself", async () => {
         const total = 10_000_000;
         let chars = 0;
-        const run = await open(tmpdir(), [], (chunk) => {
+        const run = await open(tmpdir(), (chunk) => {
             chars += chunk.length;
             run.session.ack(chunk.length);
         });

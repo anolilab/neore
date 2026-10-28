@@ -1,6 +1,6 @@
 # Desktop terminal: an interactive shell per folder
 
-Status: S1 and S2 built (macOS and Linux), 2026-10-27; S3 and S4 open. Part of [agent-host-roadmap.md](agent-host-roadmap.md).
+Status: S1 and S2 built (macOS and Linux), 2026-10-27; S4 built (Windows, proved by the `desktop-windows-check` CI job); S3 open. Part of [agent-host-roadmap.md](agent-host-roadmap.md).
 S3 needs the SSH transport ([ssh-environments.md](ssh-environments.md) S3).
 
 ## 1. Goal and decision
@@ -47,8 +47,15 @@ Decisions:
 - **Persistence.** Scrollback lives in memory and is dropped when the tab closes.
   A reopened terminal starts a new shell. Nothing is written to the app data
   directory.
-- **Windows.** The pseudo-terminal API differs on Windows, so S4 covers it
-  separately.
+- **Windows.** ConPTY through the same `node-pty`, from Windows 10 version 1903 (build 18362);
+  older builds get the "needs Windows 10 version 1903 or later" message instead of a button. The shell is
+  Windows PowerShell by absolute path under `%SystemRoot%` (`-NoLogo`, so the profile still loads), else
+  `%ComSpec%`; `$SHELL` is ignored. There is no hangup signal and `process.kill` ends one process, so a shell
+  is ended with `taskkill /t /f` (`hang-up.ts`, started without waiting, so shells end in parallel at quit), also when the host dies, because nothing else would. Without a Job Object `/t` follows parent links only, so a grandchild whose parent has already exited (an `npm run dev` wrapper that left its server behind) is missed; a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` is the follow-up.
+  `node-pty`'s own `kill` forks a helper script that a packaged app (RunAsNode fuse off) cannot run, so it is
+  not used there. `node-pty` is loaded from the unpacked copy of a packaged app (`asarUnpack`), since its
+  worker thread cannot start from inside `app.asar`. Like `shell_run`, the terminal has no sandbox on
+  Windows; it is the user's own shell, which is the point of it.
 
 ## 4. Slices
 
@@ -71,6 +78,12 @@ input, resize, copy and paste, kill on close.
 **S4 — Windows.** The pseudo-terminal on Windows, with its own tests.
 - Acceptance: S1 acceptance on Windows in CI, or the feature is marked unsupported
   on that platform.
+- As built: the first. `desktop-windows-check` (`test.yml`, `windows-latest`) runs the terminal unit and
+  real-pty tests (PowerShell on ConPTY), packages the app with `--dir` and checks `node-pty` is
+  unpacked, and runs the S1 end-to-end cases against the real shell (type a command, the site origin has no
+  channel, nothing reaches any server, every shell is gone after quit, a reload starts a fresh shell).
+  Not covered on Windows: the two flow-control cases (pause mark and throughput), because ConPTY re-renders the
+  shell's output and a character count through it is not comparable; the pause itself is the same socket pause.
 
 ## 5. Invariants crossed
 

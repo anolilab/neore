@@ -4,11 +4,12 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { makeSpawnHelperExecutable } from "./spawn-helper";
+import { loadableDirectory, makeSpawnHelperExecutable } from "./spawn-helper";
 
 const modeOf = (file: string): number => statSync(file).mode % 0o1000;
 
-describe("makeSpawnHelperExecutable", () => {
+// File modes are not a thing on Windows, which has no spawn-helper either.
+describe.skipIf(process.platform === "win32")("makeSpawnHelperExecutable", () => {
     it("adds the execute bit the tarball leaves out, for this platform's prebuild only", () => {
         const root = mkdtempSync(path.join(tmpdir(), "neore-pty-"));
         const mine = path.join(root, "prebuilds", "darwin-arm64", "spawn-helper");
@@ -51,5 +52,26 @@ describe("makeSpawnHelperExecutable", () => {
 
         expect(() => makeSpawnHelperExecutable(root, "linux", "x64")).not.toThrow();
         expect(modeOf(built)).toBe(0o700);
+    });
+});
+
+describe("loadableDirectory", () => {
+    const packaged = String.raw`C:\Apps\Neore\resources\app.asar\node_modules\node-pty`;
+    const unpacked = String.raw`C:\Apps\Neore\resources\app.asar.unpacked\node_modules\node-pty`;
+
+    it("loads the unpacked copy of a packaged app on Windows", () => {
+        expect(loadableDirectory(packaged, "win32", (file) => file === unpacked)).toBe(unpacked);
+        expect(loadableDirectory(packaged.replaceAll("\\", "/"), "win32", () => true)).toBe(unpacked.replaceAll("\\", "/"));
+    });
+
+    it("keeps the folder when there is no unpacked copy, or it is not a packaged app", () => {
+        expect(loadableDirectory(packaged, "win32", () => false)).toBe(packaged);
+        expect(loadableDirectory(String.raw`C:\work\node_modules\node-pty`, "win32", () => true)).toBe(String.raw`C:\work\node_modules\node-pty`);
+    });
+
+    it("leaves other platforms alone", () => {
+        expect(loadableDirectory("/Applications/Neore.app/Contents/Resources/app.asar/node_modules/node-pty", "darwin", () => true)).toBe(
+            "/Applications/Neore.app/Contents/Resources/app.asar/node_modules/node-pty",
+        );
     });
 });

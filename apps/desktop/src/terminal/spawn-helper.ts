@@ -28,3 +28,20 @@ export const makeSpawnHelperExecutable = (packageDirectory: string, platform: st
         }
     }
 };
+
+const ASAR_SEGMENT = /app\.asar(?=[\\/])/u;
+
+/**
+ * On Windows `node-pty` starts a worker thread from its own folder, and `node-pty` only rewrites `node_modules.asar` to its unpacked path, so the worker script path would point inside `app.asar`. A packaged app
+ * loads the copy electron-builder unpacked beside the archive (`asarUnpack` in `electron-builder.yml`); anywhere else the
+ * folder is returned as it is.
+ */
+export const loadableDirectory = (packageDirectory: string, platform: string = process.platform, exists: (file: string) => boolean = existsSync): string => {
+    if (platform !== "win32") {
+        return packageDirectory;
+    }
+
+    const unpacked = packageDirectory.replace(ASAR_SEGMENT, "app.asar.unpacked");
+
+    return exists(unpacked) ? unpacked : packageDirectory;
+};
