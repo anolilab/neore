@@ -10,19 +10,25 @@ const SESSION_BATCH = 200;
  * the host wrote is saved as a failed reply, so no client keeps a "Working" turn that nothing will finish. The host cannot be told to cancel: its secret is gone.
  */
 export const endHostSessionsOfDevice = async (ctx: MutationCtx, deviceId: Id<"devices">, now: number): Promise<void> => {
-    const { page: sessions } = await ctx.db.acpSessions.findMany({ limit: SESSION_BATCH, where: { deviceId } });
+    let cursor: string | undefined;
 
-    for (const session of sessions) {
-        if (session.status !== "ended") {
-            await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+    do {
+        const { continueCursor, page: sessions } = await ctx.db.acpSessions.findMany({ cursor, limit: SESSION_BATCH, where: { deviceId } });
+
+        for (const session of sessions) {
+            if (session.status !== "ended") {
+                await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+            }
+
+            const { page: live } = await ctx.db.persistentStreams.findMany({
+                where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId: session.threadId },
+            });
+
+            for (const stream of live) {
+                await endHostTurn(ctx, stream, { reason: "revoked" }, now);
+            }
         }
 
-        const { page: live } = await ctx.db.persistentStreams.findMany({
-            where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId: session.threadId },
-        });
-
-        for (const stream of live) {
-            await endHostTurn(ctx, stream, { reason: "revoked" }, now);
-        }
-    }
+        cursor = continueCursor ?? undefined;
+    } while (cursor !== undefined);
 };

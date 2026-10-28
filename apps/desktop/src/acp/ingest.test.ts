@@ -473,6 +473,26 @@ describe("a restart", () => {
         expect(await runningTurns()).toEqual({ turns: [] });
     });
 
+    it("keeps a turn left behind while this computer is not paired, and ends it once it is", async () => {
+        await writeFile(path.join(scratch, "acp-host-turns.json"), JSON.stringify({ turns: [{ sessionId: "old", threadId: "thread-9", turnId: "t-old" }] }));
+        backend.chunks.set("t-old", [{ kind: "turn_start", text: "x" }]);
+        paired = undefined;
+
+        const host = poster();
+
+        await host.recover();
+        await settle(POST_INTERVAL_MS * 3);
+        await host.persisted();
+
+        expect(backend.posts).toHaveLength(0);
+        expect(await runningTurns()).toEqual({ turns: [{ sessionId: "old", threadId: "thread-9", turnId: "t-old" }] });
+
+        paired = "dev1";
+        await settle(60_000);
+
+        expect(backend.chunks.get("t-old")?.at(-1)).toEqual({ kind: "turn_end", reason: "interrupted" });
+    });
+
     it("records a running turn on disk once its thread is known", async () => {
         const host = poster();
 
