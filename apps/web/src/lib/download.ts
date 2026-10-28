@@ -1,5 +1,5 @@
 import { MODEL_LOOKUP } from "@neore/ai/models";
-import { agentSwitchOf } from "@neore/backend/agent/agent-switch-logic";
+import { readAgentSwitch } from "@neore/backend/agent/agent-switch-shape";
 import type { Doc } from "@neore/backend/dataModel";
 
 import { buildDocx, DOCX_MIME_TYPE } from "./docx";
@@ -93,7 +93,7 @@ const messageText = (message: Message, stored: StoredMessagePayload | undefined)
 
 /** The line a divider row stands for ("Switched from X to Y"), or `undefined` for any other row. */
 const switchNote = (message: Message): string | undefined => {
-    const part = agentSwitchOf(message);
+    const part = readAgentSwitch(message);
 
     if (!part) {
         return undefined;
