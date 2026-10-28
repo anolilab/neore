@@ -164,6 +164,8 @@ describe("a switch in a thread that never branched", () => {
         ).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
         await expect(switchTo("no/such-model", "c2")).rejects.toThrow(NOT_ENABLED);
         await expect(switchTo("openai/gpt-image-1", "c3")).rejects.toThrow(NOT_ENABLED);
+        // Listed in the catalog but with no API behind it: refused, or a reply would silently run on another model.
+        await expect(switchTo("ext/mimo-v2-flash", "c4")).rejects.toThrow(NOT_ENABLED);
         expect(await switchRows()).toHaveLength(0);
     });
 

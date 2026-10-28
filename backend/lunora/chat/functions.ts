@@ -1407,6 +1407,13 @@ export const updateThread = authAction
             throwUnlessGranted(gateResult.outcome, "Admin access denied to this thread");
 
             const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
+
+            // A switched thread's `model` is where the paths before its first switch recover their agent: the
+            // switch itself is the only way to change what the thread runs on.
+            if (model !== undefined && threadData?.activeAgent && model !== threadData.model) {
+                throw new LunoraError("BAD_REQUEST", "Switch the agent instead of changing this thread's model");
+            }
+
             const threadLanguage = threadData?.language;
 
             // Use provided model or fall back to thread's existing model
@@ -2944,6 +2951,11 @@ export const branchThread = authAction
                     unlockProof,
                     upToAndIncludingMessageId: forkEnd.endId,
                 });
+
+                // The copy carries any agent-switch divider; the fork must run on what it says.
+                if (parentThread.activeAgent) {
+                    await context.runMutation(internal.agent.agent_switch.adoptForkAgent, { threadId: newThreadId as Id<"threads"> });
+                }
             } catch (error) {
                 // If cloning fails, clean up the thread
                 chatLogger.error("Failed to clone messages for branch:", error);
@@ -2954,11 +2966,6 @@ export const branchThread = authAction
                 await context.runMutation(internal.agent.thread_lock.dropThreadPasscodeRows, { threadId: newThreadId as Id<"threads"> });
                 await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: newThreadId as Id<"threads"> });
                 throw new LunoraError("INTERNAL_SERVER_ERROR", "Failed to copy messages to branch");
-            }
-
-            // The copy carries any agent-switch divider; the fork must run on what it says.
-            if (parentThread.activeAgent) {
-                await context.runMutation(internal.agent.agent_switch.adoptForkAgent, { threadId: newThreadId as Id<"threads"> });
             }
         }
 
