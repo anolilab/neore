@@ -19640,7 +19640,7 @@
     {
       "file": "lib/shard-housekeeping",
       "kind": "call",
-      "line": 250,
+      "line": 252,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
