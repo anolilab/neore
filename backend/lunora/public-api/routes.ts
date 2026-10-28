@@ -58,6 +58,7 @@ import { scopesToStrings } from "./scopes";
 import type { CollectedStream, StreamSource } from "./stream";
 import { collectStream, INTERRUPTED, pollStream, toNdjsonStream } from "./stream";
 import { shardContext } from "../lib/http-shard";
+import { httpLogger } from "../lib/logger";
 import { threadShardFor } from "../lib/thread-shard";
 import { isThreadLocked, THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import { collectUnlockedThreads } from "./thread-page";
@@ -215,7 +216,9 @@ const collectBlockingReply = async (input: RouteInput, threadId: string | undefi
         const shardKey = threadId ? await threadShardFor(input.ctx, input.identity.userId, threadId) : input.identity.userId;
 
         return await collectStream(streamSourceFor(shardContext(input.ctx, shardKey), streamId), { maxDurationMs: BLOCKING_CHAT_MAX_MS, signal: input.signal });
-    } catch {
+    } catch (error) {
+        httpLogger.warn(`[public-api] blocking chat read failed (thread ${threadId ?? "new"}, stream ${streamId}):`, error);
+
         return { reasoning: "", status: INTERRUPTED, text: "" };
     }
 };
@@ -537,13 +540,13 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
         mayRefuseHostThread: true,
         mcp: [
             {
-                description: `Start a new Neore thread with a first message and wait for the reply (up to 5 minutes; if it takes longer, read it later with read_messages). Returns the reply text with its threadId and messageId. Counts against the account's daily message limit like a message sent in the app. The agent's tools run in ask mode: a run that needs a person's answer returns status "waiting_on_person" with the pending request, which only a person can answer in the app. Send an idempotencyKey to make a retry safe. ${USER_DATA_NOTE}`,
+                description: `Start a new Neore thread with a first message and wait for the reply (up to 5 minutes; if it takes longer, read it later with read_messages, which needs a key that can also read threads). Returns the reply text with its threadId and messageId. Counts against the account's daily message limit like a message sent in the app. The agent's tools run in ask mode: a run that needs a person's answer returns status "waiting_on_person" with the pending request, which only a person can answer in the app. Send an idempotencyKey to make a retry safe. ${USER_DATA_NOTE}`,
                 fixed: { stream: false },
                 tool: "create_thread",
                 when: "no-threadId",
             },
             {
-                description: `Send a message into an existing thread and wait for the reply (up to 5 minutes; if it takes longer, read it later with read_messages). Returns the reply text with its threadId and messageId. Counts against the account's daily message limit like a message sent in the app. A thread that runs on a paired computer is read-only here and answers host_thread_read_only. A run that needs a person's answer returns status "waiting_on_person" with the pending request, which only a person can answer in the app. If the reply is cut short (status interrupted) or the run paused and was answered meanwhile, read the full reply with read_messages. Send an idempotencyKey to make a retry safe. ${USER_DATA_NOTE}`,
+                description: `Send a message into an existing thread and wait for the reply (up to 5 minutes; if it takes longer, read it later with read_messages, which needs a key that can also read threads). Returns the reply text with its threadId and messageId. Counts against the account's daily message limit like a message sent in the app. A thread that runs on a paired computer is read-only here and answers host_thread_read_only. A run that needs a person's answer returns status "waiting_on_person" with the pending request, which only a person can answer in the app. If the reply is cut short (status interrupted) or the run paused and was answered meanwhile, read the full reply with read_messages. Send an idempotencyKey to make a retry safe. ${USER_DATA_NOTE}`,
                 fixed: { stream: false },
                 tool: "send_message",
                 when: "threadId",

@@ -540,6 +540,18 @@ describe("MCP write tools", () => {
         expect(chatStart).toHaveBeenCalledOnce();
     });
 
+    it("refuses an idempotencyKey that is not a string, so `true` is never the key \"true\"", async () => {
+        const harness = setup({ scopes: WRITE_SCOPES });
+
+        for (const idempotencyKey of [true, 7]) {
+            const result = await sendMessageOn(harness, { idempotencyKey, prompt: "hello", threadId: "t1" });
+
+            expect(result.structuredContent).toMatchObject({ error: { code: "invalid_request" } });
+        }
+
+        expect(chatStart).not.toHaveBeenCalled();
+    });
+
     it("treats the same key on another API key as a different request", async () => {
         const one = setup({ scopes: WRITE_SCOPES });
         const two = setup({ identity: { apiKeyId: "key2", apiKeyScopes: WRITE_SCOPES, authMethod: "api_key" } });

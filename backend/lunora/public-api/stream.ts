@@ -42,6 +42,7 @@
  * stretches its polls ({@link blockingPollDelay}) to fit its five minutes.
  */
 import { sleep } from "../chat/tools/utilities";
+import { httpLogger } from "../lib/logger";
 
 /** A request the run paused on, which only a person can answer in the app. */
 export interface PendingRequest {
@@ -276,10 +277,11 @@ export const collectStream = async (source: StreamSource, options: PollOptions =
                 }
             }
         }
-    } catch {
+    } catch (error) {
         // A read failed after the run began. The caller has already started (and paid for) the turn, so it gets
         // what arrived and a status that says to read the rest from the thread, never an error to retry.
         status = INTERRUPTED;
+        httpLogger.warn("[public-api] stream read failed after the run began:", error);
     }
 
     return { ...(pendingRequest && { pendingRequest }), reasoning, status, text };

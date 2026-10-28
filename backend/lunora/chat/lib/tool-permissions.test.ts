@@ -141,6 +141,15 @@ describe("a run started with an API key", () => {
         expect(resolveToolPermission(device, { [device.key]: "auto" }, apiKey)).toBe("off");
     });
 
+    it("drops the sub-agent tools, whose child would run its tools without anyone approving them", () => {
+        for (const name of ["delegateToSubAgent", "messageWorker"]) {
+            const tool = { key: toolPermissionKey("builtin", name), source: "builtin" as const };
+
+            expect(resolveToolPermission(tool, { [tool.key]: "ask" }, apiKey)).toBe("off");
+            expect(resolveToolPermission(tool, { [tool.key]: "ask" })).toBe("ask");
+        }
+    });
+
     it("keeps off tools off and ask tools ask", () => {
         expect(resolveToolPermission(builtin, { [builtin.key]: "off" }, apiKey)).toBe("off");
         expect(resolveToolPermission(builtin, { [builtin.key]: "ask" }, apiKey)).toBe("ask");

@@ -160,7 +160,12 @@ export const toolRequest = (tool: McpTool, args: Record<string, unknown>, base: 
         }
 
         if (name === IDEMPOTENCY_ARGUMENT && takesIdempotencyKey(tool.route)) {
-            idempotencyKey = argumentValue(name, value);
+            // Not argumentValue: `true` and `"true"` must not be the same key.
+            if (typeof value !== "string") {
+                throw new PublicApiError("invalid_request", `\`${name}\` must be a string.`);
+            }
+
+            idempotencyKey = value;
         } else if (pathNames.has(name)) {
             params[name] = argumentValue(name, value);
         } else if (queryNames.has(name)) {
