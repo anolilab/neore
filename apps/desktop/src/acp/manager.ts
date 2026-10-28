@@ -19,7 +19,7 @@ import type { Handshake } from "./protocol";
 import { initialize } from "./protocol";
 import type { SendResult } from "./session";
 import { AgentSession } from "./session";
-import type { AcpView, ProbeResult, SessionSnapshot, SessionSummary, SpawnPlan } from "./types";
+import type { AcpView, ProbeResult, SessionSnapshot, SessionStatus, SessionSummary, SpawnPlan } from "./types";
 
 /** The window is told about changes at most this often; streamed text would otherwise re-render per chunk. */
 const CHANGE_INTERVAL_MS = 50;
@@ -46,6 +46,8 @@ export interface ManagerOptions {
     gate?: PermissionGate;
     /** The label of the folder the user approved for this agent (never its path), for the backend's thread. Undefined: keep the session on this computer. */
     hostInfo?: (agentKey: string, folder: string) => Pick<HostSessionInfo, "folderId" | "folderLabel"> | undefined;
+    /** Where sessions say what they measured (child buffering). */
+    log?: (message: string) => void;
     /** Saves what the sessions do on the backend (`ingest.ts`). Without it, sessions stay on this computer. */
     observer?: SessionObserver;
     /** Told that the window should read the sessions again. */
@@ -175,6 +177,7 @@ export class AcpManager {
             cancelGraceMs: this.options.cancelGraceMs,
             folder: plan.cwd,
             gate: this.options.gate ?? declineGate,
+            log: this.options.log,
             onChange: () => this.changed(),
             process: child,
             startupTimeoutMs: this.options.startupTimeoutMs,
@@ -190,6 +193,11 @@ export class AcpManager {
         }
 
         return session.id;
+    }
+
+    /** What this computer knows of the session; `undefined` when it has none by that id (not started yet, or forgotten). */
+    public statusOf(sessionId: string): SessionStatus | undefined {
+        return this.sessions.get(sessionId)?.summary().status;
     }
 
     public send(sessionId: string, prompt: string, turnId?: string): SendResult {

@@ -101,6 +101,31 @@ export const vHostEvent = v.union(
         outcome: v.union(v.literal("allowed"), v.literal("declined"), v.literal("cancelled")),
         requestId: v.string().max(128),
     }),
+    // One of the agent's own children (plans/acp-agent-host.md §4.7). `spawnId` is the tool call that started the child
+    // and keys its transcript; the host posts these only when the agent reports its children.
+    v.object({ field: v.union(v.literal("text"), v.literal("reasoning")), kind: v.literal("child_text"), spawnId: v.string().max(128), text: v.string().max(65_536) }),
+    v.object({
+        id: v.string().max(128),
+        kind: v.literal("child_tool"),
+        spawnId: v.string().max(128),
+        status: v.union(
+            v.literal("pending"),
+            v.literal("in_progress"),
+            v.literal("completed"),
+            v.literal("failed"),
+            v.literal("cancelled"),
+            v.literal("declined"),
+        ),
+        title: v.string().max(500),
+        toolKind: v.string().max(64),
+    }),
+    v.object({
+        kind: v.literal("child_end"),
+        spawnId: v.string().max(128),
+        status: v.union(v.literal("completed"), v.literal("failed"), v.literal("cancelled")),
+        // Set only for a child that streamed no text: its completion message, whole.
+        text: v.optional(v.string().max(65_536)),
+    }),
     v.object({
         error: v.optional(v.string().max(1000)),
         kind: v.literal("turn_end"),

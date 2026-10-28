@@ -567,7 +567,7 @@ deadline, whatever the error).
 - Remote answers find the Rust-side request by the id the backend shows (`requestId` on the core's permission request).
   "Approve all" is the local window's bar and was built with S2; its test (a request that arrives after the bar is drawn
   is not answered) is `approve_all_answers_exactly_the_requests_named_each_with_its_own_option`.
-- Not built here: attachments on `acp_send` (S8), a session id sent before the session opens (S7), and the throttling
+- Not built here: attachments on `acp_send` (S8), a session id sent before the session opens (S7, built: see below), and the throttling
   measurement (harness in [acp-s4-throttling.md](acp-s4-throttling.md); not run).
 
 **S5 — Registry.** Search and install from the official ACP registry, queried by
@@ -667,6 +667,55 @@ mobile M2 needs them.
   event past the byte budget is dropped and logged, not stored.
 - The byte budget for child buffering is measured on a real child-heavy session
   before it is fixed.
+
+**S7 as built:**
+- **Early commands.** The backend no longer refuses a send to a `starting` session (`session_starting` is gone from `sendToHost`,
+  `/hosts/send` and the web composer): the message, the `accepted` stream and the call are stored, and `touchSession` leaves a
+  `starting` session `starting` (only `session_open` or a failed start leaves it; `session_open` then opens it `busy` when a
+  stream is waiting). A start that is refused, expires, or whose agent never opens (`endUnopenedSession`) now also fails the
+  held stream with "The agent did not start" (`endStartingSession`), instead of leaving it to the reaper.
+- **The hold is the receipt log, not memory.** `acp/commands.ts` keeps a `start` or `send` receipt WITH its signed envelope
+  until the command has been acted on (the file format gains the envelope and signature as entries 4 and 5; a cancel or an
+  answer is not kept, since the turn or request it names does not survive a restart). `apply` answers `HELD` for a command it
+  kept (a send for a session that is starting or not known yet; a start, until its agent has opened or failed); the call is
+  acknowledged at once and `HostCommands.finished` removes the envelope later, so a sent prompt does not stay on disk.
+  `HostCommands.recover()` runs at app start, before the poster's own recovery: it re-runs `acpPrepare` on each held envelope
+  (consent revoked meanwhile, expiry), acts on starts first and sends after, and a delivery waits for it. A held send past its
+  `expiresAt` ends its stream with an error (`endLapsedTurn`). The window between acting on a command and writing "acted on"
+  is not atomic: a process killed inside it acts twice.
+- **`acp/early-sends.ts`** holds the message against its session (open sessions take it at once, ended ones refuse it). The
+  thread comes from the signed envelope (`threadId`), so the turn's channel opens at once (`HostPoster.turnHeld`): the
+  backend sees `received` and the reaper keeps hearing keepalives. The message goes in, in arrival order, when the session
+  opens; it ends the stream with an error when the start fails, the envelope expires first (a timer, and a check at drain
+  time for a computer that slept) or the turn is cancelled. A send for a session this computer has never heard of is held too,
+  because the relay can claim the send before the start.
+- **Child agents** (`acp/children.ts`, `child-updates.ts`, `masked-stream.ts`). The wire, checked in the Claude Code ACP
+  adapter's published package (0.98.0): a client that declares `_meta["subagent-transcript"]` (or the newer `subagents`
+  client capability, a draft with child sessions) gets the child's `session/update`s stamped with
+  `_meta.claudeCode.parentToolUseId`, the id of the spawn call; an adapter that is not told to hide them forwards them
+  flattened into the main feed all the same. **No agent advertises this in its handshake**, so the host cannot map
+  `subagents.ownChildren` from what an agent said, and does not map it from its name: `reportFromHandshake` leaves the group
+  `unknown`, which is unsupported. The path is built and tested behind that capability (`capabilityReport` on a session
+  stands in for an agent that reports it), and shows nothing for real agents until a source for the report exists. The host
+  also declares nothing new at `initialize`.
+  What does change for every agent: an update stamped with a parent is now kept out of the parent's reply text and tools
+  (it was appended to the reply before), whether or not children are shown.
+  The ledger: a card exists once the spawn call was seen (the first sight of a tool call, after its own event is on the wire);
+  an event that names a call that never appears makes no card; events before the card wait in one per-session buffer
+  (provisional budget `CHILD_BUFFER_BUDGET_BYTES`, 512 KiB, **not measured**: see [acp-s7-children.md](acp-s7-children.md)); past
+  it an event is dropped and logged, never stored; a spawn's terminal update ends its card once (a repeat and anything later
+  are ignored), and its text is kept only when the child streamed none; text is masked with the user's variable values and
+  held back like the agent's own.
+- **Wire and storage.** Three event kinds, `child_text`, `child_tool` and `child_end` (all keyed by `spawnId`), in `vHostEvent` (so
+  also the `persistentChunks.event` column; the schema-drift gate calls it additive). The reply keeps them as
+  `providerMetadata.neore.subagentTranscripts` (one entry per spawn id: text, reasoning, tools, how it ended; at most 16
+  children, 64,000 characters each), **not** as a `subagentTranscript` content part: host replies carry no tool parts (so there is
+  no parent card in the saved message to hang a part on), and message content is strictly typed, so a new part type would reach
+  the schema, `toUIMessages` and the UI. The backend applies the same once-only rules, so a redelivered post and a second end
+  leave one transcript.
+- **Not built:** rendering `subagentTranscripts` in the thread (nothing reads the metadata yet); the resume rule of §4.7
+  (rebuilding ownership from stored spawn parts on session load needs the reattach of harness S4, which nothing does yet);
+  a source for the `subagents.ownChildren` report; the byte budget measured on a real child-heavy session.
 
 **S8 — Images and files from host agents.** §4.8. Needs S3 (persistence), the
 device file operation, and the device-signed create on the upload route (new

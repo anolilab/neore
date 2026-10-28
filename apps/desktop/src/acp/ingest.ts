@@ -27,8 +27,9 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import type { ChildEvent } from "./children";
 import type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver } from "./host-events";
-import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, endReasonOf } from "./host-events";
+import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, childHostEvents, endReasonOf } from "./host-events";
 import type { ImportIo } from "./import-post";
 import { SessionLink } from "./session-link";
 import type { ChannelHost } from "./turn-channel";
@@ -145,6 +146,34 @@ export class HostPoster implements SessionObserver {
         this.turnStarted(sessionId, turnId, user);
     }
 
+    /**
+     * A message for a session that is not open yet (`early-sends.ts`): the thread comes with the command, so the turn
+     * is posted now. It reaches the backend as `received` and keeps its reaper window moving while it waits.
+     */
+    public turnHeld(sessionId: string, turnId: string, user: string, threadId: string): void {
+        if (this.stopped || this.options.deviceId() === undefined || this.channels.has(turnId)) {
+            return;
+        }
+
+        const channel = new TurnChannel(this.channelHost, sessionId, turnId, threadId, false);
+
+        this.channels.set(turnId, channel);
+        channel.enqueue({ kind: "turn_start", text: capPrompt(user) });
+        this.persist();
+    }
+
+    /** Ends a turn whose message was held past its expiry while the app was down: a stream waiting for it fails with the reason instead of reaping as silent. */
+    public endLapsedTurn(sessionId: string, turnId: string, threadId: string, error: string): void {
+        if (this.stopped || this.channels.has(turnId)) {
+            return;
+        }
+
+        const channel = new TurnChannel(this.channelHost, sessionId, turnId, threadId, true);
+
+        this.channels.set(turnId, channel);
+        channel.end("failed", error);
+    }
+
     /** The first call for a turn opens its channel with the user's prompt; a later one (the turn it was queued for now running) finds it open. */
     public turnStarted(sessionId: string, turnId: string, user: string): void {
         const link = this.sessions.get(sessionId);
@@ -170,6 +199,12 @@ export class HostPoster implements SessionObserver {
 
     public tool(_sessionId: string, turnId: string, tool: { id: string; kind: string; status: string; title: string }): void {
         this.channels.get(turnId)?.enqueue({ id: tool.id.slice(0, 128), kind: "tool", status: tool.status, title: tool.title.slice(0, 500), toolKind: tool.kind.slice(0, 64) });
+    }
+
+    public child(_sessionId: string, turnId: string, spawnId: string, event: ChildEvent): void {
+        for (const posted of childHostEvents(spawnId, event)) {
+            this.channels.get(turnId)?.enqueue(posted);
+        }
     }
 
     public permissionRequested(_sessionId: string, turnId: string, request: PermissionRequestEvent): void {

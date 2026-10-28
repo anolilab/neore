@@ -1260,6 +1260,28 @@ describe("the reaper", () => {
         expect(await messagesOf(threadId)).toHaveLength(before.length);
     });
 
+    it("keeps an agent's children with the reply, once each, however often the host posts them", async () => {
+        const owner = await insertUser();
+        const device = await pair(owner);
+        const threadId = await openSession(device);
+        const child = (text: string) => {
+            return { field: "text", kind: "child_text", spawnId: "task1", text };
+        };
+        const events = [START(), TEXT("delegating"), child("child "), child("says hi"), { kind: "child_end", spawnId: "task1", status: "completed" }];
+
+        const first = await turn(device, threadId, "t1", 0, events);
+
+        expect(first.status).toBe(200);
+        // The same post again, and the end again: dropped by their `seq`, not kept twice.
+        await turn(device, threadId, "t1", 0, events);
+        await turn(device, threadId, "t1", 5, [{ kind: "child_end", spawnId: "task1", status: "failed" }, { kind: "turn_end", reason: "finished" }]);
+
+        const [reply] = await assistantRepliesOf(threadId);
+
+        expect(reply?.message.content).toEqual([{ text: "delegating", type: "text" }]);
+        expect(reply?.providerMetadata.neore.subagentTranscripts).toEqual([{ reasoning: "", spawnId: "task1", status: "completed", text: "child says hi", tools: [] }]);
+    });
+
     it("keeps every chunk of a turn longer than one page when it saves the reply", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);

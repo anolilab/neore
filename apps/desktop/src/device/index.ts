@@ -15,8 +15,9 @@ import { pathToFileURL } from "node:url";
 import type { BrowserWindow as BrowserWindowInstance, IpcMainInvokeEvent, WebContents } from "electron";
 import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 
-import type { AcpCommand } from "../acp/commands";
-import { HostCommands, isAcpEnvelope } from "../acp/commands";
+import type { AcpCommand, AppliedCall } from "../acp/commands";
+import { HELD, HostCommands, isAcpEnvelope } from "../acp/commands";
+import { EarlySends, NEVER_OPENED } from "../acp/early-sends";
 import { AcpImporter } from "../acp/import";
 import { HostPoster } from "../acp/ingest";
 import { AgentInstaller } from "../acp/install";
@@ -74,6 +75,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         commands?: HostCommands;
         core?: DeviceCore;
         coreError?: unknown;
+        early?: EarlySends;
         host?: HostPoster;
         importer?: AcpImporter;
         installer?: AgentInstaller;
@@ -279,8 +281,6 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
         state.transport = created;
         state.core = created.core;
-        // A turn a previous run was cut off in ends as `interrupted`, whether or not an agent is started this time.
-        requireHost(state.core).recover();
     } catch (error) {
         // Register the handlers anyway: they reject with the reason, and the shell keeps running.
         state.coreError = error;
@@ -306,6 +306,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             appVersion: app.getVersion(),
             gate: coreGate(core),
             hostInfo: (agentKey, folder) => approvedFolder(core, agentKey, folder),
+            log: (message) => console.error(message),
             observer: host,
             onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
             plan: (agentKey, folder) => JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan,
@@ -329,25 +330,51 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return state.importer;
     };
 
-    const startRequestedSession = async (command: Extract<AcpCommand, { kind: "start" }>): Promise<void> => {
+    /** Messages that arrived before their session opened (`acp/early-sends.ts`). */
+    const requireEarly = (): EarlySends => {
+        const core = requireCore();
+
+        state.early ??= new EarlySends({
+            finished: (callId) => {
+                state.commands?.finished(callId);
+            },
+            log: (message) => console.error(message),
+            observer: requireHost(core),
+            send: (sessionId, text, turnId) => {
+                requireAcp().send(sessionId, text, turnId);
+            },
+            statusOf: (sessionId) => state.acp?.statusOf(sessionId),
+        });
+
+        return state.early;
+    };
+
+    /** Opens the session the backend asked for; the command's receipt stays open until it has opened or failed, and the messages held for it follow. */
+    const startRequestedSession = async (command: Extract<AcpCommand, { kind: "start" }>, call: AppliedCall): Promise<void> => {
         try {
-            await requireAcp().startSession(command.agentKey, command.agentLabel, command.folderPath, {
+            const sessionId = await requireAcp().startSession(command.agentKey, command.agentLabel, command.folderPath, {
                 sessionId: command.sessionId,
                 threadId: command.threadId,
             });
+
+            requireEarly().opened(sessionId);
         } catch (error) {
             console.error("[neore-desktop] a requested coding agent did not start:", (error as Error).message);
+            requireEarly().failed(command.sessionId, (error as Error).message);
+        } finally {
+            await state.commands?.finished(call.callId);
         }
     };
 
     /** Carries out one command the backend sent, after its receipt is written (`acp/commands.ts`). */
-    const applyCommand = (command: AcpCommand): string => {
+    const applyCommand = (command: AcpCommand, call: AppliedCall): "accepted" | typeof HELD => {
         const core = requireCore();
 
         switch (command.kind) {
             case "cancel": {
                 // The turn may have ended already; that is not a refusal.
                 requireAcp().cancelTurn(command.sessionId, command.turnId);
+                requireEarly().cancel(command.sessionId, command.turnId);
 
                 return "accepted";
             }
@@ -357,16 +384,15 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
                 return "accepted";
             }
             case "send": {
-                requireAcp().send(command.sessionId, command.text, command.turnId);
-
-                return "accepted";
+                // Sent now, or held until the session opens (`acp/early-sends.ts`).
+                return requireEarly().submit(command, call);
             }
             case "start": {
-                // The agent takes a while to start. The command is accepted now; the backend learns the session
-                // is open from its own `session_open`, and a start that fails is logged here.
-                startRequestedSession(command);
+                // The agent takes a while to start. The command is accepted now and stays in the receipt log until the
+                // agent has opened (or failed to); the backend learns the session is open from its own `session_open`.
+                startRequestedSession(command, call);
 
-                return "accepted";
+                return HELD;
             }
             default: {
                 throw new Error("unknown command");
@@ -378,11 +404,31 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         state.commands ??= new HostCommands({
             apply: applyCommand,
             core: requireCore(),
+            lapsed: (held) => requireHost(requireCore()).endLapsedTurn(held.sessionId, held.turnId, held.threadId, NEVER_OPENED),
+            log: (message) => console.error(message),
             receiptFile: path.join(app.getPath("userData"), "acp-host-receipts.json"),
         });
 
         return state.commands;
     };
+
+    /**
+     * Commands a previous run left unfinished go first, so a turn they own is not ended as `interrupted`; then a turn it
+     * was cut off in ends as `interrupted`, whether or not an agent is started this time.
+     */
+    const recoverFromRestart = async (core: DeviceCore): Promise<void> => {
+        try {
+            await requireCommands().recover();
+        } catch (error) {
+            console.error("[neore-desktop] commands left from the last run could not be replayed:", (error as Error).message);
+        }
+
+        await requireHost(core).recover();
+    };
+
+    if (state.core !== undefined) {
+        recoverFromRestart(state.core);
+    }
 
     const reap = setInterval(() => {
         state.transport?.reapIdleServers();

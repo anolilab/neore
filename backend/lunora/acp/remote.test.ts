@@ -395,6 +395,101 @@ describe("a start the computer accepted", () => {
     });
 });
 
+describe("a message sent while the session is still starting", () => {
+    const startedThread = async (device: Device) => {
+        const { threadId } = (await as(ownerId).mutation(
+            remote.startHostSession as never,
+            { agentKey: "claude", clientId: "t", deviceId: device.deviceId, folderId: "f1" } as never,
+        )) as { threadId: string };
+
+        return threadId;
+    };
+
+    it("is accepted and held: the stream exists, the session stays starting, and opening it leaves it busy", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await startedThread(device);
+        const result = await sendText(threadId, "fix the bug");
+
+        expect(result.outcome).toBe("sent");
+        expect(await streamField(threadId, "hostState")).toBe("accepted");
+        expect(await sessionStatus()).toBe("starting");
+
+        const [session] = await rows("acpSessions");
+
+        await run(async (ctx) => await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }));
+        expect(await sessionStatus()).toBe("busy");
+    });
+
+    it("opens idle when nothing was waiting for it", async () => {
+        const device = await pairedDevice(ownerId);
+
+        await startedThread(device);
+
+        const [session] = await rows("acpSessions");
+
+        await run(async (ctx) => await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }));
+        expect(await sessionStatus()).toBe("idle");
+    });
+
+    it("keeps the session starting while the computer posts the held turn, so the agent opening it is still seen", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await startedThread(device);
+
+        await sendText(threadId, "fix the bug");
+
+        const [session] = await rows("acpSessions");
+        const stream = await streamOf(threadId);
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, {
+                    deviceId: device.deviceId,
+                    events: [{ kind: "turn_start", text: "fix the bug" }],
+                    firstSeq: 0,
+                    sessionId: session?.hostSessionId as string,
+                    threadId,
+                    turnId: stream.hostTurnId as string,
+                }),
+        );
+        expect(await streamField(threadId, "hostState")).toBe("received");
+        expect(await sessionStatus()).toBe("starting");
+    });
+
+    it("ends the held stream with an error when the agent never opens the session", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await startedThread(device);
+        const call = (await findRow("deviceCalls", { toolName: "acp_start" }, (candidate) => candidate.threadId === threadId)) as Row;
+
+        await claim(device, call._id);
+        await accept(device, call._id);
+        await sendText(threadId, "fix the bug");
+
+        const [session] = await rows("acpSessions");
+
+        await run(async (ctx) => await ctx.runMutation(calls.endUnopenedSession, { deviceId: device.deviceId, hostSessionId: session?.hostSessionId as string }));
+
+        expect(await sessionStatus()).toBe("ended");
+        expect(await streamOf(threadId)).toMatchObject({ hostEndReason: "failed", hostState: "ended", status: "error" });
+
+        const messages = await rows("messages", { threadId });
+        const reply = messages.find((message) => message.message?.role === "assistant");
+
+        expect(reply?.error).toContain("did not start");
+    });
+
+    it("ends the held stream when the start itself is refused", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await startedThread(device);
+        const call = (await findRow("deviceCalls", { toolName: "acp_start" }, (candidate) => candidate.threadId === threadId)) as Row;
+
+        await sendText(threadId, "fix the bug");
+        await claim(device, call._id);
+        await accept(device, call._id, { error: "refused: not approved on this computer", status: "failed" });
+
+        expect(await streamOf(threadId)).toMatchObject({ hostState: "ended", status: "error" });
+    });
+});
+
 describe("sendToHost", () => {
     const readyThread = async () => {
         const device = await pairedDevice(ownerId);
@@ -444,14 +539,8 @@ describe("sendToHost", () => {
         expect(await rows("messages", { threadId })).toHaveLength(1);
     });
 
-    it("refuses a session that is still starting or has ended, an offline computer and a prompt past the call's cap", async () => {
+    it("refuses a session that has ended, an offline computer and a prompt past the call's cap", async () => {
         const device = await pairedDevice(ownerId);
-        const { threadId } = (await as(ownerId).mutation(
-            remote.startHostSession as never,
-            { agentKey: "claude", clientId: "t", deviceId: device.deviceId, folderId: "f1" } as never,
-        )) as { threadId: string };
-
-        expect(await outcomeOfSend(threadId)).toBe("session_starting");
 
         const open = await openSession(device, "host-s2");
 

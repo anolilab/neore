@@ -329,6 +329,105 @@ describe("a session and turns the backend started", () => {
     });
 });
 
+describe("a message held for a session that is not open yet", () => {
+    it("posts its turn with the thread the command named, before any session link exists, and then runs under that one turn", async () => {
+        const host = poster();
+
+        host.turnHeld("s1", "t1", "fix it", "thread-7");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.posts.find(({ post }) => post.turnId === "t1")?.post).toMatchObject({ events: [{ kind: "turn_start", text: "fix it" }], firstSeq: 0, threadId: "thread-7" });
+
+        // The session opens and the held message runs: the same turn goes on, with no second `turn_start`.
+        await open(host);
+        host.turnReceived("s1", "t1", "fix it");
+        host.turnStarted("s1", "t1", "fix it");
+        host.text("s1", "t1", "done");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")).toEqual([
+            { kind: "turn_start", text: "fix it" },
+            { kind: "text", text: "done" },
+        ]);
+    });
+
+    it("keeps posting while it waits, so the backend's reaper does not time it out", async () => {
+        const host = poster();
+
+        host.turnHeld("s1", "t1", "fix it", "thread-7");
+        await settle(POST_INTERVAL_MS);
+
+        const before = backend.posts.length;
+
+        await settle(KEEPALIVE_MS + 1000);
+        expect(backend.posts.length).toBeGreaterThan(before);
+    });
+
+    it("ends with an error when it is never sent", async () => {
+        const host = poster();
+
+        host.turnHeld("s1", "t1", "fix it", "thread-7");
+        host.turnEnded("s1", "t1", "failed", "the agent did not start");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")).toEqual([
+            { kind: "turn_start", text: "fix it" },
+            { error: "the agent did not start", kind: "turn_end", reason: "failed" },
+        ]);
+    });
+
+    it("is not posted for a computer that is not paired", async () => {
+        paired = undefined;
+
+        const host = poster();
+
+        host.turnHeld("s1", "t1", "fix it", "thread-7");
+        await settle(1000);
+        expect(backend.posts).toEqual([]);
+    });
+
+    it("ends a held message that expired while the app was down, at the seq the backend names", async () => {
+        backend.chunks.set("t1", [{ kind: "turn_start", text: "fix it" }]);
+
+        const host = poster();
+
+        host.endLapsedTurn("s1", "t1", "thread-7", "the agent did not open its session in time");
+        await settle(POST_INTERVAL_MS * 2);
+
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ error: "the agent did not open its session in time", kind: "turn_end", reason: "failed" });
+    });
+});
+
+describe("an agent's own children", () => {
+    it("are posted under the call that spawned them, long text in pieces, and the completion cut to what one post takes", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "delegate");
+        host.child("s1", "t1", "task1", { kind: "text", text: "a".repeat(40_000) });
+        host.child("s1", "t1", "task1", { id: "c1", kind: "tool", status: "completed", title: "Read", toolKind: "read" });
+        host.child("s1", "t1", "task1", { kind: "end", status: "completed", text: "x".repeat(100_000) });
+        await settle(POST_INTERVAL_MS * 4);
+
+        const events = backend.chunks.get("t1") ?? [];
+        const children = events.filter((event) => event.kind.startsWith("child_"));
+
+        expect(children.map((event) => event.kind)).toEqual(["child_text", "child_text", "child_text", "child_tool", "child_end"]);
+        expect(children.every((event) => "spawnId" in event && event.spawnId === "task1")).toBe(true);
+        expect(children.filter((event) => event.kind === "child_text").map((event) => (event as { text: string }).text.length)).toEqual([16_000, 16_000, 8000]);
+        expect((children.at(-1) as { text: string }).text).toHaveLength(30_000);
+    });
+
+    it("are not posted for a turn that is not running", async () => {
+        const host = poster();
+
+        await open(host);
+        host.child("s1", "nothing", "task1", { kind: "text", text: "late" });
+        await settle(POST_INTERVAL_MS * 2);
+        expect(backend.chunks.has("nothing")).toBe(false);
+    });
+});
+
 describe("a turn the backend ended first", () => {
     it("stops the agent on this computer, which makes good a cancel that never arrived", async () => {
         const host = poster();

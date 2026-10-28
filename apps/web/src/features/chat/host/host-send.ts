@@ -9,16 +9,7 @@ import env from "@/lib/env";
 
 /** The backend's refusals, by the `error` field of the answer. */
 export type HostSendError =
-    | "busy"
-    | "not_authenticated"
-    | "not_found"
-    | "offline"
-    | "rate_limited"
-    | "session_ended"
-    | "session_starting"
-    | "too_large"
-    | "turn_running"
-    | "unreachable";
+    "busy" | "not_authenticated" | "not_found" | "offline" | "rate_limited" | "session_ended" | "too_large" | "turn_running" | "unreachable";
 
 export type HostSendResult = { ok: true } | { error: HostSendError; ok: false };
 

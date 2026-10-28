@@ -10,7 +10,7 @@ import { patchThread } from "../../agent/table-writes";
 import { endHostStream, isLiveStream } from "../../chat/streaming/persistent/host";
 import { createAcpCancelCall } from "../../devices/lib/acp-call";
 import { streamLogger } from "../../lib/logger";
-import { appendToTranscript, buildHostReply, emptyTranscript, isTranscriptFull, type HostReplyReason } from "./reply";
+import { appendChildEvent, appendToTranscript, buildHostReply, emptyTranscript, isChildEvent, isTranscriptFull, type HostReplyReason } from "./reply";
 import { sessionOfThread, touchSession } from "./sessions";
 import { withdrawPermissionAnswers } from "./withdraw";
 
@@ -31,13 +31,15 @@ export const MAX_TAIL_PAGES = 5;
 /** Joins the front of a long turn to its end, so the reply says that the middle was left out. */
 export const OMITTED_MARKER = "\n\n[… output omitted …]\n\n";
 
-type ChunkRead = Pick<Doc<"persistentChunks">, "reasoning" | "seq" | "text">;
+type ChunkRead = Pick<Doc<"persistentChunks">, "event" | "reasoning" | "seq" | "text">;
 
 const appendChunks = (transcript: ReturnType<typeof emptyTranscript>, chunks: ChunkRead[]): void => {
     for (const chunk of chunks) {
         // Tool and permission events ride as `event` with no text of their own.
         if (chunk.text.length > 0 || chunk.reasoning) {
             appendToTranscript(transcript, chunk);
+        } else if (isChildEvent(chunk.event)) {
+            appendChildEvent(transcript, chunk.event);
         }
     }
 };

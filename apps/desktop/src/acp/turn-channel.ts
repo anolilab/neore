@@ -129,7 +129,7 @@ export class TurnChannel {
             return;
         }
 
-        this.enqueue({ kind: "turn_end", reason, ...error !== undefined && { error: error.slice(0, 1000) } });
+        this.enqueue({ kind: "turn_end", reason, ...(error !== undefined && { error: error.slice(0, 1000) }) });
         this.sealed = true;
     }
 

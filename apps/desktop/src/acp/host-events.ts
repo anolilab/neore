@@ -1,6 +1,7 @@
 /** What an agent session reports about its turns, and what the backend is told of them (`ingest.ts`). */
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
+import type { ChildEvent } from "./children";
 import type { StopReason } from "./types";
 
 export interface PermissionOption {
@@ -23,8 +24,16 @@ export interface PermissionRequestEvent {
 
 export type PermissionOutcomeKind = "allowed" | "cancelled" | "declined";
 
-export type HostEvent
-    = PermissionRequestEvent | (HostSessionInfo & { kind: "session_open" }) | { error?: string; kind: "turn_end"; reason: "cancelled" | "failed" | "finished" | "interrupted" } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
+export type HostEvent =
+    | PermissionRequestEvent
+    | { kind: "child_end"; spawnId: string; status: "cancelled" | "completed" | "failed"; text?: string }
+    | { id: string; kind: "child_tool"; spawnId: string; status: string; title: string; toolKind: string }
+    | { field: "reasoning" | "text"; kind: "child_text"; spawnId: string; text: string }
+    | (HostSessionInfo & { kind: "session_open" })
+    | { error?: string; kind: "turn_end"; reason: "cancelled" | "failed" | "finished" | "interrupted" }
+    | { id: string; kind: "tool"; status: string; title: string; toolKind: string }
+    | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string }
+    | { kind: "reasoning" | "text" | "turn_start"; text: string };
 
 export interface HostSessionInfo {
     agentKey: string;
@@ -39,6 +48,8 @@ export interface HostSessionInfo {
 
 /** What an `AgentSession` tells whoever persists its turns. Every method returns at once and never throws. */
 export interface SessionObserver {
+    /** One of the agent's own children said or did something (`children.ts`): `spawnId` is the tool call that started it. */
+    child?: (sessionId: string, turnId: string, spawnId: string, event: ChildEvent) => void;
     permissionRequested: (sessionId: string, turnId: string, request: PermissionRequestEvent) => void;
     permissionResolved: (sessionId: string, turnId: string, requestId: string, outcome: PermissionOutcomeKind) => void;
     sessionEnded: (sessionId: string) => void;
@@ -67,8 +78,8 @@ export const capSessionInfo = (info: HostSessionInfo): HostSessionInfo => {
         agentLabel: info.agentLabel.slice(0, 200),
         folderId: info.folderId.slice(0, 128),
         folderLabel: info.folderLabel.slice(0, 200),
-        ...info.capabilities !== undefined && { capabilities: info.capabilities },
-        ...info.nativeSessionId !== undefined && info.nativeSessionId !== "" && { nativeSessionId: info.nativeSessionId.slice(0, 256) },
+        ...(info.capabilities !== undefined && { capabilities: info.capabilities }),
+        ...(info.nativeSessionId !== undefined && info.nativeSessionId !== "" && { nativeSessionId: info.nativeSessionId.slice(0, 256) }),
     };
 };
 
@@ -84,9 +95,9 @@ export const capPermissionRequest = (request: PermissionRequestEvent): Permissio
         }),
         requestId: capRequestId(request.requestId),
         tool: request.tool.slice(0, 500),
-        ...request.folder !== undefined && { folder: request.folder.slice(0, 500) },
-        ...request.command !== undefined && { command: request.command.slice(0, MAX_COMMAND_CHARS) },
-        ...request.target !== undefined && { target: request.target.slice(0, MAX_TARGET_CHARS) },
+        ...(request.folder !== undefined && { folder: request.folder.slice(0, 500) }),
+        ...(request.command !== undefined && { command: request.command.slice(0, MAX_COMMAND_CHARS) }),
+        ...(request.target !== undefined && { target: request.target.slice(0, MAX_TARGET_CHARS) }),
     };
 };
 
@@ -101,11 +112,11 @@ export const wireBytes = (event: object): number => Buffer.byteLength(JSON.strin
 /** The largest single event a batch may start with; a batch's first event is always taken, so it must fit alone. */
 const MAX_EVENT_BYTES = 150_000;
 
-/** The user's prompt as the first event of a turn: within the backend's character cap and, for any script, within one post. */
-export const capPrompt = (text: string): string => {
-    let cut = text.slice(0, MAX_PROMPT_CHARS);
+/** `text` cut to `limit` characters and, for any script, until the event `make` builds from it fits in one post. */
+const cutToWire = (text: string, limit: number, make: (cut: string) => object): string => {
+    let cut = text.slice(0, limit);
 
-    while (wireBytes({ kind: "turn_start", text: cut }) > MAX_EVENT_BYTES) {
+    while (wireBytes(make(cut)) > MAX_EVENT_BYTES) {
         cut = cut.slice(0, Math.floor(cut.length * 0.8));
     }
 
@@ -113,6 +124,54 @@ export const capPrompt = (text: string): string => {
 };
 
 const LIMIT_STOPS: ReadonlySet<StopReason | "failed"> = new Set(["failed", "max_tokens", "max_turn_requests"]);
+
+/** The user's prompt as the first event of a turn: within the backend's character cap and, for any script, within one post. */
+export const capPrompt = (text: string): string =>
+    cutToWire(text, MAX_PROMPT_CHARS, (cut) => {
+        return { kind: "turn_start", text: cut };
+    });
+
+/** What the backend takes of a child's completion text; the child's streamed text is kept whole, in pieces. */
+const MAX_CHILD_END_CHARS = 30_000;
+/** The longest piece of a child's streamed text in one event, as for the agent's own (`turn-channel.ts`). */
+const MAX_CHILD_PIECE = 16_000;
+
+/** A child's event as the events the backend takes: streamed text in pieces, every field cut to its limit. */
+export const childHostEvents = (spawnId: string, event: ChildEvent): HostEvent[] => {
+    const id = spawnId.slice(0, 128);
+
+    if (event.kind === "text" || event.kind === "reasoning") {
+        const pieces: HostEvent[] = [];
+
+        for (let start = 0; start < event.text.length; start += MAX_CHILD_PIECE) {
+            pieces.push({ field: event.kind, kind: "child_text", spawnId: id, text: event.text.slice(start, start + MAX_CHILD_PIECE) });
+        }
+
+        return pieces;
+    }
+
+    if (event.kind === "tool") {
+        return [
+            {
+                id: event.id.slice(0, 128),
+                kind: "child_tool",
+                spawnId: id,
+                status: event.status,
+                title: event.title.slice(0, 500),
+                toolKind: event.toolKind.slice(0, 64),
+            },
+        ];
+    }
+
+    const text =
+        event.text === undefined
+            ? undefined
+            : cutToWire(event.text, MAX_CHILD_END_CHARS, (cut) => {
+                  return { kind: "child_end", spawnId: id, status: event.status, text: cut };
+              });
+
+    return [{ kind: "child_end", spawnId: id, status: event.status, ...(text !== undefined && text !== "" && { text }) }];
+};
 
 /** How a stop reason is told to the backend. */
 export const endReasonOf = (reason: StopReason | "failed"): "cancelled" | "failed" | "finished" => {
@@ -125,7 +184,11 @@ export const endReasonOf = (reason: StopReason | "failed"): "cancelled" | "faile
 };
 
 /** What one post came to: the backend's next `seq`, a request to resend from there, a refusal, or a reason to try again. */
-export type PostResult = { kind: "gap"; next: number } | { ended: boolean; existing?: boolean; kind: "ok"; next: number; threadId?: string } | { kind: "refused" } | { kind: "retry" };
+export type PostResult =
+    | { kind: "gap"; next: number }
+    | { ended: boolean; existing?: boolean; kind: "ok"; next: number; threadId?: string }
+    | { kind: "refused" }
+    | { kind: "retry" };
 
 const BACKOFF_START_MS = 1000;
 const BACKOFF_MAX_MS = 30_000;
