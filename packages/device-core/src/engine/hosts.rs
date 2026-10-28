@@ -215,6 +215,12 @@ pub(super) fn host_named_by(settings: &Settings, payload: &str) -> Option<Host> 
         .cloned()
 }
 
+/// Whether two targets reach the same account on the same server: the host software lives in that account's home,
+/// whatever key or forwarding a session logs in with.
+fn same_server(a: &Target, b: &Target) -> bool {
+    a.address == b.address && a.user == b.user && a.port == b.port
+}
+
 fn target_of(host: &Host) -> Target {
     Target {
         address: host.address.clone(),
@@ -556,12 +562,17 @@ impl DeviceState {
             .lock()
             .unwrap()
             .iter()
-            .any(|(_, upgrading)| upgrading == target)
+            .any(|(_, upgrading)| same_server(upgrading, target))
     }
 
     /// Whether a session (a live connection or the probe) is open to `target`.
     fn session_open(&self, target: &Target) -> bool {
-        let live = |link: &Arc<dyn HostLink>| link.is_alive() && link.target() == Some(target);
+        let live = |link: &Arc<dyn HostLink>| {
+            link.is_alive()
+                && link
+                    .target()
+                    .is_some_and(|other| same_server(other, target))
+        };
 
         self.ssh.connections.lock().unwrap().values().any(live)
             || self
@@ -959,7 +970,10 @@ impl DeviceState {
         let _guard = {
             let mut upgrading = self.ssh.upgrading.lock().unwrap();
 
-            if upgrading.iter().any(|(_, running)| *running == target) {
+            if upgrading
+                .iter()
+                .any(|(_, running)| same_server(running, &target))
+            {
                 return Err(format!("{} is already being upgraded", host.name));
             }
 
@@ -1864,7 +1878,7 @@ mod tests {
         let (state, dir, _) = engine("upgrade", &link);
         let state = state.with_host_bundle(
             Ok(bundle_in(&dir)),
-            crate::install::Root::dir(&dir.join("remote").to_string_lossy()).unwrap(),
+            crate::install::Root::dir("/neore-test/remote").unwrap(),
         );
         let id = host_id("upgrade");
 
@@ -1888,6 +1902,19 @@ mod tests {
             Arc::clone(&probed) as Arc<dyn HostLink>,
         ));
 
+        assert!(state
+            .host_upgrade(&id)
+            .unwrap_err()
+            .contains("open session"));
+
+        // The same account reached with another key is the same server: the host software is shared.
+        *state.ssh.probe.lock().unwrap() = Some((
+            Target {
+                identity_file: Some("/keys/other".into()),
+                ..target_of(&server(&id))
+            },
+            FakeLink::new(true) as Arc<dyn HostLink>,
+        ));
         assert!(state
             .host_upgrade(&id)
             .unwrap_err()
