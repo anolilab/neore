@@ -460,7 +460,10 @@ export class AgentSession {
         const turn = this.toolOwner.get(tool.id);
 
         if (turn !== undefined) {
-            this.observe((observer) => observer.tool(this.id, turn.id, { id: tool.id, kind: tool.kind, status: tool.status, title: tool.title }));
+            // Ids and kinds are the agent's own text: what is stored goes through the scrubber like the rest.
+            const { scrub } = this.options.process;
+
+            this.observe((observer) => observer.tool(this.id, turn.id, { id: scrub(tool.id), kind: scrub(tool.kind), status: tool.status, title: tool.title }));
         }
     }
 
@@ -480,7 +483,9 @@ export class AgentSession {
         this.observe((observer) =>
             observer.permissionRequested(this.id, turn.id, {
                 kind: "permission_request",
-                options: described.options.filter((option) => !option.kind.includes("always")),
+                options: described.options
+                    .filter((option) => !option.kind.includes("always"))
+                    .map((option) => { return { ...option, kind: this.options.process.scrub(option.kind), optionId: this.options.process.scrub(option.optionId) }; }),
                 requestId,
                 tool: described.tool,
                 // The label the user chose for the folder, never its path.

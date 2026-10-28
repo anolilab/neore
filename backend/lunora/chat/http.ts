@@ -929,6 +929,11 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
             return workerThreadResponse();
         }
 
+        // The reply would come from a cloud model, in a thread the desktop owns.
+        if (gateResult.hostRun) {
+            return hostRunThreadResponse();
+        }
+
         // An edit regenerates the reply, so it spends the same daily message quota
         // as `/chat/start` — it used to be an uncounted way to generate.
         const editLimit = await chargeDailyLimit(context, user, "Text");
