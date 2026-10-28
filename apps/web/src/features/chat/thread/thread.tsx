@@ -16,13 +16,13 @@ import type { Id } from "@neore/backend/dataModel";
 import cn from "@neore/ui/utils/cn";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { ArrowDownIcon } from "lucide-react";
+import { ArrowDownIcon, CornerLeftUpIcon } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
-import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
+import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -39,7 +39,8 @@ import ComposerEffortShortcuts from "./composer-effort-shortcuts";
 import CopyLastCodeBlockListener from "./copy-last-code-block";
 import EditComposer from "./edit-composer";
 import MediaGalleryView from "./media-gallery-view";
-import MessageList from "./message-list";
+import MessageList, { scrollToMessage } from "./message-list";
+import { lastPromptId } from "./minimap-items";
 import SubAgentParentBreadcrumb from "./sub-agent-parent-breadcrumb";
 import TextSelectionMenu from "./text-selection-menu";
 import ThreadMinimap from "./thread-minimap";
@@ -53,27 +54,41 @@ interface ThreadProps {
     maxWidth?: string;
 }
 
+const FLOATING_BUTTON_CLASS = cn("rounded-full shadow-md", "bg-background hover:bg-accent border", "transition-all duration-200");
+
 /**
- * Scroll to bottom button - appears when user scrolls up
- * Uses isAtBottom state from Zustand store.
+ * Scroll buttons - appear when user scrolls up
+ * Uses isAtBottom state from Zustand store. Beside scroll-to-bottom sits a jump back to the user's
+ * newest prompt: in a busy thread the answer to it is usually right below it, far up by now.
  */
 const ScrollToBottomButton: FC<{ className?: string; onClick: () => void }> = ({ className, onClick }) => {
     const isAtBottom = useChatUIStore((state) => state.isAtBottom);
+    const { messages } = useChatMessages();
+    const { threadId } = useChatThread();
     const { t } = useLingui();
 
     if (isAtBottom) {
         return null;
     }
 
+    const promptId = lastPromptId(messages);
+
     return (
-        <TooltipIconButton
-            className={cn("absolute -top-14 rounded-full shadow-md", "bg-background hover:bg-accent border", "transition-all duration-200", className)}
-            onClick={onClick}
-            tooltip={t`Scroll to bottom`}
-            variant="outline"
-        >
-            <ArrowDownIcon className="size-4" />
-        </TooltipIconButton>
+        <div className={cn("absolute -top-14 flex gap-2", className)}>
+            {promptId && (
+                <TooltipIconButton
+                    className={FLOATING_BUTTON_CLASS}
+                    onClick={() => scrollToMessage(promptId, { threadId })}
+                    tooltip={t`Jump to my last message`}
+                    variant="outline"
+                >
+                    <CornerLeftUpIcon aria-hidden="true" className="size-4" />
+                </TooltipIconButton>
+            )}
+            <TooltipIconButton className={FLOATING_BUTTON_CLASS} onClick={onClick} tooltip={t`Scroll to bottom`} variant="outline">
+                <ArrowDownIcon className="size-4" />
+            </TooltipIconButton>
+        </div>
     );
 };
 
