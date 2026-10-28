@@ -27,11 +27,11 @@ import { authMutation, rateLimit } from "../lib/crpc";
 import { isWorkerThread } from "../sub-agents/functions";
 import { storedRetentionHours } from "../lib/temporary-retention";
 import { MAX_LENGTH } from "../lib/validators";
-import type { StoredCustomProvider } from "./lib/custom-providers";
 import {
     buildLocalPromptMessage,
     buildLocalReplyMessage,
     deriveLocalThreadTitle,
+    loadCustomProviders,
     type LocalTurnOutcome,
     MAX_LOCAL_ERROR_CHARS,
     MAX_LOCAL_PROMPT_CHARS,
@@ -70,24 +70,13 @@ export interface SaveLocalTurnResult {
     userMessageId: string;
 }
 
-/** The caller's custom endpoints — `customAIProviders` is `v.any()` at rest. */
-const loadProviders = async (ctx: MutationContext, userId: string): Promise<Record<string, StoredCustomProvider>> => {
-    const prefs = await ctx.db
-        .query("aiUserPreferences")
-        .withIndex("by_userId", (q) => q.eq("userId", userId))
-        .unique();
-    const raw = prefs?.customAIProviders;
-
-    return raw && typeof raw === "object" ? (raw as Record<string, StoredCustomProvider>) : {};
-};
-
 /** Exported for the harness test; the procedure below adds auth and the rate limit. */
 export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string, args: SaveLocalTurnArgs): Promise<SaveLocalTurnResult> => {
     if (!args.prompt.trim()) {
         throw new LunoraError("BAD_REQUEST", "The prompt is empty");
     }
 
-    const resolved = resolveLocalModel(args.model, await loadProviders(ctx, userId));
+    const resolved = resolveLocalModel(args.model, await loadCustomProviders(ctx, userId));
 
     if ("error" in resolved) {
         throw new LunoraError("BAD_REQUEST", resolved.error);

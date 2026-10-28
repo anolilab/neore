@@ -96,8 +96,9 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
     const existing = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
 
     if (existing) {
-        // The agent can report more once it has been used; the thread and session stay as they are.
-        if (open.capabilities && existing.status !== "ended") {
+        // The agent can report more once it has been used; the thread and session stay as they are. A delayed or
+        // replayed open carries an older report and must not roll the stored one back.
+        if (open.capabilities && existing.status !== "ended" && open.capabilities.reportedAt >= (existing.capabilities?.reportedAt ?? 0)) {
             await ctx.db.patch(existing._id, { capabilities: open.capabilities, updatedAt: now });
         }
 

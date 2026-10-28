@@ -18,6 +18,7 @@
  *
  * Every authentication failure is the same 401. The action never touches `ctx.db`.
  */
+import { unknownCapabilityReport } from "@neore/ai/capabilities";
 import type { HttpActionCtx, Infer } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -161,16 +162,25 @@ const optionalString = (value: unknown): string | undefined | null => {
 
 /**
  * A `session_open` whose capability report does not validate keeps the session: the report is stored as "all
- * unknown" (every control hidden) and the failure is logged, instead of the whole post being refused.
+ * unknown" (every control hidden) and the failure is logged, instead of the whole post being refused. Its
+ * `reportedAt` is 0, so it never outranks a real report: the next valid one replaces it.
  */
-const withValidReport = (raw: unknown, now: number): unknown => {
-    if (!isRecord(raw) || raw.kind !== "session_open" || raw.capabilities === undefined || vCapabilityReport.safeParse(raw.capabilities).ok) {
+const withValidReport = (raw: unknown, deviceId: string): unknown => {
+    if (!isRecord(raw) || raw.kind !== "session_open" || raw.capabilities === undefined) {
         return raw;
     }
 
-    console.warn("[acp] a host sent a capability report that does not validate; stored as all unknown");
+    const parsed = vCapabilityReport.safeParse(raw.capabilities);
 
-    return { ...raw, capabilities: { groups: {}, reportedAt: now, version: 1 } };
+    if (parsed.ok) {
+        return raw;
+    }
+
+    console.warn(
+        `[acp] device ${deviceId} sent a capability report that does not validate at ${parsed.error.path.join(".") || "<root>"}; stored as all unknown`,
+    );
+
+    return { ...raw, capabilities: unknownCapabilityReport(0) };
 };
 
 interface Post {
@@ -182,7 +192,7 @@ interface Post {
 }
 
 /** The signed payload's fields, or null when they are not the shape of a post. */
-const readPost = (payload: Record<string, unknown>, now: number): Post | null => {
+const readPost = (payload: Record<string, unknown>, deviceId: string): Post | null => {
     const threadId = optionalString(payload.threadId);
     const turnId = optionalString(payload.turnId);
     const { firstSeq } = payload;
@@ -204,7 +214,7 @@ const readPost = (payload: Record<string, unknown>, now: number): Post | null =>
     const events: Post["events"] = [];
 
     for (const raw of payload.events) {
-        const parsed = vHostEvent.safeParse(withValidReport(raw, now));
+        const parsed = vHostEvent.safeParse(withValidReport(raw, deviceId));
 
         if (!parsed.ok) {
             return null;
@@ -224,7 +234,7 @@ const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: 
         return unauthorized();
     }
 
-    const post = readPost(parseJson(payload) as Record<string, unknown>, Date.now());
+    const post = readPost(parseJson(payload) as Record<string, unknown>, deviceId);
 
     if (!post) {
         return json({ error: "malformed" }, 400);
