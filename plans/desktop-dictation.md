@@ -128,25 +128,53 @@ Japanese and Chinese, over all 18 clips. "10 s clip" is the wall time to finish 
 ten-second clip (batch decoding, so first-word latency equals it). Peak memory is
 the process's resident peak.
 
-| Platform | Model | Size | Error rate | 10 s clip | Peak memory |
-| --- | --- | --- | --- | --- | --- |
-| macOS arm64 (M4, Metal, machine under build load) | tiny | 78 MB | 17.8 % | 0.70 s | 279 MB |
-| macOS arm64 | base | 148 MB | 13.3 % | 0.67 s | 383 MB |
-| macOS arm64 | small | 488 MB | 7.0 % | 1.38 s | 857 MB |
-| macOS arm64 | large-v3-turbo q5_0 | 574 MB | 1.9 % | 3.91 s | 852 MB |
-| Linux x64, Linux arm64, macOS Intel, Windows x64, Windows arm64 | all four | — | from the workflow run on this PR | | |
+| Platform | Model | Size | Error rate | 10 s clip | CPU time (10 s clip) | Peak memory |
+| --- | --- | --- | --- | --- | --- | --- |
+| macOS arm64 (M4, Metal, machine under build load) | tiny | 78 MB | 17.8 % | 0.70 s | 0.53 s | 279 MB |
+| macOS arm64 | base | 148 MB | 13.3 % | 0.67 s | — | 383 MB |
+| macOS arm64 | small | 488 MB | 7.0 % | 1.38 s | — | 857 MB |
+| macOS arm64 | large-v3-turbo q5_0 | 574 MB | 1.9 % | 3.91 s | — | 852 MB |
+| Linux x64 (GitHub runner, 4 vCPU, no GPU) | tiny | 78 MB | 17.5 % | 1.15 s | 4.2 s | 177 MB |
+| Linux x64 | base | 148 MB | 13.3 % | 2.15 s | 8.0 s | 285 MB |
+| Linux x64 | small | 488 MB | 7.0 % | 6.68 s | 25.2 s | 751 MB |
+| Linux x64 | large-v3-turbo q5_0 | 574 MB | 1.9 % | 39.0 s | 154 s | 794 MB |
+| Linux arm64 (runner, 4 vCPU) | tiny | 78 MB | 17.5 % | 1.46 s | 5.3 s | 176 MB |
+| Linux arm64 | base | 148 MB | 13.3 % | 2.76 s | 10.4 s | 284 MB |
+| Linux arm64 | small | 488 MB | 7.0 % | 8.44 s | 32.5 s | 750 MB |
+| Linux arm64 | large-v3-turbo q5_0 | 574 MB | 1.9 % | 44.6 s | 176 s | 793 MB |
+| Windows x64 (runner, 4 vCPU) | tiny | 78 MB | 17.5 % | 1.22 s | 4.2 s | 195 MB |
+| Windows x64 | base | 148 MB | 13.3 % | 2.23 s | 8.1 s | 303 MB |
+| Windows x64 | small | 488 MB | 7.0 % | 6.84 s | 25.1 s | 769 MB |
+| Windows x64 | large-v3-turbo q5_0 | 574 MB | 1.9 % | 36.8 s | 140 s | 812 MB |
+| macOS x64 (runner, virtual GPU) | — | — | — | — | — | — |
+| Windows arm64 (runner) | — | — | — | — | — | — |
 
-Per language on macOS, large-v3-turbo q5_0: en 0 %, de 0 %, es 5.7 %, fr 0 %, it 0 %,
-pl 0 %, pt 0 %, ja 5.4 %, zh 2.2 %. Every smaller model is much worse on Chinese
-(small 24 %, base 44 %); small is also weak on Italian (14 %).
+macOS x64: the first run used Metal on the runner's virtual GPU, which was slower
+than the CPU (tiny took 23 s for the 10 s clip) and returned no text for the
+quantised large model; the workflow now runs that leg with `--no-gpu`, and its
+row is filled from that run. Windows arm64: the first run did not finish within
+90 minutes; the leg now has 180.
+
+Error rates are the same on every platform that ran, so accuracy depends only on
+the model; speed depends on the hardware. Without a GPU, large-v3-turbo needs
+about four times the clip's length on these 4-core runners.
 
 **Licences.** whisper.cpp is MIT. The Whisper model weights are MIT (released by
 their authors under MIT), and the ggml conversions are published under the same
 terms, so both may be redistributed inside the app with the licence text.
 
-**Recommendation (pending the other platforms).** large-v3-turbo q5_0 as the
-default: it is the only candidate whose accuracy holds in all nine languages, at a
-download (574 MB) close to small's. If the 10 s clip takes more than about 8 s on
-the Intel or Windows runners, offer small as the faster choice for English and
-the Western European languages, and say in settings that it is weaker on Chinese
-and Japanese.
+**Recommendation.** Pick the model per machine, from what the recogniser can use:
+
+- **Apple Silicon:** large-v3-turbo q5_0 (574 MB). It is the only candidate that
+  holds in all nine languages (1.9 % overall, no language above 6 %), and Metal
+  finishes a 10 s clip in about 4 s.
+- **Machines without a supported GPU (Windows, Linux, Intel Macs):** small
+  (488 MB, 7 %), about 7 s for a 10 s clip on a 4-core runner and faster on a
+  typical desktop CPU. Settings says it is weaker on Chinese (24 %) and Italian
+  (14 %), and offers large-v3-turbo as a slower, more accurate choice.
+- A GPU backend for Windows and Linux (Vulkan or CUDA builds of whisper.cpp) would
+  let them use large-v3-turbo too; that is a packaging question for S2, not a
+  reason to block it.
+
+The chosen models' licences allow redistribution (above), which meets the S1
+acceptance. S2 can start with this split.
