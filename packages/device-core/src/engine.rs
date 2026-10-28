@@ -18,6 +18,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use crate::acp_permission::AcpPermissions;
 use crate::actions::{
     self, canonical_home, plan_builtin, platform, refused_root, shareable_roots, Action,
     ShellSettings, MAX_ROOTS,
@@ -50,6 +51,8 @@ pub enum Event {
     Progress(ProgressEvent),
     /// The tool set changed: the page should send a fresh manifest.
     Changed,
+    /// A coding agent is asking for approval: show the device window. Read the requests with `acp_permissions`.
+    AcpPermission { agent: String, tool: String },
 }
 
 /// Receives [`Event`]s. Called from engine threads; must not block.
@@ -66,6 +69,7 @@ struct McpToolRef {
 }
 
 pub struct DeviceState {
+    pub(crate) acp_permissions: AcpPermissions,
     audit_path: PathBuf,
     last_manifest_at: Mutex<u64>,
     mcp: McpManager,
@@ -114,6 +118,7 @@ impl DeviceState {
         let settings = store::load(&settings_path);
 
         DeviceState {
+            acp_permissions: AcpPermissions::default(),
             audit_path: data_dir.join("device-audit.jsonl"),
             last_manifest_at: Mutex::new(0),
             mcp: McpManager::default(),
@@ -139,12 +144,12 @@ impl DeviceState {
         }
     }
 
-    fn settings(&self) -> Settings {
+    pub(crate) fn settings(&self) -> Settings {
         self.settings.lock().unwrap().clone()
     }
 
     /// Changes the settings under the save lock: each writer reads what the last one saved, then saves its own change.
-    fn change_settings<T>(
+    pub(crate) fn change_settings<T>(
         &self,
         change: impl FnOnce(&mut Settings) -> Result<T, String>,
     ) -> Result<T, String> {
@@ -180,7 +185,7 @@ impl DeviceState {
         Ok(())
     }
 
-    fn emit(&self, event: Event) {
+    pub(crate) fn emit(&self, event: Event) {
         (self.sink)(event);
     }
 
@@ -193,7 +198,7 @@ impl DeviceState {
         self.close_hosts();
     }
 
-    fn audit(&self, entry: Value) {
+    pub(crate) fn audit(&self, entry: Value) {
         if stdfs::metadata(&self.audit_path)
             .map(|meta| meta.len() > AUDIT_MAX_BYTES)
             .unwrap_or(false)
@@ -237,6 +242,7 @@ impl DeviceState {
     /// Closing the approval window is a "no" to everything it was asking.
     pub fn deny_prompts(&self) {
         self.prompts.deny_all();
+        self.acp_decline_all();
     }
 
     pub fn status(&self) -> StatusView {

@@ -33,7 +33,7 @@ import {
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
 import { notificationInputFields } from "./notifications/validators";
 import { vSkillConfig } from "./skills/validators";
-import { vSubAgentRunStatus } from "./sub-agents/validators";
+import { vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus } from "./sub-agents/validators";
 import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./tasks/validators";
 import { vWebhookSignatureScheme } from "./triggers/validators";
 
@@ -2261,10 +2261,15 @@ export const schema = defineSchema({
     // `depth` is 1 under a user's own thread, 2 under a sub-agent's.
     subAgentRuns: defineTable({
         childThreadId: v.optional(v.string()),
+        // Set on a run the user typed into a worker thread (`dispatchToWorker`); the dedupe key of that dispatch.
+        clientId: v.optional(v.string()),
         completedAt: v.optional(v.number()),
         createdAt: v.number(),
         depth: v.number(),
         error: v.optional(v.string()),
+        // Unset = a one-shot run. A worker's child thread is created with its first run and every later
+        // dispatch is one more row on it; the worker is the thread, not a table.
+        mode: v.optional(vSubAgentRunMode),
         organizationId: v.optional(v.string()),
         // The delegating run's model, inherited when still allowed.
         parentModel: v.optional(v.string()),
@@ -2273,6 +2278,7 @@ export const schema = defineSchema({
         // When the result reached the parent thread. The post waits while the
         // parent is still streaming (`sub-agents/functions.ts:postRunResult`).
         resultPostedAt: v.optional(v.number()),
+        runner: v.optional(vSubAgentRunner),
         skillSlug: v.optional(v.string()),
         startedAt: v.optional(v.number()),
         status: vSubAgentRunStatus,

@@ -37803,6 +37803,245 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#sub_agents_functions:createWorker": {
+      "post": {
+        "description": "Invoke the `mutation` `sub_agents_functions:createWorker` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "sub_agents_functions:createWorker",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "clientId": {
+                        "type": "string"
+                      },
+                      "leadThreadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "skill": {
+                        "type": "string"
+                      },
+                      "task": {
+                        "type": "string"
+                      },
+                      "toolAllowlist": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "clientId",
+                      "leadThreadId",
+                      "name",
+                      "task"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "sub_agents_functions:createWorker",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "runId": {
+                      "description": "Id<\"subAgentRuns\">",
+                      "type": "string",
+                      "x-lunora-table": "subAgentRuns"
+                    },
+                    "state": {
+                      "anyOf": [
+                        {
+                          "const": "queued",
+                          "type": "string"
+                        },
+                        {
+                          "const": "running",
+                          "type": "string"
+                        },
+                        {
+                          "const": "succeeded",
+                          "type": "string"
+                        },
+                        {
+                          "const": "failed",
+                          "type": "string"
+                        },
+                        {
+                          "const": "cancelled",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "workerId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "runId",
+                    "state",
+                    "workerId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: sub_agents_functions:createWorker",
+        "tags": [
+          "sub-agents"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#sub_agents_functions:dispatchToWorker": {
+      "post": {
+        "description": "Invoke the `mutation` `sub_agents_functions:dispatchToWorker` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "sub_agents_functions:dispatchToWorker",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "clientId": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "workerId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "clientId",
+                      "message",
+                      "workerId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "sub_agents_functions:dispatchToWorker",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "runId": {
+                      "description": "Id<\"subAgentRuns\">",
+                      "type": "string",
+                      "x-lunora-table": "subAgentRuns"
+                    },
+                    "state": {
+                      "anyOf": [
+                        {
+                          "const": "queued",
+                          "type": "string"
+                        },
+                        {
+                          "const": "running",
+                          "type": "string"
+                        },
+                        {
+                          "const": "succeeded",
+                          "type": "string"
+                        },
+                        {
+                          "const": "failed",
+                          "type": "string"
+                        },
+                        {
+                          "const": "cancelled",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "workerId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "runId",
+                    "state",
+                    "workerId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: sub_agents_functions:dispatchToWorker",
+        "tags": [
+          "sub-agents"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#sub_agents_functions:getRunByToolCall": {
       "post": {
         "description": "Invoke the `query` `sub_agents_functions:getRunByToolCall` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -37956,6 +38195,411 @@
           }
         },
         "summary": "query: sub_agents_functions:getRunByToolCall",
+        "tags": [
+          "sub-agents"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#sub_agents_functions:getWorker": {
+      "post": {
+        "description": "Invoke the `query` `sub_agents_functions:getWorker` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "sub_agents_functions:getWorker",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "workerId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "workerId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "sub_agents_functions:getWorker",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "activeRunId": {
+                          "anyOf": [
+                            {
+                              "description": "Id<\"subAgentRuns\">",
+                              "type": "string",
+                              "x-lunora-table": "subAgentRuns"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "archived": {
+                          "type": "boolean"
+                        },
+                        "lastRunAt": {
+                          "type": "number"
+                        },
+                        "lastRunStatus": {
+                          "anyOf": [
+                            {
+                              "const": "queued",
+                              "type": "string"
+                            },
+                            {
+                              "const": "running",
+                              "type": "string"
+                            },
+                            {
+                              "const": "succeeded",
+                              "type": "string"
+                            },
+                            {
+                              "const": "failed",
+                              "type": "string"
+                            },
+                            {
+                              "const": "cancelled",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "leadThreadId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "anyOf": [
+                            {
+                              "const": "idle",
+                              "type": "string"
+                            },
+                            {
+                              "const": "queued",
+                              "type": "string"
+                            },
+                            {
+                              "const": "running",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "workerId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "activeRunId",
+                        "archived",
+                        "lastRunAt",
+                        "lastRunStatus",
+                        "leadThreadId",
+                        "name",
+                        "state",
+                        "workerId"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: sub_agents_functions:getWorker",
+        "tags": [
+          "sub-agents"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#sub_agents_functions:listActiveWorkerRuns": {
+      "post": {
+        "description": "Invoke the `query` `sub_agents_functions:listActiveWorkerRuns` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "sub_agents_functions:listActiveWorkerRuns",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "sub_agents_functions:listActiveWorkerRuns",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "leadThreadId": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "runId": {
+                        "description": "Id<\"subAgentRuns\">",
+                        "type": "string",
+                        "x-lunora-table": "subAgentRuns"
+                      },
+                      "startedAt": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "queued",
+                            "type": "string"
+                          },
+                          {
+                            "const": "running",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "workerId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "createdAt",
+                      "leadThreadId",
+                      "name",
+                      "runId",
+                      "startedAt",
+                      "status",
+                      "workerId"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: sub_agents_functions:listActiveWorkerRuns",
+        "tags": [
+          "sub-agents"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#sub_agents_functions:listWorkers": {
+      "post": {
+        "description": "Invoke the `query` `sub_agents_functions:listWorkers` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "sub_agents_functions:listWorkers",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "leadThreadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "leadThreadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "sub_agents_functions:listWorkers",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "activeRunId": {
+                        "anyOf": [
+                          {
+                            "description": "Id<\"subAgentRuns\">",
+                            "type": "string",
+                            "x-lunora-table": "subAgentRuns"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "archived": {
+                        "type": "boolean"
+                      },
+                      "lastRunAt": {
+                        "type": "number"
+                      },
+                      "lastRunStatus": {
+                        "anyOf": [
+                          {
+                            "const": "queued",
+                            "type": "string"
+                          },
+                          {
+                            "const": "running",
+                            "type": "string"
+                          },
+                          {
+                            "const": "succeeded",
+                            "type": "string"
+                          },
+                          {
+                            "const": "failed",
+                            "type": "string"
+                          },
+                          {
+                            "const": "cancelled",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "leadThreadId": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "anyOf": [
+                          {
+                            "const": "idle",
+                            "type": "string"
+                          },
+                          {
+                            "const": "queued",
+                            "type": "string"
+                          },
+                          {
+                            "const": "running",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "workerId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "activeRunId",
+                      "archived",
+                      "lastRunAt",
+                      "lastRunStatus",
+                      "leadThreadId",
+                      "name",
+                      "state",
+                      "workerId"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: sub_agents_functions:listWorkers",
         "tags": [
           "sub-agents"
         ],

@@ -84,6 +84,7 @@ vi.mock("electron", () => {
     return {
         app: {
             getPath: () => "/user-data",
+            getVersion: () => "1.2.3",
             on: (event: string, listener: () => void) => fake.appListeners.set(event, listener),
         },
         BrowserWindow,
@@ -117,8 +118,14 @@ vi.mock("./addon", () => {
     };
 });
 
+const spawnAgent = vi.hoisted(() => vi.fn());
+
+vi.mock("../acp/process", () => {
+    return { acpSupported: true, spawnAgent };
+});
+
 const { registerDeviceIpc } = await import("./index");
-const { DEVICE_CHANNEL, LOCAL_CHANNEL } = await import("./channels");
+const { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } = await import("./channels");
 
 const SITE_ORIGIN = new URL("https://neore.example");
 const options: DeviceIpcOptions = {
@@ -182,6 +189,17 @@ const invoke = (channel: string, event: IpcEvent, ...args: unknown[]): unknown =
 
 const makeCore = () => {
     return {
+        acpPermissionAnswer: vi.fn(),
+        acpPermissionAnswerBatch: vi.fn(() => 2),
+        acpPermissionAsk: vi.fn(async () => "{\"outcome\":\"cancelled\"}"),
+        acpPermissionCancelSession: vi.fn(),
+        acpPermissionDecline: vi.fn(),
+        acpPermissions: vi.fn(() => "[]"),
+        acpSpawnPlan: vi.fn((): string => {
+            throw new Error("that folder is not allowed");
+        }),
+        acpUpdate: vi.fn(() => JSON.stringify({ agents: [], envNames: [] })),
+        acpView: vi.fn(() => JSON.stringify({ agents: [{ args: [], command: "agent", envNames: [], key: "alpha", label: "Alpha" }], envNames: [] })),
         auditTail: vi.fn(() => ["{}"]),
         denyPrompts: vi.fn(),
         execute: vi.fn(async () => JSON.stringify({ payload: "{}", signature: "s" })),
@@ -395,6 +413,112 @@ describe("local channels (the device window)", () => {
         expect(core.promptAnswer).toHaveBeenCalledWith(7, "once");
         expect(() => invoke(LOCAL_CHANNEL.promptAnswer, localEvent(), 7, "everything")).toThrow("device: answer is invalid");
         expect(() => invoke(LOCAL_CHANNEL.promptAnswer, localEvent(), 1.5, "once")).toThrow("device: prompt id is invalid");
+    });
+});
+
+describe("coding-agent channels", () => {
+    const ACP_CHANNELS = [
+        LOCAL_CHANNEL.acpCancel,
+        LOCAL_CHANNEL.acpClose,
+        LOCAL_CHANNEL.acpForget,
+        LOCAL_CHANNEL.acpPermissionAnswer,
+        LOCAL_CHANNEL.acpPermissionAnswerBatch,
+        LOCAL_CHANNEL.acpPermissionDecline,
+        LOCAL_CHANNEL.acpPermissions,
+        LOCAL_CHANNEL.acpProbe,
+        LOCAL_CHANNEL.acpSend,
+        LOCAL_CHANNEL.acpSession,
+        LOCAL_CHANNEL.acpSessions,
+        LOCAL_CHANNEL.acpStart,
+        LOCAL_CHANNEL.acpUpdate,
+        LOCAL_CHANNEL.acpView,
+    ];
+
+    beforeEach(() => {
+        spawnAgent.mockReset();
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+    });
+
+    it("answer the device window only: the site and foreign frames reach nothing", () => {
+        for (const channel of ACP_CHANNELS) {
+            expect(() => invoke(channel, siteEvent(), "alpha", "/work")).toThrow("device: not the device window");
+            expect(() => invoke(channel, foreignEvent(), "alpha", "/work")).toThrow("device: not the device window");
+        }
+
+        expect(core.acpUpdate).not.toHaveBeenCalled();
+        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+        expect(core.acpPermissionAnswer).not.toHaveBeenCalled();
+        expect(core.acpPermissionAnswerBatch).not.toHaveBeenCalled();
+        expect(spawnAgent).not.toHaveBeenCalled();
+    });
+
+    it("pass a permission answer to the core as the request id and the agent's option id, and nothing else", () => {
+        invoke(LOCAL_CHANNEL.acpPermissionAnswer, localEvent(), 7, "allow-1");
+        invoke(LOCAL_CHANNEL.acpPermissionDecline, localEvent(), 8);
+        invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), [1, 2]);
+
+        expect(core.acpPermissionAnswer).toHaveBeenCalledWith(7, "allow-1");
+        expect(core.acpPermissionDecline).toHaveBeenCalledWith(8);
+        expect(core.acpPermissionAnswerBatch).toHaveBeenCalledWith([1, 2]);
+    });
+
+    it("let the core's refusal of an always option reach the window", () => {
+        core.acpPermissionAnswer.mockImplementationOnce(() => {
+            throw new Error("\"Always allow\" is not available for coding agents");
+        });
+
+        expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswer, localEvent(), 7, "always")).toThrow("Always allow");
+    });
+
+    it("check the shape of permission answers before they reach the core", () => {
+        for (const id of [0, -1, 1.5, "7", undefined]) {
+            expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswer, localEvent(), id, "allow")).toThrow("device: request id is invalid");
+        }
+
+        expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswer, localEvent(), 7, "")).toThrow("device: option is invalid");
+        expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), [])).toThrow("device: request ids are invalid");
+        expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), [1, "2"])).toThrow("device: request id is invalid");
+        expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), Array.from({ length: 51 }, (_, i) => i + 1))).toThrow("device: request ids are invalid");
+        expect(core.acpPermissionAnswer).not.toHaveBeenCalled();
+        expect(core.acpPermissionAnswerBatch).not.toHaveBeenCalled();
+    });
+
+    it("open the window and notify when an agent asks, without naming the command", () => {
+        fake.coreEmit?.(JSON.stringify({ agent: "Claude", tool: "Run tests", type: "acpPermission" }));
+
+        expect(fake.windows).toHaveLength(1);
+        expect(fake.notifications).toEqual([{ body: "Claude — Run tests", title: "A coding agent is asking for your approval" }]);
+        expect(deviceWindow().webContents.send).toHaveBeenCalledWith(LOCAL_EVENT.acp, undefined);
+    });
+
+    it("are not on the relay: the site preload's channels carry none of them", () => {
+        for (const channel of Object.values(DEVICE_CHANNEL)) {
+            expect(channel).not.toContain("acp");
+        }
+    });
+
+    it("never start a process the core did not plan: a refused plan spawns nothing", async () => {
+        await expect(invoke(LOCAL_CHANNEL.acpStart, localEvent(), "alpha", "/not/allowed")).rejects.toThrow("that folder is not allowed");
+        await expect(invoke(LOCAL_CHANNEL.acpProbe, localEvent(), "alpha")).rejects.toThrow("that folder is not allowed");
+
+        expect(core.acpSpawnPlan).toHaveBeenCalledWith("alpha", "/not/allowed");
+        expect(spawnAgent).not.toHaveBeenCalled();
+    });
+
+    it("refuse an unregistered agent before asking for a plan", async () => {
+        await expect(invoke(LOCAL_CHANNEL.acpStart, localEvent(), "nobody", "/work")).rejects.toThrow("that agent is not registered");
+
+        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+    });
+
+    it("check the shape of what the window sends before it reaches the core", () => {
+        expect(() => invoke(LOCAL_CHANNEL.acpUpdate, localEvent(), "a string")).toThrow("device: agent update is invalid");
+        expect(() => invoke(LOCAL_CHANNEL.acpUpdate, localEvent(), { op: "setEnv", value: "x".repeat(300_000) })).toThrow("too large");
+        expect(core.acpUpdate).not.toHaveBeenCalled();
+
+        invoke(LOCAL_CHANNEL.acpUpdate, localEvent(), { name: "HTTPS_PROXY", op: "setEnv", value: "https://proxy" });
+
+        expect(core.acpUpdate).toHaveBeenCalledWith(JSON.stringify({ name: "HTTPS_PROXY", op: "setEnv", value: "https://proxy" }));
     });
 });
 

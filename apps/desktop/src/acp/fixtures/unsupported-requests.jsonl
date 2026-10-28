@@ -1,0 +1,5 @@
+# The host advertises no file system and no terminal, so an agent that asks for either gets "method not found".
+{"in":{"id":41,"method":"fs/read_text_file","params":{"sessionId":"sess_1","path":"/work/a.txt"}}}
+{"out":{"id":41,"error":{"code":-32601,"message":"method not found"}}}
+{"in":{"id":"t-2","method":"terminal/create","params":{"sessionId":"sess_1","command":"ls"}}}
+{"out":{"id":"t-2","error":{"code":-32601,"message":"method not found"}}}

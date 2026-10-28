@@ -15,19 +15,31 @@ import { pathToFileURL } from "node:url";
 import type { BrowserWindow as BrowserWindowInstance, IpcMainInvokeEvent, WebContents } from "electron";
 import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 
+import { AcpManager } from "../acp/manager";
+import { coreGate } from "../acp/permission";
+import { spawnAgent } from "../acp/process";
+import type { AcpView, PermissionView, SpawnPlan } from "../acp/types";
 import type { TerminalOpener } from "../terminal/index";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
 import type { HostTransport } from "./transport";
 import { createLocalTransport } from "./transport";
-import type { CoreEvent, Prompt } from "./types";
+import type { CoreEvent, DeviceCore, Prompt } from "./types";
 import {
+    readAcpUpdate,
+    readAgentKey,
     readDeviceId,
+    readFolder,
     readHostPairing,
     readHostSpec,
     readOptionalDeviceId,
+    readOptionId,
     readPairing,
+    readPrompt,
     readPromptAnswer,
+    readRequestId,
+    readRequestIds,
     readSecretAnswer,
+    readSessionId,
     readSettingsUpdate,
     readSigned,
 } from "./validate";
@@ -44,6 +56,8 @@ const LOCAL_PRELOAD = path.join(WINDOW_DIR, "preload.cjs");
  */
 export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     const state: {
+        acp?: AcpManager;
+        core?: DeviceCore;
         coreError?: unknown;
         local?: BrowserWindowInstance;
         transport?: HostTransport;
@@ -58,6 +72,15 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         }
 
         return state.transport;
+    };
+
+    /** The coding-agent handlers drive the local core directly: agents run on this computer only. */
+    const requireCore = (): DeviceCore => {
+        if (state.core === undefined) {
+            throw new Error(`device execution is unavailable: ${String(state.coreError)}`);
+        }
+
+        return state.core;
     };
 
     const send = (target: WebContents | undefined, channel: string, payload?: unknown): void => {
@@ -173,8 +196,21 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         }
     };
 
+    const showAgentRequest = (agent: string, tool: string): void => {
+        openLocalWindow();
+        send(state.local?.webContents, LOCAL_EVENT.acp);
+
+        if (Notification.isSupported()) {
+            new Notification({ body: `${agent} — ${tool}`, title: "A coding agent is asking for your approval" }).show();
+        }
+    };
+
     const onEvent = (event: CoreEvent): void => {
         switch (event.type) {
+            case "acpPermission": {
+                showAgentRequest(event.agent, event.tool);
+                break;
+            }
             case "changed": {
                 for (const site of sites) {
                     send(site, DEVICE_CHANNEL.changed);
@@ -201,12 +237,30 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     };
 
     try {
-        state.transport = createLocalTransport(app.getPath("userData"), onEvent);
+        const created = createLocalTransport(app.getPath("userData"), onEvent);
+
+        state.transport = created;
+        state.core = created.core;
     } catch (error) {
         // Register the handlers anyway: they reject with the reason, and the shell keeps running.
         state.coreError = error;
         console.error("[neore-desktop] device execution unavailable", error);
     }
+
+    const requireAcp = (): AcpManager => {
+        const core = requireCore();
+
+        // The core decides what may start: it refuses an unregistered agent and a folder that is not allowed.
+        state.acp ??= new AcpManager({
+            appVersion: app.getVersion(),
+            gate: coreGate(core),
+            onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
+            plan: (agentKey, folder) => JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan,
+            spawn: spawnAgent,
+        });
+
+        return state.acp;
+    };
 
     const reap = setInterval(() => {
         state.transport?.reapIdleServers();
@@ -215,6 +269,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     reap.unref();
     app.on("will-quit", () => {
         clearInterval(reap);
+        // Synchronous: `will-quit` cannot await, and an agent left behind would outlive the app.
+        state.acp?.killAll();
         state.transport?.stop();
     });
 
@@ -306,8 +362,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     // A native dialog, so the page cannot draw a confirmation that looks like one.
     local(LOCAL_CHANNEL.confirm, async (message) => {
-        const text = typeof message === "string" && message.length <= 1000 ? message : "";
-        const dialogOptions = { buttons: ["Cancel", "OK"], cancelId: 0, defaultId: 1, message: text, type: "question" as const };
+        // A message that is not shown whole is not confirmed: an empty dialog with OK as the default would approve nothing readable.
+        if (typeof message !== "string" || message.length > 1000) {
+            return false;
+        }
+
+        const dialogOptions = { buttons: ["Cancel", "OK"], cancelId: 0, defaultId: 1, message, type: "question" as const };
         const parent = liveLocal();
         const result = parent === undefined ? await dialog.showMessageBox(dialogOptions) : await dialog.showMessageBox(parent, dialogOptions);
 
@@ -315,6 +375,56 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     });
 
     local(LOCAL_CHANNEL.auditTail, () => requireTransport().auditTail());
+
+    // ─── Coding agents (ACP): registered, started and driven from this window only ─────
+
+    local(LOCAL_CHANNEL.acpView, () => JSON.parse(requireCore().acpView()) as AcpView);
+
+    const updateAcp = async (update: string): Promise<AcpView> => {
+        const view = JSON.parse(requireCore().acpUpdate(update)) as AcpView;
+
+        // A running agent was started under an approval this update may have taken away.
+        await state.acp?.closeUnapproved(view);
+
+        return view;
+    };
+
+    local(LOCAL_CHANNEL.acpUpdate, (update) => updateAcp(readAcpUpdate(update)));
+
+    local(LOCAL_CHANNEL.acpProbe, (agentKey) => requireAcp().probe(readAgentKey(agentKey)));
+
+    local(LOCAL_CHANNEL.acpStart, async (agentKey, folder) => {
+        const key = readAgentKey(agentKey);
+        const agent = (JSON.parse(requireCore().acpView()) as AcpView).agents.find((candidate) => candidate.key === key);
+
+        if (agent === undefined) {
+            throw new Error("that agent is not registered");
+        }
+
+        return requireAcp().startSession(key, agent.label, readFolder(folder));
+    });
+
+    local(LOCAL_CHANNEL.acpPermissions, () => JSON.parse(requireCore().acpPermissions()) as PermissionView[]);
+
+    // Rust decides what an answer may be: the agent's own allow-once or reject-once option, for a request still
+    // waiting. Nothing here, and nothing the window sends, can choose an "always" option.
+    local(LOCAL_CHANNEL.acpPermissionAnswer, (id, optionId) => requireCore().acpPermissionAnswer(readRequestId(id), readOptionId(optionId)));
+
+    local(LOCAL_CHANNEL.acpPermissionDecline, (id) => requireCore().acpPermissionDecline(readRequestId(id)));
+
+    local(LOCAL_CHANNEL.acpPermissionAnswerBatch, (ids) => requireCore().acpPermissionAnswerBatch(readRequestIds(ids)));
+
+    local(LOCAL_CHANNEL.acpSessions, () => requireAcp().summaries());
+
+    local(LOCAL_CHANNEL.acpSession, (id) => requireAcp().snapshot(readSessionId(id)));
+
+    local(LOCAL_CHANNEL.acpSend, (id, prompt) => requireAcp().send(readSessionId(id), readPrompt(prompt)));
+
+    local(LOCAL_CHANNEL.acpCancel, (id) => requireAcp().cancel(readSessionId(id)));
+
+    local(LOCAL_CHANNEL.acpClose, (id) => requireAcp().close(readSessionId(id)));
+
+    local(LOCAL_CHANNEL.acpForget, (id) => requireAcp().remove(readSessionId(id)));
 
     // The terminal is the user's own shell, opened by a click in this window. The folder is checked by the terminal module.
     local(LOCAL_CHANNEL.terminalAvailability, () => options.terminal?.availability ?? { available: false, reason: "The terminal is not available." });

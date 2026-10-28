@@ -16,19 +16,23 @@ import type { Id } from "@neore/backend/dataModel";
 import cn from "@neore/ui/utils/cn";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { ArrowDownIcon } from "lucide-react";
+import { ArrowDownIcon, CornerLeftUpIcon } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
-import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
+import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import ForwardSelectionBar from "@/features/chat/forward/forward-selection-bar";
+import WorkerComposer from "@/features/sub-agents/components/worker-composer";
+import WorkerList from "@/features/sub-agents/components/worker-list";
+import useWorker from "@/features/sub-agents/hooks/use-worker";
+import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import ChatError from "./chat-error";
@@ -39,7 +43,8 @@ import ComposerEffortShortcuts from "./composer-effort-shortcuts";
 import CopyLastCodeBlockListener from "./copy-last-code-block";
 import EditComposer from "./edit-composer";
 import MediaGalleryView from "./media-gallery-view";
-import MessageList from "./message-list";
+import MessageList, { scrollToMessage } from "./message-list";
+import { lastPromptId } from "./minimap-items";
 import SubAgentParentBreadcrumb from "./sub-agent-parent-breadcrumb";
 import TextSelectionMenu from "./text-selection-menu";
 import ThreadMinimap from "./thread-minimap";
@@ -53,27 +58,42 @@ interface ThreadProps {
     maxWidth?: string;
 }
 
+const FLOATING_BUTTON_CLASS = cn("rounded-full shadow-md", "bg-background hover:bg-accent border", "transition-all duration-200");
+
 /**
- * Scroll to bottom button - appears when user scrolls up
- * Uses isAtBottom state from Zustand store.
+ * Scroll buttons - appear when user scrolls up
+ * Uses isAtBottom state from Zustand store. Beside scroll-to-bottom sits a jump back to the user's
+ * newest prompt: in a busy thread the answer to it is usually right below it, far up by now.
  */
-const ScrollToBottomButton: FC<{ className?: string; onClick: () => void }> = ({ className, onClick }) => {
+const ScrollToBottomButton: FC<{ canJumpToPrompt: boolean; className?: string; onClick: () => void }> = ({ canJumpToPrompt, className, onClick }) => {
     const isAtBottom = useChatUIStore((state) => state.isAtBottom);
+    const { messages } = useChatMessages();
+    const { threadId } = useChatThread();
     const { t } = useLingui();
 
     if (isAtBottom) {
         return null;
     }
 
+    // The media gallery has no message list to scroll, so the jump would do nothing there.
+    const promptId = canJumpToPrompt ? lastPromptId(messages) : undefined;
+
     return (
-        <TooltipIconButton
-            className={cn("absolute -top-14 rounded-full shadow-md", "bg-background hover:bg-accent border", "transition-all duration-200", className)}
-            onClick={onClick}
-            tooltip={t`Scroll to bottom`}
-            variant="outline"
-        >
-            <ArrowDownIcon className="size-4" />
-        </TooltipIconButton>
+        <div className={cn("absolute -top-14 flex gap-2", className)}>
+            {promptId && (
+                <TooltipIconButton
+                    className={FLOATING_BUTTON_CLASS}
+                    onClick={() => scrollToMessage(promptId, { threadId })}
+                    tooltip={t`Jump to my last message`}
+                    variant="outline"
+                >
+                    <CornerLeftUpIcon aria-hidden="true" className="size-4" />
+                </TooltipIconButton>
+            )}
+            <TooltipIconButton className={FLOATING_BUTTON_CLASS} onClick={onClick} tooltip={t`Scroll to bottom`} variant="outline">
+                <ArrowDownIcon className="size-4" />
+            </TooltipIconButton>
+        </div>
     );
 };
 
@@ -93,24 +113,22 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
 
     // Detect comparison parent instantly from the already-loaded thread doc.
     const isMultiChatThread = thread?.multiChat === true;
+    // A worker takes a turn only through `dispatchToWorker`, so its thread gets its own composer.
+    const { isLoading: isWorkerLoading, worker } = useWorker(isNewThread ? undefined : threadId);
 
     const crpc = useCRPC();
+    const afterFirstPaint = useAfterFirstPaint();
+    // A comparison parent needs its children at once; any other thread reads them after first paint,
+    // to learn whether it has workers to list.
     const { data: childThreads } = useQuery(
-        crpc.chat.functions.getChildThreads.queryOptions(threadId && isMultiChatThread ? { parentThreadId: threadId as Id<"threads"> } : skipToken),
+        crpc.chat.functions.getChildThreads.queryOptions(
+            threadId && (isMultiChatThread || (!isNewThread && afterFirstPaint)) ? { parentThreadId: threadId as Id<"threads"> } : skipToken,
+        ),
     );
+    const hasWorkers = childThreads?.some((child) => child.branchType === "subagent") === true;
 
-    // Check if this is a comparison parent thread
-    const isComparisonThread = useMemo(() => {
-        if (isMultiChatThread) {
-            return true;
-        }
-
-        if (!childThreads || childThreads.length === 0) {
-            return false;
-        }
-
-        return childThreads.some((child: any) => child.branchType === "comparison");
-    }, [isMultiChatThread, childThreads]);
+    // A comparison parent is flagged on its own thread document.
+    const isComparisonThread = isMultiChatThread;
 
     // Build comparison branches from child threads
     const comparisonBranches = useMemo((): ComparisonBranch[] => {
@@ -264,6 +282,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
                                         maxWidth={maxWidth}
                                     />
                                     <div className="flex-1" />
+                                    {hasWorkers && <WorkerList className="mb-4 w-full" threadId={threadId} />}
                                 </div>
                                 {/* Sticky within the scroll viewport, so it stays in view while the thread scrolls. */}
                                 <ThreadMinimap className="sticky top-4 hidden self-start md:block" />
@@ -277,13 +296,23 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
 
                         {/* Footer with composer */}
                         <div className="sticky bottom-0 mx-auto flex w-full max-w-(--thread-max-width) flex-col items-center justify-end rounded-t-lg bg-inherit">
-                            <ScrollToBottomButton className="z-10" onClick={handleScrollToBottom} />
+                            <ScrollToBottomButton canJumpToPrompt={composerMode === "text"} className="z-10" onClick={handleScrollToBottom} />
                             {/* Error display */}
                             <ChatError className="mb-3 w-full" />
                             <ForwardSelectionBar threadId={threadId} />
                             {/* Full-featured composer with model selector, language selector, slash commands */}
                             {/* Key by threadId to reset state when switching threads */}
-                            <Composer className="w-full" initialMessage={initialMessage} key={threadId} />
+                            {/* A worker's thread takes a turn only through a dispatch, so no chat composer while that is unknown. */}
+                            {worker && (
+                                <WorkerComposer
+                                    archived={worker.archived}
+                                    busy={worker.state !== "idle"}
+                                    className="w-full pb-4"
+                                    key={threadId}
+                                    workerId={worker.workerId}
+                                />
+                            )}
+                            {!worker && !isWorkerLoading && <Composer className="w-full" initialMessage={initialMessage} key={threadId} />}
                         </div>
                     </div>
                 </ThreadViewport>

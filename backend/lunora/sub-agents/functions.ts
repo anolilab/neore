@@ -13,12 +13,21 @@
  * status first — so a redelivered job, or a late finish racing the reaper, is a
  * no-op rather than a second run or a second post.
  *
+ * A WORKER (`mode: "worker"`) is a sub-agent thread that outlives one run: its first run creates the
+ * child thread, and every later dispatch — the lead's `messageWorker` tool call or the user typing in
+ * the thread (`dispatchToWorker`) — is one more run row on the same thread. Admission charges nothing
+ * for a worker run; the claim does, once, when the run leaves `queued`. A dispatch is deduped by a
+ * `worker-dispatch` claim taken before the rate limit, so a redelivery returns the first run's receipt.
+ *
  * Admission, in one transaction: an account that may run background work (not
  * anonymous, not being deleted), the parent thread owned by the caller, the
  * depth and fan-out caps (`logic.ts`), the `subAgents/run` rate limit, and one
  * charge to the task quotas (`tasks/account.ts:chargeRound`). Everything
  * enqueued lands on the calling shard — the thread owner's.
  */
+import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
+import { MODEL_LOOKUP } from "@neore/ai/models";
+import type { Infer } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -27,29 +36,39 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { resolveLeafRow } from "../agent/branch-rows";
 import { addMessagesHandler, getMaxMessage } from "../agent/messages";
-import { insertThreadRelationship, patchThread } from "../agent/table-writes";
+import { insertThread, insertThreadRelationship, patchThread } from "../agent/table-writes";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
+import { claimOnce, releaseClaim, WORKER_DISPATCH_CLAIM_TTL_MS, WORKER_DISPATCH_SCOPE } from "../lib/claim-once";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { enqueueJob } from "../lib/job-queue";
 import { patchById } from "../lib/patch";
 import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/account";
+import { isTaskModelAllowed } from "../tasks/logic";
+import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
+import { MAX_LENGTH } from "../lib/validators";
+import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import {
     buildResultMessage,
+    distinctChildCount,
+    intersectWithLeadTools,
     isActiveSubAgentStatus,
     normalizeToolAllowlist,
     postRetryDelayMs,
+    resolveSubAgentModel,
     SUB_AGENT_NAME,
     SUB_AGENT_POST_MAX_ATTEMPTS,
+    SUB_AGENT_MAX_TOOLS,
     SUB_AGENT_SKILL_SLUG_MAX,
     SUB_AGENT_STALE_MS,
     SUB_AGENT_TASK_MAX,
     subAgentCapProblem,
     truncateResult,
+    WORKER_CLIENT_ID_MAX,
+    WORKER_NAME_MAX,
 } from "./logic";
-import { vSubAgentRunStatus } from "./validators";
-import { isThreadLocked } from "../lib/thread-lock";
+import { vSubAgentRunMode, vSubAgentRunStatus } from "./validators";
 
 type RunDoc = Doc<"subAgentRuns">;
 
@@ -95,15 +114,22 @@ const countChildren = async (
     return count;
 };
 
+interface CommonAdmission {
+    account: NonNullable<Awaited<ReturnType<typeof loadTaskAccount>>>;
+    allowlist: string[] | undefined;
+    parent: Doc<"threads">;
+    skillSlug: string | undefined;
+    task: string;
+}
+
 /**
- * Every admission check, charging the rate limit and quotas last; returns the
- * row to insert. A refusal is `{ error }` — for the model to read — rather than
- * a throw, so what a refused start consumed stays consumed, as in chat.
+ * The checks every run shares, in order: the task, the skill, the allowlist, an account that may
+ * run background work (not anonymous, not being deleted) and a parent thread its caller owns.
  */
-export const admitSubAgentRun = async (
+const admitCommon = async (
     ctx: MutationCtx,
-    args: CreateSubAgentRunArgs,
-): Promise<{ error: string } | { row: Omit<RunDoc, "_creationTime" | "_id"> }> => {
+    args: Pick<CreateSubAgentRunArgs, "parentThreadId" | "skillSlug" | "task" | "toolAllowlist" | "userId">,
+): Promise<CommonAdmission | { error: string }> => {
     const task = args.task.trim();
 
     if (task.length === 0 || task.length > SUB_AGENT_TASK_MAX) {
@@ -144,12 +170,31 @@ export const admitSubAgentRun = async (
         return { error: "Only the owner of this conversation can delegate to sub-agents." };
     }
 
+    return { account, allowlist: allowlist.tools, parent, skillSlug, task };
+};
+
+/**
+ * Every admission check, charging the rate limit and quotas last; returns the
+ * row to insert. A refusal is `{ error }` — for the model to read — rather than
+ * a throw, so what a refused start consumed stays consumed, as in chat.
+ */
+export const admitSubAgentRun = async (
+    ctx: MutationCtx,
+    args: CreateSubAgentRunArgs,
+): Promise<{ error: string } | { row: Omit<RunDoc, "_creationTime" | "_id"> }> => {
+    const common = await admitCommon(ctx, args);
+
+    if ("error" in common) {
+        return common;
+    }
+
+    const { account, allowlist, parent, skillSlug, task } = common;
     const depth = (await threadDepth(ctx, parent._id)) + 1;
-    // A sub-agent's thread is its one run, so every child ever started from it counts.
+    // Every child ever started from the lead counts, a worker once however many runs it had.
     const capProblem = subAgentCapProblem({
         activeChildren: await countChildren(ctx, parent._id, ["queued", "running"]),
         parentDepth: depth - 1,
-        ...(depth > 1 && { totalChildren: await countChildren(ctx, parent._id, ["queued", "running", "succeeded", "failed", "cancelled"]) }),
+        ...(depth > 1 && { totalChildren: await lifetimeChildren(ctx, parent._id) }),
     });
 
     if (capProblem) {
@@ -178,7 +223,7 @@ export const admitSubAgentRun = async (
             skillSlug,
             status: "queued",
             task,
-            toolAllowlist: allowlist.tools,
+            toolAllowlist: allowlist,
             toolCallId: args.toolCallId,
             updatedAt: now,
             userId: args.userId,
@@ -186,18 +231,311 @@ export const admitSubAgentRun = async (
     };
 };
 
+// ─── Workers ─────────────────────────────────────────────────────────────────
+
+/** Why a worker dispatch was refused; `kind` picks the error a person-facing procedure throws. */
+export interface WorkerRefusal {
+    error: string;
+    kind: "archived" | "busy" | "limit" | "not_found" | "other";
+}
+
+export interface WorkerRunArgs extends CreateSubAgentRunArgs {
+    /** The worker's child thread; unset creates a worker. */
+    childThreadId?: string;
+    /** A user-typed dispatch's dedupe key; a lead's dispatch carries `toolCallId` instead. */
+    clientId?: string;
+    /** The lead run's effective tool names; unset when a person creates the worker. */
+    leadTools?: string[];
+    /** A new worker's model. */
+    model?: string;
+    /** A new worker's name, which is its thread title. */
+    name?: string;
+}
+
+export interface WorkerReceipt {
+    runId: Id<"subAgentRuns">;
+    state: RunDoc["status"];
+    workerId: string;
+}
+
+/** Runs of one worker read to find its latest or active one; a worker has one active run at a time. */
+const WORKER_RUNS_CHECKED = 20;
+
+/** A worker's first run: it holds the lead, the depth, the runner and the tool allowlist every later run copies. */
+const workerOrigin = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childThreadId: string): Promise<RunDoc | null> => {
+    const origin = await ctx.db
+        .query("subAgentRuns")
+        .withIndex("by_childThreadId", (q) => q.eq("childThreadId", childThreadId))
+        .first();
+
+    return origin?.mode === "worker" ? origin : null;
+};
+
+/** The worker's newest runs, newest first. */
+const latestWorkerRuns = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childThreadId: string): Promise<RunDoc[]> =>
+    await ctx.db
+        .query("subAgentRuns")
+        .withIndex("by_childThreadId", (q) => q.eq("childThreadId", childThreadId))
+        .order("desc")
+        .take(WORKER_RUNS_CHECKED);
+
+/** Whether `threadId` is a worker's thread — a turn there runs only through a dispatch. */
+export const isWorkerThread = async (ctx: Pick<QueryCtx, "db">, threadId: string): Promise<boolean> => {
+    const first = await ctx.db
+        .query("subAgentRuns")
+        .withIndex("by_childThreadId", (q) => q.eq("childThreadId", threadId))
+        .first();
+
+    return first?.mode === "worker";
+};
+
+/** Lifetime runs of a lead read to count its distinct children; the depth cap keeps real counts tiny. */
+const SUB_AGENT_LIFETIME_SCAN = 200;
+
+const lifetimeChildren = async (ctx: Pick<MutationCtx, "db">, parentThreadId: string): Promise<number> => {
+    const runs: RunDoc[] = [];
+
+    for (const status of ["queued", "running", "succeeded", "failed", "cancelled"] as const) {
+        runs.push(
+            ...(await ctx.db
+                .query("subAgentRuns")
+                .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", parentThreadId).eq("status", status))
+                .take(SUB_AGENT_LIFETIME_SCAN)),
+        );
+    }
+
+    return distinctChildCount(runs);
+};
+
+/** The run an earlier delivery of this dispatch inserted, if any. */
+const findDispatchedRun = async (ctx: Pick<MutationCtx, "db">, args: WorkerRunArgs): Promise<RunDoc | null> => {
+    if (args.toolCallId !== undefined) {
+        return await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_user_and_toolCallId", (q) => q.eq("userId", args.userId).eq("toolCallId", args.toolCallId))
+            .first();
+    }
+
+    if (args.childThreadId !== undefined) {
+        const recent = await latestWorkerRuns(ctx, args.childThreadId);
+
+        return recent.find((run) => run.clientId === args.clientId) ?? null;
+    }
+
+    // A worker being created has no thread yet: its first run is among the lead's.
+    for (const status of ["queued", "running", "succeeded", "failed", "cancelled"] as const) {
+        const runs = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", args.parentThreadId).eq("status", status))
+            .order("desc")
+            .take(SUB_AGENT_LIFETIME_SCAN);
+        const found = runs.find((run) => run.clientId === args.clientId && run.userId === args.userId);
+
+        if (found) {
+            return found;
+        }
+    }
+
+    return null;
+};
+
+/**
+ * Admits and inserts one worker run, creating the worker's child thread when `childThreadId` is
+ * unset. The dispatch is claimed first (`worker-dispatch`), before the rate limit and the insert: a
+ * redelivery finds its claim taken and gets the first run back with `created: false`, consuming
+ * nothing. A refusal after the claim gives it back, so a retry of the same key is not read as a
+ * replay. Charges nothing: a worker run is charged when it is claimed (`claimQueuedRun`).
+ *
+ * Tools: a new worker's are the requested names the lead could call itself (`leadTools`), or all of
+ * the lead's when none are named; a later run copies the worker's first. Depth, runner and lead are
+ * the first run's too.
+ */
+export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Promise<WorkerRefusal | { created: boolean; run: RunDoc }> => {
+    const other = (error: string): WorkerRefusal => {
+        return { error, kind: "other" };
+    };
+    const dispatchId = args.toolCallId ?? args.clientId;
+
+    if (dispatchId === undefined || dispatchId.length === 0 || dispatchId.length > WORKER_CLIENT_ID_MAX) {
+        return other("A dispatch needs an id.");
+    }
+
+    const common = await admitCommon(ctx, args);
+
+    if ("error" in common) {
+        return other(common.error);
+    }
+
+    const { account, parent, skillSlug, task } = common;
+    let origin: RunDoc | null = null;
+    let child: Doc<"threads"> | null = null;
+
+    if (args.childThreadId !== undefined) {
+        child = await ctx.db.get(args.childThreadId as Id<"threads">);
+        origin = await workerOrigin(ctx, args.childThreadId);
+
+        if (!child || child.deleted || child.userId !== args.userId || !origin || origin.parentThreadId !== parent._id) {
+            return { error: "Worker not found.", kind: "not_found" };
+        }
+    }
+
+    const claimKey = args.toolCallId === undefined ? `client:${args.childThreadId ?? args.parentThreadId}:${dispatchId}` : `tool:${args.userId}:${dispatchId}`;
+
+    if (!(await claimOnce(ctx, WORKER_DISPATCH_SCOPE, claimKey, WORKER_DISPATCH_CLAIM_TTL_MS, args.userId))) {
+        const dispatched = await findDispatchedRun(ctx, args);
+
+        return dispatched ? { created: false, run: dispatched } : other("This dispatch was already handled.");
+    }
+
+    const refuse = async (refusal: WorkerRefusal): Promise<WorkerRefusal> => {
+        await releaseClaim(ctx, WORKER_DISPATCH_SCOPE, claimKey);
+
+        return refusal;
+    };
+
+    if (child && origin) {
+        if (child.status === "archived") {
+            return await refuse({ error: "This worker is archived. Restore it to message it again.", kind: "archived" });
+        }
+
+        if (isThreadLocked(child)) {
+            return await refuse(other("This worker is locked."));
+        }
+
+        const recent = await latestWorkerRuns(ctx, child._id);
+
+        if (recent.some((run) => isActiveSubAgentStatus(run.status))) {
+            return await refuse({ error: "This worker is still working on an earlier message. Wait for it to finish.", kind: "busy" });
+        }
+    }
+
+    let allowlist = origin?.toolAllowlist;
+
+    if (!origin) {
+        const tools = intersectWithLeadTools(common.allowlist, args.leadTools);
+
+        if ("error" in tools) {
+            return await refuse(other(tools.error));
+        }
+
+        allowlist = tools.tools;
+    }
+
+    const depth = origin?.depth ?? (await threadDepth(ctx, parent._id)) + 1;
+    // A message to an existing worker starts no new child, so only a new worker meets the lifetime cap.
+    const capProblem = subAgentCapProblem({
+        activeChildren: await countChildren(ctx, parent._id, ["queued", "running"]),
+        parentDepth: depth - 1,
+        ...(depth > 1 && !origin && { totalChildren: await lifetimeChildren(ctx, parent._id) }),
+    });
+
+    if (capProblem) {
+        return await refuse(other(capProblem));
+    }
+
+    const { ok } = await createRatelimit(`subAgents/run:${account.tier}`, ctx.db as never).limit(args.userId);
+
+    if (!ok) {
+        return await refuse({ error: "You have started too many sub-agents recently. Try again later.", kind: "limit" });
+    }
+
+    const now = Date.now();
+    let childThreadId = child?._id;
+
+    if (!childThreadId) {
+        const name = (args.name?.trim() || task.split("\n", 1)[0]!).slice(0, WORKER_NAME_MAX);
+        const model = resolveSubAgentModel({
+            defaultModel: DEFAULT_CHAT_MODEL,
+            isAllowed: (id) => isTaskModelAllowed(id, (lookupId) => MODEL_LOOKUP.get(lookupId)),
+            parentModel: args.parentModel,
+            preferredModel: args.model,
+        });
+
+        childThreadId = await insertThread(ctx.db, {
+            createdAt: now,
+            model,
+            organizationId: parent.organizationId,
+            status: "active",
+            tags: ["sub-agent", "worker"],
+            title: name,
+            updatedAt: now,
+            userId: args.userId,
+        });
+        await insertThreadRelationship(ctx.db, {
+            branchPoint: 0,
+            branchType: "subagent",
+            createdAt: now,
+            parentThreadId: parent._id,
+            threadId: childThreadId,
+            userId: args.userId,
+        });
+    }
+
+    const row: Omit<RunDoc, "_creationTime" | "_id"> = {
+        childThreadId,
+        clientId: args.toolCallId === undefined ? args.clientId : undefined,
+        createdAt: now,
+        depth,
+        mode: "worker",
+        organizationId: parent.organizationId,
+        parentModel: args.parentModel,
+        parentThreadId: parent._id,
+        runner: origin?.runner ?? { kind: "headless" },
+        skillSlug: origin?.skillSlug ?? skillSlug,
+        status: "queued",
+        task,
+        toolAllowlist: allowlist,
+        toolCallId: args.toolCallId,
+        updatedAt: now,
+        userId: args.userId,
+    };
+
+    const runId = await ctx.db.insert("subAgentRuns", row);
+
+    return { created: true, run: { ...row, _creationTime: now, _id: runId } };
+};
+
+/** Admits a worker run, then enqueues the job and schedules the reaper for a run it created. */
+export const dispatchWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Promise<WorkerRefusal | WorkerReceipt> => {
+    const admitted = await admitWorkerRun(ctx, args);
+
+    if ("error" in admitted) {
+        return admitted;
+    }
+
+    if (admitted.created) {
+        // As in `createRun`: the jobs queue on this shard, the reaper on the scheduler, in one transaction.
+        await enqueueJob(internal.sub_agents.execute.runSubAgent, { runId: admitted.run._id });
+        await ctx.scheduler.runAfter(SUB_AGENT_STALE_MS, internal.sub_agents.functions.reapRun, { runId: admitted.run._id });
+    }
+
+    return { runId: admitted.run._id, state: admitted.run.status, workerId: admitted.run.childThreadId! };
+};
+
 export const createRun = internalMutation
     .input({
+        // Bounded at the boundary; the name is cut to its display length further down, and a tool name has its own pattern.
+        leadTools: v.optional(v.array(v.string().max(128))),
+        model: v.optional(v.string().max(256)),
+        name: v.optional(v.string().max(1000)),
         parentModel: v.optional(v.string()),
         parentThreadId: v.string(),
+        // A worker: the thread outlives this run and is messaged again with `messageWorker`.
+        persistent: v.optional(v.boolean()),
         skillSlug: v.optional(v.string()),
         task: v.string(),
         toolAllowlist: v.optional(v.array(v.string())),
         toolCallId: v.optional(v.string()),
         userId: v.string(),
     })
-    .output(v.union(v.object({ runId: v.id("subAgentRuns") }), v.object({ error: v.string() })))
-    .mutation(async ({ args, ctx }) => {
+    .output(v.union(v.object({ runId: v.id("subAgentRuns"), workerId: v.optional(v.string()) }), v.object({ error: v.string() })))
+    .mutation(async ({ args: { persistent, ...args }, ctx }) => {
+        if (persistent) {
+            const dispatched = await dispatchWorkerRun(ctx, args);
+
+            return "error" in dispatched ? { error: dispatched.error } : { runId: dispatched.runId, workerId: dispatched.workerId };
+        }
+
         const admitted = await admitSubAgentRun(ctx, args);
 
         if ("error" in admitted) {
@@ -216,8 +554,31 @@ export const createRun = internalMutation
     });
 
 /**
+ * A lead's message to one of its workers (the `messageWorker` tool). The tool call id dedupes it.
+ */
+export const messageWorker = internalMutation
+    .input({ message: v.string().max(SUB_AGENT_TASK_MAX), parentThreadId: v.string(), toolCallId: v.string(), userId: v.string(), workerId: v.string() })
+    .output(v.union(v.object({ runId: v.id("subAgentRuns"), state: vSubAgentRunStatus, workerId: v.string() }), v.object({ error: v.string() })))
+    .mutation(async ({ args, ctx }) => {
+        const dispatched = await dispatchWorkerRun(ctx, {
+            childThreadId: args.workerId,
+            parentThreadId: args.parentThreadId,
+            task: args.message,
+            toolCallId: args.toolCallId,
+            userId: args.userId,
+        });
+
+        return "error" in dispatched ? { error: dispatched.error } : dispatched;
+    });
+
+/**
  * `queued` → `running`, once: a redelivered job finds the run no longer queued
  * and gets `null`. Returns the run as it was claimed.
+ *
+ * A worker run is charged here, once, as it leaves `queued` — so a run cancelled while queued costs
+ * nothing, and a redelivery (which gets `null` above) cannot charge twice. When the daily limit is
+ * spent the run ends as failed, and when the worker was archived meanwhile it ends cancelled; the
+ * claim answers `null` for both.
  */
 export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<RunDoc | null> => {
     const run = await ctx.db.get(runId);
@@ -226,9 +587,34 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
         return null;
     }
 
+    // A worker's thread exists already, so the link `linkChildThread` makes for a one-shot run is not made again.
+    const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
+
+    if (run.mode === "worker") {
+        // Archived after this run was queued: it ends cancelled, uncharged, and the thread stays archived.
+        if (worker?.status === "archived") {
+            await finishRun(ctx, run._id, { kind: "cancelled" });
+
+            return null;
+        }
+
+        const account = await loadTaskAccount(ctx, run.userId);
+
+        if (!account || !(await chargeRound(ctx, run.userId, account))) {
+            await finishRun(ctx, run._id, { error: account ? DAILY_LIMIT_MESSAGE : "Your account no longer exists.", kind: "failed" });
+
+            return null;
+        }
+    }
+
     const now = Date.now();
 
     await patchById(ctx.db, run._id, { startedAt: now, status: "running", updatedAt: now });
+
+    // "running" is what the thread list reads to offer its Stop; `finishRun` puts it back.
+    if (worker?.status === "active") {
+        await patchThread(ctx.db, worker._id, { status: "running", updatedAt: now });
+    }
 
     return run;
 };
@@ -239,7 +625,12 @@ export const claimRun = internalMutation
     .output(
         v.union(
             v.object({
+                childThreadId: v.optional(v.string()),
+                clientId: v.optional(v.string()),
                 depth: v.number(),
+                mode: v.optional(vSubAgentRunMode),
+                // The worker's own model, read from its thread: the picker there changes only that worker.
+                model: v.optional(v.string()),
                 organizationId: v.optional(v.string()),
                 parentModel: v.optional(v.string()),
                 parentThreadId: v.string(),
@@ -258,8 +649,14 @@ export const claimRun = internalMutation
             return null;
         }
 
+        const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
+
         return {
+            ...(run.childThreadId !== undefined && { childThreadId: run.childThreadId }),
+            ...(run.clientId !== undefined && { clientId: run.clientId }),
             depth: run.depth,
+            ...(run.mode !== undefined && { mode: run.mode }),
+            ...(worker?.model !== undefined && { model: worker.model }),
             ...(run.organizationId !== undefined && { organizationId: run.organizationId }),
             ...(run.parentModel !== undefined && { parentModel: run.parentModel }),
             parentThreadId: run.parentThreadId,
@@ -505,10 +902,9 @@ const CANCEL_THREAD_MAX = 20;
  * Returns how many runs this call ended.
  */
 export const cancelSubAgentRunsForStop = async (ctx: MutationCtx, threadId: string, userId: string): Promise<number> => {
-    const own = await ctx.db
-        .query("subAgentRuns")
-        .withIndex("by_childThreadId", (q) => q.eq("childThreadId", threadId))
-        .first();
+    // A worker's thread holds many runs, oldest first: the one a Stop means is the active one.
+    const ownRuns = await latestWorkerRuns(ctx, threadId);
+    const own = ownRuns.find((run) => isActiveSubAgentStatus(run.status)) ?? null;
 
     const targets: RunDoc[] = [];
 
@@ -529,12 +925,14 @@ export const cancelSubAgentRunsForStop = async (ctx: MutationCtx, threadId: stri
 
     // Once its own run has ended, the thread is an ordinary one again: a reply the
     // user got there may have delegated runs of its own.
-    if (own && isActiveSubAgentStatus(own.status)) {
+    if (own) {
         targets.push(own);
     } else {
         // A stopped parent takes the whole tree down: what a cancelled run delegated
         // would otherwise keep billing and post back into a thread nobody waits on.
-        let level = await activeRunsOf(threadId);
+        // Not what a person typed into a worker's own thread (those carry a client id): only a Stop there ends them.
+        const topLevel = await activeRunsOf(threadId);
+        let level = topLevel.filter((run) => run.mode !== "worker" || run.clientId === undefined);
 
         while (level.length > 0 && targets.length < CANCEL_THREAD_MAX) {
             targets.push(...level);
@@ -624,4 +1022,266 @@ export const cancelRun = authMutation
     .output(v.object({ cancelled: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         return { cancelled: await cancelOwnedSubAgentRun(ctx, args.runId, ctx.user.userId) };
+    });
+
+// ─── Workers: person-facing procedures ───────────────────────────────────────
+
+const vWorkerReceipt = v.object({ runId: v.id("subAgentRuns"), state: vSubAgentRunStatus, workerId: v.string() });
+
+const WORKER_REFUSAL_CODES = {
+    archived: "CONFLICT",
+    busy: "CONFLICT",
+    limit: "TOO_MANY_REQUESTS",
+    not_found: "NOT_FOUND",
+    other: "BAD_REQUEST",
+} as const;
+
+const dispatchOrThrow = async (ctx: MutationCtx, args: WorkerRunArgs): Promise<WorkerReceipt> => {
+    const dispatched = await dispatchWorkerRun(ctx, args);
+
+    if ("error" in dispatched) {
+        throw new LunoraError(WORKER_REFUSAL_CODES[dispatched.kind], dispatched.error);
+    }
+
+    return dispatched;
+};
+
+/**
+ * A person creates a worker under one of their own threads, with its first task. Same caps and
+ * rate limit as a lead's delegation; no lead run vouches for the tools, so the allowlist stands as
+ * asked and every run still builds only what the user's own permissions allow a headless run.
+ */
+export const createWorker = authMutation
+    .input({
+        clientId: v.string().max(WORKER_CLIENT_ID_MAX),
+        leadThreadId: v.id("threads"),
+        model: v.optional(v.string().max(200)),
+        name: v.string().max(WORKER_NAME_MAX),
+        skill: v.optional(v.string().max(SUB_AGENT_SKILL_SLUG_MAX)),
+        task: v.string().max(SUB_AGENT_TASK_MAX),
+        toolAllowlist: v.optional(v.array(v.string().max(128)).max(SUB_AGENT_MAX_TOOLS)),
+        /** A locked chat's passcode proof, which every write to it needs. */
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
+    .output(vWorkerReceipt)
+    .mutation(async ({ args, ctx }) => {
+        // The same gate as every other write to the chat: a locked lead needs its proof before a worker starts under it.
+        throwUnlessGranted(
+            await threadGateOutcome(ctx, { level: "write", threadId: args.leadThreadId, unlockProof: args.unlockProof, userId: ctx.user.userId }),
+        );
+
+        const lead = await ctx.db.get(args.leadThreadId);
+
+        return await dispatchOrThrow(ctx, {
+            clientId: args.clientId,
+            ...(lead?.model !== undefined && { parentModel: lead.model }),
+            ...(args.model !== undefined && { model: args.model }),
+            name: args.name,
+            parentThreadId: args.leadThreadId,
+            ...(args.skill !== undefined && { skillSlug: args.skill }),
+            task: args.task,
+            ...(args.toolAllowlist !== undefined && { toolAllowlist: args.toolAllowlist }),
+            userId: ctx.user.userId,
+        });
+    });
+
+/**
+ * The user types into a worker's thread. One message starts one run: the `clientId` dedupes a retry
+ * or a redelivery, which returns the first run's receipt. An archived worker refuses; a stranger's
+ * id is NOT_FOUND, as an id that does not exist is.
+ */
+export const dispatchToWorker = authMutation
+    .input({
+        clientId: v.string().max(WORKER_CLIENT_ID_MAX),
+        message: v.string().max(SUB_AGENT_TASK_MAX),
+        workerId: v.id("threads"),
+    })
+    .output(vWorkerReceipt)
+    .mutation(async ({ args, ctx }) => {
+        const origin = await workerOrigin(ctx, args.workerId);
+
+        if (!origin || origin.userId !== ctx.user.userId) {
+            throw new LunoraError("NOT_FOUND", "Worker not found.");
+        }
+
+        return await dispatchOrThrow(ctx, {
+            childThreadId: args.workerId,
+            clientId: args.clientId,
+            parentThreadId: origin.parentThreadId,
+            task: args.message,
+            userId: ctx.user.userId,
+        });
+    });
+
+const vWorkerView = v.object({
+    activeRunId: v.union(v.id("subAgentRuns"), v.null()),
+    archived: v.boolean(),
+    lastRunAt: v.number(),
+    lastRunStatus: vSubAgentRunStatus,
+    leadThreadId: v.string(),
+    name: v.string(),
+    state: v.union(v.literal("idle"), v.literal("queued"), v.literal("running")),
+    workerId: v.string(),
+});
+
+/** A worker's name is its thread title, which a locked chat does not show. */
+const workerName = (thread: Doc<"threads">, run: RunDoc): string =>
+    isThreadLocked(thread) ? LOCKED_THREAD_TITLE : (thread.title ?? run.task.split("\n", 1)[0]!.slice(0, WORKER_NAME_MAX));
+
+/** What a worker is doing, from its active run if it has one. */
+const workerState = (working: RunDoc | undefined): "idle" | "queued" | "running" => {
+    if (!working) {
+        return "idle";
+    }
+
+    return working.status === "running" ? "running" : "queued";
+};
+
+/** Workers shown under one lead, most recently dispatched first. */
+const WORKER_LIST_MAX = 20;
+
+const ALL_STATUSES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
+
+/** The workers of one of the caller's threads: name, whether archived, whether working. */
+export const listWorkers = authQuery
+    .input({ leadThreadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
+    .output(v.array(vWorkerView))
+    .query(async ({ args, ctx }) => {
+        // A locked lead shows nothing of its workers (their titles are its content) until it is unlocked.
+        if ((await threadGateOutcome(ctx, { level: "read", threadId: args.leadThreadId, unlockProof: args.unlockProof, userId: ctx.user.userId })) !== "ok") {
+            return [];
+        }
+
+        const runs: RunDoc[] = [];
+
+        for (const status of ALL_STATUSES) {
+            runs.push(
+                ...(await ctx.db
+                    .query("subAgentRuns")
+                    .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", args.leadThreadId).eq("status", status))
+                    // Newest first: the oldest runs of a long-lived lead are not the ones whose state the list shows.
+                    .order("desc")
+                    .take(SUB_AGENT_LIFETIME_SCAN)),
+            );
+        }
+
+        const latest = new Map<string, RunDoc>();
+        const active = new Map<string, RunDoc>();
+
+        for (const run of runs) {
+            if (run.mode !== "worker" || run.userId !== ctx.user.userId || run.childThreadId === undefined) {
+                continue;
+            }
+
+            if (!latest.has(run.childThreadId) || latest.get(run.childThreadId)!.createdAt < run.createdAt) {
+                latest.set(run.childThreadId, run);
+            }
+
+            if (isActiveSubAgentStatus(run.status)) {
+                active.set(run.childThreadId, run);
+            }
+        }
+
+        const newest = [...latest.values()].toSorted((a, b) => b.createdAt - a.createdAt).slice(0, WORKER_LIST_MAX);
+        const views: Infer<typeof vWorkerView>[] = [];
+
+        for (const run of newest) {
+            const thread = await ctx.db.get(run.childThreadId as Id<"threads">);
+
+            if (!thread || thread.deleted || thread.userId !== ctx.user.userId) {
+                continue;
+            }
+
+            const working = active.get(run.childThreadId!);
+
+            views.push({
+                activeRunId: working?._id ?? null,
+                archived: thread.status === "archived",
+                lastRunAt: run.createdAt,
+                lastRunStatus: run.status,
+                leadThreadId: run.parentThreadId,
+                name: workerName(thread, run),
+                state: workerState(working),
+                workerId: run.childThreadId!,
+            });
+        }
+
+        return views;
+    });
+
+/** One worker's thread, for the composer in it: its lead, whether it is archived, whether a run is live. Null for any other thread. */
+export const getWorker = authQuery
+    .input({ workerId: v.id("threads") })
+    .output(v.union(vWorkerView, v.null()))
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get(args.workerId);
+        const origin = thread ? await workerOrigin(ctx, args.workerId) : null;
+
+        if (!thread || thread.deleted || thread.userId !== ctx.user.userId || !origin || origin.userId !== ctx.user.userId) {
+            return null;
+        }
+
+        const recent = await latestWorkerRuns(ctx, args.workerId);
+        const latest = recent[0]!;
+        const working = recent.find((run) => isActiveSubAgentStatus(run.status));
+
+        return {
+            activeRunId: working?._id ?? null,
+            archived: thread.status === "archived",
+            lastRunAt: latest.createdAt,
+            lastRunStatus: latest.status,
+            leadThreadId: origin.parentThreadId,
+            name: workerName(thread, origin),
+            state: workerState(working),
+            workerId: args.workerId,
+        };
+    });
+
+const vActiveWorkerRun = v.object({
+    createdAt: v.number(),
+    leadThreadId: v.string(),
+    name: v.string(),
+    runId: v.id("subAgentRuns"),
+    startedAt: v.union(v.number(), v.null()),
+    status: v.union(v.literal("queued"), v.literal("running")),
+    workerId: v.string(),
+});
+
+/** Live worker runs read per status; the fan-out cap keeps real ones to a handful. */
+const ACTIVE_WORKER_RUNS_MAX = 50;
+
+/** The caller's live worker runs, for a rail that shows what is working right now. */
+export const listActiveWorkerRuns = authQuery
+    .input({})
+    .output(v.array(vActiveWorkerRun))
+    .query(async ({ ctx }) => {
+        const views: Infer<typeof vActiveWorkerRun>[] = [];
+
+        for (const status of ["running", "queued"] as const) {
+            const runs = await ctx.db
+                .query("subAgentRuns")
+                .withIndex("by_user_and_status", (q) => q.eq("userId", ctx.user.userId).eq("status", status))
+                .order("desc")
+                .take(ACTIVE_WORKER_RUNS_MAX);
+
+            for (const run of runs) {
+                if (run.mode !== "worker" || run.childThreadId === undefined) {
+                    continue;
+                }
+
+                const thread = await ctx.db.get(run.childThreadId as Id<"threads">);
+
+                views.push({
+                    createdAt: run.createdAt,
+                    leadThreadId: run.parentThreadId,
+                    name: thread && !thread.deleted ? workerName(thread, run) : run.task.split("\n", 1)[0]!.slice(0, WORKER_NAME_MAX),
+                    runId: run._id,
+                    startedAt: run.startedAt ?? null,
+                    status,
+                    workerId: run.childThreadId,
+                });
+            }
+        }
+
+        return views;
     });

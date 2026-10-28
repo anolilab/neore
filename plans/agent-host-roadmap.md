@@ -106,7 +106,9 @@ stays in the thread ([harness-switch.md](harness-switch.md) §3).
    approve once or decline, with the full details shown. The first answer wins
    and the local prompt closes. Outside agents can never send one.
 5. **ACP agents run beside the device sandbox in v1**, not inside it. Every ACP
-   permission request prompts. There is no "Always allow" for ACP in v1.
+   permission request prompts. There is no "Always allow" for ACP in v1. "Approve
+   all" in the approval bar answers only the requests it shows, each once, and
+   remembers nothing ([acp-agent-host.md](acp-agent-host.md) §4.4).
 6. **SSH authority stays on the desktop.** The desktop verifies every backend
    call and runs local approval. The remote `neore-host` binary holds no device
    secret and no pairing, trusts only its SSH stdio pipe, and opens no listener.
@@ -162,7 +164,7 @@ Each changes a first slice. The recommendation is in the plan named.
 
 | # | Question | Recommendation | Plan |
 | --- | --- | --- | --- |
-| 1 | Sandbox ACP agents with network allowed, instead of running them beside the sandbox? | Beside it in v1; revisit with the egress allowlist work | [acp-agent-host.md](acp-agent-host.md) §10 |
+| 1 | Sandbox ACP agents with network allowed, instead of running them beside the sandbox? | **Decided 2026-10-27: beside it in v1**; revisit with the egress allowlist work | [acp-agent-host.md](acp-agent-host.md) §10 |
 | 2 | Show host turns on the usage page as their own bucket? | Not in v1; no usage rows for host turns | [acp-agent-host.md](acp-agent-host.md) §10 |
 | 3 | Query the ACP registry from the desktop or from the backend? | Desktop, so the backend never sees the install choice | [acp-agent-host.md](acp-agent-host.md) §10 |
 | 4 | Turn off background throttling for the main window? | Only if the S3 measurement fails | [acp-agent-host.md](acp-agent-host.md) §10 |
@@ -194,7 +196,10 @@ Each changes a first slice. The recommendation is in the plan named.
 - **Direct LAN or mesh-VPN routes with relay fallback.** The relay path is enough
   for v1. Revisit when a user reports a relay-only failure we can measure.
 - **A headless runtime with a terminal UI.** `apps/cli` covers scripting. Revisit
-  after SSH S2, since it would reuse `neore-host`.
+  after SSH S2, since it would reuse `neore-host`. An always-on headless host (an
+  agent machine that pairs as its own device, with no desktop app) is tracked in
+  [#369](https://github.com/anolilab/neore/issues/369), including why it reopens
+  the rejected "device secret on SSH hosts" trade-off.
 - **Simulator and emulator streaming.** Serves mobile developers only.
 - **Host checkpoints.** A snapshot per turn in hidden refs, and refusing a revert the agent cannot rewind. Revisit with the provider capability `checkpoints`.
 - **Merge-back of a fork's results into its source.** Revisit when forks ship.

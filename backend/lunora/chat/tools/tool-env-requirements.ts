@@ -65,6 +65,7 @@ export const TOOL_ENV_REQUIREMENTS_OR: Partial<Record<string, string[][]>> = {
 export const ALWAYS_AVAILABLE_TOOLS = [
     "askUser",
     "delegateToSubAgent",
+    "messageWorker",
     "dateTime",
     "textTranslate",
     "listLanguages",

@@ -1,4 +1,5 @@
 /** What the local device window's preload exposes as `window.neoreDevice`. */
+import type { AcpUpdate, AcpView, PermissionView, ProbeResult, SessionSnapshot, SessionSummary } from "../../acp/types";
 import type { Availability } from "../../terminal/shell";
 import type { HostProbe, Prompt, SettingsView } from "../types";
 
@@ -9,12 +10,27 @@ declare global {
 }
 
 export interface DeviceWindowApi {
+    acpCancel: (sessionId: string) => Promise<void>;
+    acpClose: (sessionId: string) => Promise<void>;
+    acpForget: (sessionId: string) => Promise<void>;
+    acpPermissionAnswer: (id: number, optionId: string) => Promise<void>;
+    acpPermissionAnswerBatch: (ids: number[]) => Promise<number>;
+    acpPermissionDecline: (id: number) => Promise<void>;
+    acpPermissions: () => Promise<PermissionView[]>;
+    acpProbe: (agentKey: string) => Promise<ProbeResult>;
+    acpSend: (sessionId: string, prompt: string) => Promise<{ position?: number; status: "queued" | "started" }>;
+    acpSession: (sessionId: string) => Promise<SessionSnapshot>;
+    acpSessions: () => Promise<SessionSummary[]>;
+    acpStart: (agentKey: string, folder: string) => Promise<string>;
+    acpUpdate: (update: AcpUpdate) => Promise<AcpView>;
+    acpView: () => Promise<AcpView>;
     auditTail: () => Promise<string[]>;
     confirm: (message: string) => Promise<boolean>;
     hostConnect: (deviceId: string) => Promise<HostProbe>;
     hostDisconnect: (deviceId: string) => Promise<void>;
     hostForgetKey: (deviceId: string) => Promise<void>;
     hostRemove: (deviceId: string) => Promise<void>;
+    onAcpChanged: (handler: () => void) => () => void;
     onPromptQueued: (handler: () => void) => () => void;
     /** Opens a terminal for the folder; `null` asks for one. */
     openTerminal: (folder: string | null) => Promise<void>;

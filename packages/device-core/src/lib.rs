@@ -10,6 +10,9 @@
 //! `engine`, `ssh` and `store`. Without it the crate is what `neore-host` runs: the
 //! `actions` the desktop already approved, over the [`host`] frame protocol.
 
+#[cfg(feature = "keychain")]
+pub mod acp;
+pub mod acp_permission;
 pub mod actions;
 #[cfg(feature = "keychain")]
 pub mod approval;

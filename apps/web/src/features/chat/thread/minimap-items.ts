@@ -69,6 +69,10 @@ export const toMinimapPreview = (text: string, maxChars: number = MINIMAP_PREVIE
  */
 export const isProvisionalId = (id: string): boolean => id.startsWith("optimistic-") || id.startsWith("transitioning-");
 
+/** The newest prompt of a message list that the server has stored, or undefined. A provisional one cannot be scrolled to yet. */
+export const lastPromptId = (messages: ReadonlyArray<{ id: string; role: string }>): string | undefined =>
+    messages.findLast((message) => message.role === "user" && !isProvisionalId(message.id))?.id;
+
 /** The user prompts of a message list, in order. Callers pass the active branch path, so each prompt appears once. */
 export const buildMinimapItems = (messages: ReadonlyArray<{ _creationTime?: number; id: string; role: string; text: string }>): MinimapItem[] =>
     messages

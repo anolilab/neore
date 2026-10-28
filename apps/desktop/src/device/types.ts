@@ -98,12 +98,23 @@ export interface SettingsView {
 
 /** What the engine emits, parsed from the addon's JSON event strings. */
 export type CoreEvent
-    = | { prompt: Prompt; type: "prompt" }
+    = | { agent: string; tool: string; type: "acpPermission" }
         | { callId: string; deviceId: string; payload: string; signature: string; type: "progress" }
+        | { prompt: Prompt; type: "prompt" }
         | { type: "changed" };
 
 /** The surface of the native `DeviceCore` class. */
 export interface DeviceCore {
+    /** Coding agents (ACP): JSON strings, parsed by `acp/`. The spawn plan holds secrets and never leaves the main process. */
+    acpPermissionAnswer: (id: number, optionId: string) => void;
+    acpPermissionAnswerBatch: (ids: number[]) => number;
+    acpPermissionAsk: (request: string) => Promise<string>;
+    acpPermissionCancelSession: (sessionId: string) => void;
+    acpPermissionDecline: (id: number) => void;
+    acpPermissions: () => string;
+    acpSpawnPlan: (agentKey: string, folder: string | null) => string;
+    acpUpdate: (update: string) => string;
+    acpView: () => string;
     auditTail: () => string[];
     denyPrompts: () => void;
     execute: (envelope: string, signature: string) => Promise<string>;
