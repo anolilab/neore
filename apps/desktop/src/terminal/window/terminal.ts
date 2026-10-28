@@ -132,7 +132,12 @@ const SSH_CONNECTION_LOST = 255;
 
 const endedText = ({ crashed, exitCode, host }: TerminalExit): string => {
     if (host !== undefined) {
-        return crashed || exitCode === SSH_CONNECTION_LOST ? `The connection to ${host} ended.` : `The session on ${host} ended (code ${String(exitCode)}).`;
+        // A crash is the local terminal process, not the connection: the server may be fine and a new shell is enough.
+        if (crashed) {
+            return `The terminal on ${host} stopped unexpectedly.`;
+        }
+
+        return exitCode === SSH_CONNECTION_LOST ? `The connection to ${host} ended.` : `The session on ${host} ended (code ${String(exitCode)}).`;
     }
 
     return crashed ? "The shell stopped unexpectedly." : `The shell exited (code ${String(exitCode)}).`;
