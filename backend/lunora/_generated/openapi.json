@@ -38318,6 +38318,16 @@
                         "name": {
                           "type": "string"
                         },
+                        "postFailed": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "state": {
                           "anyOf": [
                             {
@@ -38346,6 +38356,7 @@
                         "lastRunStatus",
                         "leadThreadId",
                         "name",
+                        "postFailed",
                         "state",
                         "workerId"
                       ],
@@ -38598,6 +38609,16 @@
                       "name": {
                         "type": "string"
                       },
+                      "postFailed": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "state": {
                         "anyOf": [
                           {
@@ -38626,6 +38647,7 @@
                       "lastRunStatus",
                       "leadThreadId",
                       "name",
+                      "postFailed",
                       "state",
                       "workerId"
                     ],

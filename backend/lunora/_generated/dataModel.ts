@@ -1464,6 +1464,7 @@ export interface Doc_subAgentRuns {
     organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
+    postFailed?: string;
     result?: string;
     resultPostedAt?: number;
     runner?: { kind: "headless" } | { deviceId: Id<"devices">; kind: "host" };
@@ -4207,6 +4208,7 @@ export interface Insert_subAgentRuns {
     organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
+    postFailed?: string;
     result?: string;
     resultPostedAt?: number;
     runner?: { kind: "headless" } | { deviceId: Id<"devices">; kind: "host" };

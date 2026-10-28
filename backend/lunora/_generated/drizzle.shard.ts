@@ -1210,6 +1210,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     organizationId: text("organizationId"),
     parentModel: text("parentModel"),
     parentThreadId: text("parentThreadId").notNull(),
+    postFailed: text("postFailed"),
     result: text("result"),
     resultPostedAt: real("resultPostedAt"),
     runner: text("runner", { mode: "json" }).$type<{ kind: "headless" } | { deviceId: Id<"devices">; kind: "host" }>(),

@@ -57,8 +57,10 @@ import {
     nextQueuedWorkerRun,
     normalizeToolAllowlist,
     postRetryDelayMs,
+    postsBack,
     resolveSubAgentModel,
     SUB_AGENT_NAME,
+    SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS,
     SUB_AGENT_POST_MAX_ATTEMPTS,
     SUB_AGENT_MAX_TOOLS,
     SUB_AGENT_SKILL_SLUG_MAX,
@@ -732,15 +734,20 @@ export const attachChildThread = internalMutation
 
 /**
  * The result as a follow-up assistant message in the parent thread, under the
- * sub-agent's name, as a new turn on the thread's active branch. Skipped when
- * the thread is gone or no longer the run's owner's.
+ * sub-agent's name, as a new turn on the thread's active branch. Writes nothing
+ * and answers why when the thread is gone, no longer the run's owner's, or locked;
+ * `undefined` means it wrote.
  */
-const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promise<void> => {
+const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promise<string | undefined> => {
     const thread = await ctx.db.get(run.parentThreadId as Id<"threads">);
 
+    if (!thread || thread.deleted || thread.userId !== run.userId) {
+        return "The conversation that started this run is gone.";
+    }
+
     // A locked parent takes no background post: the result stays with the run, unread.
-    if (!thread || thread.deleted || thread.userId !== run.userId || isThreadLocked(thread)) {
-        return;
+    if (isThreadLocked(thread)) {
+        return "The conversation that started this run is locked.";
     }
 
     const last = await getMaxMessage(ctx, thread._id);
@@ -757,6 +764,8 @@ const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promis
     });
 
     await patchById(ctx.db, thread._id, { updatedAt: Date.now() });
+
+    return undefined;
 };
 
 /**
@@ -792,27 +801,32 @@ const isThreadStreaming = async (ctx: Pick<MutationCtx, "db">, threadId: string)
 };
 
 /**
- * Posts an ended run's result to the parent thread, once. While the parent
- * is still streaming — typically the very run whose `delegateToSubAgent` call
- * started this one — the post is rescheduled, so it lands after that reply
- * rather than between its steps; past {@link SUB_AGENT_POST_MAX_ATTEMPTS} it
- * posts anyway. Returns whether this call posted.
+ * Posts an ended run's result to the parent thread, once, if the lead asked for it
+ * ({@link postsBack}). While the parent is still streaming — typically the very run
+ * whose `delegateToSubAgent` call started this one — the post is rescheduled, so it
+ * lands after that reply rather than between its steps; past
+ * {@link SUB_AGENT_POST_MAX_ATTEMPTS} it posts anyway.
+ *
+ * `resultPostedAt` is set only with the message write. A parent that cannot take it
+ * (deleted, locked) leaves it unset and the post is retried with backoff; after
+ * {@link SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS} tries the run ends in `postFailed`, the
+ * terminal state the worker row shows. `failures` counts those tries. Returns whether
+ * this call posted.
  */
-export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, attempt: number): Promise<boolean> => {
+export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, attempt: number, failures = 0): Promise<boolean> => {
     const run = await ctx.db.get(runId);
 
-    if (!run || isActiveSubAgentStatus(run.status) || run.resultPostedAt !== undefined) {
+    if (!run || isActiveSubAgentStatus(run.status) || run.resultPostedAt !== undefined || run.postFailed !== undefined || !postsBack(run)) {
         return false;
     }
 
     if (attempt < SUB_AGENT_POST_MAX_ATTEMPTS && (await isThreadStreaming(ctx, run.parentThreadId))) {
-        await ctx.scheduler.runAfter(postRetryDelayMs(attempt), internal.sub_agents.functions.postResult, { attempt: attempt + 1, runId });
+        await ctx.scheduler.runAfter(postRetryDelayMs(attempt), internal.sub_agents.functions.postResult, { attempt: attempt + 1, failures, runId });
 
         return false;
     }
 
-    await patchById(ctx.db, run._id, { resultPostedAt: Date.now() });
-    await postToParent(
+    const refusal = await postToParent(
         ctx,
         run,
         buildResultMessage({
@@ -825,7 +839,19 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
         }),
     );
 
-    return true;
+    if (refusal === undefined) {
+        await patchById(ctx.db, run._id, { resultPostedAt: Date.now() });
+
+        return true;
+    }
+
+    if (failures + 1 >= SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS) {
+        await patchById(ctx.db, run._id, { postFailed: refusal });
+    } else {
+        await ctx.scheduler.runAfter(postRetryDelayMs(failures), internal.sub_agents.functions.postResult, { attempt, failures: failures + 1, runId });
+    }
+
+    return false;
 };
 
 /**
@@ -865,7 +891,8 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     if (outcome.kind !== "cancelled") {
         await notifyQuietly(ctx, {
             dedupeKey: `sub_agent:${run._id}`,
-            link: `/chat/${run.parentThreadId}`,
+            // A run the user typed into a worker's thread reports there; the lead never heard of it.
+            link: `/chat/${postsBack(run) ? run.parentThreadId : run.childThreadId}`,
             outcome: outcome.kind === "succeeded" ? "success" : "failure",
             title: run.task.split("\n", 1)[0]!.slice(0, 200),
             type: "sub_agent",
@@ -879,10 +906,10 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
 
 /** A deferred {@link postRunResult}, rescheduled while the parent thread streams. */
 export const postResult = internalMutation
-    .input({ attempt: v.number(), runId: v.id("subAgentRuns") })
+    .input({ attempt: v.number(), failures: v.optional(v.number()), runId: v.id("subAgentRuns") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await postRunResult(ctx, args.runId, args.attempt);
+        await postRunResult(ctx, args.runId, args.attempt, args.failures);
 
         return null;
     });
@@ -1161,6 +1188,8 @@ const vWorkerView = v.object({
     lastRunStatus: vSubAgentRunStatus,
     leadThreadId: v.string(),
     name: v.string(),
+    // Why the latest run's result never reached the lead, once the post gave up; null when it did or was never owed.
+    postFailed: v.union(v.string(), v.null()),
     state: v.union(v.literal("idle"), v.literal("queued"), v.literal("running")),
     workerId: v.string(),
 });
@@ -1243,6 +1272,7 @@ export const listWorkers = authQuery
                 lastRunStatus: run.status,
                 leadThreadId: run.parentThreadId,
                 name: workerName(thread, run),
+                postFailed: run.postFailed ?? null,
                 state: workerState(working),
                 workerId: run.childThreadId!,
             });
@@ -1275,6 +1305,7 @@ export const getWorker = authQuery
             lastRunStatus: latest.status,
             leadThreadId: origin.parentThreadId,
             name: workerName(thread, origin),
+            postFailed: latest.postFailed ?? null,
             state: workerState(working),
             workerId: args.workerId,
         };

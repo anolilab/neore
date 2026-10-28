@@ -68,12 +68,25 @@ export const SUB_AGENT_POST_MAX_ATTEMPTS = 40;
 /** Delay before re-check `attempt` (0-based): 2s doubling, capped at one minute. */
 export const postRetryDelayMs = (attempt: number): number => Math.min(2000 * 2 ** attempt, 60_000);
 
+/**
+ * Re-checks of a parent thread that cannot take the post (deleted, not the run's owner's, locked)
+ * before the run is given up on as `postFailed`. With {@link postRetryDelayMs} that is a few minutes,
+ * long enough to ride out a lock the user lifts straight away.
+ */
+export const SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS = 8;
+
 /** The name the posted-back result carries in the parent thread. */
 export const SUB_AGENT_NAME = "Sub-agent";
 
 const TOOL_NAME_RE = /^[\w.:-]{1,128}$/;
 
 export type SubAgentStatus = "cancelled" | "failed" | "queued" | "running" | "succeeded";
+
+/**
+ * Whether an ended run posts its result to the lead. A worker run the user typed (or created) has no
+ * delegating tool call behind it, so the lead never asked for an answer and hears nothing.
+ */
+export const postsBack = (run: { mode?: "run" | "worker"; toolCallId?: string }): boolean => run.mode !== "worker" || run.toolCallId !== undefined;
 
 export const isActiveSubAgentStatus = (status: SubAgentStatus): boolean => status === "queued" || status === "running";
 

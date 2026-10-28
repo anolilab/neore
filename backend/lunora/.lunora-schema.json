@@ -12602,6 +12602,12 @@
           "optional": false,
           "unique": false
         },
+        "postFailed": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "result": {
           "kind": "string",
           "nullable": false,

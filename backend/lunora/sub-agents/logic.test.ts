@@ -6,6 +6,7 @@ import {
     canNest,
     nextQueuedWorkerRun,
     normalizeToolAllowlist,
+    postsBack,
     resolveSubAgentModel,
     SUB_AGENT_MAX_CONCURRENT,
     SUB_AGENT_MAX_DEPTH,
@@ -162,7 +163,10 @@ describe(canNest, () => {
 });
 
 describe("a worker's line of messages", () => {
-    const newestFirst = (...statuses: ("cancelled" | "queued" | "running" | "succeeded")[]) => statuses.map((status, index) => {return { id: index, status }});
+    const newestFirst = (...statuses: ("cancelled" | "queued" | "running" | "succeeded")[]) =>
+        statuses.map((status, index) => {
+            return { id: index, status };
+        });
 
     it("starts the oldest queued run, and none while one is running", () => {
         expect(nextQueuedWorkerRun(newestFirst("queued", "queued", "succeeded"))).toMatchObject({ id: 1 });
@@ -179,5 +183,14 @@ describe("a worker's line of messages", () => {
     it("queues a follow-up for a cloud worker and offers no steer", () => {
         expect(workerFollowUp({ kind: "headless" })).toBe("queue");
         expect(workerFollowUp(undefined)).toBe("queue");
+    });
+});
+
+describe(postsBack, () => {
+    it("owes the lead a result for every run but a worker run nobody delegated", () => {
+        expect(postsBack({})).toBe(true);
+        expect(postsBack({ mode: "run" })).toBe(true);
+        expect(postsBack({ mode: "worker", toolCallId: "call-1" })).toBe(true);
+        expect(postsBack({ mode: "worker" })).toBe(false);
     });
 });

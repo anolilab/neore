@@ -948,7 +948,7 @@ export interface InternalApiTypes {
             completeRun: FunctionReference<"mutation", { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }, boolean>;
             createRun: FunctionReference<"mutation", { leadTools?: Array<string>; model?: string; name?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }, { runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
             messageWorker: FunctionReference<"mutation", { message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
-            postResult: FunctionReference<"mutation", { attempt: number; runId: Id<"subAgentRuns"> }, null>;
+            postResult: FunctionReference<"mutation", { attempt: number; failures?: number; runId: Id<"subAgentRuns"> }, null>;
             reapRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
             shouldRunStop: FunctionReference<"query", { runId: Id<"subAgentRuns"> }, boolean>;
         };
