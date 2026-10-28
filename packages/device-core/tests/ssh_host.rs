@@ -1476,7 +1476,11 @@ fn a_minute_without_network_reconnects_with_at_most_two_ssh_processes_and_stops_
 
     relay.partition();
 
-    while began.elapsed() < Duration::from_secs(60) {
+    // ssh gives the connection up after its keepalives go unanswered (15 s, three misses and one more interval:
+    // about a minute), so a loss can land just past the minute on a slow runner; the outage lasts until it has.
+    while began.elapsed() < Duration::from_secs(60)
+        || (lost_at.is_none() && began.elapsed() < Duration::from_secs(100))
+    {
         if lost_at.is_none() && !desktop.connected() {
             lost_at = Some(began.elapsed());
 

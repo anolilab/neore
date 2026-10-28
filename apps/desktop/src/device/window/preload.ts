@@ -38,6 +38,13 @@ const api: DeviceWindowApi = {
 
         return () => ipcRenderer.removeListener(LOCAL_EVENT.acp, listener);
     },
+    onChanged: (handler) => {
+        const listener = () => handler();
+
+        ipcRenderer.on(LOCAL_EVENT.changed, listener);
+
+        return () => ipcRenderer.removeListener(LOCAL_EVENT.changed, listener);
+    },
     onPromptQueued: (handler) => {
         const listener = () => handler();
 

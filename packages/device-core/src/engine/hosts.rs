@@ -236,6 +236,14 @@ fn holds(slot: &Option<(Target, Arc<dyn HostLink>)>, link: &Arc<dyn HostLink>) -
         .is_some_and(|(_, held)| std::ptr::addr_eq(Arc::as_ptr(held), Arc::as_ptr(link)))
 }
 
+/// An upgrade in the way ends by itself, so a connect refused for it is tried again, unlike a login nobody can fix.
+fn upgrading(name: &str) -> ConnectError {
+    ConnectError {
+        message: format!("{name}'s host software is being upgraded; connect again in a moment"),
+        retryable: true,
+    }
+}
+
 pub(super) fn target_of(host: &Host) -> Target {
     Target {
         address: host.address.clone(),
@@ -1036,11 +1044,7 @@ impl DeviceState {
         let target = target_of(&host);
 
         if self.upgrade_running(&target) {
-            return Err(format!(
-                "{}'s host software is being upgraded; connect again in a moment",
-                host.name
-            )
-            .into());
+            return Err(upgrading(&host.name));
         }
 
         let link = self.connect_target(&target, interactive)?;
@@ -1053,16 +1057,25 @@ impl DeviceState {
             return Err("that server was disconnected meanwhile".into());
         }
 
-        // Dropped from the settings while the user was typing a passphrase: nothing to keep.
-        if !self
+        // Dropped from the settings while the user was typing a passphrase: nothing to keep. The same id paired
+        // again with another server is no longer this link's server either.
+        match self
             .settings()
             .hosts
             .iter()
-            .any(|current| current.device_id == device_id)
+            .find(|current| current.device_id == device_id)
         {
-            self.retire(&link);
+            None => {
+                self.retire(&link);
 
-            return Err("that server was removed meanwhile".into());
+                return Err("that server was removed meanwhile".into());
+            }
+            Some(current) if target_of(current) != target => {
+                self.retire(&link);
+
+                return Err("that server was changed meanwhile".into());
+            }
+            Some(_) => {}
         }
 
         // An upgrade can begin while this was connecting (a passphrase prompt can take a while). It looks for open
@@ -1077,11 +1090,7 @@ impl DeviceState {
         let Some(previous) = committed else {
             self.retire(&link);
 
-            return Err(format!(
-                "{}'s host software is being upgraded; connect again in a moment",
-                host.name
-            )
-            .into());
+            return Err(upgrading(&host.name));
         };
 
         if let Some(previous) = previous {
@@ -1089,7 +1098,12 @@ impl DeviceState {
         }
 
         // A disconnect between the check above and the insert removed the keeping: the link has no one to serve.
-        if !self.note_connected(device_id, &link, interactive) {
+        // A manual connect creates the keeping, so a disconnect that landed since the count was read must not be
+        // undone by it. The slot is ours, so a keeping present now is the one just made.
+        if !self.note_connected(device_id, &link, interactive)
+            || self.disconnects_of(device_id) != disconnects
+        {
+            self.keep_forget(device_id);
             self.drop_connection(device_id, &link);
 
             return Err("that server was disconnected meanwhile".into());
@@ -3029,6 +3043,66 @@ mod tests {
             "the keeping came back"
         );
         assert!(state.ssh.attempting.lock().unwrap().is_empty());
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn an_attempt_for_a_server_paired_again_elsewhere_keeps_no_link() {
+        let first = FakeLink::new(true);
+        let second = FakeLink::new(true);
+        let gate = Arc::new(Barrier::new(2));
+        let (next, wait) = (Arc::clone(&second), Arc::clone(&gate));
+        let (state, dir) = kept("repair", &first, move || {
+            wait.wait();
+            wait.wait();
+
+            Ok(Arc::clone(&next) as Arc<dyn HostLink>)
+        });
+        let (id, now) = (host_id("repair"), Instant::now());
+
+        first.alive.store(false, Ordering::SeqCst);
+        state.reconnect_tick(now);
+        state.reconnect_tick(now + Duration::from_secs(2));
+
+        // The attempt is connecting to the old address. The same id is paired with another server now.
+        gate.wait();
+        state
+            .change_settings_counted(true, |settings| {
+                settings.hosts[0].address = "other.example.com".into();
+
+                Ok(())
+            })
+            .unwrap();
+        gate.wait();
+
+        eventually("the attempt kept a link to the old server", || {
+            second.closed.load(Ordering::SeqCst) == 1
+        });
+
+        assert!(state.connection(&id).is_none());
+        assert!(state.ssh.attempting.lock().unwrap().is_empty());
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_failure_the_network_caused_goes_on_with_the_backoff_even_when_tried_by_hand() {
+        let first = FakeLink::new(true);
+        let (state, dir) = kept("handretry", &first, || Err("down".into()));
+        let id = host_id("handretry");
+
+        state.ssh.connections.lock().unwrap().remove(&id);
+        state.keep_manual(&id, true).unwrap();
+        state.keep_failed(
+            &id,
+            &ConnectError {
+                message: "timed out".into(),
+                retryable: true,
+            },
+        );
+
+        assert_eq!(phase_of(&state, "handretry").unwrap().phase, "waiting");
 
         let _ = stdfs::remove_dir_all(dir);
     }

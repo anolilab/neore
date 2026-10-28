@@ -316,8 +316,9 @@ fn write_owner_only(path: &Path, text: &str) -> Result<(), String> {
 }
 
 /// An in-process keychain for tests, so they never touch the real one. A device id
-/// that starts with `unavailable` is refused on write, like a locked keychain. Public (and hidden) so the
-/// integration tests that drive a whole `DeviceState` can use it; nothing in the product calls `install`.
+/// that starts with `unavailable` is refused on write, like a locked keychain. Public so the integration tests
+/// that drive a whole `DeviceState` can use it, behind `test-support`, which no shipped build enables.
+#[cfg(any(test, feature = "test-support"))]
 #[doc(hidden)]
 pub mod test_keychain {
     use std::collections::BTreeMap;
