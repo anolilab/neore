@@ -229,7 +229,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     relay(DEVICE_CHANNEL.manifest, async (_event, deviceId) => requireTransport().manifest(readOptionalDeviceId(deviceId)));
 
-    // The servers this computer speaks for. The page asks; the host key, the passphrase and the pairing are each
+    // The servers this computer speaks for. The page asks; the connection itself, the host key, the passphrase and the pairing are each
     // decided by the person at the local window, so a page can connect nowhere on its own.
     relay(DEVICE_CHANNEL.hostProbe, async (_event, spec) => requireTransport().hostProbe(readHostSpec(spec)));
 

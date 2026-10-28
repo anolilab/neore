@@ -208,14 +208,6 @@ impl AskUser {
         now_ms() + PAIRING_WAIT.as_millis() as u64
     }
 
-    fn clone_handle(&self) -> AskUser {
-        AskUser {
-            changed_prompts: Arc::clone(&self.changed_prompts),
-            prompts: Arc::clone(&self.prompts),
-            sink: Arc::clone(&self.sink),
-        }
-    }
-
     fn show(&self, prompt: &Prompt) {
         (self.sink)(Event::Prompt {
             prompt: prompt.clone(),
@@ -255,7 +247,11 @@ impl Interact for AskUser {
             port: target.port,
             presented: presented.to_vec(),
         };
-        let ask = self.clone_handle();
+        let ask = AskUser {
+            changed_prompts: Arc::clone(&self.changed_prompts),
+            prompts: Arc::clone(&self.prompts),
+            sink: Arc::clone(&self.sink),
+        };
 
         // Nothing is decided here, so the connection error does not wait for the window to be dismissed.
         thread::spawn(move || {
