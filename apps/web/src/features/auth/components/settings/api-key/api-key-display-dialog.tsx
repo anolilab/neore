@@ -10,6 +10,8 @@ import { useState } from "react";
 
 import type { SettingsCardClassNames } from "@/components/settings/settings-card";
 
+import McpConfigSnippet from "./mcp-config-snippet";
+
 interface APIKeyDisplayDialogProperties extends ComponentProps<typeof Dialog> {
     apiKey: string;
 
@@ -40,6 +42,8 @@ const APIKeyDisplayDialog = ({ apiKey, classNames, onOpenChange, ...properties }
                 </DialogHeader>
 
                 <div className="bg-muted rounded-md p-4 font-mono text-sm break-all">{apiKey}</div>
+
+                {apiKey && <McpConfigSnippet apiKey={apiKey} />}
 
                 <DialogFooter className={classNames?.dialog?.footer}>
                     <Button

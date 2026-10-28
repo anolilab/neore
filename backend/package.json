@@ -32,6 +32,7 @@
         "./knowledge/citations": "./lunora/knowledge/citations.ts",
         "./messenger/reply-tools": "./lunora/messenger/lib/reply-tools.ts",
         "./package.json": "./package.json",
+        "./public-api/mcp-client-config": "./lunora/public-api/mcp-client-config.ts",
         "./public-api/scopes": "./lunora/public-api/scopes.ts",
         "./schema": "./lunora/schema.ts",
         "./server": "./lunora/_generated/server.ts",

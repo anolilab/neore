@@ -72,7 +72,7 @@ const ApiKeyDeleteDialog = ({ apiKey, classNames, onOpenChange, refetch, ...prop
                     <DialogTitle className={cn("text-lg md:text-xl", classNames?.title)}>{t`Delete API Key`}</DialogTitle>
 
                     <DialogDescription className={cn("text-xs md:text-sm", classNames?.description)}>
-                        {t`Are you sure you want to delete this API key? This action cannot be undone.`}
+                        {t`Are you sure you want to delete this API key? Anything using it, such as a script or an MCP client, is refused from its next request on. This action cannot be undone.`}
                     </DialogDescription>
                 </DialogHeader>
 

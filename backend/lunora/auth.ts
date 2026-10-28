@@ -200,6 +200,31 @@ interface AuthOptionHooks {
 }
 
 /**
+ * Keys for the public v1 API (`public-api/`). Four settings matter:
+ *
+ * - `rateLimit` OFF: the plugin's default is 10 requests per DAY, and
+ *   its counter is a read-modify-write on a D1 row. Per-key limits are
+ *   enforced by the router through `rateLimits` instead, which is
+ *   atomic under the DO input gate like every other limit here.
+ * - `defaultPermissions` read-only: a key created without scopes (the
+ *   plain better-auth client call) can never write.
+ * - `nk_` prefix: identifiable in logs and by secret scanners.
+ * - No `storage` / `fallbackToDatabase`: keys live in D1 only, so every
+ *   `verifyApiKey` reads the row and a revoked key is refused on its next
+ *   request. A secondary-storage cache would open a window in which it still
+ *   verifies (`public-api/key-revocation.test.ts`). The same call stamps
+ *   `lastRequest` (one indexed `UPDATE`), which the key list shows as "last used".
+ *
+ * Scoped keys are minted server-side by `auth_api_keys.createScopedApiKey`,
+ * because `permissions` is a server-only field of `/api-key/create`.
+ */
+export const API_KEY_OPTIONS = {
+    defaultPrefix: API_KEY_PREFIX,
+    permissions: { defaultPermissions: DEFAULT_API_SCOPES },
+    rateLimit: { enabled: false },
+} satisfies Parameters<typeof apiKey>[0];
+
+/**
  * Per-path overrides for better-auth's `/api/auth/*` rate limiter.
  *
  * The limiter is ON (`@lunora/auth` enables it with `storage: "database"`, a D1
@@ -297,25 +322,7 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
                       }),
                   ]
                 : []),
-            /**
-             * Keys for the public v1 API (`public-api/`). Three settings matter:
-             *
-             * - `rateLimit` OFF: the plugin's default is 10 requests per DAY, and
-             *   its counter is a read-modify-write on a D1 row. Per-key limits are
-             *   enforced by the router through `rateLimits` instead, which is
-             *   atomic under the DO input gate like every other limit here.
-             * - `defaultPermissions` read-only: a key created without scopes (the
-             *   plain better-auth client call) can never write.
-             * - `nk_` prefix: identifiable in logs and by secret scanners.
-             *
-             * Scoped keys are minted server-side by `auth_api_keys.createScopedApiKey`,
-             * because `permissions` is a server-only field of `/api-key/create`.
-             */
-            apiKey({
-                defaultPrefix: API_KEY_PREFIX,
-                permissions: { defaultPermissions: DEFAULT_API_SCOPES },
-                rateLimit: { enabled: false },
-            }),
+            apiKey(API_KEY_OPTIONS),
             anonymous({
                 // Converting creates a NEW user, and the guest's rows live on the
                 // guest's shard: move them to the new user's (`lib/account-merge.ts`).
