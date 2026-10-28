@@ -95,6 +95,11 @@ export const SettingsSearchField: FC<
     const isExpanded = isSearching && resultCount > 0;
 
     const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+        // While an input method is composing, the arrow keys pick its candidates, not a result.
+        if (event.nativeEvent.isComposing && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+            return;
+        }
+
         switch (event.key) {
             case "ArrowDown": {
                 event.preventDefault();

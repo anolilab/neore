@@ -483,7 +483,7 @@ export const SettingsModal: FC = () => {
                         }}
                     />
                     {/* Keyed on the mode: the results are a new list, so they start at the top instead of at the navigation's scroll offset. */}
-                    <ScrollArea className="flex-1" key={settingsSearch.isSearching ? "search" : "navigation"}>
+                    <ScrollArea className="flex-1" key={settingsSearch.isSearching ? `search-${searchQuery}` : "navigation"}>
                         <SettingsSearchResults
                             activeIndex={settingsSearch.activeIndex}
                             groups={settingsSearch.groups}
