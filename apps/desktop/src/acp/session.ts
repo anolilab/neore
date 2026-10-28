@@ -277,7 +277,7 @@ export class AgentSession {
         this.current = turn;
         this.status = "busy";
         this.cancelRequested = false;
-        this.observe((observer) => observer.turnStarted(this.id, turn.id, prompt));
+        this.observe((observer) => observer.turnStarted(this.id, turn.id, this.options.process.scrub(prompt)));
         this.options.onChange();
         this.prompt(turn);
     }

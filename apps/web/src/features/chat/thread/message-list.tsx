@@ -467,13 +467,13 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                 {showPlaceholder && (
                     <div aria-posinset={setSize} aria-setsize={setSize} role="listitem">
                         {/* Gateway streaming placeholder - uses MessageContent for identical rendering */}
-                        {streamIdToShow && gatewayUrl && streamTokenToShow && (
+                        {/* Without a gateway token (a host-run turn, or a stream another client started) it reads the persisted body. */}
+                        {streamIdToShow && (
                             <StreamingPlaceholder
-                                gatewayUrl={gatewayUrl}
+                                {...(gatewayUrl && streamTokenToShow && { gatewayUrl, streamToken: streamTokenToShow })}
                                 key={streamIdToShow}
                                 maxWidth={maxWidth}
                                 streamId={streamIdToShow}
-                                streamToken={streamTokenToShow}
                             />
                         )}
                         {/* Simple "Thinking..." placeholder when regenerating but no stream yet */}

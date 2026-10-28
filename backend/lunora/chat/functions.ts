@@ -1044,6 +1044,11 @@ export const continueThread = authAction
             throw new LunoraError("BAD_REQUEST", "This is a worker's thread. Message the worker from its thread instead.");
         }
 
+        // A cloud model must never answer in a thread the desktop owns: `runChatStart` refuses it the same way.
+        if (gateResult.hostRun) {
+            throw new LunoraError("CONFLICT", "This thread runs on a paired computer. Send the message from the desktop app.");
+        }
+
         const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
         const threadLanguage = threadData?.language;
 

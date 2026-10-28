@@ -1327,6 +1327,16 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// A nonce no two calls share, as a real caller's would be.
+    fn fresh_nonce() -> String {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+        format!(
+            "nonce-{}",
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        )
+    }
+
     fn signed_call(tool: &str, input: Value, nonce: &str) -> Signed {
         envelope::sign_value(
             &turn_secret(),
@@ -1346,7 +1356,7 @@ mod tests {
             .execute(&signed_call(
                 "acp_cancel",
                 json!({ "sessionId": "s1", "turnId": "u1" }),
-                "n1",
+                &fresh_nonce(),
             ))
             .unwrap();
         let result: Value = serde_json::from_str(&result.payload).unwrap();
@@ -1367,7 +1377,7 @@ mod tests {
             .execute(&signed_call(
                 "acp_cancel",
                 json!({ "sessionId": "s1" }),
-                "n2",
+                &fresh_nonce(),
             ))
             .unwrap();
         let result: Value = serde_json::from_str(&result.payload).unwrap();

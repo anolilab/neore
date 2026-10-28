@@ -201,8 +201,10 @@ export class HostPoster implements SessionObserver {
     private async sendTurn(channel: TurnChannel, firstSeq: number, events: HostEvent[]): Promise<PostResult> {
         const deviceId = this.options.deviceId();
 
+        // Not paired yet, or the session's thread not known yet: the turn waits, it is not refused (a recovered
+        // turn must survive a start that comes before pairing).
         if (deviceId === undefined || channel.threadId === undefined) {
-            return { kind: "refused" };
+            return { kind: "retry" };
         }
 
         const payload = JSON.stringify({
