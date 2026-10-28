@@ -16942,7 +16942,13 @@
     {
       "file": "agent/thread-streaming",
       "kind": "read",
-      "line": 8,
+      "line": 7,
+      "reason": "\"hasStreamFor\" is not a registered function"
+    },
+    {
+      "file": "agent/thread-streaming",
+      "kind": "read",
+      "line": 7,
       "reason": "\"isThreadStreaming\" is not a registered function"
     },
     {
