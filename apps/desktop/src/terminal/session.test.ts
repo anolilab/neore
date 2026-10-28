@@ -174,6 +174,17 @@ describe("a running session", () => {
         expect(hangUp).toHaveBeenCalledWith(4242);
         expect(host.handle.kill).toHaveBeenCalled();
     });
+
+    it("on Windows, does not hang the shell up a second time when the host it killed exits", async () => {
+        const platform = asPlatform("win32");
+        const { host, session } = await started();
+
+        session.killNow();
+        host.stop();
+        platform.mockRestore();
+
+        expect(hangUp).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe("backpressure", () => {

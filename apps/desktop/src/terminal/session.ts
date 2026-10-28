@@ -54,6 +54,7 @@ export const startSession = (options: SessionOptions): Promise<TerminalSession> 
         let started = false;
         let settled = false;
         let ended = false;
+        let hungUp = false;
         let paused = false;
         let unacked = 0;
         let pid = 0;
@@ -108,6 +109,7 @@ export const startSession = (options: SessionOptions): Promise<TerminalSession> 
                     return;
                 }
 
+                hungUp = true;
                 hangUp(pid);
                 host.post({ type: "kill" });
                 host.kill();
@@ -168,7 +170,8 @@ export const startSession = (options: SessionOptions): Promise<TerminalSession> 
         });
         host.onExit(() => {
             // A POSIX shell hangs up when its pty closes with the host; a Windows one is left running by a host that died.
-            if (started && !ended && process.platform === "win32") {
+            // `killNow` has already hung it up, and its pid may belong to another process by now.
+            if (started && !ended && !hungUp && process.platform === "win32") {
                 hangUp(pid);
             }
 

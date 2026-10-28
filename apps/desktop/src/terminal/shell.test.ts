@@ -77,6 +77,12 @@ describe("resolveShell", () => {
             expect(resolveShell({ ComSpec: "cmd.exe", SystemRoot: env.SystemRoot }, () => undefined, "win32", exists(system)).file).toBe(system);
         });
 
+        it("does not take a %SystemRoot% that is not an absolute path", () => {
+            const system = String.raw`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`;
+
+            expect(resolveShell({ SystemRoot: String.raw`..\Win` }, () => undefined, "win32", exists(system)).file).toBe(system);
+        });
+
         it("fails clearly when there is no shell", () => {
             expect(() => resolveShell(env, () => undefined, "win32", exists())).toThrow("no shell was found");
         });

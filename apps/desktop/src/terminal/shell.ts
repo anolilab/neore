@@ -35,7 +35,10 @@ const isExecutable = (file: string): boolean => {
  * path under `%SystemRoot%`, never by name on the `PATH`, which a folder in the user's `PATH` could shadow.
  */
 const resolveWindowsShell = (env: NodeJS.ProcessEnv, executable: (file: string) => boolean): { args: string[]; file: string } => {
-    const system32 = path.win32.join(env.SystemRoot ?? env.SYSTEMROOT ?? String.raw`C:\Windows`, "System32");
+    const configuredRoot = env.SystemRoot ?? env.SYSTEMROOT;
+    // A relative root would resolve against the app's working directory, so only an absolute one is believed.
+    const systemRoot = configuredRoot !== undefined && path.win32.isAbsolute(configuredRoot) ? configuredRoot : String.raw`C:\Windows`;
+    const system32 = path.win32.join(systemRoot, "System32");
     const powershell = path.win32.join(system32, "WindowsPowerShell", "v1.0", "powershell.exe");
 
     if (executable(powershell)) {

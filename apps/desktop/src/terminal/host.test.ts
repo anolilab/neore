@@ -47,7 +47,8 @@ const dialect = windows
     }
     : {
         args: [] as string[],
-        child: "sleep 1000 & echo child-$!",
+        // A foreground job: a shell does not pass a hangup on to its background jobs (dash does not), only to the one it is running.
+        child: "sh -c 'echo child-$$; exec sleep 1000'",
         describe: "pwd; echo marker-$((6*7))",
         enter: "\n",
         file: "/bin/sh",
