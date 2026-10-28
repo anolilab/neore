@@ -592,7 +592,9 @@ backend work, listed in §4.8).
   inner handler, so a session, an API key and a device upload take one code path after authentication.
 - **The ingest finalizes the upload.** The `media` event names an upload id; the ingest ACTION finalizes it for the
   device's verified owner and stores `fileId` and `storageKey` itself, only for events the stream does not have yet. A
-  failed finalize leaves the file named and marked not attached; it never fails the post.
+  failed finalize leaves the file named and marked not attached; it never fails the post. The result is remembered
+  per (owner, upload id), so a resend of a post whose answer was lost does not find the upload gone, and the device's
+  ingest budget is spent before the finalize.
 - **Left out:** attachments on `acp_send` (not in this slice's acceptance and not in the base), files a tool call
   reports as created (S9), Office documents as downloads, and a measured cap. The phone reads the same message
   parts; it was not run here.

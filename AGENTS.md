@@ -699,7 +699,16 @@ written here is what is not.
   finalizes for the device's owner (`acp/upload.ts#finalizeHostUpload`) and
   stores as `storageKey`/`fileId` itself — a device-sent key is dropped. A
   finalize failure never fails the post (the desktop would stop posting the
-  turn); the file is noted as not attached. Content-addressed storage makes a
+  turn); the file is noted as not attached. A finalize deletes the staged
+  upload, so its result is remembered per (owner, upload id) in `actionCache`
+  and a resend of a post whose answer was lost reuses it (one file row); the
+  device's `hosts/ingest` budget is spent BEFORE the finalize
+  (`spendHostBudget`, then `applyHostEvents({ budgetSpent })`) so a post that
+  would answer 429 never uses an upload up. Device creates have their own
+  limit, `hosts/uploads/create`. The core judges a reference's TEXT first
+  (`fs::lexically_inside`, no backslash or drive forms in
+  `media::is_plain_path`) so agent text cannot make the system resolve a
+  network or automounted path. Content-addressed storage makes a
   later edit of the file leave an earlier message alone. The reply's text parts
   carry `providerMetadata.neore.runner = "host"`, which makes the reader skip
   Markdown images (`hostMarkdownComponents`): a remote one would be fetched.

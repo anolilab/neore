@@ -89,7 +89,7 @@ describe("a reply's files", () => {
         expect(reply?.message.content).toEqual([
             { data: `storage:agent-files/${"a".repeat(64)}`, filename: "photo.png", mediaType: "application/octet-stream", type: "file" },
             { data: `storage:agent-files/${"c".repeat(64)}`, filename: "report.pdf", mediaType: "application/pdf", type: "file" },
-            { providerMetadata: HOST_TEXT, text: "`photo.png` (12.0 MB) is attached as a file.\n\n`report.pdf` (2 KB) is attached as a file.", type: "text" },
+            { providerMetadata: HOST_TEXT, text: "`photo.png` (12.0 MiB) is attached as a file.\n\n`report.pdf` (2 KiB) is attached as a file.", type: "text" },
         ]);
     });
 
@@ -100,14 +100,14 @@ describe("a reply's files", () => {
     it("names a file over the cap with its size, and attaches nothing", () => {
         const reply = buildHostReply({ agentKey: "claude", reason: "finished", transcript: transcript("", "", [{ name: "big.pdf", size: 30 * 1024 * 1024 }]) });
 
-        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`big.pdf` (30.0 MB) is over the 20.0 MB limit and was not attached.", type: "text" }]);
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`big.pdf` (30.0 MiB) is over the 20.0 MiB limit and was not attached.", type: "text" }]);
         expect(reply).not.toHaveProperty("fileIds");
     });
 
     it("says a file within the cap that did not finalize could not be attached", () => {
         const reply = buildHostReply({ agentKey: "claude", reason: "finished", transcript: transcript("", "", [{ name: "a.png", size: 2048 }]) });
 
-        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`a.png` (2 KB) could not be attached.", type: "text" }]);
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`a.png` (2 KiB) could not be attached.", type: "text" }]);
     });
 
     it("never lets a file name become Markdown", () => {

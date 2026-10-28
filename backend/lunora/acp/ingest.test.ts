@@ -28,6 +28,13 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
 /** The harness runs a procedure object; production resolves a reference by path (`test/registered-api.ts`). */
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
+/** The storage-backed finalize: the real one needs a bucket, so a test says what it answers. */
+const stagedFinalize = vi.hoisted(() => vi.fn());
+
+vi.mock("../lib/chat-upload", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("../lib/chat-upload")>()), finalizeStagedUploadFile: stagedFinalize };
+});
+
 vi.mock("../_generated/internal", async (importOriginal) => {
     const { registeredApi } = await import("../../test/registered-api");
 
@@ -60,6 +67,7 @@ registerModule(registry, "lib_shard_routes", await import("../lib/shard-routes")
 registerModule(registry, "lib_shard_housekeeping", await import("../lib/shard-housekeeping"));
 registerModule(registry, "acp_ingest", await import("./ingest"));
 registerModule(registry, "acp_upload", await import("./upload"));
+registerModule(registry, "lib_action_cache", await import("../lib/action-cache"));
 registerModule(registry, "agent_sharing", await import("../agent/sharing"));
 registerModule(registry, "agent_streams", await import("../agent/streams"));
 registerModule(registry, "chat_streaming_persistent_library", await import("../chat/streaming/persistent/library"));
@@ -87,6 +95,9 @@ const insertUser = async () =>
             await ctx.db.insert("user", { createdAt: 0, email: `u${String(Math.random())}@example.com`, emailVerified: true, name: "U", updatedAt: 0 }),
     )) as string;
 
+/** Makes the next `applyHostEvents` throw, as a failing mutation or a lost response would. */
+let failApply = false;
+
 /** What the next `finalizeHostUpload` answers; `undefined` means no action may run. */
 let finalizeStub: ((args: { filename: string; uploadId: string; userId: string }) => Promise<unknown>) | undefined;
 
@@ -100,7 +111,15 @@ const httpContext = () => {
 
             return await finalizeStub(args);
         },
-        runMutation: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runMutation(ref, args)),
+        runMutation: async (ref: never, args: never) => {
+            if (failApply && ref === (applyHostEvents as never)) {
+                failApply = false;
+
+                throw new Error("the mutation failed");
+            }
+
+            return await harness.run(async (ctx: any) => await ctx.runMutation(ref, args));
+        },
         runQuery: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runQuery(ref, args)),
     };
 
@@ -236,6 +255,8 @@ const row = async (id: string) => (await harness.run(async (ctx: any) => await c
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
     finalizeStub = undefined;
+    failApply = false;
+    stagedFinalize.mockReset();
     resetFloodGuard();
     resetOwnerCache();
     ownerId = await insertUser();
@@ -1023,7 +1044,7 @@ describe("files a reply refers to", () => {
 
         const reply = await replyAt(threadId, 0);
 
-        expect(reply.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`chart.png` (1 KB) could not be attached.", type: "text" }]);
+        expect(reply.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`chart.png` (1 KiB) could not be attached.", type: "text" }]);
         expect(reply.fileIds).toBeUndefined();
     });
 
@@ -1038,7 +1059,7 @@ describe("files a reply refers to", () => {
 
         const reply = await replyAt(threadId, 0);
 
-        expect(reply.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`chart.png` (1 KB) could not be attached.", type: "text" }]);
+        expect(reply.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`chart.png` (1 KiB) could not be attached.", type: "text" }]);
     });
 
     it("names a file over the cap with its size, without an upload", async () => {
@@ -1049,7 +1070,7 @@ describe("files a reply refers to", () => {
         const reply = await replyAt(threadId, 0);
 
         expect(finalize).not.toHaveBeenCalled();
-        expect(reply.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`dump.json` (30.0 MB) is over the 20.0 MB limit and was not attached.", type: "text" }]);
+        expect(reply.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`dump.json` (30.0 MiB) is over the 20.0 MiB limit and was not attached.", type: "text" }]);
     });
 
     it("finalizes a redelivered post's file once, and not at all for a post the backend answers gap to", async () => {
@@ -1126,6 +1147,70 @@ describe("files a reply refers to", () => {
         await turn(device, threadId, "t1", 0, [START(), MEDIA, { ...MEDIA, uploadId: "x".repeat(21) }, { ...MEDIA, uploadId: "y".repeat(21) }]);
 
         expect(overlapped).toBe(false);
+    });
+
+    it("keeps a finalized file for the resend of a post whose mutation failed: one finalize, one file row, the file attached", async () => {
+        const { device, fileId, threadId } = await setUp();
+        const { finalizeHostUpload } = await import("./upload");
+        const actionContext = {
+            runMutation: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runMutation(ref, args)),
+            runQuery: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runQuery(ref, args)),
+            storage: {},
+        };
+
+        // The staging object is deleted by the first finalize: a second one throws, as the real one does.
+        stagedFinalize.mockResolvedValueOnce({ fileId, mediaType: "image/png", storageId: KEY, url: "https://signed" });
+        stagedFinalize.mockRejectedValue(new Error("the upload expired"));
+        finalizeStub = async (args) => await (finalizeHostUpload as unknown as { handler: (ctx: unknown, args: unknown) => Promise<unknown> }).handler(actionContext, args);
+        failApply = true;
+
+        await expect(turn(device, threadId, "t1", 0, [START(), MEDIA, { kind: "turn_end", reason: "finished" }])).rejects.toThrow("the mutation failed");
+
+        const resent = await turn(device, threadId, "t1", 0, [START(), MEDIA, { kind: "turn_end", reason: "finished" }]);
+
+        expect(resent.status).toBe(200);
+        expect(stagedFinalize).toHaveBeenCalledTimes(1);
+
+        const reply = await replyAt(threadId, 0);
+
+        expect(reply.message.content[0]).toMatchObject({ data: `storage:${KEY}`, type: "file" });
+        expect(reply.fileIds).toEqual([fileId]);
+
+        const rows = await pageOf(async (ctx) => await ctx.db.chatFiles.findMany({}));
+
+        expect(rows).toHaveLength(1);
+    });
+
+    it("spends the device's budget before finalizing a file, and answers 429 without using the upload up", async () => {
+        const { device, finalize, threadId } = await setUp();
+
+        await spendBudget(device.deviceId);
+
+        const sent = await turn(device, threadId, "t1", 0, [START(), MEDIA]);
+
+        expect(sent.status).toBe(429);
+        expect(finalize).not.toHaveBeenCalled();
+    });
+
+    it("charges the device's budget once for a post that names a file: the apply skips what the route already spent", async () => {
+        const device = await pair(ownerId);
+        const apply = async (budgetSpent?: boolean) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(applyHostEvents, { ...(budgetSpent && { budgetSpent }), deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: "s" }),
+            );
+
+        const rowsOf = async () => {
+            const all = await rateLimitRows();
+
+            return all.filter((limit) => JSON.stringify(limit).includes(device.deviceId)).length;
+        };
+
+        await apply(true);
+        expect(await rowsOf()).toBe(0);
+
+        await apply();
+        expect(await rowsOf()).toBe(1);
     });
 
     it("refuses a post carrying more files than one turn may attach", async () => {

@@ -266,6 +266,8 @@ export const RATE_LIMIT_CONFIGS = {
     // and a device runs a handful of sessions.
     "hosts/ingest:free": Ratelimit.fixedWindow(3000, MINUTE),
     "hosts/ingest:premium": Ratelimit.fixedWindow(3000, MINUTE),
+    // A paired computer's uploads (`acp/upload-http.ts`), apart from the person's own, so an agent cannot spend their budget.
+    "hosts/uploads/create": Ratelimit.tokenBucket(30, MINUTE, 30),
     // Adding a file to the knowledge base schedules its ingestion.
     "knowledge/add:free": Ratelimit.fixedWindow(20, MINUTE),
     "knowledge/add:premium": Ratelimit.fixedWindow(60, MINUTE),

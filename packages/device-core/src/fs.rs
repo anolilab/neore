@@ -663,6 +663,27 @@ pub fn read(roots: &[PathBuf], path: &Path) -> Result<String, String> {
     Ok(text)
 }
 
+/// `raw` as a path inside `root`, decided on the text alone: `.` and `..` are folded without touching the disk, a
+/// relative path is taken from the root, and the result must still start with it. Nothing is resolved, so a path
+/// that names another machine (`/net/host/..`, an automounted or network path) is refused before the system could
+/// connect to it, which `canonicalize` would do.
+fn lexically_inside(root: &Path, raw: &str) -> Option<PathBuf> {
+    let path = Path::new(raw.trim());
+    let mut folded = PathBuf::new();
+
+    for component in root.join(path).components() {
+        match component {
+            Component::ParentDir => {
+                folded.pop();
+            }
+            Component::CurDir => {}
+            other => folded.push(other.as_os_str()),
+        }
+    }
+
+    folded.starts_with(root).then_some(folded)
+}
+
 /// A file the agent wrote, read for attaching to its reply.
 #[derive(Debug)]
 pub struct MediaFile {
@@ -699,7 +720,14 @@ pub fn read_media(roots: &[PathBuf], reference: &str) -> MediaRead {
         return MediaRead::Refused;
     }
 
-    let Ok(path) = resolve_existing(reference, roots) else {
+    // The text first: a reference that leaves the folder is refused before anything resolves it.
+    let Some(inside) = roots
+        .iter()
+        .find_map(|root| lexically_inside(root, reference))
+    else {
+        return MediaRead::Refused;
+    };
+    let Ok(path) = resolve_existing(&inside.to_string_lossy(), roots) else {
         return MediaRead::Refused;
     };
     let Some(name) = path
@@ -1068,6 +1096,54 @@ mod tests {
         }
 
         fs::set_permissions(&secret, fs::Permissions::from_mode(0o644)).unwrap();
+    }
+
+    #[test]
+    fn a_path_is_judged_on_its_text_before_anything_resolves_it() {
+        let root = Path::new("/work/project");
+
+        assert_eq!(
+            lexically_inside(root, "out/a.png"),
+            Some(PathBuf::from("/work/project/out/a.png"))
+        );
+        assert_eq!(
+            lexically_inside(root, "./out/../a.png"),
+            Some(PathBuf::from("/work/project/a.png"))
+        );
+        assert_eq!(
+            lexically_inside(root, "/work/project/out/a.png"),
+            Some(PathBuf::from("/work/project/out/a.png"))
+        );
+
+        for outside in [
+            "../a.png",
+            "out/../../a.png",
+            "/net/host/a.png",
+            "/Volumes/share/a.png",
+            "/work/project/../other/a.png",
+            "/work/projectile/a.png",
+            "/etc/passwd",
+        ] {
+            assert_eq!(lexically_inside(root, outside), None, "{outside}");
+        }
+    }
+
+    #[test]
+    fn a_network_path_is_refused_without_resolution_being_attempted() {
+        let (_dir, roots) = media_scratch("media-network");
+
+        // None of these exist, so a refusal by the file system and one by the text could not be told apart by the
+        // result alone; the text check is pinned by `a_path_is_judged_on_its_text_before_anything_resolves_it`.
+        for reference in [
+            r"\\host\share\a.png",
+            "/net/host/a.png",
+            "//host/share/a.png",
+        ] {
+            assert!(
+                matches!(read_media(&roots, reference), MediaRead::Refused),
+                "{reference}"
+            );
+        }
     }
 
     #[test]

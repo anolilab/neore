@@ -321,6 +321,8 @@ const applyTurnPost = async (
  */
 export const applyHostEvents = internalMutation
     .input({
+        // The caller already spent this post's budget (`spendHostBudget`), so it is not charged twice.
+        budgetSpent: v.optional(v.boolean()),
         deviceId: v.string().max(MAX_LENGTH.id),
         events: v.array(vHostEvent).check((events) => events.length <= MAX_EVENTS_PER_POST, { message: "Too many events" }),
         firstSeq: v.optional(v.number()),
@@ -331,7 +333,7 @@ export const applyHostEvents = internalMutation
     .output(vApplyResult)
     .mutation(async ({ args, ctx }) => {
         // Keyed by the VERIFIED device, so a forged post cannot spend a victim's budget.
-        const limited = await checkRateLimit(ctx, "hosts/ingest:free", { key: args.deviceId });
+        const limited = args.budgetSpent === true ? { ok: true } : await checkRateLimit(ctx, "hosts/ingest:free", { key: args.deviceId });
 
         if (!limited.ok) {
             return { outcome: "limited" as const };
@@ -356,6 +358,20 @@ export const applyHostEvents = internalMutation
             { events: args.events, firstSeq: args.firstSeq, hostSessionId: args.sessionId, threadId: args.threadId, turnId: args.turnId },
             now,
         );
+    });
+
+/**
+ * Spends one post's share of a device's budget before the ingest does anything costly for it (finalizing the files
+ * it names). `false` when the device is over it. The post's `applyHostEvents` then skips its own check, so the post
+ * is charged once.
+ */
+export const spendHostBudget = internalMutation
+    .input({ deviceId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const spent = await checkRateLimit(ctx, "hosts/ingest:free", { key: args.deviceId });
+
+        return spent.ok;
     });
 
 /** The shard tick (`lib/shard-housekeeping.ts#runShardTick`): reap silent host streams, then re-arm for the next. */
