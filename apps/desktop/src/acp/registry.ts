@@ -15,6 +15,8 @@ const REGISTRY_TIMEOUT_MS = 15_000;
 const MAX_REGISTRY_BYTES = 5 * 1024 * 1024;
 /** A search result older than this is not installed from: the user searches again and sees what is current. */
 const SNAPSHOT_MAX_AGE_MS = 15 * 60_000;
+/** A search inside this window filters the last answer instead of fetching up to 5 MiB again. */
+const SNAPSHOT_REUSE_MS = 60_000;
 const MAX_RESULTS = 50;
 /** The registry's `id` pattern, and the longest key the core accepts. */
 const AGENT_ID = /^[a-z][a-z0-9-]{0,39}$/u;
@@ -25,6 +27,22 @@ const ARCHIVE_SUFFIXES: ReadonlyArray<[string, ArchiveFormat]> = [
     [".zip", "zip"],
 ];
 const UNSUPPORTED_SUFFIXES = [".tar.bz2", ".tbz2", ".dmg", ".pkg", ".deb", ".rpm", ".msi", ".appimage", ".tar.xz", ".tar.zst", ".7z"];
+// The core refuses what these refuse (`acp.rs`, `acp_install.rs`), and stays the authority; checking here lists
+// an entry as not installable with a reason, before a download.
+const VERSION = /^\d[\dA-Za-z.+-]{0,39}$/u;
+const ENV_NAME = /^[A-Z_a-z]\w{0,127}$/u;
+const PATH_SEPARATOR = /[/\\]/u;
+const LEADING_DOT_SLASH = /^\.[/\\]/u;
+const WINDOWS_DRIVE = /^[A-Za-z]:/u;
+const MAX_ARGS = 50;
+const MAX_ARG_BYTES = 1000;
+const MAX_ENV_VALUE_BYTES = 8 * 1024;
+const MAX_PUBLISHER = 200;
+const MAX_SOURCE = 1000;
+const RESERVED_ENV_PREFIXES = ["NEORE_", "ELECTRON_"];
+/** Variables that decide which code a program runs: an install may not set them. */
+const CODE_LOADING_ENV_NAMES = new Set(["_JAVA_OPTIONS", "BASH_ENV", "CLASSPATH", "COMSPEC", "ELECTRON_RUN_AS_NODE", "ENV", "GCONV_PATH", "IFS", "JDK_JAVA_OPTIONS", "NODE_OPTIONS", "PATH", "PATHEXT", "PROMPT_COMMAND", "RUBYGEMS_GEMDEPS", "ZDOTDIR"]);
+const CODE_LOADING_ENV_PREFIXES = ["BUNDLE_", "DYLD_", "GEM_", "GIT_", "JAVA", "LD_", "NODE_", "NPM_", "PERL", "PYTHON", "RUBY"];
 const CONTROL_CHARACTER = /\p{Cc}/u;
 const GITHUB_OWNER = /^https:\/\/github\.com\/([^/]+)\//u;
 
@@ -183,6 +201,48 @@ export const parseRegistry = (json: unknown): RegistryAgent[] => {
     return agents;
 };
 
+const badEnvName = (name: string): boolean => {
+    const upper = name.toUpperCase();
+
+    return !ENV_NAME.test(name)
+        || RESERVED_ENV_PREFIXES.some((prefix) => upper.startsWith(prefix))
+        || CODE_LOADING_ENV_NAMES.has(upper)
+        || CODE_LOADING_ENV_PREFIXES.some((prefix) => upper.startsWith(prefix));
+};
+
+const leavesFolder = (command: string): boolean =>
+    command.startsWith("/") || command.startsWith("\\") || WINDOWS_DRIVE.test(command) || command.split(PATH_SEPARATOR).includes("..");
+
+/** Why the core would refuse this entry, if it would. */
+const unfit = ({ name, publisher, version }: RegistryAgent, target: BinaryTarget, format: ArchiveFormat): string | undefined => {
+    if (!VERSION.test(version) || version.includes("..")) {
+        return "The registry's version is not a plain version number.";
+    }
+
+    if (name.trim() === "" || publisher.trim() === "" || publisher.length > MAX_PUBLISHER || CONTROL_CHARACTER.test(publisher)) {
+        return "The registry's name or publisher is empty or too long.";
+    }
+
+    if (target.archive.length > MAX_SOURCE) {
+        return "The download address is too long.";
+    }
+
+    // A bare download is one file, so its command is that file's name.
+    const nested = format === "raw" && PATH_SEPARATOR.test(target.cmd.replace(LEADING_DOT_SLASH, ""));
+
+    if (nested || target.cmd.trim() === "" || leavesFolder(target.cmd) || target.cmd.includes("\0")) {
+        return "The command it starts is not a file inside the download.";
+    }
+
+    if (target.args.length > MAX_ARGS || target.args.some((argument) => Buffer.byteLength(argument) > MAX_ARG_BYTES || argument.includes("\0"))) {
+        return "Its start-up arguments are longer than Neore accepts.";
+    }
+
+    const offender = Object.entries(target.env).find(([variable, value]) => badEnvName(variable) || Buffer.byteLength(value) > MAX_ENV_VALUE_BYTES || value.includes("\0"));
+
+    return offender === undefined ? undefined : `It sets ${offender[0]}, which Neore does not allow an install to set.`;
+};
+
 /** The download for `platform`, or the reason there is none. */
 export const resolveInstall = (agent: RegistryAgent, platform: string | undefined): ResolvedInstall | string => {
     if (platform === undefined) {
@@ -219,7 +279,9 @@ export const resolveInstall = (agent: RegistryAgent, platform: string | undefine
         return "The download is in a format Neore cannot unpack (supported: .tar.gz, .zip, a bare binary).";
     }
 
-    return { agent, format, sha256: target.sha256, target };
+    const reason = unfit(agent, target, format);
+
+    return reason ?? { agent, format, sha256: target.sha256, target };
 };
 
 const readCapped = async (response: Response, max: number): Promise<string> => {
@@ -256,6 +318,8 @@ export interface RegistryOptions {
     fetch?: Fetch;
     now?: () => number;
     platform?: string;
+    /** False where coding agents cannot run (`acpSupported`): everything is listed, nothing is installable. */
+    supported?: boolean;
 }
 
 /**
@@ -275,45 +339,19 @@ export class AgentRegistry {
     public constructor(options: RegistryOptions = {}) {
         this.fetchImpl = options.fetch ?? globalThis.fetch;
         this.now = options.now ?? Date.now;
-        this.platform = platformKey(options.platform ?? process.platform, options.arch ?? process.arch);
+        this.platform = options.supported === false ? undefined : platformKey(options.platform ?? process.platform, options.arch ?? process.arch);
     }
 
-    /** Fetches the registry again and lists the agents matching `query` (all of them when empty). */
+    /** Lists the agents matching `query` (all of them when empty), from an answer under a minute old or a new fetch. */
     public async search(query: string): Promise<RegistryListing[]> {
-        const response = await this.fetchImpl(REGISTRY_URL, { headers: { accept: "application/json" }, redirect: "follow", signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS) });
-
-        if (!response.ok) {
-            await response.body?.cancel();
-
-            throw new Error(`The registry answered ${String(response.status)}.`);
-        }
-
-        assertHttps(response, REGISTRY_URL);
-
-        const agents = parseRegistry(JSON.parse(await readCapped(response, MAX_REGISTRY_BYTES)) as unknown);
-
-        this.snapshot = { agents, at: this.now() };
-
+        const { snapshot } = this;
+        const agents = snapshot !== undefined && this.now() - snapshot.at < SNAPSHOT_REUSE_MS ? snapshot.agents : await this.load();
         const needle = query.trim().toLowerCase();
 
         return agents
             .filter((agent) => needle === "" || [agent.id, agent.name, agent.description].some((field) => field.toLowerCase().includes(needle)))
             .slice(0, MAX_RESULTS)
-            .map((agent) => {
-                const resolved = resolveInstall(agent, this.platform);
-
-                return {
-                    description: agent.description,
-                    id: agent.id,
-                    installable: typeof resolved !== "string",
-                    license: agent.license,
-                    name: agent.name,
-                    publisher: agent.publisher,
-                    ...(typeof resolved === "string") && { reason: resolved },
-                    repository: agent.repository,
-                    version: agent.version,
-                };
-            });
+            .map((agent) => this.listing(agent));
     }
 
     /** The download for `id` at exactly `version`, from the last search. Anything else asks for a new search. */
@@ -335,5 +373,39 @@ export class AgentRegistry {
         }
 
         return resolved;
+    }
+
+    private async load(): Promise<RegistryAgent[]> {
+        const response = await this.fetchImpl(REGISTRY_URL, { headers: { accept: "application/json" }, redirect: "follow", signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS) });
+
+        if (!response.ok) {
+            await response.body?.cancel();
+
+            throw new Error(`The registry answered ${String(response.status)}.`);
+        }
+
+        assertHttps(response, REGISTRY_URL);
+
+        const agents = parseRegistry(JSON.parse(await readCapped(response, MAX_REGISTRY_BYTES)) as unknown);
+
+        this.snapshot = { agents, at: this.now() };
+
+        return agents;
+    }
+
+    private listing(agent: RegistryAgent): RegistryListing {
+        const resolved = resolveInstall(agent, this.platform);
+
+        return {
+            description: agent.description,
+            id: agent.id,
+            installable: typeof resolved !== "string",
+            license: agent.license,
+            name: agent.name,
+            publisher: agent.publisher,
+            ...(typeof resolved === "string") && { reason: resolved },
+            repository: agent.repository,
+            version: agent.version,
+        };
     }
 }

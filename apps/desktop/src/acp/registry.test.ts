@@ -56,6 +56,34 @@ describe("what can be installed", () => {
         expect(resolveInstall(amp, undefined)).toMatch("not supported");
     });
 
+    it("lists an entry the core would refuse as not installable, with the reason", () => {
+        const target = amp.binary["linux-x86_64"];
+        const variant = (change: Partial<typeof target>, agent: Partial<typeof amp> = {}) => resolveInstall({ ...amp, ...agent, binary: { "linux-x86_64": { ...target, ...change } } }, "linux-x86_64");
+
+        expect(variant({})).toMatchObject({ format: "zip" });
+        expect(variant({}, { version: "latest" })).toMatch("plain version number");
+        expect(variant({}, { version: "1..2" })).toMatch("plain version number");
+        expect(variant({}, { publisher: "x".repeat(201) })).toMatch("publisher");
+        expect(variant({ args: [..."a".repeat(51)] })).toMatch("arguments");
+        expect(variant({ args: ["x".repeat(1001)] })).toMatch("arguments");
+        expect(variant({ cmd: "../agent" })).toMatch("inside the download");
+        expect(variant({ cmd: "/bin/sh" })).toMatch("inside the download");
+        expect(variant({ cmd: String.raw`C:\agent.exe` })).toMatch("inside the download");
+        expect(variant({ archive: `https://example.com/${"a".repeat(1000)}.zip` })).toMatch("too long");
+
+        for (const name of ["NODE_OPTIONS", "path", "NEORE_X", "ld_preload", "1BAD", "has space"]) {
+            expect(variant({ env: { [name]: "x" } }), name).toMatch(`It sets ${name}`);
+        }
+
+        expect(variant({ env: { DEMO_MODE: "x".repeat(8 * 1024 + 1) } })).toMatch("It sets DEMO_MODE");
+        expect(variant({ env: { DEMO_MODE: "acp" } })).toMatchObject({ format: "zip" });
+
+        const raw = { archive: "https://example.com/tool", cmd: "bin/tool" };
+
+        expect(variant(raw)).toMatch("inside the download");
+        expect(variant({ ...raw, cmd: "./tool" })).toMatchObject({ format: "raw" });
+    });
+
     it("refuses a download that is not https", () => {
         const plain = { ...amp, binary: { "linux-x86_64": { ...amp.binary["linux-x86_64"], archive: "http://example.com/a.zip" } } }; // eslint-disable-line unicorn/prefer-https -- the case under test
 
@@ -80,6 +108,31 @@ describe("AgentRegistry", () => {
         expect(listings.map(({ id, installable }) => [id, installable])).toEqual([["amp-acp", true], ["cortex-code", false], ["thing", false]]);
         expect(listings[0]).toMatchObject({ license: "Apache-2.0", publisher: "Ada Lovelace, Grace Hopper", version: "0.10.0" });
         expect(listings[1].reason).toMatch("no checksum");
+    });
+
+    it("lists nothing as installable where coding agents cannot run", async () => {
+        const fetchSpy = vi.fn(async () => jsonResponse(REGISTRY_FIXTURE));
+        const registry = new AgentRegistry({ arch: "x64", fetch: fetchSpy as unknown as typeof fetch, platform: "linux", supported: false });
+        const listings = await registry.search("");
+
+        expect(listings.some((listing) => listing.installable)).toBe(false);
+        expect(listings[0].reason).toMatch("not supported");
+    });
+
+    it("answers a second search from the last answer for a minute, then reads the registry again", async () => {
+        let now = 0;
+        const { fetchSpy, registry } = registryWith(() => jsonResponse(REGISTRY_FIXTURE), () => now);
+
+        await registry.search("");
+        now = 59_000;
+        const found = await registry.search("thing");
+
+        expect(found.map((entry) => entry.id)).toEqual(["thing"]);
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+        now = 61_000;
+        await registry.search("");
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
 
     it("filters by name, id and description", async () => {

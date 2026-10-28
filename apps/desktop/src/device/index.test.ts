@@ -203,6 +203,7 @@ const invoke = (channel: string, event: IpcEvent, ...args: unknown[]): unknown =
 const makeCore = () => {
     return {
         acpInstall: vi.fn((_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
+        acpInstallPrune: vi.fn(),
         acpInstallStage: vi.fn(() => mkdtempSync(path.join(fake.userData, "stage-"))),
         acpPermissionAnswer: vi.fn(),
         acpPermissionAnswerBatch: vi.fn(() => 2),
@@ -628,7 +629,8 @@ describe("registry channels (the device window)", () => {
         const [dialogOptions] = vi.mocked(dialog.showMessageBox).mock.calls.at(-1)?.slice(-1) as [{ detail: string; message: string }];
 
         expect(dialogOptions.message).toContain("Amp");
-        expect(dialogOptions.detail).toContain("Ada Lovelace, Grace Hopper");
+        expect(dialogOptions.detail).toContain("Publisher (as listed in the registry): Ada Lovelace, Grace Hopper");
+        expect(core.acpInstallPrune).toHaveBeenCalledWith("amp-acp");
         expect(dialogOptions.detail).toContain("0.10.0");
         expect(dialogOptions.detail).toMatch(DOWNLOAD_LINE);
         expect(JSON.parse(String(core.acpInstall.mock.calls[0]?.[0]))).toMatchObject({ key: "amp-acp", sha256: SHA, version: "0.10.0" });
@@ -645,6 +647,7 @@ describe("registry channels (the device window)", () => {
 
         expect(core.acpInstallStage).not.toHaveBeenCalled();
         expect(core.acpInstall).not.toHaveBeenCalled();
+        expect(core.acpInstallPrune).not.toHaveBeenCalled();
         expect(registryFetch).toHaveBeenCalledTimes(1);
     });
 

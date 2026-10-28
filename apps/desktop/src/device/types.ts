@@ -52,6 +52,7 @@ export type CoreEvent = { agent: string; tool: string; type: "acpPermission" } |
 /** The surface of the native `DeviceCore` class. */
 export interface DeviceCore {
     acpInstall: (request: string) => string;
+    acpInstallPrune: (agentKey: string) => void;
     acpInstallStage: () => string;
     /** Coding agents (ACP): JSON strings, parsed by `acp/`. The spawn plan holds secrets and never leaves the main process. */
     acpPermissionAnswer: (id: number, optionId: string) => void;

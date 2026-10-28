@@ -15,11 +15,12 @@
 //!
 //! An install grants no folder: the (agent, folder) approval still comes from the local window, as for any agent.
 //! Nothing here looks for a newer version. A second install of the same key is another explicit install, and it
-//! drops the approvals because the command is a different program.
+//! drops the approvals unless it is the same program: the same command, arguments and verified archive. A new
+//! version, or the same version republished with different bytes, is not what the folders were approved for.
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, Read, Seek};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -205,7 +206,9 @@ impl DeviceState {
         archive: &Path,
         stage_dir: &Path,
     ) -> Result<AcpView, String> {
-        let actual = sha256_file(archive)?;
+        // One open handle for the check and the unpack, so what is unpacked is what was hashed.
+        let mut file = fs::File::open(archive).map_err(|error| error.to_string())?;
+        let actual = sha256_reader(&mut file)?;
 
         if actual != request.sha256.to_ascii_lowercase() {
             self.audit(json!({
@@ -225,16 +228,20 @@ impl DeviceState {
 
         let wanted = safe_relative(Path::new(&request.cmd))?;
 
+        file.rewind().map_err(|error| error.to_string())?;
+
         match request.format {
             ArchiveFormat::Raw => {
                 if wanted.components().count() != 1 {
                     return Err("a raw download holds one file: the command is its name".into());
                 }
 
-                fs::copy(archive, unpacked.join(&wanted)).map_err(|error| error.to_string())?;
+                let mut budget = Budget::default();
+
+                write_entry(&mut file, &unpacked.join(&wanted), true, &mut budget)?;
             }
-            ArchiveFormat::TarGz => unpack_tar_gz(archive, &unpacked)?,
-            ArchiveFormat::Zip => unpack_zip(archive, &unpacked)?,
+            ArchiveFormat::TarGz => unpack_tar_gz(file, &unpacked)?,
+            ArchiveFormat::Zip => unpack_zip(file, &unpacked)?,
         }
 
         let relative = resolve_command(&unpacked, &wanted)?;
@@ -260,11 +267,32 @@ impl DeviceState {
         validate_agent(&agent)?;
         self.check_free(&agent)?;
 
-        // Replacing the same version (an explicit reinstall) starts clean.
-        let _ = fs::remove_dir_all(&final_dir);
-        fs::create_dir_all(final_dir.parent().unwrap_or(&final_dir))
-            .map_err(|error| error.to_string())?;
-        fs::rename(&unpacked, &final_dir).map_err(|error| error.to_string())?;
+        // An explicit reinstall of the same version keeps the old folder until the new one is recorded, so a
+        // failure leaves the agent as it was. The name starts with a dot: a version starts with a digit.
+        let key_dir = self.install_root().join(&request.key);
+        let aside = key_dir.join(format!(".{}.old", request.version));
+        let replaced = final_dir.exists();
+
+        fs::create_dir_all(&key_dir).map_err(|error| error.to_string())?;
+        let _ = fs::remove_dir_all(&aside);
+
+        if replaced {
+            fs::rename(&final_dir, &aside).map_err(|error| error.to_string())?;
+        }
+
+        let put_back = || {
+            let _ = fs::remove_dir_all(&final_dir);
+
+            if replaced {
+                let _ = fs::rename(&aside, &final_dir);
+            }
+        };
+
+        if let Err(error) = fs::rename(&unpacked, &final_dir) {
+            put_back();
+
+            return Err(error.to_string());
+        }
 
         let recorded = self.change_settings(|settings| {
             let existing = settings
@@ -284,9 +312,14 @@ impl DeviceState {
                     env.0.extend(std::mem::take(&mut agent.env.0));
                     agent.env = env;
 
-                    // A different version is a different program than the one the folders were approved for.
-                    if settings.acp_agents[i].command != agent.command
-                        || settings.acp_agents[i].args != agent.args
+                    // The folders were approved for one program. A different version, or the same version with
+                    // different bytes (republished), is not it.
+                    let before = &settings.acp_agents[i];
+
+                    if before.command != agent.command
+                        || before.args != agent.args
+                        || before.install.as_ref().map(|pin| &pin.sha256)
+                            != agent.install.as_ref().map(|pin| &pin.sha256)
                     {
                         settings.acp_consents.retain(|c| c.agent_key != agent.key);
                     }
@@ -303,13 +336,12 @@ impl DeviceState {
         });
 
         if let Err(error) = recorded {
-            let _ = fs::remove_dir_all(&final_dir);
+            put_back();
 
             return Err(error);
         }
 
-        // Only the pinned version stays on disk.
-        prune_other_versions(final_dir.parent(), &request.version);
+        let _ = fs::remove_dir_all(&aside);
 
         self.audit(json!({
             "at": now_ms(), "decision": "approved", "detail": format!("{} {} by {} sha256 {}", request.label, request.version, request.publisher, request.sha256.to_ascii_lowercase()),
@@ -318,6 +350,23 @@ impl DeviceState {
         self.emit(Event::Changed);
 
         Ok(self.acp_view())
+    }
+
+    /// Deletes the installed versions of `key` other than the pinned one. The caller runs it after it closed any
+    /// session that was started under the approvals the install dropped, so no running agent loses its files.
+    pub fn acp_install_prune(&self, key: &str) {
+        let settings = self.settings();
+
+        if let Some(pin) = settings
+            .acp_agents
+            .iter()
+            .find(|agent| agent.key == key)
+            .and_then(|agent| agent.install.as_ref())
+        {
+            if safe_relative(Path::new(key)).is_ok_and(|clean| clean.components().count() == 1) {
+                prune_other_versions(&self.install_root().join(key), &pin.version);
+            }
+        }
     }
 
     /// An agent registered by hand under this key is not replaced by an install.
@@ -334,7 +383,8 @@ impl DeviceState {
         }
     }
 
-    /// Deletes what an installed agent left on disk. `key` is a validated agent key, so it is one folder name.
+    /// Deletes what an installed agent left on disk, because it was removed or its command is no longer the
+    /// installed one. `key` is a validated agent key, so it is one folder name.
     pub(crate) fn remove_installed_files(&self, key: &str) {
         if safe_relative(Path::new(key)).is_ok_and(|clean| clean.components().count() == 1) {
             let _ = fs::remove_dir_all(self.install_root().join(key));
@@ -380,8 +430,7 @@ fn remove_stale(staging: &Path) {
     }
 }
 
-fn prune_other_versions(key_dir: Option<&Path>, keep: &str) {
-    let Some(key_dir) = key_dir else { return };
+fn prune_other_versions(key_dir: &Path, keep: &str) {
     let Ok(entries) = fs::read_dir(key_dir) else {
         return;
     };
@@ -393,8 +442,7 @@ fn prune_other_versions(key_dir: Option<&Path>, keep: &str) {
     }
 }
 
-fn sha256_file(path: &Path) -> Result<String, String> {
-    let mut file = fs::File::open(path).map_err(|error| error.to_string())?;
+fn sha256_reader(file: &mut fs::File) -> Result<String, String> {
     let mut hasher = Sha256::new();
     let mut buffer = vec![0_u8; 64 * 1024];
 
@@ -471,8 +519,7 @@ fn set_mode(_path: &Path, _mode: u32) -> Result<(), String> {
     Ok(())
 }
 
-fn unpack_tar_gz(archive: &Path, into: &Path) -> Result<(), String> {
-    let file = fs::File::open(archive).map_err(|error| error.to_string())?;
+fn unpack_tar_gz(file: fs::File, into: &Path) -> Result<(), String> {
     let mut tar = tar::Archive::new(flate2::read::GzDecoder::new(file));
     let mut budget = Budget::default();
 
@@ -511,8 +558,7 @@ fn unpack_tar_gz(archive: &Path, into: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn unpack_zip(archive: &Path, into: &Path) -> Result<(), String> {
-    let file = fs::File::open(archive).map_err(|error| error.to_string())?;
+fn unpack_zip(file: fs::File, into: &Path) -> Result<(), String> {
     let mut zip = zip::ZipArchive::new(file).map_err(|error| error.to_string())?;
     let mut budget = Budget::default();
 
@@ -981,10 +1027,105 @@ mod tests {
             "a different program, a new approval"
         );
         assert!(
+            dir.join("acp-agents/demo/1.2.3").exists(),
+            "the old version stays until the caller has closed the sessions that run from it"
+        );
+        state.acp_install_prune("demo");
+        assert!(
             !dir.join("acp-agents/demo/1.2.3").exists(),
             "only the pinned version stays"
         );
         assert!(dir.join("acp-agents/demo/1.3.0/agent").is_file());
+    }
+
+    #[test]
+    fn the_same_version_with_different_bytes_is_not_the_approved_program() {
+        let (state, dir) = state("republished");
+        let first = tar_gz(&[("agent", b"one", 0o755)], &[]);
+        let second = tar_gz(&[("agent", b"two", 0o755)], &[]);
+        let folder = dir.join("work");
+
+        fs::create_dir_all(&folder).unwrap();
+        state
+            .acp_install(request(
+                &state.acp_install_stage().unwrap(),
+                &first,
+                ArchiveFormat::TarGz,
+                "agent",
+            ))
+            .unwrap();
+        state
+            .acp_update(AcpUpdate::Grant {
+                agent_key: "demo".into(),
+                folder: folder.to_string_lossy().into_owned(),
+            })
+            .unwrap();
+
+        // The very same download again keeps the approval.
+        let view = state
+            .acp_install(request(
+                &state.acp_install_stage().unwrap(),
+                &first,
+                ArchiveFormat::TarGz,
+                "agent",
+            ))
+            .unwrap();
+
+        assert_eq!(view.consents.len(), 1);
+
+        // Same version, same command, different archive: the approval goes.
+        let view = state
+            .acp_install(request(
+                &state.acp_install_stage().unwrap(),
+                &second,
+                ArchiveFormat::TarGz,
+                "agent",
+            ))
+            .unwrap();
+
+        assert_eq!(
+            view.agents[0].install.as_ref().unwrap().sha256,
+            sha(&second)
+        );
+        assert!(view.consents.is_empty());
+        assert_eq!(
+            fs::read(dir.join("acp-agents/demo/1.2.3/agent")).unwrap(),
+            b"two"
+        );
+        assert_eq!(
+            fs::read_dir(dir.join("acp-agents/demo")).unwrap().count(),
+            1,
+            "the folder moved aside is gone once the new one is recorded"
+        );
+    }
+
+    #[test]
+    fn a_failed_record_leaves_no_new_folder() {
+        let (state, dir) = state("full");
+        let archive = tar_gz(&[("agent", b"x", 0o755)], &[]);
+
+        for i in 0..crate::acp::MAX_AGENTS {
+            state
+                .acp_update(
+                    serde_json::from_str(&format!(
+                        r#"{{"op":"saveAgent","key":"hand-{i}","label":"Hand {i}","command":"/bin/hand","args":[]}}"#
+                    ))
+                    .unwrap(),
+                )
+                .unwrap();
+        }
+
+        let error = state
+            .acp_install(request(
+                &state.acp_install_stage().unwrap(),
+                &archive,
+                ArchiveFormat::TarGz,
+                "agent",
+            ))
+            .unwrap_err();
+
+        assert!(error.contains("at most"), "{error}");
+        assert!(!dir.join("acp-agents/demo/1.2.3").exists());
     }
 
     #[test]
@@ -1016,11 +1157,13 @@ mod tests {
             "a different command is not the installed one"
         );
 
-        // Removing a hand-registered agent never touches the install folder; the pin was cleared above.
+        assert!(
+            !dir.join("acp-agents/demo").exists(),
+            "the files of a command that is no longer the installed one are deleted"
+        );
         state
             .acp_update(AcpUpdate::RemoveAgent { key: "demo".into() })
             .unwrap();
-        assert!(dir.join("acp-agents/demo").exists());
 
         let stage = state.acp_install_stage().unwrap();
 

@@ -494,6 +494,11 @@ impl DeviceState {
                                 settings.acp_consents.retain(|c| c.agent_key != agent.key);
                             }
 
+                            // A command that is no longer the installed one leaves its files with no owner.
+                            if settings.acp_agents[i].install.is_some() && agent.install.is_none() {
+                                uninstall = Some(agent.key.clone());
+                            }
+
                             settings.acp_agents[i] = agent;
                         }
                         None if settings.acp_agents.len() >= MAX_AGENTS => {
