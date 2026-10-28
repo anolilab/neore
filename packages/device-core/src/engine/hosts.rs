@@ -1654,7 +1654,7 @@ mod tests {
         /// What `list_files` answers, and what it was asked.
         listing: Mutex<Result<Value, String>>,
         listed: Mutex<Vec<Value>>,
-        /// What `download` writes, or why it fails after writing `partial`.
+        /// What `download` writes, or the error it fails with after writing half of it.
         archive: Mutex<Result<Vec<u8>, String>>,
         /// Makes the first `hello()` rendezvous twice with the test, which acts in between.
         gate: Mutex<Option<Arc<Barrier>>>,
