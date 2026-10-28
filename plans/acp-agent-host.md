@@ -118,6 +118,22 @@ Event kinds: `session_open` (capability report, optional native session id),
 command, folder, the agent's options), `permission_resolved`, `turn_end`
 (`finished` | `cancelled` | `failed`).
 
+`turn_end` carries the turn's outcome, so the desktop, the ingest route and the clients
+read one contract:
+
+- `status`: `finished` | `cancelled` | `failed`. A usage-limit stop (§6.1) is `failed` with
+  `reason: "usage_limit"`, not a fourth status, so a client that only knows the three still
+  shows a stopped turn. `resetAt` (epoch ms) rides along when the agent said when it resets;
+  both are bounded strings or numbers and validated like any other event field.
+- `summary` (optional, §4.9): `files` (at most 200 entries of `{ path, added, removed }`,
+  `path` inside the approved folder and at most 1,024 characters, counts non-negative
+  integers) and `patch` (the frozen unified diff as text, at most 256 KiB; over that the
+  entry is `{ tooLarge: true }` and the file list and counts stay).
+
+`applyHostEvents` rejects the whole post on a field outside these bounds, as it does for
+every other event. The exact field names are settled in the wire-format spec before S3's
+route is written; this section fixes the shape and the limits.
+
 Verification, in this order. Every auth failure gets the same answer (401):
 
 1. Parse; reject past 256 KiB. The unauthenticated flood guard is an in-isolate
@@ -176,6 +192,21 @@ dropped by `seq`, so the stored `seq` outlives every replay that could pass.
   a remote answer lands.
 - Options of an "always" kind are never shown and never sent. Rust refuses them
   from any source in v1.
+- **Pending requests sit in one bar above the composer**, one line each (tool,
+  target, folder), expandable to the full command. Several requests from one
+  session group into one bar with **Approve all**.
+- **Approve all is a batch of allow-once answers, not a rule.** It answers exactly
+  the requests the bar showed when it was pressed, each with that request's own
+  allow-once option, and records one answer per request. A request that arrives
+  afterwards prompts on its own. Nothing is remembered for later calls, so it is
+  not "Always allow" and rule 5 of the roadmap holds. It is shown only when every
+  grouped request offers an allow-once option and its full details are
+  available to expand; otherwise the bar falls back to per-line buttons. The same
+  bar and rule apply on the web and on the phone (mobile M3), where the answers
+  travel as separate `acp_permission_answer` calls.
+- **Device tool calls are not batched.** Approvals that Neore's own device
+  execution asks for (`shell_run`, `fs_write`, tainted calls) keep one decision
+  per call in the local device window.
 
 ### 4.5 Window, quit, throttling
 
@@ -307,6 +338,24 @@ the folder and refers to it in its reply. Rules:
 - **Staleness.** The reference names the file. Editing the file later does not
   change an earlier message, because the message keeps the upload it was saved with.
 
+### 4.9 What a host turn changed
+
+- Each finished host turn shows a compact summary under the reply: the files the
+  agent wrote, with added and removed line counts, and an **Open diff** that shows
+  the patch as it was at the end of that turn. Later edits do not change it.
+- **Only named writes count.** The desktop records a file when the agent's own
+  tool call says it wrote it: an ACP tool call with `diff` content, or an edit
+  event that names paths. Before a write the desktop keeps the file's earlier
+  bytes when the request names the path; the patch is frozen when the tool call
+  completes. It never uses `git status` or a folder-wide diff as evidence of what
+  the turn did, because other edits in the folder are not the agent's. A write it
+  cannot attribute is left out, not guessed.
+- Paths outside the approved folder are never read, the same rule as §4.8.
+- The summary and patch are posted with the turn's final events on the ingest
+  route. Patches are stored as a part on the reply row, capped in size; a patch
+  over the cap keeps its file list and line counts and says the diff is too large
+  to keep. The phone reads the same part.
+
 ## 5. Data changes
 
 ### 5.1 Tables and fields
@@ -379,6 +428,28 @@ the folder and refers to it in its reply. Rules:
   the UI says the agent runs with the user's rights. Its environment is built,
   not inherited (PATH, HOME, locale, what its adapter documents); no device
   secret or Neore token is ever in it.
+- **User-set environment variables.** A built environment breaks an agent that
+  needs a proxy (`HTTPS_PROXY`, `NO_PROXY`), a custom endpoint or base URL, or a CLI
+  flag read from the environment. So the local window lets the user add variables
+  globally and per agent; per agent wins. They are stored in Rust with the other
+  local settings (like allow rules and shared folders), never sent to the backend
+  or shown to the page, and applied at spawn on top of the built environment. A
+  name Neore reserves (its own `NEORE_*`, `ELECTRON_*`, `NODE_OPTIONS`) is
+  refused. Values are treated as secrets: masked in the window, never logged. On
+  an SSH host the same list lives on the desktop and is passed to `neore-host`
+  over the stdio channel ([ssh-environments.md](ssh-environments.md)).
+
+### 6.1 When a host agent hits its usage limit
+
+- A host agent bills its own account (roadmap trust rule 9), so it can stop on
+  that account's limit. When the adapter reports a usage-limit stop, the reply
+  ends with that reason, the reset time if the agent gave one, and an offer: switch
+  to another offered agent (harness-switch S3, host to host in the thread) or
+  continue on a cloud model (a fork, harness-switch S3). The offer is never taken
+  automatically, because the other agent bills a different account.
+- The desktop shows the agent's reported limit and reset time in the local
+  window when the adapter exposes them. Missing values show as unknown, never as
+  zero.
 
 ## 7. Protocol
 
@@ -429,7 +500,16 @@ throttling measurement.
   refuses a host thread; the host states (§4.6: `accepted`, `received`, `running`,
   `ended`) are stored and read back by a second client.
 
-\1the phone shows "Sending" until `received` and "Working" only from
+**S4 — Remote start, continue, cancel, answer.** Offers in the manifest,
+`/hosts/send`, `startHostSession`, `cancelHostTurn`, `answerHostPermission`, and
+the retry rule of §4.6 (the relay retries a failed claim or completion until the
+deadline, whatever the error).
+- Acceptance: a valid signature for an unapproved pair is refused by Rust; a
+  continue from the web reaches the agent and streams back; with the host offline
+  the call expires with "host did not answer" and nothing runs later; a remote
+  approve after a local one is `already_answered`; a remote answer closes the
+  local prompt; "Approve all" sends one allow-once answer per request it showed and
+  none for a request that arrived after the bar was drawn (test); the phone shows "Sending" until `received` and "Working" only from
   `running` (UI test); a claim failing with a server error and then a network reset
   is retried until it succeeds; killing the main process between claim and receipt returns the call to `pending` and it runs once when re-claimed, and killing it after the receipt but before completion acknowledges the call without running it twice.
 
@@ -471,6 +551,20 @@ backend work, listed in §4.8).
 - The size cap and the type allowlist are set from a measured sample of real agent
   output before S8 starts.
 
+**S9 — Turn changes.** §4.9. Needs S3.
+- Acceptance: a turn that writes two files shows both with correct line counts; a
+  file edited in the folder by something else during the turn is not listed; a
+  later edit leaves the stored patch unchanged; a write outside the folder is not
+  read; a patch over the cap keeps its file list.
+
+Additions to earlier slices:
+- S1 adds user-set environment variables (§6): a variable set for one agent
+  reaches that agent and no other; a reserved name is refused; no value appears in
+  a log line (test).
+- S2 adds the approval bar and Approve all locally (§4.4).
+- S4 adds the usage-limit stop and its offer (§6.1); it needs harness-switch S3
+  for the switch itself and shows only the reason until then.
+
 ## 9. Risks
 
 - **Unsandboxed agent on the user's machine.** Mitigated by per-request prompts,
@@ -485,9 +579,9 @@ backend work, listed in §4.8).
 
 ## 10. Open questions
 
-1. **Sandbox ACP agents with network allowed?** Recommendation: not in v1. Revisit
-   with [sandbox-egress-allowlist.md](sandbox-egress-allowlist.md). Owner's call;
-   it is a security decision.
+1. **Sandbox ACP agents with network allowed?** Decided 2026-10-27: not in v1;
+   agents run beside the sandbox (§6). Revisit with
+   [sandbox-egress-allowlist.md](sandbox-egress-allowlist.md).
 2. **Usage page bucket for host turns.** Recommendation: none in v1. Later, a
    count-only bucket with no cost.
 3. **Registry queried from desktop or backend.** Recommendation: desktop, so the
