@@ -94,6 +94,10 @@ def peak_rss_and_cpu(cmd):
     return proc.stdout, wall, rss, cpu, proc.returncode
 
 
+# Extra recogniser flags for one platform, e.g. `-ng` (no GPU) where the GPU backend is virtual.
+EXTRA_ARGS = os.environ.get("WHISPER_ARGS", "").split()
+
+
 def main():
     # whisper.cpp writes UTF-8; Windows would otherwise decode and print in its ANSI code page.
     sys.stdout.reconfigure(encoding="utf-8")
@@ -114,11 +118,14 @@ def main():
         errors = total = 0
         per_lang = {}
         walls, rsss, cpus = [], [], []
+        empty = 0
         for clip, (lang, _voice, text) in zip(clips, prompts):
-            out, wall, rss, cpu, code = peak_rss_and_cpu([cli, "-m", path, "-f", os.path.join(clips_dir, clip), "-l", lang, "-nt", "-np", "-t", "4"])
+            out, wall, rss, cpu, code = peak_rss_and_cpu([cli, "-m", path, "-f", os.path.join(clips_dir, clip), "-l", lang, "-nt", "-np", "-t", "4", *EXTRA_ARGS])
             if code != 0:
                 sys.exit(f"{model} failed on {clip} (exit {code})")
             ref, hyp = normalise(text, lang), normalise(out, lang)
+            # A backend that cannot run the model can exit 0 with no text; count it so the report shows it.
+            empty += not hyp
             err = edit_distance(ref, hyp)
             errors += err
             total += len(ref)
@@ -129,7 +136,7 @@ def main():
             rsss.append(rss or 0)
             cpus.append(cpu or 0)
         ten = next(os.path.join(clips_dir, f) for f in os.listdir(clips_dir) if f.startswith("00-en-10s"))
-        _out, ten_wall, ten_rss, ten_cpu, code = peak_rss_and_cpu([cli, "-m", path, "-f", ten, "-l", "en", "-nt", "-np", "-t", "4"])
+        _out, ten_wall, ten_rss, ten_cpu, code = peak_rss_and_cpu([cli, "-m", path, "-f", ten, "-l", "en", "-nt", "-np", "-t", "4", *EXTRA_ARGS])
         if code != 0:
             sys.exit(f"{model} failed on the ten-second clip (exit {code})")
         results.append(
@@ -142,6 +149,7 @@ def main():
                 "ten_second_cpu_s": round(ten_cpu or 0, 2),
                 "peak_rss_mb": round(max(rsss + [ten_rss or 0]), 0),
                 "mean_clip_s": round(sum(walls) / len(walls), 2),
+                "empty_transcripts": empty,
             }
         )
     print(json.dumps({"platform": f"{platform.system()} {platform.machine()}", "results": results}, ensure_ascii=False, indent=2))

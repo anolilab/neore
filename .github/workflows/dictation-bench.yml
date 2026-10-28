@@ -106,6 +106,8 @@ jobs:
             - name: "Run the benchmark"
               shell: "bash"
               env:
+                  # The Intel macOS runner's GPU is virtual: Metal there is slower than the CPU and cannot run the quantised large model.
+                  WHISPER_ARGS: "${{ matrix.os == 'macos-15-intel' && '-ng' || '' }}"
                   MODELS: "${{ inputs.models || 'tiny base small large-v3-turbo-q5_0' }}"
               run: |
                   set -euo pipefail
