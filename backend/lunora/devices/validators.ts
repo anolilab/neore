@@ -42,6 +42,17 @@ export const vDeviceManifestTool = v.object({
     readOnly: v.boolean(),
 });
 
+/**
+ * One (agent, folder) pair the user approved on the computer, as its signed manifest offers it
+ * (plans/acp-agent-host.md §3): labels and opaque ids, never a path or a command line.
+ */
+export const vAcpOffer = v.object({
+    agentKey: v.string().max(128),
+    agentLabel: v.string().max(200),
+    folderId: v.string().max(128),
+    folderLabel: v.string().max(200),
+});
+
 /** What `listDevices` returns per device. The secret never leaves the backend. */
 export const vDeviceView = v.object({
     _id: v.string(),

@@ -383,6 +383,7 @@ export interface Doc_deviceCalls {
 export interface Doc_devices {
     _id: Id<"devices">;
     _creationTime: number;
+    acpOffers?: Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>;
     createdAt: number;
     encryptedSecret?: string;
     lastSeenAt?: number;
@@ -3156,6 +3157,7 @@ export interface Insert_deviceCalls {
 export interface Insert_devices {
     _id?: Id<"devices">;
     _creationTime?: number;
+    acpOffers?: Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>;
     createdAt: number;
     encryptedSecret?: string;
     lastSeenAt?: number;

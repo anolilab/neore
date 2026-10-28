@@ -18,7 +18,7 @@ import { vGroupChat } from "./chat/group/validators";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
 import { vCodingAgentAssignment, vCodingAgentId, vCodingAgentRunStatus } from "./coding-agents/validators";
 import { vOAuthClientRecord, vOAuthFlow, vOAuthTarget } from "./connectors/lib/validators";
-import { vDeviceCallPhase, vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource } from "./devices/validators";
+import { vAcpOffer, vDeviceCallPhase, vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource } from "./devices/validators";
 import { embed } from "./embed";
 import {
     vEvalCheck,
@@ -623,6 +623,9 @@ export const schema = defineSchema({
     // secret signs calls and verifies results; it is removed on revoke, so a
     // revoked row can sign nothing. `manifest` is the device's verified tools.
     devices: defineTable({
+        // The (agent, folder) pairs the user approved for coding agents, from the signed manifest
+        // (`updateDeviceManifest`); unset until a shell that knows coding agents has sent one.
+        acpOffers: v.optional(v.array(vAcpOffer)),
         createdAt: v.number(),
         encryptedSecret: v.optional(v.string()),
         lastSeenAt: v.optional(v.number()),

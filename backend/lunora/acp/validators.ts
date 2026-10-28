@@ -86,3 +86,16 @@ export const vHostEvent = v.union(
         reason: v.union(v.literal("finished"), v.literal("cancelled"), v.literal("failed"), v.literal("interrupted")),
     }),
 );
+
+/**
+ * A permission request a host turn is waiting on, as the web and the phone show it: what the agent asked to do and
+ * the options it offered. Only allow-once and reject-once options are ever listed (`acp/remote.ts`).
+ */
+export const vPendingPermission = v.object({
+    command: v.optional(v.string().max(10_000)),
+    folder: v.optional(v.string().max(500)),
+    options: v.array(v.object({ kind: v.string().max(64), name: v.string().max(200), optionId: v.string().max(128) })),
+    requestId: v.string().max(128),
+    target: v.optional(v.string().max(2000)),
+    tool: v.string().max(500),
+});

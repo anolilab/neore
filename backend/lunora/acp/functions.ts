@@ -8,7 +8,7 @@ import { v } from "lunorash/server";
 import { authQuery } from "../lib/crpc";
 import { vCapabilityReport } from "../lib/capability-report";
 import { MAX_LENGTH } from "../lib/validators";
-import { vAcpSessionStatus } from "./validators";
+import { vAcpSessionStatus, vHostEndReason } from "./validators";
 
 const MAX_LISTED_SESSIONS = 50;
 
@@ -20,6 +20,25 @@ const vHostSessionView = v.object({
     createdAt: v.number(),
     deviceId: v.string(),
     folderLabel: v.string(),
+    lastEventAt: v.optional(v.number()),
+    status: vAcpSessionStatus,
+    threadId: v.string(),
+});
+
+/**
+ * One session with how its last turn ended, so Continue is offered after a restart or a timeout
+ * (plans/acp-agent-host.md §4.5). Read off the last STREAM, not the reply row: a restart that comes after the
+ * reaper moves the reason from `timeout` to `interrupted` and writes no second reply.
+ */
+const vHostSessionDetail = v.object({
+    _id: v.string(),
+    agentKey: v.string(),
+    agentLabel: v.string(),
+    capabilities: v.optional(vCapabilityReport),
+    createdAt: v.number(),
+    deviceId: v.string(),
+    folderLabel: v.string(),
+    lastEndReason: v.optional(vHostEndReason),
     lastEventAt: v.optional(v.number()),
     status: vAcpSessionStatus,
     threadId: v.string(),
@@ -68,10 +87,16 @@ export const listHostSessions = authQuery
 /** The session a host thread runs in, or null for a thread that is not one, or is not the caller's. */
 export const getHostSession = authQuery
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
-    .output(v.union(v.null(), vHostSessionView))
+    .output(v.union(v.null(), vHostSessionDetail))
     .query(async ({ args, ctx }) => {
         const threadId = ctx.db.normalizeId("threads", args.threadId);
         const row = threadId ? await ctx.db.acpSessions.findFirst({ where: { threadId, userId: ctx.user.userId } }) : null;
 
-        return row ? toView(row) : null;
+        if (!row || !threadId) {
+            return null;
+        }
+
+        const last = await ctx.db.persistentStreams.findFirst({ orderBy: [{ _creationTime: "desc" }], where: { producer: "host", threadId } });
+
+        return { ...toView(row), ...(last?.hostEndReason !== undefined && { lastEndReason: last.hostEndReason }) };
     });

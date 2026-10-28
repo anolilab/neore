@@ -263,6 +263,7 @@ export const deviceCalls = sqliteTable("deviceCalls", {
 export const devices = sqliteTable("devices", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    acpOffers: text("acpOffers", { mode: "json" }).$type<Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>>(),
     createdAt: real("createdAt").notNull(),
     encryptedSecret: text("encryptedSecret"),
     lastSeenAt: real("lastSeenAt"),

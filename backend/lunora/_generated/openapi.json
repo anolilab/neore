@@ -1720,6 +1720,38 @@
                         "folderLabel": {
                           "type": "string"
                         },
+                        "lastEndReason": {
+                          "anyOf": [
+                            {
+                              "const": "finished",
+                              "type": "string"
+                            },
+                            {
+                              "const": "cancelled",
+                              "type": "string"
+                            },
+                            {
+                              "const": "failed",
+                              "type": "string"
+                            },
+                            {
+                              "const": "interrupted",
+                              "type": "string"
+                            },
+                            {
+                              "const": "timeout",
+                              "type": "string"
+                            },
+                            {
+                              "const": "revoked",
+                              "type": "string"
+                            },
+                            {
+                              "const": "stopped",
+                              "type": "string"
+                            }
+                          ]
+                        },
                         "lastEventAt": {
                           "type": "number"
                         },
@@ -3486,6 +3518,368 @@
           "acp"
         ],
         "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#acp_remote:answerHostPermission": {
+      "post": {
+        "description": "Invoke the `mutation` `acp_remote:answerHostPermission` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "acp_remote:answerHostPermission",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "optionId": {
+                        "type": "string"
+                      },
+                      "requestId": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "optionId",
+                      "requestId",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "acp_remote:answerHostPermission",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "const": "busy",
+                          "type": "string"
+                        },
+                        {
+                          "const": "not_waiting",
+                          "type": "string"
+                        },
+                        {
+                          "const": "offline",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "sent": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "sent"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: acp_remote:answerHostPermission",
+        "tags": [
+          "acp"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#acp_remote:cancelHostTurn": {
+      "post": {
+        "description": "Invoke the `mutation` `acp_remote:cancelHostTurn` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "acp_remote:cancelHostTurn",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "acp_remote:cancelHostTurn",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "cancelled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "cancelled"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: acp_remote:cancelHostTurn",
+        "tags": [
+          "acp"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#acp_remote:getHostPendingPermissions": {
+      "post": {
+        "description": "Invoke the `query` `acp_remote:getHostPendingPermissions` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "acp_remote:getHostPendingPermissions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "acp_remote:getHostPendingPermissions",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "command": {
+                        "type": "string"
+                      },
+                      "folder": {
+                        "type": "string"
+                      },
+                      "options": {
+                        "items": {
+                          "properties": {
+                            "kind": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "optionId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name",
+                            "optionId"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "requestId": {
+                        "type": "string"
+                      },
+                      "target": {
+                        "type": "string"
+                      },
+                      "tool": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "options",
+                      "requestId",
+                      "tool"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: acp_remote:getHostPendingPermissions",
+        "tags": [
+          "acp"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#acp_remote:startHostSession": {
+      "post": {
+        "description": "Invoke the `mutation` `acp_remote:startHostSession` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "acp_remote:startHostSession",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "agentKey": {
+                        "type": "string"
+                      },
+                      "clientId": {
+                        "type": "string"
+                      },
+                      "deviceId": {
+                        "description": "Id<\"devices\">",
+                        "type": "string",
+                        "x-lunora-table": "devices"
+                      },
+                      "folderId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "agentKey",
+                      "clientId",
+                      "deviceId",
+                      "folderId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "acp_remote:startHostSession",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "started": {
+                      "type": "boolean"
+                    },
+                    "threadId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "started"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: acp_remote:startHostSession",
+        "tags": [
+          "acp"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#admin_audit_log:getAuditLogEntry": {
