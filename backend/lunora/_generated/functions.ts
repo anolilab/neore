@@ -7428,6 +7428,7 @@ const __arr1 = new Array(source["leadTools"].length);
 for (let __i1 = 0; __i1 < source["leadTools"].length; __i1++) {
 const __e1 = source["leadTools"][__i1];
 if (typeof __e1 !== "string") return DEFER;
+if (__e1.length > 128) return DEFER;
 __arr1[__i1] = __e1;
 }
 __val2 = __arr1;
@@ -7437,6 +7438,7 @@ let __has3 = false;
 let __val3;
 if (source["model"] !== undefined) {
 if (typeof source["model"] !== "string") return DEFER;
+if (source["model"].length > 256) return DEFER;
 __val3 = source["model"];
 __has3 = true;
 }
@@ -7444,6 +7446,7 @@ let __has4 = false;
 let __val4;
 if (source["name"] !== undefined) {
 if (typeof source["name"] !== "string") return DEFER;
+if (source["name"].length > 1000) return DEFER;
 __val4 = source["name"];
 __has4 = true;
 }

@@ -17842,25 +17842,25 @@
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 143,
+      "line": 145,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 226,
+      "line": 228,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 241,
+      "line": 243,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "schedule",
-      "line": 248,
+      "line": 250,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
@@ -20314,25 +20314,25 @@
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 745,
+      "line": 746,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 745,
+      "line": 746,
       "reason": "\"postRunResult\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 769,
+      "line": 770,
       "reason": "\"postRunResult\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 913,
+      "line": 914,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {

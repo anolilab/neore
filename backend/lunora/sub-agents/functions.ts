@@ -512,9 +512,10 @@ export const dispatchWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): 
 
 export const createRun = internalMutation
     .input({
-        leadTools: v.optional(v.array(v.string())),
-        model: v.optional(v.string()),
-        name: v.optional(v.string()),
+        // Bounded at the boundary; the name is cut to its display length further down, and a tool name has its own pattern.
+        leadTools: v.optional(v.array(v.string().max(128))),
+        model: v.optional(v.string().max(256)),
+        name: v.optional(v.string().max(1000)),
         parentModel: v.optional(v.string()),
         parentThreadId: v.string(),
         // A worker: the thread outlives this run and is messaged again with `messageWorker`.
