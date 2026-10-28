@@ -250,7 +250,7 @@ Where S4 departs from the text above:
 - The Windows desktop cannot install yet: it has no ControlMaster and no askpass (S3), and the bundle has no
   Windows server target.
 
-**S5 — Lifecycle (built, except the Windows measurement).** Backoff, Retry, ownership-based stop, stale-process
+**S5 — Lifecycle (built).** Backoff, Retry, ownership-based stop, stale-process
 detection, ControlMaster reuse.
 - Acceptance: drop the network for 60 s and restore it; the host reconnects with
   at most two `ssh` processes alive at any moment (the test counts them); a host
@@ -288,12 +288,11 @@ Where S5 departs from the text above:
   commands and S7's agents.
 - The per-launch log of §6 (`~/.neore/host/logs/<launch-id>.log`) and the pid files in the upgrade's prune (S4's note) are
   not built.
-- Windows: `ssh::MULTIPLEXING` is a fixed `false` there (`cfg!(unix)`), not a measurement: each server has one ssh
-  process and no master, and the local window says so. Whether Win32 OpenSSH can multiplex is NOT recorded yet, which is
-  why S5 is not fully built. The CI step "Measure ssh ControlMaster (Windows)" (`tests/ssh-mux-windows.ps1`) writes the
-  verdict to the job summary of the `device-core` job on `windows-latest` and FAILS when it cannot reach one (no sshd, no
-  login), so a broken setup gets fixed. Record its first verdict here, and if multiplexing works, decide whether to
-  enable it. It was not run where this was written.
+- Windows: `ssh::MULTIPLEXING` is a fixed `false` there (`cfg!(unix)`): each server has one ssh process and no master,
+  and the local window says so. Measured on the `windows-latest` runner (Win32 OpenSSH 9.5p2, CI step "Measure ssh
+  ControlMaster (Windows)", `tests/ssh-mux-windows.ps1`): the master did not start and the check failed (`master start
+  exit -1; check exit -1`), so ControlMaster does not work there and the fixed `false` stands. The step fails only when
+  it cannot reach a verdict (no sshd, no login), so a broken setup still gets fixed.
 
 **S6 — Files on the host.** File tree and reads over the device file actions.
 Folder download as one tar stream.

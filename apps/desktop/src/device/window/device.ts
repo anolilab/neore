@@ -796,6 +796,11 @@ $("server-form").addEventListener("submit", async (event) => {
     (event.target as HTMLFormElement).reset();
 });
 
+// A link that drops or comes back while this window stays open: show the Retry / Stop reconnecting it now needs.
+globalThis.neoreDevice.onChanged(async () => {
+    state.settings = await globalThis.neoreDevice.settingsGet();
+    renderSettings();
+});
 globalThis.neoreDevice.onPromptQueued(() => refreshPrompt());
 window.addEventListener("focus", () => refreshPrompt());
 // eslint-disable-next-line unicorn/prefer-top-level-await -- the page builds as an IIFE, where top-level await does not parse
