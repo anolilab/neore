@@ -653,6 +653,12 @@ written here is what is not.
   (`Root::dir`) because the sshd tests run as the developer: they must never touch the real `~/.neore`. Release binaries
   are built `--no-default-features`; a plain `cargo build` of `neore-host` links the keyring. `host_upgrade` is a
   LOCAL-window channel only and refuses while any session is open to the target.
+  **Registry installs** (`apps/desktop/src/acp/{registry,install}.ts`, `device-core/src/acp_install.rs`):
+  the desktop reads the ACP registry (`cdn.agentclientprotocol.com/registry/v1/latest/registry.json`) only when
+  the local window searches. A `binary` download is installable only with a published `sha256`, which the schema
+  makes OPTIONAL (`npx`/`uvx` entries never have one), so those are listed and refused. The window names an id and
+  version; the main process takes archive, checksum and command from its own snapshot and words the native
+  consent itself. Rust hashes, unpacks (no links, no `..`) and records the pin; there is no update path, by design.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay

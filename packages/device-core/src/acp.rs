@@ -24,7 +24,7 @@ use crate::acp_permission::{Answered, Outcome, PendingView, PermissionRequest};
 use crate::engine::{now_ms, validate_roots, DeviceState, Event};
 use crate::hmac::to_hex;
 
-const MAX_AGENTS: usize = 20;
+pub(crate) const MAX_AGENTS: usize = 20;
 const MAX_CONSENTS: usize = 100;
 const MAX_ARGS: usize = 50;
 const MAX_ARG_BYTES: usize = 1000;
@@ -102,9 +102,25 @@ pub struct AcpAgent {
     /// Variables for this agent only; they win over the global ones.
     #[serde(default)]
     pub env: EnvVars,
+    /// Set when the agent was installed from the registry (`acp_install.rs`): what was pinned. Only that install
+    /// writes it; a saved command that differs from the installed one clears it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub install: Option<AcpInstall>,
     /// Stable id, `a-z0-9-`: what a session, a consent and (later) an offer name.
     pub key: String,
     pub label: String,
+}
+
+/// What a registry install pinned. Nothing changes it but another explicit install: there is no update path.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AcpInstall {
+    pub publisher: String,
+    /// SHA-256 of the archive that was verified, lowercase hex.
+    pub sha256: String,
+    /// The archive's URL, as the registry gave it.
+    pub source: String,
+    pub version: String,
 }
 
 /// The user's approval of one agent in one folder, given in the local window and nowhere else.
@@ -141,6 +157,7 @@ pub struct AcpAgentView {
     pub command: String,
     /// Names only: values are masked in the window and never leave this crate.
     pub env_names: Vec<String>,
+    pub install: Option<AcpInstall>,
     pub key: String,
     pub label: String,
 }
@@ -360,7 +377,7 @@ const CODE_LOADING_PREFIXES: [&str; 11] = [
 
 /// Whether `name` changes which program (or which code in it) runs. Case-insensitive: Windows names are. A name
 /// this misses keeps the approvals, so the list errs wide.
-fn changes_program(name: &str) -> bool {
+pub(crate) fn changes_program(name: &str) -> bool {
     let upper = name.to_ascii_uppercase();
 
     CODE_LOADING_NAMES.contains(&upper.as_str())
@@ -425,6 +442,7 @@ impl DeviceState {
                     args: agent.args.clone(),
                     command: agent.command.clone(),
                     env_names: agent.env.names(),
+                    install: agent.install.clone(),
                     key: agent.key.clone(),
                     label: agent.label.clone(),
                 })
@@ -435,6 +453,8 @@ impl DeviceState {
     }
 
     pub fn acp_update(&self, update: AcpUpdate) -> Result<AcpView, String> {
+        let mut uninstall = None;
+
         self.change_settings(|settings| {
             match update {
                 AcpUpdate::SaveAgent {
@@ -448,6 +468,13 @@ impl DeviceState {
                         .iter()
                         .position(|agent| agent.key == key);
                     let agent = AcpAgent {
+                        // The pin describes the installed command: a different one is no longer that.
+                        install: existing
+                            .filter(|&i| {
+                                settings.acp_agents[i].command == command
+                                    && settings.acp_agents[i].args == args
+                            })
+                            .and_then(|i| settings.acp_agents[i].install.clone()),
                         args,
                         command,
                         env: existing
@@ -476,6 +503,14 @@ impl DeviceState {
                     }
                 }
                 AcpUpdate::RemoveAgent { key } => {
+                    if settings
+                        .acp_agents
+                        .iter()
+                        .any(|agent| agent.key == key && agent.install.is_some())
+                    {
+                        uninstall = Some(key.clone());
+                    }
+
                     settings.acp_agents.retain(|agent| agent.key != key);
                     settings.acp_consents.retain(|c| c.agent_key != key);
                 }
@@ -551,6 +586,11 @@ impl DeviceState {
 
             Ok(())
         })?;
+
+        if let Some(key) = uninstall {
+            self.remove_installed_files(&key);
+        }
+
         // The approved pairs are in the manifest: the page sends a fresh one.
         self.emit(Event::Changed);
 

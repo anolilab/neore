@@ -1,4 +1,5 @@
 /** What the local device window's preload exposes as `window.neoreDevice`. */
+import type { RegistryListing } from "../../acp/registry";
 import type { AcpUpdate, AcpView, PermissionView, ProbeResult, SessionSnapshot, SessionSummary } from "../../acp/types";
 import type { Availability } from "../../terminal/shell";
 import type { HostProbe, HostUpgrade, Prompt, SettingsView } from "../types";
@@ -18,6 +19,9 @@ export interface DeviceWindowApi {
     acpPermissionDecline: (id: number) => Promise<void>;
     acpPermissions: () => Promise<PermissionView[]>;
     acpProbe: (agentKey: string) => Promise<ProbeResult>;
+    /** Asks the main process to install a listed agent. It words and shows the confirmation itself; `null` is a "no". */
+    acpRegistryInstall: (id: string, version: string) => Promise<AcpView | null>;
+    acpRegistrySearch: (query: string) => Promise<RegistryListing[]>;
     acpSend: (sessionId: string, prompt: string) => Promise<{ position?: number; status: "queued" | "started" }>;
     acpSession: (sessionId: string) => Promise<SessionSnapshot>;
     acpSessions: () => Promise<SessionSummary[]>;

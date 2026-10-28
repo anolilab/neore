@@ -329,6 +329,7 @@ mod tests {
                     args: Vec::new(),
                     command: "/bin/agent".into(),
                     env: EnvVars::default(),
+                    install: None,
                     key: "claude".into(),
                     label: "Claude Code".into(),
                 }],

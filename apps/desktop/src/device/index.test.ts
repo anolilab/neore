@@ -94,6 +94,9 @@ vi.mock("electron", () => {
         },
         BrowserWindow,
         dialog: {
+            showMessageBox: vi.fn(async (..._args: unknown[]) => {
+                return { checkboxChecked: false, response: 1 };
+            }),
             showOpenDialog: vi.fn(async () => {
                 return { canceled: false, filePaths: ["/shared/picked"] };
             }),
@@ -129,11 +132,17 @@ vi.mock("../acp/process", () => {
     return { acpSupported: true, spawnAgent };
 });
 
+const registryFetch = vi.hoisted(() => vi.fn());
+
 const { registerDeviceIpc } = await import("./index");
+const { dialog } = await import("electron");
+const { REGISTRY_FIXTURE, SHA } = await import("../acp/fixtures/registry");
+const { REGISTRY_URL } = await import("../acp/registry");
 const { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } = await import("./channels");
 
 const SITE_ORIGIN = new URL("https://neore.example");
 const options: DeviceIpcOptions = {
+    fetch: registryFetch as unknown as typeof fetch,
     isTrusted: (event) => isTrustedUrl(SITE_ORIGIN, event.senderFrame?.url),
 };
 
@@ -194,6 +203,8 @@ const invoke = (channel: string, event: IpcEvent, ...args: unknown[]): unknown =
 
 const makeCore = () => {
     return {
+        acpInstall: vi.fn((_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
+        acpInstallStage: vi.fn(() => mkdtempSync(path.join(fake.userData, "stage-"))),
         acpPermissionAnswer: vi.fn(),
         acpPermissionAnswerBatch: vi.fn(() => 2),
         acpPermissionAnswerRemote: vi.fn(),
@@ -207,7 +218,7 @@ const makeCore = () => {
             throw new Error("that folder is not allowed");
         }),
         acpUpdate: vi.fn(() => JSON.stringify({ agents: [], envNames: [] })),
-        acpView: vi.fn(() => JSON.stringify({ agents: [{ args: [], command: "agent", envNames: [], key: "alpha", label: "Alpha" }], envNames: [] })),
+        acpView: vi.fn(() => JSON.stringify({ agents: [{ args: [], command: "agent", envNames: [], install: null, key: "alpha", label: "Alpha" }], envNames: [] })),
         auditTail: vi.fn(() => ["{}"]),
         denyPrompts: vi.fn(),
         execute: vi.fn(async () => JSON.stringify({ payload: "{}", signature: "s" })),
@@ -497,6 +508,8 @@ describe("coding-agent channels", () => {
         LOCAL_CHANNEL.acpPermissionDecline,
         LOCAL_CHANNEL.acpPermissions,
         LOCAL_CHANNEL.acpProbe,
+        LOCAL_CHANNEL.acpRegistryInstall,
+        LOCAL_CHANNEL.acpRegistrySearch,
         LOCAL_CHANNEL.acpSend,
         LOCAL_CHANNEL.acpSession,
         LOCAL_CHANNEL.acpSessions,
@@ -785,5 +798,70 @@ describe("shutdown", () => {
         fake.appListeners.get("will-quit")?.();
 
         expect(core.stop).toHaveBeenCalledTimes(1);
+    });
+});
+
+const DOWNLOAD_LINE = /Download: https:\/\/example\.com\/amp-/u;
+
+describe("registry channels (the device window)", () => {
+    const registryBody = (): Response => Response.json(REGISTRY_FIXTURE);
+
+    beforeEach(() => {
+        registryFetch.mockReset();
+        vi.mocked(dialog.showMessageBox).mockClear();
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+        registryFetch.mockImplementation(async (url: string) => url === REGISTRY_URL ? registryBody() : new Response("archive bytes"));
+    });
+
+    it("read the registry only when the window searches: loading the view or waiting changes nothing", async () => {
+        vi.useFakeTimers();
+
+        try {
+            invoke(LOCAL_CHANNEL.acpView, localEvent());
+            await vi.advanceTimersByTimeAsync(7 * 24 * 60 * 60 * 1000);
+
+            expect(registryFetch).not.toHaveBeenCalled();
+            expect(core.acpInstall).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+
+        const listings = (await invoke(LOCAL_CHANNEL.acpRegistrySearch, localEvent(), "amp")) as { id: string }[];
+
+        expect(listings.map((listing) => listing.id)).toEqual(["amp-acp"]);
+        expect(registryFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("install what the search listed after a native confirmation worded from the entry", async () => {
+        await invoke(LOCAL_CHANNEL.acpRegistrySearch, localEvent(), "");
+        await invoke(LOCAL_CHANNEL.acpRegistryInstall, localEvent(), "amp-acp", "0.10.0");
+
+        const [dialogOptions] = vi.mocked(dialog.showMessageBox).mock.calls.at(-1)?.slice(-1) as [{ detail: string; message: string }];
+
+        expect(dialogOptions.message).toContain("Amp");
+        expect(dialogOptions.detail).toContain("Ada Lovelace, Grace Hopper");
+        expect(dialogOptions.detail).toContain("0.10.0");
+        expect(dialogOptions.detail).toMatch(DOWNLOAD_LINE);
+        expect(JSON.parse(String(core.acpInstall.mock.calls[0]?.[0]))).toMatchObject({ key: "amp-acp", sha256: SHA, version: "0.10.0" });
+    });
+
+    it("install nothing on a no, for a version the registry does not list, or before a search", async () => {
+        await expect(invoke(LOCAL_CHANNEL.acpRegistryInstall, localEvent(), "amp-acp", "0.10.0")).rejects.toThrow("Search the registry again");
+
+        await invoke(LOCAL_CHANNEL.acpRegistrySearch, localEvent(), "");
+        await expect(invoke(LOCAL_CHANNEL.acpRegistryInstall, localEvent(), "amp-acp", "6.6.6")).rejects.toThrow("Search again");
+
+        vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ checkboxChecked: false, response: 0 });
+        await expect(invoke(LOCAL_CHANNEL.acpRegistryInstall, localEvent(), "amp-acp", "0.10.0")).resolves.toBeNull();
+
+        expect(core.acpInstallStage).not.toHaveBeenCalled();
+        expect(core.acpInstall).not.toHaveBeenCalled();
+        expect(registryFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("check the shape of what the window sends", async () => {
+        await expect(invoke(LOCAL_CHANNEL.acpRegistryInstall, localEvent(), "", "1.0.0")).rejects.toThrow("device: agent is invalid");
+        await expect(invoke(LOCAL_CHANNEL.acpRegistryInstall, localEvent(), "amp-acp", 1)).rejects.toThrow("device: version is invalid");
+        expect(() => invoke(LOCAL_CHANNEL.acpRegistrySearch, localEvent(), "x".repeat(101))).toThrow("device: search is invalid");
     });
 });

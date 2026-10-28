@@ -207,7 +207,7 @@ describe("an agent that answers a prompt with an error", () => {
 describe("an approval that is taken away", () => {
     const view = (consents: { agentKey: string; folderPath: string }[], agents = ["fake"]) => {
         return {
-            agents: agents.map((key) => { return { args: [], command: "x", envNames: [], key, label: key }; }),
+            agents: agents.map((key) => { return { args: [], command: "x", envNames: [], install: null, key, label: key }; }),
             consents: consents.map((consent) => { return { ...consent, folderId: "f", folderLabel: "work" }; }),
         };
     };

@@ -3,6 +3,7 @@
  * a session in a folder, talk to it, stop it. Everything an agent wrote is rendered with `textContent`.
  * Variable values are typed here and never read back: the core returns names only.
  */
+import type { RegistryListing } from "../../acp/registry";
 import type { AcpView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
 import { approveAllIds, barSignature, groupBySession } from "./permission-bar";
 
@@ -35,12 +36,13 @@ const CLICK_THROUGH_GUARD_MS = 800;
 
 const state: {
     guard?: ReturnType<typeof setTimeout>;
+    listings: RegistryListing[];
     requests: PermissionView[];
     selected?: string;
     sessions: SessionSummary[];
     signature: string;
     view: AcpView;
-} = { requests: [], sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
+} = { listings: [], requests: [], sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
 
 const showError = (error: unknown): void => {
     $("acp-error").textContent = String(error instanceof Error ? error.message : error).replace(IPC_PREFIX, "");
@@ -157,12 +159,14 @@ const renderAgents = (): void => {
             ? [item("No agents yet.")]
             : view.agents.flatMap((agent) => [
                 item(
-                    `${agent.label}: ${[agent.command, ...agent.args].join(" ")}`,
+                    agent.install === null
+                        ? `${agent.label}: ${[agent.command, ...agent.args].join(" ")}`
+                        : `${agent.label} ${agent.install.version} from the registry, by ${agent.install.publisher} (pinned, checksum ${agent.install.sha256.slice(0, 12)}…)`,
                     button("Check version", `Check the version of ${agent.label}`, () => probe(agent.key)),
                     button("Approve a folder…", `Approve a folder for ${agent.label}`, () => approveFolder(agent.key)),
                     button("Remove", `Remove ${agent.label}`, () => {
                         guarded(async () => {
-                            if (!await globalThis.neoreDevice.confirm(`Remove “${agent.label}” and its variables?`)) {
+                            if (!await globalThis.neoreDevice.confirm(`Remove “${agent.label}”, its variables${agent.install === null ? "" : " and its installed files"}?`)) {
                                 return;
                             }
 
@@ -217,6 +221,48 @@ const renderAgents = (): void => {
                         });
                     }),
                 );
+            }),
+    );
+};
+
+// ─── Registry ───────────────────────────────────────────────────────────────
+
+const installFromRegistry = (listing: RegistryListing) =>
+    guarded(async () => {
+        // The main process words and shows the confirmation (publisher, version, source); this only asks.
+        const view = await globalThis.neoreDevice.acpRegistryInstall(listing.id, listing.version);
+
+        if (view === null) {
+            return;
+        }
+
+        state.view = view;
+        renderAgents();
+        renderRegistry(state.listings);
+        $("acp-notice").textContent = `${listing.name} ${listing.version} is installed. Approve a folder for it to use it.`;
+    });
+
+const renderRegistry = (listings: RegistryListing[]): void => {
+    state.listings = listings;
+
+    $("acp-registry-results").replaceChildren(
+        ...listings.length === 0
+            ? [item("No agents found.")]
+            : listings.map((listing) => {
+                const installed = state.view.agents.find((agent) => agent.key === listing.id)?.install;
+                const li = item(
+                    `${listing.name} ${listing.version} · by ${listing.publisher} · ${listing.license}`,
+                    ...listing.installable
+                        ? [button(installed === null || installed === undefined ? "Install…" : "Reinstall…", `Install ${listing.name} ${listing.version}`, () => installFromRegistry(listing))]
+                        : [],
+                );
+                const note = document.createElement("small");
+
+                note.className = "muted";
+                note.textContent = listing.installable ? listing.description : `Not installable here: ${listing.reason ?? "unknown"}`;
+                li.append(note);
+
+                return li;
             }),
     );
 };
@@ -472,6 +518,13 @@ export const initAcp = async (): Promise<void> => {
             state.view = await globalThis.neoreDevice.acpUpdate({ args, command, key: slug(label), label, op: "saveAgent" });
             ($("acp-agent-form") as HTMLFormElement).reset();
             renderAgents();
+        });
+    });
+
+    $("acp-registry-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        guarded(async () => {
+            renderRegistry(await globalThis.neoreDevice.acpRegistrySearch(field("acp-registry-query")));
         });
     });
 

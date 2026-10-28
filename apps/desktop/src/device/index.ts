@@ -18,9 +18,11 @@ import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 import type { AcpCommand } from "../acp/commands";
 import { HostCommands, isAcpEnvelope } from "../acp/commands";
 import { HostPoster } from "../acp/ingest";
+import { AgentInstaller } from "../acp/install";
 import { AcpManager } from "../acp/manager";
 import { coreGate } from "../acp/permission";
 import { spawnAgent } from "../acp/process";
+import { AgentRegistry } from "../acp/registry";
 import type { AcpView, PermissionView, SpawnPlan } from "../acp/types";
 import { backendOrigin } from "../site";
 import type { TerminalOpener } from "../terminal/index";
@@ -31,6 +33,7 @@ import type { CoreEvent, DeviceCore, Prompt } from "./types";
 import {
     readAcpUpdate,
     readAgentKey,
+    readAgentVersion,
     readDeviceId,
     readFolder,
     readHostPairing,
@@ -42,6 +45,7 @@ import {
     readPromptAnswer,
     readRequestId,
     readRequestIds,
+    readSearchQuery,
     readSecretAnswer,
     readSessionId,
     readSettingsUpdate,
@@ -55,8 +59,7 @@ const LOCAL_PAGE = path.join(WINDOW_DIR, "device.html");
 const LOCAL_PRELOAD = path.join(WINDOW_DIR, "preload.cjs");
 
 /** The folder with the `neore-host` binaries and checksums this build ships: in the app's resources once packaged. */
-const hostBundleDirectory = (): string | undefined =>
-    app.isPackaged ? path.join(process.resourcesPath, "neore-host") : process.env.NEORE_HOST_BUNDLE;
+const hostBundleDirectory = (): string | undefined => (app.isPackaged ? path.join(process.resourcesPath, "neore-host") : process.env.NEORE_HOST_BUNDLE);
 
 /**
  * Registers the device handlers. Returns whether the core loaded: the shell advertises `device` only then
@@ -69,7 +72,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         core?: DeviceCore;
         coreError?: unknown;
         host?: HostPoster;
+        installer?: AgentInstaller;
         local?: BrowserWindowInstance;
+        registry?: AgentRegistry;
         transport?: HostTransport;
     } = {};
     /** Every site window that has made a trusted relay call and is still open: progress and changes go to each. */
@@ -161,12 +166,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const win = state.local;
 
         return (
-            win !== undefined
-            && !win.isDestroyed()
-            && event.sender === win.webContents
-            && event.senderFrame !== null
-            && event.senderFrame === win.webContents.mainFrame
-            && event.senderFrame.url === localUrl
+            win !== undefined &&
+            !win.isDestroyed() &&
+            event.sender === win.webContents &&
+            event.senderFrame !== null &&
+            event.senderFrame === win.webContents.mainFrame &&
+            event.senderFrame.url === localUrl
         );
     };
 
@@ -288,7 +293,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             appVersion: app.getVersion(),
             gate: coreGate(core),
             hostInfo: (agentKey, folder) => {
-                const consent = (JSON.parse(core.acpView()) as AcpView).consents.find((candidate) => candidate.agentKey === agentKey && candidate.folderPath === folder);
+                const consent = (JSON.parse(core.acpView()) as AcpView).consents.find(
+                    (candidate) => candidate.agentKey === agentKey && candidate.folderPath === folder,
+                );
 
                 return consent === undefined ? undefined : { folderId: consent.folderId, folderLabel: consent.folderLabel };
             },
@@ -303,7 +310,10 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     const startRequestedSession = async (command: Extract<AcpCommand, { kind: "start" }>): Promise<void> => {
         try {
-            await requireAcp().startSession(command.agentKey, command.agentLabel, command.folderPath, { sessionId: command.sessionId, threadId: command.threadId });
+            await requireAcp().startSession(command.agentKey, command.agentLabel, command.folderPath, {
+                sessionId: command.sessionId,
+                threadId: command.threadId,
+            });
         } catch (error) {
             console.error("[neore-desktop] a requested coding agent did not start:", (error as Error).message);
         }
@@ -457,11 +467,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     local(LOCAL_CHANNEL.settingsGet, () => requireTransport().settingsGet());
 
-    local(
-        LOCAL_CHANNEL.settingsUpdate,
-        (update) =>
-            // The core emits `changed` itself, so the site resends its manifest.
-            requireTransport().settingsUpdate(readSettingsUpdate(update)),
+    local(LOCAL_CHANNEL.settingsUpdate, (update) =>
+        // The core emits `changed` itself, so the site resends its manifest.
+        requireTransport().settingsUpdate(readSettingsUpdate(update)),
     );
 
     local(LOCAL_CHANNEL.pickFolder, async () => {
@@ -469,7 +477,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const parent = liveLocal();
         const result = parent === undefined ? await dialog.showOpenDialog(dialogOptions) : await dialog.showOpenDialog(parent, dialogOptions);
 
-        return result.canceled ? null : result.filePaths[0] ?? null;
+        return result.canceled ? null : (result.filePaths[0] ?? null);
     });
 
     // A native dialog, so the page cannot draw a confirmation that looks like one.
@@ -502,6 +510,41 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     };
 
     local(LOCAL_CHANNEL.acpUpdate, (update) => updateAcp(readAcpUpdate(update)));
+
+    // The registry is read when the window searches, never otherwise: there is no timer and no check of installed
+    // agents against it, so nothing updates an agent but an install the user confirms again.
+    const requireRegistry = (): AgentRegistry => {
+        state.registry ??= new AgentRegistry({ fetch: options.fetch });
+
+        return state.registry;
+    };
+
+    local(LOCAL_CHANNEL.acpRegistrySearch, (query) => requireRegistry().search(readSearchQuery(query)));
+
+    local(LOCAL_CHANNEL.acpRegistryInstall, async (id, version) => {
+        state.installer ??= new AgentInstaller({
+            // A native dialog worded here from the registry entry, not by the window.
+            confirm: async ({ detail, message }) => {
+                const dialogOptions = { buttons: ["Cancel", "Install"], cancelId: 0, defaultId: 0, detail, message, noLink: true, type: "question" as const };
+                const parent = liveLocal();
+                const result = parent === undefined ? await dialog.showMessageBox(dialogOptions) : await dialog.showMessageBox(parent, dialogOptions);
+
+                return result.response === 1;
+            },
+            core: requireCore,
+            fetch: options.fetch,
+            registry: requireRegistry(),
+        });
+
+        const view = await state.installer.install(readAgentKey(id), readAgentVersion(version));
+
+        if (view !== null) {
+            // A reinstall drops the folder approvals of the old version; a running session was started under them.
+            await state.acp?.closeUnapproved(view);
+        }
+
+        return view;
+    });
 
     local(LOCAL_CHANNEL.acpProbe, (agentKey) => requireAcp().probe(readAgentKey(agentKey)));
 
@@ -562,13 +605,20 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         }
 
         const id = readDeviceId(deviceId);
-        const host = requireTransport().settingsGet().hosts.find((candidate) => candidate.deviceId === id);
+        const host = requireTransport()
+            .settingsGet()
+            .hosts.find((candidate) => candidate.deviceId === id);
 
         if (host === undefined) {
             throw new Error("device: that server is not paired with this computer");
         }
 
-        await options.terminal.openSsh({ args: () => requireTransport().hostTerminal(id), attach: () => requireTransport().hostTerminalAttach(id), deviceId: id, label: `${host.user}@${host.address}` });
+        await options.terminal.openSsh({
+            args: () => requireTransport().hostTerminal(id),
+            attach: () => requireTransport().hostTerminalAttach(id),
+            deviceId: id,
+            label: `${host.user}@${host.address}`,
+        });
     });
 
     return state.transport !== undefined;
@@ -602,6 +652,8 @@ const promptSummary = ({ body }: Prompt): string => {
 };
 
 export interface DeviceIpcOptions {
+    /** Replaces `fetch` for the registry and its downloads; tests only. */
+    fetch?: typeof fetch;
     /** True when the sender is the site's main window (see `trust.ts`). */
     isTrusted: (event: IpcMainInvokeEvent) => boolean;
     /** Opens a terminal from the device window. Absent in tests that do not cover it. */

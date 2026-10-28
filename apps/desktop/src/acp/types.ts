@@ -42,8 +42,16 @@ export interface PermissionView {
     toolKind: string;
 }
 
+/** What a registry install pinned; set only on an agent that came from one. */
+export interface AcpInstall {
+    publisher: string;
+    sha256: string;
+    source: string;
+    version: string;
+}
+
 export interface AcpView {
-    agents: { args: string[]; command: string; envNames: string[]; key: string; label: string }[];
+    agents: { args: string[]; command: string; envNames: string[]; install: AcpInstall | null; key: string; label: string }[];
     consents: AcpConsent[];
     envNames: string[];
 }

@@ -14,6 +14,7 @@
 use std::sync::Arc;
 
 use device_core::acp::AcpUpdate;
+use device_core::acp_install::InstallRequest;
 use device_core::acp_permission::PermissionRequest;
 use device_core::engine::{HostSpec, SettingsUpdate};
 use device_core::envelope::Signed;
@@ -363,6 +364,27 @@ impl DeviceCore {
         let update: AcpUpdate = serde_json::from_str(&update)
             .map_err(|_| Error::from_reason("invalid agent update"))?;
         let view = self.state.acp_update(update).map_err(Error::from_reason)?;
+
+        to_json(&view)
+    }
+
+    /// A fresh folder for one registry download (its path). Only a file inside it can be installed.
+    #[napi]
+    pub fn acp_install_stage(&self) -> Result<String> {
+        self.state.acp_install_stage().map_err(Error::from_reason)
+    }
+
+    /// Verifies a downloaded registry archive against its published SHA-256, unpacks it, and registers the agent
+    /// with its pinned version (`InstallRequest`, JSON). Not reachable through `acp_update`. Validation is in Rust.
+    #[napi]
+    pub fn acp_install(&self, request: String) -> Result<String> {
+        // The request can carry variable values; a parse error must not quote them.
+        let request: InstallRequest = serde_json::from_str(&request)
+            .map_err(|_| Error::from_reason("invalid install request"))?;
+        let view = self
+            .state
+            .acp_install(request)
+            .map_err(Error::from_reason)?;
 
         to_json(&view)
     }
