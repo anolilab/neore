@@ -159,6 +159,7 @@ vi.mock("electron", () => {
         },
         ipcMain: {
             handle: (channel: string, listener: (event: unknown, payload?: unknown) => unknown) => fakeElectron.ipc.set(channel, listener),
+            on: () => {},
         },
         Menu: {
             buildFromTemplate: () => {
@@ -415,9 +416,36 @@ describe("the microphone", () => {
         expect(askForAudio({ id: 99 }, `${SITE}/chat`)).toBe(true);
     });
 
-    it("starts no dictation window or shortcut while the internal flag is off", () => {
+    it("starts no dictation window or shortcut while the switch in settings is off, which is the default", () => {
         expect(fake().shortcuts.has("CommandOrControl+Shift+D")).toBe(false);
         expect(fake().windows.every((win) => win.loaded.every((url) => !url.includes("dictation")))).toBe(true);
+    });
+
+    describe("the dictation settings channels", () => {
+        const CHANNELS = ["get", "update", "download", "remove"].map((name) => `neore:dictation-settings:${name}`);
+
+        it("exist, and answer neither the site nor any other window", async () => {
+            const fetchSpy = vi.spyOn(globalThis, "fetch");
+            const senders = [
+                siteSender(),
+                composerSender(),
+                sender("file:///app/dist/dictation-settings-window/settings.html"),
+                sender(`${SITE}/dictation-settings-window/settings.html`),
+            ];
+
+            const calls = CHANNELS.flatMap((channel) =>
+                senders.map(async (caller) => {
+                    expect(fake().ipc.has(channel)).toBe(true);
+
+                    return fake().ipc.get(channel)?.(caller, { enabled: true, id: "small" });
+                }),
+            );
+
+            await Promise.all(calls.map(async (call) => expect(call).rejects.toThrow("not the settings window")));
+
+            expect(fetchSpy).not.toHaveBeenCalled();
+            fetchSpy.mockRestore();
+        });
     });
 });
 

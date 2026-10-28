@@ -41,8 +41,33 @@ export const SMALL: ModelSpec = {
     version: MODEL_REVISION,
 };
 
+/** One model as settings offers it on this machine. */
+export interface OfferedModel {
+    isDefault: boolean;
+    /** What a person should know before choosing it; shown beside the choice. */
+    note: string;
+    spec: ModelSpec;
+}
+
 /**
- * Apple Silicon runs the large model on the GPU in seconds; every other machine runs the CPU and
- * gets the small one (Appendix A). Choosing a model is a settings matter (S3); until then this decides.
+ * Apple Silicon runs the large model on the GPU in seconds, so it is the default there and the only choice that matters.
+ * Every other machine runs the CPU: small is the default (about 7 s for a 10 s clip on four cores), and the large model
+ * is offered as the slower, more accurate one (Appendix A).
  */
-export const modelFor = (platform: NodeJS.Platform, arch: string): ModelSpec => platform === "darwin" && arch === "arm64" ? LARGE_V3_TURBO_Q5 : SMALL;
+export const offeredModels = (platform: NodeJS.Platform, arch: string): OfferedModel[] =>
+    platform === "darwin" && arch === "arm64"
+        ? [
+            { isDefault: true, note: "Fast and accurate in all supported languages on this Mac.", spec: LARGE_V3_TURBO_Q5 },
+            { isDefault: false, note: "Smaller and faster to download, but weaker on Chinese and Italian.", spec: SMALL },
+        ]
+        : [
+            { isDefault: true, note: "Weaker on Chinese and Italian.", spec: SMALL },
+            { isDefault: false, note: "More accurate, but several times slower on a computer without a supported GPU.", spec: LARGE_V3_TURBO_Q5 },
+        ];
+
+/** The model to use: the chosen one when this machine offers it, otherwise the machine's default. */
+export const resolveModel = (chosen: string | undefined, platform: NodeJS.Platform, arch: string): ModelSpec => {
+    const offered = offeredModels(platform, arch);
+
+    return (offered.find(({ spec }) => spec.id === chosen) ?? offered.find(({ isDefault }) => isDefault) ?? offered[0]).spec;
+};

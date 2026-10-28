@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <!-- Strict: only the page's own script and stylesheet, and no connection of any kind. -->
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Neore dictation settings</title>
+        <link rel="stylesheet" href="settings.css" />
+        <script src="settings.js" defer></script>
+    </head>
+    <body>
+        <main>
+            <h1>Dictation</h1>
+            <p id="unavailable" class="warning" role="status" hidden>On-device dictation is not available on this computer yet.</p>
+
+            <label class="check" for="enabled">
+                <input type="checkbox" id="enabled" role="switch" aria-describedby="enabled-hint" />
+                <span>Dictate on this computer</span>
+            </label>
+            <p id="enabled-hint" class="muted">
+                Off by default. Hold <kbd id="shortcut"></kbd> to dictate and release to put the text in your message. The speech is recognised
+                here: no audio leaves this computer. Nothing is downloaded while this is off.
+            </p>
+
+            <fieldset id="models">
+                <legend>Speech model</legend>
+                <p id="models-hint" class="muted">A model is downloaded once and kept on this computer. You can delete it here.</p>
+                <div id="model-list"></div>
+            </fieldset>
+
+            <div class="field">
+                <label for="language">Language</label>
+                <select id="language" aria-describedby="language-hint"></select>
+                <p id="language-hint" class="muted">Choose the language you speak for the best result, or let the model detect it.</p>
+            </div>
+
+            <p id="status" role="status" aria-live="polite"></p>
+        </main>
+    </body>
+</html>

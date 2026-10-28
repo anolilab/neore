@@ -1,0 +1,134 @@
+:root {
+    color-scheme: light dark;
+    --muted: #6b6b6b;
+    --border: #cfcfcf;
+    --warn-bg: #fff4e5;
+    --warn-fg: #7a4100;
+    font: 14px/1.45 system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --muted: #a0a0a0;
+        --border: #444;
+        --warn-bg: #3a2600;
+        --warn-fg: #ffd08a;
+    }
+}
+
+body {
+    margin: 0;
+}
+
+main {
+    padding: 16px 20px 24px;
+}
+
+h1 {
+    font-size: 18px;
+    margin: 0 0 12px;
+}
+
+.muted {
+    color: var(--muted);
+    margin: 2px 0 12px;
+}
+
+.warning {
+    background: var(--warn-bg);
+    border-radius: 6px;
+    color: var(--warn-fg);
+    padding: 10px 12px;
+}
+
+.check {
+    align-items: center;
+    display: flex;
+    font-weight: 600;
+    gap: 8px;
+}
+
+fieldset {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: 0 0 16px;
+    padding: 8px 12px 12px;
+}
+
+legend {
+    font-weight: 600;
+    padding: 0 4px;
+}
+
+.model {
+    border-top: 1px solid var(--border);
+    padding: 10px 0;
+}
+
+.model:first-of-type {
+    border-top: 0;
+}
+
+.model label {
+    align-items: center;
+    display: flex;
+    font-weight: 600;
+    gap: 8px;
+}
+
+.model .muted {
+    margin: 2px 0 6px 24px;
+}
+
+.actions {
+    display: flex;
+    gap: 8px;
+    margin-left: 24px;
+}
+
+.field {
+    margin-bottom: 16px;
+}
+
+label[for="language"] {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+button,
+select {
+    font: inherit;
+}
+
+button {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: inherit;
+    cursor: pointer;
+    padding: 4px 12px;
+}
+
+button:disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 2px solid currentcolor;
+    outline-offset: 2px;
+}
+
+kbd {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font: inherit;
+    padding: 0 4px;
+}
+
+#status {
+    min-height: 1.4em;
+}

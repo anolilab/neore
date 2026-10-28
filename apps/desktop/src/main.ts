@@ -15,7 +15,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, Notific
 import { createSetBadgeHandler } from "./badge.js";
 import { CAPABILITIES_ARG, CHANNEL, SITE_ORIGIN_ARG } from "./channels.js";
 import { registerDeviceIpc } from "./device/index.js";
-import type { DictationProbe } from "./dictation/index.js";
+import type { Dictation, DictationProbe } from "./dictation/index.js";
 import { createDictation } from "./dictation/index.js";
 import type { DroppedFile } from "./dropped-files.js";
 import { queueDroppedFiles, readDroppedFiles } from "./dropped-files.js";
@@ -33,6 +33,8 @@ interface ShellState {
     composer?: BrowserWindow;
     /** Set once `registerDeviceIpc` has run: the core loaded. */
     deviceReady: boolean;
+    /** Set in `start`: the tray's "Dictation settings…" opens its local window. */
+    dictation?: Dictation;
     isQuitting: boolean;
     mainWindow?: BrowserWindow;
     pendingCompose?: string;
@@ -646,6 +648,7 @@ const buildTrayMenu = (): Menu => {
         { click: () => focusMain(), label: "Open Neore" },
         { accelerator: QUICK_COMPOSER_SHORTCUT, click: () => toggleQuickComposer(), label: "Quick Composer" },
         { click: () => startBrowserSignIn(), label: "Sign in with browser" },
+        { click: () => state.dictation?.openSettings(), label: "Dictation settings…" },
         {
             click: () => {
                 openTerminalFromTray();
@@ -874,8 +877,6 @@ const start = (): void => {
     // one policy answers for both sessions (`dictation/permissions.ts`), so they cannot drift apart.
     const dictation = createDictation({
         canTakeDraft: () => state.mainWindow !== undefined && !state.mainWindow.isDestroyed() && isDraftTarget(origin, state.mainWindow.webContents.getURL()),
-        // The temporary internal flag for S2; the opt-in switch in settings (S3) replaces it. Baked in at build time like the site origin.
-        enabled: process.env.NEORE_DICTATION === "1",
         handOffDraft,
         isSiteUrl: (url) => isTrustedUrl(origin, url),
         log,
@@ -886,6 +887,7 @@ const start = (): void => {
     ses.setPermissionRequestHandler(dictation.policy.request);
     ses.setPermissionCheckHandler(dictation.policy.check);
     shellProbe.dictation = dictation.probe;
+    state.dictation = dictation;
 
     registerIpc();
     registerSchemeInDev();
