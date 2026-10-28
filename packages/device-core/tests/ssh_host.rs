@@ -86,7 +86,8 @@ fn sshd_binary() -> Option<PathBuf> {
 fn run(program: &str, args: &[&str]) -> String {
     let output = Command::new(program).args(args).output().unwrap();
 
-    assert!(output.status.success(), "{program} {args:?} failed");
+    // The arguments are left out of the message: one of them can be a key passphrase.
+    assert!(output.status.success(), "{program} failed");
 
     String::from_utf8_lossy(&output.stdout).trim().to_owned()
 }
