@@ -155,7 +155,18 @@ export class TurnChannel {
             return;
         }
 
-        this.threadId ??= this.host.threadOf(this.sessionId) ?? undefined;
+        if (this.threadId === undefined) {
+            const known = this.host.threadOf(this.sessionId);
+
+            // A refused session is not posted at all: ending here frees the channel instead of letting events pile up behind it.
+            if (known === null) {
+                this.finish();
+
+                return;
+            }
+
+            this.threadId = known;
+        }
 
         if (this.threadId === undefined) {
             // The session is still being opened; its open binds the thread and schedules this.
