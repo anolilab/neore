@@ -15,10 +15,11 @@ import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { getMaxMessage } from "../agent/messages";
 import { insertAgentSwitchRow, patchThread } from "../agent/table-writes";
 import { requireThreadPermission } from "../agent/thread-read-access";
-import { isThreadStreaming } from "../agent/thread-streaming";
+import { hasStreamFor, isThreadStreaming } from "../agent/thread-streaming";
 import { getUser } from "../auth/lib/better-auth-queries";
 import { claimOnce } from "../lib/claim-once";
 import { authMutation, rateLimit } from "../lib/crpc";
+import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import { findPendingApprovalOnLatestTurn } from "./lib/tool-approval-claim";
@@ -29,9 +30,11 @@ const RECENT_APPROVALS_CHECKED = 5;
 /**
  * Whether the latest turn waits on a tool approval or a question (`toolApprovalRuns`). Answering it resumes the
  * paused reply on its stored model and hangs the continuation under that reply, past a divider written in between.
+ * Read past RLS: the run is stored under the thread's owner, so a collaborator with a write grant would see none.
+ * A decision only — no row leaves this function.
  */
 const hasOpenApproval = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
-    const runs = await ctx.db
+    const runs = await systemDb(ctx)
         .query("toolApprovalRuns")
         .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
         .order("desc")
@@ -93,8 +96,9 @@ export const switchThreadAgentHandler = async (ctx: MutationCtx, args: SwitchArg
         return refuse(AGENT_SWITCH_UNSUPPORTED, "Switching to a host agent is not available yet");
     }
 
-    // A bot runs on its bot's model, a group chat on its participants, and a media thread has no model to swap.
-    if (thread.botId || thread.groupChat || thread.multiChat || (thread.mode !== undefined && thread.mode !== "text")) {
+    // A bot runs on its bot's model, a group chat on its participants, a messenger thread on the connection's,
+    // and a media thread has no model to swap.
+    if (thread.botId || thread.groupChat || thread.multiChat || thread.messengerConnectionId || (thread.mode !== undefined && thread.mode !== "text")) {
         return refuse(AGENT_SWITCH_UNSUPPORTED, "This chat runs on a fixed agent");
     }
 
@@ -121,10 +125,22 @@ export const switchThreadAgentHandler = async (ctx: MutationCtx, args: SwitchArg
 
     const to: AgentRef = { kind: "model", model: definition.id };
 
+    if (sameAgent(from, to)) {
+        return { agent: from, coldStartCostly: false, messageId: null, switched: false };
+    }
+
+    // The prompt is saved before its stream exists: a divider written in that gap would sit under a prompt the
+    // reply then hangs off, past the divider. A prompt whose run already started — and was stopped or failed
+    // before a reply — is no gap, or the user could never leave the model that is not answering. (A regenerate's
+    // gap, between pointing the leaf at its prompt and creating the stream, is milliseconds and stays open.)
+    if ((leaf.message as { role?: string } | undefined)?.role === "user" && !(await hasStreamFor(ctx, thread._id, leaf._id))) {
+        throw new LunoraError("CONFLICT", "Wait for the reply to start before switching", { data: { code: AGENT_SWITCH_STREAMING } });
+    }
+
     // The caller's, not the thread's: the claims table is shared and a `clientId` is client-chosen.
     const claimed = await claimOnce(ctx, "switch", `${args.userId}:${thread._id}:${args.clientId}`, AGENT_SWITCH_CLAIM_TTL_MS, args.userId);
 
-    if (!claimed || sameAgent(from, to)) {
+    if (!claimed) {
         return { agent: from, coldStartCostly: false, messageId: null, switched: false };
     }
 

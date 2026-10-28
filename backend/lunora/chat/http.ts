@@ -606,6 +606,8 @@ const runChatStartOnShard = async (
     // Bots chat in text only, so a media model is refused rather than swapped.
     // A regenerate's gate answer is used only for the worker check above, so it reads the thread itself.
     let threadBotId: string | undefined = access?.botId;
+    // Only a thread that was switched has an agent to look up (`agent/agent-switch.ts`).
+    let threadSwitched = access?.activeAgent !== undefined;
 
     if (validThreadId && body.regenerate && body.parentId) {
         const ownThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> });
@@ -617,6 +619,7 @@ const runChatStartOnShard = async (
         }
 
         threadBotId ??= ownThread?.botId;
+        threadSwitched = ownThread?.activeAgent !== undefined;
     }
 
     // A chat whose bot was deleted is a plain chat again, so the bot rules apply only to a bot that still exists.
@@ -636,14 +639,15 @@ const runChatStartOnShard = async (
     // A switched thread runs on the agent its path ends on, whatever the composer sent: the model a
     // send brings only stands for a thread that was never switched. A regenerate continues from its
     // prompt's path, so it runs on what was recorded THERE (`agent/agent-switch.ts`). A model outside the
-    // registry (a custom endpoint) is no switch target, so a send that names one keeps it.
-    if (validThreadId && !bot && !isAnonymous && contentType === "text" && MODEL_LOOKUP.has(effectiveModel)) {
+    // registry (a custom endpoint) is no switch target, so a send that names one keeps it, and a path
+    // that ends on one (the thread's pre-switch model) does not override the send.
+    if (validThreadId && threadSwitched && !bot && !isAnonymous && contentType === "text" && MODEL_LOOKUP.has(effectiveModel)) {
         const agentModel = await context.runQuery(internal.agent.agent_switch.getRunAgentModel, {
             ...(body.regenerate && body.parentId && { promptMessageId: body.parentId as Id<"messages"> }),
             threadId: validThreadId as Id<"threads">,
         });
 
-        if (agentModel) {
+        if (agentModel && MODEL_LOOKUP.has(agentModel)) {
             effectiveModel = agentModel;
         }
     }

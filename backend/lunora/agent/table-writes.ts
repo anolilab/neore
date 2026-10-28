@@ -88,6 +88,11 @@ export const insertAgentSwitchRow = async (
     });
 };
 
+/** Rewrites the part of a divider written by `insertAgentSwitchRow`, checked the same way. */
+export const patchAgentSwitchRow = async (db: Database, messageId: Id<"messages">, part: AgentSwitchPart): Promise<void> => {
+    await db.patch(messageId, { providerMetadata: agentSwitchRowContent(part).providerMetadata });
+};
+
 export const patchMessage = async (db: Database, messageId: Id<"messages">, fields: MessagePatch): Promise<void> => {
     await db.patch(messageId, withoutUndefined(fields));
 };
