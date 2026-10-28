@@ -372,7 +372,9 @@ export interface Doc_devices {
     name: string;
     platform: "macos" | "windows" | "linux";
     revokedAt?: number;
+    transport?: "ssh";
     userId: string;
+    viaDeviceId?: Id<"devices">;
 }
 
 export interface Doc_documentHistory {
@@ -3113,7 +3115,9 @@ export interface Insert_devices {
     name: string;
     platform: "macos" | "windows" | "linux";
     revokedAt?: number;
+    transport?: "ssh";
     userId: string;
+    viaDeviceId?: Id<"devices">;
 }
 
 export interface Insert_documentHistory {

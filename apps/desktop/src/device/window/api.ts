@@ -1,7 +1,7 @@
 /** What the local device window's preload exposes as `window.neoreDevice`. */
 import type { AcpUpdate, AcpView, PermissionView, ProbeResult, SessionSnapshot, SessionSummary } from "../../acp/types";
 import type { Availability } from "../../terminal/shell";
-import type { Prompt, SettingsView } from "../types";
+import type { HostProbe, Prompt, SettingsView } from "../types";
 
 declare global {
     // The preload exposes this on the page's global object; the device page reads it from there.
@@ -26,6 +26,10 @@ export interface DeviceWindowApi {
     acpView: () => Promise<AcpView>;
     auditTail: () => Promise<string[]>;
     confirm: (message: string) => Promise<boolean>;
+    hostConnect: (deviceId: string) => Promise<HostProbe>;
+    hostDisconnect: (deviceId: string) => Promise<void>;
+    hostForgetKey: (deviceId: string) => Promise<void>;
+    hostRemove: (deviceId: string) => Promise<void>;
     onAcpChanged: (handler: () => void) => () => void;
     onPromptQueued: (handler: () => void) => () => void;
     /** Opens a terminal for the folder; `null` asks for one. */
@@ -33,6 +37,8 @@ export interface DeviceWindowApi {
     pickFolder: () => Promise<string | null>;
     promptAnswer: (id: number, answer: "always" | "deny" | "once") => Promise<void>;
     promptCurrent: () => Promise<Prompt | null>;
+    /** The text typed for a passphrase prompt. */
+    promptSecret: (id: number, secret: string) => Promise<void>;
     settingsGet: () => Promise<SettingsView>;
     settingsUpdate: (update: Record<string, unknown>) => Promise<SettingsView>;
     terminalAvailability: () => Promise<Availability>;

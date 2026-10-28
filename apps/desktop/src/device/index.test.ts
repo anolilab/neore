@@ -203,10 +203,17 @@ const makeCore = () => {
         auditTail: vi.fn(() => ["{}"]),
         denyPrompts: vi.fn(),
         execute: vi.fn(async () => JSON.stringify({ payload: "{}", signature: "s" })),
-        manifest: vi.fn(async () => JSON.stringify({ payload: "{}", signature: "m" })),
+        hostConnect: vi.fn(async () => JSON.stringify({ platform: "linux" })),
+        hostDisconnect: vi.fn(),
+        hostForgetKey: vi.fn(),
+        hostPair: vi.fn(async (_spec: string, _deviceId: string, _secret: string) => true),
+        hostProbe: vi.fn(async (_spec: string) => JSON.stringify({ platform: "linux", sandboxAvailable: true, sandboxDetail: "Landlock", version: "0.1.0" })),
+        hostRemove: vi.fn(),
+        manifest: vi.fn(async (_deviceId?: string) => JSON.stringify({ payload: "{}", signature: "m" })),
         pair: vi.fn(async () => true),
         promptAnswer: vi.fn(),
         promptCurrent: vi.fn(() => null),
+        promptSecret: vi.fn(),
         reapIdleServers: vi.fn(),
         settingsGet: vi.fn(() => JSON.stringify({ paired: false, roots: [] })),
         settingsUpdate: vi.fn(() => JSON.stringify({ paired: false, roots: ["/x"] })),
@@ -269,6 +276,120 @@ describe("relay channels (the site window)", () => {
         expect(() => invoke(LOCAL_CHANNEL.settingsGet, siteEvent())).toThrow("device: not the device window");
         expect(() => invoke(LOCAL_CHANNEL.pickFolder, siteEvent())).toThrow("device: not the device window");
         expect(core.promptAnswer).not.toHaveBeenCalled();
+    });
+});
+
+describe("servers over SSH", () => {
+    const spec = { address: "build.example.com", name: "build-box", port: 2222, user: "deploy" };
+
+    it("refuse every sender but the site", () => {
+        for (const channel of [DEVICE_CHANNEL.hostProbe, DEVICE_CHANNEL.hostConnect, DEVICE_CHANNEL.hostDisconnect]) {
+            expect(() => invoke(channel, foreignEvent(), spec)).toThrow("device: untrusted sender");
+        }
+
+        expect(() => invoke(DEVICE_CHANNEL.hostPair, foreignEvent(), {})).toThrow("device: untrusted sender");
+        expect(core.hostProbe).not.toHaveBeenCalled();
+        expect(core.hostPair).not.toHaveBeenCalled();
+    });
+
+    it("pass a validated server and its secret to the core as JSON", async () => {
+        await expect(invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), spec)).resolves.toMatchObject({ platform: "linux" });
+        expect(JSON.parse(core.hostProbe.mock.calls[0]?.[0] as string)).toEqual(spec);
+
+        // Agent forwarding is not the page's to ask for: it never reaches the core.
+        await invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), { ...spec, forwardAgent: true });
+
+        expect(core.hostProbe.mock.calls[1]?.[0]).not.toContain("forwardAgent");
+
+        await invoke(DEVICE_CHANNEL.hostPair, siteEvent(), { deviceId: "host-1", secret: "c".repeat(64), spec: { ...spec, identityFile: "/home/me/.ssh/id" } });
+
+        expect(core.hostPair).toHaveBeenCalledWith(expect.stringContaining("\"identityFile\":\"/home/me/.ssh/id\""), "host-1", "c".repeat(64));
+    });
+
+    it("reject a malformed server before the core", async () => {
+        await expect(invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), { ...spec, port: 70_000 })).rejects.toThrow("device: port is invalid");
+        await expect(invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), { ...spec, address: "" })).rejects.toThrow("device: address is invalid");
+        await expect(invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), { ...spec, user: 7 })).rejects.toThrow("device: user is invalid");
+        await expect(invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), { ...spec, name: "prod\n\nApprove?" })).rejects.toThrow("device: name is invalid");
+        await expect(invoke(DEVICE_CHANNEL.hostProbe, siteEvent(), "build-box")).rejects.toThrow("device: server is invalid");
+        await expect(invoke(DEVICE_CHANNEL.hostPair, siteEvent(), { deviceId: "host-1", secret: "x", spec: {} })).rejects.toThrow("is invalid");
+        expect(core.hostProbe).not.toHaveBeenCalled();
+    });
+
+    it("ask the core for a server's own manifest by its device id", async () => {
+        await invoke(DEVICE_CHANNEL.manifest, siteEvent(), "host-1");
+        await invoke(DEVICE_CHANNEL.manifest, siteEvent());
+
+        expect(core.manifest.mock.calls).toEqual([["host-1"], [undefined]]);
+        await expect(invoke(DEVICE_CHANNEL.manifest, siteEvent(), 7)).rejects.toThrow("device: deviceId is invalid");
+    });
+
+    it("keep removing a server and forgetting its key out of the page's reach", () => {
+        for (const channel of [LOCAL_CHANNEL.hostRemove, LOCAL_CHANNEL.hostForgetKey, LOCAL_CHANNEL.hostConnect, LOCAL_CHANNEL.hostDisconnect]) {
+            expect(() => invoke(channel, siteEvent(), "host-1")).toThrow("device: not the device window");
+        }
+
+        expect(core.hostRemove).not.toHaveBeenCalled();
+        expect(core.hostForgetKey).not.toHaveBeenCalled();
+    });
+
+    it("let the device window manage a server", async () => {
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+        invoke(LOCAL_CHANNEL.hostForgetKey, localEvent(), "host-1");
+        invoke(LOCAL_CHANNEL.hostRemove, localEvent(), "host-1");
+        invoke(LOCAL_CHANNEL.hostDisconnect, localEvent(), "host-1");
+        await invoke(LOCAL_CHANNEL.hostConnect, localEvent(), "host-1");
+
+        expect(core.hostForgetKey).toHaveBeenCalledWith("host-1");
+        expect(core.hostRemove).toHaveBeenCalledWith("host-1");
+        expect(core.hostDisconnect).toHaveBeenCalledWith("host-1");
+        expect(core.hostConnect).toHaveBeenCalledWith("host-1");
+    });
+});
+
+describe("passphrases", () => {
+    beforeEach(() => {
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+    });
+
+    it("answer a passphrase prompt only from the device window, on a channel of its own", () => {
+        expect(() => invoke(LOCAL_CHANNEL.promptSecret, siteEvent(), 4, "hunter2")).toThrow("device: not the device window");
+        expect(() => invoke(LOCAL_CHANNEL.promptSecret, foreignEvent(), 4, "hunter2")).toThrow("device: not the device window");
+        expect(core.promptSecret).not.toHaveBeenCalled();
+
+        invoke(LOCAL_CHANNEL.promptSecret, localEvent(), 4, "hunter2");
+
+        expect(core.promptSecret).toHaveBeenCalledWith(4, "hunter2");
+        // It is not a plain answer: the ordinary channel refuses it.
+        expect(() => invoke(LOCAL_CHANNEL.promptAnswer, localEvent(), 4, "hunter2")).toThrow("device: answer is invalid");
+    });
+
+    it("refuse a malformed secret without ever putting it in the error", () => {
+        for (const bad of ["", "x".repeat(2000), "a\nb", 12]) {
+            let message = "";
+
+            try {
+                invoke(LOCAL_CHANNEL.promptSecret, localEvent(), 4, bad);
+            } catch (error) {
+                message = String(error);
+            }
+
+            expect(message).toContain("device: passphrase is invalid");
+            expect(message).not.toContain("x".repeat(20));
+        }
+
+        expect(() => invoke(LOCAL_CHANNEL.promptSecret, localEvent(), 0, "ok")).toThrow("device: prompt id is invalid");
+        expect(core.promptSecret).not.toHaveBeenCalled();
+    });
+
+    it("never forwards a passphrase into an event or a notification", () => {
+        invoke(LOCAL_CHANNEL.promptSecret, localEvent(), 4, "correct horse");
+        fake.coreEmit?.(
+            JSON.stringify({ prompt: { body: { host: "deploy@build", kind: "passphrase", prompt: "Enter passphrase for key" }, expiresAt: 1, id: 5 }, type: "prompt" }),
+        );
+
+        expect(JSON.stringify(fake.notifications)).not.toContain("correct horse");
+        expect(fake.notifications.at(-1)?.body).toBe("A key passphrase for deploy@build");
     });
 });
 
@@ -448,9 +569,10 @@ describe("events", () => {
         invoke(DEVICE_CHANNEL.openSettings, siteEvent());
         await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: "{}", signature: "a".repeat(64) });
 
-        fake.coreEmit?.(JSON.stringify({ callId: "c1", payload: "{}", signature: "p", type: "progress" }));
+        fake.coreEmit?.(JSON.stringify({ callId: "c1", deviceId: "host-1", payload: "{}", signature: "p", type: "progress" }));
 
-        expect(siteContents.send).toHaveBeenCalledWith(DEVICE_CHANNEL.progress, { callId: "c1", payload: "{}", signature: "p" });
+        // The report says which device it is for: a server's progress is signed with that server's secret.
+        expect(siteContents.send).toHaveBeenCalledWith(DEVICE_CHANNEL.progress, { callId: "c1", deviceId: "host-1", payload: "{}", signature: "p" });
         expect(deviceWindow().webContents.send).not.toHaveBeenCalledWith(DEVICE_CHANNEL.progress, expect.anything());
     });
 
@@ -468,6 +590,22 @@ describe("events", () => {
 
         expect(fake.windows).toHaveLength(1);
         expect(fake.notifications).toEqual([{ body: "fs_list — T", title: "Neore is asking for your approval" }]);
+    });
+
+    it("words a notification for each kind of prompt", () => {
+        const notify = (body: Record<string, unknown>) => {
+            fake.coreEmit?.(JSON.stringify({ prompt: { body, expiresAt: 1, id: 9 }, type: "prompt" }));
+
+            return fake.notifications.at(-1)?.body;
+        };
+
+        expect(notify({ address: "build", identityFile: null, kind: "hostConnect", name: "build-box", port: 22, user: "deploy" })).toBe("Connect to deploy@build?");
+        expect(notify({ fingerprint: "SHA256:x", host: "build", identityFile: null, keyType: "ED25519", kind: "hostKey", port: 22 })).toBe("Trust the key of build?");
+        expect(notify({ host: "build", kind: "hostKeyChanged", pinned: [], port: 22, presented: [] })).toBe("The key of build changed");
+        expect(notify({ address: "build", identityFile: null, kind: "hostPairing", name: "build-box", port: 22, user: "u" })).toBe("Add the server build-box");
+        expect(
+            notify({ allowAlways: false, detail: "ls", host: "build-box", input: "{}", kind: "call", taintedBy: [], threadTitle: "T", tool: "fs_list", toolKind: "fs" }),
+        ).toBe("fs_list on build-box — T");
     });
 
     it("tells the site its tool set changed when the core says so", () => {

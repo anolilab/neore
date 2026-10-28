@@ -263,4 +263,21 @@ select {
 
 #acp-requests pre {
     max-height: 200px;
+
+#hosts section {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 0 0 12px;
+}
+
+#hosts h3 {
+    margin: 0 0 4px;
+    font-size: 14px;
+}
+
+#prompt-secret-box {
+    display: grid;
+    gap: 4px;
+    margin: 8px 0;
 }

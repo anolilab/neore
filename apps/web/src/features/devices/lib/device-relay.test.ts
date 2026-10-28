@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { DeviceRelayPorts } from "./device-relay";
-import { createDeviceRelay, DEVICE_ONLINE_WINDOW_MS, isDeviceOnline, relayDeviceCall } from "./device-relay";
+import { createDeviceRelay, DEVICE_ONLINE_WINDOW_MS, isDeviceOnline, relayDeviceCall, viaDeviceFor } from "./device-relay";
 
-const CALL = { callId: "c1", envelope: "{}", signature: "s" };
+const CALL = { callId: "c1", deviceId: "dev1", envelope: "{}", signature: "s" };
 const RESULT = { payload: '{"kind":"result"}', signature: "r" };
 
 const ports = (overrides: Partial<DeviceRelayPorts> = {}): DeviceRelayPorts => {
@@ -22,7 +22,7 @@ describe("relayDeviceCall", () => {
 
         await expect(relayDeviceCall(CALL, relay)).resolves.toBe("completed");
         expect(relay.execute).toHaveBeenCalledWith(CALL);
-        expect(relay.complete).toHaveBeenCalledWith("c1", RESULT);
+        expect(relay.complete).toHaveBeenCalledWith(CALL, RESULT);
     });
 
     it("never runs a call another window claimed", async () => {
@@ -40,7 +40,7 @@ describe("relayDeviceCall", () => {
         });
 
         await expect(relayDeviceCall(CALL, relay)).resolves.toBe("refused");
-        expect(relay.release).toHaveBeenCalledWith("c1", "the request has expired");
+        expect(relay.release).toHaveBeenCalledWith(CALL, "the request has expired");
         expect(relay.complete).not.toHaveBeenCalled();
     });
 });
@@ -54,6 +54,13 @@ describe("createDeviceRelay", () => {
         push([CALL, { ...CALL, callId: "c2" }]);
         await vi.waitFor(() => expect(relay.complete).toHaveBeenCalledTimes(2));
         expect(relay.claim).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe("viaDeviceFor", () => {
+    it("names the desktop only for a server it holds", () => {
+        expect(viaDeviceFor("desktop", "desktop")).toBeUndefined();
+        expect(viaDeviceFor("desktop", "host-1")).toBe("desktop");
     });
 });
 

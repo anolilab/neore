@@ -248,7 +248,9 @@ export const devices = sqliteTable("devices", {
     name: text("name").notNull(),
     platform: text("platform", { mode: "json" }).$type<"macos" | "windows" | "linux">().notNull(),
     revokedAt: real("revokedAt"),
+    transport: text("transport"),
     userId: text("userId").notNull(),
+    viaDeviceId: text("viaDeviceId").references((): AnySQLiteColumn => devices._id),
 }, (t) => ({
     by_userId: index("by_userId").on(t.userId),
 }));

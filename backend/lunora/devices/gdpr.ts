@@ -29,8 +29,8 @@ export const collectDevicesForExport = internalQuery
             calls: calls.page.map(({ completedAt, createdAt, decision, deviceName, error, exitCode, input, output, status, taintedBy, threadId, toolName }) => {
                 return { completedAt, createdAt, decision, deviceName, error, exitCode, input, output, status, taintedBy, threadId, toolName };
             }),
-            devices: devices.page.map(({ createdAt, lastSeenAt, manifest, name, platform }) => {
-                return { createdAt, lastSeenAt, name, platform, tools: (manifest ?? []).map((tool) => tool.name) };
+            devices: devices.page.map(({ createdAt, lastSeenAt, manifest, name, platform, transport }) => {
+                return { createdAt, lastSeenAt, name, platform, tools: (manifest ?? []).map((tool) => tool.name), transport };
             }),
         };
     });

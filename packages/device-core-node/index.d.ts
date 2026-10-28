@@ -16,17 +16,42 @@ export declare class DeviceCore {
    * Resolves `false` when declined or unanswered.
    */
   pair(deviceId: string, secret: string, accountLabel: string): Promise<boolean>
-  /** The signed tool manifest (`{ payload, signature }`, JSON). */
-  manifest(): Promise<string>
+  /**
+   * The signed tool manifest (`{ payload, signature }`, JSON): this computer's, or the named server's, which
+   * is signed with that server's own secret.
+   */
+  manifest(deviceId?: string | undefined | null): Promise<string>
   /**
    * Verifies, asks about (through `onEvent`), runs and signs one relayed call.
    * Resolves the signed result (`{ payload, signature }`, JSON).
    */
   execute(envelope: string, signature: string): Promise<string>
+  /**
+   * Connects a server that is not paired yet, asking the person at the local window to trust its key and for a
+   * key passphrase. Resolves what the server reported (`{ platform, sandboxAvailable, … }`, JSON).
+   */
+  hostProbe(spec: string): Promise<string>
+  /**
+   * Stores the probed server as a device of its own, with the secret the backend minted for it, once the user
+   * confirms it in the local window. Resolves `false` when declined.
+   */
+  hostPair(spec: string, deviceId: string, secret: string): Promise<boolean>
+  /** Connects a paired server again. Resolves what the server reported (JSON). */
+  hostConnect(deviceId: string): Promise<string>
+  hostDisconnect(deviceId: string): void
+  /** Forgets a server on this computer: its secret, folders and connection. */
+  hostRemove(deviceId: string): void
+  /** Drops a server's pinned host key so the next connection asks again. */
+  hostForgetKey(deviceId: string): void
   /** The prompt the approval window should show (JSON), or `null`. */
   promptCurrent(): string | null
   /** Answers one prompt: `deny`, `once` or `always`. */
   promptAnswer(id: number, answer: string): void
+  /**
+   * Answers a passphrase prompt with what the user typed. Not a plain answer: the text goes to ssh and nowhere
+   * else, and is never part of a prompt, an event or a log.
+   */
+  promptSecret(id: number, secret: string): void
   /** Denies every prompt still waiting. Call when the approval window closes. */
   denyPrompts(): void
   /** The shared folders, rules, servers and sandbox setting (JSON). */
@@ -60,8 +85,11 @@ export declare class DeviceCore {
   acpPermissionCancelSession(sessionId: string): void
   /** The most recent audit lines, newest first (each a JSON object). */
   auditTail(): Array<string>
-  /** Stops local MCP servers idle for ten minutes. Call about once a minute. */
-  reapIdleServers(): void
+  /**
+   * Stops local MCP servers idle for ten minutes. Call about once a minute. Resolves when the sweep is done, and
+   * runs on the blocking pool: a server that is mid-call holds its lock, and the main thread must not wait for it.
+   */
+  reapIdleServers(): Promise<boolean>
   /** Stops every local MCP server. Call on quit. */
   stop(): void
 }

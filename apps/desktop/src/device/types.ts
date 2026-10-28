@@ -9,19 +9,68 @@ export interface Signed {
     signature: string;
 }
 
+/** A server this computer speaks for, and whether it is connected right now (`HostStatus` in `engine/hosts.rs`). */
+export interface HostStatus {
+    connected: boolean;
+    deviceId: string;
+    name: string;
+}
+
 /** Who this computer is paired as (`StatusView` in `device-core/src/engine.rs`). */
 export interface DeviceStatus {
     accountLabel: string | null;
     deviceId: string | null;
+    hosts: HostStatus[];
     platform: string;
+}
+
+/** Where a server is and how to log in (`HostSpec` in `engine/hosts.rs`). The page supplies it. */
+export interface HostSpec {
+    address: string;
+    identityFile?: string;
+    name: string;
+    port?: number;
+    user: string;
+}
+
+/** What a connected server reported about itself (`HostProbe`). */
+export interface HostProbe {
+    platform: string;
+    sandboxAvailable: boolean;
+    sandboxDetail: string;
+    version: string;
+}
+
+/** A server as the local window lists it (`HostView`). */
+export interface HostView {
+    address: string;
+    allowShellNetwork: boolean;
+    connected: boolean;
+    deviceId: string;
+    forwardAgent: boolean;
+    identityFile: string | null;
+    name: string;
+    platform: string | null;
+    port: number;
+    requireShellSandbox: boolean;
+    roots: string[];
+    sandboxDetail: string | null;
+    user: string;
 }
 
 export interface Prompt {
     body:
         | { accountLabel: string; kind: "pairing" }
+        | { address: string; identityFile: string | null; kind: "hostConnect"; name: string; port: number; user: string }
+        | { address: string; identityFile: string | null; kind: "hostPairing"; name: string; port: number; user: string }
+        | { fingerprint: string; host: string; identityFile: string | null; keyType: string; kind: "hostKey"; port: number }
+        | { host: string; kind: "hostKeyChanged"; pinned: string[]; port: number; presented: string[] }
+        | { host: string; kind: "passphrase"; prompt: string }
         | {
             allowAlways: boolean;
             detail: string;
+            /** The server the call runs on; absent for this computer. */
+            host?: string;
             input: string;
             kind: "call";
             sandbox: { confined: boolean; note: string } | null;
@@ -39,6 +88,7 @@ export interface SettingsView {
     allowRules: string[];
     allowShellNetwork: boolean;
     auditPath: string;
+    hosts: HostView[];
     mcpServers: { args: string[]; command: string; env: Record<string, string>; name: string }[];
     paired: boolean;
     requireShellSandbox: boolean;
@@ -47,7 +97,11 @@ export interface SettingsView {
 }
 
 /** What the engine emits, parsed from the addon's JSON event strings. */
-export type CoreEvent = { agent: string; tool: string; type: "acpPermission" } | { prompt: Prompt; type: "prompt" } | { callId: string; payload: string; signature: string; type: "progress" } | { type: "changed" };
+export type CoreEvent
+    = | { agent: string; tool: string; type: "acpPermission" }
+        | { callId: string; deviceId: string; payload: string; signature: string; type: "progress" }
+        | { prompt: Prompt; type: "prompt" }
+        | { type: "changed" };
 
 /** The surface of the native `DeviceCore` class. */
 export interface DeviceCore {
@@ -64,10 +118,17 @@ export interface DeviceCore {
     auditTail: () => string[];
     denyPrompts: () => void;
     execute: (envelope: string, signature: string) => Promise<string>;
-    manifest: () => Promise<string>;
+    hostConnect: (deviceId: string) => Promise<string>;
+    hostDisconnect: (deviceId: string) => void;
+    hostForgetKey: (deviceId: string) => void;
+    hostPair: (spec: string, deviceId: string, secret: string) => Promise<boolean>;
+    hostProbe: (spec: string) => Promise<string>;
+    hostRemove: (deviceId: string) => void;
+    manifest: (deviceId?: string) => Promise<string>;
     pair: (deviceId: string, secret: string, accountLabel: string) => Promise<boolean>;
     promptAnswer: (id: number, answer: string) => void;
     promptCurrent: () => string | null;
+    promptSecret: (id: number, secret: string) => void;
     reapIdleServers: () => Promise<boolean>;
     settingsGet: () => string;
     settingsUpdate: (update: string) => string;

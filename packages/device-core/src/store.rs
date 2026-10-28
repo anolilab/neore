@@ -1,9 +1,10 @@
-//! The device's persisted state: the pairing, the shared folders, the local MCP
-//! servers, the allow rules and the shell-sandbox policy. One JSON file in the app
-//! data dir, owner-only (0600 on Unix), written atomically.
+//! The device's persisted state: the pairing, the servers reached over SSH, the shared
+//! folders, the local MCP servers, the allow rules and the shell-sandbox policy. One JSON
+//! file in the app data dir, owner-only (0600 on Unix), written atomically.
 //!
-//! The pairing secret lives in the OS keychain (service `dev.neore.device`,
-//! account = device id). The file keeps it only when the keychain refuses.
+//! Every secret lives in the OS keychain (service `dev.neore.device`, account = device
+//! id): the pairing's and one per server, which only this desktop ever holds. The file
+//! keeps one only when the keychain refuses.
 //!
 //! Only Rust writes it, and only on the local window's commands or a confirmed
 //! pairing — the remote page has no command that changes it.
@@ -30,6 +31,34 @@ pub struct Pairing {
     pub secret: String,
 }
 
+/// A server this desktop reaches over SSH and speaks for. It is a device of its own on the backend, so it has
+/// its own secret; the server itself never sees it.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Host {
+    pub address: String,
+    /// "Allow network for shell commands" turned ON for this server.
+    #[serde(default)]
+    pub allow_shell_network: bool,
+    /// "Require sandbox for shell commands" turned OFF for this server, stored inverted like the desktop's.
+    #[serde(default)]
+    pub allow_unsandboxed_shell: bool,
+    pub device_id: String,
+    #[serde(default)]
+    pub forward_agent: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_file: Option<String>,
+    pub name: String,
+    pub port: u16,
+    /// Absolute folders ON THE SERVER; the server checks them against its own filesystem.
+    #[serde(default)]
+    pub roots: Vec<String>,
+    /// Empty once the keychain holds it; present in the file only as a fallback.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub secret: String,
+    pub user: String,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
@@ -54,6 +83,9 @@ pub struct Settings {
     /// restricted, where the OS sandbox can enforce it.
     #[serde(default)]
     pub allow_shell_network: bool,
+    /// The servers this desktop speaks for (`transport: ssh` on the backend).
+    #[serde(default)]
+    pub hosts: Vec<Host>,
     #[serde(default)]
     pub mcp_servers: Vec<McpServerConfig>,
     #[serde(default)]
@@ -123,56 +155,86 @@ fn keychain_delete(device_id: &str) {
     }
 }
 
+/// Every secret a settings value holds, by the device id it belongs to: the pairing's and each server's.
+fn secrets_mut(settings: &mut Settings) -> Vec<(&str, &mut String)> {
+    let paired = settings
+        .pairing
+        .iter_mut()
+        .map(|pairing| (pairing.device_id.as_str(), &mut pairing.secret));
+    let hosts = settings
+        .hosts
+        .iter_mut()
+        .map(|host| (host.device_id.as_str(), &mut host.secret));
+
+    paired.chain(hosts).collect()
+}
+
+/// The device ids whose secrets a settings value keeps in the keychain.
+fn device_ids(settings: &Settings) -> Vec<&str> {
+    settings
+        .pairing
+        .iter()
+        .map(|pairing| pairing.device_id.as_str())
+        .chain(settings.hosts.iter().map(|host| host.device_id.as_str()))
+        .collect()
+}
+
 /// Reads the settings, moving a secret found in the file into the keychain. A
 /// keychain that cannot be read keeps the pairing with an empty secret (calls
 /// fail closed) and retries on the next load, rather than unpairing.
 pub fn load(path: &Path) -> Settings {
     let mut settings = read_file(path).unwrap_or_default();
+    let mut inline = false;
 
-    if let Some(pairing) = settings.pairing.as_mut() {
-        if pairing.secret.is_empty() {
-            match keychain_get(&pairing.device_id) {
-                Ok(secret) => pairing.secret = secret,
+    for (device_id, secret) in secrets_mut(&mut settings) {
+        if secret.is_empty() {
+            match keychain_get(device_id) {
+                Ok(stored) => *secret = stored,
                 Err(error) => eprintln!("[device-core] pairing secret unavailable: {error}"),
             }
         } else {
-            // A file from before the keychain: `save` moves the secret and strips it.
-            let _ = save(path, &settings);
+            inline = true;
         }
+    }
+
+    if inline {
+        // A file from before the keychain: `save` moves the secrets and strips them.
+        let _ = save(path, &settings);
     }
 
     settings
 }
 
 pub fn save(path: &Path, settings: &Settings) -> Result<(), String> {
-    let previous = read_file(path).and_then(|stored| stored.pairing);
+    let previous = read_file(path).unwrap_or_default();
 
-    save_over(path, previous.as_ref(), settings)
+    save_over(path, &previous, settings)
 }
 
-/// Writes the settings over the pairing they replace. The engine passes the pairing it holds in memory, so a save
+/// Writes the settings over the ones they replace. The engine passes the settings it holds in memory, so a save
 /// does not reread the file.
-pub fn save_over(
-    path: &Path,
-    previous: Option<&Pairing>,
-    settings: &Settings,
-) -> Result<(), String> {
-    let current = settings.pairing.as_ref();
+pub fn save_over(path: &Path, previous: &Settings, settings: &Settings) -> Result<(), String> {
+    let mut stored = settings.clone();
+    let before = device_ids(previous);
 
     // Re-pairing the same device overwrites its keychain entry; keep the old one to restore on failure.
-    let overwritten = match (previous, current) {
-        (Some(old), Some(new)) if old.device_id == new.device_id => keychain_get(&old.device_id)
-            .ok()
-            .map(|secret| (old.device_id.clone(), secret)),
-        _ => None,
-    };
+    let overwritten: Vec<(String, String)> = stored
+        .pairing
+        .iter()
+        .map(|pairing| pairing.device_id.as_str())
+        .chain(stored.hosts.iter().map(|host| host.device_id.as_str()))
+        .filter(|device_id| before.contains(device_id))
+        .filter_map(|device_id| {
+            keychain_get(device_id)
+                .ok()
+                .map(|secret| (device_id.to_owned(), secret))
+        })
+        .collect();
 
-    let mut stored = settings.clone();
-
-    if let Some(pairing) = stored.pairing.as_mut() {
-        if !pairing.secret.is_empty() {
-            match keychain_set(&pairing.device_id, &pairing.secret) {
-                Ok(()) => pairing.secret.clear(),
+    for (device_id, secret) in secrets_mut(&mut stored) {
+        if !secret.is_empty() {
+            match keychain_set(device_id, secret) {
+                Ok(()) => secret.clear(),
                 Err(error) => eprintln!(
                     "[device-core] keychain unavailable, secret kept in device.json: {error}"
                 ),
@@ -185,18 +247,19 @@ pub fn save_over(
         .and_then(|text| write_owner_only(path, &text));
 
     if let Err(error) = saved {
-        if let Some((device_id, secret)) = overwritten {
+        for (device_id, secret) in overwritten {
             let _ = keychain_set(&device_id, &secret);
         }
 
         return Err(error);
     }
 
-    // A replaced or removed pairing takes its keychain entry with it, once the new settings are on disk.
-    if let Some(previous) =
-        previous.filter(|previous| current.map(|c| &c.device_id) != Some(&previous.device_id))
-    {
-        keychain_delete(&previous.device_id);
+    // A replaced or removed pairing, or a removed server, takes its keychain entry with it, once the new settings
+    // are on disk.
+    let after = device_ids(settings);
+
+    for device_id in before.into_iter().filter(|id| !after.contains(id)) {
+        keychain_delete(device_id);
     }
 
     Ok(())
@@ -421,6 +484,135 @@ mod tests {
         assert!(save(&path, &pairing("rb-1", "new-secret")).is_err());
         assert_eq!(keychain_get("rb-1").unwrap(), "old-secret");
         assert_eq!(load(&path), pairing("rb-1", "old-secret"));
+    }
+
+    fn host(device_id: &str, secret: &str) -> Host {
+        Host {
+            address: "build.example.com".into(),
+            allow_shell_network: false,
+            allow_unsandboxed_shell: false,
+            device_id: device_id.into(),
+            forward_agent: false,
+            identity_file: None,
+            name: "build-box".into(),
+            port: 22,
+            roots: vec!["/srv/app".into()],
+            secret: secret.into(),
+            user: "deploy".into(),
+        }
+    }
+
+    fn with_hosts(device_id: &str, secret: &str, hosts: Vec<Host>) -> Settings {
+        Settings {
+            hosts,
+            ..pairing(device_id, secret)
+        }
+    }
+
+    #[test]
+    fn each_server_keeps_its_own_secret_in_the_keychain() {
+        test_keychain::install();
+        let path = temp_file("hosts");
+        let settings = with_hosts(
+            "hk-desktop",
+            "desktop-secret",
+            vec![host("hk-a", "secret-a"), host("hk-b", "secret-b")],
+        );
+
+        save(&path, &settings).unwrap();
+
+        let text = fs::read_to_string(&path).unwrap();
+
+        assert!(holds("hk-desktop") && holds("hk-a") && holds("hk-b"));
+        assert!(!text.contains("secret-a") && !text.contains("secret-b"));
+        assert_eq!(keychain_get("hk-a").unwrap(), "secret-a");
+        assert_eq!(keychain_get("hk-b").unwrap(), "secret-b");
+        assert_eq!(load(&path), settings);
+    }
+
+    #[test]
+    fn a_removed_server_drops_its_keychain_entry_and_the_rest_stay() {
+        test_keychain::install();
+        let path = temp_file("host-removed");
+
+        save(
+            &path,
+            &with_hosts(
+                "hr-desktop",
+                "desktop-secret",
+                vec![host("hr-a", "secret-a"), host("hr-b", "secret-b")],
+            ),
+        )
+        .unwrap();
+        // The in-memory settings come back without secrets; the keychain still has them.
+        let loaded = load(&path);
+        let without_a = Settings {
+            hosts: loaded
+                .hosts
+                .iter()
+                .filter(|h| h.device_id != "hr-a")
+                .cloned()
+                .collect(),
+            ..loaded.clone()
+        };
+
+        save_over(&path, &loaded, &without_a).unwrap();
+
+        assert!(!holds("hr-a"));
+        assert!(holds("hr-b") && holds("hr-desktop"));
+        assert_eq!(load(&path), without_a);
+    }
+
+    #[test]
+    fn dropping_the_pairing_drops_the_servers_it_held() {
+        test_keychain::install();
+        let path = temp_file("host-unpair");
+        let paired = with_hosts(
+            "hu-desktop",
+            "desktop-secret",
+            vec![host("hu-a", "secret-a")],
+        );
+
+        save(&path, &paired).unwrap();
+        save_over(&path, &paired, &Settings::default()).unwrap();
+
+        assert!(!holds("hu-desktop") && !holds("hu-a"));
+    }
+
+    #[test]
+    fn a_failed_save_keeps_a_servers_previous_secret() {
+        test_keychain::install();
+        let path = temp_file("host-rollback");
+
+        save(
+            &path,
+            &with_hosts("hb-desktop", "d", vec![host("hb-a", "old-secret")]),
+        )
+        .unwrap();
+        fs::create_dir(path.with_extension("json.tmp")).unwrap();
+
+        assert!(save(
+            &path,
+            &with_hosts("hb-desktop", "d", vec![host("hb-a", "new-secret")])
+        )
+        .is_err());
+        assert_eq!(keychain_get("hb-a").unwrap(), "old-secret");
+    }
+
+    #[test]
+    fn a_servers_secret_stays_in_the_file_when_the_keychain_refuses() {
+        test_keychain::install();
+        let path = temp_file("host-fallback");
+        let settings = with_hosts(
+            "hf-desktop",
+            "d",
+            vec![host("unavailable-host", "fallback-secret")],
+        );
+
+        save(&path, &settings).unwrap();
+
+        assert!(!holds("unavailable-host"));
+        assert_eq!(load(&path), settings);
     }
 
     #[test]

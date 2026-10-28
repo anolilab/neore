@@ -399,3 +399,170 @@ describe("revokeDevice", () => {
         await expect(as(ownerId).mutation(functions.heartbeatDevice as never, { deviceId } as never)).resolves.toEqual({ paired: false });
     });
 });
+
+describe("servers reached over SSH", () => {
+    const byId = (a: string, b: string) => a.localeCompare(b);
+
+    const registerHost = async (userId: string, viaDeviceId: string, name = "build-box") =>
+        (await as(userId).mutation(functions.registerDevice as never, { name, platform: "linux", viaDeviceId } as never)) as {
+            deviceId: string;
+            secret: string;
+        };
+
+    /** A desktop and a host it holds, the host online with a manifest signed by the host's own secret. */
+    const desktopWithHost = async (userId: string) => {
+        const desktop = await pairedDevice(userId);
+        const host = await registerHost(userId, desktop.deviceId);
+
+        await as(userId).mutation(
+            functions.updateDeviceManifest as never,
+            { ...(await signManifest(host.deviceId, host.secret)), viaDeviceId: desktop.deviceId } as never,
+        );
+
+        return { desktop, host };
+    };
+
+    const hostCall = async (userId: string, hostId: string) => {
+        const threadId = await insertThread(userId);
+
+        return (await createCall({ deviceId: hostId, threadId, userId })) as { callId: string };
+    };
+
+    it("lists a host with its transport and the desktop that holds it", async () => {
+        const { desktop, host } = await desktopWithHost(ownerId);
+        const listed = (await as(ownerId).query(functions.listDevices as never, {} as never)) as { _id: string; transport?: string; viaDeviceId?: string }[];
+
+        expect(listed.find((device) => device._id === host.deviceId)).toMatchObject({ transport: "ssh", viaDeviceId: desktop.deviceId });
+        expect(listed.find((device) => device._id === desktop.deviceId)).not.toHaveProperty("transport");
+    });
+
+    it("lets the owner rename a server, and nobody else", async () => {
+        const { host } = await desktopWithHost(ownerId);
+
+        await as(ownerId).mutation(functions.renameDevice as never, { deviceId: host.deviceId, name: "renamed" } as never);
+
+        const listed = (await as(ownerId).query(functions.listDevices as never, {} as never)) as { _id: string; name: string }[];
+
+        expect(listed.find((device) => device._id === host.deviceId)?.name).toBe("renamed");
+        await expect(as(STRANGER).mutation(functions.renameDevice as never, { deviceId: host.deviceId, name: "mine" } as never)).rejects.toThrow(
+            NOT_FOUND_ERROR,
+        );
+    });
+
+    it("refuses to pair a host under a desktop that is not the caller's, or under another host", async () => {
+        const mine = await pairedDevice(ownerId);
+        const stranger = await insertUser();
+        const theirs = await pairedDevice(stranger);
+        const { deviceId: hostId } = await registerHost(ownerId, mine.deviceId);
+
+        await expect(registerHost(ownerId, theirs.deviceId)).rejects.toThrow(NOT_FOUND_ERROR);
+        await expect(registerHost(stranger, mine.deviceId)).rejects.toThrow(NOT_FOUND_ERROR);
+        await expect(registerHost(ownerId, hostId)).rejects.toThrow(NOT_FOUND_ERROR);
+    });
+
+    it("offers an online host's tools to a thread, and signs its calls with the host's secret", async () => {
+        const { desktop, host } = await desktopWithHost(ownerId);
+        const threadId = await insertThread(ownerId);
+        const context = (await harness.run(
+            async (ctx: any) => await ctx.runQuery(internals.getDeviceToolContext, { now: Date.now(), threadId, userId: ownerId }),
+        )) as { devices: { deviceId: string }[] };
+
+        // The desktop has a manifest too; the host is offered beside it.
+        expect(context.devices.map((device) => device.deviceId).toSorted(byId)).toEqual([desktop.deviceId, host.deviceId].toSorted(byId));
+
+        const { callId } = await hostCall(ownerId, host.deviceId);
+        const pending = (await as(ownerId).query(
+            functions.listPendingDeviceCalls as never,
+            {
+                deviceId: desktop.deviceId,
+                hostDeviceIds: [host.deviceId],
+            } as never,
+        )) as { callId: string; deviceId: string; envelope: string; signature: string }[];
+
+        expect(pending.map((call) => call.deviceId)).toEqual([host.deviceId]);
+        await expect(verifyDevicePayload(host.secret, "call", pending[0]!.envelope, pending[0]!.signature)).resolves.toBe(true);
+        await expect(verifyDevicePayload(desktop.secret, "call", pending[0]!.envelope, pending[0]!.signature)).resolves.toBe(false);
+        expect(pending[0]?.callId).toBe(callId);
+    });
+
+    it("lists a host's calls only for the desktop that holds it", async () => {
+        const { desktop, host } = await desktopWithHost(ownerId);
+        const other = await pairedDevice(ownerId);
+
+        await hostCall(ownerId, host.deviceId);
+
+        const listFor = async (deviceId: string, hostDeviceIds: string[]) =>
+            (await as(ownerId).query(functions.listPendingDeviceCalls as never, { deviceId, hostDeviceIds } as never)) as unknown[];
+
+        await expect(listFor(other.deviceId, [host.deviceId])).resolves.toEqual([]);
+        await expect(listFor(desktop.deviceId, [])).resolves.toEqual([]);
+        await expect(listFor(desktop.deviceId, [host.deviceId])).resolves.toHaveLength(1);
+        // A server's id is not a desktop: listing with it as the primary device shows nothing.
+        await expect(listFor(host.deviceId, [])).resolves.toEqual([]);
+    });
+
+    it("refuses a claim for a host from a desktop that does not hold it, or from none", async () => {
+        const { desktop, host } = await desktopWithHost(ownerId);
+        const other = await pairedDevice(ownerId);
+        const { callId } = await hostCall(ownerId, host.deviceId);
+        const claim = async (viaDeviceId?: string) =>
+            await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId: host.deviceId, viaDeviceId } as never);
+
+        await expect(claim(other.deviceId)).rejects.toThrow(NOT_FOUND_ERROR);
+        await expect(claim()).rejects.toThrow(NOT_FOUND_ERROR);
+        await expect(claim(desktop.deviceId)).resolves.toEqual({ claimed: true });
+    });
+
+    it("accepts a host's result only when it is signed with the host's secret", async () => {
+        const { desktop, host } = await desktopWithHost(ownerId);
+        const { callId } = await hostCall(ownerId, host.deviceId);
+        const complete = async (secret: string, viaDeviceId = desktop.deviceId) =>
+            await as(ownerId).mutation(functions.completeDeviceCall as never, { ...(await signedResult(host.deviceId, secret, callId)), viaDeviceId } as never);
+
+        await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId: host.deviceId, viaDeviceId: desktop.deviceId } as never);
+
+        // The desktop's own secret, a made-up one: neither is the host's.
+        await expect(complete(desktop.secret)).rejects.toThrow(SIGNATURE_ERROR);
+        await expect(complete("e".repeat(64))).rejects.toThrow(SIGNATURE_ERROR);
+        const { deviceId: otherDesktop } = await pairedDevice(ownerId);
+
+        await expect(complete(host.secret, otherDesktop)).rejects.toThrow(NOT_FOUND_ERROR);
+        await expect(complete(host.secret)).resolves.toEqual({ accepted: true });
+        expect(await readCall(callId)).toMatchObject({ output: "file body", status: "completed" });
+    });
+
+    it("beats and reports progress for a host only through its desktop", async () => {
+        const { desktop, host } = await desktopWithHost(ownerId);
+        const { callId } = await hostCall(ownerId, host.deviceId);
+
+        await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId: host.deviceId, viaDeviceId: desktop.deviceId } as never);
+        await expect(as(ownerId).mutation(functions.heartbeatDevice as never, { deviceId: host.deviceId } as never)).resolves.toEqual({ paired: false });
+        await expect(
+            as(ownerId).mutation(functions.heartbeatDevice as never, { deviceId: host.deviceId, viaDeviceId: desktop.deviceId } as never),
+        ).resolves.toEqual({ paired: true });
+        await expect(
+            as(ownerId).mutation(
+                functions.reportDeviceCallProgress as never,
+                { ...(await signedProgress(host.deviceId, host.secret, callId)), viaDeviceId: desktop.deviceId } as never,
+            ),
+        ).resolves.toEqual({ accepted: true });
+        await expect(
+            as(ownerId).mutation(functions.reportDeviceCallProgress as never, (await signedProgress(host.deviceId, host.secret, callId)) as never),
+        ).rejects.toThrow(NOT_FOUND_ERROR);
+    });
+
+    it("revoking the desktop revokes its hosts and expires their open calls; revoking a host leaves the desktop", async () => {
+        const first = await desktopWithHost(ownerId);
+        const second = await desktopWithHost(ownerId);
+        const { callId } = await hostCall(ownerId, first.host.deviceId);
+        const ids = async () =>
+            ((await as(ownerId).query(functions.listDevices as never, {} as never)) as { _id: string }[]).map((device) => device._id).toSorted(byId);
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId: second.host.deviceId } as never);
+        expect(await ids()).toEqual([first.desktop.deviceId, first.host.deviceId, second.desktop.deviceId].toSorted(byId));
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId: first.desktop.deviceId } as never);
+        expect(await ids()).toEqual([second.desktop.deviceId]);
+        expect(await readCall(callId)).toMatchObject({ status: "expired" });
+    });
+});

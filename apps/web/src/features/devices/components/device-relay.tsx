@@ -4,19 +4,31 @@ import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
-import { executeOnNativeDevice, getNativeDeviceManifest, getNativeDeviceStatus, onNativeDeviceChanged, onNativeDeviceProgress } from "@/lib/native/bridge";
+import type { NativeDeviceStatus } from "@/lib/native/bridge";
+import {
+    disconnectNativeHost,
+    executeOnNativeDevice,
+    getNativeDeviceManifest,
+    getNativeDeviceStatus,
+    onNativeDeviceChanged,
+    onNativeDeviceProgress,
+} from "@/lib/native/bridge";
 
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import type { DeviceRelayPorts } from "../lib/device-relay";
-import { createDeviceRelay, DEVICE_HEARTBEAT_MS } from "../lib/device-relay";
+import { createDeviceRelay, DEVICE_HEARTBEAT_MS, viaDeviceFor } from "../lib/device-relay";
+
+const idsOf = (key: string): string[] => (key === "" ? [] : key.split(","));
 
 /**
  * Mounted only inside the desktop shell, for a signed-in account, after first
  * paint (`lib/native/native-bridge.tsx`). While this computer is paired to the
- * signed-in account it:
+ * signed-in account it acts for the computer AND for each server it holds and is
+ * connected to (a device of its own on the backend, named with `viaDeviceId`):
  *
  * - beats every 30 s, so the backend offers its tools to the agent;
- * - sends the shell's signed tool list whenever it changes;
+ * - sends the shell's signed tool list whenever it changes (a server's is signed
+ *   with that server's own secret);
  * - relays every pending call to the shell and the signed result back, and the
  *   shell's signed progress reports (approval showing, running) in between, so
  *   the chat can say where the call is.
@@ -26,8 +38,12 @@ import { createDeviceRelay, DEVICE_HEARTBEAT_MS } from "../lib/device-relay";
  */
 const DeviceRelay: FC = () => {
     const crpc = useCRPC();
-    const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
+    const [status, setStatus] = useState<NativeDeviceStatus | undefined>(undefined);
     const [paired, setPaired] = useState(false);
+    const deviceId = status?.deviceId ?? undefined;
+    // The servers to act for: connected ones only, so no call is claimed that the shell cannot reach.
+    const hostIds = (status?.hosts ?? []).filter((host) => host.connected).map((host) => host.deviceId);
+    const hostKey = hostIds.join(",");
 
     const heartbeat = useMutation(crpc.devices.functions.heartbeatDevice.mutationOptions());
     const updateManifest = useMutation(crpc.devices.functions.updateDeviceManifest.mutationOptions());
@@ -57,10 +73,10 @@ const DeviceRelay: FC = () => {
         };
     });
 
-    // Which device this shell is paired as: now, after a pairing on the Devices page, and after the shell's own changes.
+    // Which device this shell is paired as, and which servers it holds: now, after a pairing on the Devices page, and after the shell's own changes.
     useEffect(() => {
         const read = () => {
-            void getNativeDeviceStatus().then((status) => setDeviceId(status?.deviceId ?? undefined));
+            void getNativeDeviceStatus().then(setStatus);
         };
         const stop = onNativeDeviceChanged(read);
 
@@ -80,6 +96,7 @@ const DeviceRelay: FC = () => {
         }
 
         let cancelled = false;
+        const via = (id: string) => viaDeviceFor(deviceId, id) as Id<"devices"> | undefined;
         const beat = () => {
             void (async () => {
                 try {
@@ -92,6 +109,21 @@ const DeviceRelay: FC = () => {
                     // Offline or rate-limited: the next beat tries again.
                 }
             })();
+
+            for (const id of idsOf(hostKey)) {
+                void (async () => {
+                    try {
+                        const result = await mutations.current.heartbeat({ deviceId: id as Id<"devices">, viaDeviceId: via(id) });
+
+                        // Revoked on the web: stop beating for it. Removing it here is the local window's.
+                        if (!result.paired) {
+                            await disconnectNativeHost(id);
+                        }
+                    } catch {
+                        // Offline or rate-limited: the next beat tries again.
+                    }
+                })();
+            }
         };
 
         beat();
@@ -105,26 +137,33 @@ const DeviceRelay: FC = () => {
             clearInterval(timer);
             globalThis.removeEventListener("focus", beat);
         };
-    }, [deviceId]);
+    }, [deviceId, hostKey]);
 
-    // The signed tool list: once paired, and whenever the shell's folders or servers change.
+    // The signed tool lists: once paired, and whenever the shell's folders, servers or connections change.
     useEffect(() => {
         if (!paired || deviceId === undefined) {
             return undefined;
         }
 
-        return onNativeDeviceChanged(() => {
-            void (async () => {
-                const manifest = await getNativeDeviceManifest();
+        const send = async (id: string): Promise<void> => {
+            const manifest = await getNativeDeviceManifest(id === deviceId ? undefined : id);
 
-                if (manifest) {
-                    await mutations.current.updateManifest({ deviceId: deviceId as Id<"devices">, ...manifest });
-                }
-            })().catch(() => {
-                // A refused manifest leaves the previous tool set in place.
-            });
+            if (manifest) {
+                await mutations.current.updateManifest({
+                    deviceId: id as Id<"devices">,
+                    viaDeviceId: viaDeviceFor(deviceId, id) as Id<"devices"> | undefined,
+                    ...manifest,
+                });
+            }
+        };
+
+        return onNativeDeviceChanged(() => {
+            // A refused manifest leaves the previous tool set in place.
+            for (const id of [deviceId, ...idsOf(hostKey)]) {
+                send(id).catch(() => {});
+            }
         });
-    }, [deviceId, paired]);
+    }, [deviceId, hostKey, paired]);
 
     // The shell's signed "approval showing" / "running" reports, relayed as-is.
     useEffect(() => {
@@ -132,14 +171,21 @@ const DeviceRelay: FC = () => {
             return undefined;
         }
 
-        return onNativeDeviceProgress((report) => {
-            mutations.current.reportProgress({ deviceId: deviceId as Id<"devices">, ...report, callId: report.callId as Id<"deviceCalls"> }).catch(() => {
-                // Display only: a lost report leaves the chat saying "sent to the device".
-            });
+        return onNativeDeviceProgress(({ deviceId: reportedFor, ...report }) => {
+            mutations.current
+                .reportProgress({
+                    ...report,
+                    callId: report.callId as Id<"deviceCalls">,
+                    deviceId: reportedFor as Id<"devices">,
+                    viaDeviceId: viaDeviceFor(deviceId, reportedFor) as Id<"devices"> | undefined,
+                })
+                .catch(() => {
+                    // Display only: a lost report leaves the chat saying "sent to the device".
+                });
         });
     }, [deviceId, paired]);
 
-    // One relay per device; it remembers which calls it already took.
+    // One relay per desktop; it remembers which calls it already took.
     const relay = useRef<ReturnType<typeof createDeviceRelay> | undefined>(undefined);
 
     useEffect(() => {
@@ -149,19 +195,26 @@ const DeviceRelay: FC = () => {
             return;
         }
 
-        const id = deviceId as Id<"devices">;
+        // Each call names the device it is for; a server's is addressed with the desktop that holds it.
+        const addressed = (call: { callId: string; deviceId: string }) => {
+            return {
+                callId: call.callId as Id<"deviceCalls">,
+                deviceId: call.deviceId as Id<"devices">,
+                viaDeviceId: viaDeviceFor(deviceId, call.deviceId) as Id<"devices"> | undefined,
+            };
+        };
         const ports: DeviceRelayPorts = {
-            claim: async (callId) => {
-                const result = await mutations.current.claim({ callId: callId as Id<"deviceCalls">, deviceId: id });
+            claim: async (call) => {
+                const result = await mutations.current.claim(addressed(call));
 
                 return result.claimed;
             },
-            complete: async (callId, result) => {
-                await mutations.current.complete({ callId: callId as Id<"deviceCalls">, deviceId: id, ...result });
+            complete: async (call, result) => {
+                await mutations.current.complete({ ...addressed(call), ...result });
             },
-            execute: executeOnNativeDevice,
-            release: async (callId, reason) => {
-                await mutations.current.release({ callId: callId as Id<"deviceCalls">, deviceId: id, reason });
+            execute: ({ envelope, signature }) => executeOnNativeDevice({ envelope, signature }),
+            release: async (call, reason) => {
+                await mutations.current.release({ ...addressed(call), reason });
             },
         };
 
@@ -170,7 +223,9 @@ const DeviceRelay: FC = () => {
 
     // Live: a new call reaches this page as soon as the agent makes it.
     const { data: pending } = useQuery(
-        crpc.devices.functions.listPendingDeviceCalls.queryOptions(paired && deviceId !== undefined ? { deviceId: deviceId as Id<"devices"> } : skipToken),
+        crpc.devices.functions.listPendingDeviceCalls.queryOptions(
+            paired && deviceId !== undefined ? { deviceId: deviceId as Id<"devices">, hostDeviceIds: hostIds as Id<"devices">[] } : skipToken,
+        ),
     );
 
     useEffect(() => {

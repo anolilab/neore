@@ -6,7 +6,7 @@
 //! grants. An unanswered prompt is denied when its deadline passes, and closing
 //! the window denies everything waiting.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -52,12 +52,49 @@ pub struct SandboxState {
 pub enum PromptBody {
     /// Pair this app with an account.
     Pairing { account_label: String },
+    /// A page asks to open an SSH connection to a server that is not paired yet. Asked before anything touches the
+    /// network, so a page cannot probe hosts or log in as a user of its choosing on its own.
+    HostConnect {
+        address: String,
+        identity_file: Option<String>,
+        name: String,
+        port: u16,
+        user: String,
+    },
+    /// Add a server reached over SSH as a device of its own.
+    HostPairing {
+        address: String,
+        identity_file: Option<String>,
+        name: String,
+        port: u16,
+        user: String,
+    },
+    /// First use of a server: trust the key it presents? "Once" trusts and pins it, "deny" does not.
+    HostKey {
+        fingerprint: String,
+        host: String,
+        identity_file: Option<String>,
+        key_type: String,
+        port: u16,
+    },
+    /// A pinned server presents another key. Nothing to decide: the connection is refused and this only shows why.
+    HostKeyChanged {
+        host: String,
+        pinned: Vec<String>,
+        port: u16,
+        presented: Vec<String>,
+    },
+    /// ssh asks for a key passphrase. Answered with [`Prompts::answer_secret`], never with a plain answer.
+    Passphrase { host: String, prompt: String },
     /// Run one tool call.
     Call {
         /// "Always allow" is offered: the tool may be always-allowed and the call is untainted.
         allow_always: bool,
         /// What exactly will happen, spelled out (the command line, the path…).
         detail: String,
+        /// The server the call will run on, when it is not this computer.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        host: Option<String>,
         input: String,
         /// Set for shell calls only.
         sandbox: Option<SandboxState>,
@@ -80,8 +117,8 @@ pub struct Prompt {
 impl Prompt {
     fn allows_always(&self) -> bool {
         match &self.body {
-            PromptBody::Pairing { .. } => false,
             PromptBody::Call { allow_always, .. } => *allow_always,
+            _ => false,
         }
     }
 }
@@ -90,6 +127,8 @@ impl Prompt {
 pub struct Prompts {
     next_id: Mutex<u64>,
     queue: Mutex<VecDeque<(Prompt, Sender<Answer>)>>,
+    /// Secrets typed into a [`PromptBody::Passphrase`] prompt, by prompt id, until its asker takes them. Memory only.
+    secrets: Mutex<HashMap<u64, String>>,
 }
 
 impl Prompts {
@@ -128,6 +167,49 @@ impl Prompts {
             .retain(|(queued, _)| queued.id != id);
 
         answer
+    }
+
+    /// [`Self::ask`] for a prompt whose answer is a secret the user types. `None` when it was denied, timed out or
+    /// closed. The secret never appears in a [`Prompt`], so it never reaches the window's state or an event.
+    pub fn ask_secret(
+        &self,
+        body: PromptBody,
+        expires_at: u64,
+        wait: Duration,
+        on_queued: impl FnOnce(&Prompt),
+    ) -> Option<String> {
+        let queued = Mutex::new(0);
+        let answer = self.ask(body, expires_at, wait, |prompt| {
+            *queued.lock().unwrap() = prompt.id;
+            on_queued(prompt);
+        });
+        let secret = self
+            .secrets
+            .lock()
+            .unwrap()
+            .remove(&*queued.lock().unwrap());
+
+        match answer {
+            Answer::Once | Answer::Always => secret,
+            Answer::Deny | Answer::Timeout => None,
+        }
+    }
+
+    /// Answers a [`PromptBody::Passphrase`] prompt with what the user typed.
+    pub fn answer_secret(&self, id: u64, secret: String) -> Result<(), String> {
+        let asking = self.queue.lock().unwrap().iter().any(|(prompt, _)| {
+            prompt.id == id && matches!(prompt.body, PromptBody::Passphrase { .. })
+        });
+
+        if !asking {
+            return Err("that request is no longer waiting".into());
+        }
+
+        self.secrets.lock().unwrap().insert(id, secret);
+
+        self.answer(id, Answer::Once).inspect_err(|_| {
+            self.secrets.lock().unwrap().remove(&id);
+        })
     }
 
     /// The prompt the window should show.
@@ -176,6 +258,7 @@ mod tests {
         PromptBody::Call {
             allow_always,
             detail: String::new(),
+            host: None,
             input: "{}".into(),
             sandbox: None,
             tainted_by: vec![],
@@ -247,6 +330,73 @@ mod tests {
         .unwrap();
         assert_eq!(pairing["kind"], "pairing");
         assert_eq!(pairing["accountLabel"], "me");
+    }
+
+    #[test]
+    fn a_passphrase_reaches_only_its_asker_and_never_the_prompt() {
+        let prompts = Arc::new(Prompts::default());
+        let body = || PromptBody::Passphrase {
+            host: "build-box".into(),
+            prompt: "Enter passphrase for key".into(),
+        };
+        let asking = {
+            let prompts = prompts.clone();
+
+            thread::spawn(move || prompts.ask_secret(body(), 0, Duration::from_secs(5), |_| {}))
+        };
+
+        let prompt = loop {
+            if let Some(prompt) = prompts.current() {
+                break prompt;
+            }
+
+            thread::sleep(Duration::from_millis(5));
+        };
+
+        // A plain answer is not a passphrase: it is a denial of the question.
+        assert!(!serde_json::to_string(&prompt).unwrap().contains("hunter2"));
+        prompts.answer_secret(prompt.id, "hunter2".into()).unwrap();
+
+        assert_eq!(asking.join().unwrap().as_deref(), Some("hunter2"));
+        assert!(prompts.secrets.lock().unwrap().is_empty());
+        assert!(prompts.answer_secret(prompt.id, "late".into()).is_err());
+        assert!(prompts.secrets.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_secret_cannot_answer_another_kind_of_prompt() {
+        let prompts = Arc::new(Prompts::default());
+        let waiting = {
+            let prompts = prompts.clone();
+
+            thread::spawn(move || prompts.ask(call(false), 0, Duration::from_secs(5), |_| {}))
+        };
+
+        let id = loop {
+            if let Some(prompt) = prompts.current() {
+                break prompt.id;
+            }
+
+            thread::sleep(Duration::from_millis(5));
+        };
+
+        assert!(prompts.answer_secret(id, "x".into()).is_err());
+        prompts.deny_all();
+        assert_eq!(waiting.join().unwrap(), Answer::Deny);
+    }
+
+    #[test]
+    fn a_denied_passphrase_prompt_gives_nothing() {
+        let prompts = Prompts::default();
+        let body = PromptBody::Passphrase {
+            host: "h".into(),
+            prompt: "p".into(),
+        };
+
+        assert_eq!(
+            prompts.ask_secret(body, 0, Duration::from_millis(20), |_| {}),
+            None
+        );
     }
 
     #[test]

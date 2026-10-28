@@ -605,6 +605,20 @@ written here is what is not.
   and re-checks the folders and the sandbox on ITS machine. Both paths share the
   vectors in `tests/common/actions.json`; a new tool or a changed result goes there.
   Desktop main-process calls go through `HostTransport` (`apps/desktop/src/device/transport.ts`).
+  **Servers over SSH** (`device-core/src/ssh.rs`, `engine/hosts.rs`, plans/ssh-environments.md): a server
+  is a `devices` row of its own (`transport: "ssh"`, `viaDeviceId` = the desktop that holds it) whose secret
+  lives only in THIS desktop's keychain, one entry per device id (`store.rs`). Calls, manifests, progress and
+  results for it are verified and signed on the desktop with that secret, after the same local approval
+  (prompt naming the server, no "Always allow"); only the approved action goes down the pipe to `neore-host`.
+  Every relay procedure takes the desktop's id for a server and compares it with the row: an ownership
+  check, not a security control — the guard is that only the holder of the secret can sign. `ssh` runs with
+  `-F /dev/null`, pinned keys in `<appData>/ssh/known_hosts` (never the user's), `UpdateHostKeys=no` (else ssh
+  would add keys behind the trust prompt) and no `BatchMode` (it disables askpass). The passphrase reaches ssh
+  through `SSH_ASKPASS` and two FIFOs in a 0700 dir — no listener, no file; it has its own IPC channel
+  (`promptSecret`), never `promptAnswer`. `ControlPath` is `<appData>/ssh/cm/%C`, falling back to
+  `~/.neore/cm` when that overflows a Unix socket path (macOS's default userData does), never `/tmp`.
+  Tests start a real `sshd` as the current user (`tests/ssh_host.rs`; `NEORE_REQUIRE_SSHD=1` makes a missing one
+  fail). Windows desktops have no passphrase helper or multiplexing yet.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay

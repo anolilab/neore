@@ -6,7 +6,7 @@
  * Everything in a prompt came from a model or the network, so it is rendered
  * with textContent only — never as HTML.
  */
-import type { Prompt, SettingsView } from "../types";
+import type { HostView, Prompt, SettingsView } from "../types";
 import { initAcp } from "./acp-page";
 
 /** Buttons stay disabled this long after a prompt appears, so a click meant for another window cannot land on "Allow". */
@@ -70,45 +70,121 @@ const renderPrompt = (prompt: Prompt | null): void => {
     const buttons = [$("deny"), $("once"), $("always")] as HTMLButtonElement[];
     const { body } = prompt;
 
-    if (body.kind === "pairing") {
-        setText("prompt-heading", "Pair this computer?");
-        // A new pairing replaces the stored one; say so when settings show one.
-        const replaces = state.settings?.paired ? ` This replaces the current pairing (“${state.settings.accountLabel ?? "your account"}”).` : "";
+    setHidden("prompt-warning", true);
+    setHidden("prompt-sandbox", true);
+    setHidden("prompt-input-box", true);
+    setHidden("prompt-secret-box", true);
+    setHidden("always", true);
+    setHidden("once", false);
+    setText("deny", "Deny");
+    ($("prompt-secret") as HTMLInputElement).value = "";
 
-        setText(
-            "prompt-context",
-            `The Neore account “${body.accountLabel}” wants to use this computer for agent tools.${replaces} Every action will still ask you here first, and you can unpair at any time.`,
-        );
-        setHidden("prompt-warning", true);
-        setText("prompt-detail", "Nothing runs now. Pairing only lets the agent ASK.");
-        setHidden("prompt-input-box", true);
-        setHidden("prompt-sandbox", true);
-        setText("once", "Pair");
-        setText("deny", "Cancel");
-        setHidden("always", true);
-    } else {
-        setText("prompt-heading", `Allow “${body.tool}”?`);
-        setText("prompt-context", body.threadTitle ? `Requested by the agent in “${body.threadTitle}”.` : "Requested by the agent.");
+    const identityLine = (identityFile: string | null): string =>
+        identityFile === null ? "Login: your SSH agent and default keys" : `Login: only the key file ${identityFile}`;
 
-        const taints = body.taintedBy.map((source) => TAINT_LABELS[source] ?? source);
+    switch (body.kind) {
+        case "hostConnect": {
+            setText("prompt-heading", `Connect to ${body.user}@${body.address}?`);
+            setText(
+                "prompt-context",
+                "A page in Neore asks this computer to open an SSH connection so it can add this server. Nothing is sent until you agree; if you did not just start adding a server, cancel.",
+            );
+            setText("prompt-detail", `${body.user}@${body.address}:${String(body.port)}\n${identityLine(body.identityFile)}`);
+            setText("once", "Connect");
+            setText("deny", "Cancel");
 
-        setHidden("prompt-warning", taints.length === 0);
-        setText(
-            "prompt-warning",
-            `This request follows content from outside (${taints.join(", ")}). Text there can try to steer the agent — check exactly what will run before allowing it.`,
-        );
-        setText("prompt-detail", body.detail);
+            break;
+        }
+        case "hostKey": {
+            setText("prompt-heading", `Trust ${body.host}?`);
+            setText(
+                "prompt-context",
+                `This is the first connection to ${body.host}:${String(body.port)}. Compare the fingerprint with the one your server's administrator gave you. Neore remembers this key and refuses the server if it ever presents another.`,
+            );
+            setText("prompt-detail", `${body.keyType} key\n${body.fingerprint}\n${identityLine(body.identityFile)}`);
+            setText("once", "Trust and connect");
+            setText("deny", "Cancel");
 
-        const sandboxLine = body.sandbox?.note ?? "";
+            break;
+        }
+        case "hostKeyChanged": {
+            setText("prompt-heading", `The key of ${body.host} changed`);
+            setText(
+                "prompt-context",
+                `${body.host}:${String(body.port)} presented a key other than the one Neore pinned, so the connection was refused and nothing was sent. Someone may be intercepting the connection. If the server was reinstalled on purpose, forget its key in the server's settings and connect again.`,
+            );
+            setHidden("prompt-warning", false);
+            setText("prompt-warning", "Do not continue unless you know why this key changed.");
+            setText("prompt-detail", `Pinned:\n${body.pinned.join("\n")}\n\nPresented now:\n${body.presented.join("\n")}`);
+            // Nothing to decide: closing it is the only button.
+            setHidden("once", true);
+            setText("deny", "Close");
 
-        setHidden("prompt-sandbox", !sandboxLine);
-        $("prompt-sandbox").className = body.sandbox?.confined ? "muted" : "warning";
-        setText("prompt-sandbox", sandboxLine);
-        setHidden("prompt-input-box", false);
-        setText("prompt-input", body.input);
-        setText("once", "Allow once");
-        setText("deny", "Deny");
-        setHidden("always", !body.allowAlways);
+            break;
+        }
+        case "hostPairing": {
+            setText("prompt-heading", `Add the server “${body.name}”?`);
+            setText(
+                "prompt-context",
+                "It becomes a device of your Neore account that this computer speaks for. Every action on it will still ask you here first, and the server never receives a secret of yours.",
+            );
+            setText("prompt-detail", `${body.user}@${body.address}:${String(body.port)}\n${identityLine(body.identityFile)}`);
+            setText("once", "Add server");
+            setText("deny", "Cancel");
+
+            break;
+        }
+        case "pairing": {
+            setText("prompt-heading", "Pair this computer?");
+            // A new pairing replaces the stored one; say so when settings show one.
+            const replaces = state.settings?.paired ? ` This replaces the current pairing (“${state.settings.accountLabel ?? "your account"}”).` : "";
+
+            setText(
+                "prompt-context",
+                `The Neore account “${body.accountLabel}” wants to use this computer for agent tools.${replaces} Every action will still ask you here first, and you can unpair at any time.`,
+            );
+            setText("prompt-detail", "Nothing runs now. Pairing only lets the agent ASK.");
+            setText("once", "Pair");
+            setText("deny", "Cancel");
+
+            break;
+        }
+        case "passphrase": {
+            setText("prompt-heading", `Key passphrase for ${body.host}`);
+            setText("prompt-context", "ssh needs it to unlock your key. It goes to ssh and is stored nowhere.");
+            setText("prompt-detail", body.prompt);
+            setHidden("prompt-secret-box", false);
+            setText("once", "Unlock");
+            setText("deny", "Cancel");
+
+            break;
+        }
+        default: {
+            setText("prompt-heading", body.host === undefined ? `Allow “${body.tool}”?` : `Allow “${body.tool}” on ${body.host}?`);
+            setText(
+                "prompt-context",
+                body.threadTitle ? `Requested by the agent in “${body.threadTitle}”.` : "Requested by the agent.",
+            );
+
+            const taints = body.taintedBy.map((source) => TAINT_LABELS[source] ?? source);
+
+            setHidden("prompt-warning", taints.length === 0);
+            setText(
+                "prompt-warning",
+                `This request follows content from outside (${taints.join(", ")}). Text there can try to steer the agent — check exactly what will run before allowing it.`,
+            );
+            setText("prompt-detail", body.detail);
+
+            const sandboxLine = body.sandbox?.note ?? "";
+
+            setHidden("prompt-sandbox", !sandboxLine);
+            $("prompt-sandbox").className = body.sandbox?.confined ? "muted" : "warning";
+            setText("prompt-sandbox", sandboxLine);
+            setHidden("prompt-input-box", false);
+            setText("prompt-input", body.input);
+            setText("once", "Allow once");
+            setHidden("always", !body.allowAlways);
+        }
     }
 
     for (const button of buttons) {
@@ -145,7 +221,7 @@ const renderPrompt = (prompt: Prompt | null): void => {
 
     tick();
     state.expiryTimer = setInterval(tick, 1000);
-    $("deny").focus();
+    $(body.kind === "passphrase" ? "prompt-secret" : "deny").focus();
 };
 
 const refreshPrompt = async (): Promise<void> => {
@@ -166,8 +242,39 @@ const answer = async (value: "always" | "deny" | "once"): Promise<void> => {
     await refreshPrompt();
 };
 
+/** A passphrase prompt is answered with the typed text, on a channel of its own; any other with a plain answer. */
+const confirmPrompt = async (): Promise<void> => {
+    if (state.current?.body.kind !== "passphrase") {
+        await answer("once");
+
+        return;
+    }
+
+    const field = $("prompt-secret") as HTMLInputElement;
+    const { id } = state.current;
+    const typed = field.value;
+
+    field.value = "";
+
+    try {
+        await globalThis.neoreDevice.promptSecret(id, typed);
+    } catch (error) {
+        setText("prompt-error", String(error));
+    }
+
+    await refreshPrompt();
+};
+
 $("deny").addEventListener("click", () => answer("deny"));
-$("once").addEventListener("click", () => answer("once"));
+$("once").addEventListener("click", () => confirmPrompt());
+$("prompt-secret").addEventListener("keydown", (event) => {
+    if ((event as KeyboardEvent).key !== "Enter" || $("once").hasAttribute("disabled")) {
+        return;
+    }
+
+    event.preventDefault();
+    confirmPrompt();
+});
 $("always").addEventListener("click", () => answer("always"));
 
 // ─── Settings ───────────────────────────────────────────────────────────────
@@ -232,6 +339,175 @@ const removeRule = (rule: string): Promise<void> =>
         return { allowRules: latest.allowRules.filter((other) => other !== rule) };
     });
 
+/** The change to one server's folders or shell policy. */
+const updateHost = (deviceId: string, change: Record<string, unknown>): Promise<void> =>
+    update(() => {
+        return { host: { deviceId, ...change } };
+    });
+
+const hostAction = async (work: () => Promise<unknown>, done: string): Promise<void> => {
+    status("Working…");
+
+    try {
+        await work();
+        status(done);
+    } catch (error) {
+        status(String(error));
+    }
+
+    state.settings = await globalThis.neoreDevice.settingsGet();
+    renderSettings();
+};
+
+const button = (label: string, onClick: () => void, description?: string): HTMLButtonElement => {
+    const element = document.createElement("button");
+
+    element.type = "button";
+    element.textContent = label;
+
+    if (description !== undefined) {
+        element.setAttribute("aria-label", `${label}: ${description}`);
+    }
+
+    element.addEventListener("click", onClick);
+
+    return element;
+};
+
+const hostCard = (host: HostView): HTMLElement => {
+    const card = document.createElement("section");
+    const heading = document.createElement("h3");
+    const where = document.createElement("p");
+    const folders = document.createElement("ul");
+    const typed = document.createElement("input");
+    const label = document.createElement("label");
+    const actions = document.createElement("div");
+    const sandbox = document.createElement("label");
+    const network = document.createElement("label");
+    const sandboxBox = document.createElement("input");
+    const networkBox = document.createElement("input");
+    const forward = document.createElement("label");
+    const forwardBox = document.createElement("input");
+
+    card.setAttribute("aria-label", host.name);
+    heading.textContent = host.name;
+    where.className = "muted";
+    where.textContent = `${host.user}@${host.address}:${String(host.port)} — ${host.connected ? `connected (${host.platform ?? "unknown"})` : "not connected"}`;
+
+    actions.className = "row";
+    actions.append(
+        host.connected
+            ? button("Disconnect", () => hostAction(() => globalThis.neoreDevice.hostDisconnect(host.deviceId), "Disconnected."), host.name)
+            : button("Connect", () => hostAction(() => globalThis.neoreDevice.hostConnect(host.deviceId), "Connected."), host.name),
+        button(
+            "Forget host key",
+            async () => {
+                if (await globalThis.neoreDevice.confirm(`Forget the pinned key of ${host.address}? The next connection asks to trust whatever key it presents.`)) {
+                    await hostAction(() => globalThis.neoreDevice.hostForgetKey(host.deviceId), "Key forgotten.");
+                }
+            },
+            host.name,
+        ),
+        button(
+            "Remove",
+            async () => {
+                if (await globalThis.neoreDevice.confirm(`Remove ${host.name} from this computer? Also remove it under Settings → Devices in the Neore app.`)) {
+                    await hostAction(() => globalThis.neoreDevice.hostRemove(host.deviceId), "Removed.");
+                }
+            },
+            host.name,
+        ),
+    );
+
+    folders.replaceChildren(
+        ...host.roots.length === 0
+            ? [listItem("No shared folders: the agent cannot reach this server until you add one.")]
+            : host.roots.map((root) =>
+                listItem(root, "Remove", () => updateHost(host.deviceId, { roots: host.roots.filter((other) => other !== root) })),
+            ),
+    );
+
+    typed.type = "text";
+    typed.id = `host-root-${host.deviceId}`;
+    typed.placeholder = "/path/on/the/server";
+    typed.autocomplete = "off";
+    typed.spellcheck = false;
+    label.className = "sr-only";
+    label.htmlFor = typed.id;
+    label.textContent = `Folder on ${host.name}`;
+
+    const addFolder = button("Add folder", async () => {
+        const path = typed.value.trim();
+
+        if (path) {
+            await updateHost(host.deviceId, { roots: [...host.roots, path] });
+        }
+    });
+
+    sandboxBox.type = "checkbox";
+    sandboxBox.checked = host.requireShellSandbox;
+    sandboxBox.addEventListener("change", async () => {
+        if (!sandboxBox.checked && !await globalThis.neoreDevice.confirm(`Allow shell commands on ${host.name} to run WITHOUT a sandbox where it has none? They would run with full access to that server.`)) {
+            sandboxBox.checked = true;
+
+            return;
+        }
+
+        await updateHost(host.deviceId, { requireShellSandbox: sandboxBox.checked });
+    });
+    sandbox.className = "check";
+    sandbox.append(sandboxBox, " Require sandbox for shell commands");
+
+    networkBox.type = "checkbox";
+    networkBox.checked = host.allowShellNetwork;
+    networkBox.addEventListener("change", async () => {
+        if (networkBox.checked && !await globalThis.neoreDevice.confirm(`Allow shell commands on ${host.name} to use the network?`)) {
+            networkBox.checked = false;
+
+            return;
+        }
+
+        await updateHost(host.deviceId, { allowShellNetwork: networkBox.checked });
+    });
+    network.className = "check";
+    network.append(networkBox, " Allow network for shell commands");
+
+    forwardBox.type = "checkbox";
+    forwardBox.checked = host.forwardAgent;
+    forwardBox.addEventListener("change", async () => {
+        if (
+            forwardBox.checked
+            && !await globalThis.neoreDevice.confirm(
+                `Let ${host.name} use your SSH agent? Anyone with root on that server could use your keys for as long as the connection is open.`,
+            )
+        ) {
+            forwardBox.checked = false;
+
+            return;
+        }
+
+        await updateHost(host.deviceId, { forwardAgent: forwardBox.checked });
+    });
+    forward.className = "check";
+    forward.append(forwardBox, " Forward my SSH agent to this server (takes effect on the next connection)");
+
+    const row = document.createElement("div");
+
+    row.className = "row";
+    row.append(label, typed, addFolder);
+    card.append(heading, where, actions, folders, row, sandbox, network, forward);
+
+    if (host.sandboxDetail !== null) {
+        const detail = document.createElement("p");
+
+        detail.className = "muted";
+        detail.textContent = `Sandbox on the server: ${host.sandboxDetail}`;
+        card.append(detail);
+    }
+
+    return card;
+};
+
 const openTerminal = async (folder: string | null): Promise<void> => {
     try {
         await globalThis.neoreDevice.openTerminal(folder);
@@ -245,13 +521,7 @@ const rootItem = (root: string): HTMLLIElement => {
     const item = listItem(root, "Remove", () => removeRoot(root));
 
     if (state.terminalAvailable) {
-        const button = document.createElement("button");
-
-        button.type = "button";
-        button.textContent = "Terminal";
-        button.setAttribute("aria-label", `Open a terminal in ${root}`);
-        button.addEventListener("click", () => openTerminal(root));
-        item.append(button);
+        item.append(button("Terminal", () => openTerminal(root), `Open a terminal in ${root}`));
     }
 
     return item;
@@ -279,6 +549,11 @@ const renderSettings = (): void => {
             : `Not available on this computer: ${view.sandboxUnavailable}. ${unsandboxed}`,
     );
 
+    const none = document.createElement("p");
+
+    none.className = "muted";
+    none.textContent = "None.";
+    $("hosts").replaceChildren(...view.hosts.length === 0 ? [none] : view.hosts.map((host) => hostCard(host)));
     $("roots").replaceChildren(...view.roots.map((root) => rootItem(root)));
     $("servers").replaceChildren(
         ...view.mcpServers.map((server) =>

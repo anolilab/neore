@@ -227,16 +227,16 @@ export const RATE_LIMIT_CONFIGS = {
     "connectors/oauth:premium": Ratelimit.fixedWindow(40, MINUTE),
     // Device execution (`devices/`). Pairing is rare; a call is one approval
     // prompt on the user's own computer, so a looping model is cut off early.
-    // Heartbeats come every 30 s per open shell window.
+    // Heartbeats come every 30 s per open shell window, for the desktop and for each server it holds (at most
+    // ten devices, plus a burst on each window focus); a manifest goes out per device on each change.
     "devices/call:free": Ratelimit.fixedWindow(60, MINUTE),
     "devices/call:premium": Ratelimit.fixedWindow(60, MINUTE),
-    "devices/heartbeat:free": Ratelimit.fixedWindow(12, MINUTE),
-    "devices/heartbeat:premium": Ratelimit.fixedWindow(12, MINUTE),
+    "devices/heartbeat:free": Ratelimit.fixedWindow(60, MINUTE),
+    "devices/heartbeat:premium": Ratelimit.fixedWindow(60, MINUTE),
     "devices/manage:free": Ratelimit.fixedWindow(30, MINUTE),
     "devices/manage:premium": Ratelimit.fixedWindow(30, MINUTE),
-    "devices/manifest:free": Ratelimit.fixedWindow(30, HOUR),
-
-    "devices/manifest:premium": Ratelimit.fixedWindow(30, HOUR),
+    "devices/manifest:free": Ratelimit.fixedWindow(120, HOUR),
+    "devices/manifest:premium": Ratelimit.fixedWindow(120, HOUR),
     "devices/register:free": Ratelimit.fixedWindow(5, HOUR),
     "devices/register:premium": Ratelimit.fixedWindow(5, HOUR),
     "devices/relay:free": Ratelimit.fixedWindow(120, MINUTE),

@@ -1,8 +1,8 @@
 //! N-API addon around `device-core`, for the Electron shell (`apps/desktop`).
 //!
-//! The surface is what the shell needs and nothing more: pairing, the signed
-//! manifest, executing one relayed call, the local approval and settings
-//! commands, and the audit tail. Envelope signing and verification are not
+//! The surface is what the shell needs and nothing more: pairing, the servers
+//! reached over SSH, the signed manifest, executing one relayed call, the local
+//! approval and settings commands, and the audit tail. Envelope signing and verification are not
 //! exported; they happen inside `execute`, `pair` and `manifest`.
 //!
 //! Structured values cross as JSON strings (the Rust serde types are the one
@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use device_core::acp::AcpUpdate;
 use device_core::acp_permission::PermissionRequest;
-use device_core::engine::SettingsUpdate;
+use device_core::engine::{HostSpec, SettingsUpdate};
 use device_core::envelope::Signed;
 use device_core::{DeviceState, Event};
 use napi::bindgen_prelude::{
@@ -108,13 +108,18 @@ impl DeviceCore {
         blocking(env, move || state.pair(&device_id, &secret, &account_label))
     }
 
-    /// The signed tool manifest (`{ payload, signature }`, JSON).
+    /// The signed tool manifest (`{ payload, signature }`, JSON): this computer's, or the named server's, which
+    /// is signed with that server's own secret.
     #[napi]
-    pub fn manifest<'env>(&self, env: &'env Env) -> Result<PromiseRaw<'env, String>> {
+    pub fn manifest<'env>(
+        &self,
+        env: &'env Env,
+        device_id: Option<String>,
+    ) -> Result<PromiseRaw<'env, String>> {
         let state = Arc::clone(&self.state);
 
         blocking(env, move || {
-            let signed = state.manifest()?;
+            let signed = state.manifest_for(device_id.as_deref())?;
 
             serde_json::to_string(&signed).map_err(|error| error.to_string())
         })
@@ -141,6 +146,80 @@ impl DeviceCore {
         })
     }
 
+    /// Connects a server that is not paired yet, asking the person at the local window to trust its key and for a
+    /// key passphrase. Resolves what the server reported (`{ platform, sandboxAvailable, … }`, JSON).
+    #[napi]
+    pub fn host_probe<'env>(
+        &self,
+        env: &'env Env,
+        spec: String,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let spec: HostSpec = serde_json::from_str(&spec).map_err(|_| "invalid server")?;
+            let probe = state.host_probe(&spec)?;
+
+            serde_json::to_string(&probe).map_err(|error| error.to_string())
+        })
+    }
+
+    /// Stores the probed server as a device of its own, with the secret the backend minted for it, once the user
+    /// confirms it in the local window. Resolves `false` when declined.
+    #[napi]
+    pub fn host_pair<'env>(
+        &self,
+        env: &'env Env,
+        spec: String,
+        device_id: String,
+        secret: String,
+    ) -> Result<PromiseRaw<'env, bool>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let spec: HostSpec = serde_json::from_str(&spec).map_err(|_| "invalid server")?;
+
+            state.host_pair(&spec, &device_id, &secret)
+        })
+    }
+
+    /// Connects a paired server again. Resolves what the server reported (JSON).
+    #[napi]
+    pub fn host_connect<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let probe = state.host_connect(&device_id)?;
+
+            serde_json::to_string(&probe).map_err(|error| error.to_string())
+        })
+    }
+
+    #[napi]
+    pub fn host_disconnect(&self, device_id: String) {
+        self.state.host_disconnect(&device_id);
+    }
+
+    /// Forgets a server on this computer: its secret, folders and connection.
+    #[napi]
+    pub fn host_remove(&self, device_id: String) -> Result<()> {
+        self.state
+            .host_remove(&device_id)
+            .map_err(Error::from_reason)
+    }
+
+    /// Drops a server's pinned host key so the next connection asks again.
+    #[napi]
+    pub fn host_forget_key(&self, device_id: String) -> Result<()> {
+        self.state
+            .host_forget_key(&device_id)
+            .map_err(Error::from_reason)
+    }
+
     /// The prompt the approval window should show (JSON), or `null`.
     #[napi]
     pub fn prompt_current(&self) -> Result<Option<String>> {
@@ -160,6 +239,19 @@ impl DeviceCore {
 
         self.state
             .prompt_answer(id as u64, &answer)
+            .map_err(Error::from_reason)
+    }
+
+    /// Answers a passphrase prompt with what the user typed. Not a plain answer: the text goes to ssh and nowhere
+    /// else, and is never part of a prompt, an event or a log.
+    #[napi]
+    pub fn prompt_secret(&self, id: f64, secret: String) -> Result<()> {
+        if !(id.fract() == 0.0 && (1.0..=MAX_SAFE_INTEGER).contains(&id)) {
+            return Err(Error::from_reason("invalid prompt id"));
+        }
+
+        self.state
+            .prompt_secret(id as u64, secret)
             .map_err(Error::from_reason)
     }
 
