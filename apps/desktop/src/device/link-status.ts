@@ -27,11 +27,11 @@ export const describeLink = (host: { connected: boolean; platform: string | null
     return `connection lost — reconnecting${attempt} in ${String(seconds)} s`;
 };
 
-/** The note under a server whose ssh cannot share one connection between sessions, or `null`. */
+/** The note under a server whose sessions do not share one connection (Windows), or `null`. */
 export const multiplexingNote = (multiplexed: boolean): string | null => {
     if (multiplexed) {
         return null;
     }
 
-    return "This computer's ssh cannot share a connection between sessions, so each server uses one ssh process of its own.";
+    return "Neore does not share one connection between sessions on Windows, so each server uses one ssh process of its own.";
 };

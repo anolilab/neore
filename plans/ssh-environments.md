@@ -250,7 +250,7 @@ Where S4 departs from the text above:
 - The Windows desktop cannot install yet: it has no ControlMaster and no askpass (S3), and the bundle has no
   Windows server target.
 
-**S5 — Lifecycle (built).** Backoff, Retry, ownership-based stop, stale-process
+**S5 — Lifecycle (built, except the Windows measurement).** Backoff, Retry, ownership-based stop, stale-process
 detection, ControlMaster reuse.
 - Acceptance: drop the network for 60 s and restore it; the host reconnects with
   at most two `ssh` processes alive at any moment (the test counts them); a host
@@ -273,17 +273,27 @@ Where S5 departs from the text above:
   sends a `reap` frame (protocol 2) naming the launches this computer started and lost; the host stops one only if its
   pid's command line carries that id. A host it finds that was not named (another computer's session, one left before a
   desktop restart) is counted and left alone. The list of launches is in memory: after a restart of the desktop a stale
-  host is not recognised as ours and ends when the server drops its dead connection.
+  host is not recognised as ours and ends when the server drops its dead connection. A host told to stop (SIGTERM) kills
+  the process group of every command it is running before it exits, because only its own thread enforces a command's
+  timeout; the pid is signalled through a pidfd on Linux and only after its program is `neore-host` and its arguments
+  carry the launch id.
+- A reconnect that cannot be fixed by waiting stops at once: a changed key, a refused login, a missing install, a host
+  that refuses its command line (exit status 2: an old binary under the same version; reinstall) and a passphrase nobody
+  gave. Only the local window's Retry starts the attempts over; a page's connect counts as one more attempt of the
+  10-minute window and is refused once it is full.
 - Agent forwarding (the stable socket path deferred by S3): with it on, the host links the session's `SSH_AUTH_SOCK` from
-  `<run>/agent.sock` (replaced atomically by each launch) and sets that path for itself and its children. A sandboxed
-  `shell_run` gets no agent either way (its environment is an allowlist); the path serves unsandboxed commands and
-  S7's agents.
+  `<run>/agent-<desktop tag>.sock` (replaced atomically by each launch of that desktop; the tag is drawn once per
+  installation) and sets that path for itself and its children, so two desktops on one account do not share a link. A
+  sandboxed `shell_run` gets no agent either way (its environment is an allowlist); the path serves unsandboxed
+  commands and S7's agents.
 - The per-launch log of §6 (`~/.neore/host/logs/<launch-id>.log`) and the pid files in the upgrade's prune (S4's note) are
   not built.
-- Windows: `ssh::MULTIPLEXING` is false there, so each server has one ssh process and no master, and the local window
-  says so. Whether Win32 OpenSSH could multiplex is NOT yet recorded: the CI step "Measure ssh ControlMaster (Windows)"
-  (`tests/ssh-mux-windows.ps1`) writes the result to the job summary of the `device-core` job on `windows-latest`, and
-  this note is to be updated from its first run. It was not run where this was written.
+- Windows: `ssh::MULTIPLEXING` is a fixed `false` there (`cfg!(unix)`), not a measurement: each server has one ssh
+  process and no master, and the local window says so. Whether Win32 OpenSSH can multiplex is NOT recorded yet, which is
+  why S5 is not fully built. The CI step "Measure ssh ControlMaster (Windows)" (`tests/ssh-mux-windows.ps1`) writes the
+  verdict to the job summary of the `device-core` job on `windows-latest` and FAILS when it cannot reach one (no sshd, no
+  login), so a broken setup gets fixed. Record its first verdict here, and if multiplexing works, decide whether to
+  enable it. It was not run where this was written.
 
 **S6 — Files on the host.** File tree and reads over the device file actions.
 Folder download as one tar stream.

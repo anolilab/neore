@@ -294,6 +294,42 @@ impl Drop for Job {
     }
 }
 
+/// The process groups of the runs in flight, so a host that is told to stop can end them: only the thread that
+/// started a run enforces its timeout, and that thread dies with the host.
+#[cfg(unix)]
+static RUNNING: Mutex<Vec<u32>> = Mutex::new(Vec::new());
+
+/// Notes a run's group while it lives and forgets it however the run ends.
+#[cfg(unix)]
+struct Tracked(u32);
+
+#[cfg(unix)]
+impl Tracked {
+    fn new(pid: u32) -> Self {
+        RUNNING.lock().unwrap().push(pid);
+
+        Tracked(pid)
+    }
+}
+
+#[cfg(unix)]
+impl Drop for Tracked {
+    fn drop(&mut self) {
+        RUNNING.lock().unwrap().retain(|pid| *pid != self.0);
+    }
+}
+
+/// Kills every run in flight, background children included. For a host that was told to stop.
+#[cfg(unix)]
+pub fn kill_running() {
+    for pid in RUNNING.lock().unwrap().iter() {
+        // SAFETY: plain syscall with no memory arguments; the group is one this process made and has not finished.
+        unsafe {
+            libc::kill(-(*pid as libc::pid_t), libc::SIGKILL);
+        }
+    }
+}
+
 fn kill_tree(child: &mut Child) {
     #[cfg(unix)]
     {
@@ -376,6 +412,8 @@ pub fn run(
     })?;
     #[cfg(windows)]
     let _job = Job::attach(&child);
+    #[cfg(unix)]
+    let _tracked = Tracked::new(child.id());
 
     let buffer = Arc::new(Mutex::new((Vec::new(), false)));
     let stop = Arc::new(AtomicBool::new(false));

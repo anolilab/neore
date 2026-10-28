@@ -8,9 +8,13 @@
 //! A host this computer did not start, such as another computer's session or one left by an earlier run of the
 //! desktop, is counted and left alone.
 //!
-//! With agent forwarding on, the session's `SSH_AUTH_SOCK` dies with the session. The host links it from a fixed
-//! path in the run folder ([`stabilise_agent_socket`]) and its children inherit that path, which a later session
-//! re-points.
+//! A host told to stop (SIGTERM) first kills the process group of every command it is running ([`exit_on_term`]):
+//! the host's own thread is what enforces a command's timeout, so a host that just died would leave a long command
+//! running unsupervised.
+//!
+//! With agent forwarding on, the session's `SSH_AUTH_SOCK` dies with the session. The host links it from a path in
+//! the run folder that belongs to one desktop ([`stabilise_agent_socket`]) and its children inherit that path, which
+//! a later session of the same desktop re-points. Another desktop on the same account has a link of its own.
 
 use std::fs;
 use std::io;
@@ -21,7 +25,6 @@ use serde::{Deserialize, Serialize};
 /// Where a test points the run folder. The desktop starts the host with an empty environment, so no server's
 /// session can set it.
 pub const RUN_DIR_VARIABLE: &str = "NEORE_HOST_RUN_DIR";
-const AGENT_SOCKET: &str = "agent.sock";
 
 /// A launch id is 32 lowercase hex characters: it goes into a file name and a command line.
 pub fn is_launch_id(text: &str) -> bool {
@@ -40,6 +43,14 @@ pub fn run_dir() -> Option<PathBuf> {
     }
 }
 
+/// A desktop tag is 16 lowercase hex characters (`SshPaths::desktop_tag`).
+pub fn is_desktop_tag(text: &str) -> bool {
+    text.len() == 16
+        && text
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
 fn pid_file(dir: &Path, id: &str) -> PathBuf {
     dir.join(format!("{id}.pid"))
 }
@@ -53,6 +64,10 @@ pub struct Launch {
 impl Launch {
     pub fn id(&self) -> &str {
         &self.id
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 
     /// Files `dir/<id>.pid` for this process, creating `dir` owner-only.
@@ -138,36 +153,38 @@ fn read_pid_file(path: &Path) -> Option<(i64, String)> {
     is_launch_id(&id).then_some((pid, id))
 }
 
-/// Points `SSH_AUTH_SOCK` at a fixed link in `dir` instead of the session's own socket, for this process and
-/// everything it starts. The link is replaced atomically, so a session that starts later re-points it for every
-/// host that uses it. Does nothing without a forwarded agent. Call before any thread starts.
+/// Points `SSH_AUTH_SOCK` at a link in `dir` named for `desktop`, for this process and everything it starts. The
+/// link is replaced atomically, so a later session of the same desktop re-points it for every host that uses it; a
+/// session of another desktop links under its own name. Does nothing without a forwarded agent. Call before any
+/// thread starts.
 #[cfg(unix)]
-pub fn stabilise_agent_socket(dir: &Path) -> io::Result<Option<PathBuf>> {
+pub fn stabilise_agent_socket(dir: &Path, desktop: &str) -> io::Result<Option<PathBuf>> {
     let Some(session) = std::env::var_os("SSH_AUTH_SOCK").map(PathBuf::from) else {
         return Ok(None);
     };
 
-    if !session.is_absolute() {
+    if !session.is_absolute() || !is_desktop_tag(desktop) {
         std::env::remove_var("SSH_AUTH_SOCK");
 
         return Ok(None);
     }
 
-    let link = link_agent_socket(dir, &session)?;
+    let link = link_agent_socket(dir, desktop, &session)?;
 
     std::env::set_var("SSH_AUTH_SOCK", &link);
 
     Ok(Some(link))
 }
 
-/// Points `dir/agent.sock` at `session`, replacing what it pointed at.
+/// Points `dir/agent-<desktop>.sock` at `session`, replacing what it pointed at.
 #[cfg(unix)]
-fn link_agent_socket(dir: &Path, session: &Path) -> io::Result<PathBuf> {
+fn link_agent_socket(dir: &Path, desktop: &str, session: &Path) -> io::Result<PathBuf> {
     private_dir(dir)?;
 
+    let name = format!("agent-{desktop}.sock");
     let (link, temporary) = (
-        dir.join(AGENT_SOCKET),
-        dir.join(format!("{AGENT_SOCKET}.{}", std::process::id())),
+        dir.join(&name),
+        dir.join(format!("{name}.{}", std::process::id())),
     );
 
     let _ = fs::remove_file(&temporary);
@@ -175,6 +192,76 @@ fn link_agent_socket(dir: &Path, session: &Path) -> io::Result<PathBuf> {
     fs::rename(&temporary, &link)?;
 
     Ok(link)
+}
+
+/// Makes SIGTERM end the host the way a stop should: every command in flight is killed with its process group, the
+/// launch file is removed and the process exits. The handler only writes a byte to a pipe; a thread does the rest.
+#[cfg(unix)]
+pub fn exit_on_term(pid_file: Option<PathBuf>) -> io::Result<()> {
+    static WAKE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+
+    extern "C" fn on_term(_: libc::c_int) {
+        let fd = WAKE.load(std::sync::atomic::Ordering::Relaxed);
+
+        // SAFETY: write(2) is async-signal-safe; the byte is a constant.
+        unsafe {
+            libc::write(fd, [1u8].as_ptr().cast(), 1);
+        }
+    }
+
+    let mut fds = [0 as libc::c_int; 2];
+
+    // SAFETY: `fds` holds the two descriptors pipe(2) fills in.
+    if unsafe { libc::pipe(fds.as_mut_ptr()) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+
+    let (read, write) = (fds[0], fds[1]);
+
+    WAKE.store(write, std::sync::atomic::Ordering::Relaxed);
+
+    // SAFETY: a zeroed sigaction with a handler and an empty mask is a valid argument.
+    let installed = unsafe {
+        let mut action: libc::sigaction = std::mem::zeroed();
+
+        action.sa_sigaction = on_term as extern "C" fn(libc::c_int) as usize;
+        action.sa_flags = libc::SA_RESTART;
+        libc::sigemptyset(&mut action.sa_mask);
+        libc::sigaction(libc::SIGTERM, &action, std::ptr::null_mut())
+    };
+
+    if installed != 0 {
+        return Err(io::Error::last_os_error());
+    }
+
+    std::thread::spawn(move || {
+        let mut byte = [0u8; 1];
+
+        loop {
+            // SAFETY: reading one byte into a buffer of one byte.
+            let read_bytes = unsafe { libc::read(read, byte.as_mut_ptr().cast(), 1) };
+
+            if read_bytes == 1 {
+                break;
+            }
+
+            if read_bytes < 0 && io::Error::last_os_error().kind() == io::ErrorKind::Interrupted {
+                continue;
+            }
+
+            return;
+        }
+
+        crate::shell::kill_running();
+
+        if let Some(path) = pid_file {
+            let _ = fs::remove_file(path);
+        }
+
+        std::process::exit(128 + libc::SIGTERM);
+    });
+
+    Ok(())
 }
 
 /// What a reap found.
@@ -188,11 +275,13 @@ pub struct Reaped {
     pub others: usize,
 }
 
-/// The command line of `pid`, when it is running.
+/// The command line of `pid`, split into its arguments, when it is running.
 #[cfg(unix)]
-fn command_line(pid: i64) -> Option<String> {
+fn command_line(pid: i64) -> Option<Vec<String>> {
     if let Ok(bytes) = fs::read(format!("/proc/{pid}/cmdline")) {
-        return Some(String::from_utf8_lossy(&bytes).replace('\0', " "));
+        let line = String::from_utf8_lossy(&bytes).into_owned();
+
+        return Some(line.split('\0').map(str::to_owned).collect());
     }
 
     let output = std::process::Command::new("ps")
@@ -202,13 +291,60 @@ fn command_line(pid: i64) -> Option<String> {
         .output()
         .ok()?;
 
-    (output.status.success() && !output.stdout.is_empty())
-        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    (output.status.success() && !output.stdout.is_empty()).then(|| {
+        String::from_utf8_lossy(&output.stdout)
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect()
+    })
 }
 
+/// Whether `pid` is a `neore-host` started as launch `id`: its program is `neore-host` and `--launch <id>` is among
+/// its arguments.
 #[cfg(unix)]
 fn runs_launch(pid: i64, id: &str) -> bool {
-    command_line(pid).is_some_and(|line| line.contains(&format!("--launch {id}")))
+    command_line(pid).is_some_and(|args| {
+        args.first().and_then(|program| program.rsplit('/').next()) == Some("neore-host")
+            && args
+                .windows(2)
+                .any(|pair| pair[0] == "--launch" && pair[1] == id)
+    })
+}
+
+/// Sends SIGTERM to `pid` if it is launch `id`. On Linux the process is pinned with a pidfd before it is checked,
+/// so the pid cannot be reused between the check and the signal.
+#[cfg(unix)]
+fn stop_launch(pid: i64, id: &str) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        // SAFETY: pidfd_open takes a pid and flags, and returns a descriptor or -1.
+        let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid as libc::pid_t, 0) };
+
+        if fd >= 0 {
+            let fd = fd as libc::c_int;
+            // SAFETY: pidfd_send_signal takes the descriptor, a signal, no siginfo and flags 0.
+            let sent = runs_launch(pid, id)
+                && unsafe {
+                    libc::syscall(
+                        libc::SYS_pidfd_send_signal,
+                        fd,
+                        libc::SIGTERM,
+                        std::ptr::null::<libc::siginfo_t>(),
+                        0,
+                    )
+                } == 0;
+
+            // SAFETY: closing the descriptor opened above, once.
+            unsafe {
+                libc::close(fd);
+            }
+
+            return sent;
+        }
+    }
+
+    // SAFETY: `kill` takes a plain pid and signal.
+    runs_launch(pid, id) && unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM) } == 0
 }
 
 /// Stops the launches in `ids` that are still running, and counts the other hosts it finds. `own` is the caller's
@@ -225,9 +361,8 @@ pub fn reap(dir: &Path, ids: &[String], own: Option<&str>) -> Reaped {
         let path = pid_file(dir, id);
 
         match read_pid_file(&path) {
-            Some((pid, filed)) if filed == **id && runs_launch(pid, id) => {
-                // SAFETY: `kill` takes a plain pid and signal; the pid was checked above.
-                let sent = unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM) } == 0;
+            Some((pid, filed)) if filed == **id => {
+                let sent = stop_launch(pid, id);
 
                 let _ = fs::remove_file(&path);
 
@@ -377,20 +512,26 @@ mod tests {
     #[test]
     fn a_session_socket_is_replaced_by_a_stable_link_in_the_run_folder() {
         let dir = dir("agent");
-        let link = link_agent_socket(&dir, Path::new("/tmp/ssh-x/agent.1")).unwrap();
+        let (mine, other) = ("0123456789abcdef", "fedcba9876543210");
+        let link = link_agent_socket(&dir, mine, Path::new("/tmp/ssh-x/agent.1")).unwrap();
 
-        assert_eq!(link, dir.join("agent.sock"));
+        assert_eq!(link, dir.join(format!("agent-{mine}.sock")));
         assert_eq!(
             fs::read_link(&link).unwrap(),
             Path::new("/tmp/ssh-x/agent.1")
         );
 
-        // A later session re-points the same path.
-        link_agent_socket(&dir, Path::new("/tmp/ssh-y/agent.2")).unwrap();
+        // A later session of the same desktop re-points the same path; another desktop has a link of its own.
+        link_agent_socket(&dir, mine, Path::new("/tmp/ssh-y/agent.2")).unwrap();
+        link_agent_socket(&dir, other, Path::new("/tmp/ssh-z/agent.3")).unwrap();
 
         assert_eq!(
             fs::read_link(&link).unwrap(),
             Path::new("/tmp/ssh-y/agent.2")
+        );
+        assert_eq!(
+            fs::read_link(dir.join(format!("agent-{other}.sock"))).unwrap(),
+            Path::new("/tmp/ssh-z/agent.3")
         );
 
         let _ = fs::remove_dir_all(dir);
