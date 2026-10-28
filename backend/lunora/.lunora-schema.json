@@ -14861,6 +14861,12 @@
                   "unique": false,
                   "refined": true
                 },
+                "complete": {
+                  "kind": "boolean",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
                 "folder": {
                   "kind": "string",
                   "nullable": false,
