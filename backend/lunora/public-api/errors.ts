@@ -19,6 +19,7 @@ export const API_ERROR_CODES = {
     host_thread_read_only: 409,
     idempotency_conflict: 422,
     idempotency_in_progress: 409,
+    idempotency_outcome_unknown: 409,
     insufficient_scope: 403,
     internal_error: 500,
     invalid_api_key: 401,

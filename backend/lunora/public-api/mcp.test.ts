@@ -51,6 +51,8 @@ const openThread = { _creationTime: 1, _id: "t1", status: "active", title: "Plan
 interface Fixture {
     /** What `getChunksAfter` answers on every read. Default: a finished stream with one chunk. */
     chunks?: { chunks: { text: string }[]; locked?: boolean; pendingRequest?: object; status: string };
+    /** `getChunksAfter` throws, as a read of an unreachable shard does. */
+    chunksFail?: unknown;
     identity?: object | null;
     limit?: { ok: boolean; retryAfter?: number };
     routes?: ReadonlyArray<RouteDefinition>;
@@ -84,6 +86,10 @@ const setup = (fixture: Fixture = {}) => {
                 return { continueCursor: "", isDone: true, page: [] };
             }
             case "chat_streaming_persistent_library:getChunksAfter": {
+                if (fixture.chunksFail) {
+                    throw fixture.chunksFail;
+                }
+
                 return { locked: false, totalChunks: 0, ...(fixture.chunks ?? { chunks: [{ text: "Hello" }], status: "done" }) };
             }
             case "lib_action_cache:get": {
@@ -166,6 +172,14 @@ const callTool = async (fixture: Fixture, name: string, args: Record<string, unk
     const response = await harness.post(rpc("tools/call", { arguments: args, name }));
 
     return { ...harness, response, result: ((await response.json()) as { result?: ToolResult }).result };
+};
+
+/** A `tools/call` of `send_message` on a harness, answering the tool result. */
+const sendMessageOn = async (harness: ReturnType<typeof setup>, args: Record<string, unknown>, id = 1): Promise<ToolResult> => {
+    const response = await harness.post(rpc("tools/call", { arguments: args, name: "send_message" }, id));
+    const body = (await response.json()) as { result: ToolResult };
+
+    return body.result;
 };
 
 const rateLimitCalls = (calls: { args: unknown; name: string }[]) => calls.filter((entry) => entry.name === "lib_rate_limiter_mutations:applyRateLimit");
@@ -512,11 +526,7 @@ describe("MCP write tools", () => {
 
     it("creates one message for the same idempotencyKey twice, and replays the first result", async () => {
         const harness = setup({ scopes: WRITE_SCOPES });
-        const call = async (args: Record<string, unknown>) => {
-            const response = await harness.post(rpc("tools/call", { arguments: args, name: "send_message" }));
-
-            return ((await response.json()) as { result: ToolResult }).result;
-        };
+        const call = async (args: Record<string, unknown>) => await sendMessageOn(harness, args);
         const args = { idempotencyKey: "once-1", prompt: "hello", threadId: "t1" };
         const first = await call(args);
         const second = await call(args);
@@ -557,11 +567,7 @@ describe("MCP write tools", () => {
 
         const harness = setup({ scopes: WRITE_SCOPES });
         const args = { idempotencyKey: "race", prompt: "hello", threadId: "t1" };
-        const call = async (id: number) => {
-            const response = await harness.post(rpc("tools/call", { arguments: args, name: "send_message" }, id));
-
-            return ((await response.json()) as { result: ToolResult }).result;
-        };
+        const call = async (id: number) => await sendMessageOn(harness, args, id);
         const winner = call(1);
 
         await vi.waitFor(() => {
@@ -601,6 +607,59 @@ describe("MCP write tools", () => {
 
         expect(((await retried.json()) as { result: ToolResult }).result.isError).toBe(false);
         expect(chatStart).toHaveBeenCalledTimes(2);
+    });
+
+    it("never runs a turn twice for one key, even when following its reply fails", async () => {
+        const harness = setup({ chunksFail: new Error("shard unreachable"), scopes: WRITE_SCOPES });
+        const args = { idempotencyKey: "paid-once", prompt: "hello", threadId: "t1" };
+        const call = async () => await sendMessageOn(harness, args);
+        const first = await call();
+
+        // The turn was saved, charged and queued by `runChatStart`: the caller gets the ids and reads the reply later.
+        expect(first).toMatchObject({ isError: false, structuredContent: { messageId: "m1", status: "interrupted", threadId: "t1" } });
+
+        const retry = await call();
+
+        expect(retry.structuredContent).toEqual(first.structuredContent);
+        expect(chatStart).toHaveBeenCalledOnce();
+    });
+
+    it("holds the claim for a POST with the REST header too", async () => {
+        let finish!: () => void;
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node >= 22.11; the configured range starts at 22.0
+        const gate = new Promise<void>((resolve) => {
+            finish = resolve;
+        });
+
+        chatStart.mockImplementation(async () => {
+            await gate;
+
+            return startedResponse();
+        });
+
+        const harness = setup({ scopes: WRITE_SCOPES });
+        const post = async () =>
+            await harness.request("/chat", {
+                body: JSON.stringify({ prompt: "hello", stream: false, threadId: "t1" }),
+                headers: { "Content-Type": "application/json", "Idempotency-Key": "rest-1" },
+                method: "POST",
+            });
+        const first = post();
+
+        await vi.waitFor(() => {
+            expect(harness.claims.size).toBe(1);
+        });
+
+        finish();
+
+        const done = await first;
+
+        expect(done.status).toBe(202);
+        expect(harness.claims.size).toBe(1);
+        const replayed = await post();
+
+        expect(replayed.headers.get("Idempotent-Replayed")).toBe("true");
+        expect(chatStart).toHaveBeenCalledOnce();
     });
 
     it("rejects an idempotencyKey the header would reject", async () => {
@@ -674,6 +733,29 @@ describe("MCP tool table", () => {
             expect(tool.route.operationId, tool.name).toBe("createChat");
             expect(tool.route.scopes, tool.name).toEqual([["chat", "write"]]);
         }
+    });
+
+    it("offers idempotencyKey only on POST tools whose route accepts the header", () => {
+        const refusing: RouteDefinition = {
+            body: z.object({ prompt: z.string() }),
+            handler: async () => {
+                return { data: {} };
+            },
+            mcp: [{ description: "Makes a secret.", tool: "make_secret" }],
+            method: "post",
+            noIdempotency: true,
+            operationId: "fixtureSecret",
+            path: "/fixture/secret",
+            response: z.object({}),
+            scopes: [["chat", "write"]],
+            summary: "Secret",
+            tag: "Chat",
+        };
+        const byName = Object.fromEntries(buildMcpTools([...ROUTES, refusing]).map((tool) => [tool.name, tool.inputSchema]));
+
+        expect(byName["send_message"]).toHaveProperty("properties.idempotencyKey");
+        expect(byName["make_secret"]).not.toHaveProperty("properties.idempotencyKey");
+        expect(byName["get_thread"]).not.toHaveProperty("properties.idempotencyKey");
     });
 
     it("tells the agent that what a tool returns is data, not instructions", () => {

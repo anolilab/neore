@@ -100,8 +100,8 @@ const operation = (route: RouteDefinition) => {
                 route.noIdempotency !== true && {
                     409: errorResponse(
                         route.mayRefuseHostThread
-                            ? "`host_thread_read_only` (the thread runs on a paired computer), `conflict` or `idempotency_in_progress`"
-                            : "`conflict` or `idempotency_in_progress`",
+                            ? "`host_thread_read_only` (the thread runs on a paired computer), `conflict`, `idempotency_in_progress` or `idempotency_outcome_unknown`"
+                            : "`conflict`, `idempotency_in_progress` or `idempotency_outcome_unknown`",
                     ),
                     422: errorResponse("`idempotency_conflict`"),
                 }),

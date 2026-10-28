@@ -7,7 +7,7 @@
  *   2. scopes     — every scope the route lists; 403 `insufficient_scope`
  *   3. key limit  — `publicApi/read` or `publicApi/write` for this key id; 429
  *   4. body       — size cap, JSON, zod; 400 / 413
- *   5. idempotency — POSTs with `Idempotency-Key` (an MCP write tool also holds a claim-once on it)
+ *   5. idempotency — POSTs with `Idempotency-Key` (held as a claim-once while the request runs)
  *   6. handler    — an existing procedure, as the key's owner
  *
  * and every failure is rendered by `errors.ts` in the one public error shape.
@@ -141,17 +141,17 @@ const idempotencyStore = (ctx: HttpActionCtx): IdempotencyStore => {
     };
 };
 
-/** `lib/claim-once.ts` scope of the hold a write tool takes on its idempotency key. */
-const MCP_WRITE_CLAIM_SCOPE = "mcp-write";
+/** `lib/claim-once.ts` scope of the hold a POST takes on its idempotency key. */
+const IDEMPOTENCY_CLAIM_SCOPE = "public-api-idempotency";
 
-const mcpWriteClaim = (ctx: HttpActionCtx, identity: ApiKeyIdentity) => (storageKey: string) => {
+const idempotencyClaim = (ctx: HttpActionCtx, identity: ApiKeyIdentity) => (storageKey: string) => {
     let claimedAt: number | undefined;
 
     return {
         acquire: async () => {
             const fence = await ctx.runMutation(internal.lib.claim_once.claimKeyFenced, {
                 key: storageKey,
-                scope: MCP_WRITE_CLAIM_SCOPE,
+                scope: IDEMPOTENCY_CLAIM_SCOPE,
                 ttlMs: IDEMPOTENCY_TTL_MS,
                 userId: identity.userId,
             });
@@ -161,7 +161,7 @@ const mcpWriteClaim = (ctx: HttpActionCtx, identity: ApiKeyIdentity) => (storage
             return fence !== null;
         },
         release: async () => {
-            await ctx.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: storageKey, scope: MCP_WRITE_CLAIM_SCOPE });
+            await ctx.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: storageKey, scope: IDEMPOTENCY_CLAIM_SCOPE });
         },
     };
 };
@@ -181,10 +181,9 @@ const runRoute = async (
     requestId: string,
     request: Request,
     params: Record<string, string>,
-    viaMcp = false,
 ): Promise<Response> => {
     try {
-        return await inShard(lunora, identity.userId, async (ctx) => await handleOnShard(route, ctx, identity, requestId, request, params, viaMcp));
+        return await inShard(lunora, identity.userId, async (ctx) => await handleOnShard(route, ctx, identity, requestId, request, params));
     } catch (error) {
         return failure(route.operationId, error, requestId);
     }
@@ -236,7 +235,7 @@ const handleMcp = async (routes: ReadonlyArray<RouteDefinition>, c: Context<Luno
                         throw error;
                     }
 
-                    return await runRoute(tool.route, c.var.lunora, identity, requestId, call.request, call.params, true);
+                    return await runRoute(tool.route, c.var.lunora, identity, requestId, call.request, call.params);
                 } catch (error) {
                     return failure(tool.route.operationId, error, requestId);
                 }
@@ -290,7 +289,6 @@ const handleOnShard = async (
     requestId: string,
     request: Request,
     params: Record<string, string>,
-    viaMcp: boolean,
 ): Promise<Response> => {
     try {
         await applyKeyRateLimit(ctx, identity, route.method !== "get");
@@ -327,8 +325,8 @@ const handleOnShard = async (
                   {
                       apiKeyId: identity.apiKeyId,
                       body: body.raw,
-                      // A tool call is retried by an agent that may fire twice at once; the REST header keeps its best-effort marker.
-                      ...(viaMcp && { claim: mcpWriteClaim(ctx, identity) }),
+                      // A retry can arrive while the first request still runs; the stored marker alone does not stop both.
+                      claim: idempotencyClaim(ctx, identity),
                       idempotencyKey,
                       method: request.method,
                       pathAndQuery: url.pathname + url.search,

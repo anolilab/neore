@@ -36,6 +36,9 @@ const INSTRUCTIONS =
 /** The tool argument that becomes the `Idempotency-Key` header of a write tool's request. */
 const IDEMPOTENCY_ARGUMENT = "idempotencyKey";
 
+/** A POST that refuses the header (a reply with a one-time secret) takes no `idempotencyKey` either. */
+const takesIdempotencyKey = (route: RouteDefinition): boolean => route.method === "post" && !route.noIdempotency;
+
 const PARSE_ERROR = -32_700;
 const INVALID_REQUEST = -32_600;
 const METHOD_NOT_FOUND = -32_601;
@@ -92,7 +95,7 @@ const toolInputSchema = (route: RouteDefinition, entry: McpToolEntry): Record<st
                 ]),
             ),
             ...body.properties,
-            ...(route.method === "post" && {
+            ...(takesIdempotencyKey(route) && {
                 [IDEMPOTENCY_ARGUMENT]: {
                     description: `Makes a retry safe: the same key with the same arguments returns the first result instead of acting again, for 24 hours. Use a fresh key per intended action.`,
                     maxLength: 255,
@@ -156,7 +159,7 @@ export const toolRequest = (tool: McpTool, args: Record<string, unknown>, base: 
             continue;
         }
 
-        if (name === IDEMPOTENCY_ARGUMENT && tool.route.method === "post") {
+        if (name === IDEMPOTENCY_ARGUMENT && takesIdempotencyKey(tool.route)) {
             idempotencyKey = argumentValue(name, value);
         } else if (pathNames.has(name)) {
             params[name] = argumentValue(name, value);

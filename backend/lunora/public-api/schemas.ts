@@ -224,7 +224,7 @@ export const zChatCompletedSchema = z.object({
     reasoning: z.string(),
     status: z.string().meta({
         description:
-            "`done` on success; `waiting_on_person` when the run paused for an approval or a question (see `pendingRequest`); otherwise why the generation stopped.",
+            "`done` on success; `waiting_on_person` when the run paused for an approval or a question (see `pendingRequest`); `interrupted` when the reply could not be followed to its end; otherwise why the generation stopped. For `interrupted`, and for a run that paused and was answered before this read ended, read the full reply from the thread's messages.",
     }),
     text: z.string(),
     threadId: z.string(),

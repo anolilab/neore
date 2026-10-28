@@ -16,9 +16,11 @@
  * reliably stops is the common case — a retry while the first attempt is still
  * running answers `idempotency_in_progress` rather than running twice.
  *
- * A caller that needs the lock (the MCP write tools) passes a `claim`, taken
- * atomically before the handler runs: the loser of a race answers
- * `idempotency_in_progress` and replays the winner's stored response on retry.
+ * The router also passes a `claim`, taken atomically before the handler runs, so
+ * the loser of a race does not run it too. It is held as long as a stored
+ * response is replayable and given back only when nothing was stored, so a
+ * request that dies mid-run answers `idempotency_outcome_unknown` to a retry
+ * instead of running twice.
  */
 import { PublicApiError } from "./errors";
 import { sha256Hex } from "../lib/crypto";
@@ -138,15 +140,20 @@ export const withIdempotency = async (
 
     const claim = options.claim?.(storageKey);
 
+    // The claim outlives the pending marker, so a held claim with no record is a request that started and left
+    // no outcome (or one that has not written its marker yet): its work may have happened, and running it again
+    // could do it twice.
     if (claim && !(await claim.acquire())) {
-        throw new PublicApiError("idempotency_in_progress", "A request with this idempotency key is still being processed. Retry shortly.");
+        throw new PublicApiError(
+            "idempotency_outcome_unknown",
+            `A request with this \`${IDEMPOTENCY_HEADER}\` is still running, or ended without a recorded result. Check whether it took effect (for a chat, read the thread's messages) before sending it again with a new key.`,
+        );
     }
-
-    await store.put(storageKey, { fingerprint, state: "pending" }, IDEMPOTENCY_PENDING_TTL_MS);
 
     let response: Response;
 
     try {
+        await store.put(storageKey, { fingerprint, state: "pending" }, IDEMPOTENCY_PENDING_TTL_MS);
         response = await handler();
     } catch (error) {
         await store.remove(storageKey);

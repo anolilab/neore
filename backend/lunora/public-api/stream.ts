@@ -53,6 +53,9 @@ export interface PendingRequest {
 
 export const WAITING_ON_PERSON = "waiting_on_person";
 
+/** A blocking read that lost the stream part-way: the rest of the reply is in the thread's messages. */
+export const INTERRUPTED = "interrupted";
+
 export type StreamEvent =
     | { error: { code: string; message: string }; type: "error" }
     | { lastChunkIndex: number; type: "resume" }
@@ -227,7 +230,8 @@ export interface CollectedStream {
 /**
  * Drain a stream into one blocking completion. Its polls stretch
  * ({@link blockingPollDelay}) so the read budget spans the whole wait; running
- * out of it reads as `relay_budget`.
+ * out of it reads as `relay_budget`. A read that throws ends it as
+ * `interrupted` with what arrived, and the caller reads the rest from the thread.
  */
 export const collectStream = async (source: StreamSource, options: PollOptions = {}): Promise<CollectedStream> => {
     let text = "";
@@ -237,39 +241,45 @@ export const collectStream = async (source: StreamSource, options: PollOptions =
 
     const events = pollStream(source, { delay: blockingPollDelay, ...options });
 
-    for await (const event of events) {
-        switch (event.type) {
-            case "done": {
-                status = event.status;
-                pendingRequest = event.pendingRequest;
-                break;
-            }
-            case "error": {
-                status = event.error.code;
-                break;
-            }
-            case "reasoning": {
-                reasoning += event.text;
-                break;
-            }
-            case "reply.restart": {
-                // One text: a steered reply's two halves are joined, the boundary is for streaming consumers.
-                break;
-            }
-            case "resume": {
-                break;
-            }
-            case "speaker": {
-                break;
-            }
-            case "text": {
-                text += event.text;
-                break;
-            }
-            default: {
-                break;
+    try {
+        for await (const event of events) {
+            switch (event.type) {
+                case "done": {
+                    status = event.status;
+                    pendingRequest = event.pendingRequest;
+                    break;
+                }
+                case "error": {
+                    status = event.error.code;
+                    break;
+                }
+                case "reasoning": {
+                    reasoning += event.text;
+                    break;
+                }
+                case "reply.restart": {
+                    // One text: a steered reply's two halves are joined, the boundary is for streaming consumers.
+                    break;
+                }
+                case "resume": {
+                    break;
+                }
+                case "speaker": {
+                    break;
+                }
+                case "text": {
+                    text += event.text;
+                    break;
+                }
+                default: {
+                    break;
+                }
             }
         }
+    } catch {
+        // A read failed after the run began. The caller has already started (and paid for) the turn, so it gets
+        // what arrived and a status that says to read the rest from the thread, never an error to retry.
+        status = INTERRUPTED;
     }
 
     return { ...(pendingRequest && { pendingRequest }), reasoning, status, text };

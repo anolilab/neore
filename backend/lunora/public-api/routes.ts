@@ -55,8 +55,8 @@ import {
 } from "./schemas";
 import type { ApiAction, ApiResource } from "./scopes";
 import { scopesToStrings } from "./scopes";
-import type { StreamSource } from "./stream";
-import { collectStream, pollStream, toNdjsonStream } from "./stream";
+import type { CollectedStream, StreamSource } from "./stream";
+import { collectStream, INTERRUPTED, pollStream, toNdjsonStream } from "./stream";
 import { shardContext } from "../lib/http-shard";
 import { threadShardFor } from "../lib/thread-shard";
 import { isThreadLocked, THREAD_LOCKED_CODE } from "../lib/thread-lock";
@@ -205,6 +205,21 @@ const streamSourceFor = (ctx: HttpActionCtx, streamId: string): StreamSource => 
 /** How long a blocking (`stream: false`) chat may hold the request before answering with what it has. */
 export const BLOCKING_CHAT_MAX_MS = 5 * 60 * 1000;
 
+/**
+ * The reply of a turn `runChatStart` has already saved, charged and queued, so a failure here must not become an
+ * error: the caller would retry and pay for a second turn. It becomes `interrupted` (a 2xx, stored and replayed
+ * by an idempotency key) and the caller reads the reply from the thread.
+ */
+const collectBlockingReply = async (input: RouteInput, threadId: string | undefined, streamId: string): Promise<CollectedStream> => {
+    try {
+        const shardKey = threadId ? await threadShardFor(input.ctx, input.identity.userId, threadId) : input.identity.userId;
+
+        return await collectStream(streamSourceFor(shardContext(input.ctx, shardKey), streamId), { maxDurationMs: BLOCKING_CHAT_MAX_MS, signal: input.signal });
+    } catch {
+        return { reasoning: "", status: INTERRUPTED, text: "" };
+    }
+};
+
 const startChat = async (input: RouteInput, request: { model?: string; prompt: string; stream?: boolean; threadId?: string }): Promise<RouteResult> => {
     const signingSecret = process.env.LLM_GATEWAY_SIGNING_SECRET;
 
@@ -244,11 +259,7 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
         // which for a thread shared with the key owner is not the caller's. A new
         // thread is the caller's own; an existing one's answer is still cached
         // from `runChatStart`, so neither costs a subrequest of the read budget.
-        const shardKey = request.threadId ? await threadShardFor(input.ctx, input.identity.userId, request.threadId) : input.identity.userId;
-        const collected = await collectStream(streamSourceFor(shardContext(input.ctx, shardKey), body.streamId), {
-            maxDurationMs: BLOCKING_CHAT_MAX_MS,
-            signal: input.signal,
-        });
+        const collected = await collectBlockingReply(input, request.threadId, body.streamId);
 
         // A thread locked mid-reply is NOT FOUND to an API key; its partial text is dropped.
         if (collected.status === "thread_locked") {
@@ -532,7 +543,7 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
                 when: "no-threadId",
             },
             {
-                description: `Send a message into an existing thread and wait for the reply (up to 5 minutes; if it takes longer, read it later with read_messages). Returns the reply text with its threadId and messageId. Counts against the account's daily message limit like a message sent in the app. A thread that runs on a paired computer is read-only here and answers host_thread_read_only. A run that needs a person's answer returns status "waiting_on_person" with the pending request, which only a person can answer in the app. Send an idempotencyKey to make a retry safe. ${USER_DATA_NOTE}`,
+                description: `Send a message into an existing thread and wait for the reply (up to 5 minutes; if it takes longer, read it later with read_messages). Returns the reply text with its threadId and messageId. Counts against the account's daily message limit like a message sent in the app. A thread that runs on a paired computer is read-only here and answers host_thread_read_only. A run that needs a person's answer returns status "waiting_on_person" with the pending request, which only a person can answer in the app. If the reply is cut short (status interrupted) or the run paused and was answered meanwhile, read the full reply with read_messages. Send an idempotencyKey to make a retry safe. ${USER_DATA_NOTE}`,
                 fixed: { stream: false },
                 tool: "send_message",
                 when: "threadId",
