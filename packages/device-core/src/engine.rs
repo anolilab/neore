@@ -24,7 +24,7 @@ use crate::actions::{
     ShellSettings, MAX_ROOTS,
 };
 use crate::approval::{Answer, Prompt, PromptBody, Prompts, SandboxState};
-use crate::envelope::{self, CallEnvelope, Domain, NonceSet, Signed};
+use crate::envelope::{self, Domain, NonceSet, Signed};
 use crate::install::{Bundle, Root};
 use crate::mcp::{self, McpManager, McpServerConfig};
 use crate::sandbox;
@@ -39,10 +39,6 @@ pub use crate::actions::{cap_utf8, now_ms, MAX_OUTPUT_BYTES};
 
 const MAX_MCP_SERVERS: usize = 20;
 const AUDIT_MAX_BYTES: u64 = 5 * 1024 * 1024;
-/// The one `acp_*` call kind handled here: stopping a turn needs no prompt. Starting, sending and answering come
-/// with the remote-control slice.
-const ACP_CANCEL_TOOL: &str = "acp_cancel";
-const ACP_ID_MAX: usize = 128;
 /// How long a pairing waits for its confirmation click.
 const PAIRING_WAIT: Duration = Duration::from_secs(5 * 60);
 
@@ -58,9 +54,8 @@ pub enum Event {
     Changed,
     /// A coding agent is asking for approval: show the device window. Read the requests with `acp_permissions`.
     AcpPermission { agent: String, tool: String },
-    /// The backend asked this computer to cancel a coding agent's turn (a signed `acp_cancel` call).
-    #[serde(rename_all = "camelCase")]
-    AcpCancel { session_id: String, turn_id: String },
+    /// A remote answer took a coding-agent request out of the queue: the device window should read it again.
+    AcpPermissionsChanged,
 }
 
 /// Receives [`Event`]s. Called from engine threads; must not block.
@@ -517,8 +512,9 @@ impl DeviceState {
             &mut self.nonces.lock().unwrap(),
         )?;
 
-        if call.tool == ACP_CANCEL_TOOL {
-            return self.execute_acp_cancel(&pairing, &call);
+        // Coding-agent commands carry no nonce and are handled by the main process (`acp_call.rs`).
+        if crate::acp_call::is_acp_tool(&call.tool) {
+            return Err("coding-agent commands go through the host channel".into());
         }
 
         let tainted = !call.tainted_by.is_empty();
@@ -700,51 +696,6 @@ impl DeviceState {
         envelope::sign_value(secret, Domain::Result, &result)
     }
 
-    /// A cancel needs no approval: it only stops a turn the user already started. The main process does the
-    /// stopping when it receives the event; the signed result says the request was valid and handed on.
-    fn execute_acp_cancel(&self, pairing: &Pairing, call: &CallEnvelope) -> Result<Signed, String> {
-        let id = |key: &str| {
-            call.input
-                .get(key)
-                .and_then(Value::as_str)
-                .filter(|value| (1..=ACP_ID_MAX).contains(&value.len()))
-        };
-        let outcome = match (id("sessionId"), id("turnId")) {
-            (Some(session_id), Some(turn_id)) => {
-                self.emit(Event::AcpCancel {
-                    session_id: session_id.to_owned(),
-                    turn_id: turn_id.to_owned(),
-                });
-                Outcome::done("accepted")
-            }
-            _ => Outcome::failed("denied", "refused: a cancel names a session and a turn"),
-        };
-
-        self.audit(json!({
-            "at": now_ms(), "callId": call.call_id, "decision": outcome.decision,
-            "status": outcome.status, "thread": call.thread_title, "tool": call.tool,
-        }));
-
-        let mut result = json!({
-            "v": 1, "kind": "result", "callId": call.call_id, "deviceId": pairing.device_id,
-            "status": outcome.status, "decision": outcome.decision, "truncated": false,
-        });
-
-        if let Some(output) = outcome.output {
-            result["output"] = json!(output);
-        }
-
-        if let Some(error) = outcome.error {
-            result["error"] = json!(error);
-        }
-
-        Ok(envelope::sign_value(
-            &pairing.secret,
-            Domain::Result,
-            &result,
-        ))
-    }
-
     /// Signs one batch of coding-agent turn output for the backend's ingest route. Only a payload that names
     /// itself a turn post for THIS device is signed, so this is no general signing oracle.
     pub fn sign_turn(&self, payload: &str) -> Result<String, String> {
@@ -847,7 +798,11 @@ impl DeviceState {
         Ok(envelope::sign_value(
             &pairing.secret,
             Domain::Manifest,
-            &json!({ "v": 1, "kind": "manifest", "deviceId": pairing.device_id, "issuedAt": issued_at, "tools": tools }),
+            &json!({
+                "v": 1, "kind": "manifest", "deviceId": pairing.device_id, "issuedAt": issued_at, "tools": tools,
+                // The pairs the user approved for coding agents, so the web and the phone can offer them.
+                "acpOffers": self.acp_offers(),
+            }),
         ))
     }
 }
@@ -977,22 +932,22 @@ fn plan(
     })
 }
 
-struct Outcome {
-    decision: &'static str,
-    error: Option<String>,
-    exit_code: Option<i32>,
-    output: Option<String>,
-    status: &'static str,
+pub(crate) struct Outcome {
+    pub(crate) decision: &'static str,
+    pub(crate) error: Option<String>,
+    pub(crate) exit_code: Option<i32>,
+    pub(crate) output: Option<String>,
+    pub(crate) status: &'static str,
     /// The tool itself cut its output (the shell's pipe cap).
-    truncated: bool,
+    pub(crate) truncated: bool,
 }
 
 impl Outcome {
-    fn failed(decision: &'static str, error: impl Into<String>) -> Self {
+    pub(crate) fn failed(decision: &'static str, error: impl Into<String>) -> Self {
         Outcome::of(decision, actions::Outcome::failed(error))
     }
 
-    fn done(output: &str) -> Self {
+    pub(crate) fn done(output: &str) -> Self {
         Outcome {
             decision: "rule",
             error: None,
@@ -1086,7 +1041,7 @@ pub struct StatusView {
 /// The pairing, when its secret is usable. A pairing whose keychain entry could not be read loads with an empty secret;
 /// an HMAC keyed with the empty string is public, so such a pairing must refuse every call and manifest until the
 /// keychain answers on a later load.
-fn usable_pairing(settings: &Settings) -> Result<Pairing, String> {
+pub(crate) fn usable_pairing(settings: &Settings) -> Result<Pairing, String> {
     let pairing = settings
         .pairing
         .clone()
@@ -1308,6 +1263,7 @@ mod tests {
     }
 
     fn paired_state(name: &str) -> (DeviceState, PathBuf, std::sync::Arc<Mutex<Vec<Event>>>) {
+        crate::store::test_keychain::install();
         let dir = std::env::temp_dir().join(format!("neore-device-{name}-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         store::save(
@@ -1352,67 +1308,6 @@ mod tests {
             .sign_turn(r#"{"kind":"turn","deviceId":"dev1"}"#)
             .is_err());
         assert!(state.sign_turn("not json").is_err());
-
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    /// A nonce no two calls share, as a real caller's would be.
-    fn fresh_nonce() -> String {
-        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
-        format!(
-            "nonce-{}",
-            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        )
-    }
-
-    fn signed_call(tool: &str, input: Value, nonce: &str) -> Signed {
-        envelope::sign_value(
-            &turn_secret(),
-            Domain::Call,
-            &json!({
-                "v": 1, "kind": "call", "callId": "c1", "deviceId": "dev1", "tool": tool,
-                "input": input, "threadId": "t1", "threadTitle": "T", "taintedBy": [],
-                "issuedAt": 1, "expiresAt": now_ms() + 60_000, "nonce": nonce
-            }),
-        )
-    }
-
-    #[test]
-    fn a_signed_cancel_is_handed_to_the_main_process_without_a_prompt() {
-        let (state, dir, events) = paired_state("acp-cancel");
-        let result = state
-            .execute(&signed_call(
-                "acp_cancel",
-                json!({ "sessionId": "s1", "turnId": "u1" }),
-                &fresh_nonce(),
-            ))
-            .unwrap();
-        let result: Value = serde_json::from_str(&result.payload).unwrap();
-
-        assert_eq!(result["status"], "completed");
-        assert!(matches!(
-            events.lock().unwrap().as_slice(),
-            [Event::AcpCancel { session_id, turn_id }] if session_id == "s1" && turn_id == "u1"
-        ));
-
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn a_cancel_that_names_no_turn_is_refused_and_cancels_nothing() {
-        let (state, dir, events) = paired_state("acp-cancel-bad");
-        let result = state
-            .execute(&signed_call(
-                "acp_cancel",
-                json!({ "sessionId": "s1" }),
-                &fresh_nonce(),
-            ))
-            .unwrap();
-        let result: Value = serde_json::from_str(&result.payload).unwrap();
-
-        assert_eq!(result["status"], "failed");
-        assert!(events.lock().unwrap().is_empty());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
