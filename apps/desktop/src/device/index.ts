@@ -455,7 +455,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             throw new Error("device: that server is not paired with this computer");
         }
 
-        await options.terminal.openSsh({ args: () => requireTransport().hostTerminal(id), deviceId: id, label: `${host.user}@${host.address}` });
+        await options.terminal.openSsh({ args: () => requireTransport().hostTerminal(id), attach: () => requireTransport().hostTerminalAttach(id), deviceId: id, label: `${host.user}@${host.address}` });
     });
 
     return state.transport !== undefined;

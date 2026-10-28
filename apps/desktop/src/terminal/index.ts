@@ -31,10 +31,11 @@ const PARTITION = "neore-terminal";
 
 /** A shell on a server: the local `ssh` on the pseudo-terminal, through the connection the device module holds open. */
 interface SshEntry {
+    /** The arguments for a restart: only a connection that is still up, never a new one. */
+    attach: () => Promise<string[]>;
     /** The arguments for the next start, as `args` returned them when the window opened. Used once. */
     first?: string[];
     label: string;
-    resolveArgs: () => Promise<string[]>;
 }
 
 /** What runs on the pseudo-terminal. */
@@ -61,6 +62,8 @@ interface Entry {
 export interface SshTerminal {
     /** The `ssh` arguments of a shell on it (`device-core`'s `hostTerminal`). Asks to trust the server's key when it must. */
     args: () => Promise<string[]>;
+    /** The arguments for a new shell on the connection that is still up (`hostTerminalAttach`); rejects when it is not, and never connects. */
+    attach: () => Promise<string[]>;
     deviceId: string;
     /** `user@address`, for the window's title and for saying which connection ended. */
     label: string;
@@ -284,6 +287,9 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
         }
     };
 
+    /** A server whose connection is being made for a window that is not open yet, so a second click joins it. */
+    const connecting = new Map<string, Promise<void>>();
+
     const openSsh = async (terminal: SshTerminal): Promise<void> => {
         if (!availability.available) {
             throw new Error(availability.reason);
@@ -295,10 +301,28 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
             return;
         }
 
-        // Before any window: connecting is what asks to trust the server's key, and a server that is not trusted gets no shell.
-        const first = await terminal.args();
+        const pending = connecting.get(key);
 
-        openWindow(key, homedir(), terminal.label, { first, label: terminal.label, resolveArgs: terminal.args });
+        if (pending !== undefined) {
+            await pending;
+
+            return;
+        }
+
+        // Before any window: connecting is what asks to trust the server's key, and a server that is not trusted gets no shell.
+        const opening = (async () => {
+            const first = await terminal.args();
+
+            openWindow(key, homedir(), terminal.label, { attach: terminal.attach, first, label: terminal.label });
+        })();
+
+        connecting.set(key, opening);
+
+        try {
+            await opening;
+        } finally {
+            connecting.delete(key);
+        }
     };
 
     /** What to run on the pseudo-terminal: the user's login shell, or `ssh` to a server. */
@@ -309,8 +333,8 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
     };
 
     const sshLaunch = async (ssh: SshEntry): Promise<Launch> => {
-        // A restart connects again, and asks again if it must; only the first start uses what opening the window got.
-        const args = ssh.first ?? await ssh.resolveArgs();
+        // A restart rides the connection if it is still up and otherwise fails: bringing a server back (and its trust prompt) is the device window's.
+        const args = ssh.first ?? await ssh.attach();
 
         // eslint-disable-next-line no-param-reassign -- an entry is this window's mutable record
         ssh.first = undefined;

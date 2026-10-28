@@ -127,7 +127,7 @@ const handleKey = (event: KeyboardEvent): boolean => {
     return true;
 };
 
-/** ssh answers 255 when the connection, not the shell, ended. */
+/** ssh answers 255 when the connection, not the shell, ended. A shell that itself exits with 255 reads the same, and the window cannot tell the two apart. */
 const SSH_CONNECTION_LOST = 255;
 
 const endedText = ({ crashed, exitCode, host }: TerminalExit): string => {

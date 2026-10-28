@@ -257,8 +257,8 @@ describe("opening", () => {
 
 describe("a terminal on a server", () => {
     const SSH_ARGS = ["-o", "StrictHostKeyChecking=yes", "-t", "--", "build.example.com"];
-    const server = (args: () => Promise<string[]> = async () => SSH_ARGS) => {
-        return { args, deviceId: "host-1", label: "deploy@build.example.com" };
+    const server = (args: () => Promise<string[]> = async () => SSH_ARGS, attach: () => Promise<string[]> = async () => SSH_ARGS) => {
+        return { args, attach, deviceId: "host-1", label: "deploy@build.example.com" };
     };
 
     it("asks for the shell's arguments before it opens a window, and a server that is not trusted gets none", async () => {
@@ -292,7 +292,7 @@ describe("a terminal on a server", () => {
 
         const names = spawn?.type === "spawn" ? Object.keys(spawn.env) : [];
 
-        expect(names).toContain("SSH_AUTH_SOCK");
+        expect(names).not.toContain("SSH_AUTH_SOCK");
         expect(names).not.toContain("ELECTRON_RUN_AS_NODE");
         expect(names).not.toContain("NEORE_SITE_URL");
         expect(names).not.toContain("AWS_SECRET_ACCESS_KEY");
@@ -310,37 +310,70 @@ describe("a terminal on a server", () => {
         expect(lastWindow().focus).toHaveBeenCalled();
     });
 
-    it("connects again for a new shell, so a lost connection is asked for afresh", async () => {
+    it("opens the window once when the same server is clicked twice while it connects", async () => {
+        let answer: (value: string[]) => void = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the project's TypeScript lib does not have it yet
+        const pending = new Promise<string[]>((resolve) => {
+            answer = resolve;
+        });
+        const args = vi.fn(() => pending);
+
+        const first = terminals.openSsh(server(args));
+        const second = terminals.openSsh(server(args));
+
+        answer(SSH_ARGS);
+        await Promise.all([first, second]);
+
+        expect(args).toHaveBeenCalledTimes(1);
+        expect(fake.windows).toHaveLength(1);
+    });
+
+    it("lets a refused connection be tried again by the next click", async () => {
         const args = vi.fn(async () => SSH_ARGS);
 
+        args.mockRejectedValueOnce(new Error("the server's host key was not trusted"));
+
+        await expect(terminals.openSsh(server(args))).rejects.toThrow("not trusted");
         await terminals.openSsh(server(args));
+
+        expect(args).toHaveBeenCalledTimes(2);
+        expect(fake.windows).toHaveLength(1);
+    });
+
+    it("rides the connection that is still up for a new shell, and never connects again", async () => {
+        const args = vi.fn(async () => SSH_ARGS);
+        const attach = vi.fn(async () => SSH_ARGS);
+
+        await terminals.openSsh(server(args, attach));
         await startShell();
         // The first start used what opening the window got.
-        expect(args).toHaveBeenCalledTimes(1);
+        expect(attach).not.toHaveBeenCalled();
 
         hosts[0]?.emit({ exitCode: 255, signal: 0, type: "exit" });
         await startShell();
 
-        expect(args).toHaveBeenCalledTimes(2);
+        expect(args).toHaveBeenCalledTimes(1);
+        expect(attach).toHaveBeenCalledTimes(1);
         expect(hosts).toHaveLength(2);
     });
 
-    it("starts no shell when a new connection is refused, and says why", async () => {
-        const args = vi.fn(async () => SSH_ARGS);
+    it("starts no shell when the connection is gone, and says why", async () => {
+        const attach = vi.fn(async () => SSH_ARGS);
 
-        await terminals.openSsh(server(args));
+        await terminals.openSsh(server(undefined, attach));
         await startShell();
         hosts[0]?.emit({ exitCode: 255, signal: 0, type: "exit" });
-        args.mockRejectedValueOnce(new Error("the connection to deploy@build.example.com is not up"));
+        attach.mockRejectedValueOnce(new Error("the connection to deploy@build.example.com is not up; connect it in the device window first"));
 
-        await expect(startShell()).rejects.toThrow("is not up");
+        await expect(startShell()).rejects.toThrow("connect it in the device window");
         expect(hosts).toHaveLength(1);
     });
 
-    it("starts nothing for a window that closed while the connection waited on a prompt", async () => {
-        const args = vi.fn(async () => SSH_ARGS);
+    it("starts nothing for a window that closed while the restart looked up the connection", async () => {
+        const attach = vi.fn(async () => SSH_ARGS);
 
-        await terminals.openSsh(server(args));
+        await terminals.openSsh(server(undefined, attach));
         await startShell();
         hosts[0]?.emit({ exitCode: 255, signal: 0, type: "exit" });
 
@@ -351,7 +384,7 @@ describe("a terminal on a server", () => {
             answer = resolve;
         });
 
-        args.mockImplementationOnce(() => pending);
+        attach.mockImplementationOnce(() => pending);
 
         const restarting = startShell();
 

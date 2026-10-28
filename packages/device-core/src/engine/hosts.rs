@@ -741,16 +741,29 @@ impl DeviceState {
     /// use and for a key passphrase, in the local window, so an untrusted server gets no terminal. The shell rides
     /// the connection's master, so it ends with it.
     pub fn host_terminal(&self, device_id: &str) -> Result<Vec<String>, String> {
-        let host = self
-            .settings()
-            .hosts
-            .into_iter()
-            .find(|host| host.device_id == device_id)
-            .ok_or("that server is not paired with this computer")?;
+        let host = self.paired_host(device_id)?;
 
         self.host_connect(device_id)?;
 
         crate::ssh::terminal_args(&target_of(&host), &self.ssh.paths)
+    }
+
+    /// The same arguments, for a new shell on a connection that is still up. It never connects: restarting a
+    /// shell must not bring a server back that the user disconnected, so a lost connection is the user's to make
+    /// again, in the device window.
+    pub fn host_terminal_attach(&self, device_id: &str) -> Result<Vec<String>, String> {
+        let host = self.paired_host(device_id)?;
+
+        crate::ssh::terminal_args(&target_of(&host), &self.ssh.paths)
+            .map_err(|error| format!("{error}; connect it in the device window first"))
+    }
+
+    fn paired_host(&self, device_id: &str) -> Result<Host, String> {
+        self.settings()
+            .hosts
+            .into_iter()
+            .find(|host| host.device_id == device_id)
+            .ok_or_else(|| "that server is not paired with this computer".to_owned())
     }
 
     pub fn host_disconnect(&self, device_id: &str) {
@@ -1604,9 +1617,19 @@ mod tests {
         );
         // The stand-in link has no ssh master behind it, so nothing is offered to run.
         assert!(state
-            .host_terminal("host-1")
+            .host_terminal(host_id("terminal").as_str())
             .unwrap_err()
             .contains("is not up"));
+
+        // Attaching to a connection never makes one, and says where to make it.
+        assert_eq!(
+            state.host_terminal_attach("nobody").unwrap_err(),
+            "that server is not paired with this computer"
+        );
+        assert!(state
+            .host_terminal_attach(host_id("terminal").as_str())
+            .unwrap_err()
+            .contains("is not up; connect it in the device window first"));
 
         let _ = stdfs::remove_dir_all(dir);
     }

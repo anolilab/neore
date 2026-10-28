@@ -154,7 +154,6 @@ describe("sshEnvironment", () => {
             LANG: "de_DE.UTF-8",
             LC_ALL: "de_DE.UTF-8",
             PATH: "/usr/bin",
-            SSH_AUTH_SOCK: "/run/user/1000/agent",
             TERM: "xterm-256color",
             USER: "me",
         });

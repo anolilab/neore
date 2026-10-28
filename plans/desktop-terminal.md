@@ -80,8 +80,9 @@ connects the server first (which asks to trust its key and for a passphrase, in 
 window exists) and returns the `ssh` arguments; the terminal module runs the local `ssh` on its pseudo-terminal like
 any other shell. The shell rides the connection's multiplexed master and never becomes one (`ControlMaster=no`,
 `BatchMode=yes`), and `ProxyCommand=false` makes it fail instead of opening a connection of its own when the master
-is gone. `-e none` removes the escape character, so `~C` cannot add a forward (a listener); the agent is never
-forwarded to a terminal. There is no remote command, so the server starts the user's own login shell. When the
+is gone. `-e none` removes the escape character, so `~C` cannot add a forward (a listener); the terminal
+itself requests no agent forwarding (`ForwardAgent=no`), though a server the user opted into forwarding for
+exposes the agent socket to that account on the server whatever the terminal asks. There is no remote command, so the server starts the user's own login shell. When the
 connection ends, ssh exits with 255 and the window says so. Left out: opening in a chosen folder on the server,
 and a terminal on a server without the host binary (connecting needs it until the install slice).
 

@@ -125,6 +125,7 @@ export interface DeviceCore {
     hostProbe: (spec: string) => Promise<string>;
     hostRemove: (deviceId: string) => void;
     hostTerminal: (deviceId: string) => Promise<string>;
+    hostTerminalAttach: (deviceId: string) => Promise<string>;
     manifest: (deviceId?: string) => Promise<string>;
     pair: (deviceId: string, secret: string, accountLabel: string) => Promise<boolean>;
     promptAnswer: (id: number, answer: string) => void;

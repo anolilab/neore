@@ -622,7 +622,8 @@ written here is what is not.
   **A terminal on a server** (`hostTerminal` → `ssh.rs#terminal_args`) is the local `ssh` on the terminal module's PTY,
   riding the connection's master: `host_connect` first (the trust prompt and passphrase come BEFORE any window), then
   `-O check`, then the same hardened options with `-t`, `ControlMaster=no`, `BatchMode=yes` (all asking stays in the
-  device window), `ForwardAgent=no` whatever the server's flag, and `-e none` — without it `~C` opens ssh's command
+  device window), `ForwardAgent=no` whatever the server's flag (the terminal requests no forwarding, but a server the user opted
+  into forwarding for exposes the agent socket to that account on the server anyway), and `-e none` — without it `~C` opens ssh's command
   line and a person can add a `-L` listener. `ProxyCommand=false` is deliberate: ssh tries the control socket before
   it connects, so with the master gone it fails instead of opening a connection of its own. No remote command; the
   server starts the user's login shell. Ending the master (Disconnect, forgetting the key) ends the terminal; ssh

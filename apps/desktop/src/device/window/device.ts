@@ -399,7 +399,7 @@ const hostCard = (host: HostView): HTMLElement => {
         host.connected
             ? button("Disconnect", () => hostAction(() => globalThis.neoreDevice.hostDisconnect(host.deviceId), "Disconnected."), host.name)
             : button("Connect", () => hostAction(() => globalThis.neoreDevice.hostConnect(host.deviceId), "Connected."), host.name),
-        ...state.terminalAvailable ? [button("Terminal", () => hostAction(() => globalThis.neoreDevice.openHostTerminal(host.deviceId), "Terminal opened."), `Open a terminal on ${host.name}`)] : [],
+        ...state.terminalAvailable ? [button("Terminal", () => hostAction(() => globalThis.neoreDevice.openHostTerminal(host.deviceId), "Terminal opened."), host.name)] : [],
         button(
             "Forget host key",
             async () => {
@@ -522,7 +522,7 @@ const rootItem = (root: string): HTMLLIElement => {
     const item = listItem(root, "Remove", () => removeRoot(root));
 
     if (state.terminalAvailable) {
-        item.append(button("Terminal", () => openTerminal(root), `Open a terminal in ${root}`));
+        item.append(button("Terminal", () => openTerminal(root), root));
     }
 
     return item;

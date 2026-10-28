@@ -612,7 +612,7 @@ fn a_terminal_rides_the_open_connection_and_ends_with_it() {
 }
 
 #[test]
-fn a_server_that_was_not_trusted_gets_no_terminal() {
+fn a_declined_host_key_leaves_no_connection_for_a_terminal_to_ride() {
     let Some(sshd) = sshd_binary() else { return };
     let server = Server::start(&sshd, "terminal-declined");
     let (target, paths) = (server.target("client"), server.paths("a"));

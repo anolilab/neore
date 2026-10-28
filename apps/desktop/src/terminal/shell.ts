@@ -122,8 +122,8 @@ export const resolveSsh = (env: NodeJS.ProcessEnv = process.env, executable: (fi
     return found;
 };
 
-/** What ssh needs of the local environment: where things are, who is asking, the agent's socket and the locale. Nothing else is handed on. */
-const SSH_ENVIRONMENT = /^(?:HOME|LANG|LC_.*|LOGNAME|PATH|SSH_AUTH_SOCK|TMPDIR|USER)$/u;
+/** What ssh needs of the local environment: where things are, who is asking and the locale. Nothing else is handed on. */
+const SSH_ENVIRONMENT = /^(?:HOME|LANG|LC_.*|LOGNAME|PATH|TMPDIR|USER)$/u;
 
 /** The environment of the local `ssh` of a terminal on a server. `TERM` is the one thing ssh passes on, in its request for a terminal. */
 export const sshEnvironment = (env: NodeJS.ProcessEnv = process.env): Record<string, string> => {

@@ -211,6 +211,7 @@ const makeCore = () => {
         hostProbe: vi.fn(async (_spec: string) => JSON.stringify({ platform: "linux", sandboxAvailable: true, sandboxDetail: "Landlock", version: "0.1.0" })),
         hostRemove: vi.fn(),
         hostTerminal: vi.fn(async (_deviceId: string) => JSON.stringify(["-t", "--", "build.example.com"])),
+        hostTerminalAttach: vi.fn(async (_deviceId: string) => JSON.stringify(["-t", "--", "build.example.com"])),
         manifest: vi.fn(async (_deviceId?: string) => JSON.stringify({ payload: "{}", signature: "m" })),
         pair: vi.fn(async () => true),
         promptAnswer: vi.fn(),
@@ -582,6 +583,16 @@ describe("opening a terminal", () => {
             expect(core.hostTerminal).not.toHaveBeenCalled();
             await expect(server.args()).resolves.toEqual(["-t", "--", "build.example.com"]);
             expect(core.hostTerminal).toHaveBeenCalledWith("host-1");
+        });
+
+        it("gives a restart a way to attach that never connects", async () => {
+            await invoke(LOCAL_CHANNEL.openHostTerminal, localEvent(), "host-1");
+
+            const [server] = terminal.openSsh.mock.calls[0] as [SshTerminal];
+
+            await expect(server.attach()).resolves.toEqual(["-t", "--", "build.example.com"]);
+            expect(core.hostTerminalAttach).toHaveBeenCalledWith("host-1");
+            expect(core.hostTerminal).not.toHaveBeenCalled();
         });
 
         it("refuses a server that is not paired, and an id that is not text, before connecting anything", async () => {
