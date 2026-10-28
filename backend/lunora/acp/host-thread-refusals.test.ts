@@ -32,6 +32,7 @@ vi.mock("../_generated/internal", async (importOriginal) => {
 const { registerModule } = await import("../../test/registered-api");
 const { default: schema } = await import("../schema");
 const sharing = await import("../chat/sharing");
+const chatFunctions = await import("../chat/functions");
 const group = await import("../chat/group/functions");
 
 registerModule(registry, "agent_sharing", await import("../agent/sharing"));
@@ -74,6 +75,12 @@ describe("a host-run thread", () => {
         const threadId = await insertThread({ runner: "host" });
 
         await expect(as(ownerId).mutation(sharing.toggleThreadVisibility as never, { isPublic: true, threadId } as never)).rejects.toThrow(COMPUTER);
+    });
+
+    it("cannot be made public through the thread-visibility mutation either", async () => {
+        const threadId = await insertThread({ runner: "host" });
+
+        await expect(as(ownerId).mutation(chatFunctions.updateThreadVisibility as never, { isPublic: true, threadId } as never)).rejects.toThrow(COMPUTER);
     });
 
     it("cannot be turned into a group chat", async () => {
