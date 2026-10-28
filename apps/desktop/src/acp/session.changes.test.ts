@@ -6,8 +6,9 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { TurnChanges } from "./changes";
 import type { SessionObserver, TurnSummary } from "./host-events";
 import type { PermissionGate } from "./permission";
 import { AgentSession } from "./session";
@@ -37,6 +38,7 @@ afterEach(async () => {
 
 const start = async () => {
     const ends: { reason: string; summary?: TurnSummary }[] = [];
+    const order: string[] = [];
     const observer: SessionObserver = {
         permissionRequested: () => {},
         permissionResolved: () => {},
@@ -47,8 +49,11 @@ const start = async () => {
         tool: () => {},
         turnEnded: (_session, _turn, reason, _error, summary) => {
             ends.push({ reason, ...summary !== undefined && { summary } });
+            order.push("ended");
         },
-        turnStarted: () => {},
+        turnStarted: (_session, _turn, user) => {
+            order.push(`started ${user}`);
+        },
     };
     const agent = memoryAgent();
     const session = new AgentSession({
@@ -75,7 +80,7 @@ const start = async () => {
         agent.say({ method: "session/update", params: { sessionId: "sess_1", update: body } });
     };
 
-    return { agent, ends, player, session, steps, update };
+    return { agent, ends, order, player, session, steps, update };
 };
 
 describe("a turn's changes, told to the observer", () => {
@@ -135,5 +140,36 @@ describe("a turn's changes, told to the observer", () => {
         await expect.poll(() => ends.length).toBe(1);
 
         expect(ends[0]).toEqual({ reason: "end_turn" });
+    });
+});
+
+describe("a turn that changed files, then a queued prompt", () => {
+    it("starts the next prompt only after the first turn's end is told", async () => {
+        const { agent, ends, order, player, session, steps, update } = await start();
+
+        session.send("second");
+        update({ content: [{ newText: "x\n", oldText: null, path: path.join(work, "a.txt"), type: "diff" }], kind: "edit", sessionUpdate: "tool_call", status: "pending", title: "Write", toolCallId: "c1" });
+        update({ sessionUpdate: "tool_call_update", status: "completed", toolCallId: "c1" });
+        await player.play(steps.slice(-1));
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/prompt" && JSON.stringify(frame.params).includes("second"))).toBe(true);
+
+        expect(order).toEqual(["started say hi", "ended", "started second"]);
+        expect(ends[0]?.summary?.files).toEqual([{ added: 1, path: "a.txt", removed: 0 }]);
+        expect(session.snapshot().status).toBe("busy");
+    });
+
+    it("ends the turn without a summary when reading what it changed fails, and carries on", async () => {
+        const failing = vi.spyOn(TurnChanges.prototype, "summary").mockRejectedValueOnce(new Error("boom"));
+        const { agent, ends, order, player, session, steps, update } = await start();
+
+        session.send("second");
+        update({ content: [{ newText: "x\n", oldText: null, path: path.join(work, "a.txt"), type: "diff" }], kind: "edit", sessionUpdate: "tool_call", status: "pending", title: "Write", toolCallId: "c1" });
+        update({ sessionUpdate: "tool_call_update", status: "completed", toolCallId: "c1" });
+        await player.play(steps.slice(-1));
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/prompt" && JSON.stringify(frame.params).includes("second"))).toBe(true);
+
+        failing.mockRestore();
+        expect(ends).toEqual([{ reason: "end_turn" }]);
+        expect(order).toEqual(["started say hi", "ended", "started second"]);
     });
 });

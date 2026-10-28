@@ -474,6 +474,20 @@ describe("a turn that changed files", () => {
         expect(Math.max(...backend.bodyBytes)).toBeLessThan(256 * 1024);
     });
 
+    it("sends the end of the turn again without its summary when the backend refuses the post, so the reply is still saved", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "edit it");
+        backend.respond = (post) => post.events.some((event) => event.kind === "turn_end" && event.summary !== undefined) ? Response.json({ error: "bad" }, { status: 400 }) : undefined;
+        host.turnEnded("s1", "t1", "end_turn", undefined, { files: [{ added: 1, path: "a.ts", removed: 0 }], patch: "+x\n" });
+        await settle(POST_INTERVAL_MS);
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished" });
+        expect(backend.ended.has("t1")).toBe(true);
+    });
+
     it("sends a turn with nothing changed exactly as before", async () => {
         const host = poster();
 

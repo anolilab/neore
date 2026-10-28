@@ -9,22 +9,21 @@ import { useState } from "react";
 
 import type { UIMessage } from "@/lib/agent";
 
+import type { PatchLineKind } from "./host-changes-lines";
+import { classifyPatch } from "./host-changes-lines";
+
 type HostChangesData = NonNullable<UIMessage["hostChanges"]>;
 
 interface HostChangesProps {
     changes: HostChangesData;
 }
 
-const lineClass = (line: string): string | undefined => {
-    if (line.startsWith("+") && !line.startsWith("+++")) {
-        return "text-green-700 dark:text-green-400";
-    }
-
-    if (line.startsWith("-") && !line.startsWith("---")) {
-        return "text-red-700 dark:text-red-400";
-    }
-
-    return line.startsWith("@@") ? "text-muted-foreground" : undefined;
+const LINE_CLASS: Record<PatchLineKind, string | undefined> = {
+    add: "text-green-700 dark:text-green-400",
+    context: undefined,
+    header: "text-muted-foreground font-medium",
+    hunk: "text-muted-foreground",
+    remove: "text-red-700 dark:text-red-400",
 };
 
 /**
@@ -80,10 +79,9 @@ const HostChanges: FC<HostChangesProps> = ({ changes }) => {
                         </DialogHeader>
                         <DialogPanel>
                             <pre className="overflow-x-auto font-mono text-xs leading-5" data-testid="host-changes-patch">
-                                {patch.split("\n").map((line, index) => (
-                                    // The patch never changes, so a line's position is its identity.
-                                    <span className={lineClass(line)} key={index}>
-                                        {line}
+                                {classifyPatch(patch).map((line) => (
+                                    <span className={LINE_CLASS[line.kind]} key={line.id}>
+                                        {line.text}
                                         {"\n"}
                                     </span>
                                 ))}
