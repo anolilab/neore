@@ -91,6 +91,32 @@ The gateway proxies OpenAI Realtime, but the web client has no call UI and the
 backend has no session ticket for it. **Not built:** needs billing per minute,
 ticketing and a UI.
 
+## Jump to my last message
+
+In a busy thread, often with queued or steered messages, the user asks something
+("how is it going?"), steps away, and comes back to a long run of new replies. The
+answer is usually right after their own question, which is now far up. Design: a
+control beside the existing scroll-to-bottom button
+(`apps/web/src/features/chat/thread/thread-viewport.tsx`) that scrolls to the
+user's last sent message on the active path, and a keyboard shortcut registered in
+`features/keyboard/`. It reads the rows the thread already holds; message
+windowing (`message-windowing.ts`) must load that row if it is outside the window.
+No backend change. **Not built:** small, not scheduled.
+
+## Prompt text fixed per thread
+
+A deploy that changes the system prompt or the tool instructions changes how
+every existing thread behaves on its next turn, and invalidates every provider's
+prompt cache for it (see the caching rules in
+[harness-switch.md](harness-switch.md)). Design: stamp a prompt version on the
+thread when it is created; `backend/lunora/chat/execute.ts` builds that version's
+text, and all versions stay in the build. A thread moves to the newest version
+only when the user starts a new thread or chooses to upgrade it. Unknown or
+removed versions fall back to the newest. A golden test per version pins the
+bytes, so a text change is a deliberate new version. **Not built:** measure first
+how often prompt changes ship and how much cache they cost; it adds a version
+dimension to every prompt change.
+
 ## Audit of the remaining items (2026-10-19)
 
 Checked against the code. "Decision" means a product call is needed first.

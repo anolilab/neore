@@ -234,6 +234,15 @@ dropped by `seq`, so the stored `seq` outlives every replay that could pass.
 - On a desktop restart or update, in-flight host turns end at once, and their pending
   requests become not resumable. Before an update installs, the app counts running
   turns and says so.
+- **A turn cut off by a restart says so and can continue.** It ends with the reason
+  `interrupted` (restart, update or crash, as the desktop knows on its next start),
+  not as a plain error. The reply offers **Continue**: an ordinary send into the
+  same session, or into a new one when the old one cannot be loaded, whose prompt
+  tells the agent its last turn was interrupted by a restart and that any
+  background work it started (a background shell, a watcher) was stopped with it.
+  Without that note an agent that was waiting on its own background task waits
+  for a completion that will never come. Continue is offered, never sent on its
+  own: the desktop restarting does not mean the user wants the turn to run again.
 - Reconnects use jittered exponential backoff with a cap, reset only after a
   connection stays up. After a long suspension, the relay replaces its connection
   instead of probing it.
@@ -447,6 +456,11 @@ the folder and refers to it in its reply. Rules:
   to another offered agent (harness-switch S3, host to host in the thread) or
   continue on a cloud model (a fork, harness-switch S3). The offer is never taken
   automatically, because the other agent bills a different account.
+- **Taking the offer runs the stopped turn again.** The switch re-sends that turn's
+  prompt and attachments to the new agent, whoever started it: the user, a lead's
+  dispatch, a trigger, or a turn whose page has since reloaded. The prompt comes
+  from the stored user row, never from the composer, so it works with an empty
+  composer and on another device.
 - The desktop shows the agent's reported limit and reset time in the local
   window when the adapter exposes them. Missing values show as unknown, never as
   zero.
@@ -563,7 +577,13 @@ Additions to earlier slices:
   a log line (test).
 - S2 adds the approval bar and Approve all locally (§4.4).
 - S4 adds the usage-limit stop and its offer (§6.1); it needs harness-switch S3
-  for the switch itself and shows only the reason until then.
+  for the switch itself and shows only the reason until then. Acceptance: taking
+  the offer on a dispatch-started turn, and after a page reload, re-runs that turn
+  on the new agent (test).
+- S3 adds the `interrupted` end reason and S4 the Continue offer (§4.5).
+  Acceptance: killing the desktop mid-turn ends the turn as `interrupted` on the
+  next start; Continue sends a prompt that names the interruption; nothing is sent
+  without the user's click.
 
 ## 9. Risks
 
