@@ -44,10 +44,11 @@ loop, tested in `stream.test.ts`) and `chat-api.ts` (`startChat` →
 - Backend `POST /chat/chunks` (the poll): `backend/lunora/http.ts:264`,
   `backend/lunora/chat/streaming/persistent/http-api.ts:84`.
 
-**Gap found:** the chat screen passes the global `fetch` (RN) into `relayReply`,
-not `expo/fetch`. RN's fetch does not expose a readable body, so `relayReply`
-returns "failed" on the `!response.body` check. The first task is to wire
-`expo/fetch` in and prove a token arrives before the reply completes.
+**Gap fixed (2026-10-28):** the chat screen passed the global `fetch` (RN) into
+`relayReply`; RN's fetch exposes no readable body, so `relayReply` returned
+"failed" on the `!response.body` check. The relay now goes through `expo/fetch`
+(`apps/mobile/src/lib/streaming-fetch.ts`). Still to prove on a device: a token
+arrives before the reply completes (acceptance 1).
 
 **Acceptance**
 1. A prompt sent on a phone streams to the screen with first text in under
