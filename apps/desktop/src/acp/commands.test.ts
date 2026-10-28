@@ -15,7 +15,7 @@ import { HostCommands, isAcpEnvelope } from "./commands";
 
 const SEND: AcpCommand = { kind: "send", sessionId: "s1", text: "fix it", turnId: "u1" };
 
-let dir: string;
+let directory: string;
 let receiptFile: string;
 
 /** A core that prepares what the envelope says, and signs by writing the outcome into the payload. */
@@ -29,6 +29,9 @@ const fakeCore = (prepared: Record<string, unknown>) => {
 const envelopeFor = (callId: string, command: AcpCommand | null = SEND, refusal: string | null = null): string => JSON.stringify({ callId, command, refusal, tool: "acp_send" });
 
 const outcomeOf = (signed: { payload: string }): string => (JSON.parse(signed.payload) as { outcome: string }).outcome;
+
+/** One delivery of a call, and the outcome that came back signed. */
+const deliver = async (target: HostCommands, callId: string): Promise<string> => outcomeOf(await target.execute(envelopeFor(callId), "sig"));
 
 const make = (applied: AcpCommand[], overrides: { apply?: (command: AcpCommand) => Promise<string> | string; file?: string; now?: () => number } = {}) =>
     new HostCommands({
@@ -45,12 +48,12 @@ const make = (applied: AcpCommand[], overrides: { apply?: (command: AcpCommand) 
     });
 
 beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), "neore-commands-"));
-    receiptFile = path.join(dir, "receipts.json");
+    directory = mkdtempSync(path.join(tmpdir(), "neore-commands-"));
+    receiptFile = path.join(directory, "receipts.json");
 });
 
 afterEach(() => {
-    rmSync(dir, { force: true, recursive: true });
+    rmSync(directory, { force: true, recursive: true });
 });
 
 describe("a coding-agent command", () => {
@@ -75,16 +78,16 @@ describe("a coding-agent command", () => {
         const applied: AcpCommand[] = [];
 
         // A receipt that cannot be written means the command is not acted on and the call is not acknowledged.
-        writeFileSync(path.join(dir, "a-file"), "x");
-        await expect(make(applied, { file: path.join(dir, "a-file", "receipts.json") }).execute(envelopeFor("c1"), "sig")).rejects.toThrow();
+        writeFileSync(path.join(directory, "a-file"), "x");
+        await expect(make(applied, { file: path.join(directory, "a-file", "receipts.json") }).execute(envelopeFor("c1"), "sig")).rejects.toThrow();
         expect(applied).toEqual([]);
 
         // The restarted process finds no receipt for it, runs it, and acknowledges any later delivery without running it again.
         const restarted = make(applied);
 
-        expect(outcomeOf(await restarted.execute(envelopeFor("c1"), "sig"))).toBe("accepted");
+        expect(await deliver(restarted, "c1")).toBe("accepted");
         expect(applied).toEqual([SEND]);
-        expect(outcomeOf(await restarted.execute(envelopeFor("c1"), "sig"))).toBe("accepted");
+        expect(await deliver(restarted, "c1")).toBe("accepted");
         expect(applied).toEqual([SEND]);
     });
 
@@ -129,9 +132,9 @@ describe("a coding-agent command", () => {
             },
         });
 
-        expect(outcomeOf(await refusing.execute(envelopeFor("c1"), "sig"))).toBe("this session is still starting");
+        expect(await deliver(refusing, "c1")).toBe("this session is still starting");
         // It did not run, so it holds no receipt: a delivery that comes back is a second try, and runs.
-        expect(outcomeOf(await make(applied).execute(envelopeFor("c1"), "sig"))).toBe("accepted");
+        expect(await deliver(make(applied), "c1")).toBe("accepted");
         expect(applied).toEqual([SEND]);
     });
 
@@ -151,10 +154,10 @@ describe("a coding-agent command", () => {
 
 describe("telling a coding-agent command from a device tool", () => {
     it("reads the tool name and nothing else, and treats anything unreadable as a device call", () => {
-        expect(isAcpEnvelope('{"tool":"acp_send"}')).toBe(true);
-        expect(isAcpEnvelope('{"tool":"acp_cancel"}')).toBe(true);
-        expect(isAcpEnvelope('{"tool":"fs_read"}')).toBe(false);
-        expect(isAcpEnvelope('{"tool":7}')).toBe(false);
+        expect(isAcpEnvelope("{\"tool\":\"acp_send\"}")).toBe(true);
+        expect(isAcpEnvelope("{\"tool\":\"acp_cancel\"}")).toBe(true);
+        expect(isAcpEnvelope("{\"tool\":\"fs_read\"}")).toBe(false);
+        expect(isAcpEnvelope("{\"tool\":7}")).toBe(false);
         expect(isAcpEnvelope("not json")).toBe(false);
         expect(isAcpEnvelope("[]")).toBe(false);
     });

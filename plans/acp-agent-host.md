@@ -553,6 +553,23 @@ deadline, whatever the error).
   and measures there; `plans/acp-s3-throttling.md` stays the record of the method
   and the safe default (throttling on).
 
+**S4 as built** (differences from the text above):
+- `/hosts/send` writes the user's message and the host stream in one mutation, like the local-turn path
+  (`createHostStream`); it writes no pending reply row, because `finishHostTurn` saves the reply when the turn ends.
+  It is called from the browser with the owner's bearer, not through the gateway; the stream token it returns is the
+  same `createStreamToken`, but the web reads a host turn from the persisted stream, as every other reader does.
+- `acp_*` calls spend no nonce. A lapsed claim redelivers the same envelope, which a persisted nonce would refuse, so the
+  replay defence is the main process's receipt log, keyed by the signed call id, written before the command is acted on
+  and kept until the envelope expires. The core checks (`acp_prepare`), the main process writes the receipt and acts,
+  the core signs (`acp_sign`). A command is not persisted beyond its receipt: that is S7.
+- Claim lease 30 s (`ACP_CLAIM_LEASE_MS`, a guess, to be set from the throttling measurement); the claim window gates only
+  the first claim. Clocks are scheduled checks on one call (`acp/calls.ts`), not a sweep.
+- Remote answers find the Rust-side request by the id the backend shows (`requestId` on the core's permission request).
+  "Approve all" is the local window's bar and was built with S2; its test (a request that arrives after the bar is drawn
+  is not answered) is `approve_all_answers_exactly_the_requests_named_each_with_its_own_option`.
+- Not built here: attachments on `acp_send` (S8), a session id sent before the session opens (S7), and the throttling
+  measurement (harness in [acp-s4-throttling.md](acp-s4-throttling.md); not run).
+
 **S5 — Registry.** Search and install from the official ACP registry, queried by
 the desktop. Pinned versions, checksum verification, installs under the app data
 directory, local consent for each install.

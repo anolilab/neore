@@ -8,6 +8,7 @@ import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
 import { formatDateTime } from "@neore/ui/utils/locale-format";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import type { FC } from "react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -31,6 +32,8 @@ import { isDeviceOnline } from "../lib/device-relay";
 
 interface DeviceView {
     _id: string;
+    /** The (agent, folder) pairs the user approved on the computer; each can be started from here. */
+    acpOffers?: { agentKey: string; agentLabel: string; folderId: string; folderLabel: string }[];
     createdAt: number;
     lastSeenAt?: number;
     name: string;
@@ -52,6 +55,51 @@ const useNow = (): number => {
     }, []);
 
     return now;
+};
+
+/**
+ * Starts a coding agent on the computer, for a pair the user approved in the desktop app's own window. Only a pair
+ * the computer offered is listed, and the computer checks again before it starts anything.
+ */
+const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ device, online }) => {
+    const { t } = useLingui();
+    const crpc = useCRPC();
+    const navigate = useNavigate();
+    const start = useMutation(crpc.acp.remote.startHostSession.mutationOptions());
+    const offers = device.acpOffers ?? [];
+
+    if (offers.length === 0) {
+        return null;
+    }
+
+    return (
+        <ul aria-label={t`Coding agents you can start on ${device.name}`} className="flex basis-full flex-wrap gap-2">
+            {offers.map((offer) => (
+                <li key={`${offer.agentKey}:${offer.folderId}`}>
+                    <Button
+                        disabled={!online || start.isPending}
+                        onClick={() => {
+                            start.mutate(
+                                { agentKey: offer.agentKey, clientId: crypto.randomUUID(), deviceId: device._id as Id<"devices">, folderId: offer.folderId },
+                                {
+                                    onError: (error) => toast.error(error.message),
+                                    onSuccess: (result) => {
+                                        if (result.threadId !== undefined) {
+                                            void navigate({ params: { threadId: result.threadId }, to: "/chat/$threadId" });
+                                        }
+                                    },
+                                },
+                            );
+                        }}
+                        size="sm"
+                        variant="outline"
+                    >
+                        {t`Start ${offer.agentLabel} in ${offer.folderLabel}`}
+                    </Button>
+                </li>
+            ))}
+        </ul>
+    );
 };
 
 const DeviceRow: FC<{
@@ -122,6 +170,7 @@ const DeviceRow: FC<{
                     {t`Remove`}
                 </Button>
             </div>
+            <StartAgents device={device} online={online} />
             <ConfirmDialog
                 confirmLabel={t`Remove`}
                 description={t`The agent can no longer ask this device for anything. Its activity log stays until it expires.`}
