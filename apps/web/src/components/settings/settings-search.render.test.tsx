@@ -32,14 +32,15 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
+const WHITESPACE = /\s/;
+const ENDS_IN_RESULTS = /results$/;
 const NO_LOCKED_TABS: ReadonlySet<SettingsTab> = new Set();
 const everyTab = { activeOrganization: true, apiKey: true, organization: true };
 
 const onSelect = vi.fn<(entry: SettingsSearchEntry) => void>();
-const onPreview = vi.fn<(tab: SettingsTab) => void>();
 const onEscapeReachedDialog = vi.fn();
 
-const Harness: FC<{ lockedTabs?: ReadonlySet<SettingsTab> }> = ({ lockedTabs = NO_LOCKED_TABS }) => {
+const Harness: FC<{ announcement?: string; lockedTabs?: ReadonlySet<SettingsTab> }> = ({ announcement, lockedTabs = NO_LOCKED_TABS }) => {
     const navigation = useMemo(() => resolveSettingsNavigation(everyTab, (descriptor) => descriptor.id ?? ""), []);
     const search = useSettingsSearch(navigation);
 
@@ -54,12 +55,12 @@ const Harness: FC<{ lockedTabs?: ReadonlySet<SettingsTab> }> = ({ lockedTabs = N
             role="presentation"
         >
             <SettingsSearchField
-                activeIndex={search.activeIndex}
+                activeOptionId={search.activeOptionId}
+                announcement={announcement}
                 isSearching={search.isSearching}
                 listboxId={search.listboxId}
                 onActivate={() => search.activeEntry && onSelect(search.activeEntry)}
                 onMove={search.moveActive}
-                optionId={search.optionId}
                 query={search.query}
                 resultCount={search.resultCount}
                 setQuery={search.setQuery}
@@ -70,7 +71,6 @@ const Harness: FC<{ lockedTabs?: ReadonlySet<SettingsTab> }> = ({ lockedTabs = N
                 isSearching={search.isSearching}
                 listboxId={search.listboxId}
                 lockedTabs={lockedTabs}
-                onPreview={onPreview}
                 onSelect={onSelect}
                 optionId={search.optionId}
                 setActive={search.setActive}
@@ -222,14 +222,44 @@ describe("settings search combobox", () => {
         expect(locked.every((option) => option.textContent?.includes("Agent"))).toBe(true);
     });
 
-    it("previews a tab's chunk when its result is hovered", () => {
-        onPreview.mockClear();
+    it("selects a result on hover without scrolling it into view, and scrolls on the arrow keys", () => {
+        const scrollIntoView = vi.mocked(HTMLElement.prototype.scrollIntoView);
+
         render(<Harness />);
         type("model");
+        scrollIntoView.mockClear();
         fireEvent.mouseEnter(screen.getAllByRole("option")[1] as HTMLElement);
 
-        expect(onPreview).toHaveBeenCalledTimes(1);
         expect(selectedOption()).toBe(screen.getAllByRole("option")[1]);
+        expect(scrollIntoView).not.toHaveBeenCalled();
+
+        press("ArrowDown");
+
+        expect(scrollIntoView).toHaveBeenCalledTimes(1);
+        expect(scrollIntoView.mock.instances[0]).toBe(screen.getAllByRole("option")[2]);
+    });
+
+    it("keys option ids on the result, so the active descendant changes when another result is on top", () => {
+        render(<Harness />);
+        type("model");
+
+        const field = screen.getByRole("combobox", { name: "Search settings" });
+        const before = field.getAttribute("aria-activedescendant");
+
+        type("agent");
+
+        expect(field.getAttribute("aria-activedescendant")).not.toBe(before);
+        expect(field.getAttribute("aria-activedescendant")).toBe(selectedOption()?.id);
+        expect(field.getAttribute("aria-activedescendant")).not.toMatch(WHITESPACE);
+    });
+
+    it("announces where the last pick led while the field is empty", () => {
+        render(<Harness announcement="Opened Agent: Task Planning Module" />);
+
+        expect(screen.getByRole("status").textContent).toBe("Opened Agent: Task Planning Module");
+
+        type("model");
+        expect(screen.getByRole("status").textContent).toMatch(ENDS_IN_RESULTS);
     });
 });
 

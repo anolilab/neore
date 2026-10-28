@@ -207,20 +207,24 @@ export const SettingsModal: FC = () => {
     const tabContentRef = useRef<HTMLDivElement>(null);
     // The setting a search result asked to scroll to; a new object per pick, so choosing the same one again jumps again.
     const [pendingJump, setPendingJump] = useState<{ label: string } | null>(null);
+    // Where the last pick led, for the live region: the field is empty after a pick, so nothing else tells a screen reader it worked.
+    const [announcement, setAnnouncement] = useState("");
 
     // Runs after the destination tab's commit; the tab may still be loading its chunk, which the jump waits for.
+    // Moves focus to the row's own control when it has one; a row without one leaves focus in the search field.
     useEffect(() => {
         if (!pendingJump || !tabContentRef.current) {
             return undefined;
         }
 
-        return jumpToSettingsRow(tabContentRef.current, pendingJump.label);
+        return jumpToSettingsRow(tabContentRef.current, pendingJump.label, (control) => control?.focus({ preventScroll: true }));
     }, [pendingJump]);
 
     // The modal stays mounted, so a query left in the field would greet the next opening.
     // Cleared on any close, including ones that bypass `handleClose`.
-    if (!isOpen && searchQuery !== "") {
+    if (!isOpen && (searchQuery !== "" || announcement !== "")) {
         setSearchQuery("");
+        setAnnouncement("");
     }
 
     // Compute query options at render time — queryOptions() calls hooks internally
@@ -285,11 +289,16 @@ export const SettingsModal: FC = () => {
         // The current tab is not written to the URL during a session; the initial
         // tab is read from the URL on mount so deep-links (?settingsTab=privacy) still work.
         setCurrentTab(tab);
+        // A jump still waiting on the old tab is over.
+        setPendingJump(null);
     };
 
     const handleSearchSelect = (entry: SettingsSearchEntry) => {
-        handleTabChange(entry.tab);
-        setPendingJump(entry.kind === "setting" ? { label: entry.label } : null);
+        const { label, tab, tabLabel } = entry;
+
+        handleTabChange(tab);
+        setPendingJump(entry.kind === "setting" ? { label } : null);
+        setAnnouncement(entry.kind === "setting" ? t`Opened ${tabLabel}: ${label}` : t`Opened ${tabLabel}`);
         setSearchQuery("");
         // The chosen result unmounts with the list; keep focus in the dialog.
         searchInputRef.current?.focus();
@@ -314,12 +323,6 @@ export const SettingsModal: FC = () => {
         return locked;
     }, [isAnonymous, navigationGroups]);
 
-    // Don't mount until first opened; once mounted, keep alive so the Dialog's
-    // Activity component can deactivate/reactivate content without remounting.
-    if (!isOpen && !hasOpened) {
-        return null;
-    }
-
     // Loads a tab's chunk and data ahead of opening it; a tab the navigation locks for a guest loads nothing.
     const previewTab = (tab: SettingsTab) => {
         if (lockedTabs.has(tab)) {
@@ -329,6 +332,24 @@ export const SettingsModal: FC = () => {
         preloadTab[tab]?.();
         prefetchTabData(tab);
     };
+
+    // The selected result is the one Enter opens, whether it is on top after typing, reached with the arrow keys or hovered.
+    const activeResultTab = settingsSearch.activeEntry?.tab;
+    const previewActiveResult = useEffectEvent(() => {
+        if (activeResultTab) {
+            previewTab(activeResultTab);
+        }
+    });
+
+    useEffect(() => {
+        previewActiveResult();
+    }, [activeResultTab]);
+
+    // Don't mount until first opened; once mounted, keep alive so the Dialog's
+    // Activity component can deactivate/reactivate content without remounting.
+    if (!isOpen && !hasOpened) {
+        return null;
+    }
 
     const getTabTitle = (): string => {
         for (const group of navigationGroups) {
@@ -442,22 +463,19 @@ export const SettingsModal: FC = () => {
                         <DialogDescription className="sr-only">{t`Configure your application settings`}</DialogDescription>
                     </DialogHeader>
                     <SettingsSearchField
-                        activeIndex={settingsSearch.activeIndex}
+                        activeOptionId={settingsSearch.activeOptionId}
+                        announcement={announcement}
                         inputRef={searchInputRef}
                         isSearching={settingsSearch.isSearching}
                         listboxId={settingsSearch.listboxId}
                         onActivate={() => settingsSearch.activeEntry && handleSearchSelect(settingsSearch.activeEntry)}
-                        onMove={(step) => {
-                            const entry = settingsSearch.moveActive(step);
-
-                            if (entry) {
-                                previewTab(entry.tab);
-                            }
-                        }}
-                        optionId={settingsSearch.optionId}
+                        onMove={settingsSearch.moveActive}
                         query={searchQuery}
                         resultCount={settingsSearch.resultCount}
-                        setQuery={setSearchQuery}
+                        setQuery={(value) => {
+                            setAnnouncement("");
+                            setSearchQuery(value);
+                        }}
                     />
                     {/* Keyed on the mode: the results are a new list, so they start at the top instead of at the navigation's scroll offset. */}
                     <ScrollArea className="flex-1" key={settingsSearch.isSearching ? "search" : "navigation"}>
@@ -467,7 +485,6 @@ export const SettingsModal: FC = () => {
                             isSearching={settingsSearch.isSearching}
                             listboxId={settingsSearch.listboxId}
                             lockedTabs={lockedTabs}
-                            onPreview={previewTab}
                             onSelect={handleSearchSelect}
                             optionId={settingsSearch.optionId}
                             setActive={settingsSearch.setActive}

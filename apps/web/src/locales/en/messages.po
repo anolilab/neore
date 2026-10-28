@@ -997,7 +997,7 @@ msgstr "{providerName} · your own Bedrock account ({region})"
 msgid "{requestCount} req"
 msgstr "{requestCount} req"
 
-#: src/components/settings/settings-search.tsx:79
+#: src/components/settings/settings-search.tsx:93
 msgid "{resultCount, plural, one {# result} other {# results}}"
 msgstr "{resultCount, plural, one {# result} other {# results}}"
 
@@ -6272,7 +6272,7 @@ msgstr "Configure variable values for this thread. These values will replace {VA
 msgid "Configure Variables"
 msgstr "Configure Variables"
 
-#: src/components/settings/settings-modal.tsx:442
+#: src/components/settings/settings-modal.tsx:463
 msgid "Configure your application settings"
 msgstr "Configure your application settings"
 
@@ -19491,7 +19491,7 @@ msgid "No response yet"
 msgstr "No response yet"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:221
-#: src/components/settings/settings-search.tsx:166
+#: src/components/settings/settings-search.tsx:175
 #: src/features/vault/components/empty-states.tsx:13
 msgid "No results"
 msgstr "No results"
@@ -20674,6 +20674,14 @@ msgstr "OpenAI's smallest LLM"
 #: src/features/marketing/data/models-data.ts:1028
 msgid "OpenAI's smallest model for maximum speed"
 msgstr "OpenAI's smallest model for maximum speed"
+
+#: src/components/settings/settings-modal.tsx:301
+msgid "Opened {tabLabel}"
+msgstr "Opened {tabLabel}"
+
+#: src/components/settings/settings-modal.tsx:301
+msgid "Opened {tabLabel}: {label}"
+msgstr "Opened {tabLabel}: {label}"
 
 #: src/features/settings/components/account/account-settings.tsx:434
 msgid "Opening a blank chat"
@@ -23989,7 +23997,7 @@ msgstr "Required."
 msgid "requires an account"
 msgstr "requires an account"
 
-#: src/components/settings/settings-search.tsx:206
+#: src/components/settings/settings-search.tsx:211
 msgid "Requires an account"
 msgstr "Requires an account"
 
@@ -25089,11 +25097,11 @@ msgstr "Search Results ({0})"
 msgid "Search servers…"
 msgstr "Search servers…"
 
-#: src/components/settings/settings-search.tsx:128
+#: src/components/settings/settings-search.tsx:142
 msgid "Search settings"
 msgstr "Search settings"
 
-#: src/components/settings/settings-search.tsx:132
+#: src/components/settings/settings-search.tsx:146
 msgid "Search settings..."
 msgstr "Search settings..."
 
@@ -25652,8 +25660,8 @@ msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in resp
 msgstr "Set up triggers to automate tasks on a schedule, via webhooks, or in response to events."
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:255
-#: src/components/settings/settings-modal.tsx:342
-#: src/components/settings/settings-modal.tsx:440
+#: src/components/settings/settings-modal.tsx:363
+#: src/components/settings/settings-modal.tsx:461
 #: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
 msgstr "Settings"
@@ -25663,7 +25671,7 @@ msgstr "Settings"
 msgid "Settings saved"
 msgstr "Settings saved"
 
-#: src/components/settings/settings-search.tsx:172
+#: src/components/settings/settings-search.tsx:181
 msgid "Settings search results"
 msgstr "Settings search results"
 

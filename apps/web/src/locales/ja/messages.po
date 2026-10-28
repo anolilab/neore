@@ -998,7 +998,7 @@ msgstr "{providerName} · ご自身の Bedrock アカウント（{region}）"
 msgid "{requestCount} req"
 msgstr "{requestCount} 件"
 
-#: src/components/settings/settings-search.tsx:79
+#: src/components/settings/settings-search.tsx:93
 msgid "{resultCount, plural, one {# result} other {# results}}"
 msgstr ""
 
@@ -6273,7 +6273,7 @@ msgstr "このスレッドの変数の値を設定します。プロンプトを
 msgid "Configure Variables"
 msgstr "変数を設定"
 
-#: src/components/settings/settings-modal.tsx:442
+#: src/components/settings/settings-modal.tsx:463
 msgid "Configure your application settings"
 msgstr "アプリケーションの設定を構成します"
 
@@ -19482,7 +19482,7 @@ msgid "No response yet"
 msgstr "まだ応答がありません"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:221
-#: src/components/settings/settings-search.tsx:166
+#: src/components/settings/settings-search.tsx:175
 #: src/features/vault/components/empty-states.tsx:13
 msgid "No results"
 msgstr "結果なし"
@@ -20665,6 +20665,14 @@ msgstr "OpenAI の最小の LLM"
 #: src/features/marketing/data/models-data.ts:1028
 msgid "OpenAI's smallest model for maximum speed"
 msgstr "最高速を実現する OpenAI の最小モデル"
+
+#: src/components/settings/settings-modal.tsx:301
+msgid "Opened {tabLabel}"
+msgstr ""
+
+#: src/components/settings/settings-modal.tsx:301
+msgid "Opened {tabLabel}: {label}"
+msgstr ""
 
 #: src/features/settings/components/account/account-settings.tsx:434
 msgid "Opening a blank chat"
@@ -23972,7 +23980,7 @@ msgstr "必須。"
 msgid "requires an account"
 msgstr "にはアカウントが必要です"
 
-#: src/components/settings/settings-search.tsx:206
+#: src/components/settings/settings-search.tsx:211
 msgid "Requires an account"
 msgstr ""
 
@@ -25072,11 +25080,11 @@ msgstr "検索結果（{0}）"
 msgid "Search servers…"
 msgstr "サーバーを検索…"
 
-#: src/components/settings/settings-search.tsx:128
+#: src/components/settings/settings-search.tsx:142
 msgid "Search settings"
 msgstr ""
 
-#: src/components/settings/settings-search.tsx:132
+#: src/components/settings/settings-search.tsx:146
 msgid "Search settings..."
 msgstr ""
 
@@ -25631,8 +25639,8 @@ msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in resp
 msgstr "トリガーを設定して、スケジュール、Webhook、またはイベントに応じてタスクを自動化しましょう。"
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:255
-#: src/components/settings/settings-modal.tsx:342
-#: src/components/settings/settings-modal.tsx:440
+#: src/components/settings/settings-modal.tsx:363
+#: src/components/settings/settings-modal.tsx:461
 #: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
 msgstr "設定"
@@ -25642,7 +25650,7 @@ msgstr "設定"
 msgid "Settings saved"
 msgstr "設定を保存しました"
 
-#: src/components/settings/settings-search.tsx:172
+#: src/components/settings/settings-search.tsx:181
 msgid "Settings search results"
 msgstr ""
 

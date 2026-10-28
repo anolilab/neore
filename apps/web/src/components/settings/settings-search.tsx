@@ -11,7 +11,10 @@ import { useId, useMemo, useState } from "react";
 import { SETTINGS_KEYWORDS } from "@/features/settings/lib/settings-keywords";
 import type { SettingsNavGroup, SettingsTab } from "@/features/settings/lib/settings-navigation";
 import type { SettingsSearchEntry } from "@/features/settings/lib/settings-search";
-import { buildSettingsSearchIndex, searchSettings } from "@/features/settings/lib/settings-search";
+import { buildSettingsSearchIndex, searchSettings, settingsEntryKey } from "@/features/settings/lib/settings-search";
+
+/** Anything an element id should not carry: ids named by `aria-activedescendant` stay one token. */
+const NON_ID_CHARACTERS = /[^\p{L}\p{N}]+/gu;
 
 /** The query, what it finds in the navigation the user can see, and which result is selected. */
 export const useSettingsSearch = (navigation: ReadonlyArray<SettingsNavGroup>) => {
@@ -31,27 +34,36 @@ export const useSettingsSearch = (navigation: ReadonlyArray<SettingsNavGroup>) =
         setSelected(0);
     };
 
-    /** Moves the selection one result, wrapping at the ends; answers the entry it lands on. */
-    const moveActive = (step: 1 | -1): SettingsSearchEntry | undefined => {
+    // Built from the entry, not its position: the id `aria-activedescendant` names changes when a different result is on top.
+    const optionId = (entry: SettingsSearchEntry): string => `${baseId}-option-${settingsEntryKey(entry).replaceAll(NON_ID_CHARACTERS, "-")}`;
+    const activeEntry = entries[activeIndex];
+
+    /** Moves the selection one result, wrapping at the ends, and brings it into view in the list. */
+    const moveActive = (step: 1 | -1): void => {
         if (entries.length === 0) {
-            return undefined;
+            return;
         }
 
         const next = (activeIndex + step + entries.length) % entries.length;
+        const entry = entries[next];
 
         setSelected(next);
 
-        return entries[next];
+        if (entry) {
+            // The options are all in the DOM already; only which one is selected changes. Hovering moves the selection too and must not scroll.
+            document.querySelector(`#${CSS.escape(optionId(entry))}`)?.scrollIntoView({ block: "nearest" });
+        }
     };
 
     return {
-        activeEntry: entries[activeIndex],
+        activeEntry,
         activeIndex,
+        activeOptionId: activeEntry && optionId(activeEntry),
         groups,
         isSearching: query.trim() !== "",
         listboxId: `${baseId}-results`,
         moveActive,
-        optionId: (position: number) => `${baseId}-option-${String(position)}`,
+        optionId,
         query,
         resultCount: entries.length,
         setActive: setSelected,
@@ -67,17 +79,19 @@ type SettingsSearchState = ReturnType<typeof useSettingsSearch>;
  * reaches the dialog once the field is empty.
  */
 export const SettingsSearchField: FC<
-    Pick<SettingsSearchState, "activeIndex" | "isSearching" | "listboxId" | "optionId" | "query" | "resultCount" | "setQuery"> & {
+    Pick<SettingsSearchState, "activeOptionId" | "isSearching" | "listboxId" | "query" | "resultCount" | "setQuery"> & {
+        /** Shown in the live region while there is no query, e.g. where the last result led. */
+        announcement?: string;
         inputRef?: Ref<HTMLInputElement>;
         onActivate: () => void;
         onMove: (step: 1 | -1) => void;
     }
-> = ({ activeIndex, inputRef, isSearching, listboxId, onActivate, onMove, optionId, query, resultCount, setQuery }) => {
+> = ({ activeOptionId, announcement = "", inputRef, isSearching, listboxId, onActivate, onMove, query, resultCount, setQuery }) => {
     const { t } = useLingui();
     // Inside `t`: a bare `plural()` compiles to the global i18n, which this app never activates.
     // eslint-disable-next-line no-restricted-syntax -- the macro compiles this to a message, not a string conversion
     const resultSummary = t`${plural(resultCount, { one: "# result", other: "# results" })}`;
-    const status = isSearching ? resultSummary : "";
+    const status = isSearching ? resultSummary : announcement;
     const isExpanded = isSearching && resultCount > 0;
 
     const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -121,7 +135,7 @@ export const SettingsSearchField: FC<
             <div className="relative">
                 <Search aria-hidden className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
                 <Input
-                    aria-activedescendant={isExpanded ? optionId(activeIndex) : undefined}
+                    aria-activedescendant={isExpanded ? activeOptionId : undefined}
                     aria-autocomplete="list"
                     aria-controls={isExpanded ? listboxId : undefined}
                     aria-expanded={isExpanded}
@@ -143,19 +157,14 @@ export const SettingsSearchField: FC<
     );
 };
 
-const revealOption = (node: HTMLButtonElement | null) => {
-    node?.scrollIntoView({ block: "nearest" });
-};
-
 /** The results as the listbox the field controls, grouped by tab. Options are not in the tab order: the field drives them. */
 export const SettingsSearchResults: FC<
     Pick<SettingsSearchState, "activeIndex" | "groups" | "isSearching" | "listboxId" | "optionId" | "setActive"> & {
         /** Tabs a guest cannot open; their results carry the lock the navigation shows. */
         lockedTabs: ReadonlySet<SettingsTab>;
-        onPreview: (tab: SettingsTab) => void;
         onSelect: (entry: SettingsSearchEntry) => void;
     }
-> = ({ activeIndex, groups, isSearching, listboxId, lockedTabs, onPreview, onSelect, optionId, setActive }) => {
+> = ({ activeIndex, groups, isSearching, listboxId, lockedTabs, onSelect, optionId, setActive }) => {
     const { t } = useLingui();
 
     if (!isSearching) {
@@ -184,14 +193,10 @@ export const SettingsSearchResults: FC<
                                     "text-muted-foreground flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
                                     isActive ? "bg-muted text-foreground" : "hover:bg-muted hover:text-foreground",
                                 )}
-                                id={optionId(entryPosition)}
-                                key={`${entry.kind}-${entry.tab}-${entry.section ?? ""}-${entry.label}`}
+                                id={optionId(entry)}
+                                key={settingsEntryKey(entry)}
                                 onClick={() => onSelect(entry)}
-                                onMouseEnter={() => {
-                                    setActive(entryPosition);
-                                    onPreview(entry.tab);
-                                }}
-                                ref={isActive ? revealOption : undefined}
+                                onMouseEnter={() => setActive(entryPosition)}
                                 role="option"
                                 tabIndex={-1}
                                 type="button"
