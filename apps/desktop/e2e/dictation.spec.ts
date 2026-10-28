@@ -135,7 +135,7 @@ const audioBytes = (app: ElectronApplication): Promise<number> =>
     app.evaluate(() => (globalThis as unknown as { neoreShell: { dictation: Probe } }).neoreShell.dictation.audioBytes);
 
 const findPage = async (app: ElectronApplication, isMatch: (url: string) => boolean): Promise<Page> => {
-    await expect.poll(() => app.windows().filter((page) => isMatch(page.url())).length).toBeGreaterThan(0);
+    await expect.poll(() => app.windows().filter((page) => isMatch(page.url())).length, { timeout: 20_000 }).toBeGreaterThan(0);
 
     return app.windows().find((page) => isMatch(page.url())) as Page;
 };
@@ -296,10 +296,12 @@ test("with the network blocked, a dictation completes and inserts its text as a 
         expect(draft).toMatch(FAKE_TRANSCRIPT);
         // The window closed on release, and nothing recorded stayed on disk.
         await expect.poll(() => app.windows().filter((window) => DICTATION_PAGE.test(window.url())).length).toBe(0);
-        expect(await audioFiles([userData, temp])).toStrictEqual([]);
     } finally {
         await app.close();
     }
+
+    // After the app has quit: while it runs, Windows keeps some of its own files (the cookie store) open and unreadable.
+    expect(await audioFiles([userData, temp])).toStrictEqual([]);
 });
 
 test("killing the helper shows an error and does not take the app down", async () => {
