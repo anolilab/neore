@@ -82,7 +82,6 @@ import {
     workerPostFailure,
     workerReapDecision,
     WORKER_POLICY_MAX_PER_HOUR,
-    workerRunToStop,
 } from "./logic";
 import type { vWorkerPolicy } from "./validators";
 import { vDispatchSource, vSubAgentRunMode, vSubAgentRunStatus } from "./validators";
@@ -417,7 +416,13 @@ const HOUR_MS = 60 * 60_000;
 /** Worker runs of one lead's readable in the last hour: enough rows to see a limit is reached. */
 const DISPATCHES_COUNTED = 200;
 
-/** How many dispatches the lead's workers received in the last hour, for its policy's `maxDispatchesPerHour`. */
+/**
+ * How many dispatches the lead's workers received in the last hour, for its policy's `maxDispatchesPerHour`.
+ *
+ * Reads the user's newest runs across every conversation and filters to this lead, so it is exact only
+ * while the user has at most {@link DISPATCHES_COUNTED} runs an hour: the `subAgents/run` rate limit (10 an hour
+ * on free, 60 on premium) is what guarantees that. Raise that limit past the window and this undercounts, and the cap with it.
+ */
 const dispatchesInLastHour = async (ctx: Pick<MutationCtx, "db">, userId: string, parentThreadId: string, now: number): Promise<number> => {
     const recent = await ctx.db
         .query("subAgentRuns")
@@ -1153,6 +1158,58 @@ export const cancelSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRun
 /** Runs read per stop; the fan-out cap keeps real ones to a handful, the bound is for a runaway. */
 const CANCEL_THREAD_MAX = 20;
 
+/** The queued and running runs a thread delegated, `CANCEL_THREAD_MAX` at most per status. */
+const activeRunsOf = async (ctx: MutationCtx, parentThreadId: string): Promise<RunDoc[]> => {
+    const runs: RunDoc[] = [];
+
+    for (const status of ["queued", "running"] as const) {
+        runs.push(
+            ...(await ctx.db
+                .query("subAgentRuns")
+                .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", parentThreadId).eq("status", status))
+                .take(CANCEL_THREAD_MAX)),
+        );
+    }
+
+    return runs;
+};
+
+/**
+ * Everything a thread delegated that is still going, and below those what they delegated (depth is
+ * capped): what a stop of that thread must take down, or the sub-agents keep billing and post back
+ * into a thread nobody waits on. Not what a person typed into a worker's own thread (those carry a
+ * client id): only a Stop there ends them.
+ */
+const delegatedTree = async (ctx: MutationCtx, threadId: string): Promise<RunDoc[]> => {
+    const targets: RunDoc[] = [];
+    const notTyped = (run: RunDoc) => run.mode !== "worker" || run.clientId === undefined;
+    const topLevel = await activeRunsOf(ctx, threadId);
+    let level = topLevel.filter((run) => notTyped(run));
+
+    while (level.length > 0 && targets.length < CANCEL_THREAD_MAX) {
+        targets.push(...level);
+
+        const below = await Promise.all(level.flatMap((run) => (run.childThreadId ? [activeRunsOf(ctx, run.childThreadId)] : [])));
+
+        level = below.flat().filter((run) => notTyped(run));
+    }
+
+    return targets;
+};
+
+/** Cancels the caller's own runs among `targets`; returns how many this call ended. */
+const cancelRuns = async (ctx: MutationCtx, targets: ReadonlyArray<RunDoc>, userId: string): Promise<number> => {
+    let cancelled = 0;
+
+    for (const run of targets) {
+        if (run.userId === userId && (await cancelSubAgentRun(ctx, run._id))) {
+            cancelled += 1;
+        }
+    }
+
+    return cancelled;
+};
+
 /**
  * What stopping `threadId` cancels, for the chat Stop paths. A sub-agent's own
  * thread, while its run is active, cancels only that run — not siblings, not the
@@ -1165,53 +1222,9 @@ export const cancelSubAgentRunsForStop = async (ctx: MutationCtx, threadId: stri
     // A worker's thread holds many runs and may have messages queued: a Stop means the one going.
     const own = workerCurrentRun(await latestWorkerRuns(ctx, threadId)) ?? null;
 
-    const targets: RunDoc[] = [];
-
-    const activeRunsOf = async (parentThreadId: string): Promise<RunDoc[]> => {
-        const runs: RunDoc[] = [];
-
-        for (const status of ["queued", "running"] as const) {
-            runs.push(
-                ...(await ctx.db
-                    .query("subAgentRuns")
-                    .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", parentThreadId).eq("status", status))
-                    .take(CANCEL_THREAD_MAX)),
-            );
-        }
-
-        return runs;
-    };
-
     // Once its own run has ended, the thread is an ordinary one again: a reply the
     // user got there may have delegated runs of its own.
-    if (own) {
-        targets.push(own);
-    } else {
-        // A stopped parent takes the whole tree down: what a cancelled run delegated
-        // would otherwise keep billing and post back into a thread nobody waits on.
-        // Not what a person typed into a worker's own thread (those carry a client id): only a Stop there ends them.
-        const topLevel = await activeRunsOf(threadId);
-        const notTyped = (run: RunDoc) => run.mode !== "worker" || run.clientId === undefined;
-        let level = topLevel.filter((run) => notTyped(run));
-
-        while (level.length > 0 && targets.length < CANCEL_THREAD_MAX) {
-            targets.push(...level);
-
-            const below = await Promise.all(level.flatMap((run) => (run.childThreadId ? [activeRunsOf(run.childThreadId)] : [])));
-
-            level = below.flat().filter((run) => notTyped(run));
-        }
-    }
-
-    let cancelled = 0;
-
-    for (const run of targets) {
-        if (run.userId === userId && (await cancelSubAgentRun(ctx, run._id))) {
-            cancelled += 1;
-        }
-    }
-
-    return cancelled;
+    return await cancelRuns(ctx, own ? [own] : await delegatedTree(ctx, threadId), userId);
 };
 
 // ─── Public ──────────────────────────────────────────────────────────────────
@@ -1407,17 +1420,21 @@ export const setWorkerPolicy = authMutation
     });
 
 /**
- * Stops a worker for its owner. `current` ends the run going (or, with none going, the head of the
- * queue); `all_queued` also ends every queued run behind it — newest first, so ending the head does
- * not start the one behind it just to cancel that too. A run ended while queued was never charged. A
- * run stopped while running finishes its step, and the next message waits for that loop to exit
- * (`resumeLineAfterStoppedRun`). The `clientId` dedupes a retried click; a second stop finds nothing
- * live and ends nothing. Returns how many runs this call ended.
+ * Stops a worker for its owner. `current` ends the one run the person meant — `runId`, the run their
+ * view showed — and only while it is still live: a run that finished meanwhile is not replaced by the
+ * one behind it, which the person never saw. `all_queued` ends the running run and every queued run
+ * behind it — newest first, so ending the head does not start the one behind it just to cancel that
+ * too. A run ended while queued was never charged. A run stopped while running finishes its step, and
+ * the next message waits for that loop to exit (`resumeLineAfterStoppedRun`); what that run delegated
+ * to sub-agents is ended with it (`delegatedTree`). The `clientId` dedupes a retried click. Returns
+ * how many runs this call ended.
  */
 export const stopWorker = authMutation
     .use(rateLimit("chat/update"))
     .input({
         clientId: v.string().max(WORKER_CLIENT_ID_MAX),
+        // The run the stop is meant for: required with `current`, ignored by `all_queued`.
+        runId: v.optional(v.id("subAgentRuns")),
         scope: v.union(v.literal("current"), v.literal("all_queued")),
         workerId: v.id("threads"),
     })
@@ -1427,6 +1444,10 @@ export const stopWorker = authMutation
 
         if (!origin || origin.userId !== ctx.user.userId) {
             throw new LunoraError("NOT_FOUND", "Worker not found.");
+        }
+
+        if (args.scope === "current" && args.runId === undefined) {
+            throw new LunoraError("BAD_REQUEST", "Say which run to stop.");
         }
 
         if (
@@ -1441,13 +1462,19 @@ export const stopWorker = authMutation
         const targets =
             args.scope === "all_queued"
                 ? [...recent.filter((run) => run.status === "queued"), ...recent.filter((run) => run.status === "running")]
-                : [workerRunToStop(recent)].filter((run) => run !== undefined);
+                : recent.filter((run) => run._id === args.runId && isActiveSubAgentStatus(run.status));
 
         let cancelled = 0;
 
         for (const run of targets) {
+            const wasRunning = run.status === "running";
+
             if (await cancelSubAgentRun(ctx, run._id)) {
                 cancelled += 1;
+
+                if (wasRunning) {
+                    await cancelRuns(ctx, await delegatedTree(ctx, args.workerId), ctx.user.userId);
+                }
             }
         }
 
@@ -1492,6 +1519,8 @@ const vWorkerView = v.object({
     // The latest runs, each with its own state and delivery: one run's result never holds up another's.
     runs: v.array(vWorkerRunView),
     state: v.union(v.literal("idle"), v.literal("queued"), v.literal("running")),
+    // A run was stopped and its loop has not exited: it still writes, and the queue waits for it.
+    stopping: v.boolean(),
     workerId: v.string(),
 });
 
@@ -1516,7 +1545,7 @@ const progressFields = async (
     ctx: QueryCtx,
     group: ReadonlyArray<RunDoc>,
     working: RunDoc | undefined,
-): Promise<{ lastActivityAt: number | null; queuedRuns: number; quietAfterMs: number; runs: Infer<typeof vWorkerRunView>[] }> => {
+): Promise<{ lastActivityAt: number | null; queuedRuns: number; quietAfterMs: number; runs: Infer<typeof vWorkerRunView>[]; stopping: boolean }> => {
     const activityAt = working?.status === "running" && working.childThreadId !== undefined ? await workerActivityAt(ctx, working.childThreadId) : undefined;
 
     return {
@@ -1533,6 +1562,7 @@ const progressFields = async (
                 task: run.task.split("\n", 1)[0]!.slice(0, 160),
             };
         }),
+        stopping: group.some((run) => run.status === "cancelled" && isWorkerLoopLive(run)),
     };
 };
 

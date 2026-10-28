@@ -25,7 +25,6 @@ import {
     workerFollowUp,
     workerPostFailure,
     workerReapDecision,
-    workerRunToStop,
 } from "./logic";
 
 const NOT_ACCEPTED = /does not accept/u;
@@ -303,22 +302,6 @@ describe(workerReapDecision, () => {
                 run: { loopExitedAt: startedAt + 1, startedAt, status: "cancelled" },
             }),
         ).toStrictEqual({ kind: "skip" });
-    });
-});
-
-describe(workerRunToStop, () => {
-    it("is the run going, else the head of the queue, and nothing while a stopped loop unwinds", () => {
-        const queuedHead = { status: "queued" } as const;
-        const queuedTail = { status: "queued" } as const;
-        const going = { startedAt: 1, status: "running" } as const;
-        const unwinding = { startedAt: 1, status: "cancelled" } as const;
-        const gone = { loopExitedAt: 2, startedAt: 1, status: "cancelled" } as const;
-
-        expect(workerRunToStop([queuedTail, queuedHead, going])).toBe(going);
-        expect(workerRunToStop([queuedTail, queuedHead])).toBe(queuedHead);
-        expect(workerRunToStop([queuedTail, queuedHead, unwinding])).toBeUndefined();
-        expect(workerRunToStop([queuedTail, queuedHead, gone])).toBe(queuedHead);
-        expect(workerRunToStop([])).toBeUndefined();
     });
 });
 

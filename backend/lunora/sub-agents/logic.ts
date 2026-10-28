@@ -286,17 +286,6 @@ export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFir
     newestFirst.find((run) => run.status === "running") ?? newestFirst.findLast((run) => run.status === "queued");
 
 /**
- * What a stop with scope `current` ends, from the runs newest first: the run going, or, when none
- * is and no stopped loop is still unwinding, the head of the queue. A worker whose only live run is a
- * stopped one has nothing to stop, so a second stop cannot reach the message behind it.
- */
-export const workerRunToStop = <T extends { loopExitedAt?: number; startedAt?: number; status: SubAgentStatus }>(
-    newestFirst: ReadonlyArray<T>,
-): T | undefined =>
-    newestFirst.find((run) => run.status === "running") ??
-    (newestFirst.some((run) => isWorkerLoopLive(run)) ? undefined : newestFirst.findLast((run) => run.status === "queued"));
-
-/**
  * Why the lead never got the worker's latest result, from its runs newest first: the newest run the
  * lead asked for decides, so a failure shows only while that run gave up posting. Null when it posted,
  * is still on its way, or the lead asked for none.

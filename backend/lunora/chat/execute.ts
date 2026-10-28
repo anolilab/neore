@@ -422,6 +422,7 @@ export const runStreamingAgent = internalAction
                     savedMessages: result.savedMessages,
                     snapshot: {
                         autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
+                        ...(origin === "outside_agent" && { dispatchOrigin: origin }),
                         instructions: streamTextArgs.system ?? agent.options.instructions,
                         mcpServerNames: toolResult.mcpServerNames,
                         // A run that pauses extracts at the pause; its continuation extracts only the steers it takes.

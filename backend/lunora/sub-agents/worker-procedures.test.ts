@@ -11,6 +11,7 @@ import { gateThreadActionHandler } from "../chat/functions";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import {
     admitWorkerRun,
+    admitSubAgentRun,
     cancelSubAgentRunsForStop,
     claimQueuedRun,
     createWorker,
@@ -102,9 +103,9 @@ const dailyCounter = async (): Promise<string[]> => {
 };
 
 /** A worker with its first run already finished, so the next message is free to start. */
-const idleWorker = async (): Promise<string> => {
+const idleWorker = async (toolCallId = "call-1"): Promise<string> => {
     const admitted = await run(
-        async (context) => await admitWorkerRun(context, { name: "Researcher", parentThreadId: leadId, task: "First", toolCallId: "call-1", userId: OWNER }),
+        async (context) => await admitWorkerRun(context, { name: "Researcher", parentThreadId: leadId, task: "First", toolCallId, userId: OWNER }),
     );
 
     if ("error" in admitted) {
@@ -594,8 +595,8 @@ describe("the chat entry points", () => {
 describe("stopping a worker", () => {
     const startedRuns = () => jobsQueueMessages.filter((queued) => queued.body.functionPath.includes("runSubAgent")).map((queued) => queued.body.args?.runId);
     const claim = async (runId: string) => await run(async (context) => await claimQueuedRun(context, runId as never));
-    const stop = async (workerId: string, scope: "all_queued" | "current", clientId: string, userId = OWNER) =>
-        (await as(userId).mutation(stopWorker as never, { clientId, scope, workerId } as never)) as { cancelled: number };
+    const stop = async (workerId: string, scope: "all_queued" | "current", clientId: string, runId?: string, userId = OWNER) =>
+        (await as(userId).mutation(stopWorker as never, { clientId, runId, scope, workerId } as never)) as { cancelled: number };
     const statusOf = async () => {
         const rows = await runRows();
 
@@ -608,7 +609,7 @@ describe("stopping a worker", () => {
 
         await claim(a!.runId);
 
-        expect(await stop(workerId, "current", "stop-1")).toStrictEqual({ cancelled: 1 });
+        expect(await stop(workerId, "current", "stop-1", a!.runId)).toStrictEqual({ cancelled: 1 });
         expect(await statusOf()).toMatchObject({ [a!.runId]: "cancelled", [b!.runId]: "queued", [c!.runId]: "queued" });
         expect(startedRuns()).toStrictEqual([a!.runId]);
 
@@ -640,23 +641,105 @@ describe("stopping a worker", () => {
         const [a, b] = [await message(workerId, "c-a"), await message(workerId, "c-b")] as { runId: string }[];
 
         await claim(a!.runId);
-        expect(await stop(workerId, "current", "stop-1")).toStrictEqual({ cancelled: 1 });
-        expect(await stop(workerId, "current", "stop-1")).toStrictEqual({ cancelled: 0 });
-        // A new click, with only a stopped loop live, must not reach the message behind it.
-        expect(await stop(workerId, "current", "stop-2")).toStrictEqual({ cancelled: 0 });
+        expect(await stop(workerId, "current", "stop-1", a!.runId)).toStrictEqual({ cancelled: 1 });
+        expect(await stop(workerId, "current", "stop-1", a!.runId)).toStrictEqual({ cancelled: 0 });
+        // A new click on the run already stopped must not reach the message behind it.
+        expect(await stop(workerId, "current", "stop-2", a!.runId)).toStrictEqual({ cancelled: 0 });
         const statuses = await statusOf();
 
         expect(statuses[b!.runId]).toBe("queued");
     });
 
-    it("ends the head of the queue when nothing is going, and nothing for an idle worker", async () => {
-        const idle = await idleWorker();
+    it("ends the run a stale view named only while it is live, never the one that took its place", async () => {
+        const workerId = await idleWorker();
+        const [a, b] = [await message(workerId, "c-a"), await message(workerId, "c-b")] as { runId: string }[];
 
-        expect(await stop(idle, "current", "stop-1")).toStrictEqual({ cancelled: 0 });
+        await claim(a!.runId);
+        // A finishes and the line advances to B; the person's view still shows A when they click Stop.
+        await run(async (context) => await finishRunFromLoop(context, a!.runId as never, { kind: "succeeded", result: "done" }));
+        expect(startedRuns()).toStrictEqual([a!.runId, b!.runId]);
+
+        expect(await stop(workerId, "current", "stop-1", a!.runId)).toStrictEqual({ cancelled: 0 });
+        expect(await statusOf()).toMatchObject({ [a!.runId]: "succeeded", [b!.runId]: "queued" });
+
+        // The same click aimed at B, which the person did see, ends it.
+        expect(await stop(workerId, "current", "stop-2", b!.runId)).toStrictEqual({ cancelled: 1 });
+    });
+
+    it("needs a run for `current`, and ignores another worker's run", async () => {
+        const workerId = await idleWorker();
+        const other = await idleWorker("call-2");
+        const a = (await message(other, "c-a")) as { runId: string };
+
+        expect(await stop(workerId, "current", "stop-1").catch((error: unknown) => error)).toMatchObject({ code: "BAD_REQUEST" });
+        expect(await stop(workerId, "current", "stop-2", a.runId)).toStrictEqual({ cancelled: 0 });
+        expect(await statusOf()).toMatchObject({ [a.runId]: "queued" });
+    });
+
+    it("ends the sub-agents the stopped run started", async () => {
+        const workerId = await idleWorker();
+        const a = (await message(workerId, "c-a")) as { runId: string };
+
+        await claim(a.runId);
+        const nested = await run(async (context) => {
+            const admitted = await admitSubAgentRun(context, { parentThreadId: workerId, task: "Nested", toolCallId: "nested", userId: OWNER });
+
+            if (!("row" in admitted)) {
+                throw new Error(admitted.error);
+            }
+
+            return await context.db.insert("subAgentRuns", admitted.row);
+        });
+
+        expect(await stop(workerId, "current", "stop-1", a.runId)).toStrictEqual({ cancelled: 1 });
+        expect(await statusOf()).toMatchObject({ [a.runId]: "cancelled", [nested]: "cancelled" });
+    });
+
+    it("shows a stopped run as `stopping` until its loop exits", async () => {
+        const workerId = await idleWorker();
+        const [a] = [await message(workerId, "c-a"), await message(workerId, "c-b")] as { runId: string }[];
+
+        await claim(a!.runId);
+        expect(await as(OWNER).query(getWorker as never, { workerId } as never)).toMatchObject({ stopping: false });
+
+        await stop(workerId, "current", "stop-1", a!.runId);
+        expect(await as(OWNER).query(getWorker as never, { workerId } as never)).toMatchObject({ queuedRuns: 1, state: "queued", stopping: true });
+
+        await run(async (context) => await finishRunFromLoop(context, a!.runId as never, { kind: "succeeded", result: "late" }));
+        expect(await as(OWNER).query(getWorker as never, { workerId } as never)).toMatchObject({ stopping: false });
+    });
+
+    it("shows a stopped run as `stopping` on an otherwise idle worker, so the view can still say so", async () => {
+        const workerId = await idleWorker();
+        const a = (await message(workerId, "c-a")) as { runId: string };
+
+        await claim(a.runId);
+        await stop(workerId, "current", "stop-1", a.runId);
+
+        expect(await as(OWNER).query(getWorker as never, { workerId } as never)).toMatchObject({ queuedRuns: 0, state: "idle", stopping: true });
+    });
+
+    it("clears the queue behind a stopped loop with `all_queued`", async () => {
+        const workerId = await idleWorker();
+        const [a, b] = [await message(workerId, "c-a"), await message(workerId, "c-b")] as { runId: string }[];
+
+        await claim(a!.runId);
+        await stop(workerId, "current", "stop-1", a!.runId);
+
+        expect(await stop(workerId, "all_queued", "stop-2")).toStrictEqual({ cancelled: 1 });
+        expect(await statusOf()).toMatchObject({ [b!.runId]: "cancelled" });
+    });
+
+    it("ends the head of the queue when it is the run named, and nothing for an idle worker's finished one", async () => {
+        const idle = await idleWorker();
+        const all = await runRows();
+        const finished = all.find((row) => row.childThreadId === idle)!._id as string;
+
+        expect(await stop(idle, "current", "stop-1", finished)).toStrictEqual({ cancelled: 0 });
 
         const a = (await message(idle, "c-a")) as { runId: string };
 
-        expect(await stop(idle, "current", "stop-2")).toStrictEqual({ cancelled: 1 });
+        expect(await stop(idle, "current", "stop-2", a.runId)).toStrictEqual({ cancelled: 1 });
         const statuses = await statusOf();
 
         expect(statuses[a.runId]).toBe("cancelled");
@@ -664,7 +747,7 @@ describe("stopping a worker", () => {
 
     it("answers a stranger as it would a worker that does not exist", async () => {
         const workerId = await idleWorker();
-        const error = (await stop(workerId, "current", "stop-1", STRANGER).catch((error_: unknown) => error_)) as { code: string };
+        const error = (await stop(workerId, "current", "stop-1", undefined, STRANGER).catch((error_: unknown) => error_)) as { code: string };
 
         expect(error).toMatchObject({ code: "NOT_FOUND" });
     });

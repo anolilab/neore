@@ -38505,6 +38505,9 @@
                             }
                           ]
                         },
+                        "stopping": {
+                          "type": "boolean"
+                        },
                         "workerId": {
                           "type": "string"
                         }
@@ -38523,6 +38526,7 @@
                         "quietAfterMs",
                         "runs",
                         "state",
+                        "stopping",
                         "workerId"
                       ],
                       "type": "object"
@@ -38918,6 +38922,9 @@
                           }
                         ]
                       },
+                      "stopping": {
+                        "type": "boolean"
+                      },
                       "workerId": {
                         "type": "string"
                       }
@@ -38936,6 +38943,7 @@
                       "quietAfterMs",
                       "runs",
                       "state",
+                      "stopping",
                       "workerId"
                     ],
                     "type": "object"
@@ -39065,6 +39073,11 @@
                     "properties": {
                       "clientId": {
                         "type": "string"
+                      },
+                      "runId": {
+                        "description": "Id<\"subAgentRuns\">",
+                        "type": "string",
+                        "x-lunora-table": "subAgentRuns"
                       },
                       "scope": {
                         "anyOf": [

@@ -308,18 +308,20 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
                             {worker && <WorkerRunLog className="w-full pb-2" runs={worker.runs} />}
                             {worker && (
                                 <WorkerStopBar
+                                    activeRunId={worker.activeRunId}
                                     className="w-full pb-2"
                                     lastActivityAt={worker.lastActivityAt}
                                     queuedRuns={worker.queuedRuns}
                                     quietAfterMs={worker.quietAfterMs}
                                     state={worker.state}
+                                    stopping={worker.stopping}
                                     workerId={worker.workerId}
                                 />
                             )}
                             {worker && (
                                 <WorkerComposer
                                     archived={worker.archived}
-                                    busy={worker.state !== "idle"}
+                                    busy={worker.state !== "idle" || worker.stopping}
                                     className="w-full pb-4"
                                     followUp={worker.followUp}
                                     key={threadId}

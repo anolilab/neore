@@ -1001,8 +1001,8 @@ export const resumeApprovedRun = async (
         }
 
         setResearchDepth(ctx, config.researchDepth);
-        // A resumed run is one a person answered (an approval or a question), whoever started it.
-        setDispatchOrigin(ctx, "lead");
+        // The snapshot keeps what started the run: a person answering an approval does not make it the lead's.
+        setDispatchOrigin(ctx, config.dispatchOrigin ?? "lead");
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({

@@ -404,6 +404,7 @@ const runSpeaker = async (
 
         const snapshot: ToolRunConfig = {
             autoMediaEnrichment: turn.agentPrefs.autoMediaEnrichment ?? false,
+            ...(turn.origin === "outside_agent" && { dispatchOrigin: turn.origin }),
             group: groupSnapshot(turn, speaker.skillId, position),
             instructions: system,
             mcpServerNames: toolResult.mcpServerNames,
@@ -795,8 +796,8 @@ export const continueGroupAfterToolApproval = async (
         isAnonymous: group.isAnonymous,
         mcpServerNames: config.mcpServerNames,
         organizationId: group.organizationId,
-        // A resumed turn is one a person answered.
-        origin: "lead",
+        // The approval snapshot kept what started the turn: a person answering it does not make it the lead's.
+        origin: config.dispatchOrigin ?? "lead",
         promptMessageId: resumed.lastMessageId ?? approvalId,
         researchDepth: config.researchDepth,
         searchMode: config.searchMode,
