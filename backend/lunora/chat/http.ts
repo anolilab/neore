@@ -1,5 +1,5 @@
 import { ANONYMOUS_FREE_MODEL } from "@neore/ai/constants";
-import { MODEL_LOOKUP } from "@neore/ai/models";
+import { enabledModelOf, MODEL_LOOKUP } from "@neore/ai/models";
 import type { CinemaSettings } from "@neore/ai/types/cinema";
 import type { HttpActionCtx } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
@@ -10,6 +10,7 @@ import { isHostRunThread } from "../acp/lib/host-thread";
 import { getFile } from "../agent/client";
 import { getCurrentUserInternal } from "../auth/lib/helper";
 import type { BetterAuthUser } from "../auth/lib/types";
+import { assertPaidModel } from "./lib/enabled-model";
 import { hmacSha256Hex, sha256Hex, timingSafeEqual } from "../lib/crypto";
 import type { Signer } from "../lib/storage-sign";
 import { httpScheduler } from "../lib/http-scheduler";
@@ -995,6 +996,23 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                 threadId: threadId as Id<"threads">,
             })) ??
             ((thread.model as string) || "openrouter/anthropic/claude-3.5-sonnet");
+
+        // The path's model may have been picked before a plan lapsed (or by a collaborator, against their plan):
+        // the edit's reply runs under the owner's plan, so a paid model it can no longer run is refused here, as a
+        // send would be, before the edit is saved.
+        const pathModel = enabledModelOf(model, { mode: "text" });
+
+        if (pathModel) {
+            try {
+                await assertPaidModel(context, userId, pathModel);
+            } catch (error) {
+                if (error instanceof LunoraError) {
+                    return Response.json({ error: "MODEL_REQUIRES_PLAN", message: error.message }, { headers: { "Content-Type": "application/json" }, status: 403 });
+                }
+
+                throw error;
+            }
+        }
 
         // Convert content to message format
         const messageContent: any[] = [];
