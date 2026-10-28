@@ -59,7 +59,7 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                         </Badge>
                         {worker.postFailed !== null && (
                             <Badge title={worker.postFailed} variant="destructive">
-                                {t`Result not delivered`}
+                                <span role="status">{t`Result not delivered`}</span>
                             </Badge>
                         )}
                         {!worker.archived && worker.state === "idle" && (

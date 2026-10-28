@@ -1245,10 +1245,13 @@ const vWorkerView = v.object({
 const workerName = (thread: Doc<"threads">, run: RunDoc): string =>
     isThreadLocked(thread) ? LOCKED_THREAD_TITLE : (thread.title ?? run.task.split("\n", 1)[0]!.slice(0, WORKER_NAME_MAX));
 
-/** What a worker is doing, from its active run if it has one. */
-const workerState = (working: RunDoc | undefined): "idle" | "queued" | "running" => {
+/**
+ * What a worker is doing, from its active run if it has one. A stopped run whose loop is still unwinding
+ * counts as running: a message sent now waits for it, so the worker is not idle (and not archivable).
+ */
+const workerState = (working: RunDoc | undefined, unwinding: boolean): "idle" | "queued" | "running" => {
     if (!working) {
-        return "idle";
+        return unwinding ? "running" : "idle";
     }
 
     return working.status === "running" ? "running" : "queued";
@@ -1316,7 +1319,7 @@ export const listWorkers = authQuery
                 leadThreadId: run.parentThreadId,
                 name: workerName(thread, run),
                 postFailed: workerPostFailure(group),
-                state: workerState(working),
+                state: workerState(working, group.some((candidate) => isWorkerLoopLive(candidate))),
                 workerId: run.childThreadId!,
             });
         }
@@ -1349,7 +1352,7 @@ export const getWorker = authQuery
             leadThreadId: origin.parentThreadId,
             name: workerName(thread, origin),
             postFailed: workerPostFailure(recent),
-            state: workerState(working),
+            state: workerState(working, recent.some((candidate) => isWorkerLoopLive(candidate))),
             workerId: args.workerId,
         };
     });
