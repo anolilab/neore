@@ -20,6 +20,11 @@ vi.mock("./composer-tiptap/composer-tiptap-editor", () => {
     };
 });
 
+// A report stored by a newer build can carry a degradation this one does not know.
+const reportWithUnknownDegradation = JSON.parse(
+    '{"groups":{"turns":{"followUp":{"degradation":"emulated","kind":"steer"}}},"reportedAt":1,"version":1}',
+) as CapabilityReport;
+
 const report = (groups: CapabilityReport["groups"]): CapabilityReport => {
     return { groups, reportedAt: 1, version: 1 };
 };
@@ -58,6 +63,7 @@ describe("steer control", () => {
         ["a report that says nothing", report({})],
         ["a report without turns.followUp", report({ turns: { cancel: { degradation: "none", supported: true } } })],
         ["a runner that only queues", CLOUD_HEADLESS_CAPABILITIES],
+        ["a steer with a degradation it does not know", reportWithUnknownDegradation],
         ["a follow-up of none", report({ turns: { followUp: { kind: "none" } } })],
         ["a local model", LOCAL_BROWSER_CAPABILITIES],
     ])("is absent for %s, though the message can still be queued", (_name, candidate) => {

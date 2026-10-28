@@ -52,6 +52,11 @@ export const enqueuePrompt = <A>(state: PromptQueueState<A>, item: QueuedPrompt<
     return { ...state, items: [...state.items, item] };
 };
 
+/** Ahead of everything already queued. */
+export const prependPrompt = <A>(state: PromptQueueState<A>, item: QueuedPrompt<A>): PromptQueueState<A> => {
+    return { ...state, items: [item, ...state.items] };
+};
+
 export const removeQueuedPrompt = <A>(state: PromptQueueState<A>, id: string): PromptQueueState<A> => {
     const items = state.items.filter((item) => item.id !== id);
 

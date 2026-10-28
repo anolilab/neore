@@ -13,6 +13,7 @@ const chat = vi.hoisted(() => {
         isLocalModel: false,
         queryArgs: undefined as unknown,
         runner: undefined as "host" | undefined,
+        threadLoaded: true,
     };
 });
 
@@ -49,7 +50,7 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
             return { isLocalModel: chat.isLocalModel };
         },
         useChatThread: () => {
-            return { thread: { runner: chat.runner }, threadId: "thread-1" };
+            return { thread: chat.threadLoaded ? { runner: chat.runner } : undefined, threadId: "thread-1" };
         },
     };
 });
@@ -60,6 +61,7 @@ describe("useRunnerCapabilities", () => {
         chat.isLocalModel = false;
         chat.queryArgs = undefined;
         chat.runner = undefined;
+        chat.threadLoaded = true;
     });
 
     it("declares a cloud thread's capabilities in code, with no query", () => {
@@ -92,5 +94,24 @@ describe("useRunnerCapabilities", () => {
         rerender();
 
         expect(followUpControl(result.current)).toBe("steer-restart");
+    });
+
+    it("reports nothing while the thread has not loaded, whichever runner it turns out to have", () => {
+        chat.threadLoaded = false;
+
+        const { result } = renderHook(() => useRunnerCapabilities());
+
+        expect(result.current).toBeNull();
+        expect(followUpControl(result.current)).toBe("none");
+    });
+
+    it("does not offer a host's native steer, which the backend refuses", () => {
+        chat.runner = "host";
+        chat.data = { groups: { turns: { cancel: { degradation: "none", supported: true }, followUp: { kind: "steer" } } }, reportedAt: 5, version: 1 };
+
+        const { result } = renderHook(() => useRunnerCapabilities());
+
+        expect(followUpControl(result.current)).toBe("none");
+        expect(result.current?.groups.turns?.cancel).toEqual({ degradation: "none", supported: true });
     });
 });
