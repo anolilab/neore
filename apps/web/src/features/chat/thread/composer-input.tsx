@@ -746,13 +746,7 @@ const ComposerInput = ({
     // refused steer (a group chat, a reply that just ended) is simply queued.
     const { mutateAsync: steerRun } = useMutation(crpc.chat.steering.steerRun.mutationOptions());
     const followUp = followUpControl(useRunnerCapabilities());
-    const canSteer =
-        isThreadComposer &&
-        !isComparisonValid &&
-        Boolean(sseStreamState) &&
-        attachments.length === 0 &&
-        attachedReferences.length === 0 &&
-        (followUp === "steer" || followUp === "steer-restart");
+    const canSteer = isThreadComposer && !isComparisonValid && Boolean(sseStreamState) && attachments.length === 0 && attachedReferences.length === 0;
 
     const handleSteer = useCallback(() => {
         const streamId = sseStreamState;
