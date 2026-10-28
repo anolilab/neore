@@ -1758,7 +1758,7 @@ fn reaping_a_host_ends_the_commands_it_was_running() {
         "op": "run",
         "params": {
             "tool": "shell_run",
-            "input": { "command": "echo $$ > command.pid; exec sleep 600", "timeoutSeconds": 600 },
+            "input": { "command": "ls /dev/fd > command.fds; echo $$ > command.pid; exec sleep 600", "timeoutSeconds": 600 },
             "roots": [root],
             "remainingMs": 700_000,
             "allowUnsandboxedShell": true,
@@ -1779,6 +1779,21 @@ fn reaping_a_host_ends_the_commands_it_was_running() {
 
     let command: i64 = fs::read_to_string(&marker).unwrap().trim().parse().unwrap();
 
+    // The host's stop pipe is not among what the command inherited: it sees what any shell of this test sees.
+    let baseline = String::from_utf8(
+        Command::new("sh")
+            .args(["-c", "ls /dev/fd"])
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap();
+    let inherited = fs::read_to_string(root.join("command.fds")).unwrap();
+
+    assert!(
+        inherited.lines().count() <= baseline.lines().count(),
+        "the command inherited descriptors: {inherited} (a plain shell has {baseline})"
+    );
     assert!(running(command));
 
     let reaped = connection.reap(&[SPARE.to_owned()]).unwrap();
