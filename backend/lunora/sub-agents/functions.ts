@@ -279,9 +279,9 @@ const workerOrigin = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childThread
 };
 
 /**
- * The worker's newest runs, newest first by `createdAt`, plus every run still queued or running however
- * old: a burst of newer cancelled messages must not push the live run out of view, or a second one would
- * start beside it. Admission keeps `createdAt` strictly increasing per worker, so the order is the order
+ * The worker's newest runs, newest first by `createdAt`, plus the queued and running ones, and the newest
+ * cancelled ones (a stopped loop may still be unwinding), however old: a burst of newer cancelled messages
+ * must not push a live run out of view, or a second one would start beside it. Admission keeps `createdAt` strictly increasing per worker, so the order is the order
  * the messages were sent even when `_creationTime` ties.
  */
 const latestWorkerRuns = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childThreadId: string): Promise<RunDoc[]> => {
@@ -293,10 +293,11 @@ const latestWorkerRuns = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childTh
     const seen = new Set<string>(recent.map((run) => run._id));
     const older: RunDoc[] = [];
 
-    for (const status of ["running", "queued"] as const) {
+    for (const status of ["running", "queued", "cancelled"] as const) {
         const live = await ctx.db
             .query("subAgentRuns")
             .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", childThreadId).eq("status", status))
+            .order("desc")
             .take(WORKER_RUNS_CHECKED);
 
         older.push(...live.filter((run) => !seen.has(run._id)));
@@ -922,7 +923,8 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     // the user started there meanwhile holds that status too, so it stays while one is live.
     const child = run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
 
-    if (child?.status === "running" && !(await isThreadStreaming(ctx, child._id))) {
+    // Ending a worker's queued run leaves the one going alone: only the run that was going frees the thread.
+    if (child?.status === "running" && (run.mode !== "worker" || wasRunning) && !(await isThreadStreaming(ctx, child._id))) {
         await patchThread(ctx.db, child._id, { status: "active", updatedAt: now });
     }
 
@@ -1057,14 +1059,15 @@ export const cancelSubAgentRunsForStop = async (ctx: MutationCtx, threadId: stri
         // would otherwise keep billing and post back into a thread nobody waits on.
         // Not what a person typed into a worker's own thread (those carry a client id): only a Stop there ends them.
         const topLevel = await activeRunsOf(threadId);
-        let level = topLevel.filter((run) => run.mode !== "worker" || run.clientId === undefined);
+        const notTyped = (run: RunDoc) => run.mode !== "worker" || run.clientId === undefined;
+        let level = topLevel.filter((run) => notTyped(run));
 
         while (level.length > 0 && targets.length < CANCEL_THREAD_MAX) {
             targets.push(...level);
 
             const below = await Promise.all(level.flatMap((run) => (run.childThreadId ? [activeRunsOf(run.childThreadId)] : [])));
 
-            level = below.flat();
+            level = below.flat().filter((run) => notTyped(run));
         }
     }
 

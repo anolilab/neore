@@ -259,6 +259,36 @@ describe("a busy worker", () => {
         expect(startedRuns()).toStrictEqual([a.runId, last.runId]);
     });
 
+    it("keeps seeing a stopped run's unwinding loop behind a long run of cancelled messages", async () => {
+        const workerId = await idleWorker();
+        const a = (await message(workerId, "c-a")) as { runId: string };
+
+        await claim(a.runId);
+        await run(async (context) => await cancelSubAgentRunsForStop(context, workerId, OWNER));
+
+        const [first] = await runRows();
+
+        // Seeded directly: sending that many messages would hit the dispatch rate limit.
+        await run(async (context) => {
+            for (let index = 1; index <= 25; index += 1) {
+                const { _creationTime, _id, ...fields } = first;
+
+                await context.db.insert("subAgentRuns", {
+                    ...fields,
+                    createdAt: first.createdAt + index,
+                    startedAt: undefined,
+                    toolCallId: `seed-${String(index)}`,
+                });
+            }
+        });
+
+        const last = (await message(workerId, "c-last")) as { runId: string };
+
+        // The stopped loop is older than the newest 20 rows but has not exited: nothing starts beside it.
+        expect(startedRuns()).toStrictEqual([a.runId]);
+        expect(last.runId).toBeDefined();
+    });
+
     it("does not show a worker as idle while a stopped run's loop is still unwinding", async () => {
         const workerId = await idleWorker();
         const a = (await message(workerId, "c-a")) as { runId: string };
