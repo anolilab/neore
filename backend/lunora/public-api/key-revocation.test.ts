@@ -18,8 +18,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { API_KEY_OPTIONS } from "../auth";
 import type { ApiKeyAuthApi } from "./identity";
-import { API_KEY_HEADER, extractApiKey, resolveApiKeyIdentity } from "./identity";
-import { buildMcpClientConfig } from "./mcp-client-config";
+import { API_KEY_HEADER, API_KEY_SCHEME, extractApiKey, resolveApiKeyIdentity } from "./identity";
+import { API_KEY_ENV_VAR, buildMcpClientConfig } from "./mcp-client-config";
 import { createPublicApiRouter } from "./router";
 
 vi.mock("../chat/http", () => {
@@ -149,8 +149,15 @@ describe("MCP client config", () => {
 
         expect(Object.keys(headers)).toEqual([API_KEY_HEADER]);
         expect(extractApiKey(new Headers(headers))).toBe(KEY);
-        expect(config.claudeCommand).toContain(`--header "${API_KEY_HEADER}: ${config.headerValue}"`);
         expect(url).toBe(config.url);
+    });
+
+    it("keeps the key out of the `claude mcp add` line, which reads it from the environment", () => {
+        const [exportLine, addLine] = buildMcpClientConfig(BASE_URL, KEY).claudeCommand.split("\n", 2);
+
+        expect(exportLine).toBe(`export ${API_KEY_ENV_VAR}='${KEY}'`);
+        expect(addLine).toContain(`--header "${API_KEY_HEADER}: ${API_KEY_SCHEME} $${API_KEY_ENV_VAR}"`);
+        expect(addLine).not.toContain(KEY);
     });
 
     it("points at the MCP endpoint, whatever trailing slash the origin has", () => {
