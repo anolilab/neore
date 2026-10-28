@@ -7,6 +7,9 @@ import { v } from "lunorash/server";
 
 export const vDevicePlatform = v.union(v.literal("macos"), v.literal("windows"), v.literal("linux"));
 
+/** How a device is reached. Unset is a desktop paired directly; `ssh` is a server a desktop speaks for (`viaDeviceId`). */
+export const vDeviceTransport = v.literal("ssh");
+
 /**
  * A call's lifecycle. `pending` waits for the device to claim it, `claimed` is
  * on the device (approval prompt or running); the rest are terminal.
@@ -50,6 +53,8 @@ export const vDeviceView = v.object({
     name: v.string(),
     platform: vDevicePlatform,
     toolNames: v.array(v.string()),
+    transport: v.optional(vDeviceTransport),
+    viaDeviceId: v.optional(v.string()),
 });
 
 /** One audit row, as `listDeviceCalls` shows it. */

@@ -20733,6 +20733,11 @@
                         "description": "Id<\"devices\">",
                         "type": "string",
                         "x-lunora-table": "devices"
+                      },
+                      "viaDeviceId": {
+                        "description": "Id<\"devices\">",
+                        "type": "string",
+                        "x-lunora-table": "devices"
                       }
                     },
                     "required": [
@@ -20816,6 +20821,11 @@
                       },
                       "signature": {
                         "type": "string"
+                      },
+                      "viaDeviceId": {
+                        "description": "Id<\"devices\">",
+                        "type": "string",
+                        "x-lunora-table": "devices"
                       }
                     },
                     "required": [
@@ -21012,6 +21022,11 @@
                   "args": {
                     "properties": {
                       "deviceId": {
+                        "description": "Id<\"devices\">",
+                        "type": "string",
+                        "x-lunora-table": "devices"
+                      },
+                      "viaDeviceId": {
                         "description": "Id<\"devices\">",
                         "type": "string",
                         "x-lunora-table": "devices"
@@ -21317,6 +21332,13 @@
                           "type": "string"
                         },
                         "type": "array"
+                      },
+                      "transport": {
+                        "const": "ssh",
+                        "type": "string"
+                      },
+                      "viaDeviceId": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -21361,6 +21383,14 @@
                         "description": "Id<\"devices\">",
                         "type": "string",
                         "x-lunora-table": "devices"
+                      },
+                      "hostDeviceIds": {
+                        "items": {
+                          "description": "Id<\"devices\">",
+                          "type": "string",
+                          "x-lunora-table": "devices"
+                        },
+                        "type": "array"
                       }
                     },
                     "required": [
@@ -21396,6 +21426,9 @@
                       "callId": {
                         "type": "string"
                       },
+                      "deviceId": {
+                        "type": "string"
+                      },
                       "envelope": {
                         "type": "string"
                       },
@@ -21405,6 +21438,7 @@
                     },
                     "required": [
                       "callId",
+                      "deviceId",
                       "envelope",
                       "signature"
                     ],
@@ -21457,6 +21491,11 @@
                             "type": "string"
                           }
                         ]
+                      },
+                      "viaDeviceId": {
+                        "description": "Id<\"devices\">",
+                        "type": "string",
+                        "x-lunora-table": "devices"
                       }
                     },
                     "required": [
@@ -21541,6 +21580,11 @@
                       },
                       "reason": {
                         "type": "string"
+                      },
+                      "viaDeviceId": {
+                        "description": "Id<\"devices\">",
+                        "type": "string",
+                        "x-lunora-table": "devices"
                       }
                     },
                     "required": [
@@ -21684,6 +21728,11 @@
                       },
                       "signature": {
                         "type": "string"
+                      },
+                      "viaDeviceId": {
+                        "description": "Id<\"devices\">",
+                        "type": "string",
+                        "x-lunora-table": "devices"
                       }
                     },
                     "required": [
@@ -21827,6 +21876,11 @@
                       },
                       "signature": {
                         "type": "string"
+                      },
+                      "viaDeviceId": {
+                        "description": "Id<\"devices\">",
+                        "type": "string",
+                        "x-lunora-table": "devices"
                       }
                     },
                     "required": [

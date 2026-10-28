@@ -40,6 +40,11 @@ describe("computeTaint", () => {
         ).toEqual(["web", "mcp", "files"]);
     });
 
+    it("treats what a server reached over SSH returned as device output", () => {
+        // A host is a device of its own, so its tools carry the same `device_<tag>__` name.
+        expect(computeTaint([{ content: [{ toolName: "device_9f3k2a__shell_run", type: "tool-result" }], role: "tool" }])).toEqual(["device"]);
+    });
+
     it("ignores a tool CALL (only results carry content)", () => {
         expect(computeTaint([{ content: [{ toolName: "webSearch", type: "tool-call" }], role: "assistant" }])).toEqual([]);
     });

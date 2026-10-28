@@ -42,11 +42,27 @@ const RESULT_STATUSES: ReadonlySet<string> = new Set(["completed", "denied", "fa
 const DECISIONS: ReadonlySet<string> = new Set(["always", "denied", "once", "rule", "timeout"]);
 const OUTPUT_PREVIEW_CHARS = 4000;
 
-/** The caller's device, or FORBIDDEN — a stranger's id reads exactly like a missing one. */
-const requireOwnDevice = async (ctx: Pick<MutationCtx, "db">, deviceId: Id<"devices">, userId: string): Promise<Doc<"devices">> => {
+/**
+ * What the relaying desktop names when it acts for a server it reaches over SSH. An optional argument on every
+ * relay procedure: a host is addressed WITH the desktop that holds it, and a desktop without one.
+ */
+const vViaDeviceId = v.optional(v.id("devices"));
+
+/**
+ * The caller's device, or NOT_FOUND — a stranger's id reads exactly like a missing one. `viaDeviceId` must be the
+ * desktop the row names (`undefined` for a device without one), so a desktop cannot act for another desktop's host.
+ * That is an ownership check, not a security control: a client can name any device it owns. What stops a
+ * desktop that does not hold a host's secret is the signature check on its results.
+ */
+const requireOwnDevice = async (
+    ctx: Pick<MutationCtx, "db">,
+    deviceId: Id<"devices">,
+    userId: string,
+    viaDeviceId?: Id<"devices">,
+): Promise<Doc<"devices">> => {
     const device = await ctx.db.devices.findFirst({ where: { _id: deviceId, userId } });
 
-    if (!device) {
+    if (!device || device.viaDeviceId !== viaDeviceId) {
         throw new LunoraError("NOT_FOUND", "Device not found");
     }
 
@@ -69,7 +85,7 @@ const deviceSecret = async (device: Doc<"devices">): Promise<string> => {
  */
 export const registerDevice = authMutation
     .use(rateLimit("devices/register"))
-    .input({ name: vDeviceName, platform: vDevicePlatform })
+    .input({ name: vDeviceName, platform: vDevicePlatform, viaDeviceId: vViaDeviceId })
     .output(v.object({ deviceId: v.string(), secret: v.string() }))
     .mutation(async ({ args, ctx }) => {
         const { impersonatedBy, userId } = ctx.user;
@@ -94,6 +110,15 @@ export const registerDevice = authMutation
             throw new LunoraError("BAD_REQUEST", `At most ${String(MAX_DEVICES_PER_USER)} devices can be paired. Remove one first.`);
         }
 
+        // A server is paired by a desktop of the caller's that is itself paired directly: no chains.
+        if (args.viaDeviceId !== undefined) {
+            const desktop = await requireOwnDevice(ctx, args.viaDeviceId, userId);
+
+            if (desktop.encryptedSecret === undefined) {
+                throw new LunoraError("FORBIDDEN", "The desktop is not paired");
+            }
+        }
+
         const secret = generateDeviceSecret();
         const deviceId = await ctx.db.insert("devices", {
             createdAt: ctx.now,
@@ -101,9 +126,10 @@ export const registerDevice = authMutation
             name: args.name.trim(),
             platform: args.platform,
             userId,
+            ...(args.viaDeviceId !== undefined && { transport: "ssh" as const, viaDeviceId: args.viaDeviceId }),
         });
 
-        ctx.log.event("devices.register_device", { platform: args.platform });
+        ctx.log.event("devices.register_device", { platform: args.platform, ssh: args.viaDeviceId !== undefined });
 
         return { deviceId: deviceId as string, secret };
     });
@@ -123,6 +149,8 @@ export const listDevices = authQuery
                 platform: device.platform,
                 toolNames: (device.manifest ?? []).map((tool) => tool.name),
                 ...(device.lastSeenAt !== undefined && { lastSeenAt: device.lastSeenAt }),
+                ...(device.transport !== undefined && { transport: device.transport }),
+                ...(device.viaDeviceId !== undefined && { viaDeviceId: device.viaDeviceId as string }),
             };
         });
     });
@@ -144,19 +172,31 @@ export const renameDevice = authMutation
 /**
  * Unpairs a device from the web — the way out for a lost laptop. The row (and
  * with it the secret) is deleted, so nothing is ever signed for it again; its
- * audit rows stay, carrying the device's name.
+ * audit rows stay, carrying the device's name. Revoking a desktop revokes the
+ * servers it holds in the same mutation (their secrets live on that desktop);
+ * revoking a server alone leaves the desktop paired.
  */
 export const revokeDevice = authMutation
     .use(rateLimit("devices/manage"))
     .input({ deviceId: v.id("devices") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const device = await requireOwnDevice(ctx, args.deviceId, ctx.user.userId);
+        const { userId } = ctx.user;
+        const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
 
-        await expireOpenCalls(ctx, device._id, "The device was removed");
-        await ctx.db.delete(device._id);
+        if (!device) {
+            throw new LunoraError("NOT_FOUND", "Device not found");
+        }
 
-        ctx.log.event("devices.revoke_device", { revoked: true });
+        const { page: owned } = await ctx.db.devices.findMany({ limit: MAX_DEVICES_PER_USER, where: { userId } });
+        const hosts = owned.filter((other) => other.viaDeviceId === device._id);
+
+        for (const revoked of [device, ...hosts]) {
+            await expireOpenCalls(ctx, revoked._id, "The device was removed");
+            await ctx.db.delete(revoked._id);
+        }
+
+        ctx.log.event("devices.revoke_device", { hosts: hosts.length, revoked: true });
 
         return null;
     });
@@ -167,12 +207,12 @@ export const revokeDevice = authMutation
  */
 export const heartbeatDevice = authMutation
     .use(rateLimit("devices/heartbeat"))
-    .input({ deviceId: v.id("devices") })
+    .input({ deviceId: v.id("devices"), viaDeviceId: vViaDeviceId })
     .output(v.object({ paired: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId: ctx.user.userId } });
 
-        if (!device) {
+        if (!device || device.viaDeviceId !== args.viaDeviceId) {
             return { paired: false };
         }
 
@@ -190,10 +230,10 @@ export const heartbeatDevice = authMutation
  */
 export const updateDeviceManifest = authMutation
     .use(rateLimit("devices/manifest"))
-    .input({ deviceId: v.id("devices"), payload: vManifestPayload, signature: vSignature })
+    .input({ deviceId: v.id("devices"), payload: vManifestPayload, signature: vSignature, viaDeviceId: vViaDeviceId })
     .output(v.object({ toolCount: v.number() }))
     .mutation(async ({ args, ctx }) => {
-        const device = await requireOwnDevice(ctx, args.deviceId, ctx.user.userId);
+        const device = await requireOwnDevice(ctx, args.deviceId, ctx.user.userId, args.viaDeviceId);
         const secret = await deviceSecret(device);
 
         if (!(await verifyDevicePayload(secret, "manifest", args.payload, args.signature))) {
@@ -226,22 +266,38 @@ export const updateDeviceManifest = authMutation
     });
 
 /**
- * Calls waiting for this device — the relay's live query. The page forwards
- * each envelope to the shell, which verifies our signature before anything else.
+ * Calls waiting for this device and for the servers it holds — the relay's live
+ * query. The page forwards each envelope to the shell, which verifies our
+ * signature before anything else. `hostDeviceIds` are the servers the relay
+ * speaks for; one that is not the caller's, or is held by another desktop,
+ * contributes nothing.
  */
 export const listPendingDeviceCalls = authQuery
-    .input({ deviceId: v.id("devices") })
-    .output(v.array(v.object({ callId: v.string(), envelope: v.string(), signature: v.string() })))
+    .input({
+        deviceId: v.id("devices"),
+        hostDeviceIds: v.optional(
+            v.array(v.id("devices")).check((ids) => ids.length <= MAX_DEVICES_PER_USER, { message: "Too many servers" }),
+        ),
+    })
+    .output(v.array(v.object({ callId: v.string(), deviceId: v.string(), envelope: v.string(), signature: v.string() })))
     .query(async ({ args, ctx }) => {
-        const { page } = await ctx.db.deviceCalls.findMany({
-            limit: 10,
-            orderBy: [{ createdAt: "asc" }],
-            where: { deviceId: args.deviceId, status: "pending", userId: ctx.user.userId },
-        });
+        const { userId } = ctx.user;
+        const held = await Promise.all((args.hostDeviceIds ?? []).map(async (id) => await ctx.db.devices.findFirst({ where: { _id: id, userId } })));
+        const deviceIds = [args.deviceId, ...held.flatMap((host) => (host?.viaDeviceId === args.deviceId ? [host._id] : []))];
+        const pages = await Promise.all(
+            deviceIds.map(
+                async (deviceId) =>
+                    await ctx.db.deviceCalls.findMany({ limit: 10, orderBy: [{ createdAt: "asc" }], where: { deviceId, status: "pending", userId } }),
+            ),
+        );
 
-        return page.map((call) => {
-            return { callId: call._id as string, envelope: call.envelope, signature: call.signature };
-        });
+        return pages
+            .flatMap(({ page }) => page)
+            .toSorted((a, b) => a.createdAt - b.createdAt)
+            .slice(0, 10)
+            .map((call) => {
+                return { callId: call._id as string, deviceId: call.deviceId as string, envelope: call.envelope, signature: call.signature };
+            });
     });
 
 /**
@@ -250,7 +306,7 @@ export const listPendingDeviceCalls = authQuery
  */
 export const claimDeviceCall = authMutation
     .use(rateLimit("devices/relay"))
-    .input({ callId: v.id("deviceCalls"), deviceId: v.id("devices") })
+    .input({ callId: v.id("deviceCalls"), deviceId: v.id("devices"), viaDeviceId: vViaDeviceId })
     .output(v.object({ claimed: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
@@ -261,7 +317,8 @@ export const claimDeviceCall = authMutation
             return { claimed: false };
         }
 
-        await requireOwnDevice(ctx, args.deviceId, userId);
+        await requireOwnDevice(ctx, args.deviceId, userId, args.viaDeviceId);
+
         await ctx.db.patch(call._id, { claimedAt: now, status: "claimed" });
 
         ctx.log.event("devices.claim_device_call", { claimed: true });
@@ -275,11 +332,11 @@ export const claimDeviceCall = authMutation
  */
 export const completeDeviceCall = authMutation
     .use(rateLimit("devices/relay"))
-    .input({ callId: v.id("deviceCalls"), deviceId: v.id("devices"), payload: vResultPayload, signature: vSignature })
+    .input({ callId: v.id("deviceCalls"), deviceId: v.id("devices"), payload: vResultPayload, signature: vSignature, viaDeviceId: vViaDeviceId })
     .output(v.object({ accepted: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
-        const device = await requireOwnDevice(ctx, args.deviceId, userId);
+        const device = await requireOwnDevice(ctx, args.deviceId, userId, args.viaDeviceId);
         const secret = await deviceSecret(device);
 
         if (!(await verifyDevicePayload(secret, "result", args.payload, args.signature))) {
@@ -327,11 +384,11 @@ export const completeDeviceCall = authMutation
  */
 export const reportDeviceCallProgress = authMutation
     .use(rateLimit("devices/relay"))
-    .input({ callId: v.id("deviceCalls"), deviceId: v.id("devices"), payload: vProgressPayload, signature: vSignature })
+    .input({ callId: v.id("deviceCalls"), deviceId: v.id("devices"), payload: vProgressPayload, signature: vSignature, viaDeviceId: vViaDeviceId })
     .output(v.object({ accepted: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
-        const device = await requireOwnDevice(ctx, args.deviceId, userId);
+        const device = await requireOwnDevice(ctx, args.deviceId, userId, args.viaDeviceId);
         const secret = await deviceSecret(device);
 
         if (!(await verifyDevicePayload(secret, "progress", args.payload, args.signature))) {
@@ -377,16 +434,21 @@ export const releaseDeviceCall = authMutation
         callId: v.id("deviceCalls"),
         deviceId: v.id("devices"),
         reason: v.string().check((value) => value.length <= 500, { message: "Reason too long" }),
+        viaDeviceId: vViaDeviceId,
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const call = await ctx.db.deviceCalls.findFirst({ where: { _id: args.callId, deviceId: args.deviceId, userId: ctx.user.userId } });
+        const { userId } = ctx.user;
+        const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
+        const call = await ctx.db.deviceCalls.findFirst({ where: { _id: args.callId, deviceId: args.deviceId, userId } });
 
-        if (call?.status === "claimed") {
+        const released = call?.status === "claimed" && device !== null && device.viaDeviceId === args.viaDeviceId;
+
+        if (released) {
             await ctx.db.patch(call._id, { completedAt: ctx.now, error: `The device refused the request: ${args.reason}`, status: "failed" });
         }
 
-        ctx.log.event("devices.release_device_call", { released: call?.status === "claimed" });
+        ctx.log.event("devices.release_device_call", { released });
 
         return null;
     });

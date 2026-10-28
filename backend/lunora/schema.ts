@@ -17,7 +17,7 @@ import { vGroupChat } from "./chat/group/validators";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
 import { vCodingAgentAssignment, vCodingAgentId, vCodingAgentRunStatus } from "./coding-agents/validators";
 import { vOAuthClientRecord, vOAuthFlow, vOAuthTarget } from "./connectors/lib/validators";
-import { vDeviceCallPhase, vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource } from "./devices/validators";
+import { vDeviceCallPhase, vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource, vDeviceTransport } from "./devices/validators";
 import { embed } from "./embed";
 import {
     vEvalCheck,
@@ -595,6 +595,8 @@ export const schema = defineSchema({
     // A paired install of the desktop shell (`devices/`, `apps/desktop`). The
     // secret signs calls and verifies results; it is removed on revoke, so a
     // revoked row can sign nothing. `manifest` is the device's verified tools.
+    // A server reached over SSH is a row of its own (`transport: "ssh"`) held by
+    // the desktop in `viaDeviceId`; only that desktop knows its secret.
     devices: defineTable({
         createdAt: v.number(),
         encryptedSecret: v.optional(v.string()),
@@ -604,7 +606,9 @@ export const schema = defineSchema({
         name: v.string(),
         platform: vDevicePlatform,
         revokedAt: v.optional(v.number()),
+        transport: v.optional(vDeviceTransport),
         userId: v.string(),
+        viaDeviceId: v.optional(v.id("devices")),
     })
         .shardBy("userId")
         .index("by_userId", ["userId"]),

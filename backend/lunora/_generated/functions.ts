@@ -4718,19 +4718,27 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["callId"] !== "string") return DEFER;
 if (typeof source["deviceId"] !== "string") return DEFER;
-return { "callId": source["callId"], "deviceId": source["deviceId"] };
+let __has1 = false;
+let __val1;
+if (source["viaDeviceId"] !== undefined) {
+if (typeof source["viaDeviceId"] !== "string") return DEFER;
+__val1 = source["viaDeviceId"];
+__has1 = true;
+}
+return { "callId": source["callId"], "deviceId": source["deviceId"], ...(__has1 ? { "viaDeviceId": __val1 } : {}) };
 });
 installCompiledValidatorMap(lunora_devices_functions_84.heartbeatDevice.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["deviceId"] !== "string") return DEFER;
-return { "deviceId": source["deviceId"] };
-});
-installCompiledValidatorMap(lunora_devices_functions_84.listPendingDeviceCalls.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["deviceId"] !== "string") return DEFER;
-return { "deviceId": source["deviceId"] };
+let __has1 = false;
+let __val1;
+if (source["viaDeviceId"] !== undefined) {
+if (typeof source["viaDeviceId"] !== "string") return DEFER;
+__val1 = source["viaDeviceId"];
+__has1 = true;
+}
+return { "deviceId": source["deviceId"], ...(__has1 ? { "viaDeviceId": __val1 } : {}) };
 });
 installCompiledValidatorMap(lunora_devices_functions_84.revokeDevice.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8700,19 +8708,19 @@ export interface Caller {
     };
     devices: {
         functions: {
-            claimDeviceCall: (args: { callId: Id<"deviceCalls">; deviceId: Id<"devices"> }) => Promise<{ claimed: boolean }>;
-            completeDeviceCall: (args: { callId: Id<"deviceCalls">; deviceId: Id<"devices">; payload: string; signature: string }) => Promise<{ accepted: boolean }>;
+            claimDeviceCall: (args: { callId: Id<"deviceCalls">; deviceId: Id<"devices">; viaDeviceId?: Id<"devices"> }) => Promise<{ claimed: boolean }>;
+            completeDeviceCall: (args: { callId: Id<"deviceCalls">; deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }) => Promise<{ accepted: boolean }>;
             getDeviceCallByToolCall: (args: { toolCallId: string }) => Promise<null | { _id: string; deviceName: string; phase?: "prompting" | "running"; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; toolName: string }>;
-            heartbeatDevice: (args: { deviceId: Id<"devices"> }) => Promise<{ paired: boolean }>;
+            heartbeatDevice: (args: { deviceId: Id<"devices">; viaDeviceId?: Id<"devices"> }) => Promise<{ paired: boolean }>;
             listDeviceCalls: (args: { deviceId?: Id<"devices">; limit?: number }) => Promise<Array<{ _id: string; completedAt?: number; createdAt: number; decision?: string; deviceId: string; deviceName: string; error?: string; exitCode?: number; input: string; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: string; toolName: string; truncated?: boolean }>>;
-            listDevices: (args?: {}) => Promise<Array<{ _id: string; createdAt: number; lastSeenAt?: number; name: string; platform: "macos" | "windows" | "linux"; toolNames: Array<string> }>>;
-            listPendingDeviceCalls: (args: { deviceId: Id<"devices"> }) => Promise<Array<{ callId: string; envelope: string; signature: string }>>;
-            registerDevice: (args: { name: string; platform: "macos" | "windows" | "linux" }) => Promise<{ deviceId: string; secret: string }>;
-            releaseDeviceCall: (args: { callId: Id<"deviceCalls">; deviceId: Id<"devices">; reason: string }) => Promise<null>;
+            listDevices: (args?: {}) => Promise<Array<{ _id: string; createdAt: number; lastSeenAt?: number; name: string; platform: "macos" | "windows" | "linux"; toolNames: Array<string>; transport?: "ssh"; viaDeviceId?: string }>>;
+            listPendingDeviceCalls: (args: { deviceId: Id<"devices">; hostDeviceIds?: Array<Id<"devices">> }) => Promise<Array<{ callId: string; deviceId: string; envelope: string; signature: string }>>;
+            registerDevice: (args: { name: string; platform: "macos" | "windows" | "linux"; viaDeviceId?: Id<"devices"> }) => Promise<{ deviceId: string; secret: string }>;
+            releaseDeviceCall: (args: { callId: Id<"deviceCalls">; deviceId: Id<"devices">; reason: string; viaDeviceId?: Id<"devices"> }) => Promise<null>;
             renameDevice: (args: { deviceId: Id<"devices">; name: string }) => Promise<null>;
-            reportDeviceCallProgress: (args: { callId: Id<"deviceCalls">; deviceId: Id<"devices">; payload: string; signature: string }) => Promise<{ accepted: boolean }>;
+            reportDeviceCallProgress: (args: { callId: Id<"deviceCalls">; deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }) => Promise<{ accepted: boolean }>;
             revokeDevice: (args: { deviceId: Id<"devices"> }) => Promise<null>;
-            updateDeviceManifest: (args: { deviceId: Id<"devices">; payload: string; signature: string }) => Promise<{ toolCount: number }>;
+            updateDeviceManifest: (args: { deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }) => Promise<{ toolCount: number }>;
         };
         gdpr: {
             collectDevicesForExport: (args: { userId: string }) => Promise<{ calls: Array<unknown>; devices: Array<unknown> }>;
