@@ -66,7 +66,13 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-    process.env.TMPDIR = previousTemporary;
+    // Assigning `undefined` to an environment variable stores the text "undefined": it has to be removed instead.
+    if (previousTemporary === undefined) {
+        delete process.env.TMPDIR;
+    } else {
+        process.env.TMPDIR = previousTemporary;
+    }
+
     vi.restoreAllMocks();
     await rm(root, { force: true, recursive: true });
 });
