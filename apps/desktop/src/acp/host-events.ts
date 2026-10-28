@@ -9,6 +9,8 @@ export interface PermissionOption {
 
 export interface PermissionRequestEvent {
     command?: string;
+    /** False when anything the person decides on is missing: the details were cut, here or by the core. A remote "allow" is never offered for it. */
+    complete?: boolean;
     folder?: string;
     kind: "permission_request";
     options: PermissionOption[];
@@ -48,6 +50,8 @@ export interface SessionObserver {
 // them is refused whole, so the host cuts to them first.
 const MAX_PROMPT_CHARS = 100_000;
 const MAX_OPTIONS = 16;
+const MAX_COMMAND_CHARS = 10_000;
+const MAX_TARGET_CHARS = 2000;
 
 /** A session's labels, cut to what the backend takes. */
 export const capSessionInfo = (info: HostSessionInfo): HostSessionInfo => {
@@ -61,7 +65,10 @@ export const capSessionInfo = (info: HostSessionInfo): HostSessionInfo => {
 
 /** A permission request, cut to what the backend takes. `command` and `target` may carry paths; the user chose to show them (plan §4.4). */
 export const capPermissionRequest = (request: PermissionRequestEvent): PermissionRequestEvent => {
+    const cut = (request.command?.length ?? 0) > MAX_COMMAND_CHARS || (request.target?.length ?? 0) > MAX_TARGET_CHARS;
+
     return {
+        complete: request.complete !== false && !cut,
         kind: "permission_request",
         options: request.options.slice(0, MAX_OPTIONS).map((option) => {
             return { kind: option.kind.slice(0, 64), name: option.name.slice(0, 200), optionId: option.optionId.slice(0, 128) };
@@ -69,8 +76,8 @@ export const capPermissionRequest = (request: PermissionRequestEvent): Permissio
         requestId: capRequestId(request.requestId),
         tool: request.tool.slice(0, 500),
         ...request.folder !== undefined && { folder: request.folder.slice(0, 500) },
-        ...request.command !== undefined && { command: request.command.slice(0, 10_000) },
-        ...request.target !== undefined && { target: request.target.slice(0, 2000) },
+        ...request.command !== undefined && { command: request.command.slice(0, MAX_COMMAND_CHARS) },
+        ...request.target !== undefined && { target: request.target.slice(0, MAX_TARGET_CHARS) },
     };
 };
 

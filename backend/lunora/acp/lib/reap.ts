@@ -13,7 +13,7 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { extendHostStream } from "../../chat/streaming/persistent/host";
 import { HOST_TURN_MAX_MS } from "./constants";
-import { withdrawSend } from "./calls";
+import { withdrawSend } from "./withdraw";
 import { endHostTurn, sendHostCancel } from "./finish";
 import { sessionOfThread, touchSession } from "./sessions";
 

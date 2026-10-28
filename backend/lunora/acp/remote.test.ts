@@ -45,14 +45,19 @@ const { signDevicePayload } = await import("../devices/lib/signing");
 const { ACP_CLAIM_LEASE_MS, ACP_CLAIM_WINDOW_MS, DEVICE_CALL_DEADLINE_MS } = await import("../devices/lib/constants");
 const { parseAcpOffers } = await import("../devices/lib/manifest");
 const { applyHostEvents } = await import("./ingest");
+const { createAcpCall } = await import("../devices/lib/acp-call");
 const calls = await import("./calls");
 const remote = await import("./remote");
 const send = await import("./send");
 const { getHostSession } = await import("./functions");
+const streaming = await import("../chat/streaming/index");
 const { reapExpiredHostStreams } = await import("./lib/reap");
 
 registerModule(registry, "acp_calls", calls);
 registerModule(registry, "acp_ingest", await import("./ingest"));
+registerModule(registry, "agent_sharing", await import("../agent/sharing"));
+registerModule(registry, "agent_streams", await import("../agent/streams"));
+registerModule(registry, "chat_streaming_persistent_library", await import("../chat/streaming/persistent/library"));
 registerModule(registry, "lib_shard_routes", await import("../lib/shard-routes"));
 registerModule(registry, "lib_shard_housekeeping", await import("../lib/shard-housekeeping"));
 
@@ -141,7 +146,7 @@ const openSession = async (device: Device, hostSessionId = "host-s1"): Promise<s
 };
 
 const sendText = async (threadId: string, text = "fix the bug", requestId = crypto.randomUUID(), userId = ownerId) =>
-    await run(async (ctx) => await ctx.runMutation(send.sendToHost, { requestId, text, threadId, userId }));
+    await run(async (ctx) => await ctx.runMutation(send.sendToHost, { plan: "free", requestId, text, threadId, userId }));
 
 const outcomeOfSend = async (...args: Parameters<typeof sendText>): Promise<unknown> => {
     const result = await sendText(...args);
@@ -190,7 +195,7 @@ const streamOf = async (threadId: string): Promise<Row> => {
     return stream as Row;
 };
 
-const addRequest = async (streamId: string, seq: number, requestId: string, kinds: string[] = ["allow_once", "allow_always", "reject_once"]) =>
+const addRequest = async (streamId: string, seq: number, requestId: string, kinds: string[] = ["allow_once", "allow_always", "reject_once"], complete?: boolean) =>
     await run(async (ctx) => {
         await ctx.db.persistentChunks.insert({
             event: {
@@ -200,6 +205,7 @@ const addRequest = async (streamId: string, seq: number, requestId: string, kind
                 }),
                 requestId,
                 tool: "Run tests",
+                ...(complete !== undefined && { complete }),
             },
             seq,
             streamId,
@@ -490,6 +496,49 @@ describe("sendToHost", () => {
     });
 });
 
+describe("a continue from the web", () => {
+    it("reaches the agent and streams back to every client, from the send to the saved reply", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await openSession(device);
+        const post = async (firstSeq: number, events: unknown[], turnId: string) =>
+            await run(async (ctx) => await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events, firstSeq, sessionId: "host-s1", threadId, turnId }));
+        const bodyOf = async (streamId: string) => (await as(ownerId).query(streaming.getStreamBody as never, { streamId } as never)) as Row;
+
+        // The web sends: stored, signed, not yet anywhere near the agent.
+        const sent = await sendText(threadId, "now add a test");
+        const stream = await streamOf(threadId);
+        const turnId = stream.hostTurnId as string;
+
+        expect(await bodyOf(sent.streamId)).toMatchObject({ hostState: "accepted", status: "pending" });
+
+        // The page relays the call; the computer takes it and says so.
+        const call = await sendCall();
+
+        expect(JSON.parse(call.envelope as string).input).toMatchObject({ text: "now add a test", turnId });
+        await claim(device, call._id);
+        await accept(device, call._id);
+        expect(await bodyOf(sent.streamId)).toMatchObject({ hostState: "received" });
+
+        // The agent starts: the computer posts the turn under the id the backend minted, from the first event.
+        await post(0, [{ kind: "turn_start", text: "now add a test" }, { kind: "text", text: "Adding " }], turnId);
+        expect(await bodyOf(sent.streamId)).toMatchObject({ hostState: "running", status: "streaming", text: "Adding " });
+
+        await post(2, [{ kind: "text", text: "the test." }, { kind: "turn_end", reason: "finished" }], turnId);
+
+        // Every client reads the same end, and the reply is saved under the prompt that was sent.
+        expect(await bodyOf(sent.streamId)).toMatchObject({ hostState: "ended", status: "done", text: "Adding the test." });
+
+        const messages = await rows("messages", { threadId });
+        const reply = messages.find((message) => message.message.role === "assistant");
+
+        expect(messages.find((message) => message.message.role === "user")?._id).toBe(sent.messageId);
+        expect(JSON.stringify(reply?.message)).toContain("Adding the test.");
+        expect(await sessionStatus()).toBe("idle");
+        // And the thread takes the next message.
+        expect(await outcomeOfSend(threadId, "thanks")).toBe("sent");
+    });
+});
+
 describe("the clock on a command", () => {
     it("expires a command nobody claimed in its window with 'host did not answer', and nothing runs later", async () => {
         vi.useFakeTimers({ toFake: ["Date"] });
@@ -625,6 +674,59 @@ describe("cancelHostTurn", () => {
         expect(await sessionStatus()).toBe("idle");
     });
 
+    it("goes out however many answers and sends are waiting, and withdraws the answers still on their way", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await openSession(device);
+
+        await sendText(threadId);
+        const live = await streamOf(threadId);
+
+        await addRequest(live._id, 0, "r1");
+
+        // The open-call budget is full: the send and two answers.
+        for (let index = 0; index < 2; index += 1) {
+            await as(ownerId).mutation(remote.answerHostPermission as never, { optionId: "r1-allow_once", requestId: "r1", threadId } as never);
+        }
+
+        const full = await run(
+            async (ctx) =>
+                await createAcpCall(ctx, { deviceId: device.deviceId as never, input: { optionId: "x", requestId: "r2", sessionId: "host-s1" }, kind: "acp_permission_answer", threadId: threadId as never, userId: ownerId }, Date.now()),
+        );
+
+        expect(full).toEqual({ error: "busy" });
+
+        await expect(cancel(threadId)).resolves.toEqual({ cancelled: true });
+
+        expect(await rows("deviceCalls", { toolName: "acp_cancel" })).toHaveLength(1);
+
+        const answers = await rows("deviceCalls", { toolName: "acp_permission_answer" });
+
+        expect(answers.map((call) => call.status)).toEqual(["expired", "expired"]);
+        expect(answers.map((call) => call.input)).toEqual(["", ""]);
+    });
+
+    it("is not held back by a full budget of other commands", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await openSession(device);
+
+        await sendText(threadId);
+
+        const stream = await streamOf(threadId);
+
+        await addRequest(stream._id, 0, "r1");
+
+        for (let index = 0; index < 2; index += 1) {
+            await as(ownerId).mutation(remote.answerHostPermission as never, { optionId: "r1-allow_once", requestId: "r1", threadId } as never);
+        }
+
+        const cancelCall = await run(
+            async (ctx) =>
+                await createAcpCall(ctx, { deviceId: device.deviceId as never, input: { sessionId: "host-s1", turnId: stream.hostTurnId }, kind: "acp_cancel", threadId: threadId as never, userId: ownerId }, Date.now()),
+        );
+
+        expect(cancelCall).toEqual({ callId: expect.any(String) });
+    });
+
     it("is the owner's alone", async () => {
         const device = await pairedDevice(ownerId);
         const threadId = await openSession(device);
@@ -660,6 +762,21 @@ describe("answerHostPermission", () => {
         expect(pending).toHaveLength(1);
         expect(pending[0]?.options.map((option: Row) => option.kind)).toEqual(["allow_once", "reject_once"]);
         expect(JSON.stringify(pending)).not.toContain("always");
+    });
+
+    it("offers only a decline for a request that was cut, and refuses an allow for it", async () => {
+        const { stream, threadId } = await waiting();
+
+        await addRequest(stream._id, 1, "r2", ["allow_once", "reject_once"], false);
+        await run(async (ctx) => await ctx.db.patch(stream._id, { hostPendingPermissions: ["r1", "r2"] }));
+
+        const pending = (await as(ownerId).query(remote.getHostPendingPermissions as never, { threadId } as never)) as Row[];
+        const cut = pending.find((request) => request.requestId === "r2");
+
+        expect(cut).toMatchObject({ incomplete: true });
+        expect(cut?.options.map((option: Row) => option.kind)).toEqual(["reject_once"]);
+        await expect(answer(threadId, "r2", "r2-allow_once")).rejects.toThrow(NOT_OFFERED);
+        await expect(answer(threadId, "r2", "r2-reject_once")).resolves.toEqual({ sent: true });
     });
 
     it("queues a signed acp_permission_answer for an option the agent offered", async () => {

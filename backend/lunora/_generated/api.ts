@@ -15,7 +15,7 @@ export interface ApiTypes {
         remote: {
             answerHostPermission: FunctionReference<"mutation", { optionId: string; requestId: string; threadId: Id<"threads"> }, { reason?: "busy" | "not_waiting" | "offline"; sent: boolean }>;
             cancelHostTurn: FunctionReference<"mutation", { threadId: Id<"threads"> }, { cancelled: boolean }>;
-            getHostPendingPermissions: FunctionReference<"query", { threadId: Id<"threads"> }, Array<{ command?: string; folder?: string; options: Array<{ kind: string; name: string; optionId: string }>; requestId: string; target?: string; tool: string }>>;
+            getHostPendingPermissions: FunctionReference<"query", { threadId: Id<"threads"> }, Array<{ command?: string; folder?: string; incomplete?: boolean; options: Array<{ kind: string; name: string; optionId: string }>; requestId: string; target?: string; tool: string }>>;
             startHostSession: FunctionReference<"mutation", { agentKey: string; clientId: string; deviceId: Id<"devices">; folderId: string }, { started: boolean; threadId?: string }>;
         };
     };
@@ -373,7 +373,7 @@ export interface ApiTypes {
     };
     devices: {
         functions: {
-            claimDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; deviceId: Id<"devices"> }, { claimed: boolean }>;
+            claimDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; claimId?: string; deviceId: Id<"devices"> }, { claimed: boolean }>;
             completeDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; deviceId: Id<"devices">; payload: string; signature: string }, { accepted: boolean }>;
             getDeviceCallByToolCall: FunctionReference<"query", { toolCallId: string }, null | { _id: string; deviceName: string; phase?: "prompting" | "running"; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; toolName: string }>;
             heartbeatDevice: FunctionReference<"mutation", { deviceId: Id<"devices"> }, { paired: boolean }>;

@@ -150,9 +150,12 @@ const DeviceRelay: FC = () => {
         }
 
         const id = deviceId as Id<"devices">;
+        // This window's name for its claims. A retry after a lost answer carries it, so the backend knows the claim
+        // it already holds is this window's own and answers it again; another window has another id.
+        const windowId = crypto.randomUUID();
         const ports: DeviceRelayPorts = {
             claim: async (callId) => {
-                const result = await mutations.current.claim({ callId: callId as Id<"deviceCalls">, deviceId: id });
+                const result = await mutations.current.claim({ callId: callId as Id<"deviceCalls">, claimId: windowId, deviceId: id });
 
                 return result.claimed;
             },

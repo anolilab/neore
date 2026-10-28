@@ -66,6 +66,8 @@ export const vHostEvent = v.union(
     // `command` and `target` may carry paths and file contents' names: §4.4 shows the request in full to its owner.
     v.object({
         command: v.optional(v.string().max(10_000)),
+        // False when the command, target or details were cut: the web then offers a decline only.
+        complete: v.optional(v.boolean()),
         folder: v.optional(v.string().max(500)),
         kind: v.literal("permission_request"),
         options: v
@@ -94,6 +96,8 @@ export const vHostEvent = v.union(
 export const vPendingPermission = v.object({
     command: v.optional(v.string().max(10_000)),
     folder: v.optional(v.string().max(500)),
+    /** True when the request was cut, so the person is not offered "allow" for what they cannot read whole. */
+    incomplete: v.optional(v.boolean()),
     options: v.array(v.object({ kind: v.string().max(64), name: v.string().max(200), optionId: v.string().max(128) })),
     requestId: v.string().max(128),
     target: v.optional(v.string().max(2000)),

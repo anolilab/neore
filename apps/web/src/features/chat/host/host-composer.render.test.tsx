@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const harness = vi.hoisted(() => {
     return {
         calls: [] as [string, unknown][],
+        /** What the next sends answer, in order; an empty list answers ok. */
+        sendResults: [] as ({ error: string; ok: false } | { ok: true })[],
         data: {} as Record<string, unknown>,
     };
 });
@@ -33,7 +35,7 @@ vi.mock("./host-send", () => {
         sendHostMessage: vi.fn(async (input: unknown) => {
             harness.calls.push(["send", input]);
 
-            return { ok: true };
+            return harness.sendResults.shift() ?? { ok: true };
         }),
     };
 });
@@ -76,6 +78,7 @@ vi.mock("@/lib/lunora/crpc", async () => {
 const { default: HostComposer } = await import("./host-composer");
 
 const ALWAYS = /always/iu;
+const CUT = /too long to show whole/u;
 
 const OPTIONS = [
     { kind: "allow_once", name: "Allow", optionId: "r1-allow" },
@@ -98,6 +101,7 @@ const session = (fields: Record<string, unknown> = {}) => {
 
 beforeEach(() => {
     harness.calls = [];
+    harness.sendResults = [];
 });
 
 afterEach(() => {
@@ -116,6 +120,35 @@ describe("the coding-agent composer", () => {
         await waitFor(() => expect(harness.calls).toHaveLength(1));
         expect(harness.calls[0]).toEqual(["send", { requestId: expect.any(String), text: "fix the bug", threadId: "thread-1" }]);
         await waitFor(() => expect(box.value).toBe(""));
+    });
+
+    it("reuses the request id for a retry of the same text and takes a new one for different text", async () => {
+        harness.sendResults = [
+            { error: "unreachable", ok: false },
+            { error: "unreachable", ok: false },
+        ];
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+        const send = () => fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+        fireEvent.change(box, { target: { value: "first" } });
+        send();
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+        // The answer was lost: the same text goes again under the same id.
+        await waitFor(() => expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(false));
+        send();
+        await waitFor(() => expect(harness.calls).toHaveLength(2));
+        // An edit is another message.
+        fireEvent.change(box, { target: { value: "second" } });
+        await waitFor(() => expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(false));
+        send();
+        await waitFor(() => expect(harness.calls).toHaveLength(3));
+
+        const ids = harness.calls.map(([, input]) => (input as { requestId: string }).requestId);
+
+        expect(ids[1]).toBe(ids[0]);
+        expect(ids[2]).not.toBe(ids[0]);
     });
 
     it("does not send an empty message", async () => {
@@ -182,6 +215,17 @@ describe("a permission request from the agent", () => {
         expect(screen.getByRole("button", { name: "Allow once" })).toBeTruthy();
         expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy();
         expect(screen.queryByText(ALWAYS)).toBeNull();
+    });
+
+    it("says a request was cut and offers only a decline", async () => {
+        mount({
+            ...withRequest(),
+            "acp.remote.getHostPendingPermissions": [{ command: "pnpm te", incomplete: true, options: [OPTIONS[1]], requestId: "r1", tool: "Run tests" }],
+        });
+
+        expect(await screen.findByText(CUT)).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Allow once" })).toBeNull();
+        expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy();
     });
 
     it("answers with the agent's own option id for that request", async () => {

@@ -21,7 +21,7 @@ import { createStreamToken } from "../chat/streaming/persistent/stream-token";
 import { createHostStream } from "../chat/streaming/persistent/host";
 import { createAcpCall } from "../devices/lib/acp-call";
 import { claimOnce, hasClaim } from "../lib/claim-once";
-import { checkRateLimit } from "../lib/rate-limiter";
+import { checkRateLimit, getUserTier } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
 import { liveHostStream } from "./remote";
 import { isHostRunThread } from "./lib/host-thread";
@@ -50,6 +50,8 @@ const vSendResult = v.union(
 
 export const sendToHost = internalMutation
     .input({
+        // The caller's tier, as `/chat/start` takes it: the limit a paying account has is its own.
+        plan: v.union(v.literal("free"), v.literal("premium")),
         requestId: v.string().max(MAX_LENGTH.id),
         text: v.string().max(100_000),
         threadId: v.string().max(MAX_LENGTH.id),
@@ -89,7 +91,7 @@ export const sendToHost = internalMutation
             return { outcome: "turn_running" as const };
         }
 
-        const limited = await checkRateLimit(ctx, "hosts/send:free", { key: userId });
+        const limited = await checkRateLimit(ctx, `hosts/send:${args.plan}`, { key: userId });
 
         if (!limited.ok) {
             return { outcome: "rate_limited" as const };
@@ -166,21 +168,23 @@ export const hostSendHttpAction = async (context: HttpActionCtx, request: Reques
         return json({ error: "malformed" }, 400);
     }
 
-    let userId: string | undefined;
+    let user: Awaited<ReturnType<typeof getCurrentUserInternal>>;
 
     try {
-        const user = await getCurrentUserInternal(context);
-
-        userId = user?._id;
+        user = await getCurrentUserInternal(context);
     } catch {
         return json({ error: "not_authenticated" }, 401);
     }
+
+    const userId = user?._id;
 
     if (!userId) {
         return json({ error: "not_authenticated" }, 401);
     }
 
-    const result = await context.runMutation(internal.acp.send.sendToHost, { requestId, text, threadId, userId });
+    const plan = getUserTier({ plan: user?.plan ?? null }) === "premium" ? "premium" : "free";
+
+    const result = await context.runMutation(internal.acp.send.sendToHost, { plan, requestId, text, threadId, userId });
 
     if (result.outcome === "sent") {
         const streamToken = await createStreamToken(result.streamId, userId, threadId, signingSecret);

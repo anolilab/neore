@@ -26,6 +26,11 @@ interface Inflight {
 
 /** What a channel needs from the poster it belongs to. */
 export interface ChannelHost {
+    /**
+     * The backend closed a turn this host has not ended (Stop, the reaper, a revoke), so the agent may still be
+     * running it. A cancel that never arrived (the page was throttled or closed, the call expired) is made good here.
+     */
+    readonly endedByBackend: (channel: TurnChannel) => void;
     readonly finished: (channel: TurnChannel) => void;
     readonly log: (message: string) => void;
     readonly now: () => number;
@@ -232,6 +237,10 @@ export class TurnChannel {
                 this.probe = false;
                 this.inflight = undefined;
                 this.nextSeq = result.next;
+
+                if (result.ended && !this.sealed) {
+                    this.host.endedByBackend(this);
+                }
 
                 if (result.ended || inflight.events.some((event) => event.kind === "turn_end")) {
                     this.finish();

@@ -17,18 +17,13 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import type { MutationCtx } from "../../_generated/server";
 import { isForwardHostState, updateHostStream } from "../../chat/streaming/persistent/host";
-import { patchDeviceCall } from "../../devices/lib/call-writes";
 import { isAcpTool } from "../../devices/lib/state";
 import { START_GRACE_MS } from "./constants";
 import { finishHostTurn } from "./finish";
-import { sessionOfThread } from "./sessions";
 
 type Call = Doc<"deviceCalls">;
 
 export type AcpCallEnd = { error?: string; status: "completed" | "denied" | "expired" | "failed" };
-
-/** Written on every terminal path of a coding-agent call, beside its status. */
-export const ACP_CLEARED = { envelope: "", input: "" } as const;
 
 export const HOST_DID_NOT_ANSWER = "host did not answer";
 
@@ -101,34 +96,5 @@ export const onAcpCallEnded = async (ctx: MutationCtx, call: Call, end: AcpCallE
         }
 
         await endStartingSession(ctx, call.deviceId, input.sessionId, now);
-    }
-};
-
-const sendTurnId = (call: Doc<"deviceCalls">): string | undefined => {
-    try {
-        const parsed = JSON.parse(call.input) as { turnId?: unknown };
-
-        return typeof parsed.turnId === "string" ? parsed.turnId : undefined;
-    } catch {
-        return undefined;
-    }
-};
-
-/** A prompt the computer has not acknowledged is expired, so it does not run after the person pressed Stop. */
-export const withdrawSend = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, now: number): Promise<void> => {
-    const session = await sessionOfThread(ctx, stream.threadId as Id<"threads">);
-
-    if (!session) {
-        return;
-    }
-
-    for (const status of ["pending", "claimed"] as const) {
-        const { page } = await ctx.db.deviceCalls.findMany({ limit: 50, where: { deviceId: session.deviceId, status } });
-
-        for (const call of page) {
-            if (call.toolName === "acp_send" && sendTurnId(call) === stream.hostTurnId) {
-                await patchDeviceCall(ctx, call._id, { completedAt: now, error: "Stopped", status: "expired", ...ACP_CLEARED });
-            }
-        }
     }
 };

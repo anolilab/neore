@@ -80,9 +80,18 @@ const settle = async (write: Promise<void>): Promise<void> => {
     }
 };
 
+/** What the log keeps of a call: when its envelope expires, and why the command was refused if it was. */
+interface Receipt {
+    expiresAt: number;
+    refusal?: string;
+}
+
 export class HostCommands {
-    /** callId → when its envelope expires. In memory first, so two deliveries at once cannot both run. */
-    private readonly receipts = new Map<string, number>();
+    /** callId → receipt. In memory first, so two deliveries at once cannot both run. */
+    private readonly receipts = new Map<string, Receipt>();
+
+    /** Deliveries being handled now. A second delivery of the same call waits for the first's outcome instead of guessing it. */
+    private readonly handling = new Map<string, Promise<string>>();
 
     private loaded: Promise<void> | undefined;
 
@@ -107,18 +116,42 @@ export class HostCommands {
             return prepared.refusal ?? "refused";
         }
 
-        if (this.receipts.has(prepared.callId)) {
-            // A redelivery: the first delivery got as far as its receipt, and is not run again.
-            return ACCEPTED;
+        const { callId } = prepared;
+        const running = this.handling.get(callId);
+
+        if (running !== undefined) {
+            return await running;
         }
 
-        // In memory before the write, so a second delivery that arrives meanwhile finds it; on disk before the command runs.
-        this.receipts.set(prepared.callId, prepared.expiresAt);
+        const known = this.receipts.get(callId);
+
+        if (known !== undefined) {
+            // A redelivery: the first delivery got as far as its receipt and is not run again. Carried out, it is
+            // acknowledged; refused, it is refused the same way, since the call must end as it did the first time.
+            return known.refusal ?? ACCEPTED;
+        }
+
+        const first = this.receive(prepared.command, callId, prepared.expiresAt);
+
+        this.handling.set(callId, first);
+
+        try {
+            return await first;
+        } finally {
+            this.handling.delete(callId);
+        }
+    }
+
+    /** The receipt is on disk before the command is acted on; a refusal is written beside it, so it stays a refusal. */
+    private async receive(command: AcpCommand, callId: string, expiresAt: number): Promise<string> {
+        const receipt: Receipt = { expiresAt };
+
+        this.receipts.set(callId, receipt);
 
         try {
             await this.persist();
         } catch (error) {
-            this.receipts.delete(prepared.callId);
+            this.receipts.delete(callId);
 
             throw error;
         }
@@ -126,20 +159,18 @@ export class HostCommands {
         let outcome: string;
 
         try {
-            outcome = await this.options.apply(prepared.command);
+            outcome = await this.options.apply(command);
         } catch (error) {
             outcome = (error as Error).message.slice(0, 200) || "refused";
         }
 
-        // A command that was refused did not run. Its receipt goes, so a delivery that comes back (the refusal never
-        // reached the backend) is looked at again, not acknowledged as if it had been carried out.
         if (outcome !== ACCEPTED) {
-            this.receipts.delete(prepared.callId);
+            receipt.refusal = outcome;
 
             try {
                 await this.persist();
             } catch {
-                // The refusal is still signed; a receipt left behind only makes a redelivery an acknowledgement.
+                // The refusal is still signed. Without it on disk, a redelivery after a restart reads as carried out.
             }
         }
 
@@ -163,7 +194,7 @@ export class HostCommands {
 
             for (const entry of entries) {
                 if (Array.isArray(entry) && typeof entry[0] === "string" && typeof entry[1] === "number") {
-                    this.receipts.set(entry[0], entry[1]);
+                    this.receipts.set(entry[0], { expiresAt: entry[1], ...typeof entry[2] === "string" && { refusal: entry[2] } });
                 }
             }
         } catch {
@@ -176,7 +207,7 @@ export class HostCommands {
     private async persist(): Promise<void> {
         const cutoff = this.now() - KEEP_AFTER_EXPIRY_MS;
 
-        for (const [callId, expiresAt] of this.receipts) {
+        for (const [callId, { expiresAt }] of this.receipts) {
             if (expiresAt < cutoff) {
                 this.receipts.delete(callId);
             }
@@ -203,7 +234,7 @@ export class HostCommands {
         const { receiptFile } = this.options;
 
         await mkdir(path.dirname(receiptFile), { recursive: true });
-        await writeFile(`${receiptFile}.tmp`, JSON.stringify({ receipts: [...this.receipts] }), { mode: 0o600 });
+        await writeFile(`${receiptFile}.tmp`, JSON.stringify({ receipts: [...this.receipts].map(([callId, { expiresAt, refusal }]) => refusal === undefined ? [callId, expiresAt] : [callId, expiresAt, refusal]) }), { mode: 0o600 });
         await rename(`${receiptFile}.tmp`, receiptFile);
     }
 }
