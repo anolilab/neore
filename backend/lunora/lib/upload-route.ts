@@ -182,6 +182,8 @@ export interface ServeUploadOptions {
     /** See {@link UserUploadOptions.allowedTypes}. */
     allowedTypes?: ReadonlyArray<string>;
     bucket: R2UploadBucket;
+    /** The limit a create is charged to; the device route has its own, apart from the person's. */
+    createLimit?: "hosts/uploads/create" | "uploads/create";
     /** The purpose of a create, or `undefined` for a request continuing an upload already created. */
     purpose: UploadPurpose | undefined;
     request: Request;
@@ -194,10 +196,10 @@ export interface ServeUploadOptions {
 
 /**
  * Serve one upload request for `userId` on that user's shard, whoever proved the identity (a session, an API key
- * or a device signature). `admit` runs first on every request; a create is then charged against `uploads/create`,
+ * or a device signature). `admit` runs first on every request; a create is then charged against `createLimit`,
  * and its staging key gets the same reap a finalize would have made moot.
  */
-export const serveUserUpload = async ({ admit, allowedTypes, bucket, purpose, request, scheduler, shardCtx, userId }: ServeUploadOptions): Promise<Response> => {
+export const serveUserUpload = async ({ admit, allowedTypes, bucket, createLimit = "uploads/create", purpose, request, scheduler, shardCtx, userId }: ServeUploadOptions): Promise<Response> => {
     const refused = await admit?.(shardCtx, request);
 
     if (refused) {
@@ -206,7 +208,7 @@ export const serveUserUpload = async ({ admit, allowedTypes, bucket, purpose, re
 
     const handler = createUserUploadHandler({
         admitCreate: async () => {
-            const limit = await shardCtx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { identifier: userId, key: "uploads/create" });
+            const limit = await shardCtx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { identifier: userId, key: createLimit });
 
             return limit.ok
                 ? undefined

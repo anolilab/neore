@@ -55,6 +55,7 @@ registerModule(registry, "acp_upload", await import("./upload"));
 registerModule(registry, "lib_claim_once", await import("../lib/claim-once"));
 registerModule(registry, "lib_rate_limiter_mutations", await import("../lib/rate-limiter-mutations"));
 
+const NOT_THE_DEVICE_LIMIT = /(?<!hosts%2F)uploads%2Fcreate/u;
 const ORIGIN = "https://backend.example.test";
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 const MB = 1024 * 1024;
@@ -277,6 +278,25 @@ describe("a signed upload from a paired computer", () => {
         resetOwnerCache();
 
         expect(await statusOf(await createRequest(owner))).toBe(401);
+    });
+
+    it("charges a create to the devices' own limit, not the person's", async () => {
+        const owner = await pair(await insertUser());
+
+        await create(owner);
+
+        const rows = JSON.stringify(await harness.run(async (ctx: any) => await ctx.db.query("rateLimits").collect()));
+
+        expect(rows).toContain("hosts%2Fuploads%2Fcreate");
+        expect(rows).not.toMatch(NOT_THE_DEVICE_LIMIT);
+    });
+
+    it("refuses a create that carries a body, whatever its length header says", async () => {
+        const owner = await pair(await insertUser());
+        const request = await createRequest(owner);
+        const withBody = new Request(request.url, { body: "x", headers: request.headers, method: "POST" });
+
+        expect(await statusOf(withBody)).toBe(401);
     });
 
     it("refuses a request with no signature headers, a malformed one, or a payload for another device", async () => {

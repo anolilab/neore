@@ -131,7 +131,7 @@ const bindCreate = (post: Record<string, unknown>, request: Request, pathname: s
         declaredLength !== String(size) ||
         declaredType(request) !== type ||
         request.headers.has("upload-defer-length") ||
-        (request.body !== null && Number(request.headers.get("content-length") ?? 0) > 0)
+        request.body !== null
     ) {
         return null;
     }
@@ -257,6 +257,7 @@ export const hostUploadHttpAction = async (context: HttpActionCtx, request: Requ
         return await serveUserUpload({
             allowedTypes: HOST_MEDIA_MIME_TYPES,
             bucket,
+            createLimit: "hosts/uploads/create",
             purpose: method === "POST" ? "chat" : undefined,
             request: bound.request,
             scheduler,

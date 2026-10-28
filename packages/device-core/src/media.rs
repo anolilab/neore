@@ -123,10 +123,16 @@ pub fn classify(name: &str, head: &[u8]) -> Option<(&'static str, Kind)> {
 }
 
 /// Whether a reference is a plain path. A URL or a data URI names no file in the folder, and is never opened.
+/// Neither is a Windows form that can name another machine or drive (`\\host\share`, `C:`, a backslash anywhere):
+/// resolving one would make a connection on the agent's say-so.
 pub fn is_plain_path(reference: &str) -> bool {
     let reference = reference.trim();
+    let drive =
+        reference.as_bytes().get(1) == Some(&b':') && reference.as_bytes()[0].is_ascii_alphabetic();
 
     !reference.is_empty()
+        && !drive
+        && !reference.contains('\\')
         && reference.chars().count() <= MAX_REFERENCE_CHARS
         && !reference.contains('\0')
         && !reference.contains("://")
@@ -209,6 +215,10 @@ mod tests {
         assert!(!is_plain_path("file:///etc/passwd"));
         assert!(!is_plain_path("data:image/png;base64,AAAA"));
         assert!(!is_plain_path("//host/share/a.png"));
+        assert!(!is_plain_path(r"\\host\share\a.png"));
+        assert!(!is_plain_path(r"C:\Users\a.png"));
+        assert!(!is_plain_path("C:a.png"));
+        assert!(!is_plain_path(r"out\a.png"));
         assert!(!is_plain_path("a\0b.png"));
         assert!(!is_plain_path(&"a".repeat(MAX_REFERENCE_CHARS + 1)));
     }

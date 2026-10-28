@@ -105,7 +105,11 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         // The agent's own session id, kept for an import to find and a later reattach to use (S6); set once.
         const learnedNativeId = existing.nativeSessionId === undefined ? open.nativeSessionId : undefined;
         // A message sent while the agent was still starting (§4.6) is waiting for it: the session opens already busy.
-        const opening = opened && (await ctx.db.persistentStreams.findFirst({ where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId: existing.threadId } })) !== null;
+        const opening =
+            opened &&
+            (await ctx.db.persistentStreams.findFirst({
+                where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId: existing.threadId },
+            })) !== null;
 
         if (existing.status !== "ended" && (opened || newerReport || learnedNativeId !== undefined)) {
             await ctx.db.patch(existing._id, {
@@ -374,6 +378,8 @@ const applyTurnPost = async (
  */
 export const applyHostEvents = internalMutation
     .input({
+        // The caller already spent this post's budget (`spendHostBudget`), so it is not charged twice.
+        budgetSpent: v.optional(v.boolean()),
         // A session-level post with no events: the desktop's session ended.
         close: v.optional(v.boolean()),
         deviceId: v.string().max(MAX_LENGTH.id),
@@ -386,7 +392,7 @@ export const applyHostEvents = internalMutation
     .output(vApplyResult)
     .mutation(async ({ args, ctx }) => {
         // Keyed by the VERIFIED device, so a forged post cannot spend a victim's budget.
-        const limited = await checkRateLimit(ctx, "hosts/ingest:free", { key: args.deviceId });
+        const limited = args.budgetSpent === true ? { ok: true } : await checkRateLimit(ctx, "hosts/ingest:free", { key: args.deviceId });
 
         if (!limited.ok) {
             return { outcome: "limited" as const };
@@ -426,6 +432,20 @@ export const applyHostEvents = internalMutation
             { events: args.events, firstSeq: args.firstSeq, hostSessionId: args.sessionId, threadId: args.threadId, turnId: args.turnId },
             now,
         );
+    });
+
+/**
+ * Spends one post's share of a device's budget before the ingest does anything costly for it (finalizing the files
+ * it names). `false` when the device is over it. The post's `applyHostEvents` then skips its own check, so the post
+ * is charged once.
+ */
+export const spendHostBudget = internalMutation
+    .input({ deviceId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const spent = await checkRateLimit(ctx, "hosts/ingest:free", { key: args.deviceId });
+
+        return spent.ok;
     });
 
 /** The shard tick (`lib/shard-housekeeping.ts#runShardTick`): reap silent host streams, then re-arm for the next. */

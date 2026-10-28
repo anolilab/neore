@@ -141,7 +141,7 @@ const withoutAttachedImages = (text: string, references: ReadonlySet<string>): s
         : text.replaceAll(MARKDOWN_IMAGE, (whole, alt: string, target: string) => (references.has(decodedTarget(target)) ? alt : whole));
 
 const formatSize = (bytes: number): string =>
-    bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MiB` : `${Math.max(1, Math.round(bytes / 1024))} KiB`;
 
 /** A file name as inline code: the name is the agent's text, and must not become Markdown, a link or an image. */
 const asCode = (name: string): string => `\`${name.replaceAll(/[`\r\n]/gu, " ").trim()}\``;

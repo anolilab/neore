@@ -323,7 +323,16 @@ const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: 
         return json({ error: "refused" }, 403);
     }
 
+    // Finalizing a file deletes its staged upload, so the device's budget is spent first: a post that would be
+    // answered 429 must not have used the upload up.
+    const hasUploads = post.events.some((event) => event.kind === "media" && event.uploadId !== undefined);
+
+    if (hasUploads && !(await context.runMutation(internal.acp.ingest.spendHostBudget, { deviceId }))) {
+        return json({ error: "rate_limited" }, 429);
+    }
+
     const result = await context.runMutation(internal.acp.ingest.applyHostEvents, {
+        ...(hasUploads && { budgetSpent: true }),
         deviceId,
         events: await resolveMedia(context, ownerId, post),
         sessionId: post.sessionId,

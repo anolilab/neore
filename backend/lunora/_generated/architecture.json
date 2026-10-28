@@ -21,6 +21,16 @@
       "to": "table:persistentStreams"
     },
     {
+      "from": "function:acp_upload:finalizeHostUpload",
+      "kind": "call",
+      "to": "function:lib_action_cache:get"
+    },
+    {
+      "from": "function:acp_upload:finalizeHostUpload",
+      "kind": "call",
+      "to": "function:lib_action_cache:put"
+    },
+    {
       "from": "function:admin_cleanup:executeCleanup",
       "kind": "call",
       "to": "function:admin_cleanup:getCleanupConfigInternal"
@@ -7073,6 +7083,13 @@
       "id": "function:acp_ingest:reapHostStreams",
       "kind": "function",
       "name": "acp.ingest.reapHostStreams",
+      "module": "acp"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:acp_ingest:spendHostBudget",
+      "kind": "function",
+      "name": "acp.ingest.spendHostBudget",
       "module": "acp"
     },
     {
@@ -16386,7 +16403,13 @@
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 292,
+      "line": 296,
+      "reason": "\"hostIngestHttpAction\" is not a registered function"
+    },
+    {
+      "file": "acp/http",
+      "kind": "call",
+      "line": 300,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
@@ -19644,19 +19667,19 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 795,
+      "line": 797,
       "reason": "\"rateLimitGuard\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 891,
+      "line": 893,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 933,
+      "line": 935,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {
@@ -19752,13 +19775,13 @@
     {
       "file": "lib/upload-route",
       "kind": "call",
-      "line": 209,
+      "line": 211,
       "reason": "\"serveUserUpload\" is not a registered function"
     },
     {
       "file": "lib/upload-route",
       "kind": "schedule",
-      "line": 220,
+      "line": 222,
       "reason": "\"serveUserUpload\" is not a registered function"
     },
     {
