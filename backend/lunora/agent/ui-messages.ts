@@ -17,6 +17,7 @@ import {
 import type { Infer } from "lunorash/server";
 
 import { omit, pick } from "../lib/collections";
+import { agentSwitchOf } from "./agent-switch-logic";
 import type { MessageBranch } from "./branch-tree";
 import { fromModelMessage, toModelMessage, toUIFilePart } from "./mapping";
 import { type MessageCost, type StepUsage, sumMessageCosts, sumStepUsage } from "./message-cost";
@@ -314,6 +315,12 @@ const createSystemUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataType
         ...(message.providerMetadata && { providerMetadata: message.providerMetadata as ProviderMetadata }),
     };
 
+    // An agent switch is a system row whose part is the divider, not text (`agent-switch-logic.ts`).
+    const agentSwitch = agentSwitchOf(message);
+    const parts = agentSwitch
+        ? ([{ data: agentSwitch, id: message._id, type: "data-agentSwitch" }] as unknown as UIMessage<METADATA, DATA_PARTS, TOOLS>["parts"])
+        : [{ text, type: "text", ...partCommon } satisfies TextUIPart];
+
     return {
         _creationTime: message.createdAt ?? message._creationTime,
         agentName: message.agentName,
@@ -321,7 +328,7 @@ const createSystemUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataType
         key: `${message.threadId}-${message.order}-${message.stepOrder}`,
         metadata: message.metadata,
         order: message.order,
-        parts: [{ text, type: "text", ...partCommon } satisfies TextUIPart],
+        parts,
         role: "system",
         status: message.streaming ? ("streaming" as const) : message.status,
         stepOrder: message.stepOrder,

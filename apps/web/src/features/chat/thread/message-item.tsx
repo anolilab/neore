@@ -8,6 +8,7 @@
  */
 
 import { Trans, useLingui } from "@lingui/react/macro";
+import type { AgentSwitchPart } from "@neore/backend/agent/agent-switch-validators";
 import type { Id } from "@neore/backend/dataModel";
 import { getVisibleUserText } from "@neore/chat-ui/utils/page-context";
 import { Message, MessageAction, MessageActions, MessageContent as MessageContentWrapper } from "@neore/ui/components/ai-elements/message";
@@ -54,6 +55,7 @@ import { saveBlob } from "@/lib/download";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
+import AgentSwitchDivider from "./agent-switch-divider";
 import ForkBranchDialog from "./fork-branch-dialog";
 import formatMessageTime from "./format-message-time";
 import GenerationModelMenu from "./generation-model-menu";
@@ -574,6 +576,16 @@ const MessageItem: FC<MessageItemProps> = memo(
         }
 
         if (message.role === "system") {
+            const agentSwitch = message.parts.find((part) => part.type === "data-agentSwitch");
+
+            if (agentSwitch && "data" in agentSwitch) {
+                return (
+                    <div {...containerProps}>
+                        <AgentSwitchDivider part={agentSwitch.data as AgentSwitchPart} />
+                    </div>
+                );
+            }
+
             return (
                 <div {...containerProps}>
                     <SystemMessage>{content}</SystemMessage>

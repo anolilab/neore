@@ -143,10 +143,11 @@ says what it costs.
 - `threads.activeAgent`: optional cache of the active path's agent. Shape `{ kind: "model", model }` or
   `{ kind: "host", hostId, agentKey, folderId }`.
 - Message part `agentSwitch`: `{ from, to, mode, startMessageId, fallbackReason? }`.
-  The `parts` column is `v.array(v.any())` (`backend/lunora/schema.ts`), so the
-  database takes the new part with no schema change. S1 adds a checked shape for it in
-  `agent/table-writes.ts`, the only writer, and a test that a reader skips unknown
-  part kinds.
+  Stored as one `system` row with no text in `messages`, its payload in
+  `providerMetadata.neoreAgentSwitch` (the `messages` table has no `parts` column; `parts` is
+  `streamDeltas`). S1 adds a checked shape for it in `agent/table-writes.ts`, the only writer, and
+  tests that readers skip it (the model context) or fall back to a plain row (a marker that does not
+  check). S1 writes `mode: "full"`: the new model sees the whole path, as before.
 - No new table. A cloud-to-host or host-to-cloud switch that forks is recorded as a
   `threadRelationships` row with the existing `continuation` branch type; S3 checks
   that this value fits the fork, and adds a value only if it does not.

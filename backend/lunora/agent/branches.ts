@@ -5,6 +5,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx as QueryContext } from "../_generated/server";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { throwBadRequest, throwForbidden, throwThreadNotFound } from "../lib/error-helpers";
+import { syncActiveAgent } from "./agent-switch";
 import { childrenOf, contextPathIds, descendFrom, getThreadRow, loadActivePath, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
 import type { MessageBranch } from "./branch-tree";
 import { BRANCH_ROOT, forkEnd, messageRowsOf } from "./branch-tree";
@@ -231,6 +232,7 @@ export const setActiveLeaf = internalMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         await ctx.db.patch(args.threadId, { activeLeafMessageId: args.messageId });
+        await syncActiveAgent(ctx, args.threadId, args.messageId);
 
         return null;
     });
@@ -278,6 +280,7 @@ export const saveEditedSiblingHandler = async (
     const savedId = saved._id as Id<"messages">;
 
     await ctx.db.patch(threadId, { activeLeafMessageId: savedId });
+    await syncActiveAgent(ctx, threadId, savedId);
 
     return savedId;
 };
@@ -415,6 +418,7 @@ export const switchBranch = authMutation
         const leaf = await descendFrom(ctx, args.threadId, target);
 
         await ctx.db.patch(args.threadId, { activeLeafMessageId: leaf._id });
+        await syncActiveAgent(ctx, args.threadId, leaf._id);
 
         ctx.log.event("agent.switch_branch", { leafFound: true, threadId: args.threadId });
 

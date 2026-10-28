@@ -13,6 +13,7 @@ import { paymentExtension } from "@lunora/payment";
 import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { defineSchema, defineTable, v } from "lunorash/server";
 
+import { vAgentRef } from "./agent/agent-switch-validators";
 import { vGroupChat } from "./chat/group/validators";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
 import { vCodingAgentAssignment, vCodingAgentId, vCodingAgentRunStatus } from "./coding-agents/validators";
@@ -2556,6 +2557,10 @@ export const schema = defineSchema({
         }),
 
     threads: defineTable({
+        // Cache of the agent the active path runs on, for the thread list and the composer's
+        // first paint; the path's last `agentSwitch` row decides (`agent/agent-switch.ts`).
+        // Unset = the thread was never switched, and every send keeps its own model.
+        activeAgent: v.optional(vAgentRef),
         // The message the user last pointed the in-thread branch switcher at.
         // Unset = the thread never branched, and reads stay on the linear fast
         // path. The displayed path descends from here by latest child.

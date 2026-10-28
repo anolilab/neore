@@ -344,7 +344,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // identity of the store snapshot or of the thread row.
     const { loadThreadData } = modelStore;
     const hasThread = Boolean(thread);
-    const threadModel = thread?.model;
+    // The agent a switched thread's path runs on, else the thread's model.
+    const threadModel = thread?.activeAgent?.model ?? thread?.model;
     const threadMode = thread?.mode;
 
     useEffect(() => {
@@ -381,14 +382,14 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             }
 
             // Use thread's saved model (from initialThread or threadData)
-            if (thread?.model) {
-                return thread.model;
+            if (threadModel) {
+                return threadModel;
             }
         }
 
         // New thread or fallback: use store's selected model (user's last choice or default)
         return modelStore.selectedModel || DEFAULT_CHAT_MODEL;
-    }, [modelProp, modelStore.selectedModel, modelStore.selectedModelThreadId, modelStore.userChangedModel, threadId, thread?.model]);
+    }, [modelProp, modelStore.selectedModel, modelStore.selectedModelThreadId, modelStore.userChangedModel, threadId, threadModel]);
 
     const {
         loadMore,

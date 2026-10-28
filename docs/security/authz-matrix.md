@@ -253,6 +253,7 @@ for a schema table that is neither policed nor listed:
 | `bots_functions.listBots` | query | authQuery | bots | caller-scoped (ctx.user) | ok |
 | `bots_functions.updateBot` | mutation | authMutation + RL | bots | row.userId == caller; model checked against the catalog | ok |
 | `changelog_functions.getChangelogs` | action | publicAction | — | none (public) | accepted — public by design; cached with a module cooldown |
+| `chat_agent_switch.switchThreadAgent` | mutation | authMutation + RL | threads, messages, idempotencyClaims | thread WRITE grant (`requireThreadPermission`, the right a collaborator has to pick a send's model); an enabled, paid-plan-checked chat model only; refused while a reply streams, on bot, group and media threads, and for host targets; claim-once on the caller's `clientId`; the divider row goes in through `agent/table-writes.ts` | ok |
 | `chat_ask_user.answerAskUser` | mutation | authMutation + RL | toolApprovalRuns, threads | thread owner only (as `respondToToolApproval`); the request must be an `askUser` call on the latest turn | ok |
 | `chat_autocomplete.suggestCompletion` | action | authAction + RL | userSettings | caller-scoped (ctx.user); refuses unless the caller's own opt-in setting is on; the draft comes from the caller and is sent to the utility model as JSON data; reads no thread | ok |
 | `chat_import_functions.cancelImportJob` | mutation | authMutation | chatImportJobs | row.userId == caller | ok |

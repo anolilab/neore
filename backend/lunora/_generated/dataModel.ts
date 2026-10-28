@@ -1647,6 +1647,7 @@ export interface Doc_threadRelationships {
 export interface Doc_threads {
     _id: Id<"threads">;
     _creationTime: number;
+    activeAgent?: { kind: "model"; model: string };
     activeLeafMessageId?: string;
     botId?: Id<"bots">;
     category?: string;
@@ -4385,6 +4386,7 @@ export interface Insert_threadRelationships {
 export interface Insert_threads {
     _id?: Id<"threads">;
     _creationTime?: number;
+    activeAgent?: { kind: "model"; model: string };
     activeLeafMessageId?: string;
     botId?: Id<"bots">;
     category?: string;
