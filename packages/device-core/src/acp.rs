@@ -551,6 +551,8 @@ impl DeviceState {
 
             Ok(())
         })?;
+        // The approved pairs are in the manifest: the page sends a fresh one.
+        self.emit(Event::Changed);
 
         Ok(self.acp_view())
     }
@@ -1194,6 +1196,7 @@ mod tests {
             details: "{}".into(),
             details_complete: true,
             folder: "/work".into(),
+            request_id: "r1".into(),
             options: vec![
                 OfferedOption {
                     kind: "allow_once".into(),
