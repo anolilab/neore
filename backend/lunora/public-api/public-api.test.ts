@@ -273,6 +273,23 @@ describe("idempotency", () => {
         expect(held.size).toBe(1);
     });
 
+    it("tells the loser of a race that the winner is still running, not that the outcome is lost", async () => {
+        const fingerprint = await requestFingerprint(options.method, options.pathAndQuery, options.body);
+        const { claim, held } = claimTable();
+        let reads = 0;
+        const nextRead = () => {
+            reads += 1;
+
+            return reads;
+        };
+        // Both requests missed the store; by the loser's second look the winner has written its pending marker.
+        const store = { ...memoryStore(), get: async () => (nextRead() === 1 ? undefined : { fingerprint, state: "pending" }) };
+
+        held.add(await idempotencyStorageKey(options.apiKeyId, options.idempotencyKey));
+
+        await expect(withIdempotency(store, { ...options, claim }, async () => Response.json({}))).rejects.toMatchObject({ code: "idempotency_in_progress" });
+    });
+
     it("gives the claim back when the handler fails or answers a 5xx", async () => {
         const { claim, held } = claimTable();
 

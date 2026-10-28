@@ -102,6 +102,9 @@ export interface IdempotencyStore {
     remove: (key: string) => Promise<void>;
 }
 
+/** How long the loser of a race for a key waits for the winner's pending marker before reading it again. */
+const RECHECK_MS = 150;
+
 /**
  * Run `handler` under idempotency. Responses with a 5xx status are NOT stored —
  * the marker is removed so the client's retry runs for real.
@@ -121,21 +124,31 @@ export const withIdempotency = async (
 ): Promise<Response> => {
     const storageKey = await idempotencyStorageKey(options.apiKeyId, options.idempotencyKey);
     const fingerprint = await requestFingerprint(options.method, options.pathAndQuery, options.body);
-    const decision = decideIdempotency(await store.get(storageKey), fingerprint);
+    // What a stored record says about this request: a replay, or a refusal; `undefined` means it may run.
+    const answerFrom = (stored: unknown): Response | undefined => {
+        const decision = decideIdempotency(stored, fingerprint);
 
-    if (decision.kind === "conflict") {
-        throw new PublicApiError("idempotency_conflict", `This \`${IDEMPOTENCY_HEADER}\` was already used for a different request.`);
-    }
+        if (decision.kind === "conflict") {
+            throw new PublicApiError("idempotency_conflict", `This \`${IDEMPOTENCY_HEADER}\` was already used for a different request.`);
+        }
 
-    if (decision.kind === "in_progress") {
-        throw new PublicApiError("idempotency_in_progress", "A request with this idempotency key is still being processed. Retry shortly.");
-    }
+        if (decision.kind === "in_progress") {
+            throw new PublicApiError("idempotency_in_progress", "A request with this idempotency key is still being processed. Retry shortly.");
+        }
 
-    if (decision.kind === "replay") {
-        return new Response(decision.record.body, {
-            headers: { "Content-Type": decision.record.contentType, "Idempotent-Replayed": "true" },
-            status: decision.record.status,
-        });
+        if (decision.kind === "replay") {
+            return new Response(decision.record.body, {
+                headers: { "Content-Type": decision.record.contentType, "Idempotent-Replayed": "true" },
+                status: decision.record.status,
+            });
+        }
+
+        return undefined;
+    };
+    const first = answerFrom(await store.get(storageKey));
+
+    if (first) {
+        return first;
     }
 
     const claim = options.claim?.(storageKey);
@@ -144,6 +157,21 @@ export const withIdempotency = async (
     // no outcome (or one that has not written its marker yet): its work may have happened, and running it again
     // could do it twice.
     if (claim && !(await claim.acquire())) {
+        // Another request holds the key. If it is still running (or already done) its record says so: that is a
+        // retry-shortly, or a replay, not a lost outcome. The winner may not have written its marker yet, so look
+        // twice before calling the outcome unknown.
+        for (const wait of [0, RECHECK_MS]) {
+            await new Promise((resolve) => {
+                setTimeout(resolve, wait);
+            });
+
+            const answered = answerFrom(await store.get(storageKey));
+
+            if (answered) {
+                return answered;
+            }
+        }
+
         throw new PublicApiError(
             "idempotency_outcome_unknown",
             `A request with this \`${IDEMPOTENCY_HEADER}\` is still running, or ended without a recorded result. Check whether it took effect (for a chat, read the thread's messages) before sending it again with a new key.`,
