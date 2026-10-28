@@ -218,6 +218,14 @@ pub fn exit_on_term(pid_file: Option<PathBuf>) -> io::Result<()> {
 
     let (read, write) = (fds[0], fds[1]);
 
+    // Neither end may reach the commands the host starts: a command that wrote to this pipe would stop the host.
+    for fd in [read, write] {
+        // SAFETY: setting a flag on a descriptor opened above.
+        if unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+
     WAKE.store(write, std::sync::atomic::Ordering::Relaxed);
 
     // SAFETY: a zeroed sigaction with a handler and an empty mask is a valid argument.

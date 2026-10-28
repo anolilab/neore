@@ -503,7 +503,7 @@ fn base64_encode_unpadded(bytes: &[u8]) -> String {
 }
 
 /// The keys `ssh-keyscan` reads from the server, without authenticating.
-fn scan_keys(target: &Target) -> Result<Vec<HostKey>, String> {
+fn scan_keys(target: &Target) -> Result<Vec<HostKey>, SshError> {
     let output = Command::new("ssh-keyscan")
         .args([
             "-T",
@@ -518,14 +518,15 @@ fn scan_keys(target: &Target) -> Result<Vec<HostKey>, String> {
         .stdin(Stdio::null())
         .stderr(Stdio::null())
         .output()
-        .map_err(|error| format!("ssh-keyscan could not run: {error}"))?;
+        // This computer cannot run the scanner: waiting will not change that.
+        .map_err(|error| SshError::Other(format!("ssh-keyscan could not run: {error}")))?;
     let keys = parse_keys(&String::from_utf8_lossy(&output.stdout), None);
 
     if keys.is_empty() {
-        return Err(format!(
+        return Err(SshError::Unreachable(format!(
             "{} presented no host key (is it reachable, and is it running an SSH server?)",
             target.label()
-        ));
+        )));
     }
 
     Ok(keys)
@@ -719,7 +720,7 @@ pub(crate) fn check_host_key(
     interact: &dyn Interact,
 ) -> Result<(), SshError> {
     let spec = target.host_spec();
-    let presented = scan_keys(target).map_err(SshError::Unreachable)?;
+    let presented = scan_keys(target)?;
     let pinned = pinned_keys(paths, &spec);
 
     if pinned.is_empty() {
