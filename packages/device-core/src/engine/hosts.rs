@@ -90,6 +90,7 @@ pub struct HostUpgrade {
 struct UpgradeGuard<'a> {
     device_id: String,
     state: &'a DeviceState,
+    target: Target,
 }
 
 impl Drop for UpgradeGuard<'_> {
@@ -99,7 +100,7 @@ impl Drop for UpgradeGuard<'_> {
             .upgrading
             .lock()
             .unwrap()
-            .retain(|(id, _)| *id != self.device_id);
+            .retain(|(id, target)| !(*id == self.device_id && *target == self.target));
     }
 }
 
@@ -594,6 +595,7 @@ impl DeviceState {
         Some(UpgradeGuard {
             device_id: id.to_owned(),
             state: self,
+            target: target.clone(),
         })
     }
 
@@ -1112,15 +1114,20 @@ impl DeviceState {
         let version = link.hello().version.clone();
 
         link.close();
-        link.exit_master();
 
         if version != HOST_VERSION {
+            link.exit_master();
+
             return Err(format!(
                 "the installed host reports version {version}, not {HOST_VERSION}; the old versions were kept"
             ));
         }
 
-        install::prune(&remote, &self.ssh.root)?;
+        // The master stays up for the prune, which would otherwise log in again (and ask for the key's passphrase again).
+        let pruned = install::prune(&remote, &self.ssh.root);
+
+        link.exit_master();
+        pruned?;
         self.emit(Event::Changed);
 
         Ok(HostUpgrade {

@@ -266,12 +266,13 @@ mv -f "$t" "$d/neore-host"
     )
 }
 
-/// Removes the version folders other than `version`, and nothing else: `run/` and `logs/` do not start with a digit.
+/// Removes the version folders other than `version`, and nothing else: `run/` and `logs/` do not start with a digit,
+/// and a digit-named folder without a host binary in it is not an installed version.
 fn prune_script(root: &Root, version: &str) -> String {
     format!(
         r#"set -eu
 for x in "{root}"/[0-9]*; do
-  [ -d "$x" ] || continue
+  [ -f "$x/neore-host" ] || continue
   [ "${{x##*/}}" = "{version}" ] || rm -rf -- "$x"
 done
 "#,
@@ -503,6 +504,40 @@ mod tests {
         let error = bundle.read("x86_64-apple-darwin").unwrap_err();
 
         assert!(error.contains("does not match the checksum"), "{error}");
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn pruning_removes_other_installed_versions_and_leaves_every_other_folder() {
+        let dir = std::env::temp_dir().join(format!("neore-prune-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+
+        for (folder, binary) in [
+            (HOST_VERSION, true),
+            ("0.0.1", true),
+            ("2025-backup", false),
+            ("run", false),
+        ] {
+            fs::create_dir_all(dir.join(folder)).unwrap();
+
+            if binary {
+                fs::write(dir.join(folder).join("neore-host"), b"x").unwrap();
+            }
+        }
+
+        let root = Root::dir(dir.to_str().unwrap()).unwrap();
+        let status = std::process::Command::new("/bin/sh")
+            .args(["-c", &prune_script(&root, HOST_VERSION)])
+            .status()
+            .unwrap();
+
+        assert!(status.success());
+        assert!(dir.join(HOST_VERSION).exists());
+        assert!(!dir.join("0.0.1").exists());
+        assert!(dir.join("2025-backup").exists());
+        assert!(dir.join("run").exists());
 
         let _ = fs::remove_dir_all(dir);
     }
