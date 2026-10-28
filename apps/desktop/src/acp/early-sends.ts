@@ -48,17 +48,6 @@ export class EarlySends {
 
     public constructor(private readonly options: EarlySendsOptions) {}
 
-    /** How many messages wait for a session. */
-    public get size(): number {
-        let total = 0;
-
-        for (const sends of this.held.values()) {
-            total += sends.length;
-        }
-
-        return total;
-    }
-
     /** Sends the message now, or holds it. Throws to refuse one for a session that has ended. */
     public submit(command: { sessionId: string; text: string; turnId: string }, call: AppliedCall): Held | typeof ACCEPTED {
         const { sessionId, text, turnId } = command;
