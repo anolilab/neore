@@ -59,33 +59,34 @@ export interface RecognizerOptions {
     /** What the user is dictating in; `auto` lets the model detect it. Checked here too, since it ends up in the helper's arguments. */
     language: Language;
     modelPath: string;
-    /** The OS the helper runs on: how it hands back its text differs on Windows. */
-    platform?: NodeJS.Platform;
     spawn?: (command: string, args: ReadonlyArray<string>, options: SpawnOptions) => ChildProcess;
     timeoutMs?: number;
 }
 
 /** A segment that is only an annotation (`[BLANK_AUDIO]`, `(music)`, `*applause*`): the model's note about silence, not speech. */
+const TIMESTAMP = /^\[\d+:\d{2}:\d{2}\.\d{3} --> \d+:\d{2}:\d{2}\.\d{3}\]\s*/u;
 const LINE_BREAK = /\r?\n/u;
 const ANNOTATION = /^(?:\[[^\]]*\]|\([^)]*\)|\*[^*]*\*)$/u;
 
 /** One segment per line of the recogniser's output; empty lines and annotations are dropped. */
+
+/**
+ * How the helper is told to put its text on stdout. With `-f -` it has no file name to derive an output from, and upstream's stdin
+ * mode (`-otxt`) opens `/dev/stdout` (the console, `CON`, on Windows). Neither is our pipe: a pipe is a socket here, which cannot be
+ * opened by path, so the helper exits cleanly with no text. An output name that is not `-` makes it print each segment to
+ * stdout itself, one line per segment behind a timestamp (`parseTranscript` strips it), and with no `-o*` format flag no file is
+ * opened under that name. The CI run of the real helper on every OS is what shows this.
+ */
+const OUTPUT_ARGUMENTS = ["-of", "unused"];
+
 export const parseTranscript = (output: string): Transcript => {
     const segments = output
         .split(LINE_BREAK)
-        .map((line) => line.trim())
+        .map((line) => line.replace(TIMESTAMP, "").trim())
         .filter((line) => line !== "" && !ANNOTATION.test(line));
 
     return { segments, text: segments.join(" ") };
 };
-
-/**
- * How the helper is told to put its text on stdout. With `-f -` it has no file name to derive an output from, and upstream's stdin
- * mode (`-otxt`) writes to `/dev/stdout`, or to the console (`CON`) on Windows: not our pipe, so a Windows dictation would always come
- * back empty. There an output name that is not `-` makes the helper print each segment to stdout itself, and with no `-o*`
- * format flag no file is opened under that name. The text then arrives without the line breaks `-otxt` adds between segments.
- */
-const outputArguments = (platform: NodeJS.Platform): string[] => platform === "win32" ? ["-of", "unused"] : ["-otxt"];
 
 const helperEnvironment = (): NodeJS.ProcessEnv => {
     const env: NodeJS.ProcessEnv = {};
@@ -112,7 +113,7 @@ export const startRecognizer = (options: RecognizerOptions): Recognizer => {
     const spawn = options.spawn ?? nodeSpawn;
     const timeoutMs = options.timeoutMs ?? TRANSCRIBE_TIMEOUT_MS;
     // `-l`: the default is English, which would turn other languages into English, so it is always given (`auto` detects).
-    const args = [...options.helper.args, "-m", options.modelPath, "-f", "-", ...outputArguments(options.platform ?? process.platform), "-nt", "-np", "-l", options.language];
+    const args = [...options.helper.args, "-m", options.modelPath, "-f", "-", ...OUTPUT_ARGUMENTS, "-np", "-l", options.language];
     const child = spawn(options.helper.command, args, {
         cwd: options.cwd,
         env: helperEnvironment(),

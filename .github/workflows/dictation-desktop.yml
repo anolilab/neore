@@ -31,8 +31,56 @@ env:
     MODEL_REVISION: "5359861c739e955e79d9a303bcbc70fb988958b1"
 
 jobs:
+    # The Linux helper is built where the release builds it (the oldest runner it ships from, capped at that runner's glibc) and the
+    # test legs below run that binary on the newer runners, so CI tests what ships. Windows builds in its own leg.
+    linux-helper:
+        name: "Speech helper (${{ matrix.os }})"
+        runs-on: "${{ matrix.os }}"
+        timeout-minutes: 60
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: "ubuntu-22.04"
+                      helper: "linux-x64"
+                    - os: "ubuntu-22.04-arm"
+                      helper: "linux-arm64"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            # The script needs Node, git and cmake, all on the image; nothing from the workspace is installed.
+            - name: "Build the speech helper"
+              run: 'node apps/desktop/scripts/build-dictation-helper.mjs --work "$RUNNER_TEMP/whisper.cpp" --max-glibc 2.35'
+
+            - name: "Stage the helper and the spoken clip"
+              env:
+                  HELPER: "${{ matrix.helper }}"
+              run: |
+                  mkdir -p "$RUNNER_TEMP/stage"
+                  cp -R "apps/desktop/helper/$HELPER" "$RUNNER_TEMP/stage/helper"
+                  cp "$RUNNER_TEMP/whisper.cpp/samples/jfk.wav" "$RUNNER_TEMP/stage/jfk.wav"
+
+            - name: "Upload the helper"
+              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              with:
+                  name: "speech-helper-${{ matrix.helper }}"
+                  if-no-files-found: "error"
+                  retention-days: 1
+                  path: "${{ runner.temp }}/stage"
+
     dictation:
         name: "Dictation (${{ matrix.os }})"
+        needs: "linux-helper"
+        # A failed Linux build must not skip the Windows legs; it fails the Linux ones by the missing artifact.
+        if: "${{ !cancelled() }}"
         runs-on: "${{ matrix.os }}"
         timeout-minutes: 90
         strategy:
@@ -125,10 +173,18 @@ jobs:
 
             # On the unsupported leg a failed build must not hide the assertion that settings says "unavailable"; the
             # failed step stays visible, and the helper's own steps below are marked the same way.
-            - name: "Build the speech helper"
+            - name: "Build the speech helper (Windows)"
+              if: "runner.os == 'Windows'"
               continue-on-error: ${{ matrix.expect == 'unsupported' }}
               shell: "bash"
               run: 'pnpm --filter @neore/desktop run build:dictation-helper -- --work "$RUNNER_TEMP/whisper.cpp"'
+
+            - name: "Download the speech helper built on the older runner (Linux)"
+              if: "runner.os == 'Linux'"
+              uses: "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093" # v4.3.0
+              with:
+                  name: "speech-helper-${{ matrix.helper }}"
+                  path: "${{ runner.temp }}/stage"
 
             - name: "Download the models and verify them"
               continue-on-error: ${{ matrix.expect == 'unsupported' }}
@@ -167,6 +223,14 @@ jobs:
               run: |
                   set -euo pipefail
                   native() { if command -v cygpath > /dev/null; then cygpath -m "$1"; else echo "$1"; fi; }
+                  if [[ "$HELPER" == linux-* ]]; then
+                      mkdir -p "apps/desktop/helper"
+                      cp -R "$RUNNER_TEMP/stage/helper" "apps/desktop/helper/$HELPER"
+                      chmod +x "apps/desktop/helper/$HELPER/whisper-cli"
+                      clip="$RUNNER_TEMP/stage/jfk.wav"
+                  else
+                      clip="$RUNNER_TEMP/whisper.cpp/samples/jfk.wav"
+                  fi
                   cli="$PWD/apps/desktop/helper/$HELPER/whisper-cli"
                   if [[ "$HELPER" == win-* ]]; then cli="$cli.exe"; fi
                   entries=""
@@ -175,38 +239,52 @@ jobs:
                   done
                   {
                       echo "NEORE_WHISPER_CLI=$(native "$cli")"
-                      echo "NEORE_WHISPER_CLIP=$(native "$RUNNER_TEMP/whisper.cpp/samples/jfk.wav")"
+                      echo "NEORE_WHISPER_CLIP=$(native "$clip")"
+                      echo "NEORE_WHISPER_TIMINGS=$(native "$RUNNER_TEMP/timings.md")"
                       echo "NEORE_WHISPER_EXPECT=country"
                       echo "NEORE_WHISPER_MODELS=${entries#,}"
                       echo "NEORE_WHISPER_MODEL=$(native "$RUNNER_TEMP/models/ggml-${MODELS%% *}.bin")"
                   } >> "$GITHUB_ENV"
-                  {
-                      echo "### Speech helper: $RUNNER_LABEL"
-                      echo ""
-                      echo "| Platform | Model | Time | Clip | Factor | Budget |"
-                      echo "| --- | --- | --- | --- | --- | --- |"
-                  } >> "$GITHUB_STEP_SUMMARY"
+                  echo "$RUNNER_LABEL" > "$RUNNER_TEMP/runner-label.txt"
 
+            # Not tied to the helper: these use a stand-in, and must run (and pass) wherever the helper could not be built.
             - name: "Unit and integration tests"
+              if: "always()"
               run: "pnpm --filter @neore/desktop exec vitest run src/dictation --exclude src/dictation/real-helper.test.ts"
 
             # The helper alone: the same arguments the app gives it, a spoken clip in, its text out, and the time it took.
             - name: "The real helper on a spoken clip"
+              if: "always()"
               continue-on-error: ${{ matrix.expect == 'unsupported' }}
               run: "pnpm --filter @neore/desktop exec vitest run src/dictation/real-helper.test.ts"
 
             - name: "End-to-end tests (supported platform)"
-              if: "matrix.expect == 'supported' && runner.os != 'Linux'"
+              if: "always() && matrix.expect == 'supported' && runner.os != 'Linux'"
               run: 'pnpm --filter @neore/desktop exec playwright test e2e/dictation.spec.ts --grep-invert "unsupported platform"'
 
             # No display on the runner: Xvfb gives Electron one.
             - name: "End-to-end tests (supported platform, Linux)"
-              if: "matrix.expect == 'supported' && runner.os == 'Linux'"
+              if: "always() && matrix.expect == 'supported' && runner.os == 'Linux'"
               run: 'xvfb-run -a pnpm --filter @neore/desktop exec playwright test e2e/dictation.spec.ts --grep-invert "unsupported platform"'
 
             - name: "End-to-end test: an unsupported platform says so (Windows on ARM)"
-              if: "matrix.expect == 'unsupported'"
+              if: "always() && matrix.expect == 'unsupported'"
               run: 'pnpm --filter @neore/desktop exec playwright test e2e/dictation.spec.ts --grep "unsupported platform"'
+
+            # The leg is not green without a measurement of the default model, even where the steps above are allowed to fail
+            # (Windows on ARM): the numbers are what decides whether that platform is offered.
+            - name: "Record the measurement and require one"
+              if: "always()"
+              shell: "bash"
+              run: |
+                  {
+                      echo "### Speech helper: $(cat "$RUNNER_TEMP/runner-label.txt" 2>/dev/null || echo unknown)"
+                      echo ""
+                      echo "| Platform | Model | Time | Clip | Factor | Budget |"
+                      echo "| --- | --- | --- | --- | --- | --- |"
+                      cat "$RUNNER_TEMP/timings.md" 2>/dev/null || true
+                  } >> "$GITHUB_STEP_SUMMARY"
+                  grep -q "| small |" "$RUNNER_TEMP/timings.md"
 
             - name: "Upload the Playwright results"
               if: "failure()"

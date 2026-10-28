@@ -10,8 +10,13 @@
 // start-up check is skipped). `--max-glibc` fails a Linux build that needs a newer glibc than that: the release
 // builds on the oldest runner it ships from, so a helper that links against a newer one never reaches users.
 //
-// Needs git, cmake and a C++ toolchain; Windows on arm64 needs the "C++ Clang tools for Windows" component (clang-cl). The same pin is used by the benchmark in
-// plans/desktop-dictation.md (Appendix A), so the shipped build is the one that was measured.
+// Needs git, cmake and a C++ toolchain; Windows on arm64 needs the "C++ Clang tools for Windows" component (clang-cl).
+// The same pin is used by the benchmark in plans/desktop-dictation.md (Appendix A), so the shipped build is the one that was measured.
+//
+// CPU floor. `GGML_NATIVE=OFF` stops ggml tuning for the build machine, but on x64 it still enables the AVX2 family
+// (AVX2, FMA, F16C, BMI2), so a CPU older than Haswell (2013) or an AMD one older than Excavator dies with SIGILL at
+// start; dictation reports that as a helper error. ARM builds target armv8.2-a with half-precision and dot-product
+// instructions (Cortex-A75 and later). Nothing detects an older CPU at run time; the plan lists both floors.
 import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
@@ -113,6 +118,43 @@ const peImports = (file) => {
     return names;
 };
 
+/**
+ * The CMake generator for the Visual Studio this machine has: the runner images move on (VS 2022, then 2026), and CMake only knows a
+ * generator by a name that carries the version, so a fixed one stops working the day the image changes.
+ */
+const visualStudioGenerator = () => {
+    if (process.env.NEORE_CMAKE_GENERATOR !== undefined) {
+        return process.env.NEORE_CMAKE_GENERATOR;
+    }
+
+    const vswhere = path.join(process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", "Microsoft Visual Studio", "Installer", "vswhere.exe");
+    const version = existsSync(vswhere)
+        ? execFileSync(
+              vswhere,
+              [
+                  "-latest",
+                  "-prerelease",
+                  "-products",
+                  "*",
+                  "-requires",
+                  "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                  "-property",
+                  "installationVersion",
+              ],
+              { encoding: "utf8" },
+          ).trim()
+        : "";
+    const generator = { 17: "Visual Studio 17 2022", 18: "Visual Studio 18 2026" }[Number.parseInt(version, 10)];
+
+    if (generator === undefined) {
+        throw new Error(`no Visual Studio with the C++ tools was found (vswhere reported "${version}"); set NEORE_CMAKE_GENERATOR`);
+    }
+
+    process.stdout.write(`using the ${generator} generator\n`);
+
+    return generator;
+};
+
 const flags = [
     "-DCMAKE_BUILD_TYPE=Release",
     // One file to ship and sign: no libwhisper/libggml next to it.
@@ -153,7 +195,7 @@ if (process.platform === "win32") {
     // ggml refuses to build for ARM with MSVC unless it may tune for the build machine (`GGML_NATIVE=ON`), which this build never
     // does: arm64 goes through clang-cl, which takes the baseline above. x64 builds with MSVC proper. The architecture and the
     // toolset are options of the Visual Studio generator, so no developer prompt has to be open.
-    flags.push("-G", process.env.NEORE_CMAKE_GENERATOR ?? "Visual Studio 17 2022", "-A", targetArch === "arm64" ? "ARM64" : "x64");
+    flags.push("-G", visualStudioGenerator(), "-A", targetArch === "arm64" ? "ARM64" : "x64");
 
     if (targetArch === "arm64") {
         flags.push("-T", "ClangCL");

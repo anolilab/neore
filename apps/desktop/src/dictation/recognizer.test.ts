@@ -45,6 +45,14 @@ describe("parseTranscript", () => {
         expect(parseTranscript("Call me (maybe) tomorrow.").text).toBe("Call me (maybe) tomorrow.");
     });
 
+    it("drops the timestamp the helper prints before each segment", () => {
+        expect(parseTranscript("\n[00:00:00.000 --> 00:00:03.500]   Hello there.\n[00:00:03.500 --> 00:00:05.000]   And more.\n")).toStrictEqual({
+            segments: ["Hello there.", "And more."],
+            text: "Hello there. And more.",
+        });
+        expect(parseTranscript("[00:00:00.000 --> 00:00:30.000]   [BLANK_AUDIO]\n").text).toBe("");
+    });
+
     it("keeps multi-byte text intact", () => {
         expect(parseTranscript("こんにちは、世界。\n").text).toBe("こんにちは、世界。");
     });
@@ -105,7 +113,7 @@ describe("startRecognizer", () => {
         expect(started).toBe(false);
     });
 
-    const argumentsSeen = async (platform: NodeJS.Platform): Promise<string[]> => {
+    it("tells the helper to detect the language, to print its text itself and to write nothing to disk", async () => {
         const seen: string[] = [];
         const { spawn } = await import("node:child_process");
 
@@ -114,7 +122,6 @@ describe("startRecognizer", () => {
             helper,
             language: "auto",
             modelPath: model,
-            platform,
             spawn: (command, args, options) => {
                 seen.push(...args);
 
@@ -122,22 +129,8 @@ describe("startRecognizer", () => {
             },
         }).transcribe(pcm(100));
 
-        return seen;
-    };
-
-    it("tells the helper to detect the language and to write nothing to disk", async () => {
-        for (const platform of ["darwin", "linux"] as const) {
-            const seen = await argumentsSeen(platform);
-
-            expect(seen.slice(seen.indexOf("-m"))).toStrictEqual(["-m", model, "-f", "-", "-otxt", "-nt", "-np", "-l", "auto"]);
-            expect(seen.filter((argument) => argument.startsWith("-o") && argument !== "-otxt")).toStrictEqual([]);
-        }
-    });
-
-    it("on Windows gets the text from the helper's own printing, not from `-otxt`, which would go to the console", async () => {
-        const seen = await argumentsSeen("win32");
-
-        expect(seen.slice(seen.indexOf("-m"))).toStrictEqual(["-m", model, "-f", "-", "-of", "unused", "-nt", "-np", "-l", "auto"]);
+        // `-otxt` would write to `/dev/stdout` (the console on Windows), which a pipe cannot be opened as: no text would come back.
+        expect(seen.slice(seen.indexOf("-m"))).toStrictEqual(["-m", model, "-f", "-", "-of", "unused", "-np", "-l", "auto"]);
         // No output format at all: with a name that is not `-`, nothing is opened for writing.
         expect(seen.filter((argument) => OUTPUT_FORMAT.test(argument))).toStrictEqual([]);
     });

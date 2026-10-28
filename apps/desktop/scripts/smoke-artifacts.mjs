@@ -74,7 +74,9 @@ for (const dir of unpacked) {
 // The dictation helper (`scripts/build-dictation-helper.mjs`) sits next to `app.asar.unpacked`, outside the asar, with its licence
 // texts: one folder for each arch the helper was built for. Where none was built (Windows on ARM is not offered), none is packed.
 const helperRoot = path.join(fileURLToPath(new URL("..", import.meta.url)), "helper");
-const built = existsSync(helperRoot) ? readdirSync(helperRoot).length : 0;
+// Only a folder that holds a helper counts: an empty `<os>-<arch>` left by an earlier run packs nothing.
+const hasHelper = (dir) => existsSync(path.join(dir, "whisper-cli")) || existsSync(path.join(dir, "whisper-cli.exe"));
+const built = existsSync(helperRoot) ? readdirSync(helperRoot).filter((name) => hasHelper(path.join(helperRoot, name))).length : 0;
 const packedHelpers = unpacked.map((dir) => path.join(path.dirname(dir), "dictation")).filter((dir) => existsSync(dir));
 
 if (packedHelpers.length !== built) {
