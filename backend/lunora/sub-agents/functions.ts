@@ -927,7 +927,9 @@ export const cancelSubAgentRunsForStop = async (ctx: MutationCtx, threadId: stri
     } else {
         // A stopped parent takes the whole tree down: what a cancelled run delegated
         // would otherwise keep billing and post back into a thread nobody waits on.
-        let level = await activeRunsOf(threadId);
+        // Not what a person typed into a worker's own thread (those carry a client id): only a Stop there ends them.
+        const topLevel = await activeRunsOf(threadId);
+        let level = topLevel.filter((run) => run.mode !== "worker" || run.clientId === undefined);
 
         while (level.length > 0 && targets.length < CANCEL_THREAD_MAX) {
             targets.push(...level);

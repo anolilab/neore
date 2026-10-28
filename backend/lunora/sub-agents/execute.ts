@@ -85,6 +85,7 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             // grant is withheld, so a default `ask` removes the tool there.
             ...(canNest(claim.depth) && { approvedTools: [SUB_AGENT_TOOL_NAME] }),
             beforeThread: assertCanRun,
+            keepThreadStatus: worker !== undefined,
             memory: false,
             model,
             onThread: async (childThreadId) => {

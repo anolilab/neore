@@ -375,6 +375,27 @@ describe("archiving a worker", () => {
     });
 });
 
+describe("a Stop in the lead", () => {
+    it("ends the lead's dispatches but not a message a person typed into a worker's thread", async () => {
+        const dispatched = await create({ name: "A", toolCallId: "call-a" });
+        const other = await create({ name: "B", toolCallId: "call-b" });
+
+        await claim(other.run._id);
+        await finish(other.run._id);
+
+        // A person types into B; the lead's own dispatch to A is still queued.
+        const typed = (await dispatch({ childThreadId: other.run.childThreadId, clientId: "typed-1" })) as { run: { _id: string } };
+
+        await claim(typed.run._id);
+        await harness.run(async (ctx: any) => await cancelSubAgentRunsForStop(ctx, leadId, userId));
+
+        const all = await runs();
+
+        expect(all.find((run) => run._id === typed.run._id)).toMatchObject({ status: "running" });
+        expect(all.find((run) => run._id === dispatched.run._id)).toMatchObject({ status: "cancelled" });
+    });
+});
+
 describe("a Stop in a worker's thread", () => {
     it("cancels its active run, not an older finished one", async () => {
         const first = await create();

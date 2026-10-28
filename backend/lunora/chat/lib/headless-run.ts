@@ -67,6 +67,8 @@ export interface HeadlessRunOptions {
     beforeThread?: () => Promise<void>;
     /** The bot the run is for: its memories are read and written in that bot's scope. Unset = the user's own. */
     botId?: string;
+    /** Leave an existing thread's status as it is, instead of marking it active when the run ends. */
+    keepThreadStatus?: boolean;
     /** A step cap for a quick reply. Default: Deep Work's budget, with context compression between steps. */
     maxSteps?: number;
     /** Retrieve memories before, and extract them after. */
@@ -239,8 +241,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
         const text = result.text ?? "";
 
         await ctx.runMutation(internal.agent.threads.updateThread, {
-            // An existing thread keeps its status: a worker archived mid-run stays archived.
-            patch: { ...(existingThreadId === undefined && { status: "active" as const }), updatedAt: Date.now() },
+            // A worker archived mid-run stays archived; every other run brings its thread back to active.
+            patch: { ...(!options.keepThreadStatus && { status: "active" as const }), updatedAt: Date.now() },
             threadId: threadId as Id<"threads">,
         });
 
