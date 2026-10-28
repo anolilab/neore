@@ -426,7 +426,13 @@ describe("servers over SSH", () => {
         expect(core.hostForgetKey).toHaveBeenCalledWith("host-1");
         expect(core.hostRemove).toHaveBeenCalledWith("host-1");
         expect(core.hostDisconnect).toHaveBeenCalledWith("host-1");
-        expect(core.hostConnect).toHaveBeenCalledWith("host-1");
+        expect(core.hostConnect).toHaveBeenCalledWith("host-1", true);
+    });
+
+    it("let only the device window's Retry start the reconnect attempts over", async () => {
+        await invoke(DEVICE_CHANNEL.hostConnect, siteEvent(), "host-1");
+
+        expect(core.hostConnect).toHaveBeenLastCalledWith("host-1", false);
     });
 });
 

@@ -1,7 +1,8 @@
 //! The headless host the desktop drives over a pipe (`device_core::host`). Started as
-//! `neore-host --stdio [--launch <id>]`; it opens no listener, and stdout carries frames only.
+//! `neore-host --stdio [--launch <id> [--desktop <tag>]]`; it opens no listener, and stdout carries frames only.
 //!
-//! `--launch` names this run so the desktop that started it can stop it later (`device_core::launch`).
+//! `--launch` names this run so the desktop that started it can stop it later, and `--desktop` names that desktop
+//! for the agent socket link (`device_core::launch`).
 
 use std::io;
 use std::process::ExitCode;
@@ -11,7 +12,7 @@ use device_core::launch::{self, Launch};
 fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);
     let usage = || {
-        eprintln!("usage: neore-host --stdio [--launch <id>]");
+        eprintln!("usage: neore-host --stdio [--launch <id> [--desktop <tag>]]");
 
         ExitCode::from(2)
     };
@@ -28,6 +29,14 @@ fn main() -> ExitCode {
         },
         Some(_) => return usage(),
     };
+    let desktop = match (launch_id.as_ref(), args.next().as_deref()) {
+        (_, None) => None,
+        (Some(_), Some("--desktop")) => match args.next() {
+            Some(tag) if launch::is_desktop_tag(&tag) => Some(tag),
+            _ => return usage(),
+        },
+        _ => return usage(),
+    };
 
     if args.next().is_some() {
         return usage();
@@ -43,8 +52,10 @@ fn main() -> ExitCode {
         let dir = launch::run_dir()?;
 
         #[cfg(unix)]
-        if let Err(error) = launch::stabilise_agent_socket(&dir) {
-            eprintln!("neore-host: the agent socket could not be linked: {error}");
+        if let Some(tag) = &desktop {
+            if let Err(error) = launch::stabilise_agent_socket(&dir, tag) {
+                eprintln!("neore-host: the agent socket could not be linked: {error}");
+            }
         }
 
         match Launch::register(id, &dir) {
@@ -59,6 +70,13 @@ fn main() -> ExitCode {
             }
         }
     });
+
+    #[cfg(unix)]
+    if let Err(error) = launch::exit_on_term(launch.as_ref().map(|launch| launch.path().to_owned()))
+    {
+        eprintln!("neore-host: SIGTERM is not handled: {error}");
+    }
+
     let served =
         device_core::host::serve_launch(io::stdin().lock(), io::stdout(), launch_id.as_deref());
 

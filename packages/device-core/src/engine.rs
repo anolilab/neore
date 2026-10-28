@@ -108,7 +108,7 @@ struct SshState {
     /// Live connections by the server's device id.
     connections: Mutex<HashMap<String, Arc<dyn HostLink>>>,
     /// The servers (by device id) with a connection attempt running: at most one each, the person's or the keeper's.
-    attempting: Mutex<HashSet<String>>,
+    attempting: Arc<Mutex<HashSet<String>>>,
     /// The servers the person connected and has not disconnected, with where their reconnecting stands.
     keeps: Mutex<HashMap<String, crate::lifecycle::Keep>>,
     /// The launches of `neore-host` this computer started on each server, so the next session can stop the ones a
@@ -160,7 +160,7 @@ impl DeviceState {
             sink: Arc::from(sink),
             ssh: SshState {
                 binary: binary.to_owned(),
-                attempting: Mutex::default(),
+                attempting: Arc::default(),
                 bundle: Err("this build ships no host software".to_owned()),
                 changed_prompts: Arc::default(),
                 keeps: Mutex::default(),

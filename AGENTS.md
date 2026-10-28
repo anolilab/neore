@@ -665,15 +665,19 @@ written here is what is not.
   up (exit 255 or unknown: the network went away and the master may be wedged; a host that merely ended leaves a healthy
   master to share), then retries with 2/4/8/16/32 s waits, at most 5 attempts per 10 minutes, one attempt per server at a
   time and 45 s each. A background attempt asks NOBODY (no passphrase, no trust prompt): a login that needs a person, a
-  changed key or a missing install stops the retrying at once and waits for "Retry", which is the ordinary `hostConnect`.
+  changed key, a missing or outdated install (exit 2) stops the retrying at once and waits for "Retry", which is the
+  ordinary `hostConnect`; only the local window's Retry (`retry: true`) starts the attempts over, a page's connect
+  counts as one more attempt of the window and is refused once it is full.
   The host is started `--stdio --launch <id>`, files `<run>/<id>.pid` and removes it on exit; a lost connection leaves it
   running until the server notices, so the next session sends a `reap` frame naming the launches THIS computer started
-  (kept in memory per server). The host stops an id only after its pid's command line carries `--launch <id>`; any other
+  (kept in memory per server). The host stops an id only after its program is `neore-host` and its arguments carry
+  `--launch <id>` (through a pidfd on Linux); SIGTERM makes a host kill every command's process group before it exits
+  (`shell::kill_running`), since only the host's thread enforces a command's timeout. Any other
   host (another computer's, one from before a restart) is counted and left alone. The run folder is `~/.neore/host/run`
   (tests: `NEORE_HOST_RUN_DIR`, which `env -i` keeps out of a real launch). Forwarded agent: the host links the session's
-  `SSH_AUTH_SOCK` from `<run>/agent.sock` and its children inherit that path. `ssh::MULTIPLEXING` is false on Windows (one
-  ssh process per server, said in the window); whether Win32 OpenSSH could multiplex is recorded by the CI step
-  `Measure ssh ControlMaster (Windows)`, not assumed.
+  `SSH_AUTH_SOCK` from `<run>/agent-<desktop tag>.sock` and its children inherit that path. `ssh::MULTIPLEXING` is a fixed
+  `false` on Windows (one ssh process per server, said in the window), not a measurement; the CI step
+  `Measure ssh ControlMaster (Windows)` records whether Win32 OpenSSH could multiplex and fails when it cannot say.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay

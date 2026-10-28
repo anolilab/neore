@@ -73,7 +73,7 @@ export interface HostView {
     deviceId: string;
     forwardAgent: boolean;
     identityFile: string | null;
-    /** False where this computer's ssh cannot share a connection (Windows): the server has an ssh process of its own. */
+    /** False where Neore does not share one connection between sessions (Windows): the server has an ssh process of its own. */
     multiplexed: boolean;
     name: string;
     platform: string | null;
@@ -153,7 +153,7 @@ export interface DeviceCore {
     auditTail: () => string[];
     denyPrompts: () => void;
     execute: (envelope: string, signature: string) => Promise<string>;
-    hostConnect: (deviceId: string) => Promise<string>;
+    hostConnect: (deviceId: string, retry: boolean) => Promise<string>;
     hostDisconnect: (deviceId: string) => void;
     hostForgetKey: (deviceId: string) => void;
     hostPair: (spec: string, deviceId: string, secret: string) => Promise<boolean>;

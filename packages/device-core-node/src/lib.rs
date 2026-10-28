@@ -207,17 +207,20 @@ impl DeviceCore {
         })
     }
 
-    /// Connects a paired server, or tries again once reconnecting gave up; from then on a lost link is retried in the background. Resolves what the server reported (JSON).
+    /// Connects a paired server, or tries again once reconnecting gave up; from then on a lost link is retried in
+    /// the background. `retry` is the Retry of the local window and starts the attempts over; a page's connect
+    /// counts as one more attempt of the window. Resolves what the server reported (JSON).
     #[napi]
     pub fn host_connect<'env>(
         &self,
         env: &'env Env,
         device_id: String,
+        retry: bool,
     ) -> Result<PromiseRaw<'env, String>> {
         let state = Arc::clone(&self.state);
 
         blocking(env, move || {
-            let probe = state.host_connect(&device_id)?;
+            let probe = state.host_connect(&device_id, retry)?;
 
             serde_json::to_string(&probe).map_err(|error| error.to_string())
         })

@@ -55,8 +55,9 @@ const KEY_TYPES: [&str; 5] = [
     "ssh-rsa",
 ];
 
-/// Whether this computer's `ssh` can share one connection between sessions (`ControlMaster`). Windows' OpenSSH
-/// has no Unix sockets to multiplex over, so a server there gets one ssh process of its own and the window says so.
+/// Whether Neore shares one connection between sessions (`ControlMaster`). It does not on Windows: whether Win32
+/// OpenSSH could is not known yet (the CI step "Measure ssh ControlMaster (Windows)" records it), so a server there
+/// gets one ssh process of its own and the window says so.
 pub const MULTIPLEXING: bool = cfg!(unix);
 
 #[cfg(unix)]
@@ -160,6 +161,39 @@ impl SshPaths {
             control_dir,
             known_hosts: root.join("known_hosts"),
         }
+    }
+
+    /// A name for this installation, drawn once and kept beside the pinned keys: it tells apart the agent sockets of
+    /// two desktops that use one account on a server.
+    pub fn desktop_tag(&self) -> io::Result<String> {
+        let file = self
+            .known_hosts
+            .parent()
+            .map_or_else(|| PathBuf::from("desktop-id"), |dir| dir.join("desktop-id"));
+
+        if let Some(tag) = fs::read_to_string(&file)
+            .ok()
+            .map(|text| text.trim().to_owned())
+            .filter(|tag| crate::launch::is_desktop_tag(tag))
+        {
+            return Ok(tag);
+        }
+
+        let tag = crate::install::desktop_tag();
+
+        if let Some(dir) = file.parent() {
+            private_dir(dir)?;
+        }
+
+        fs::write(&file, format!("{tag}\n"))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            fs::set_permissions(&file, fs::Permissions::from_mode(0o600))?;
+        }
+
+        Ok(tag)
     }
 
     /// Creates the directories (0700) and checks the control path fits a socket.
@@ -376,18 +410,24 @@ pub fn control_args(target: &Target, paths: &SshPaths, operation: &str) -> Vec<S
 
 /// The command the server's shell runs: a clean environment (no `SSH_AUTH_SOCK` unless forwarding is on, no
 /// inherited variable of any kind) and the host binary, named `launch` (see `launch.rs`). `binary` is trusted text;
-/// production passes [`default_binary`]. `launch` is a [`crate::launch::is_launch_id`].
-pub fn remote_command(forward_agent: bool, binary: &str, launch: &str) -> String {
+/// production passes [`default_binary`]. `launch` is a [`crate::launch::is_launch_id`]. With forwarding on, `desktop`
+/// (a [`crate::launch::is_desktop_tag`]) names this computer, so the host links the agent socket under a name no other
+/// desktop's launch shares.
+pub fn remote_command(forward_agent: bool, binary: &str, launch: &str, desktop: &str) -> String {
     debug_assert!(crate::launch::is_launch_id(launch));
+    debug_assert!(crate::launch::is_desktop_tag(desktop));
 
-    let agent = if forward_agent {
-        " SSH_AUTH_SOCK=\"$SSH_AUTH_SOCK\""
+    let (agent, tag) = if forward_agent {
+        (
+            " SSH_AUTH_SOCK=\"$SSH_AUTH_SOCK\"",
+            format!(" --desktop {desktop}"),
+        )
     } else {
-        ""
+        ("", String::new())
     };
 
     format!(
-        "exec env -i HOME=\"$HOME\" PATH=/usr/bin:/bin LANG=C.UTF-8{agent} {binary} --stdio --launch {launch}"
+        "exec env -i HOME=\"$HOME\" PATH=/usr/bin:/bin LANG=C.UTF-8{agent} {binary} --stdio --launch {launch}{tag}"
     )
 }
 
@@ -601,6 +641,11 @@ pub enum SshError {
     HostMissing {
         target: String,
     },
+    /// The host refused how it was started (exit status 2, its usage error): the binary there is older than
+    /// this app expects although it sits under the same version.
+    HostOutdated {
+        target: String,
+    },
     /// The server could not be reached or did not answer: worth another try later.
     Unreachable(String),
     Other(String),
@@ -637,6 +682,10 @@ impl fmt::Display for SshError {
                 presented.join(", ")
             ),
             SshError::HostKeyDeclined => f.write_str("the server's host key was not trusted"),
+            SshError::HostOutdated { target } => write!(
+                f,
+                "neore-host on {target} did not understand how it was started: the software there is out of date. Reinstall the host software from the server's settings (\"Install host software\")."
+            ),
             SshError::HostMissing { target } => write!(
                 f,
                 "neore-host {HOST_VERSION} is not installed on {target}. Install it from the server's settings (\"Install host software\")."
@@ -967,11 +1016,19 @@ impl HostConnection {
         check_host_key(target, paths, interact.as_ref())?;
 
         let launch_id = crate::install::launch_id();
+        let desktop_tag = paths.desktop_tag().map_err(|error| {
+            SshError::Other(format!("the install id could not be read: {error}"))
+        })?;
         let mut command = Command::new("ssh");
 
         command
             .args(ssh_args(target, paths))
-            .arg(remote_command(target.forward_agent, binary, &launch_id))
+            .arg(remote_command(
+                target.forward_agent,
+                binary,
+                &launch_id,
+                &desktop_tag,
+            ))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -1086,15 +1143,23 @@ impl HostConnection {
                 )));
             }
             Err(reason) => {
-                let missing = exited_with(&mut child, 127);
+                let code = exit_code_within(&mut child);
 
                 let _ = child.kill();
                 let _ = child.wait();
 
-                if missing {
-                    return Err(SshError::HostMissing {
-                        target: target.label(),
-                    });
+                match code {
+                    Some(127) => {
+                        return Err(SshError::HostMissing {
+                            target: target.label(),
+                        })
+                    }
+                    Some(2) => {
+                        return Err(SshError::HostOutdated {
+                            target: target.label(),
+                        })
+                    }
+                    _ => {}
                 }
 
                 return Err(SshError::from_connect_failure(explain(
@@ -1266,17 +1331,18 @@ fn route(pending: &Pending, frame: &[u8]) {
     let _ = sender.send(reply);
 }
 
-/// Whether `child` ends with `code` within a moment: a shell reports a command it cannot find as 127.
-fn exited_with(child: &mut Child, code: i32) -> bool {
+/// How `child` ended, if it does within a moment: a shell reports a command it cannot find as 127, and the host
+/// reports a command line it does not understand as 2.
+fn exit_code_within(child: &mut Child) -> Option<i32> {
     for _ in 0..20 {
         if let Ok(Some(status)) = child.try_wait() {
-            return status.code() == Some(code);
+            return status.code();
         }
 
         thread::sleep(Duration::from_millis(100));
     }
 
-    false
+    None
 }
 
 /// The most of a remote command's stdout or stderr that is kept; a server cannot make this computer hold more.
@@ -1636,14 +1702,19 @@ mod tests {
     #[test]
     fn the_remote_command_starts_from_an_empty_environment() {
         let launch = "0123456789abcdef0123456789abcdef";
-        let command = remote_command(false, &default_binary(), launch);
+        let desktop = "0123456789abcdef";
+        let command = remote_command(false, &default_binary(), launch, desktop);
 
         assert_eq!(
             command,
             format!("exec env -i HOME=\"$HOME\" PATH=/usr/bin:/bin LANG=C.UTF-8 \"$HOME/.neore/host/{HOST_VERSION}/neore-host\" --stdio --launch {launch}")
         );
         assert!(!command.contains("SSH_AUTH_SOCK"));
-        assert!(remote_command(true, "x", launch).contains("SSH_AUTH_SOCK=\"$SSH_AUTH_SOCK\""));
+
+        let forwarding = remote_command(true, "x", launch, desktop);
+
+        assert!(forwarding.contains("SSH_AUTH_SOCK=\"$SSH_AUTH_SOCK\""));
+        assert!(forwarding.ends_with(&format!("--launch {launch} --desktop {desktop}")));
     }
 
     #[test]
