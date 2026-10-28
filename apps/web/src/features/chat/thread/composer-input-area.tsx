@@ -15,6 +15,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import type { FollowUpControl } from "@neore/ai/capabilities";
 import { buttonVariants } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import { Separator } from "@neore/ui/components/separator";
@@ -62,6 +63,12 @@ interface ComposerInputAreaProps {
     customVariables?: PromptVariable[];
     /** Whether input is disabled */
     disabled?: boolean;
+
+    /**
+     * How the runner takes a message sent while it works (`followUpControl`). Only a steer
+     * shows the button; omitted, it reads as "none", so a runner that did not say hides it.
+     */
+    followUp?: FollowUpControl;
     /** Whether a recalled prompt is showing, see `ComposerTiptapEditor` */
     isHistoryRecalled?: () => boolean;
     /** Whether streaming is active (shows stop button) */
@@ -122,6 +129,7 @@ const ComposerInputArea = ({
     compact = false,
     customVariables,
     disabled = false,
+    followUp = "none",
     isStreaming = false,
     isUploading = false,
     maxRows = 5,
@@ -283,12 +291,12 @@ const ComposerInputArea = ({
                     survive when transcribed text makes the input non-empty. */}
                 {isStreaming ? (
                     <>
-                        {onSteer && !isEmpty && !isUploading && (
+                        {onSteer && (followUp === "steer" || followUp === "steer-restart") && !isEmpty && !isUploading && (
                             <Tooltip>
                                 <TooltipTrigger
                                     render={
                                         <button
-                                            aria-label={t`Steer the reply`}
+                                            aria-label={followUp === "steer-restart" ? t`Interrupt and restart` : t`Steer the reply`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "outline" }),
                                                 "my-2 size-[34px]",
@@ -302,7 +310,11 @@ const ComposerInputArea = ({
                                         </button>
                                     }
                                 />
-                                <TooltipContent side="bottom">{t`Steer — the current reply reads this at its next step`}</TooltipContent>
+                                <TooltipContent side="bottom">
+                                    {followUp === "steer-restart"
+                                        ? t`Interrupt and restart — stops the current reply and sends this`
+                                        : t`Steer — the current reply reads this at its next step`}
+                                </TooltipContent>
                             </Tooltip>
                         )}
                         {canQueueWhileStreaming && (!isEmpty || isUploading) && (
