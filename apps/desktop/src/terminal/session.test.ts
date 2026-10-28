@@ -144,6 +144,30 @@ describe("a running session", () => {
         expect(hangUp).not.toHaveBeenCalled();
     });
 
+    it("on Windows, does not hang up again after a closed tab's host stopped the shell itself", async () => {
+        const platform = asPlatform("win32");
+        const { host, session } = await started();
+
+        session.kill();
+        host.stop();
+        platform.mockRestore();
+
+        expect(hangUp).not.toHaveBeenCalled();
+    });
+
+    it("on Windows, hangs the shell up once when the host does not stop in time", async () => {
+        const platform = asPlatform("win32");
+        const { host, session } = await started();
+
+        session.kill();
+        await vi.advanceTimersByTimeAsync(2500);
+        platform.mockRestore();
+
+        expect(host.handle.kill).toHaveBeenCalledTimes(1);
+        expect(hangUp).toHaveBeenCalledTimes(1);
+        expect(hangUp).toHaveBeenCalledWith(4242);
+    });
+
     it("ignores input and output after the end", async () => {
         const { host, onData, session } = await started();
 

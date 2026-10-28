@@ -100,8 +100,17 @@ export const startSession = (options: SessionOptions): Promise<TerminalSession> 
                     return;
                 }
 
+                // The host ends the shell itself on `kill`, so its exit must not send a second hang-up to a pid that may be
+                // reused by then. Only a host that does not stop in time leaves the hang-up to us, while the pid is still the shell's.
+                hungUp = true;
                 host.post({ type: "kill" });
-                forceTimer ??= setTimeout(() => host.kill(), FORCE_KILL_MS);
+                forceTimer ??= setTimeout(() => {
+                    if (!ended && process.platform === "win32") {
+                        hangUp(pid);
+                    }
+
+                    host.kill();
+                }, FORCE_KILL_MS);
                 forceTimer.unref();
             },
             killNow: () => {
@@ -170,7 +179,7 @@ export const startSession = (options: SessionOptions): Promise<TerminalSession> 
         });
         host.onExit(() => {
             // A POSIX shell hangs up when its pty closes with the host; a Windows one is left running by a host that died.
-            // `killNow` has already hung it up, and its pid may belong to another process by now.
+            // After `kill` or `killNow` the shell has already been hung up, and its pid may belong to another process by now.
             if (started && !ended && !hungUp && process.platform === "win32") {
                 hangUp(pid);
             }
