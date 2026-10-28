@@ -27,7 +27,10 @@ export const collectAcpSessionsForExport = internalQuery
                     capabilities: v.optional(vCapabilityReport),
                     createdAt: v.number(),
                     folderLabel: v.string(),
+                    importedTurns: v.optional(v.number()),
+                    importState: v.optional(v.union(v.literal("importing"), v.literal("done"))),
                     lastEventAt: v.optional(v.number()),
+                    nativeSessionId: v.optional(v.string()),
                     status: vAcpSessionStatus,
                     threadId: v.string(),
                 }),
@@ -39,18 +42,35 @@ export const collectAcpSessionsForExport = internalQuery
 
         return {
             // Labels and times only: no device id, no path ever reaches the backend.
-            sessions: page.map(({ agentKey, agentLabel, capabilities, createdAt, folderLabel, lastEventAt, status, threadId }) => {
-                return {
+            sessions: page.map(
+                ({
                     agentKey,
                     agentLabel,
+                    capabilities,
                     createdAt,
                     folderLabel,
+                    importedTurns,
+                    importState,
+                    lastEventAt,
+                    nativeSessionId,
                     status,
-                    threadId: threadId as string,
-                    ...(capabilities !== undefined && { capabilities }),
-                    ...(lastEventAt !== undefined && { lastEventAt }),
-                };
-            }),
+                    threadId,
+                }) => {
+                    return {
+                        agentKey,
+                        agentLabel,
+                        createdAt,
+                        folderLabel,
+                        status,
+                        threadId: threadId as string,
+                        ...(capabilities !== undefined && { capabilities }),
+                        ...(importedTurns !== undefined && { importedTurns }),
+                        ...(importState !== undefined && { importState }),
+                        ...(lastEventAt !== undefined && { lastEventAt }),
+                        ...(nativeSessionId !== undefined && { nativeSessionId }),
+                    };
+                },
+            ),
         };
     });
 

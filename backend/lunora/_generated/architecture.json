@@ -11,6 +11,11 @@
       "to": "function:acp_calls:checkAcpCall"
     },
     {
+      "from": "function:acp_functions:deleteSessionsOfThread",
+      "kind": "write",
+      "to": "table:acpSessions"
+    },
+    {
       "from": "function:acp_gdpr:deleteUserAcpSessions",
       "kind": "write",
       "to": "table:acpSessions"
@@ -2089,6 +2094,11 @@
       "from": "function:chat_functions:getThreadTemporaryStatus",
       "kind": "read",
       "to": "table:temporaryThreads"
+    },
+    {
+      "from": "function:chat_functions:hardDeleteThread",
+      "kind": "call",
+      "to": "function:acp_functions:deleteSessionsOfThread"
     },
     {
       "from": "function:chat_functions:hardDeleteThread",
@@ -7055,6 +7065,13 @@
       "id": "function:acp_calls:endUnopenedSession",
       "kind": "function",
       "name": "acp.calls.endUnopenedSession",
+      "module": "acp"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:acp_functions:deleteSessionsOfThread",
+      "kind": "function",
+      "name": "acp.functions.deleteSessionsOfThread",
       "module": "acp"
     },
     {
@@ -16416,13 +16433,25 @@
     {
       "file": "acp/lib/import",
       "kind": "write",
-      "line": 83,
+      "line": 66,
       "reason": "\"openImport\" is not a registered function"
     },
     {
       "file": "acp/lib/import",
       "kind": "write",
-      "line": 197,
+      "line": 70,
+      "reason": "\"openImport\" is not a registered function"
+    },
+    {
+      "file": "acp/lib/import",
+      "kind": "write",
+      "line": 94,
+      "reason": "\"openImport\" is not a registered function"
+    },
+    {
+      "file": "acp/lib/import",
+      "kind": "write",
+      "line": 202,
       "reason": "\"applyImportTurns\" is not a registered function"
     },
     {

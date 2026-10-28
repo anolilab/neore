@@ -5,6 +5,7 @@
 import type { Infer } from "lunorash/server";
 import { v } from "lunorash/server";
 
+import { internalMutation } from "../_generated/server";
 import { authQuery } from "../lib/crpc";
 import { vCapabilityReport } from "../lib/capability-report";
 import { MAX_LENGTH } from "../lib/validators";
@@ -69,6 +70,21 @@ const toView = (row: {
         ...(row.lastEventAt !== undefined && { lastEventAt: row.lastEventAt }),
     };
 };
+
+/** The thread is gone for good: so is the session that ran or imported into it, or its agent session could never be imported again. */
+export const deleteSessionsOfThread = internalMutation
+    .input({ threadId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const threadId = ctx.db.normalizeId("threads", args.threadId);
+        const { page } = threadId ? await ctx.db.acpSessions.findMany({ where: { threadId } }) : { page: [] };
+
+        for (const session of page) {
+            await ctx.db.delete(session._id);
+        }
+
+        return null;
+    });
 
 /** The caller's coding-agent sessions, newest first. */
 export const listHostSessions = authQuery

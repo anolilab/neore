@@ -50,7 +50,8 @@ const { signDevicePayload } = await import("../devices/lib/signing");
 const { floodAllowed, hostIngestHttpAction, readCappedBody, resetFloodGuard, resetOwnerCache } = await import("./http");
 const { applyHostEvents, reapHostStreams } = await import("./ingest");
 const { createHostStream } = await import("../chat/streaming/persistent/host");
-const { getHostSession, listHostSessions } = await import("./functions");
+const { deleteSessionsOfThread, getHostSession, listHostSessions } = await import("./functions");
+const { collectAcpSessionsForExport } = await import("./gdpr");
 const agentThreads = await import("../agent/threads");
 const composite = await import("../chat/composite");
 const { measureDb } = await import("../../test/db-cost");
@@ -431,6 +432,121 @@ describe("importing an agent's saved session", () => {
         const { threadId } = await importSession(device, TURNS);
 
         await expect(turn(device, threadId, "t9", 0, [START()])).resolves.toMatchObject({ status: 403 });
+    });
+
+    it("imports a session again once its thread was deleted, soft or hard", async () => {
+        const device = await pair(ownerId);
+        const first = await importSession(device, TURNS);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(first.threadId, { deleted: true }));
+
+        const second = await importSession(device, TURNS);
+
+        expect(second.threadId).not.toBe(first.threadId);
+        expect(second.opened.json).toMatchObject({ existing: false });
+        await expect(transcriptOf(second.threadId)).resolves.toHaveLength(4);
+        expect(await sessionRows()).toHaveLength(1);
+
+        // The hard delete removes the session with the thread; a session left behind by anything else is replaced all the same.
+        await harness.run(async (ctx: any) => {
+            await ctx.runMutation(deleteSessionsOfThread, { threadId: second.threadId });
+            await ctx.db.delete(second.threadId);
+        });
+        expect(await sessionRows()).toHaveLength(0);
+
+        const third = await importSession(device, TURNS);
+
+        expect(third.threadId).not.toBe(second.threadId);
+        await expect(transcriptOf(third.threadId)).resolves.toHaveLength(4);
+    });
+
+    it("replaces the session of a thread that vanished without it", async () => {
+        const device = await pair(ownerId);
+        const first = await importSession(device, TURNS);
+
+        await harness.run(async (ctx: any) => await ctx.db.delete(first.threadId));
+
+        const second = await importSession(device, TURNS);
+
+        expect(second.threadId).not.toBe(first.threadId);
+        expect(await sessionRows()).toHaveLength(1);
+    });
+
+    it("lets a thread deleted mid-import be imported again in full", async () => {
+        const device = await pair(ownerId);
+        const sessionId = "import-1";
+        const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId });
+
+        await ingest(device, { events: [IMPORT_TURN("fix the bug", "Done.")], firstSeq: 0, sessionId, threadId: json.threadId });
+        await harness.run(async (ctx: any) => await ctx.db.patch(json.threadId, { deleted: true }));
+        await expect(
+            ingest(device, { events: [IMPORT_TURN("and the tests", "Tests too."), IMPORT_END], firstSeq: 1, sessionId, threadId: json.threadId }),
+        ).resolves.toMatchObject({
+            status: 403,
+        });
+
+        const again = await importSession(device, TURNS);
+
+        expect(again.threadId).not.toBe(json.threadId);
+        expect(again.opened.json).toMatchObject({ next: 0 });
+        await expect(transcriptOf(again.threadId)).resolves.toHaveLength(4);
+    });
+
+    it("lets another computer of the same user finish an unfinished import", async () => {
+        const first = await pair(ownerId);
+        const second = await pair(ownerId);
+        const sessionId = "import-1";
+        const { json } = await ingest(first, { events: [IMPORT_OPEN], sessionId });
+
+        await ingest(first, { events: [TURNS[0]], firstSeq: 0, sessionId, threadId: json.threadId });
+
+        const finished = await importSession(second, TURNS);
+
+        expect(finished.opened.json).toMatchObject({ ended: false, existing: true, next: 1, threadId: json.threadId });
+        expect(finished.sent?.json).toMatchObject({ ended: true, next: 2 });
+        await expect(transcriptOf(json.threadId)).resolves.toHaveLength(4);
+        expect(await sessionRows()).toMatchObject([{ deviceId: second.deviceId, importState: "done" }]);
+        // The first computer no longer writes into it.
+        await expect(ingest(first, { events: [TURNS[1]], firstSeq: 1, sessionId, threadId: json.threadId })).resolves.toMatchObject({ status: 403 });
+    });
+
+    it("closes the import when the end arrives after the backend already holds every turn of the post", async () => {
+        const device = await pair(ownerId);
+        const sessionId = "import-1";
+        const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId });
+        const three = [IMPORT_TURN("a", "1"), IMPORT_TURN("b", "2"), IMPORT_TURN("c", "3")];
+
+        await ingest(device, { events: three, firstSeq: 0, sessionId, threadId: json.threadId });
+
+        await expect(ingest(device, { events: [three[0], three[1], IMPORT_END], firstSeq: 0, sessionId, threadId: json.threadId })).resolves.toMatchObject({
+            json: { ended: true, next: 3 },
+            status: 200,
+        });
+        expect(await sessionRows()).toMatchObject([{ importedTurns: 3, importState: "done" }]);
+        await expect(transcriptOf(json.threadId)).resolves.toHaveLength(6);
+    });
+
+    it("refuses an end that is not the last event", async () => {
+        const device = await pair(ownerId);
+        const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId: "import-1" });
+
+        await expect(
+            ingest(device, { events: [IMPORT_END, IMPORT_TURN("a", "b")], firstSeq: 0, sessionId: "import-1", threadId: json.threadId }),
+        ).resolves.toMatchObject({
+            status: 403,
+        });
+    });
+
+    it("exports the native id and the import state with the session", async () => {
+        const device = await pair(ownerId);
+
+        await importSession(device, TURNS);
+
+        const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(collectAcpSessionsForExport, { userId: ownerId }))) as {
+            sessions: Record<string, unknown>[];
+        };
+
+        expect(exported.sessions).toMatchObject([{ importedTurns: 2, importState: "done", nativeSessionId: "native-1" }]);
     });
 
     it("takes the capability report the host builds from a handshake, on a live session and on an import", async () => {
