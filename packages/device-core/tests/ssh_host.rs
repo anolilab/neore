@@ -1348,7 +1348,7 @@ impl Desktop {
         // The first sight of a server asks the person; the key is pinned here so nothing is asked later.
         let first = connect(server, &target, &paths, &trusting()).unwrap();
 
-        finish(&first);
+        finish(&first, &target, &paths);
         drop(first);
 
         fs::create_dir_all(&data_dir).unwrap();
@@ -1476,7 +1476,11 @@ fn a_minute_without_network_reconnects_with_at_most_two_ssh_processes_and_stops_
 
     relay.partition();
 
-    while began.elapsed() < Duration::from_secs(60) {
+    // ssh gives the connection up after its keepalives go unanswered (15 s, three misses and one more interval:
+    // about a minute), so a loss can land just past the minute on a slow runner; the outage lasts until it has.
+    while began.elapsed() < Duration::from_secs(60)
+        || (lost_at.is_none() && began.elapsed() < Duration::from_secs(100))
+    {
         if lost_at.is_none() && !desktop.connected() {
             lost_at = Some(began.elapsed());
 
@@ -1586,7 +1590,7 @@ fn a_host_this_computer_did_not_start_survives_a_reap_and_a_disconnect() {
     let _ = earlier.wait();
 
     // Disconnecting ends this computer's own session and host, and nothing else.
-    finish(&connection);
+    finish(&connection, &target, &paths);
     drop(connection);
     wait_for(
         "the session's own host kept running",
@@ -1647,7 +1651,7 @@ fn a_forwarded_agent_is_linked_from_a_stable_path_in_the_run_folder() {
     assert_ne!(Path::new(&session), stable);
     assert_eq!(fs::read_link(&stable).unwrap(), Path::new(&session));
 
-    finish(&connection);
+    finish(&connection, &target, &paths);
 
     // Without forwarding the host links nothing.
     let plain = Server::start(&sshd, "no-agent");
@@ -1669,7 +1673,7 @@ fn a_forwarded_agent_is_linked_from_a_stable_path_in_the_run_folder() {
     );
     assert!(!plain.remote_env().contains("SSH_AUTH_SOCK"));
 
-    finish(&connection);
+    finish(&connection, &target, &paths);
 
     let _ = agent.kill();
     let _ = agent.wait();
@@ -1807,7 +1811,7 @@ fn reaping_a_host_ends_the_commands_it_was_running() {
 
     let _ = stale.wait();
 
-    finish(&connection);
+    finish(&connection, &target, &paths);
 }
 
 /// A host that refuses how it is started (an old binary under the same version) is not a network problem.

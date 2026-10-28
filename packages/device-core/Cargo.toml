@@ -23,6 +23,12 @@ default = ["keychain"]
 # keychain), and the registry installs (`acp_install.rs`, which unpacks archives). `actions`, `fs`, `shell` and
 # `sandbox` build without it, so `neore-host` links no archive code.
 keychain = ["dep:keyring", "dep:flate2", "dep:tar", "dep:zip"]
+# `store::test_keychain`, the in-memory keychain the integration tests install. Off in every build that ships: only
+# this crate's own dev-dependency below turns it on, so `install()` is not in the addon or the host.
+test-support = []
+
+[dev-dependencies]
+device-core = { path = ".", default-features = false, features = ["test-support"] }
 
 [dependencies]
 flate2 = { version = "1.1", optional = true }

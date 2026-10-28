@@ -330,6 +330,7 @@ dependencies = [
 name = "device-core"
 version = "0.1.0"
 dependencies = [
+ "device-core",
  "flate2",
  "keyring",
  "landlock",

@@ -233,10 +233,11 @@ impl DeviceState {
         }
     }
 
-    /// A connection by hand failed. A server that was kept waits for the next Retry.
+    /// A connection by hand failed. A server that was kept waits for the next Retry when the failure needs the
+    /// person; one the network or an upgrade caused goes on with the backoff.
     pub(super) fn keep_failed(&self, device_id: &str, error: &ConnectError) {
         if let Some(keep) = self.ssh.keeps.lock().unwrap().get_mut(device_id) {
-            keep.failed(Instant::now(), false, &error.message);
+            keep.failed(Instant::now(), error.retryable, &error.message);
         }
     }
 

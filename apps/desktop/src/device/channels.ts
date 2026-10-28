@@ -60,9 +60,10 @@ export const LOCAL_CHANNEL = {
     terminalSshAvailability: "neore:device-local:terminal-ssh-availability",
 } as const;
 
-/** Main → device window: a prompt was queued, read `promptCurrent` again. */
+/** Main → device window: a prompt was queued, read `promptCurrent` again; the engine's state changed, read `settingsGet`. */
 export const LOCAL_EVENT = {
     /** A coding-agent session changed: read the sessions again. */
     acp: "neore:device-local:acp",
+    changed: "neore:device-local:changed",
     prompt: "neore:device-local:prompt",
 } as const;

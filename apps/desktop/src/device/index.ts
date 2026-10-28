@@ -242,6 +242,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
                     send(site, DEVICE_CHANNEL.changed);
                 }
 
+                send(state.local?.webContents, LOCAL_EVENT.changed);
+
                 break;
             }
             case "progress": {
