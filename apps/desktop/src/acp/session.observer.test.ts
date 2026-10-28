@@ -12,6 +12,17 @@ import { memoryAgent, readTranscript, transcriptPlayer } from "./testing/harness
 
 const HOST_INFO: HostSessionInfo = { agentKey: "example", agentLabel: "Example", folderId: "f1", folderLabel: "neore" };
 
+/** What the backend is told when the session opens: the labels, the agent's own session id and what it advertised at the handshake. */
+const OPENED = {
+    ...HOST_INFO,
+    capabilities: {
+        groups: { sessions: { listNative: { reason: "not_offered", supported: false }, load: { reason: "not_offered", supported: false } } },
+        reportedAt: expect.any(Number),
+        version: 1,
+    },
+    nativeSessionId: "sess_1",
+};
+
 const recorder = () => {
     const calls: unknown[][] = [];
     const record
@@ -80,7 +91,7 @@ describe("a session's observer", () => {
         await expect.poll(() => session.snapshot().status).toBe("idle");
 
         expect(calls).toEqual([
-            ["sessionOpened", HOST_INFO],
+            ["sessionOpened", OPENED],
             ["turnStarted", expect.any(String), "say hi"],
             ["thought", expect.any(String), "thinking"],
             ["text", expect.any(String), "Hi"],
@@ -167,7 +178,7 @@ describe("a session and turns the backend sent", () => {
         const { session } = await start(refuse, observer, undefined, { sessionId: "backend-session", threadId: "thread-1" });
 
         expect(session.id).toBe("backend-session");
-        expect(calls).toEqual([["sessionOpened", HOST_INFO, "thread-1"]]);
+        expect(calls).toEqual([["sessionOpened", OPENED, "thread-1"]]);
     });
 
     it("runs a prompt under the turn id it was sent with, received before it starts", async () => {

@@ -3,8 +3,11 @@
  * a session in a folder, talk to it, stop it. Everything an agent wrote is rendered with `textContent`.
  * Variable values are typed here and never read back: the core returns names only.
  */
+import type { CapabilityReport } from "@neore/ai/capabilities";
+
 import type { RegistryListing } from "../../acp/registry";
-import type { AcpView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
+import type { AcpView, ImportSummary, NativeSessionView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
+import { canImportSessions } from "./import-control";
 import { approveAllIds, barSignature, groupBySession } from "./permission-bar";
 
 const TOOL_LABELS: Record<ToolStatus, string> = {
@@ -36,13 +39,17 @@ const CLICK_THROUGH_GUARD_MS = 800;
 
 const state: {
     guard?: ReturnType<typeof setTimeout>;
+    /** The saved sessions being offered for import, and where they are from. */
+    importing?: { agentKey: string; folder: string; sessions: NativeSessionView[] };
     listings: RegistryListing[];
+    /** What each agent reported at its last start, by key. */
+    reports: Record<string, CapabilityReport>;
     requests: PermissionView[];
     selected?: string;
     sessions: SessionSummary[];
     signature: string;
     view: AcpView;
-} = { listings: [], requests: [], sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
+} = { listings: [], reports: {}, requests: [], sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
 
 const showError = (error: unknown): void => {
     $("acp-error").textContent = String(error instanceof Error ? error.message : error).replace(IPC_PREFIX, "");
@@ -148,7 +155,75 @@ const probe = (key: string) =>
     guarded(async () => {
         const result = await globalThis.neoreDevice.acpProbe(key);
 
-        $("acp-notice").textContent = `${agentLabel(key)}: ${result.agentName || "agent"} ${result.agentVersion}, protocol ${String(result.protocolVersion)}. No session was opened.`;
+        await refreshReports();
+        $("acp-notice").textContent = `${agentLabel(key)}: ${result.agentName || "agent"} ${result.agentVersion}, protocol ${String(result.protocolVersion)}. No session was opened.${canImportSessions(state.reports[key]) ? " Its saved sessions can be imported." : ""}`;
+    });
+
+// ─── Importing saved sessions ───────────────────────────────────────────────
+
+const refreshReports = async (): Promise<void> => {
+    state.reports = await globalThis.neoreDevice.acpReports();
+
+    // An agent that was changed reports nothing until it starts again: its open list goes with the control.
+    if (state.importing !== undefined && !canImportSessions(state.reports[state.importing.agentKey])) {
+        state.importing = undefined;
+        renderImport();
+    }
+
+    renderAgents();
+};
+
+const importedText = (summary: ImportSummary): string => {
+    if (summary.status === "already") {
+        return "That session is already in Neore; nothing was added.";
+    }
+
+    const notes = [
+        summary.droppedTurns > 0 ? `${String(summary.droppedTurns)} later turns were not kept` : "",
+        summary.shortenedTurns > 0 ? `${String(summary.shortenedTurns)} turns have a message cut to the size Neore stores` : "",
+    ].filter(Boolean);
+
+    return `Imported ${String(summary.turns)} turns as a thread in Neore.${notes.length === 0 ? "" : ` ${notes.join("; ")}.`}`;
+};
+
+const renderImport = (): void => {
+    const { importing } = state;
+
+    $("acp-import").hidden = importing === undefined;
+
+    if (importing === undefined) {
+        return;
+    }
+
+    const { agentKey, folder, sessions } = importing;
+
+    $("acp-import-heading").textContent = `Saved sessions of ${agentLabel(agentKey)} in ${folder}`;
+    $("acp-import-list").replaceChildren(
+        ...sessions.length === 0
+            ? [item("None.")]
+            : sessions.map((session) => {
+                const when = session.updatedAt === "" ? "" : ` · ${new Date(session.updatedAt).toLocaleString()}`;
+                const name = session.title === "" ? "Untitled session" : session.title;
+
+                return item(
+                    `${name}${when}`,
+                    button("Import", `Import the session ${name}`, () => {
+                        guarded(async () => {
+                            $("acp-notice").textContent = "Importing…";
+                            $("acp-notice").textContent = importedText(await globalThis.neoreDevice.acpImport(agentKey, folder, session.sessionId, session.title === "" ? undefined : session.title));
+                        });
+                    }),
+                );
+            }),
+    );
+};
+
+const openImport = (agentKey: string, folder: string) =>
+    guarded(async () => {
+        $("acp-notice").textContent = "Asking the agent for its saved sessions…";
+        state.importing = { agentKey, folder, sessions: await globalThis.neoreDevice.acpImportList(agentKey, folder) };
+        $("acp-notice").textContent = "";
+        renderImport();
     });
 
 const renderAgents = (): void => {
@@ -181,6 +256,10 @@ const renderAgents = (): void => {
                         item(
                             `↳ ${consent.folderPath}`,
                             button("Start", `Start ${agent.label} in ${consent.folderPath}`, () => startIn(agent.key, consent.folderPath)),
+                            // Only for an agent that said it can; a missing, unknown or not-offered answer shows nothing.
+                            ...canImportSessions(state.reports[agent.key])
+                                ? [button("Import sessions…", `Import saved sessions of ${agent.label} in ${consent.folderPath}`, () => openImport(agent.key, consent.folderPath))]
+                                : [],
                             button("Stop approving", `Stop approving ${agent.label} in ${consent.folderPath}`, () => {
                                 guarded(async () => {
                                     state.view = await globalThis.neoreDevice.acpUpdate({ agentKey: agent.key, folderId: consent.folderId, op: "revoke" });
@@ -568,9 +647,14 @@ export const initAcp = async (): Promise<void> => {
         });
     });
 
+    $("acp-import-close").addEventListener("click", () => {
+        state.importing = undefined;
+        renderImport();
+    });
+
     globalThis.neoreDevice.onAcpChanged(async () => {
         try {
-            await Promise.all([refreshRequests(), refreshSessions()]);
+            await Promise.all([refreshRequests(), refreshSessions(), refreshReports()]);
         } catch (error) {
             showError(error);
         }
@@ -579,6 +663,6 @@ export const initAcp = async (): Promise<void> => {
     await guarded(async () => {
         state.view = await globalThis.neoreDevice.acpView();
         renderAgents();
-        await Promise.all([refreshRequests(), refreshSessions()]);
+        await Promise.all([refreshRequests(), refreshSessions(), refreshReports()]);
     });
 };

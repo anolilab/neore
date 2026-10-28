@@ -39,6 +39,7 @@ import { isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "../de
 import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
+import { applyImportTurns, isImportEvent, openImport } from "./lib/import";
 import { reapExpiredHostStreams } from "./lib/reap";
 import { sessionOfThread, touchSession } from "./lib/sessions";
 import { vHostEvent } from "./validators";
@@ -69,7 +70,8 @@ export const verifyHostPost = internalQuery
     });
 
 const vApplyResult = v.union(
-    v.object({ ended: v.boolean(), next: v.number(), outcome: v.literal("applied"), threadId: v.optional(v.string()) }),
+    // `existing`: an import found the agent session already here (imported before, or run here).
+    v.object({ ended: v.boolean(), existing: v.optional(v.boolean()), next: v.number(), outcome: v.literal("applied"), threadId: v.optional(v.string()) }),
     v.object({ next: v.number(), outcome: v.literal("gap") }),
     v.object({ outcome: v.literal("refused") }),
     v.object({ outcome: v.literal("limited") }),
@@ -99,9 +101,16 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         // A session started from the web (`startHostSession`) waits as `starting` for this: the agent is up. The agent
         // can also report more once it has been used; the thread and session stay as they are.
         const opened = existing.status === "starting";
+        // The agent's own session id, kept for an import to find and a later reattach to use (S6); set once.
+        const learnedNativeId = existing.nativeSessionId === undefined ? open.nativeSessionId : undefined;
 
-        if (existing.status !== "ended" && (opened || open.capabilities)) {
-            await ctx.db.patch(existing._id, { updatedAt: now, ...(open.capabilities && { capabilities: open.capabilities }), ...(opened && { lastEventAt: now, status: "idle" as const }) });
+        if (existing.status !== "ended" && (opened || open.capabilities || learnedNativeId !== undefined)) {
+            await ctx.db.patch(existing._id, {
+                updatedAt: now,
+                ...(open.capabilities && { capabilities: open.capabilities }),
+                ...(learnedNativeId !== undefined && { nativeSessionId: learnedNativeId }),
+                ...(opened && { lastEventAt: now, status: "idle" as const }),
+            });
         }
 
         return { ended: existing.status === "ended", next: 0, outcome: "applied", threadId: existing.threadId as string };
@@ -183,7 +192,7 @@ const applyTurnPost = async (
         firstSeq === undefined ||
         !Number.isSafeInteger(firstSeq) ||
         firstSeq < 0 ||
-        events.some((event) => event.kind === "session_open")
+        events.some((event) => event.kind === "session_open" || isImportEvent(event))
     ) {
         return REFUSED;
     }
@@ -356,7 +365,13 @@ export const applyHostEvents = internalMutation
         const { now } = ctx;
 
         if (args.threadId === undefined) {
-            return await openSession(ctx, device, args.sessionId, args.events, now);
+            return args.events[0]?.kind === "import_open"
+                ? await openImport(ctx, device, args.sessionId, args.events, now)
+                : await openSession(ctx, device, args.sessionId, args.events, now);
+        }
+
+        if (args.events.some((event) => isImportEvent(event))) {
+            return await applyImportTurns(ctx, device, { events: args.events, firstSeq: args.firstSeq, hostSessionId: args.sessionId, threadId: args.threadId }, now);
         }
 
         return await applyTurnPost(

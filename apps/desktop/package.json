@@ -27,6 +27,7 @@
         "@agentclientprotocol/sdk": "2.0.2",
         "@anolilab/eslint-config": "catalog:lint",
         "@electron/fuses": "2.1.3",
+        "@neore/ai": "workspace:*",
         "@playwright/test": "catalog:test",
         "@xterm/addon-fit": "0.11.0",
         "@xterm/headless": "6.0.0",

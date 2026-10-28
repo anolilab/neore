@@ -5,7 +5,8 @@
  *
  *   { v: 1, kind: "turn", deviceId, issuedAt, sessionId, threadId?, turnId?, firstSeq?, events: [...] }
  *
- * No `threadId` = a session-level post (`session_open`, which makes the host thread). Otherwise a turn post: the
+ * No `threadId` = a session-level post (`session_open`, which makes the host thread; `import_open`, which makes or finds the
+ * thread of an agent's saved session). Otherwise a turn post: the
  * event at index `i` takes `seq = firstSeq + i`.
  *
  * The checks, in the order that keeps a forged post from costing anything:
@@ -231,7 +232,15 @@ const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: 
 
     switch (result.outcome) {
         case "applied": {
-            return json({ ended: result.ended, next: result.next, ...(result.threadId !== undefined && { threadId: result.threadId }) }, 200);
+            return json(
+                {
+                    ended: result.ended,
+                    next: result.next,
+                    ...(result.existing !== undefined && { existing: result.existing }),
+                    ...(result.threadId !== undefined && { threadId: result.threadId }),
+                },
+                200,
+            );
         }
         case "gap": {
             return json({ error: "gap", next: result.next }, 409);

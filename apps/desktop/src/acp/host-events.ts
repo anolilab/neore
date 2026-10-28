@@ -1,4 +1,6 @@
 /** What an agent session reports about its turns, and what the backend is told of them (`ingest.ts`). */
+import type { CapabilityReport } from "@neore/ai/capabilities";
+
 import type { StopReason } from "./types";
 
 export interface PermissionOption {
@@ -22,13 +24,17 @@ export interface PermissionRequestEvent {
 export type PermissionOutcomeKind = "allowed" | "cancelled" | "declined";
 
 export type HostEvent
-    = PermissionRequestEvent | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; kind: "session_open" } | { error?: string; kind: "turn_end"; reason: "cancelled" | "failed" | "finished" | "interrupted" } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
+    = PermissionRequestEvent | (HostSessionInfo & { kind: "session_open" }) | { error?: string; kind: "turn_end"; reason: "cancelled" | "failed" | "finished" | "interrupted" } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
 
 export interface HostSessionInfo {
     agentKey: string;
     agentLabel: string;
+    /** What the agent advertised at the handshake (`capabilities.ts`). */
+    capabilities?: CapabilityReport;
     folderId: string;
     folderLabel: string;
+    /** The agent's own id for the session, so an import finds it and a later reattach can use it. */
+    nativeSessionId?: string;
 }
 
 /** What an `AgentSession` tells whoever persists its turns. Every method returns at once and never throws. */
@@ -60,6 +66,8 @@ export const capSessionInfo = (info: HostSessionInfo): HostSessionInfo => {
         agentLabel: info.agentLabel.slice(0, 200),
         folderId: info.folderId.slice(0, 128),
         folderLabel: info.folderLabel.slice(0, 200),
+        ...info.capabilities !== undefined && { capabilities: info.capabilities },
+        ...info.nativeSessionId !== undefined && info.nativeSessionId !== "" && { nativeSessionId: info.nativeSessionId.slice(0, 256) },
     };
 };
 
@@ -87,7 +95,7 @@ export const capRequestId = (requestId: string): string => requestId.slice(0, 12
  * What an event adds to the body of a post, in UTF-8 bytes: the payload is JSON inside a JSON string, so quotes
  * and backslashes are escaped twice, and a CJK character is three bytes. The backend caps the body, not the characters.
  */
-export const wireBytes = (event: HostEvent): number => Buffer.byteLength(JSON.stringify(JSON.stringify(event)));
+export const wireBytes = (event: object): number => Buffer.byteLength(JSON.stringify(JSON.stringify(event)));
 
 /** The largest single event a batch may start with; a batch's first event is always taken, so it must fit alone. */
 const MAX_EVENT_BYTES = 150_000;
@@ -113,7 +121,7 @@ export const endReasonOf = (reason: StopReason | "failed"): "cancelled" | "faile
 };
 
 /** What one post came to: the backend's next `seq`, a request to resend from there, a refusal, or a reason to try again. */
-export type PostResult = { kind: "gap"; next: number } | { ended: boolean; kind: "ok"; next: number; threadId?: string } | { kind: "refused" } | { kind: "retry" };
+export type PostResult = { kind: "gap"; next: number } | { ended: boolean; existing?: boolean; kind: "ok"; next: number; threadId?: string } | { kind: "refused" } | { kind: "retry" };
 
 const BACKOFF_START_MS = 1000;
 const BACKOFF_MAX_MS = 30_000;

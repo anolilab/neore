@@ -6,6 +6,11 @@
       "to": "function:crons:cronTick"
     },
     {
+      "from": "function:acp_calls:checkAcpCall",
+      "kind": "schedule",
+      "to": "function:acp_calls:checkAcpCall"
+    },
+    {
       "from": "function:acp_gdpr:deleteUserAcpSessions",
       "kind": "write",
       "to": "table:acpSessions"
@@ -19,6 +24,11 @@
       "from": "function:acp_ingest:applyHostEvents",
       "kind": "write",
       "to": "table:persistentStreams"
+    },
+    {
+      "from": "function:acp_remote:startHostSession",
+      "kind": "write",
+      "to": "table:acpSessions"
     },
     {
       "from": "function:admin_cleanup:executeCleanup",
@@ -3399,6 +3409,11 @@
       "from": "function:crons:vacuumDocumentHistory",
       "kind": "schedule",
       "to": "function:crons:vacuumDocumentHistory"
+    },
+    {
+      "from": "function:devices_functions:claimDeviceCall",
+      "kind": "schedule",
+      "to": "function:acp_calls:checkAcpCall"
     },
     {
       "from": "function:devices_functions:claimDeviceCall",
@@ -7029,6 +7044,20 @@
       "name": "tick"
     },
     {
+      "detail": "mutation",
+      "id": "function:acp_calls:checkAcpCall",
+      "kind": "function",
+      "name": "acp.calls.checkAcpCall",
+      "module": "acp"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:acp_calls:endUnopenedSession",
+      "kind": "function",
+      "name": "acp.calls.endUnopenedSession",
+      "module": "acp"
+    },
+    {
       "detail": "query",
       "id": "function:acp_functions:getHostSession",
       "kind": "function",
@@ -7075,6 +7104,41 @@
       "id": "function:acp_ingest:verifyHostPost",
       "kind": "function",
       "name": "acp.ingest.verifyHostPost",
+      "module": "acp"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:acp_remote:answerHostPermission",
+      "kind": "function",
+      "name": "acp.remote.answerHostPermission",
+      "module": "acp"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:acp_remote:cancelHostTurn",
+      "kind": "function",
+      "name": "acp.remote.cancelHostTurn",
+      "module": "acp"
+    },
+    {
+      "detail": "query",
+      "id": "function:acp_remote:getHostPendingPermissions",
+      "kind": "function",
+      "name": "acp.remote.getHostPendingPermissions",
+      "module": "acp"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:acp_remote:startHostSession",
+      "kind": "function",
+      "name": "acp.remote.startHostSession",
+      "module": "acp"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:acp_send:sendToHost",
+      "kind": "function",
+      "name": "acp.send.sendToHost",
       "module": "acp"
     },
     {
@@ -16322,20 +16386,44 @@
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 125,
+      "line": 126,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 206,
+      "line": 207,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 223,
+      "line": 224,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
+    },
+    {
+      "file": "acp/lib/calls",
+      "kind": "write",
+      "line": 58,
+      "reason": "\"endStartingSession\" is not a registered function"
+    },
+    {
+      "file": "acp/lib/calls",
+      "kind": "schedule",
+      "line": 93,
+      "reason": "\"onAcpCallEnded\" is not a registered function"
+    },
+    {
+      "file": "acp/lib/import",
+      "kind": "write",
+      "line": 77,
+      "reason": "\"openImport\" is not a registered function"
+    },
+    {
+      "file": "acp/lib/import",
+      "kind": "write",
+      "line": 188,
+      "reason": "\"applyImportTurns\" is not a registered function"
     },
     {
       "file": "acp/lib/revoke",
@@ -16348,6 +16436,12 @@
       "kind": "write",
       "line": 21,
       "reason": "\"touchSession\" is not a registered function"
+    },
+    {
+      "file": "acp/send",
+      "kind": "call",
+      "line": 187,
+      "reason": "\"hostSendHttpAction\" is not a registered function"
     },
     {
       "file": "admin/audit-log",
@@ -18680,14 +18774,26 @@
     {
       "file": "devices/lib/acp-call",
       "kind": "write",
-      "line": 46,
-      "reason": "\"createAcpCancelCall\" is not a registered function"
+      "line": 64,
+      "reason": "\"createAcpCall\" is not a registered function"
     },
     {
       "file": "devices/lib/acp-call",
       "kind": "write",
-      "line": 76,
-      "reason": "\"createAcpCancelCall\" is not a registered function"
+      "line": 94,
+      "reason": "\"createAcpCall\" is not a registered function"
+    },
+    {
+      "file": "devices/lib/acp-call",
+      "kind": "schedule",
+      "line": 96,
+      "reason": "\"createAcpCall\" is not a registered function"
+    },
+    {
+      "file": "devices/lib/call-writes",
+      "kind": "write",
+      "line": 13,
+      "reason": "\"patchDeviceCall\" is not a registered function"
     },
     {
       "file": "devices/lib/state",
@@ -19472,79 +19578,79 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 116,
+      "line": 118,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 116,
+      "line": 118,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 116,
+      "line": 118,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 116,
+      "line": 118,
       "reason": "\"hasClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 116,
+      "line": 118,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 135,
+      "line": 137,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 135,
+      "line": 137,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 138,
+      "line": 140,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 138,
+      "line": 140,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 192,
+      "line": 194,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 215,
+      "line": 217,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 220,
+      "line": 222,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 337,
+      "line": 339,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -19580,19 +19686,19 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 794,
+      "line": 802,
       "reason": "\"rateLimitGuard\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 890,
+      "line": 898,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 932,
+      "line": 940,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {

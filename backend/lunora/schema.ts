@@ -140,6 +140,10 @@ export const schema = defineSchema({
         folderId: v.string(),
         folderLabel: v.string(),
         hostSessionId: v.string(),
+        // An imported session (S6) takes its transcript from the host a turn at a time: `importedTurns` is how many the backend
+        // holds, `importState` whether the host has sent the end. Unset on a session that ran here.
+        importedTurns: v.optional(v.number()),
+        importState: v.optional(v.union(v.literal("importing"), v.literal("done"))),
         lastEventAt: v.optional(v.number()),
         nativeSessionId: v.optional(v.string()),
         status: vAcpSessionStatus,
@@ -151,7 +155,9 @@ export const schema = defineSchema({
         .index("by_threadId", ["threadId"])
         .index("by_userId_status", ["userId", "status"])
         // Also serves "every session of a device" (a revoke reads the prefix).
-        .index("by_deviceId_hostSessionId", ["deviceId", "hostSessionId"]),
+        .index("by_deviceId_hostSessionId", ["deviceId", "hostSessionId"])
+        // One thread per agent session (S6): an import finds a session that already exists, imported or run here.
+        .index("by_userId_agentKey_nativeSessionId", ["userId", "agentKey", "nativeSessionId"]),
 
     actionCache: defineTable({
         expiresAt: v.number(),

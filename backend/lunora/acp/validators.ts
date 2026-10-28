@@ -46,6 +46,25 @@ export const vHostEvent = v.union(
         kind: v.literal("session_open"),
         nativeSessionId: v.optional(v.string().max(256)),
     }),
+    // An import (S6) of an agent's saved session: `import_open` finds or makes the thread, each `import_turn` is one
+    // prompt and its reply, `import_end` closes the transcript. Posted as session-level (`import_open`) or turn-level posts.
+    v.object({
+        agentKey: v.string().max(128),
+        agentLabel: v.string().max(200),
+        capabilities: v.optional(vCapabilityReport),
+        folderId: v.string().max(128),
+        folderLabel: v.string().max(200),
+        kind: v.literal("import_open"),
+        nativeSessionId: v.string().max(256),
+        title: v.optional(v.string().max(200)),
+    }),
+    v.object({
+        kind: v.literal("import_turn"),
+        reasoning: v.optional(v.string().max(65_536)),
+        text: v.string().max(65_536),
+        user: v.string().max(100_000),
+    }),
+    v.object({ kind: v.literal("import_end") }),
     v.object({ kind: v.literal("turn_start"), text: v.string().max(100_000) }),
     v.object({ kind: v.literal("text"), text: v.string().max(65_536) }),
     v.object({ kind: v.literal("reasoning"), text: v.string().max(65_536) }),
