@@ -2951,6 +2951,11 @@ export const branchThread = authAction
                 await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: newThreadId as Id<"threads"> });
                 throw new LunoraError("INTERNAL_SERVER_ERROR", "Failed to copy messages to branch");
             }
+
+            // The copy carries any agent-switch divider; the fork must run on what it says.
+            if (parentThread.activeAgent) {
+                await context.runMutation(internal.agent.agent_switch.adoptForkAgent, { threadId: newThreadId as Id<"threads"> });
+            }
         }
 
         // Record audit history for branched thread creation

@@ -16,10 +16,36 @@ import { getMaxMessage } from "../agent/messages";
 import { insertAgentSwitchRow, patchThread } from "../agent/table-writes";
 import { requireThreadPermission } from "../agent/thread-read-access";
 import { isThreadStreaming } from "../agent/thread-streaming";
+import { getUser } from "../auth/lib/better-auth-queries";
 import { claimOnce } from "../lib/claim-once";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
+import { findPendingApprovalOnLatestTurn } from "./lib/tool-approval-claim";
+
+/** Approval requests checked for being open on the latest turn — the newest few, never the thread's history. */
+const RECENT_APPROVALS_CHECKED = 5;
+
+/**
+ * Whether the latest turn waits on a tool approval or a question (`toolApprovalRuns`). Answering it resumes the
+ * paused reply on its stored model and hangs the continuation under that reply, past a divider written in between.
+ */
+const hasOpenApproval = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
+    const runs = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
+        .order("desc")
+        .take(RECENT_APPROVALS_CHECKED);
+
+    for (const run of runs) {
+        // A request the conversation moved past is stale and blocks nothing.
+        if (run.status === "pending" && (await findPendingApprovalOnLatestTurn(ctx, threadId, run.approvalId))) {
+            return true;
+        }
+    }
+
+    return false;
+};
 
 /** Why a switch was refused, for the client to word: the `data.code` of the error. */
 export const AGENT_SWITCH_STREAMING = "AGENT_SWITCH_STREAMING";
@@ -56,6 +82,13 @@ export const switchThreadAgentHandler = async (ctx: MutationCtx, args: SwitchArg
     // The right a collaborator already has to pick the model of a send.
     const { thread } = await requireThreadPermission(ctx, args.threadId, args.userId, "write", args.unlockProof);
 
+    // Guests are pinned to the free model whatever a send names (`/chat/start`), so there is no agent to switch.
+    const caller = await getUser(ctx, args.userId);
+
+    if (caller?.isAnonymous === true) {
+        return refuse(AGENT_SWITCH_UNSUPPORTED, "Guests run on the free model");
+    }
+
     if (args.target.kind !== "model") {
         return refuse(AGENT_SWITCH_UNSUPPORTED, "Switching to a host agent is not available yet");
     }
@@ -73,6 +106,10 @@ export const switchThreadAgentHandler = async (ctx: MutationCtx, args: SwitchArg
     // A hard rule, so a transcript never has two agents writing at once.
     if (await isThreadStreaming(ctx, thread._id)) {
         throw new LunoraError("CONFLICT", "Wait for the reply to finish, or stop it, before switching", { data: { code: AGENT_SWITCH_STREAMING } });
+    }
+
+    if (await hasOpenApproval(ctx, thread._id)) {
+        throw new LunoraError("CONFLICT", "Answer the pending request before switching", { data: { code: AGENT_SWITCH_STREAMING } });
     }
 
     const leaf = await leafRowOf(ctx, thread);
