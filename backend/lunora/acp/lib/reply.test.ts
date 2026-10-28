@@ -9,6 +9,8 @@ const transcript = (text: string, reasoning = "") => {
 };
 
 const RESTARTED = /restarted/u;
+const STOPPED_SENDING = /stopped sending output/u;
+const REMOVED = /was removed/u;
 
 describe("buildHostReply", () => {
     it("saves a finished turn as a successful, unbilled reply", () => {
@@ -45,6 +47,19 @@ describe("buildHostReply", () => {
             finishReason: "other",
             status: "success",
         });
+    });
+});
+
+describe("a timed-out or revoked turn", () => {
+    it("is always saved as a failed reply, with a note of its own", () => {
+        const timeout = buildHostReply({ agentKey: "claude", reason: "timeout", transcript: transcript("") });
+        const revoked = buildHostReply({ agentKey: "claude", reason: "revoked", transcript: transcript("so far") });
+
+        expect(timeout).toMatchObject({ finishReason: "error", status: "failed" });
+        expect(timeout?.error).toMatch(STOPPED_SENDING);
+        expect(revoked).toMatchObject({ finishReason: "error", status: "failed" });
+        expect(revoked?.error).toMatch(REMOVED);
+        expect(revoked?.message.content).toEqual([{ text: "so far", type: "text" }]);
     });
 });
 

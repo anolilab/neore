@@ -575,6 +575,18 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
         }
     }, [isSSEStreaming, isSubmitting]);
 
+    // A coding agent's thread runs on the user's computer; the server refuses a send from here (409 HOST_RUN_THREAD),
+    // so say so instead of letting the first send fail. Remote send lands with the next slice of plans/acp-agent-host.md.
+    if (thread?.runner === "host") {
+        return (
+            <div className={cn("relative w-full", className)}>
+                <p className="text-muted-foreground bg-muted rounded-lg px-4 py-3 text-center text-sm" role="status">
+                    {t`This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet.`}
+                </p>
+            </div>
+        );
+    }
+
     const renderModeSettings = () => {
         if (composerMode === "image") {
             return (

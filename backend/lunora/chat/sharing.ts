@@ -3,6 +3,7 @@ import { signDocsForDisplay } from "../agent/display-media";
 import { LunoraError } from "lunorash/server";
 import { v } from "lunorash/server";
 
+import { refuseHostThread } from "../acp/lib/host-thread";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
@@ -222,6 +223,8 @@ export const createThreadInvite = authMutation
         if (!accessResult.hasAccess || !accessResult.thread.userId) {
             throw new LunoraError("FORBIDDEN", "Admin access required to create invites");
         }
+
+        refuseHostThread(accessResult.thread, "shared");
 
         // Check if invite already exists for this email and thread
         const invites = await context.runQuery(internal.agent.sharing.listThreadInvites, {
@@ -489,6 +492,10 @@ export const toggleThreadVisibility = authMutation
         // A locked chat is never published: its passcode would not protect the public copy.
         if (isPublic && isThreadLocked(accessResult.thread)) {
             throw new LunoraError("BAD_REQUEST", "Unlock and stop locking this chat before you share it.");
+        }
+
+        if (isPublic) {
+            refuseHostThread(accessResult.thread, "made public");
         }
 
         const newToken = isPublic ? generateToken() : undefined;

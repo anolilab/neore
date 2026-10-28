@@ -2,6 +2,8 @@
  * The host-stream reaper. A host stream with no post for {@link HOST_STREAM_IDLE_MS} is set to `timeout`, its
  * host is sent `acp_cancel`, and whatever arrives for it afterwards is dropped (the ingest answers `ended`).
  *
+ * What the host wrote is kept as a failed reply, so the thread says why the turn stopped.
+ *
  * It runs on the shard tick (`lib/shard-housekeeping.ts#runShardTick`), which `createHostStream` and every
  * window bump arm through `noteShardDue`, so a silent stream is reaped within about a minute of its window
  * rather than waiting for the ten-minute housekeeping sweep (that sweep still reaps one through
@@ -9,9 +11,9 @@
  */
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { endHostStream, extendHostStream } from "../../chat/streaming/persistent/host";
+import { extendHostStream } from "../../chat/streaming/persistent/host";
 import { HOST_TURN_MAX_MS } from "./constants";
-import { sendHostCancel } from "./finish";
+import { endHostTurn, sendHostCancel } from "./finish";
 import { sessionOfThread, touchSession } from "./sessions";
 
 const REAP_BATCH = 100;
@@ -31,7 +33,7 @@ export const expireHostStream = async (ctx: MutationCtx, stream: Stream, now: nu
         return;
     }
 
-    if (!(await endHostStream(ctx, stream, { reason: "timeout", status: "timeout" }, now))) {
+    if (!(await endHostTurn(ctx, stream, { reason: "timeout" }, now))) {
         return;
     }
 

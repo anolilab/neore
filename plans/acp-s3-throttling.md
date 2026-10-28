@@ -9,6 +9,10 @@ signed-in desktop session and a backend to run an hour-long hidden-window turn a
 or heartbeat gap was recorded. §10 Q4 stays at its recommendation: **keep background throttling on** until a
 measurement fails its budget.
 
+The measurement is now an acceptance item of S4 in [acp-agent-host.md](acp-agent-host.md): the page relay that
+claims `acp_cancel` is what a hidden window throttles, and S4 adds the remote paths that depend on it, so S4
+measures there. This file stays the record of the method.
+
 ## What the slice does so the measurement can fail safely
 
 - The poster does not depend on the page: the main process posts the output itself, from timers in the main

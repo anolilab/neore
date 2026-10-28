@@ -242,6 +242,12 @@ const applyTurnPost = async (
     // A stream that is over takes nothing more (the reaper timed it out, Stop ended it, a revoke cut it). The
     // host reads `ended` and stops posting.
     if (!isLiveStream(stream)) {
+        // A restart that comes after the reaper: the turn was cut off, not merely silent. The reply stays as it
+        // was saved; only the reason moves on, so Continue (plans/acp-agent-host.md §4.5) is offered all the same.
+        if (stream.hostEndReason === "timeout" && events.some((event) => event.kind === "turn_end" && event.reason === "interrupted")) {
+            await ctx.db.patch(stream._id, { hostEndReason: "interrupted" });
+        }
+
         return { ended: true, next, outcome: "applied" };
     }
 

@@ -1,6 +1,6 @@
 /** One turn's output on its way to the backend, in order, one batch at a time (`ingest.ts` has the rules). */
 import type { HostEvent, PostResult } from "./host-events";
-import { jitteredBackoff } from "./host-events";
+import { jitteredBackoff, wireBytes } from "./host-events";
 
 /** At most one post per turn in this interval. */
 export const POST_INTERVAL_MS = 250;
@@ -11,8 +11,8 @@ const PROBE_SEQ = 1_000_000_000;
 
 /** A text event's longest text. The backend takes 65536; a smaller piece keeps a post well under its body cap after JSON escaping, twice. */
 const MAX_EVENT_TEXT = 16_000;
-/** The JSON length of one post's events. */
-const MAX_BATCH_JSON = 60_000;
+/** What one post's events add to its body, in UTF-8 bytes. The backend refuses a body past 256 KiB; the rest is the envelope and headroom. */
+const MAX_BATCH_BYTES = 200_000;
 const MAX_BATCH_EVENTS = 200;
 /** Unsent output a turn holds while the backend is out of reach; past this, new text is dropped, not the turn. */
 const MAX_PENDING_JSON = 4_000_000;
@@ -188,9 +188,9 @@ export class TurnChannel {
 
         while (this.pending.length > 0 && batch.length < MAX_BATCH_EVENTS) {
             const [next] = this.pending;
-            const length = next === undefined ? 0 : jsonLength(next);
+            const length = next === undefined ? 0 : wireBytes(next);
 
-            if (next === undefined || (batch.length > 0 && size + length > MAX_BATCH_JSON)) {
+            if (next === undefined || (batch.length > 0 && size + length > MAX_BATCH_BYTES)) {
                 break;
             }
 
@@ -266,7 +266,8 @@ export class TurnChannel {
         this.probe = false;
         this.nextSeq = next;
         this.inflight = { events: inflight.events.slice(Math.max(0, next - inflight.firstSeq)), firstSeq: next };
-        await this.transmit(this.inflight);
+        // The resend is a post like any other: it waits out the interval.
+        this.schedule(Math.max(0, POST_INTERVAL_MS - (this.host.now() - this.lastPostAt)));
     }
 
     /** After an acknowledged batch: more output waits, or the turn idles under a keepalive. */

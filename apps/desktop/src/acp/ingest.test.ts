@@ -26,7 +26,10 @@ interface Post {
 class FakeBackend {
     public readonly chunks = new Map<string, HostEvent[]>();
 
-    public readonly posts: { post: Post; signature: string }[] = [];
+    /** Each body's size in UTF-8 bytes, as the backend's cap counts it. */
+    public readonly bodyBytes: number[] = [];
+
+    public readonly posts: { at: number; post: Post; signature: string }[] = [];
 
     public ended = new Set<string>();
 
@@ -38,7 +41,8 @@ class FakeBackend {
         const { payload, signature } = JSON.parse(String(init?.body)) as { payload: string; signature: string };
         const post = JSON.parse(payload) as Post;
 
-        this.posts.push({ post, signature });
+        this.posts.push({ at: clock, post, signature });
+        this.bodyBytes.push(Buffer.byteLength(String(init?.body)));
 
         const failure = this.failNext.shift();
 
@@ -315,6 +319,104 @@ describe("a turn", () => {
 
         expect(backend.posts.filter(({ post }) => post.turnId === "t1")).toHaveLength(1);
         expect(host.busy).toBe(false);
+    });
+
+    it("waits out the interval before it resends after a 409", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "one");
+        await settle(POST_INTERVAL_MS);
+        backend.respond = (post) => {
+            backend.respond = undefined;
+
+            return post.turnId === "t1" ? Response.json({ error: "gap", next: 2 }, { status: 409 }) : undefined;
+        };
+        host.text("s1", "t1", "two");
+        await settle(POST_INTERVAL_MS);
+
+        const turnPosts = backend.posts.filter(({ post }) => post.turnId === "t1");
+
+        expect(turnPosts).toHaveLength(2);
+
+        await settle(POST_INTERVAL_MS);
+
+        const all = backend.posts.filter(({ post }) => post.turnId === "t1");
+
+        expect(all).toHaveLength(3);
+        expect((all[2]?.at ?? 0) - (all[1]?.at ?? 0)).toBeGreaterThanOrEqual(POST_INTERVAL_MS);
+        expect(backend.texts("t1")).toBe("onetwo");
+    });
+
+    it.each([400, 413])("drops a turn the backend answers %i for, instead of resending it for ever", async (status) => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext = [status];
+        host.turnStarted("s1", "t1", "go");
+        await settle(POST_INTERVAL_MS);
+        await settle(KEEPALIVE_MS * 4);
+
+        expect(backend.posts.filter(({ post }) => post.turnId === "t1")).toHaveLength(1);
+        expect(host.busy).toBe(false);
+    });
+
+    it("cuts a permission request to the backend's limits, so a long command does not get the post refused", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.permissionRequested("s1", "t1", {
+            command: "x".repeat(50_000),
+            folder: "f".repeat(900),
+            kind: "permission_request",
+            options: Array.from({ length: 30 }, (_, index) => {
+                return { kind: "allow_once".padEnd(200, "k"), name: "n".repeat(500), optionId: `${"o".repeat(300)}${String(index)}` };
+            }),
+            requestId: "r".repeat(300),
+            target: "t".repeat(9000),
+            tool: "T".repeat(2000),
+        });
+        host.permissionResolved("s1", "t1", "r".repeat(300), "allowed");
+        await settle(POST_INTERVAL_MS);
+
+        const [, request, resolved] = backend.chunks.get("t1") ?? [];
+
+        expect(request).toMatchObject({ kind: "permission_request" });
+
+        const asked = request as Extract<HostEvent, { kind: "permission_request" }>;
+
+        expect(asked.command).toHaveLength(10_000);
+        expect(asked.folder).toHaveLength(500);
+        expect(asked.target).toHaveLength(2000);
+        expect(asked.tool).toHaveLength(500);
+        expect(asked.requestId).toHaveLength(128);
+        expect(asked.options).toHaveLength(16);
+        expect(asked.options.every((option) => option.kind.length <= 64 && option.name.length <= 200 && option.optionId.length <= 128)).toBe(true);
+        expect(resolved).toMatchObject({ kind: "permission_resolved", requestId: asked.requestId });
+    });
+
+    it("keeps every body under the backend's cap for a prompt and output in a script that takes three bytes a character", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "漢".repeat(90_000));
+
+        for (let step = 0; step < 40; step += 1) {
+            host.text("s1", "t1", "字".repeat(16_000));
+            host.text("s1", "t1", "\"\\".repeat(4000));
+        }
+
+        await settle(POST_INTERVAL_MS);
+        await settle(POST_INTERVAL_MS * 80);
+
+        const turnBodies = backend.posts.flatMap(({ post }, index) => post.turnId === "t1" ? [backend.bodyBytes[index] ?? 0] : []);
+
+        expect(turnBodies.length).toBeGreaterThan(1);
+        expect(Math.max(...turnBodies)).toBeLessThan(256 * 1024);
+        expect(backend.chunks.get("t1")?.[0]).toMatchObject({ kind: "turn_start" });
+        expect(backend.chunks.get("t1")).toHaveLength(81);
     });
 
     it("posts a keepalive while the turn is silent, so the reaper does not time it out", async () => {

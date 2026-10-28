@@ -1,27 +1,38 @@
 /**
  * How a host turn ends, from every direction: the host's `turn_end`, the reaper, a revoked device and Stop. Each
- * ends the stream through `endHostStream` (status and `hostState: ended` in one write); the host's own end and
- * Stop also save the reply from the chunks written so far.
+ * saves the reply from the chunks written so far (a timeout or a revoke as a failed one, so the thread says why)
+ * and ends the stream through `endHostStream` (status and `hostState: ended` in one write).
  */
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { addMessagesHandler } from "../../agent/messages";
 import { patchThread } from "../../agent/table-writes";
-import { endHostStream } from "../../chat/streaming/persistent/host";
+import { endHostStream, isLiveStream } from "../../chat/streaming/persistent/host";
 import { createAcpCancelCall } from "../../devices/lib/acp-call";
-import { appendToTranscript, buildHostReply, emptyTranscript, type HostReplyReason } from "./reply";
+import { appendToTranscript, buildHostReply, emptyTranscript, isTranscriptFull, type HostReplyReason } from "./reply";
 import { sessionOfThread, touchSession } from "./sessions";
 
 type Stream = Doc<"persistentStreams">;
 
-/** Everything the host wrote to a stream, in order. */
+const CHUNK_PAGE = 200;
+
+/** What the host wrote to a stream, in order, up to the reply cap. Pages through the chunks and stops once the text is full (reasoning after that point is not kept). */
 export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId: Id<"persistentStreams">) => {
     const transcript = emptyTranscript();
-    const { page } = await ctx.db.persistentChunks.findMany({ orderBy: [{ seq: "asc" }], where: { streamId } });
+    let cursor: string | undefined;
 
-    for (const chunk of page) {
-        appendToTranscript(transcript, chunk);
-    }
+    do {
+        const page = await ctx.db.persistentChunks.findMany({ cursor, limit: CHUNK_PAGE, orderBy: [{ seq: "asc" }], where: { streamId } });
+
+        for (const chunk of page.page) {
+            // Tool and permission events ride as `event` with no text of their own.
+            if (chunk.text.length > 0 || chunk.reasoning) {
+                appendToTranscript(transcript, chunk);
+            }
+        }
+
+        cursor = page.isDone || isTranscriptFull(transcript) ? undefined : (page.continueCursor ?? undefined);
+    } while (cursor);
 
     return transcript;
 };
@@ -57,20 +68,40 @@ const saveHostReply = async (ctx: MutationCtx, stream: Stream, reason: HostReply
     return messages[0]?._id as Id<"messages"> | undefined;
 };
 
-/** The host's `turn_end`: save the reply, end the stream, free the session. A stream that already ended is left alone. */
-export const finishHostTurn = async (ctx: MutationCtx, stream: Stream, end: { error?: string; reason: HostReplyReason }, now: number): Promise<boolean> => {
-    if (stream.status !== "pending" && stream.status !== "streaming") {
+const STATUS_OF: Record<HostReplyReason, "done" | "error" | "timeout"> = {
+    cancelled: "done",
+    failed: "error",
+    finished: "done",
+    interrupted: "error",
+    revoked: "error",
+    stopped: "done",
+    timeout: "timeout",
+};
+
+/**
+ * Saves the reply and ends the stream, whoever ends it. A stream that already ended is left alone (false). The
+ * session is not touched: the caller knows whether it goes idle (a turn's end) or is already ended (a revoke).
+ */
+export const endHostTurn = async (ctx: MutationCtx, stream: Stream, end: { error?: string; reason: HostReplyReason }, now: number): Promise<boolean> => {
+    if (!isLiveStream(stream)) {
         return false;
     }
 
     await saveHostReply(ctx, stream, end.reason, end.error);
 
-    const failed = end.reason === "failed" || end.reason === "interrupted";
-    const ended = await endHostStream(ctx, stream, { reason: end.reason, status: failed ? "error" : "done" }, now);
-    const session = await sessionOfThread(ctx, stream.threadId as Id<"threads">);
+    return await endHostStream(ctx, stream, { reason: end.reason, status: STATUS_OF[end.reason] }, now);
+};
 
-    if (session) {
-        await touchSession(ctx, session, "idle", now);
+/** The host's `turn_end` or Stop: {@link endHostTurn}, then the session is free again. */
+export const finishHostTurn = async (ctx: MutationCtx, stream: Stream, end: { error?: string; reason: HostReplyReason }, now: number): Promise<boolean> => {
+    const ended = await endHostTurn(ctx, stream, end, now);
+
+    if (ended) {
+        const session = await sessionOfThread(ctx, stream.threadId as Id<"threads">);
+
+        if (session) {
+            await touchSession(ctx, session, "idle", now);
+        }
     }
 
     return ended;

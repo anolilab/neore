@@ -15,6 +15,7 @@ import type { Infer } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../../_generated/dataModel";
+import { refuseHostThread } from "../../acp/lib/host-thread";
 import { internalMutation, internalQuery } from "../../_generated/server";
 import type { QueryCtx as QueryContext } from "../../_generated/server";
 import { loadActivePathTail } from "../../agent/branch-rows";
@@ -382,6 +383,10 @@ export const updateGroupChat = authMutation
 
         if (thread.userId !== userId) {
             throw new LunoraError("FORBIDDEN", "Only the thread owner can change its participants");
+        }
+
+        if (skillIds.length > 0) {
+            refuseHostThread(thread, "made a group chat");
         }
 
         if (skillIds.length === 0) {
