@@ -93,13 +93,16 @@ export const capPrompt = (text: string): string => {
     return cut;
 };
 
+const LIMIT_STOPS: ReadonlySet<StopReason | "failed"> = new Set(["failed", "max_tokens", "max_turn_requests"]);
+
 /** How a stop reason is told to the backend. */
 export const endReasonOf = (reason: StopReason | "failed"): "cancelled" | "failed" | "finished" => {
     if (reason === "cancelled") {
         return "cancelled";
     }
 
-    return reason === "failed" ? "failed" : "finished";
+    // An agent that stopped at a limit did not finish the turn: it is told as a failure until a usage-limit outcome exists.
+    return LIMIT_STOPS.has(reason) ? "failed" : "finished";
 };
 
 /** What one post came to: the backend's next `seq`, a request to resend from there, a refusal, or a reason to try again. */

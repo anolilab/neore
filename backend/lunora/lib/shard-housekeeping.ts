@@ -213,7 +213,9 @@ export const runShardTick = internalMutation
         // Also schedules `checkDueTasks` (see `triggers/schedule.ts`).
         await ctx.runMutation(internal.triggers.schedule.checkDueTriggers, {});
         // Coding-agent turns that went silent; re-arms this shard for the next one to expire.
-        await ctx.runMutation(internal.acp.ingest.reapHostStreams, {});
+        await bestEffort("reapHostStreams", async () => {
+            await ctx.runMutation(internal.acp.ingest.reapHostStreams, {});
+        });
 
         const { now } = ctx;
         const [trigger, task] = await Promise.all([

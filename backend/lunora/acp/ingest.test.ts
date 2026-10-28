@@ -665,6 +665,23 @@ describe("the reaper", () => {
         expect(await chunksOf(stream?._id)).toHaveLength(2);
     });
 
+    it("ends a silent stream whose prompt message is gone, without failing the tick", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("working")]);
+        await harness.run(async (ctx: any) => {
+            const stream = await ctx.db.persistentStreams.findFirst({ where: { hostTurnId: "t1" } });
+
+            await ctx.db.delete(stream.messageId);
+        });
+        await expire("t1", Date.now() - 1000);
+        await reap();
+
+        expect(await streamFor("t1")).toMatchObject({ hostEndReason: "timeout", status: "timeout" });
+        expect(await assistantRepliesOf(threadId)).toHaveLength(0);
+    });
+
     it("saves a failed reply even when the silent turn wrote nothing", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);

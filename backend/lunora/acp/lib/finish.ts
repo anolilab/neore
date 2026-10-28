@@ -9,6 +9,7 @@ import { addMessagesHandler } from "../../agent/messages";
 import { patchThread } from "../../agent/table-writes";
 import { endHostStream, isLiveStream } from "../../chat/streaming/persistent/host";
 import { createAcpCancelCall } from "../../devices/lib/acp-call";
+import { streamLogger } from "../../lib/logger";
 import { appendToTranscript, buildHostReply, emptyTranscript, isTranscriptFull, type HostReplyReason } from "./reply";
 import { sessionOfThread, touchSession } from "./sessions";
 
@@ -48,6 +49,12 @@ const saveHostReply = async (ctx: MutationCtx, stream: Stream, reason: HostReply
 
     // The thread was deleted while the turn ran: a reply saved now would outlive its cleanup.
     if (!thread || thread.deleted) {
+        return undefined;
+    }
+
+    // The prompt the reply answers is gone (a deleted message): saving would assert, and the reaper would
+    // fail the whole shard tick on it.
+    if (stream.messageId && !(await ctx.db.get(stream.messageId as Id<"messages">))) {
         return undefined;
     }
 
@@ -126,17 +133,22 @@ export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: numb
         return;
     }
 
-    await createAcpCancelCall(
-        ctx,
-        {
-            deviceId: session.deviceId,
-            hostSessionId: session.hostSessionId,
-            threadId: stream.threadId as Id<"threads">,
-            turnId: stream.hostTurnId,
-            userId: stream.userId,
-        },
-        now,
-    );
+    try {
+        await createAcpCancelCall(
+            ctx,
+            {
+                deviceId: session.deviceId,
+                hostSessionId: session.hostSessionId,
+                threadId: stream.threadId as Id<"threads">,
+                turnId: stream.hostTurnId,
+                userId: stream.userId,
+            },
+            now,
+        );
+    } catch (error) {
+        // Best effort, as above: the stream ends either way.
+        streamLogger.warn("[acp] could not ask the host to cancel a turn", error);
+    }
 };
 
 /** The sidebar's Stop for a host stream: keep what was written, end the stream, tell the host to cancel. */
