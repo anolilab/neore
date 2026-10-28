@@ -308,12 +308,21 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     // ─── Relay (site window) ───────────────────────────────────────────────
 
+    const pairAndOpenSessions = async (deviceId: string, secret: string, accountLabel: string): Promise<boolean> => {
+        const paired = await requireTransport().pair(deviceId, secret, accountLabel);
+
+        // Sessions opened before pairing stayed on this computer; they open on the backend now.
+        state.host?.paired();
+
+        return paired;
+    };
+
     relay(DEVICE_CHANNEL.status, () => requireTransport().status());
 
     relay(DEVICE_CHANNEL.pair, (_event, pairing) => {
         const { accountLabel, deviceId, secret } = readPairing(pairing);
 
-        return requireTransport().pair(deviceId, secret, accountLabel);
+        return pairAndOpenSessions(deviceId, secret, accountLabel);
     });
 
     relay(DEVICE_CHANNEL.manifest, async (_event, deviceId) => requireTransport().manifest(readOptionalDeviceId(deviceId)));

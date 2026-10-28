@@ -101,6 +101,13 @@ export class HostPoster implements SessionObserver {
         link.open();
     }
 
+    /** This computer was paired: the sessions that stayed local while it was not now open on the backend. */
+    public paired(): void {
+        for (const link of this.sessions.values()) {
+            link.paired();
+        }
+    }
+
     public turnStarted(sessionId: string, turnId: string, user: string): void {
         const link = this.sessions.get(sessionId);
 

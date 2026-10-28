@@ -28,6 +28,16 @@ export class SessionLink {
         clearTimeout(this.timer);
     }
 
+    /** The computer was paired after this session opened: tries `session_open` again if it was left local. */
+    public paired(): void {
+        if (this.threadId !== null) {
+            return;
+        }
+
+        this.threadId = undefined;
+        this.open();
+    }
+
     /** Posts `session_open` until the backend answers with the thread. */
     public async open(): Promise<void> {
         if (this.opening) {
@@ -49,8 +59,13 @@ export class SessionLink {
             const result = await this.poster.request(payload);
 
             if (result.kind === "ok" && result.threadId !== undefined) {
-                this.threadId = result.threadId;
-                this.poster.bound(this.sessionId, result.threadId);
+                // An ended session (its thread was deleted in the app) takes no more turns.
+                if (result.ended) {
+                    this.threadId = null;
+                } else {
+                    this.threadId = result.threadId;
+                    this.poster.bound(this.sessionId, result.threadId);
+                }
             } else if (result.kind === "refused") {
                 this.threadId = null;
             } else {
