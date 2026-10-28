@@ -565,6 +565,11 @@ jobs:
             - name: "Smoke-test the bundles and the addon"
               run: "pnpm --filter @neore/desktop run smoke"
 
+            # Launches the real shell: a terminal opens, runs a command and survives a reload, and every
+            # shell is gone after quit. Only the terminal cases run here; the rest of the suite is not green yet.
+            - name: "Run the terminal end-to-end tests"
+              run: "pnpm --filter @neore/desktop exec playwright test --grep terminal"
+
     test-required-check:
         needs: ["files-changed", "test", "e2e", "device-core", "desktop-package", "desktop-macos-check"]
         name: "Check Test Run"

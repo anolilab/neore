@@ -30,10 +30,17 @@ const $ = (id: string): HTMLElement => {
 };
 
 // Page-wide state, kept on one object so the functions below assign properties rather than module bindings.
-const state: { current: Prompt | null; expiryTimer?: ReturnType<typeof setInterval>; saves: Promise<void>; settings: SettingsView | null } = {
+const state: {
+    current: Prompt | null;
+    expiryTimer?: ReturnType<typeof setInterval>;
+    saves: Promise<void>;
+    settings: SettingsView | null;
+    terminalAvailable: boolean;
+} = {
     current: null,
     saves: Promise.resolve(),
     settings: null,
+    terminalAvailable: false,
 };
 
 const setText = (id: string, text: string): void => {
@@ -222,6 +229,31 @@ const removeRule = (rule: string): Promise<void> =>
         return { allowRules: latest.allowRules.filter((other) => other !== rule) };
     });
 
+const openTerminal = async (folder: string | null): Promise<void> => {
+    try {
+        await globalThis.neoreDevice.openTerminal(folder);
+        status("");
+    } catch (error) {
+        status(String(error));
+    }
+};
+
+const rootItem = (root: string): HTMLLIElement => {
+    const item = listItem(root, "Remove", () => removeRoot(root));
+
+    if (state.terminalAvailable) {
+        const button = document.createElement("button");
+
+        button.type = "button";
+        button.textContent = "Terminal";
+        button.setAttribute("aria-label", `Open a terminal in ${root}`);
+        button.addEventListener("click", () => openTerminal(root));
+        item.append(button);
+    }
+
+    return item;
+};
+
 const renderSettings = (): void => {
     if (state.settings === null) {
         return;
@@ -244,7 +276,7 @@ const renderSettings = (): void => {
             : `Not available on this computer: ${view.sandboxUnavailable}. ${unsandboxed}`,
     );
 
-    $("roots").replaceChildren(...view.roots.map((root) => listItem(root, "Remove", () => removeRoot(root))));
+    $("roots").replaceChildren(...view.roots.map((root) => rootItem(root)));
     $("servers").replaceChildren(
         ...view.mcpServers.map((server) =>
             listItem(`${server.name}: ${[server.command, ...server.args].join(" ")}`, "Remove", () => removeServer(server.name)),
@@ -274,7 +306,17 @@ const loadAudit = async (): Promise<void> => {
     );
 };
 
+const loadTerminalAvailability = async (): Promise<void> => {
+    const availability = await globalThis.neoreDevice.terminalAvailability();
+
+    state.terminalAvailable = availability.available;
+    setHidden("open-terminal", !availability.available);
+    setHidden("terminal-status", availability.available);
+    setText("terminal-status", availability.available ? "" : availability.reason);
+};
+
 const loadSettings = async (): Promise<void> => {
+    await loadTerminalAvailability();
     state.settings = await globalThis.neoreDevice.settingsGet();
     renderSettings();
     await loadAudit();
@@ -297,6 +339,8 @@ $("pick-root").addEventListener("click", async () => {
         await addRoot(folder);
     }
 });
+
+$("open-terminal").addEventListener("click", () => openTerminal(null));
 
 $("add-root").addEventListener("click", async () => {
     const field = $("typed-root") as HTMLInputElement;

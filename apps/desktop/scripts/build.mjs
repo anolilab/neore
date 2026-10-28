@@ -2,6 +2,7 @@
 // page into `dist/`. The site origin is baked in at build time (`NEORE_SITE_URL`):
 // there is no runtime override.
 import { copyFileSync, mkdirSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,6 +21,7 @@ const dist = path.join(root, "dist");
 rmSync(dist, { force: true, recursive: true });
 mkdirSync(path.join(dist, "quick-composer"), { recursive: true });
 mkdirSync(path.join(dist, "device-window"), { recursive: true });
+mkdirSync(path.join(dist, "terminal-window"), { recursive: true });
 
 const common = {
     bundle: true,
@@ -52,9 +54,19 @@ const preloadEntries = [
     ["site preload", path.join(root, "src/preload.ts"), path.join(dist, "preload.cjs")],
     ["Quick Composer preload", path.join(root, "src/quick-composer/preload.ts"), path.join(dist, "quick-composer", "preload.cjs")],
     ["device window preload", path.join(root, "src/device/window/preload.ts"), path.join(dist, "device-window", "preload.cjs")],
+    ["terminal window preload", path.join(root, "src/terminal/window/preload.ts"), path.join(dist, "terminal-window", "preload.cjs")],
 ];
 
 await esbuild.build({ ...common, entryPoints: [path.join(root, "src/main.ts")], outfile: path.join(dist, "main.cjs") });
+
+// The terminal host is its own process (an Electron utility process). `node-pty` is native: it stays outside the
+// bundle and is loaded from node_modules by the host, on the first spawn.
+await esbuild.build({
+    ...common,
+    external: [...common.external, "node-pty"],
+    entryPoints: [path.join(root, "src/terminal/host-main.ts")],
+    outfile: path.join(dist, "terminal-host.cjs"),
+});
 
 for (const [name, entryPoint, outfile] of preloadEntries) {
     assertSandboxedPreload(name, await esbuild.build({ ...common, entryPoints: [entryPoint], outfile, metafile: true }));
@@ -81,5 +93,26 @@ await esbuild.build({
 for (const file of ["device.html", "device.css"]) {
     copyFileSync(path.join(root, "src/device/window", file), path.join(dist, "device-window", file));
 }
+
+// The local terminal window's page, built like the device window's. The emulator's stylesheet is copied beside it.
+await esbuild.build({
+    bundle: true,
+    format: "iife",
+    platform: "browser",
+    target: "es2022",
+    entryPoints: [path.join(root, "src/terminal/window/terminal.ts")],
+    outfile: path.join(dist, "terminal-window", "terminal.js"),
+    sourcemap: !release,
+    logLevel: "info",
+});
+
+for (const file of ["terminal.html", "terminal.css"]) {
+    copyFileSync(path.join(root, "src/terminal/window", file), path.join(dist, "terminal-window", file));
+}
+
+copyFileSync(
+    path.join(path.dirname(createRequire(import.meta.url).resolve("@xterm/xterm/package.json")), "css", "xterm.css"),
+    path.join(dist, "terminal-window", "xterm.css"),
+);
 
 copyFileSync(path.join(root, "assets/icon.png"), path.join(dist, "icon.png"));
