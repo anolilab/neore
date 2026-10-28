@@ -152,7 +152,11 @@ def main():
             walls.append(wall)
             rsss.append(rss or 0)
             cpus.append(cpu or 0)
-        ten = next(os.path.join(clips_dir, f) for f in os.listdir(clips_dir) if f.startswith("00-en-10s"))
+        # The speed figure is for ONE known clip: a second match or a renamed file must stop the run, not pick whichever comes first.
+        controls = [f for f in os.listdir(clips_dir) if f.startswith("00-en-10s")]
+        if controls != ["00-en-10s.flac"]:
+            sys.exit(f"expected exactly 00-en-10s.flac as the control clip; found {controls}")
+        ten = os.path.join(clips_dir, controls[0])
         ten_out, ten_wall, ten_rss, ten_cpu, code = peak_rss_and_cpu([cli, "-m", path, "-f", ten, "-l", "en", "-nt", "-np", "-t", "4", *EXTRA_ARGS])
         if code != 0:
             sys.exit(f"{model} failed on the ten-second clip (exit {code})")
