@@ -1180,7 +1180,7 @@ impl DeviceState {
     pub(super) fn host_restart(&self, device_id: &str) {
         // A connect still waiting (on a passphrase) was opened with the settings from before this change; it must not
         // be installed afterwards with, say, agent forwarding the owner has just turned off.
-        self.ssh.disconnects.fetch_add(1, Ordering::SeqCst);
+        self.note_disconnect(device_id);
 
         let link = self.ssh.connections.lock().unwrap().remove(device_id);
 
