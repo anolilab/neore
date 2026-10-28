@@ -134,6 +134,13 @@ enum Open {
 /// `(name, kind, size)` per entry, and whether the listing was cut.
 type Listing = (Vec<(String, &'static str, u64)>, bool);
 
+/// One page of a folder in name order: its entries, whether more follow, and whether the folder was cut short.
+struct Page {
+    cut: bool,
+    entries: Vec<(String, &'static str, u64)>,
+    more: bool,
+}
+
 fn outside_roots() -> io::Error {
     io::Error::new(
         io::ErrorKind::PermissionDenied,
@@ -143,7 +150,8 @@ fn outside_roots() -> io::Error {
 
 #[cfg(unix)]
 mod confined {
-    use super::{outside_roots, Listing, Open};
+    use super::{outside_roots, Listing, Open, Page};
+    use std::collections::BinaryHeap;
     use std::ffi::{CString, OsStr};
     use std::fs::File;
     use std::io;
@@ -243,63 +251,158 @@ mod confined {
         openat(dir.as_raw_fd(), name, flags).map(File::from)
     }
 
-    /// `(name, kind, size)` of up to `max` entries of a directory, read through the descriptor that
-    /// `open_dir` confined. The `bool` says whether there were more.
-    pub fn entries(roots: &[PathBuf], path: &Path, max: usize) -> io::Result<Listing> {
-        let dir = open_dir(roots, path, true)?;
-        let fd = dir.as_raw_fd();
-        // SAFETY: `fdopendir` takes over `fd`, so the owner is forgotten and `closedir` closes it below.
-        let stream = unsafe { libc::fdopendir(fd) };
+    /// A folder opened by [`open_dir`] and read through that descriptor.
+    struct Stream {
+        fd: libc::c_int,
+        stream: *mut libc::DIR,
+    }
 
-        if stream.is_null() {
-            return Err(io::Error::last_os_error());
+    impl Stream {
+        fn open(roots: &[PathBuf], path: &Path) -> io::Result<Stream> {
+            let dir = open_dir(roots, path, true)?;
+            let fd = dir.as_raw_fd();
+            // SAFETY: `fdopendir` takes over `fd`, so the owner is forgotten and `closedir` (in `Drop`) closes it.
+            let stream = unsafe { libc::fdopendir(fd) };
+
+            if stream.is_null() {
+                return Err(io::Error::last_os_error());
+            }
+
+            std::mem::forget(dir);
+
+            Ok(Stream { fd, stream })
         }
 
-        std::mem::forget(dir);
+        /// Calls `visit` with each name but `.` and `..` until it answers `false`.
+        fn names(&mut self, mut visit: impl FnMut(&std::ffi::CStr) -> bool) {
+            loop {
+                // SAFETY: `stream` is a live DIR* until `closedir`; the entry is only read before the next call.
+                let entry = unsafe { libc::readdir(self.stream) };
 
-        let mut listed = Vec::new();
-        let mut truncated = false;
+                if entry.is_null() {
+                    return;
+                }
 
-        loop {
-            // SAFETY: `stream` is a live DIR* until `closedir`; the entry is only read before the next call.
-            let entry = unsafe { libc::readdir(stream) };
+                // SAFETY: `d_name` is a NUL-terminated string inside the entry returned above.
+                let name = unsafe { std::ffi::CStr::from_ptr((*entry).d_name.as_ptr()) };
 
-            if entry.is_null() {
-                break;
+                if !matches!(name.to_bytes(), b"." | b"..") && !visit(name) {
+                    return;
+                }
             }
+        }
 
-            // SAFETY: `d_name` is a NUL-terminated string inside the entry returned above.
-            let name = unsafe { std::ffi::CStr::from_ptr((*entry).d_name.as_ptr()) };
-
-            if matches!(name.to_bytes(), b"." | b"..") {
-                continue;
-            }
-
-            if listed.len() >= max {
-                truncated = true;
-                break;
-            }
-
+        /// What an entry is and its size, without following it.
+        fn kind(fd: libc::c_int, name: &std::ffi::CStr) -> (&'static str, u64) {
             // SAFETY: an all-zero `stat` is a valid out-parameter; `fstatat` fills it.
             let mut stat: libc::stat = unsafe { std::mem::zeroed() };
             // SAFETY: `fd` is still open (owned by `stream`) and `name` is NUL-terminated.
             let found =
                 unsafe { libc::fstatat(fd, name.as_ptr(), &mut stat, libc::AT_SYMLINK_NOFOLLOW) }
                     == 0;
-            let (kind, size) = match (found, stat.st_mode & libc::S_IFMT) {
+
+            match (found, stat.st_mode & libc::S_IFMT) {
                 (false, _) => ("unknown", 0),
                 (true, libc::S_IFLNK) => ("symlink", stat.st_size as u64),
                 (true, libc::S_IFDIR) => ("dir", stat.st_size as u64),
                 (true, _) => ("file", stat.st_size as u64),
-            };
+            }
+        }
+    }
+
+    impl Drop for Stream {
+        fn drop(&mut self) {
+            // SAFETY: `stream` came from `fdopendir` and is closed exactly once.
+            unsafe { libc::closedir(self.stream) };
+        }
+    }
+
+    /// `(name, kind, size)` of up to `max` entries of a directory, read through the descriptor that
+    /// `open_dir` confined. The `bool` says whether there were more.
+    pub fn entries(roots: &[PathBuf], path: &Path, max: usize) -> io::Result<Listing> {
+        let mut stream = Stream::open(roots, path)?;
+        let fd = stream.fd;
+        let mut listed = Vec::new();
+        let mut truncated = false;
+
+        stream.names(|name| {
+            if listed.len() >= max {
+                truncated = true;
+
+                return false;
+            }
+
+            let (kind, size) = Stream::kind(fd, name);
 
             listed.push((name.to_string_lossy().into_owned(), kind, size));
-        }
 
-        // SAFETY: `stream` came from `fdopendir` and is closed exactly once.
-        unsafe { libc::closedir(stream) };
+            true
+        });
 
         Ok((listed, truncated))
+    }
+
+    /// The `limit` smallest names greater than `after`, with their kinds, and whether more follow. Every name is
+    /// read but only `limit + 1` are kept, and only those are looked at with `fstatat`, so a page costs one pass
+    /// over the folder's names and memory for one page, however large the folder is. At most `scan` names are
+    /// read; `cut` says the folder had more.
+    pub fn page(
+        roots: &[PathBuf],
+        path: &Path,
+        after: Option<&str>,
+        limit: usize,
+        scan: usize,
+    ) -> io::Result<Page> {
+        let mut stream = Stream::open(roots, path)?;
+        // Largest on top, so the one to give up is always at hand. Compared as text, like the sorted listing.
+        let mut kept: BinaryHeap<(String, Vec<u8>)> = BinaryHeap::new();
+        let (mut scanned, mut cut) = (0usize, false);
+
+        stream.names(|name| {
+            if scanned >= scan {
+                cut = true;
+
+                return false;
+            }
+
+            scanned += 1;
+
+            let text = String::from_utf8_lossy(name.to_bytes());
+
+            if after.is_some_and(|after| text.as_ref() <= after) {
+                return true;
+            }
+
+            if kept.len() <= limit {
+                kept.push((text.into_owned(), name.to_bytes().to_vec()));
+            } else if kept
+                .peek()
+                .is_some_and(|largest| text.as_ref() < largest.0.as_str())
+            {
+                kept.pop();
+                kept.push((text.into_owned(), name.to_bytes().to_vec()));
+            }
+
+            true
+        });
+
+        let fd = stream.fd;
+        let mut names = kept.into_sorted_vec();
+        let more = names.len() > limit;
+
+        names.truncate(limit);
+
+        let entries = names
+            .into_iter()
+            .map(|(text, raw)| {
+                let (kind, size) = std::ffi::CString::new(raw)
+                    .map_or(("unknown", 0), |raw| Stream::kind(fd, &raw));
+
+                (text, kind, size)
+            })
+            .collect();
+
+        Ok(Page { cut, entries, more })
     }
 }
 
@@ -310,7 +413,7 @@ mod confined {
 /// file can still create it at a swapped-in place before the check; the file is then removed again.
 #[cfg(windows)]
 mod confined {
-    use super::{outside_roots, within_roots, Listing, Open};
+    use super::{outside_roots, within_roots, Listing, Open, Page};
     use std::ffi::OsString;
     use std::fs::{File, OpenOptions};
     use std::io;
@@ -614,6 +717,35 @@ mod confined {
 
         Ok((listed, truncated))
     }
+
+    /// A page of the folder in name order. Windows lists a folder in one call that already carries every
+    /// entry's attributes, so it is read whole (up to `scan` entries) and cut to the page.
+    pub fn page(
+        roots: &[PathBuf],
+        path: &Path,
+        after: Option<&str>,
+        limit: usize,
+        scan: usize,
+    ) -> io::Result<Page> {
+        let (mut listed, cut) = entries(roots, path, scan)?;
+
+        listed.sort();
+        listed.drain(
+            ..after.map_or(0, |after| {
+                listed.partition_point(|(name, _, _)| name.as_str() <= after)
+            }),
+        );
+
+        let more = listed.len() > limit;
+
+        listed.truncate(limit);
+
+        Ok(Page {
+            cut,
+            entries: listed,
+            more,
+        })
+    }
 }
 
 /// A folder opened for reading through the same walk as [`list`], for a caller that goes on by descriptor.
@@ -637,35 +769,28 @@ pub fn list(roots: &[PathBuf], path: &Path) -> Result<Value, String> {
 }
 
 /// One page of a folder, name-sorted: the entries after `after` (a name from the previous page's `next`), at most
-/// `limit` of them. A folder is read whole for each page, so a page costs the folder's size, not the page's;
-/// `fs_list` keeps its 1000-entry cut for the agent.
+/// `limit` of them. A page reads the folder's names but keeps and looks at only the page, so it costs a pass over
+/// the folder and memory for the page; `fs_list` keeps its 1000-entry cut for the agent.
 pub fn list_page(
     roots: &[PathBuf],
     path: &Path,
     after: Option<&str>,
     limit: usize,
 ) -> Result<Value, String> {
-    let (mut listed, cut) =
-        confined::entries(roots, path, MAX_FOLDER_ENTRIES).map_err(|error| error.to_string())?;
-
-    listed.sort();
-
-    let start = after.map_or(0, |after| {
-        listed.partition_point(|(name, _, _)| name.as_str() <= after)
-    });
-    let page = &listed[start..];
-    let more = page.len() > limit;
-    let page = &page[..page.len().min(limit)];
+    let page = confined::page(roots, path, after, limit, MAX_FOLDER_ENTRIES)
+        .map_err(|error| error.to_string())?;
+    let next = page
+        .more
+        .then(|| page.entries.last().map(|(name, _, _)| name.as_str()))
+        .flatten();
     let entries: Vec<Value> = page
+        .entries
         .iter()
         .map(|(name, kind, size)| json!({ "name": name, "type": kind, "size": size }))
         .collect();
-    let next = more
-        .then(|| page.last().map(|(name, _, _)| name.as_str()))
-        .flatten();
 
     Ok(
-        json!({ "path": path.to_string_lossy(), "entries": entries, "next": next, "truncated": cut }),
+        json!({ "path": path.to_string_lossy(), "entries": entries, "next": next, "truncated": page.cut }),
     )
 }
 
@@ -972,5 +1097,54 @@ mod tests {
         assert!(second["next"].is_null());
         assert!(names(&past_the_end).is_empty());
         assert!(list_page(&roots, &roots[0].join("a.txt"), None, 3).is_err());
+    }
+
+    #[test]
+    fn a_large_folder_pages_completely_in_name_order() {
+        let dir = scratch("many");
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+
+        for index in 0..2500 {
+            fs::write(dir.join(format!("root/f{index:05}")), "x").unwrap();
+        }
+
+        let mut seen = Vec::new();
+        let mut after: Option<String> = None;
+        let mut pages = 0;
+
+        loop {
+            let page = list_page(&roots, &roots[0], after.as_deref(), 1000).unwrap();
+
+            pages += 1;
+            seen.extend(page["entries"].as_array().unwrap().iter().map(|entry| {
+                (
+                    entry["name"].as_str().unwrap().to_owned(),
+                    entry["size"].as_u64().unwrap(),
+                )
+            }));
+
+            match page["next"].as_str() {
+                Some(next) => after = Some(next.to_owned()),
+                None => break,
+            }
+        }
+
+        // The file and folder `scratch` made, and the 2,500 more, once each and in order.
+        assert_eq!(pages, 3);
+        assert_eq!(seen.len(), 2502);
+        assert!(seen.windows(2).all(|pair| pair[0].0 < pair[1].0));
+        assert!(seen
+            .iter()
+            .any(|(name, size)| name == "f02499" && *size == 1));
+    }
+
+    #[test]
+    fn a_folder_larger_than_the_scan_cap_says_so() {
+        let dir = scratch("scan");
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+        let page = confined::page(&roots, &roots[0], None, 10, 1).unwrap();
+
+        assert!(page.cut);
+        assert_eq!(page.entries.len(), 1);
     }
 }

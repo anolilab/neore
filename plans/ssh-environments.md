@@ -306,19 +306,23 @@ Where S6 departs from the text above:
   they add nothing to `taintedBy`; what an agent's `fs_list`/`fs_read` on a server returns is a `device_*` result and
   is already `device`-tainted. What a server lists or holds is shown as text and labelled with the server's name.
 - `fs_list` keeps its 1000-entry cut (the agent's); the tree uses a new host op `list` that pages a folder by name
-  (`after` cursor, 2,000 per page). A page reads the folder whole, so it costs the folder's size, not the page's. Reads
+  (`after` cursor, 2,000 per page). A page reads the folder's names (one pass, at most 1,000,000) but keeps and looks at only the page, so it costs a pass over the folder and memory for the page. Reads
   go through the existing `fs_read` action (1 MiB, text).
 - The download is the host op `tar` (protocol 3, which a protocol-2 host does not speak: install the host software
   again). The host writes ustar by hand over the descriptor walk of `fs.rs` (a tar library opens by name); long paths
-  use a prefix or a PAX `path` record. Symlinks (inside the folder or out), FIFOs, devices and sockets are left out and
-  counted as `skipped`; modes lose setuid/setgid/sticky, owners are 0. Limits: 200,000 entries, 4 GiB, 64 levels.
+  use a prefix or a PAX `path` record. Symlinks (inside the folder or out), hard-linked files (another name may lie outside the folder), FIFOs, devices and
+  sockets are left out and counted as `skipped`; modes lose setuid/setgid/sticky, owners are 0. Limits: 200,000 entries, 4 GiB, 64 levels.
   The archive streams as raw chunk frames (256 KiB) followed by the normal response with what it holds; a `cancel` op
-  stops it, and so does a connection that ends. The desktop writes `<file>.part` and renames it when the answer says the
-  archive is complete, and never unpacks it.
+  stops it, and so does a connection that ends. The reader of the connection never waits for the disk (it carries every
+  other request's answer): chunks queue by bytes and a writer 64 MiB behind ends the download. The desktop writes a
+  `<file>.<pid>-<n>.part` of its own (created new) and renames it when the answer says the archive is complete, and never
+  unpacks it. Each list, read and download is an audit line (`files_list`, `files_read`, `files_download`, decision `window`).
 - A Windows host does not archive (no `openat`; the handle walk of `fs.rs` has no directory recursion yet).
 - Measured (debug build, local sshd, Apple silicon macOS 26, 10,000 files of 440 bytes in one folder, six runs): listing
-  the 10,001 entries in six pages took 0.46–0.78 s; the 10.2 MB tar took 0.69–1.29 s. Pinned in `tests/ssh_host.rs`:
-  5 s and 8 s.
+  the 10,001 entries in six pages took 0.46–0.78 s (0.28–0.42 s over three runs once a page kept only its own names); the
+  10.2 MB tar took 0.69–1.29 s. Pinned in `tests/ssh_host.rs`:
+  5 s and 8 s. These are from a laptop: the first green CI run's Ubuntu and macOS numbers (logged by the test) are to
+  be added here, and the budgets re-pinned if they leave less than 3× headroom. PENDING.
 - Not built: a progress bar or cancel button for a download (a disconnect or an idle minute ends one), and listing a
   whole tree in one request.
 
