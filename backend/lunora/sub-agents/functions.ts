@@ -46,6 +46,8 @@ import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
+import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
+import { MAX_LENGTH } from "../lib/validators";
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import {
     buildResultMessage,
@@ -1058,9 +1060,14 @@ export const createWorker = authMutation
         skill: v.optional(v.string().max(SUB_AGENT_SKILL_SLUG_MAX)),
         task: v.string().max(SUB_AGENT_TASK_MAX),
         toolAllowlist: v.optional(v.array(v.string().max(128)).max(SUB_AGENT_MAX_TOOLS)),
+        /** A locked chat's passcode proof, which every write to it needs. */
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(vWorkerReceipt)
     .mutation(async ({ args, ctx }) => {
+        // The same gate as every other write to the chat: a locked lead needs its proof before a worker starts under it.
+        throwUnlessGranted(await threadGateOutcome(ctx, { level: "write", threadId: args.leadThreadId, unlockProof: args.unlockProof, userId: ctx.user.userId }));
+
         const lead = await ctx.db.get(args.leadThreadId);
 
         return await dispatchOrThrow(ctx, {
@@ -1135,9 +1142,14 @@ const ALL_STATUSES = ["queued", "running", "succeeded", "failed", "cancelled"] a
 
 /** The workers of one of the caller's threads: name, whether archived, whether working. */
 export const listWorkers = authQuery
-    .input({ leadThreadId: v.id("threads") })
+    .input({ leadThreadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(v.array(vWorkerView))
     .query(async ({ args, ctx }) => {
+        // A locked lead shows nothing of its workers (their titles are its content) until it is unlocked.
+        if ((await threadGateOutcome(ctx, { level: "read", threadId: args.leadThreadId, unlockProof: args.unlockProof, userId: ctx.user.userId })) !== "ok") {
+            return [];
+        }
+
         const runs: RunDoc[] = [];
 
         for (const status of ALL_STATUSES) {

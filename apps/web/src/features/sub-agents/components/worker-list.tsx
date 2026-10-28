@@ -8,6 +8,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { useUnlockProof } from "@neore/client-runtime";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { skipToken, useQuery } from "@tanstack/react-query";
@@ -27,8 +28,11 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
     const crpc = useCRPC();
     const afterFirstPaint = useAfterFirstPaint();
     const updateThread = useUpdateThread();
+    const unlockProof = useUnlockProof(threadId ?? "");
     const { data: workers } = useQuery(
-        crpc.sub_agents.functions.listWorkers.queryOptions(threadId && afterFirstPaint ? { leadThreadId: threadId as Id<"threads"> } : skipToken),
+        crpc.sub_agents.functions.listWorkers.queryOptions(
+            threadId && afterFirstPaint ? { leadThreadId: threadId as Id<"threads">, unlockProof } : skipToken,
+        ),
     );
 
     if (!workers || workers.length === 0) {

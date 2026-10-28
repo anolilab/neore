@@ -37786,6 +37786,9 @@
                           "type": "string"
                         },
                         "type": "array"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -38417,6 +38420,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [

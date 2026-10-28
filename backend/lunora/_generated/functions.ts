@@ -7502,12 +7502,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["workerId"] !== "string") return DEFER;
 return { "workerId": source["workerId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_164.listWorkers.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["leadThreadId"] !== "string") return DEFER;
-return { "leadThreadId": source["leadThreadId"] };
-});
 installCompiledValidatorMap(lunora_sub_agents_functions_164.postResult.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -9417,12 +9411,12 @@ export interface Caller {
             claimRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<{ childThreadId?: string; clientId?: string; depth: number; mode?: "run" | "worker"; model?: string; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
             completeRun: (args: { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }) => Promise<boolean>;
             createRun: (args: { leadTools?: Array<string>; model?: string; name?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }) => Promise<{ runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
-            createWorker: (args: { clientId: string; leadThreadId: Id<"threads">; model?: string; name: string; skill?: string; task: string; toolAllowlist?: Array<string> }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
+            createWorker: (args: { clientId: string; leadThreadId: Id<"threads">; model?: string; name: string; skill?: string; task: string; toolAllowlist?: Array<string>; unlockProof?: string }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
             dispatchToWorker: (args: { clientId: string; message: string; workerId: Id<"threads"> }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
             getRunByToolCall: (args: { toolCallId: string }) => Promise<{ _id: Id<"subAgentRuns">; childThreadId: string | null; completedAt: number | null; createdAt: number; depth: number; error: string | null; result: string | null; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; task: string } | null>;
             getWorker: (args: { workerId: Id<"threads"> }) => Promise<{ activeRunId: Id<"subAgentRuns"> | null; archived: boolean; lastRunAt: number; lastRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled"; leadThreadId: string; name: string; state: "idle" | "queued" | "running"; workerId: string } | null>;
             listActiveWorkerRuns: (args?: {}) => Promise<Array<{ createdAt: number; leadThreadId: string; name: string; runId: Id<"subAgentRuns">; startedAt: number | null; status: "queued" | "running"; workerId: string }>>;
-            listWorkers: (args: { leadThreadId: Id<"threads"> }) => Promise<Array<{ activeRunId: Id<"subAgentRuns"> | null; archived: boolean; lastRunAt: number; lastRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled"; leadThreadId: string; name: string; state: "idle" | "queued" | "running"; workerId: string }>>;
+            listWorkers: (args: { leadThreadId: Id<"threads">; unlockProof?: string }) => Promise<Array<{ activeRunId: Id<"subAgentRuns"> | null; archived: boolean; lastRunAt: number; lastRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled"; leadThreadId: string; name: string; state: "idle" | "queued" | "running"; workerId: string }>>;
             messageWorker: (args: { message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: (args: { attempt: number; runId: Id<"subAgentRuns"> }) => Promise<null>;
             reapRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<null>;

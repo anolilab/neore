@@ -642,12 +642,12 @@ export interface ApiTypes {
     sub_agents: {
         functions: {
             cancelRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, { cancelled: boolean }>;
-            createWorker: FunctionReference<"mutation", { clientId: string; leadThreadId: Id<"threads">; model?: string; name: string; skill?: string; task: string; toolAllowlist?: Array<string> }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
+            createWorker: FunctionReference<"mutation", { clientId: string; leadThreadId: Id<"threads">; model?: string; name: string; skill?: string; task: string; toolAllowlist?: Array<string>; unlockProof?: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
             dispatchToWorker: FunctionReference<"mutation", { clientId: string; message: string; workerId: Id<"threads"> }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
             getRunByToolCall: FunctionReference<"query", { toolCallId: string }, { _id: Id<"subAgentRuns">; childThreadId: string | null; completedAt: number | null; createdAt: number; depth: number; error: string | null; result: string | null; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; task: string } | null>;
             getWorker: FunctionReference<"query", { workerId: Id<"threads"> }, { activeRunId: Id<"subAgentRuns"> | null; archived: boolean; lastRunAt: number; lastRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled"; leadThreadId: string; name: string; state: "idle" | "queued" | "running"; workerId: string } | null>;
             listActiveWorkerRuns: FunctionReference<"query", {}, Array<{ createdAt: number; leadThreadId: string; name: string; runId: Id<"subAgentRuns">; startedAt: number | null; status: "queued" | "running"; workerId: string }>>;
-            listWorkers: FunctionReference<"query", { leadThreadId: Id<"threads"> }, Array<{ activeRunId: Id<"subAgentRuns"> | null; archived: boolean; lastRunAt: number; lastRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled"; leadThreadId: string; name: string; state: "idle" | "queued" | "running"; workerId: string }>>;
+            listWorkers: FunctionReference<"query", { leadThreadId: Id<"threads">; unlockProof?: string }, Array<{ activeRunId: Id<"subAgentRuns"> | null; archived: boolean; lastRunAt: number; lastRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled"; leadThreadId: string; name: string; state: "idle" | "queued" | "running"; workerId: string }>>;
         };
     };
     system_prompts: {
