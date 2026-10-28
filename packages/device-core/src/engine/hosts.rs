@@ -3,13 +3,13 @@
 //! it, so the calls and the results are verified and signed HERE, with the server's secret; what goes down the pipe
 //! is the already approved action (`host.rs` runs it).
 
-use std::collections::HashSet;
 use std::path::PathBuf;
 use std::thread;
 
+use super::reconnect::{ConnectError, ReconnectView};
 use super::*;
 use crate::install::{self, Installed, Remote};
-use crate::ssh::{Hello, HostConnection, HostKey, Interact, HOST_VERSION};
+use crate::ssh::{Hello, HostConnection, HostKey, Interact, HOST_VERSION, MULTIPLEXING};
 
 /// At most as many servers as the backend lets one account pair devices.
 const MAX_HOSTS: usize = 10;
@@ -113,6 +113,9 @@ pub struct HostStatus {
     pub connected: bool,
     pub device_id: String,
     pub name: String,
+    /// Set while a server the person connected is being reconnected, or after it gave up.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reconnect: Option<ReconnectView>,
 }
 
 /// A server as the local window lists it.
@@ -125,9 +128,13 @@ pub struct HostView {
     pub device_id: String,
     pub forward_agent: bool,
     pub identity_file: Option<String>,
+    /// Whether this computer's ssh shares one connection between sessions to the server. Where it cannot
+    /// (Windows), each server has an ssh process of its own.
+    pub multiplexed: bool,
     pub name: String,
     pub platform: Option<String>,
     pub port: u16,
+    pub reconnect: Option<ReconnectView>,
     pub require_shell_sandbox: bool,
     pub roots: Vec<String>,
     pub sandbox_detail: Option<String>,
@@ -229,7 +236,7 @@ fn holds(slot: &Option<(Target, Arc<dyn HostLink>)>, link: &Arc<dyn HostLink>) -
         .is_some_and(|(_, held)| std::ptr::addr_eq(Arc::as_ptr(held), Arc::as_ptr(link)))
 }
 
-fn target_of(host: &Host) -> Target {
+pub(super) fn target_of(host: &Host) -> Target {
     Target {
         address: host.address.clone(),
         forward_agent: host.forward_agent,
@@ -242,6 +249,8 @@ fn target_of(host: &Host) -> Target {
 /// Asks the person at the local window what an SSH connection needs a person for.
 struct AskUser {
     changed_prompts: Arc<Mutex<HashSet<String>>>,
+    /// False for a reconnect in the background, which asks nobody anything: no trust prompt, no passphrase.
+    interactive: bool,
     prompts: Arc<Prompts>,
     sink: SharedSink,
 }
@@ -260,6 +269,10 @@ impl AskUser {
 
 impl Interact for AskUser {
     fn trust_key(&self, target: &Target, key: &HostKey) -> bool {
+        if !self.interactive {
+            return false;
+        }
+
         let body = PromptBody::HostKey {
             fingerprint: key.fingerprint(),
             host: target.address.clone(),
@@ -292,6 +305,7 @@ impl Interact for AskUser {
         };
         let ask = AskUser {
             changed_prompts: Arc::clone(&self.changed_prompts),
+            interactive: true,
             prompts: Arc::clone(&self.prompts),
             sink: Arc::clone(&self.sink),
         };
@@ -307,6 +321,10 @@ impl Interact for AskUser {
     }
 
     fn passphrase(&self, target: &Target, prompt: &str) -> Option<String> {
+        if !self.interactive {
+            return None;
+        }
+
         let body = PromptBody::Passphrase {
             host: format!("{}@{}", target.user, target.address),
             prompt: prompt.chars().take(300).collect(),
@@ -419,13 +437,18 @@ fn completed_or_failed(status: &str) -> &'static str {
 }
 
 impl DeviceState {
-    fn connection(&self, device_id: &str) -> Option<Arc<dyn HostLink>> {
+    pub(super) fn connection(&self, device_id: &str) -> Option<Arc<dyn HostLink>> {
         self.ssh.connections.lock().unwrap().get(device_id).cloned()
     }
 
     fn ask_user(&self) -> Arc<dyn Interact> {
+        self.ask_user_as(true)
+    }
+
+    fn ask_user_as(&self, interactive: bool) -> Arc<dyn Interact> {
         Arc::new(AskUser {
             changed_prompts: Arc::clone(&self.ssh.changed_prompts),
+            interactive,
             prompts: Arc::clone(&self.prompts),
             sink: Arc::clone(&self.sink),
         })
@@ -441,6 +464,7 @@ impl DeviceState {
                     .is_some_and(|link| link.is_alive()),
                 device_id: host.device_id.clone(),
                 name: host.name.clone(),
+                reconnect: self.reconnect_view(&host.device_id),
             })
             .collect()
     }
@@ -461,9 +485,11 @@ impl DeviceState {
                     device_id: host.device_id.clone(),
                     forward_agent: host.forward_agent,
                     identity_file: host.identity_file.clone(),
+                    multiplexed: MULTIPLEXING,
                     name: host.name.clone(),
                     platform: link.as_ref().map(|link| link.hello().platform.clone()),
                     port: host.port,
+                    reconnect: self.reconnect_view(&host.device_id),
                     require_shell_sandbox: !host.allow_unsandboxed_shell,
                     roots: host.roots.clone(),
                     sandbox_detail: link
@@ -478,7 +504,7 @@ impl DeviceState {
     /// Ends a session, and the server's master with it when no other session still rides it (a probe of the same
     /// server, a reconnect that already took its place). Not while host software is being installed there: the
     /// install runs over that same master, and exits it itself.
-    fn retire(&self, link: &Arc<dyn HostLink>) {
+    pub(super) fn retire(&self, link: &Arc<dyn HostLink>) {
         link.close();
 
         let Some(target) = link.target() else { return };
@@ -527,6 +553,14 @@ impl DeviceState {
         for link in stale {
             self.retire(&link);
         }
+
+        let settings = self.settings();
+
+        self.ssh
+            .keeps
+            .lock()
+            .unwrap()
+            .retain(|id, _| settings.hosts.iter().any(|host| host.device_id == *id));
     }
 
     pub(super) fn close_probe(&self) {
@@ -538,6 +572,8 @@ impl DeviceState {
     }
 
     pub(super) fn close_hosts(&self) {
+        self.keep_forget_all();
+
         let links: Vec<Arc<dyn HostLink>> = self
             .ssh
             .connections
@@ -553,24 +589,29 @@ impl DeviceState {
         }
     }
 
-    fn connect_target(&self, target: &Target) -> Result<Arc<dyn HostLink>, String> {
+    fn connect_target(
+        &self,
+        target: &Target,
+        interactive: bool,
+    ) -> Result<Arc<dyn HostLink>, ConnectError> {
         #[cfg(test)]
         if let Some(connector) = &self.ssh.connector {
             return connector(target);
         }
 
-        let link: Arc<dyn HostLink> = Arc::new(HostConnection::connect(
+        let link: Arc<dyn HostLink> = Arc::new(HostConnection::connect_within(
             target,
             &self.ssh.paths,
             &self.ssh.binary,
-            &self.ask_user(),
+            &self.ask_user_as(interactive),
+            Self::attempt_patience(interactive),
         )?);
 
         Ok(link)
     }
 
     /// Whether host software is being installed on `target` right now.
-    fn upgrade_running(&self, target: &Target) -> bool {
+    pub(super) fn upgrade_running(&self, target: &Target) -> bool {
         self.ssh
             .upgrading
             .lock()
@@ -750,7 +791,7 @@ impl DeviceState {
             drop(marked);
         }
 
-        let link = self.connect_target(&target)?;
+        let link = self.connect_target(&target, true)?;
 
         // Unpaired while the person was answering or the connection was opening: nothing may keep it.
         if usable_pairing(&self.settings()).is_err() {
@@ -912,8 +953,13 @@ impl DeviceState {
             .flatten();
 
         match committed {
-            Some(Some(previous)) => self.retire(&previous),
-            Some(None) => {}
+            Some(previous) => {
+                if let Some(previous) = previous {
+                    self.retire(&previous);
+                }
+
+                self.note_connected(device_id, &link);
+            }
             None => {
                 self.leave_probe(&link);
                 self.retire(&link);
@@ -925,8 +971,29 @@ impl DeviceState {
         Ok(true)
     }
 
-    /// Connects a paired server again (after a restart or a lost connection).
+    /// Connects a paired server (after a restart, or as a Retry once reconnecting gave up). From here on the server
+    /// is kept connected until it is disconnected: a lost link is retried in the background.
     pub fn host_connect(&self, device_id: &str) -> Result<HostProbe, String> {
+        self.keep_manual(device_id);
+
+        let result = self.connect_host(device_id, true);
+
+        if let Err(error) = &result {
+            self.keep_failed(device_id, error);
+        }
+
+        self.emit(Event::Changed);
+
+        result.map_err(|error| error.message)
+    }
+
+    /// One connection attempt. `interactive` is the person's own: it may ask for a passphrase. The keeper's runs
+    /// silent. Only one attempt runs per server at a time.
+    pub(super) fn connect_host(
+        &self,
+        device_id: &str,
+        interactive: bool,
+    ) -> Result<HostProbe, ConnectError> {
         let host = self
             .settings()
             .hosts
@@ -935,6 +1002,8 @@ impl DeviceState {
             .ok_or("that server is not paired with this computer")?;
 
         if let Some(link) = self.connection(device_id).filter(|link| link.is_alive()) {
+            self.note_connected(device_id, &link);
+
             return Ok(HostProbe::of(link.hello()));
         }
 
@@ -944,11 +1013,15 @@ impl DeviceState {
             return Err(format!(
                 "{}'s host software is being upgraded; connect again in a moment",
                 host.name
-            ));
+            )
+            .into());
         }
 
+        let Some(_attempt) = self.begin_attempt(device_id) else {
+            return Err(format!("{} is already connecting", host.name).into());
+        };
         let disconnects = self.ssh.disconnects.load(Ordering::SeqCst);
-        let link = self.connect_target(&target)?;
+        let link = self.connect_target(&target, interactive)?;
         let probe = HostProbe::of(link.hello());
 
         // Disconnected while the connect was waiting: the user asked for that, and it stays asked.
@@ -985,13 +1058,15 @@ impl DeviceState {
             return Err(format!(
                 "{}'s host software is being upgraded; connect again in a moment",
                 host.name
-            ));
+            )
+            .into());
         };
 
         if let Some(previous) = previous {
             self.retire(&previous);
         }
 
+        self.note_connected(device_id, &link);
         self.emit(Event::Changed);
 
         Ok(probe)
@@ -1028,6 +1103,7 @@ impl DeviceState {
 
     pub fn host_disconnect(&self, device_id: &str) {
         self.ssh.disconnects.fetch_add(1, Ordering::SeqCst);
+        self.keep_forget(device_id);
 
         let link = self.ssh.connections.lock().unwrap().remove(device_id);
 
@@ -1347,6 +1423,7 @@ mod tests {
     use crate::store::test_keychain;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
     use std::sync::Barrier;
+    use std::time::Instant;
 
     const DESKTOP_SECRET: &str = "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0";
     const HOST_SECRET: &str = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1";
@@ -1359,6 +1436,11 @@ mod tests {
         runs: Mutex<Vec<Value>>,
         closed: AtomicUsize,
         master_exits: AtomicUsize,
+        launch: Option<String>,
+        /// The launches the engine asked this session to stop, one list per request.
+        reaped: Mutex<Vec<Vec<String>>>,
+        /// What `master_suspect` answers.
+        suspect: AtomicBool,
         /// Makes the first `hello()` rendezvous twice with the test, which acts in between.
         gate: Mutex<Option<Arc<Barrier>>>,
         target: Option<Target>,
@@ -1366,11 +1448,19 @@ mod tests {
 
     impl FakeLink {
         fn new(sandbox: bool) -> Arc<FakeLink> {
+            Self::launched(sandbox, None)
+        }
+
+        /// A session that started `neore-host` under the launch id `launch`.
+        fn launched(sandbox: bool, launch: Option<&str>) -> Arc<FakeLink> {
             Arc::new(FakeLink {
                 alive: AtomicBool::new(true),
                 closed: AtomicUsize::new(0),
                 gate: Mutex::default(),
+                launch: launch.map(str::to_owned),
                 master_exits: AtomicUsize::new(0),
+                reaped: Mutex::default(),
+                suspect: AtomicBool::new(false),
                 target: Some(target_of(&server("host-1"))),
                 hello: Hello {
                     platform: "linux".into(),
@@ -1401,6 +1491,23 @@ mod tests {
 
         fn exit_master(&self) {
             self.master_exits.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn launch_id(&self) -> Option<&str> {
+            self.launch.as_deref()
+        }
+
+        fn master_suspect(&self) -> bool {
+            self.suspect.load(Ordering::SeqCst)
+        }
+
+        fn reap(&self, ids: &[String]) -> Result<crate::launch::Reaped, String> {
+            self.reaped.lock().unwrap().push(ids.to_vec());
+
+            Ok(crate::launch::Reaped {
+                stopped: ids.to_vec(),
+                ..Default::default()
+            })
         }
 
         fn hello(&self) -> &Hello {
@@ -2593,6 +2700,245 @@ mod tests {
         ask.key_changed(&target, &["a".into()], &["b".into()]);
         notices(2);
         state.prompts.deny_all();
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────
+
+    /// Waits for `condition` for up to two seconds.
+    fn eventually(what: &str, condition: impl Fn() -> bool) {
+        for _ in 0..400 {
+            if condition() {
+                return;
+            }
+
+            thread::sleep(Duration::from_millis(5));
+        }
+
+        panic!("{what}");
+    }
+
+    /// An engine whose server was connected by hand over `first` (so the keeper has it) and which connects over
+    /// whatever `connector` hands out afterwards.
+    fn kept(
+        name: &str,
+        first: &Arc<FakeLink>,
+        connector: impl Fn() -> Result<Arc<dyn HostLink>, ConnectError> + Send + Sync + 'static,
+    ) -> (Arc<DeviceState>, PathBuf) {
+        let (mut state, dir, _) = engine(name, first);
+
+        state.ssh.connector = Some(Box::new(move |_| connector()));
+        state.note_connected(&host_id(name), &(Arc::clone(first) as Arc<dyn HostLink>));
+
+        (Arc::new(state), dir)
+    }
+
+    fn phase_of(state: &DeviceState, name: &str) -> Option<ReconnectView> {
+        state.reconnect_view(&host_id(name))
+    }
+
+    #[test]
+    fn a_lost_link_is_replaced_in_the_background_old_session_first() {
+        let first = FakeLink::new(true);
+        let second = FakeLink::new(true);
+        let next = Arc::clone(&second);
+        let (state, dir) = kept("lost", &first, move || {
+            Ok(Arc::clone(&next) as Arc<dyn HostLink>)
+        });
+        let now = Instant::now();
+
+        // The network went away: ssh gave up on the connection, so the master may be wedged.
+        first.alive.store(false, Ordering::SeqCst);
+        first.suspect.store(true, Ordering::SeqCst);
+        state.reconnect_tick(now);
+
+        let waiting = phase_of(&state, "lost").unwrap();
+
+        assert_eq!((waiting.phase, waiting.attempt), ("waiting", Some(1)));
+        assert_eq!(
+            first.closed.load(Ordering::SeqCst),
+            1,
+            "the old session stayed open"
+        );
+        assert_eq!(
+            first.master_exits.load(Ordering::SeqCst),
+            1,
+            "a wedged master was kept"
+        );
+        assert!(state.connection(&host_id("lost")).is_none());
+
+        // Not before the wait is over.
+        state.reconnect_tick(now + Duration::from_secs(1));
+        assert_eq!(second.closed.load(Ordering::SeqCst), 0);
+        assert!(state.connection(&host_id("lost")).is_none());
+
+        state.reconnect_tick(now + Duration::from_secs(2));
+        eventually("the server was not reconnected", || {
+            state.connection(&host_id("lost")).is_some()
+        });
+        state.reconnect_tick(now + Duration::from_secs(3));
+
+        assert!(
+            phase_of(&state, "lost").is_none(),
+            "{:?}",
+            phase_of(&state, "lost")
+        );
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_host_that_merely_ended_leaves_the_master_for_the_next_session_to_share() {
+        let first = FakeLink::new(true);
+        let (state, dir) = kept("ended", &first, || Err("down".into()));
+
+        first.alive.store(false, Ordering::SeqCst);
+        state.reconnect_tick(Instant::now());
+
+        assert_eq!(first.closed.load(Ordering::SeqCst), 1);
+        assert_eq!(first.master_exits.load(Ordering::SeqCst), 0);
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn attempts_back_off_and_a_failure_that_needs_a_person_waits_for_a_retry() {
+        let first = FakeLink::new(true);
+        let failures = Arc::new(Mutex::new(vec![
+            ConnectError {
+                message: "no route".into(),
+                retryable: true,
+            },
+            ConnectError {
+                message: "the login was refused".into(),
+                retryable: false,
+            },
+        ]));
+        let queue = Arc::clone(&failures);
+        let (state, dir) = kept("backoff", &first, move || {
+            Err(queue.lock().unwrap().remove(0))
+        });
+        let start = Instant::now();
+
+        first.alive.store(false, Ordering::SeqCst);
+        state.reconnect_tick(start);
+
+        // First attempt after two seconds; it fails and the next wait is four.
+        state.reconnect_tick(start + Duration::from_secs(2));
+        eventually("the first attempt did not finish", || {
+            failures.lock().unwrap().len() == 1
+        });
+        eventually("the wait did not double", || {
+            phase_of(&state, "backoff")
+                .is_some_and(|view| view.attempt == Some(2) && view.phase == "waiting")
+        });
+
+        let waiting = phase_of(&state, "backoff").unwrap();
+        let in_ms = waiting.next_attempt_at.unwrap().saturating_sub(now_ms());
+
+        assert!((3_000..=4_000).contains(&in_ms), "{in_ms}");
+
+        // A login nobody can fix by waiting stops the attempts at once.
+        state.reconnect_tick(start + Duration::from_secs(60));
+        eventually("the refusal did not stop the attempts", || {
+            phase_of(&state, "backoff").is_some_and(|view| view.phase == "gaveUp")
+        });
+        assert_eq!(
+            phase_of(&state, "backoff").unwrap().reason.as_deref(),
+            Some("the login was refused")
+        );
+        state.reconnect_tick(start + Duration::from_secs(3600));
+        assert!(
+            failures.lock().unwrap().is_empty(),
+            "it tried again by itself"
+        );
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_retry_starts_the_attempts_over_and_a_disconnect_ends_the_keeping() {
+        let first = FakeLink::new(true);
+        let back = FakeLink::new(true);
+        let next = Arc::clone(&back);
+        let (state, dir) = kept("retry", &first, move || {
+            Ok(Arc::clone(&next) as Arc<dyn HostLink>)
+        });
+        let id = host_id("retry");
+
+        // The link is gone and the person's own attempt failed: the keeper waits for a Retry.
+        state.ssh.connections.lock().unwrap().remove(&id);
+        state.keep_manual(&id);
+        state.keep_failed(&id, &"the passphrase was not given".into());
+
+        assert_eq!(phase_of(&state, "retry").unwrap().phase, "gaveUp");
+
+        state.host_connect(&id).unwrap();
+
+        assert!(phase_of(&state, "retry").is_none());
+        assert!(state.connection(&id).is_some_and(|link| link.is_alive()));
+
+        // Disconnected by hand: the keeper has nothing to bring back.
+        state.host_disconnect(&id);
+        state.reconnect_tick(Instant::now() + Duration::from_secs(3600));
+
+        assert!(state.ssh.keeps.lock().unwrap().is_empty());
+        assert!(state.connection(&id).is_none());
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_background_attempt_asks_nobody_and_one_server_has_one_attempt_at_a_time() {
+        let first = FakeLink::new(true);
+        let (state, dir, _) = engine("silent", &first);
+        let ask = state.ask_user_as(false);
+        let target = target_of(&server(&host_id("silent")));
+        let key = HostKey {
+            blob: "AAAA".into(),
+            key_type: "ssh-ed25519".into(),
+        };
+
+        assert!(!ask.trust_key(&target, &key));
+        assert_eq!(ask.passphrase(&target, "Enter passphrase"), None);
+        assert!(state.prompt_current().is_none(), "a prompt was queued");
+
+        let id = host_id("silent");
+        let slot = state.begin_attempt(&id).unwrap();
+
+        assert!(state.begin_attempt(&id).is_none());
+        drop(slot);
+        assert!(state.begin_attempt(&id).is_some());
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_new_session_stops_the_launches_this_computer_left_and_no_others() {
+        let old = FakeLink::launched(true, Some("11111111111111111111111111111111"));
+        let new = FakeLink::launched(true, Some("22222222222222222222222222222222"));
+        let (state, dir, _) = engine("reap", &old);
+        let id = host_id("reap");
+
+        state.note_connected(&id, &(Arc::clone(&old) as Arc<dyn HostLink>));
+        assert!(
+            old.reaped.lock().unwrap().is_empty(),
+            "the first session reaped something"
+        );
+
+        state.note_connected(&id, &(Arc::clone(&new) as Arc<dyn HostLink>));
+
+        assert_eq!(
+            new.reaped.lock().unwrap().as_slice(),
+            [vec!["11111111111111111111111111111111".to_owned()]],
+            "only the launch this computer made earlier is named"
+        );
+        assert_eq!(
+            state.ssh.launches.lock().unwrap()[&id],
+            ["22222222222222222222222222222222"],
+            "a reaped launch stays on the list"
+        );
 
         let _ = stdfs::remove_dir_all(dir);
     }

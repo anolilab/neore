@@ -95,9 +95,12 @@ impl DeviceCore {
             None => state,
         };
 
-        Ok(DeviceCore {
-            state: Arc::new(state),
-        })
+        let state = Arc::new(state);
+
+        // Reconnects a server the user connected when its link drops, and reaps what a lost session left running.
+        state.supervise();
+
+        Ok(DeviceCore { state })
     }
 
     /// `{ accountLabel, deviceId, platform }` (JSON).
@@ -203,7 +206,7 @@ impl DeviceCore {
         })
     }
 
-    /// Connects a paired server again. Resolves what the server reported (JSON).
+    /// Connects a paired server, or tries again once reconnecting gave up; from then on a lost link is retried in the background. Resolves what the server reported (JSON).
     #[napi]
     pub fn host_connect<'env>(
         &self,

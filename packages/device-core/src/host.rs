@@ -24,9 +24,11 @@ use crate::actions::{
     MAX_ROOTS,
 };
 use crate::frame::{read_frame, write_frame};
+use crate::launch;
 use crate::sandbox::{self, Support};
 
-pub const PROTOCOL_VERSION: u32 = 1;
+/// 2: the `reap` request.
+pub const PROTOCOL_VERSION: u32 = 2;
 /// Requests being served at once; a further one is refused, not queued behind a ten-minute command.
 const MAX_IN_FLIGHT: usize = 8;
 
@@ -43,9 +45,10 @@ pub enum Outgoing {
     Response {
         id: u64,
         ok: bool,
-        /// The action's outcome when `ok`. A failed action is still `ok`: its status says so.
+        /// The action's outcome (`run`) or the reap report when `ok`. A failed action is still `ok`: its status
+        /// says so.
         #[serde(skip_serializing_if = "Option::is_none")]
-        result: Option<Outcome>,
+        result: Option<Value>,
         /// Why the request itself could not be served, when not `ok`.
         #[serde(skip_serializing_if = "Option::is_none")]
         error: Option<String>,
@@ -190,7 +193,39 @@ fn refuse(id: u64, error: impl Into<String>) -> Outgoing {
     }
 }
 
-fn serve_request(op: &str, params: Value, id: u64, received: Instant) -> Outgoing {
+/// The `reap` request: the launches to stop, by id.
+#[derive(Deserialize)]
+struct ReapParams {
+    launches: Vec<String>,
+}
+
+fn serve_reap(params: Value, id: u64, own: Option<&str>) -> Outgoing {
+    let Ok(params) = serde_json::from_value::<ReapParams>(params) else {
+        return refuse(id, "invalid reap params");
+    };
+    let Some(dir) = launch::run_dir() else {
+        return refuse(id, "this machine's home directory is unknown");
+    };
+
+    Outgoing::Response {
+        id,
+        ok: true,
+        result: serde_json::to_value(launch::reap(&dir, &params.launches, own)).ok(),
+        error: None,
+    }
+}
+
+fn serve_request(
+    op: &str,
+    params: Value,
+    id: u64,
+    received: Instant,
+    own: Option<&str>,
+) -> Outgoing {
+    if op == "reap" {
+        return serve_reap(params, id, own);
+    }
+
     if op != "run" {
         return refuse(id, format!("unknown op {op}"));
     }
@@ -203,7 +238,7 @@ fn serve_request(op: &str, params: Value, id: u64, received: Instant) -> Outgoin
         Ok(outcome) => Outgoing::Response {
             id,
             ok: true,
-            result: Some(outcome),
+            result: serde_json::to_value(outcome).ok(),
             error: None,
         },
         Err(_) => refuse(id, "the host failed while running the action"),
@@ -224,7 +259,16 @@ impl Drop for Slot {
 /// broken stream or a request that is not a request, and the caller ends the connection on it. Either way
 /// it returns only once the requests still running have finished: each run's own timeout is what stops a
 /// command, so a host that went away first would leave the shell unsupervised.
-pub fn serve<R, W>(mut reader: R, writer: W) -> io::Result<()>
+pub fn serve<R, W>(reader: R, writer: W) -> io::Result<()>
+where
+    R: Read,
+    W: Write + Send + 'static,
+{
+    serve_launch(reader, writer, None)
+}
+
+/// [`serve`] as the launch `own` (its id), which a `reap` request never stops.
+pub fn serve_launch<R, W>(mut reader: R, writer: W, own: Option<&str>) -> io::Result<()>
 where
     R: Read,
     W: Write + Send + 'static,
@@ -240,6 +284,7 @@ where
         &in_flight,
         &reply_failed,
         &mut running,
+        own,
     );
 
     for request in running {
@@ -255,6 +300,7 @@ fn serve_requests<R, W>(
     in_flight: &Arc<AtomicUsize>,
     reply_failed: &Arc<AtomicBool>,
     running: &mut Vec<thread::JoinHandle<()>>,
+    own: Option<&str>,
 ) -> io::Result<()>
 where
     R: Read,
@@ -294,13 +340,19 @@ where
         let slot = Slot(Arc::clone(in_flight));
         let writer = Arc::clone(writer);
         let reply_failed = Arc::clone(reply_failed);
+        let own = own.map(str::to_owned);
 
         running.retain(|request| !request.is_finished());
         running.push(thread::spawn(move || {
             let _slot = slot;
 
             // The reader sees the flag on its next frame, or its own EOF if the desktop is gone.
-            if send(&writer, &serve_request(&op, params, id, received)).is_err() {
+            if send(
+                &writer,
+                &serve_request(&op, params, id, received, own.as_deref()),
+            )
+            .is_err()
+            {
                 reply_failed.store(true, Ordering::SeqCst);
             }
         }));
