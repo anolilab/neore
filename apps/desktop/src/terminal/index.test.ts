@@ -418,7 +418,7 @@ describe("a terminal on a server", () => {
     });
 
     it("is refused where no terminal is offered", async () => {
-        const platform = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+        const platform = vi.spyOn(process, "platform", "get").mockReturnValue("freebsd");
 
         fake.handlers.clear();
 
@@ -436,11 +436,9 @@ describe("a terminal on a server", () => {
         await terminals.openSsh(server());
         await startShell();
 
-        const kill = vi.spyOn(process, "kill").mockImplementation(() => true);
-
         fake.appListeners.get("before-quit")?.();
 
-        expect(kill).toHaveBeenCalledWith(9000, "SIGHUP");
+        expect(hangUp).toHaveBeenCalledWith(9000);
     });
 });
 
