@@ -41,7 +41,11 @@ interface NativeBridge {
 /** The device relay the shell exposes when it advertises `device` (`apps/desktop/src/preload.ts`). Relay only. */
 interface NativeDeviceRelay {
     execute: (call: { envelope: string; signature: string }) => Promise<NativeSigned>;
-    manifest: () => Promise<NativeSigned>;
+    hostConnect: (deviceId: string) => Promise<NativeHostProbe>;
+    hostDisconnect: (deviceId: string) => Promise<void>;
+    hostPair: (pairing: { deviceId: string; secret: string; spec: NativeHostSpec }) => Promise<boolean>;
+    hostProbe: (spec: NativeHostSpec) => Promise<NativeHostProbe>;
+    manifest: (deviceId?: string) => Promise<NativeSigned>;
     onChanged: (handler: () => void) => UnlistenFunction;
     onProgress: (handler: (report: NativeDeviceProgress) => void) => UnlistenFunction;
     openSettings: () => Promise<void>;
@@ -288,11 +292,37 @@ export const completeNativeSignIn = async (signIn: NativeSignIn, fetchImpl: type
 
 export type NativeDevicePlatform = "linux" | "macos" | "windows";
 
+/** A server this computer speaks for, and whether the shell is connected to it right now. */
+export interface NativeHostStatus {
+    connected: boolean;
+    deviceId: string;
+    name: string;
+}
+
 export interface NativeDeviceStatus {
     accountLabel?: string | null;
     /** The backend device this shell is paired as; absent when unpaired. */
     deviceId?: string | null;
+    /** The servers reached over SSH that this shell holds the secrets of. Absent from an older shell. */
+    hosts?: NativeHostStatus[];
     platform: NativeDevicePlatform;
+}
+
+/** Where a server is and how to log in. The shell validates it and asks the user before anything connects. */
+export interface NativeHostSpec {
+    address: string;
+    identityFile?: string;
+    name: string;
+    port?: number;
+    user: string;
+}
+
+/** What a connected server reported about itself. */
+export interface NativeHostProbe {
+    platform: NativeDevicePlatform;
+    sandboxAvailable: boolean;
+    sandboxDetail: string;
+    version: string;
 }
 
 /** A payload and its HMAC, exactly as the shell or the backend signed it. */
@@ -327,8 +357,42 @@ export const pairNativeDevice = async (pairing: { accountLabel: string; deviceId
     }
 };
 
-/** `undefined` until the shell advertises `device`. */
-export const getNativeDeviceManifest = async (): Promise<NativeSigned | undefined> => getDeviceBridge()?.manifest();
+/** `undefined` until the shell advertises `device`. With a device id: that server's manifest, signed with its own secret. */
+export const getNativeDeviceManifest = async (deviceId?: string): Promise<NativeSigned | undefined> => getDeviceBridge()?.manifest(deviceId);
+
+/**
+ * Connects a server that is not paired yet. The shell asks the user to trust its key on first use and for a key
+ * passphrase, in its own window. Rejects with the reason when it cannot connect.
+ */
+export const probeNativeHost = async (spec: NativeHostSpec): Promise<NativeHostProbe> => {
+    const relay = getDeviceBridge();
+
+    if (relay === undefined) {
+        throw new Error("This desktop app cannot connect to servers");
+    }
+
+    return relay.hostProbe(spec);
+};
+
+/** Stores the probed server with the secret the backend minted for it. `false` when the user declined in the shell. */
+export const pairNativeHost = async (pairing: { deviceId: string; secret: string; spec: NativeHostSpec }): Promise<boolean> => {
+    try {
+        return (await getDeviceBridge()?.hostPair(pairing)) === true;
+    } catch {
+        return false;
+    }
+};
+
+/** Connects a paired server again. Rejects with the reason (a changed host key, a refused login…). */
+export const connectNativeHost = async (deviceId: string): Promise<NativeHostProbe | undefined> => getDeviceBridge()?.hostConnect(deviceId);
+
+export const disconnectNativeHost = async (deviceId: string): Promise<void> => {
+    try {
+        await getDeviceBridge()?.hostDisconnect(deviceId);
+    } catch {
+        // Already gone.
+    }
+};
 
 /** Rejects until the shell advertises `device`; otherwise the shell's own rejection reaches the caller. */
 export const executeOnNativeDevice = async (call: { envelope: string; signature: string }): Promise<NativeSigned> => {
@@ -353,6 +417,8 @@ export const openNativeDeviceSettings = async (): Promise<void> => {
 /** A signed "prompting" / "running" report for one call, relayed as-is to `reportDeviceCallProgress`. */
 export interface NativeDeviceProgress extends NativeSigned {
     callId: string;
+    /** The device the report is for: this computer, or a server it speaks for. */
+    deviceId: string;
 }
 
 /** Signed progress reports for calls this page relayed; a no-op until the shell advertises `device`. */

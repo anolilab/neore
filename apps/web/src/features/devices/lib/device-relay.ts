@@ -15,24 +15,32 @@ export const DEVICE_HEARTBEAT_MS = 30_000;
 
 export interface PendingDeviceCall {
     callId: string;
+    /** The device the call is for: this computer, or one of the servers it speaks for. */
+    deviceId: string;
     envelope: string;
     signature: string;
 }
 
 export interface DeviceRelayPorts {
-    claim: (callId: string) => Promise<boolean>;
-    complete: (callId: string, result: NativeSigned) => Promise<void>;
+    claim: (call: PendingDeviceCall) => Promise<boolean>;
+    complete: (call: PendingDeviceCall, result: NativeSigned) => Promise<void>;
     execute: (call: PendingDeviceCall) => Promise<NativeSigned>;
     /** The shell refused the envelope itself: fail the call now rather than at its deadline. */
-    release: (callId: string, reason: string) => Promise<void>;
+    release: (call: PendingDeviceCall, reason: string) => Promise<void>;
 }
+
+/**
+ * The desktop to name when acting for `deviceId`: a server is addressed with the desktop that holds it, the
+ * desktop itself with none. The backend compares it with the server's row.
+ */
+export const viaDeviceFor = (desktopId: string, deviceId: string): string | undefined => (deviceId === desktopId ? undefined : desktopId);
 
 export type DeviceRelayOutcome = "completed" | "not-claimed" | "refused";
 
 const reasonOf = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 500);
 
 export const relayDeviceCall = async (call: PendingDeviceCall, ports: DeviceRelayPorts): Promise<DeviceRelayOutcome> => {
-    if (!(await ports.claim(call.callId))) {
+    if (!(await ports.claim(call))) {
         return "not-claimed";
     }
 
@@ -41,12 +49,12 @@ export const relayDeviceCall = async (call: PendingDeviceCall, ports: DeviceRela
     try {
         result = await ports.execute(call);
     } catch (error) {
-        await ports.release(call.callId, reasonOf(error));
+        await ports.release(call, reasonOf(error));
 
         return "refused";
     }
 
-    await ports.complete(call.callId, result);
+    await ports.complete(call, result);
 
     return "completed";
 };
