@@ -16,6 +16,9 @@ import subprocess
 import sys
 import threading
 import time
+
+# A recogniser that hangs must not hold the whole job until its timeout and lose every result.
+CLIP_TIMEOUT_S = 900
 import unicodedata
 
 CHAR_LANGS = {"ja", "zh"}
@@ -60,6 +63,10 @@ def _run_measured_windows(cmd):
             pass
 
     while proc.poll() is None:
+        if time.monotonic() - start > CLIP_TIMEOUT_S:
+            proc.kill()
+            proc.wait()
+            break
         sample()
         time.sleep(0.02)
     # The exited process's handle stays open until it is reaped, so one last sample still counts its final work.
@@ -75,7 +82,10 @@ def peak_rss_and_cpu(cmd):
     is_mac = platform.system() == "Darwin"
     timer = ["/usr/bin/time", "-l"] if is_mac else ["/usr/bin/time", "-v"]
     start = time.monotonic()
-    proc = subprocess.run(timer + cmd, capture_output=True, encoding="utf-8", errors="replace")
+    try:
+        proc = subprocess.run(timer + cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=CLIP_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        return "", time.monotonic() - start, None, None, -1
     wall = time.monotonic() - start
     err = proc.stderr
     rss = cpu = None
@@ -136,20 +146,26 @@ def main():
             rsss.append(rss or 0)
             cpus.append(cpu or 0)
         ten = next(os.path.join(clips_dir, f) for f in os.listdir(clips_dir) if f.startswith("00-en-10s"))
-        _out, ten_wall, ten_rss, ten_cpu, code = peak_rss_and_cpu([cli, "-m", path, "-f", ten, "-l", "en", "-nt", "-np", "-t", "4", *EXTRA_ARGS])
+        ten_out, ten_wall, ten_rss, ten_cpu, code = peak_rss_and_cpu([cli, "-m", path, "-f", ten, "-l", "en", "-nt", "-np", "-t", "4", *EXTRA_ARGS])
         if code != 0:
             sys.exit(f"{model} failed on the ten-second clip (exit {code})")
+        # A run that produced no text did no recognition, so its time says nothing about the model.
+        ten_empty = not normalise(ten_out, "en")
         results.append(
             {
                 "model": model,
                 "size_mb": round(size_mb, 1),
-                "error_rate": round(errors / total, 3),
+                # Word error rate for most languages, character error rate for ja/zh: the pooled figure mixes
+                # units, so the comparable score is the mean of the per-language rates.
+                "mean_lang_error": round(sum(v[0] / v[1] for v in per_lang.values()) / len(per_lang), 3),
+                "pooled_error": round(errors / total, 3),
                 "per_lang_error": {k: round(v[0] / v[1], 3) for k, v in per_lang.items()},
                 "ten_second_clip_s": round(ten_wall, 2),
                 "ten_second_cpu_s": round(ten_cpu or 0, 2),
                 "peak_rss_mb": round(max(rsss + [ten_rss or 0]), 0),
                 "mean_clip_s": round(sum(walls) / len(walls), 2),
                 "empty_transcripts": empty,
+                "ten_second_clip_empty": ten_empty,
             }
         )
     print(json.dumps({"platform": f"{platform.system()} {platform.machine()}", "results": results}, ensure_ascii=False, indent=2))

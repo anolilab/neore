@@ -123,36 +123,42 @@ microphone prompt and helper packaging for each.
 Harness: `tools/dictation-bench/` (`bench.py`, 18 prompts in the nine supported
 languages read by synthetic voices, plus one clip of exactly ten seconds), run by
 `.github/workflows/dictation-bench.yml`. Recogniser: whisper.cpp v1.9.5 (pinned
-commit in the workflow). Error rate is word error rate, character error rate for
-Japanese and Chinese, over all 18 clips. "10 s clip" is the wall time to finish the
-ten-second clip (batch decoding, so first-word latency equals it). Peak memory is
+commit in the workflow). The error figure is the mean of the per-language rates (word
+error rate, character error rate for Japanese and Chinese), so languages counted
+in characters and in words are not mixed in one total. "10 s clip" is the wall time to finish the
+ten-second clip with batch decoding. First-word latency is not measured here:
+batch decoding returns the text only at the end. S2 measures it with streamed
+partial results on the chosen model. Peak memory is
 the process's resident peak.
 
-| Platform | Model | Size | Error rate | 10 s clip | CPU time (10 s clip) | Peak memory |
+| Platform | Model | Size | Mean error per language | 10 s clip | CPU time (10 s clip) | Peak memory |
 | --- | --- | --- | --- | --- | --- | --- |
-| macOS arm64 (M4, Metal, machine under build load) | tiny | 78 MB | 17.8 % | 0.70 s | 0.53 s | 279 MB |
-| macOS arm64 | base | 148 MB | 13.3 % | 0.67 s | — | 383 MB |
-| macOS arm64 | small | 488 MB | 7.0 % | 1.38 s | — | 857 MB |
-| macOS arm64 | large-v3-turbo q5_0 | 574 MB | 1.9 % | 3.91 s | — | 852 MB |
-| Linux x64 (GitHub runner, 4 vCPU, no GPU) | tiny | 78 MB | 17.5 % | 1.15 s | 4.2 s | 177 MB |
-| Linux x64 | base | 148 MB | 13.3 % | 2.15 s | 8.0 s | 285 MB |
-| Linux x64 | small | 488 MB | 7.0 % | 6.68 s | 25.2 s | 751 MB |
-| Linux x64 | large-v3-turbo q5_0 | 574 MB | 1.9 % | 39.0 s | 154 s | 794 MB |
-| Linux arm64 (runner, 4 vCPU) | tiny | 78 MB | 17.5 % | 1.46 s | 5.3 s | 176 MB |
-| Linux arm64 | base | 148 MB | 13.3 % | 2.76 s | 10.4 s | 284 MB |
-| Linux arm64 | small | 488 MB | 7.0 % | 8.44 s | 32.5 s | 750 MB |
-| Linux arm64 | large-v3-turbo q5_0 | 574 MB | 1.9 % | 44.6 s | 176 s | 793 MB |
-| Windows x64 (runner, 4 vCPU) | tiny | 78 MB | 17.5 % | 1.22 s | 4.2 s | 195 MB |
-| Windows x64 | base | 148 MB | 13.3 % | 2.23 s | 8.1 s | 303 MB |
-| Windows x64 | small | 488 MB | 7.0 % | 6.84 s | 25.1 s | 769 MB |
-| Windows x64 | large-v3-turbo q5_0 | 574 MB | 1.9 % | 36.8 s | 140 s | 812 MB |
-| macOS x64 (runner, virtual GPU) | — | — | — | — | — | — |
+| macOS arm64 (M4, Metal, machine under build load) | tiny | 78 MB | 16.1 % | 0.70 s | 0.53 s | 279 MB |
+| macOS arm64 | base | 148 MB | 12.2 % | 0.67 s | — | 383 MB |
+| macOS arm64 | small | 488 MB | 6.5 % | 1.38 s | — | 857 MB |
+| macOS arm64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 3.91 s | — | 852 MB |
+| Linux x64 (GitHub runner, 4 vCPU, no GPU) | tiny | 78 MB | 15.9 % | 1.15 s | 4.2 s | 177 MB |
+| Linux x64 | base | 148 MB | 12.2 % | 2.15 s | 8.0 s | 285 MB |
+| Linux x64 | small | 488 MB | 6.5 % | 6.68 s | 25.2 s | 751 MB |
+| Linux x64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 39.0 s | 154 s | 794 MB |
+| Linux arm64 (runner, 4 vCPU) | tiny | 78 MB | 15.9 % | 1.46 s | 5.3 s | 176 MB |
+| Linux arm64 | base | 148 MB | 12.2 % | 2.76 s | 10.4 s | 284 MB |
+| Linux arm64 | small | 488 MB | 6.5 % | 8.44 s | 32.5 s | 750 MB |
+| Linux arm64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 44.6 s | 176 s | 793 MB |
+| Windows x64 (runner, 4 vCPU) | tiny | 78 MB | 15.9 % | 1.22 s | 4.2 s | 195 MB |
+| Windows x64 | base | 148 MB | 12.2 % | 2.23 s | 8.1 s | 303 MB |
+| Windows x64 | small | 488 MB | 6.5 % | 6.84 s | 25.1 s | 769 MB |
+| Windows x64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 36.8 s | 140 s | 812 MB |
+| macOS x64 (runner, CPU only) | tiny | 78 MB | 15.9 % | 1.65 s | 4.5 s | 228 MB |
+| macOS x64 | base | 148 MB | 12.2 % | 2.67 s | 8.1 s | 338 MB |
+| macOS x64 | small | 488 MB | 6.5 % | 7.47 s | 24.8 s | 809 MB |
+| macOS x64 | large-v3-turbo q5_0 | 574 MB | 1.5 % | 25.4 s | 87.2 s | 874 MB |
 | Windows arm64 (runner) | — | — | — | — | — | — |
 
-macOS x64: the first run used Metal on the runner's virtual GPU, which was slower
+macOS x64: a first run used Metal on the runner's virtual GPU, which was slower
 than the CPU (tiny took 23 s for the 10 s clip) and returned no text for the
-quantised large model; the workflow now runs that leg with `--no-gpu`, and its
-row is filled from that run. Windows arm64: the first run did not finish within
+quantised large model; the rows above are the CPU-only run (`--no-gpu`), which
+is also what Intel Macs should use. Windows arm64: the first run did not finish within
 90 minutes; the leg now has 180.
 
 Error rates are the same on every platform that ran, so accuracy depends only on
@@ -166,15 +172,16 @@ terms, so both may be redistributed inside the app with the licence text.
 **Recommendation.** Pick the model per machine, from what the recogniser can use:
 
 - **Apple Silicon:** large-v3-turbo q5_0 (574 MB). It is the only candidate that
-  holds in all nine languages (1.9 % overall, no language above 6 %), and Metal
+  holds in all nine languages (1.5 % mean across languages, no language above 6 %), and Metal
   finishes a 10 s clip in about 4 s.
 - **Machines without a supported GPU (Windows, Linux, Intel Macs):** small
-  (488 MB, 7 %), about 7 s for a 10 s clip on a 4-core runner and faster on a
+  (488 MB, 6.5 %), about 7 s for a 10 s clip on a 4-core runner and faster on a
   typical desktop CPU. Settings says it is weaker on Chinese (24 %) and Italian
   (14 %), and offers large-v3-turbo as a slower, more accurate choice.
 - A GPU backend for Windows and Linux (Vulkan or CUDA builds of whisper.cpp) would
   let them use large-v3-turbo too; that is a packaging question for S2, not a
   reason to block it.
 
-The chosen models' licences allow redistribution (above), which meets the S1
-acceptance. S2 can start with this split.
+The chosen models' licences allow redistribution (above). S1 stays open until the
+Windows arm64 row is recorded; S2 can start on Apple Silicon with
+this split meanwhile.
