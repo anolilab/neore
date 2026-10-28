@@ -97,8 +97,9 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
             return;
         }
 
-        // If existing thread, also persist to Lunora
-        if (threadId && thread) {
+        // If existing thread, also persist to Lunora. A switched thread keeps its model: it is the agent of every
+        // branch from before the first switch, and a pick the server cannot switch to lives in the composer only.
+        if (threadId && thread && !thread.activeAgent) {
             await updateThreadAction({
                 model: newModel,
                 threadId: threadId as Id<"threads">,

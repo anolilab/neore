@@ -260,6 +260,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "admin_cleanup:updateCleanupConfig": lunora_admin_cleanup_1.updateCleanupConfig as unknown as RegisteredLunoraFunction,
     "admin_cleanup:writeCleanupLog": lunora_admin_cleanup_1.writeCleanupLog as unknown as RegisteredLunoraFunction,
     "admin_gateway_analytics:getGatewayAnalytics": lunora_admin_gateway_analytics_2.getGatewayAnalytics as unknown as RegisteredLunoraFunction,
+    "agent_agent_switch:adoptForkAgent": lunora_agent_agent_switch_3.adoptForkAgent as unknown as RegisteredLunoraFunction,
     "agent_agent_switch:getRunAgentModel": lunora_agent_agent_switch_3.getRunAgentModel as unknown as RegisteredLunoraFunction,
     "agent_auto_archive:archiveIfStillIdle": lunora_agent_auto_archive_4.archiveIfStillIdle as unknown as RegisteredLunoraFunction,
     "agent_auto_archive:autoArchiveContinue": lunora_agent_auto_archive_4.autoArchiveContinue as unknown as RegisteredLunoraFunction,
@@ -1472,6 +1473,12 @@ __val3 = source["thresholdDays"];
 __has3 = true;
 }
 return { ...(__has1 ? { "batchSize": __val1 } : {}), ...(__has2 ? { "isEnabled": __val2 } : {}), ...(__has3 ? { "thresholdDays": __val3 } : {}) };
+});
+installCompiledValidatorMap(lunora_agent_agent_switch_3.adoptForkAgent.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+return { "threadId": source["threadId"] };
 });
 installCompiledValidatorMap(lunora_agent_agent_switch_3.getRunAgentModel.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -7978,6 +7985,7 @@ export interface Caller {
     };
     agent: {
         agent_switch: {
+            adoptForkAgent: (args: { threadId: Id<"threads"> }) => Promise<null>;
             getRunAgentModel: (args: { promptMessageId?: Id<"messages">; replacedMessageId?: Id<"messages">; threadId: Id<"threads"> }) => Promise<string | null>;
         };
         auto_archive: {
@@ -9628,6 +9636,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
     },
     agent: {
         agent_switch: {
+            adoptForkAgent: (args) => callRegistered(context, "agent_agent_switch:adoptForkAgent", args),
             getRunAgentModel: (args) => callRegistered(context, "agent_agent_switch:getRunAgentModel", args),
         },
         auto_archive: {
