@@ -3,48 +3,135 @@
 import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Input } from "@neore/ui/components/input";
-import { Search } from "lucide-react";
-import type { FC, Ref } from "react";
-import { useMemo, useState } from "react";
+import cn from "@neore/ui/utils/cn";
+import { Lock, Search } from "lucide-react";
+import type { FC, KeyboardEvent, Ref } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { SETTINGS_KEYWORDS } from "@/features/settings/lib/settings-keywords";
 import type { SettingsNavGroup, SettingsTab } from "@/features/settings/lib/settings-navigation";
 import type { SettingsSearchEntry } from "@/features/settings/lib/settings-search";
 import { buildSettingsSearchIndex, searchSettings } from "@/features/settings/lib/settings-search";
 
-/** The query, and what it finds in the navigation the user can see. */
+/** The query, what it finds in the navigation the user can see, and which result is selected. */
 export const useSettingsSearch = (navigation: ReadonlyArray<SettingsNavGroup>) => {
     const { t } = useLingui();
-    const [query, setQuery] = useState("");
+    const baseId = useId();
+    const [query, setQueryState] = useState("");
+    const [selected, setSelected] = useState(0);
     const index = useMemo(() => buildSettingsSearchIndex(navigation, SETTINGS_KEYWORDS, t), [navigation, t]);
     const groups = useMemo(() => searchSettings(index, query), [index, query]);
-    const resultCount = groups.reduce((count, group) => count + group.entries.length, 0);
+    const entries = useMemo(() => groups.flatMap((group) => group.entries), [groups]);
+    // The navigation can change under an open query, so the stored position is clamped rather than trusted.
+    const activeIndex = Math.min(selected, entries.length - 1);
 
-    return { groups, isSearching: query.trim() !== "", query, resultCount, setQuery };
+    // A new query is a new list: selection starts on its first result.
+    const setQuery = (value: string) => {
+        setQueryState(value);
+        setSelected(0);
+    };
+
+    /** Moves the selection one result, wrapping at the ends; answers the entry it lands on. */
+    const moveActive = (step: 1 | -1): SettingsSearchEntry | undefined => {
+        if (entries.length === 0) {
+            return undefined;
+        }
+
+        const next = (activeIndex + step + entries.length) % entries.length;
+
+        setSelected(next);
+
+        return entries[next];
+    };
+
+    return {
+        activeEntry: entries[activeIndex],
+        activeIndex,
+        groups,
+        isSearching: query.trim() !== "",
+        listboxId: `${baseId}-results`,
+        moveActive,
+        optionId: (position: number) => `${baseId}-option-${String(position)}`,
+        query,
+        resultCount: entries.length,
+        setActive: setSelected,
+        setQuery,
+    };
 };
 
 type SettingsSearchState = ReturnType<typeof useSettingsSearch>;
 
-/** A search field; it also owns the live region that announces how many results there are. */
+/**
+ * A combobox over the results: focus stays in the field, the selected result is announced through
+ * `aria-activedescendant`, and the result count through a live region. Escape clears the query first and only
+ * reaches the dialog once the field is empty.
+ */
 export const SettingsSearchField: FC<
-    Pick<SettingsSearchState, "isSearching" | "query" | "resultCount" | "setQuery"> & { inputRef?: Ref<HTMLInputElement> }
-> = ({ inputRef, isSearching, query, resultCount, setQuery }) => {
+    Pick<SettingsSearchState, "activeIndex" | "isSearching" | "listboxId" | "optionId" | "query" | "resultCount" | "setQuery"> & {
+        inputRef?: Ref<HTMLInputElement>;
+        onActivate: () => void;
+        onMove: (step: 1 | -1) => void;
+    }
+> = ({ activeIndex, inputRef, isSearching, listboxId, onActivate, onMove, optionId, query, resultCount, setQuery }) => {
     const { t } = useLingui();
     // Inside `t`: a bare `plural()` compiles to the global i18n, which this app never activates.
     // eslint-disable-next-line no-restricted-syntax -- the macro compiles this to a message, not a string conversion
     const resultSummary = t`${plural(resultCount, { one: "# result", other: "# results" })}`;
     const status = isSearching ? resultSummary : "";
+    const isExpanded = isSearching && resultCount > 0;
+
+    const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+        switch (event.key) {
+            case "ArrowDown": {
+                event.preventDefault();
+                onMove(1);
+                break;
+            }
+            case "ArrowUp": {
+                event.preventDefault();
+                onMove(-1);
+                break;
+            }
+            case "Enter": {
+                // Enter confirms an IME composition before it means "open".
+                if (isExpanded && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    onActivate();
+                }
+
+                break;
+            }
+            case "Escape": {
+                if (query !== "") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setQuery("");
+                }
+
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    };
 
     return (
         <div className="px-2 pb-2">
             <div className="relative">
                 <Search aria-hidden className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
                 <Input
+                    aria-activedescendant={isExpanded ? optionId(activeIndex) : undefined}
+                    aria-autocomplete="list"
+                    aria-controls={isExpanded ? listboxId : undefined}
+                    aria-expanded={isExpanded}
                     aria-label={t`Search settings`}
                     className="pl-9"
                     onChange={(event) => setQuery(event.target.value)}
+                    onKeyDown={handleKeyDown}
                     placeholder={t`Search settings...`}
                     ref={inputRef}
+                    role="combobox"
                     type="search"
                     value={query}
                 />
@@ -56,10 +143,19 @@ export const SettingsSearchField: FC<
     );
 };
 
-/** The matches as buttons in tab order: the field is a plain search input, so arrow keys are not promised. */
+const revealOption = (node: HTMLButtonElement | null) => {
+    node?.scrollIntoView({ block: "nearest" });
+};
+
+/** The results as the listbox the field controls, grouped by tab. Options are not in the tab order: the field drives them. */
 export const SettingsSearchResults: FC<
-    Pick<SettingsSearchState, "groups" | "isSearching"> & { onPreview: (tab: SettingsTab) => void; onSelect: (entry: SettingsSearchEntry) => void }
-> = ({ groups, isSearching, onPreview, onSelect }) => {
+    Pick<SettingsSearchState, "activeIndex" | "groups" | "isSearching" | "listboxId" | "optionId" | "setActive"> & {
+        /** Tabs a guest cannot open; their results carry the lock the navigation shows. */
+        lockedTabs: ReadonlySet<SettingsTab>;
+        onPreview: (tab: SettingsTab) => void;
+        onSelect: (entry: SettingsSearchEntry) => void;
+    }
+> = ({ activeIndex, groups, isSearching, listboxId, lockedTabs, onPreview, onSelect, optionId, setActive }) => {
     const { t } = useLingui();
 
     if (!isSearching) {
@@ -70,25 +166,51 @@ export const SettingsSearchResults: FC<
         return <p className="text-muted-foreground px-3 py-2 text-sm">{t`No results`}</p>;
     }
 
+    const entries = groups.flatMap((group) => group.entries);
+
     return (
-        <nav aria-label={t`Settings search results`} className="flex flex-col gap-1 p-2">
+        <div aria-label={t`Settings search results`} className="flex flex-col gap-1 p-2" id={listboxId} role="listbox">
             {groups.map((group) => (
                 <div aria-label={group.entries[0]?.tabLabel} key={group.tab} role="group">
-                    {group.entries.map((entry) => (
-                        <button
-                            className="text-muted-foreground hover:bg-muted hover:text-foreground flex w-full flex-col rounded-md px-3 py-2 text-left text-sm transition-colors"
-                            key={`${entry.tab}-${entry.section ?? ""}-${entry.label}`}
-                            onClick={() => onSelect(entry)}
-                            onFocus={() => onPreview(entry.tab)}
-                            onMouseEnter={() => onPreview(entry.tab)}
-                            type="button"
-                        >
-                            <span className="text-foreground">{entry.label}</span>
-                            <span className="text-xs">{entry.section ? `${entry.tabLabel} · ${entry.section}` : entry.group}</span>
-                        </button>
-                    ))}
+                    {group.entries.map((entry) => {
+                        const entryPosition = entries.indexOf(entry);
+                        const isActive = entryPosition === activeIndex;
+                        const isLocked = lockedTabs.has(entry.tab);
+
+                        return (
+                            <button
+                                aria-selected={isActive}
+                                className={cn(
+                                    "text-muted-foreground flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                                    isActive ? "bg-muted text-foreground" : "hover:bg-muted hover:text-foreground",
+                                )}
+                                id={optionId(entryPosition)}
+                                key={`${entry.kind}-${entry.tab}-${entry.section ?? ""}-${entry.label}`}
+                                onClick={() => onSelect(entry)}
+                                onMouseEnter={() => {
+                                    setActive(entryPosition);
+                                    onPreview(entry.tab);
+                                }}
+                                ref={isActive ? revealOption : undefined}
+                                role="option"
+                                tabIndex={-1}
+                                type="button"
+                            >
+                                <span className="flex min-w-0 flex-1 flex-col">
+                                    <span className="text-foreground">{entry.label}</span>
+                                    <span className="text-xs">{entry.section ? `${entry.tabLabel} · ${entry.section}` : entry.group}</span>
+                                </span>
+                                {isLocked && (
+                                    <>
+                                        <Lock aria-hidden className="size-3 shrink-0 opacity-50" />
+                                        <span className="sr-only">{t`Requires an account`}</span>
+                                    </>
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
             ))}
-        </nav>
+        </div>
     );
 };

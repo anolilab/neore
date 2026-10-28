@@ -201,13 +201,8 @@ export const SettingsModal: FC = () => {
 
         return resolveSettingsNavigation(flags, t);
     }, [t, apiKey, organization, activeOrganization]);
-    const {
-        groups: searchGroups,
-        isSearching,
-        query: searchQuery,
-        resultCount: searchResultCount,
-        setQuery: setSearchQuery,
-    } = useSettingsSearch(navigationGroups);
+    const settingsSearch = useSettingsSearch(navigationGroups);
+    const { query: searchQuery, setQuery: setSearchQuery } = settingsSearch;
     const searchInputRef = useRef<HTMLInputElement>(null);
     const tabContentRef = useRef<HTMLDivElement>(null);
     // The setting a search result asked to scroll to; a new object per pick, so choosing the same one again jumps again.
@@ -325,6 +320,16 @@ export const SettingsModal: FC = () => {
         return null;
     }
 
+    // Loads a tab's chunk and data ahead of opening it; a tab the navigation locks for a guest loads nothing.
+    const previewTab = (tab: SettingsTab) => {
+        if (lockedTabs.has(tab)) {
+            return;
+        }
+
+        preloadTab[tab]?.();
+        prefetchTabData(tab);
+    };
+
     const getTabTitle = (): string => {
         for (const group of navigationGroups) {
             const item = group.items.find((i) => i.tab === currentTab);
@@ -437,29 +442,37 @@ export const SettingsModal: FC = () => {
                         <DialogDescription className="sr-only">{t`Configure your application settings`}</DialogDescription>
                     </DialogHeader>
                     <SettingsSearchField
+                        activeIndex={settingsSearch.activeIndex}
                         inputRef={searchInputRef}
-                        isSearching={isSearching}
+                        isSearching={settingsSearch.isSearching}
+                        listboxId={settingsSearch.listboxId}
+                        onActivate={() => settingsSearch.activeEntry && handleSearchSelect(settingsSearch.activeEntry)}
+                        onMove={(step) => {
+                            const entry = settingsSearch.moveActive(step);
+
+                            if (entry) {
+                                previewTab(entry.tab);
+                            }
+                        }}
+                        optionId={settingsSearch.optionId}
                         query={searchQuery}
-                        resultCount={searchResultCount}
+                        resultCount={settingsSearch.resultCount}
                         setQuery={setSearchQuery}
                     />
                     {/* Keyed on the mode: the results are a new list, so they start at the top instead of at the navigation's scroll offset. */}
-                    <ScrollArea className="flex-1" key={isSearching ? "search" : "navigation"}>
+                    <ScrollArea className="flex-1" key={settingsSearch.isSearching ? "search" : "navigation"}>
                         <SettingsSearchResults
-                            groups={searchGroups}
-                            isSearching={isSearching}
-                            onPreview={(tab) => {
-                                // A tab the navigation locks for a guest loads nothing ahead.
-                                if (isAnonymous && navigationGroups.some((group) => group.items.some((item) => item.tab === tab && item.requiresAuth))) {
-                                    return;
-                                }
-
-                                preloadTab[tab]?.();
-                                prefetchTabData(tab);
-                            }}
+                            activeIndex={settingsSearch.activeIndex}
+                            groups={settingsSearch.groups}
+                            isSearching={settingsSearch.isSearching}
+                            listboxId={settingsSearch.listboxId}
+                            lockedTabs={lockedTabs}
+                            onPreview={previewTab}
                             onSelect={handleSearchSelect}
+                            optionId={settingsSearch.optionId}
+                            setActive={settingsSearch.setActive}
                         />
-                        {!isSearching && (
+                        {!settingsSearch.isSearching && (
                             <nav className="flex flex-col gap-1 p-2">
                                 {navigationGroups.map((group) => (
                                     <div className="mb-2" key={group.label}>

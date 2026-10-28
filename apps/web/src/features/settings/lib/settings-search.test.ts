@@ -104,6 +104,22 @@ describe("settings search", () => {
         expect(foundTabs(index, "séçürity")).toEqual(["auth-security"]);
     });
 
+    it("finds a tab typed with decomposed accents (a separate combining mark), as some keyboards and pastes produce", () => {
+        const { index, navigation } = searchIn("fr");
+        const items = navigation.flatMap((group) => group.items);
+        const accented = items.filter((item) => item.label.normalize("NFD") !== item.label);
+
+        // Without an accented French label this would pass vacuously.
+        expect(accented.length).toBeGreaterThan(0);
+
+        for (const item of accented) {
+            const decomposed = item.label.normalize("NFD");
+
+            expect(foundTabs(index, decomposed), `fr: "${item.label}" typed decomposed`).toContain(item.tab);
+            expect(foundTabs(index, item.label.normalize("NFC")), `fr: "${item.label}" typed composed`).toContain(item.tab);
+        }
+    });
+
     it("keeps the voicing mark of a kana", () => {
         expect(normalizeSearchText("が")).not.toBe(normalizeSearchText("か"));
     });
