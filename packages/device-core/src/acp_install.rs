@@ -1012,7 +1012,7 @@ mod tests {
             .acp_spawn_plan("demo", Some(&folder.to_string_lossy()))
             .unwrap();
 
-        assert!(plan.command.ends_with("acp-agents/demo/1.2.3/agent"));
+        assert!(Path::new(&plan.command).ends_with("acp-agents/demo/1.2.3/agent"));
 
         let stage = state.acp_install_stage().unwrap();
         let mut newer = request(&stage, &second, ArchiveFormat::TarGz, "agent");
@@ -1140,9 +1140,9 @@ mod tests {
         let save = |command: &str| {
             state
                 .acp_update(
-                    serde_json::from_str(&format!(
-                        r#"{{"op":"saveAgent","key":"demo","label":"Demo!","command":"{command}","args":["acp"]}}"#
-                    ))
+                    serde_json::from_value(json!({
+                        "op": "saveAgent", "key": "demo", "label": "Demo!", "command": command, "args": ["acp"],
+                    }))
                     .unwrap(),
                 )
                 .unwrap()
