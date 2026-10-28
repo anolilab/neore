@@ -682,10 +682,12 @@ written here is what is not.
   `cancel` are host ops of the stdio pipe, reached from the LOCAL window only (`host_files_list` / `host_file_read` /
   `host_download`; no signed call, no prompt, the person is the one asking) and never by the agent, so none of it enters
   `taintedBy`. `tar` is hand-written ustar (`archive.rs`) walked by `openat` + `O_NOFOLLOW` from the folder's descriptor, the
-  same confinement as `fs_list`: symlinks (inside or out), FIFOs and devices are LEFT OUT, not followed and not archived,
+  same confinement as `fs_list`: symlinks (inside or out), hard-linked files (`st_nlink > 1`: another name may be outside), FIFOs
+  and devices are LEFT OUT, not followed and not archived,
   and the desktop never unpacks the file it saves — the host's word is not trusted to name paths or plant links. Chunks are
-  raw frames (`frame.rs` `CHUNK_TAG`), not JSON, followed by the ordinary response; the reader of the connection blocks when
-  the disk is slow (bounded queue), and an idle minute ends a download. The save path comes from a native dialog in the main
+  raw frames (`frame.rs` `CHUNK_TAG`), not JSON, followed by the ordinary response. The reader of the connection NEVER waits
+  for the disk (it carries every other request's answer): chunks queue by bytes, and a writer more than 64 MiB behind
+  ends the download; an idle minute ends one too. A `list` page reads the folder's names but keeps only the page. The save path comes from a native dialog in the main
   process, never from the window. Unix hosts only: a Windows host answers "not supported". The 10,000-file budget is pinned
   in `tests/ssh_host.rs` with the numbers it was set from.
   **Chat status** comes from the device too: Rust emits a SIGNED

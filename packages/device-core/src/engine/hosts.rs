@@ -1367,11 +1367,23 @@ impl DeviceState {
     ) -> Result<Value, String> {
         let (host, link) = self.files_link(device_id)?;
         let params = json!({ "after": after, "path": path, "roots": host.roots });
-        let mut page = link.list_files(&params, FILES_WAIT)?;
+        let page = link.list_files(&params, FILES_WAIT);
 
-        page["host"] = json!(host.name);
+        self.audit_files(&host, "files_list", path, page.is_ok());
 
-        Ok(page)
+        page.map(|mut page| {
+            page["host"] = json!(host.name);
+
+            page
+        })
+    }
+
+    /// Records what the local window did on a server. It decided itself, so the decision is "window".
+    fn audit_files(&self, host: &Host, tool: &str, path: &str, completed: bool) {
+        self.audit(json!({
+            "at": now_ms(), "decision": "window", "host": host.name, "path": path,
+            "status": if completed { "completed" } else { "failed" }, "tool": tool,
+        }));
     }
 
     /// A file of a connected server as text (the first megabyte), by the same action an agent's `fs_read` runs.
@@ -1383,7 +1395,18 @@ impl DeviceState {
             "roots": host.roots,
             "tool": "fs_read",
         });
-        let remote = link.run(&params, FILES_WAIT + Duration::from_secs(10))?;
+        let remote = link.run(&params, FILES_WAIT + Duration::from_secs(10));
+
+        self.audit_files(
+            &host,
+            "files_read",
+            path,
+            remote
+                .as_ref()
+                .is_ok_and(|remote| remote.status == "completed"),
+        );
+
+        let remote = remote?;
 
         if remote.status != "completed" {
             return Err(remote
@@ -1414,13 +1437,25 @@ impl DeviceState {
             .file_name()
             .filter(|_| destination.is_absolute())
             .ok_or("the destination is not a file path")?;
+        // Named for this download alone, and created only if new: two downloads to one destination cannot write the
+        // same file.
+        static PARTIALS: AtomicU64 = AtomicU64::new(0);
+
         let partial = destination.with_file_name({
             let mut partial = name.to_owned();
 
-            partial.push(".part");
+            partial.push(format!(
+                ".{}-{}.part",
+                std::process::id(),
+                PARTIALS.fetch_add(1, Ordering::SeqCst)
+            ));
             partial
         });
-        let file = stdfs::File::create(&partial).map_err(|error| error.to_string())?;
+        let file = stdfs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&partial)
+            .map_err(|error| error.to_string())?;
         let mut file = std::io::BufWriter::with_capacity(256 * 1024, file);
         let params = json!({ "path": path, "roots": host.roots });
         let result = link
@@ -1439,10 +1474,7 @@ impl DeviceState {
             let _ = stdfs::remove_file(&partial);
         }
 
-        self.audit(json!({
-            "at": now_ms(), "host": host.name, "path": path, "tool": "files_download",
-            "status": if result.is_ok() { "completed" } else { "failed" },
-        }));
+        self.audit_files(&host, "files_download", path, result.is_ok());
 
         result.map(|mut summary| {
             summary["host"] = json!(host.name);
@@ -3498,6 +3530,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(page["host"], "build-box");
+        assert!(state.audit_tail().join("\n").contains("files_list"));
         assert_eq!(
             link.listed.lock().unwrap().as_slice(),
             [json!({ "after": "m", "path": "src", "roots": ["/srv/app"] })]
@@ -3522,6 +3555,7 @@ mod tests {
 
         assert_eq!(read["host"], "build-box");
         assert_eq!(read["text"], "from the server");
+        assert!(state.audit_tail().join("\n").contains("files_read"));
 
         let run = link.runs.lock().unwrap()[0].clone();
 
@@ -3544,6 +3578,19 @@ mod tests {
         );
     }
 
+    /// Files in `dir` that are a download in progress or left behind.
+    fn parts(dir: &Path) -> Vec<PathBuf> {
+        stdfs::read_dir(dir)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "part")
+            })
+            .collect()
+    }
+
     #[test]
     fn a_download_lands_complete_or_not_at_all() {
         let link = FakeLink::new(true);
@@ -3554,7 +3601,7 @@ mod tests {
 
         assert_eq!(summary["host"], "build-box");
         assert_eq!(stdfs::read(&destination).unwrap(), b"TAR");
-        assert!(!dir.join("app.tar.part").exists());
+        assert!(parts(&dir).is_empty());
 
         // A failure part way leaves the earlier file as it was and no part file.
         *link.archive.lock().unwrap() = Err("the server stopped sending".into());
@@ -3564,7 +3611,7 @@ mod tests {
             "the server stopped sending"
         );
         assert_eq!(stdfs::read(&destination).unwrap(), b"TAR");
-        assert!(!dir.join("app.tar.part").exists());
+        assert!(parts(&dir).is_empty());
         assert!(state
             .host_download(&id, "", Path::new("relative.tar"))
             .is_err());

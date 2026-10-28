@@ -5,6 +5,8 @@
 //! parent, so a symlink swapped in while the archive is written is never followed. Symlinks are not archived at
 //! all (neither the link nor what it points at), nor are devices, FIFOs and sockets: the archive of an untrusted
 //! server must not be able to plant a link when someone unpacks it, and the server is not trusted either way.
+//! A regular file with more than one hard link is left out too: its other names may be outside the shared folders
+//! (`ln` makes one without any permission on the target's folder), and `O_NOFOLLOW` cannot tell.
 //!
 //! The tar is hand-written ustar (a PAX `path` record for names that do not fit), because a tar library opens
 //! files by name and would undo the descriptor walk. Owners are written as 0, modes without setuid, setgid and the
@@ -26,7 +28,8 @@ pub struct Summary {
     pub bytes: u64,
     pub files: u64,
     pub folders: u64,
-    /// Entries left out: symlinks, devices, FIFOs and sockets, and anything that could not be opened.
+    /// Entries left out: symlinks, hard-linked files, devices, FIFOs and sockets, and anything that could not be
+    /// opened.
     pub skipped: u64,
 }
 
@@ -171,6 +174,8 @@ mod unix {
         /// The file type bits of the mode.
         kind: libc::mode_t,
         mtime: u64,
+        /// Names the file has.
+        links: u64,
         /// The permission bits of the mode: no setuid, setgid or sticky bit goes into an archive.
         perm: u32,
         size: u64,
@@ -181,6 +186,7 @@ mod unix {
     fn stat_of(stat: &libc::stat) -> Stat {
         Stat {
             kind: stat.st_mode & libc::S_IFMT,
+            links: u64::from(stat.st_nlink),
             perm: u32::from(stat.st_mode & 0o777),
             mtime: stat.st_mtime.max(0) as u64,
             size: stat.st_size.max(0) as u64,
@@ -420,7 +426,7 @@ mod unix {
             let Some((fd, stat)) = opened
                 .ok()
                 .and_then(|fd| stat_fd(&fd).map(|stat| (fd, stat)))
-                .filter(|(_, stat)| stat.kind == libc::S_IFREG)
+                .filter(|(_, stat)| stat.kind == libc::S_IFREG && stat.links == 1)
             else {
                 self.summary.skipped += 1;
 
@@ -549,7 +555,7 @@ mod tests {
     }
 
     #[test]
-    fn links_and_special_files_are_left_out_and_never_followed() {
+    fn links_hard_links_and_special_files_are_left_out_and_never_followed() {
         let dir = scratch("links");
         let outside = dir.join("outside");
 
@@ -558,6 +564,7 @@ mod tests {
         std::os::unix::fs::symlink(dir.join("secret.txt"), dir.join("root/link.txt")).unwrap();
         std::os::unix::fs::symlink(&outside, dir.join("root/up")).unwrap();
         std::os::unix::fs::symlink("a.txt", dir.join("root/inside-link")).unwrap();
+        fs::hard_link(dir.join("secret.txt"), dir.join("root/hard.txt")).unwrap();
         assert!(Command::new("mkfifo")
             .arg(dir.join("root/fifo"))
             .status()
@@ -573,7 +580,7 @@ mod tests {
             names,
             ["root/", "root/a.txt", "root/sub/", "root/sub/b.txt"]
         );
-        assert_eq!(summary.skipped, 4);
+        assert_eq!(summary.skipped, 5);
         assert!(!text.contains("nope") && !text.contains("outside-content"));
     }
 

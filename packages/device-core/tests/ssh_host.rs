@@ -1859,7 +1859,10 @@ fn big_folder(label: &str) -> (PathBuf, u64) {
 /// How long a 10,000-file folder may take to list and to download, each, over a real ssh session.
 ///
 /// MEASURED over six runs of this test (debug build, a sshd on 127.0.0.1, Apple silicon macOS 26, 2026-10-28):
-/// listing the 10,001 entries in six pages took 0.46 to 0.78 s, the download of the 10.2 MB tar 0.69 to 1.29 s.
+/// listing the 10,001 entries in six pages took 0.46 to 0.78 s, the download of the 10.2 MB tar 0.69 to 1.29 s (the
+/// listing took 0.28 to 0.42 s over three runs once a page kept only its own names).
+/// TODO(S6): add the first green CI run's Ubuntu and macOS numbers (the job summary has them) and re-pin if they
+/// leave less than three times headroom.
 /// The budgets are about six times the worst run: CI runners are slower and noisier than a laptop, and what this
 /// guards is a regression to something that costs a round trip per file (minutes), not a few percent.
 const LIST_BUDGET: Duration = Duration::from_secs(5);
@@ -1919,7 +1922,20 @@ fn a_ten_thousand_file_folder_lists_and_downloads_within_the_budget() {
         .unwrap();
     let downloaded = started.elapsed();
 
-    eprintln!("listed {names_len} entries in {pages} pages in {listed:?}, downloaded {size} bytes in {downloaded:?}", names_len = names.len(), size = fs::metadata(&archive_path).unwrap().len());
+    // The numbers the budgets were set from; a passing test prints nothing, so CI gets them in the job summary.
+    let line = format!(
+        "ten-thousand-file folder: listed {} entries in {pages} pages in {listed:?}, downloaded {} bytes in {downloaded:?} (budgets {LIST_BUDGET:?} and {DOWNLOAD_BUDGET:?})",
+        names.len(),
+        fs::metadata(&archive_path).unwrap().len()
+    );
+
+    eprintln!("{line}");
+
+    if let Some(summary) = std::env::var_os("GITHUB_STEP_SUMMARY") {
+        let mut summary = fs::OpenOptions::new().append(true).open(summary).unwrap();
+
+        writeln!(summary, "{line}\n").unwrap();
+    }
 
     assert!(listed < LIST_BUDGET, "listing took {listed:?}");
     assert!(
@@ -1958,4 +1974,75 @@ fn a_ten_thousand_file_folder_lists_and_downloads_within_the_budget() {
         .contains("outside the shared folders"));
 
     finish(&connection, &target, &paths);
+}
+
+/// A writer that takes its time, like a slow disk.
+struct Slow(Duration);
+
+impl std::io::Write for Slow {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        thread::sleep(self.0);
+
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn another_request_is_answered_while_a_download_waits_on_a_slow_disk() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "slow");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let connection = Arc::new(connect(&server, &target, &paths, &trusting()).unwrap());
+    let dir = std::env::temp_dir().join(format!("neore-slow-{}", std::process::id()));
+
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("big")).unwrap();
+    fs::write(dir.join("big/blob"), vec![7u8; 16 * 1024 * 1024]).unwrap();
+
+    let folder = fs::canonicalize(dir.join("big")).unwrap();
+    let params = json!({ "roots": [folder], "path": "" });
+    let download = {
+        let (connection, params) = (Arc::clone(&connection), params.clone());
+
+        thread::spawn(move || {
+            let started = Instant::now();
+            let result = connection.download(
+                &params,
+                &mut Slow(Duration::from_millis(100)),
+                Duration::from_secs(30),
+            );
+
+            (result, started.elapsed())
+        })
+    };
+
+    // The disk takes about six seconds for the 16 MiB; the connection must not wait for it.
+    thread::sleep(Duration::from_secs(1));
+
+    let started = Instant::now();
+    let page = connection
+        .list_files(&params, Duration::from_secs(30))
+        .unwrap();
+    let answered = started.elapsed();
+
+    assert_eq!(page["entries"].as_array().unwrap().len(), 1);
+    assert!(
+        answered < Duration::from_secs(2),
+        "the page took {answered:?}"
+    );
+
+    let (result, took) = download.join().unwrap();
+
+    assert!(result.is_ok(), "{result:?}");
+    assert!(
+        took > Duration::from_secs(3),
+        "the disk was not slow: {took:?}"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+    finish(&connection);
 }

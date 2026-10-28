@@ -834,7 +834,8 @@ $("files-more").addEventListener("click", () => loadFiles(false));
 $("files-up").addEventListener("click", () => {
     const { folder } = files;
 
-    showFolder(folder === null || folder.lastIndexOf("/") <= 0 ? null : folder.slice(0, folder.lastIndexOf("/")));
+    // A shared folder is the top: above it the server would only answer that it is outside them.
+    showFolder(folder === null || filesHost()?.roots.includes(folder) === true || folder.lastIndexOf("/") <= 0 ? null : folder.slice(0, folder.lastIndexOf("/")));
 });
 $("files-download").addEventListener("click", async () => {
     const host = filesHost();
