@@ -17318,25 +17318,25 @@
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 414,
+      "line": 421,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 439,
+      "line": 446,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 466,
+      "line": 473,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 467,
+      "line": 474,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
