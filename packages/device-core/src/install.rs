@@ -211,20 +211,34 @@ const SUM_OF_FILE: &str = r#"sum_of() {
 }
 "#;
 
+/// What a server's answer to a query starts with. A login shell's rc files can print before the script runs, so
+/// an answer is the line behind this marker and nothing else on stdout.
+const ANSWER: &str = "NEORE:";
+
+/// The `PATH` of the clean environment: the usual places plus where NixOS and Guix keep their tools.
+const PATH: &str = "/usr/bin:/bin:/usr/sbin:/run/current-system/sw/bin";
+
 /// The command line that runs `script` on the server: a clean environment and `sh`, whatever the login shell is.
 fn shell(script: &str) -> String {
     debug_assert!(!script.contains('\''));
 
-    format!("exec env -i HOME=\"$HOME\" PATH=/usr/bin:/bin /bin/sh -c '{script}'")
+    format!("exec env -i HOME=\"$HOME\" PATH={PATH} /bin/sh -c '{script}'")
+}
+
+/// The answer in a script's stdout, ignoring whatever else was printed around it.
+fn answer_in(stdout: &str) -> Option<&str> {
+    stdout
+        .lines()
+        .find_map(|line| line.trim_end().strip_prefix(ANSWER))
 }
 
 fn status_script(root: &Root, version: &str, sha256: &str) -> String {
     format!(
         r#"{SUM_OF_FILE}f="{root}/{version}/neore-host"
 if [ -f "$f" ] && [ -x "$f" ]; then
-  if [ "$(sum_of "$f")" = "{sha256}" ]; then echo current; else echo different; fi
+  if [ "$(sum_of "$f")" = "{sha256}" ]; then echo {ANSWER}current; else echo {ANSWER}different; fi
 else
-  echo missing
+  echo {ANSWER}missing
 fi
 "#,
         root = root.text()
@@ -302,9 +316,12 @@ impl Remote<'_> {
 
     /// The Rust target of the server, from its own `uname`.
     pub fn triple(&self) -> Result<&'static str, String> {
-        let answer = self.run("uname -sm", &mut std::io::empty())?;
+        let stdout = self.run(
+            &format!("echo \"{ANSWER}$(uname -sm)\""),
+            &mut std::io::empty(),
+        )?;
 
-        target_for_uname(&answer)
+        target_for_uname(answer_in(&stdout).unwrap_or_default())
     }
 }
 
@@ -333,7 +350,7 @@ pub fn install(remote: &Remote, bundle: &Bundle, root: &Root) -> Result<Installe
         &mut std::io::empty(),
     )?;
 
-    if state.trim() == "current" {
+    if answer_in(&state) == Some("current") {
         return Ok(Installed::Current);
     }
 
@@ -418,6 +435,26 @@ mod tests {
     }
 
     #[test]
+    fn an_answer_is_the_marked_line_whatever_the_login_shell_printed() {
+        assert_eq!(
+            answer_in("Welcome to box\nNEORE:Linux x86_64\n"),
+            Some("Linux x86_64")
+        );
+        assert_eq!(answer_in("NEORE:current\r\n"), Some("current"));
+        assert_eq!(
+            answer_in("last login: today\nNEORE:missing\nbye\n"),
+            Some("missing")
+        );
+        assert_eq!(answer_in("Linux x86_64\n"), None);
+        assert_eq!(answer_in(""), None);
+        assert_eq!(
+            target_for_uname(answer_in("motd\nNEORE:Darwin arm64\n").unwrap()).unwrap(),
+            "aarch64-apple-darwin"
+        );
+        assert!(target_for_uname(answer_in("motd\n").unwrap_or_default()).is_err());
+    }
+
+    #[test]
     fn a_manifest_of_another_version_or_with_a_bad_entry_is_refused() {
         let dir = temporary("manifest");
         let load = |text: String| {
@@ -481,7 +518,7 @@ mod tests {
 
         for script in scripts {
             assert!(!script.contains('\''), "{script}");
-            assert!(shell(&script).starts_with("exec env -i HOME=\"$HOME\" PATH=/usr/bin:/bin"));
+            assert!(shell(&script).starts_with("exec env -i HOME=\"$HOME\" PATH=/usr/bin:/bin:"));
         }
     }
 

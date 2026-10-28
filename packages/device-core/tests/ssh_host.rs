@@ -896,13 +896,38 @@ fn a_platform_the_bundle_has_no_binary_for_is_refused_before_anything_is_created
         paths: &paths,
         target: &target,
     };
+    let nothing_uploaded = || {
+        let mut files = Vec::new();
+
+        files_under(&server.dir, &mut files);
+        files.retain(|file| {
+            file.to_string_lossy().contains("neore-host")
+                && !file.starts_with(server.dir.join("bundle"))
+        });
+
+        assert!(files.is_empty(), "something was uploaded: {files:?}");
+        assert!(
+            !server.dir.join("host-root").exists(),
+            "the refusal came after the server was touched"
+        );
+    };
     let error = install::install(&remote, &bundle, &root).unwrap_err();
 
     assert!(error.contains("ships no neore-host"), "{error}");
-    assert!(
-        !server.dir.join("host-root").exists(),
-        "the refusal came after the server was touched"
-    );
+    nothing_uploaded();
+
+    // A bundle with no binary at all is refused the same way.
+    fs::write(
+        server.dir.join("bundle").join("manifest.json"),
+        json!({ "version": HOST_VERSION, "targets": {} }).to_string(),
+    )
+    .unwrap();
+
+    let empty = Bundle::load(&server.dir.join("bundle")).unwrap();
+    let error = install::install(&remote, &empty, &root).unwrap_err();
+
+    assert!(error.contains("ships no neore-host"), "{error}");
+    nothing_uploaded();
 
     end_master(&target, &paths);
 }

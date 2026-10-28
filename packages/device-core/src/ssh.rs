@@ -1187,6 +1187,16 @@ fn exited_with(child: &mut Child, code: i32) -> bool {
     false
 }
 
+fn drain(mut stream: impl Read + Send + 'static) -> thread::JoinHandle<Vec<u8>> {
+    thread::spawn(move || {
+        let mut bytes = Vec::new();
+
+        let _ = stream.read_to_end(&mut bytes);
+
+        bytes
+    })
+}
+
 /// What one remote command printed.
 pub struct Exec {
     pub stdout: String,
@@ -1227,6 +1237,10 @@ pub fn exec(
         .spawn()
         .map_err(|error| SshError::Other(format!("ssh could not run: {error}")))?;
     let mut stdin = child.stdin.take().expect("piped stdin");
+    // Drained while the input is still going: a server that answers more than a pipe holds before it has read all
+    // of its stdin would otherwise block on its write while this blocks on the write of the input.
+    let stdout = drain(child.stdout.take().expect("piped stdout"));
+    let stderr = drain(child.stderr.take().expect("piped stderr"));
 
     // The server may stop reading (a failed `mkdir`, say): its stderr then says why, and that is the error.
     match io::copy(input, &mut stdin) {
@@ -1241,30 +1255,30 @@ pub fn exec(
 
     drop(stdin);
 
-    let output = child
-        .wait_with_output()
+    let status = child
+        .wait()
         .map_err(|error| SshError::Other(format!("ssh failed: {error}")))?;
+    let (stdout, stderr) = (
+        stdout.join().unwrap_or_default(),
+        stderr.join().unwrap_or_default(),
+    );
 
     #[cfg(unix)]
     drop(askpass);
 
-    if output.status.success() {
+    if status.success() {
         return Ok(Exec {
-            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stdout: String::from_utf8_lossy(&stdout).into_owned(),
         });
     }
 
-    let said = String::from_utf8_lossy(&output.stderr);
+    let said = String::from_utf8_lossy(&stderr);
     let said = said.trim();
 
     Err(SshError::Other(if said.contains("Permission denied") {
         explain(target, said, &Mutex::new(said.to_owned()))
     } else if said.is_empty() {
-        format!(
-            "the command on {} failed ({})",
-            target.label(),
-            output.status
-        )
+        format!("the command on {} failed ({status})", target.label())
     } else {
         format!("on {}: {said}", target.label())
     }))
