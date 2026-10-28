@@ -240,7 +240,13 @@ describe("a busy worker", () => {
             for (let index = 1; index <= 25; index += 1) {
                 const { _creationTime, _id, ...fields } = first;
 
-                await context.db.insert("subAgentRuns", { ...fields, createdAt: first.createdAt + index, startedAt: undefined, status: "cancelled", toolCallId: `seed-${String(index)}` });
+                await context.db.insert("subAgentRuns", {
+                    ...fields,
+                    createdAt: first.createdAt + index,
+                    startedAt: undefined,
+                    status: "cancelled",
+                    toolCallId: `seed-${String(index)}`,
+                });
             }
         });
 

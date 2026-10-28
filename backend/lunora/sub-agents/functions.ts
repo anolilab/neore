@@ -1332,7 +1332,10 @@ export const listWorkers = authQuery
                 leadThreadId: run.parentThreadId,
                 name: workerName(thread, run),
                 postFailed: workerPostFailure(group),
-                state: workerState(working, group.some((candidate) => isWorkerLoopLive(candidate))),
+                state: workerState(
+                    working,
+                    group.some((candidate) => isWorkerLoopLive(candidate)),
+                ),
                 workerId: run.childThreadId!,
             });
         }
@@ -1365,7 +1368,10 @@ export const getWorker = authQuery
             leadThreadId: origin.parentThreadId,
             name: workerName(thread, origin),
             postFailed: workerPostFailure(recent),
-            state: workerState(working, recent.some((candidate) => isWorkerLoopLive(candidate))),
+            state: workerState(
+                working,
+                recent.some((candidate) => isWorkerLoopLive(candidate)),
+            ),
             workerId: args.workerId,
         };
     });
