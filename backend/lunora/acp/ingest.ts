@@ -16,7 +16,7 @@
 import type { Infer } from "lunorash/server";
 import { v } from "lunorash/server";
 
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
@@ -96,6 +96,15 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
     const existing = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
 
     if (existing) {
+        // A thread deleted in the app ends its session: the desktop learns it is over instead of posting into it.
+        const thread = await ctx.db.get(existing.threadId as Id<"threads">);
+
+        if ((!thread || thread.deleted) && existing.status !== "ended") {
+            await ctx.db.patch(existing._id, { status: "ended", updatedAt: now });
+
+            return { ended: true, next: 0, outcome: "applied", threadId: existing.threadId as string };
+        }
+
         // The agent can report more once it has been used; the thread and session stay as they are.
         if (open.capabilities && existing.status !== "ended") {
             await ctx.db.patch(existing._id, { capabilities: open.capabilities, updatedAt: now });
