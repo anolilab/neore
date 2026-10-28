@@ -11,8 +11,8 @@ import schema from "../schema";
 import { admitWorkerRun } from "./functions";
 import { WORKER_SYSTEM } from "./logic";
 
-const { registry, runs } = vi.hoisted(() => {
-    return { registry: new Map<string, unknown>(), runs: [] as Record<string, any>[] };
+const { contexts, probe, registry, runs } = vi.hoisted(() => {
+    return { contexts: [] as string[][], probe: { on: false }, registry: new Map<string, unknown>(), runs: [] as Record<string, any>[] };
 });
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -20,10 +20,31 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 
 vi.mock("../chat/lib/headless-run", () => {
     return {
-        runHeadlessAgent: async (_ctx: unknown, options: Record<string, any>) => {
+        runHeadlessAgent: async (ctx: any, options: Record<string, any>) => {
             runs.push(options);
 
-            return { text: `reply ${String(runs.length)}`, threadId: options.thread.threadId };
+            const text = `reply ${String(runs.length)}`;
+
+            if (probe.on) {
+                // What the agent reads as history, then what a real run saves into the thread.
+                const { threadId } = options.thread;
+                const { fetchContextMessages } = await import("../agent/client/search");
+                const { internal } = await import("../_generated/internal");
+                const history = await fetchContextMessages(ctx, {} as never, { contextOptions: { recentMessages: 50 }, threadId, userId: options.userId });
+
+                contexts.push(history.map((row) => row.text ?? ""));
+                await ctx.runMutation(internal.agent.messages.addMessages, {
+                    fromUser: true,
+                    messages: [
+                        { message: { content: options.prompt, role: "user" }, status: "success" },
+                        { message: { content: text, role: "assistant" }, status: "success" },
+                    ],
+                    threadId,
+                    userId: options.userId,
+                });
+            }
+
+            return { text, threadId: options.thread.threadId };
         },
     };
 });
@@ -39,10 +60,13 @@ let leadId: string;
 beforeAll(async () => {
     registerModule(registry, "sub_agents_functions", await import("./functions"));
     registerModule(registry, "tasks_internal", await import("../tasks/internal"));
+    registerModule(registry, "agent_messages", await import("../agent/messages"));
 });
 
 beforeEach(async () => {
     runs.length = 0;
+    contexts.length = 0;
+    probe.on = false;
     harness = lunoraTest(schema as never);
     userId = (await harness.run(
         async (ctx: any) => await ctx.db.insert("user", { createdAt: 0, email: "u@example.com", emailVerified: true, name: "U", updatedAt: 0 }),
@@ -88,6 +112,22 @@ describe("a worker's runs", () => {
 
         expect(rows.map((row) => row.status)).toStrictEqual(["succeeded", "succeeded"]);
         expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(2);
+    });
+
+    it("builds the second run's context from the first run's saved reply", async () => {
+        probe.on = true;
+
+        const first = await dispatch({ toolCallId: "call-1" });
+
+        await execute(first._id);
+
+        const second = await dispatch({ childThreadId: first.childThreadId, clientId: "client-1", task: "What about the second part?" });
+
+        await execute(second._id);
+
+        expect(contexts).toHaveLength(2);
+        expect(contexts[0]).toStrictEqual([]);
+        expect(contexts[1]).toContain("reply 1");
     });
 
     it("runs on the worker thread's model, not the lead's", async () => {

@@ -120,7 +120,7 @@ export const normalizeToolAllowlist = (tools: ReadonlyArray<string> | undefined)
 
 /**
  * What a worker is allowed to call: the requested names that the lead could call itself, or the
- * lead's whole set when none are requested. A worker never widens its lead, so a requested name the
+ * lead's set (at most {@link SUB_AGENT_MAX_TOOLS} names) when none are requested. A worker never widens its lead, so a requested name the
  * lead lacks is refused rather than dropped. `leadTools` is the lead run's effective tool names, after
  * the user's permissions; `undefined` means no lead run vouches for the request (a person creating the
  * worker), and the request stands.
@@ -134,7 +134,8 @@ export const intersectWithLeadTools = (
     }
 
     if (requested === undefined) {
-        return { tools: [...leadTools] };
+        // Capped like a requested list, so a lead with many tools yields a worker with the first few.
+        return { tools: leadTools.slice(0, SUB_AGENT_MAX_TOOLS) };
     }
 
     const available = new Set(leadTools);

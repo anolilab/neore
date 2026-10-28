@@ -239,7 +239,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
         const text = result.text ?? "";
 
         await ctx.runMutation(internal.agent.threads.updateThread, {
-            patch: { status: "active", updatedAt: Date.now() },
+            // An existing thread keeps its status: a worker archived mid-run stays archived.
+            patch: { ...(existingThreadId === undefined && { status: "active" as const }), updatedAt: Date.now() },
             threadId: threadId as Id<"threads">,
         });
 

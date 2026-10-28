@@ -188,11 +188,11 @@ export const admitSubAgentRun = async (
 
     const { account, allowlist, parent, skillSlug, task } = common;
     const depth = (await threadDepth(ctx, parent._id)) + 1;
-    // A sub-agent's thread is its one run, so every child ever started from it counts.
+    // Every child ever started from the lead counts, a worker once however many runs it had.
     const capProblem = subAgentCapProblem({
         activeChildren: await countChildren(ctx, parent._id, ["queued", "running"]),
         parentDepth: depth - 1,
-        ...(depth > 1 && { totalChildren: await countChildren(ctx, parent._id, ["queued", "running", "succeeded", "failed", "cancelled"]) }),
+        ...(depth > 1 && { totalChildren: await lifetimeChildren(ctx, parent._id) }),
     });
 
     if (capProblem) {
@@ -478,7 +478,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         parentModel: args.parentModel,
         parentThreadId: parent._id,
         runner: origin?.runner ?? { kind: "headless" },
-        skillSlug: origin ? undefined : skillSlug,
+        skillSlug: origin?.skillSlug ?? skillSlug,
         status: "queued",
         task,
         toolAllowlist: allowlist,
@@ -573,7 +573,8 @@ export const messageWorker = internalMutation
  *
  * A worker run is charged here, once, as it leaves `queued` — so a run cancelled while queued costs
  * nothing, and a redelivery (which gets `null` above) cannot charge twice. When the daily limit is
- * spent the run ends as failed and the claim answers `null`.
+ * spent the run ends as failed, and when the worker was archived meanwhile it ends cancelled; the
+ * claim answers `null` for both.
  */
 export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<RunDoc | null> => {
     const run = await ctx.db.get(runId);
@@ -582,7 +583,17 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
         return null;
     }
 
+    // A worker's thread exists already, so the link `linkChildThread` makes for a one-shot run is not made again.
+    const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
+
     if (run.mode === "worker") {
+        // Archived after this run was queued: it ends cancelled, uncharged, and the thread stays archived.
+        if (worker?.status === "archived") {
+            await finishRun(ctx, run._id, { kind: "cancelled" });
+
+            return null;
+        }
+
         const account = await loadTaskAccount(ctx, run.userId);
 
         if (!account || !(await chargeRound(ctx, run.userId, account))) {
@@ -596,10 +607,7 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
 
     await patchById(ctx.db, run._id, { startedAt: now, status: "running", updatedAt: now });
 
-    // "running" is what the thread list reads to offer its Stop; `finishRun` puts it back. A worker's
-    // thread exists already, so the link `linkChildThread` makes for a one-shot run is not made again.
-    const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
-
+    // "running" is what the thread list reads to offer its Stop; `finishRun` puts it back.
     if (worker?.status === "active") {
         await patchThread(ctx.db, worker._id, { status: "running", updatedAt: now });
     }
@@ -1245,7 +1253,7 @@ export const listActiveWorkerRuns = authQuery
                 views.push({
                     createdAt: run.createdAt,
                     leadThreadId: run.parentThreadId,
-                    name: thread ? workerName(thread, run) : run.task.split("\n", 1)[0]!.slice(0, WORKER_NAME_MAX),
+                    name: thread && !thread.deleted ? workerName(thread, run) : run.task.split("\n", 1)[0]!.slice(0, WORKER_NAME_MAX),
                     runId: run._id,
                     startedAt: run.startedAt ?? null,
                     status,

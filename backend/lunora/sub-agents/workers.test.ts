@@ -8,8 +8,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import type { WorkerRunArgs } from "./functions";
-import { admitWorkerRun, cancelSubAgentRunsForStop, claimQueuedRun, finishRun, isWorkerThread } from "./functions";
-import { intersectWithLeadTools, SUB_AGENT_MAX_CONCURRENT } from "./logic";
+import { admitSubAgentRun, admitWorkerRun, cancelSubAgentRunsForStop, claimQueuedRun, finishRun, isWorkerThread } from "./functions";
+import { intersectWithLeadTools, SUB_AGENT_MAX_CONCURRENT, SUB_AGENT_MAX_TOOLS } from "./logic";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -121,6 +121,12 @@ describe("creating a worker", () => {
         expect(intersectWithLeadTools(["a", "b"], undefined)).toStrictEqual({ tools: ["a", "b"] });
         expect(intersectWithLeadTools(undefined, undefined)).toStrictEqual({ tools: undefined });
     });
+
+    it("stores at most SUB_AGENT_MAX_TOOLS of the lead's tools when none are requested", () => {
+        const lead = Array.from({ length: SUB_AGENT_MAX_TOOLS + 10 }, (_, index) => `tool${String(index)}`);
+
+        expect(intersectWithLeadTools(undefined, lead)).toStrictEqual({ tools: lead.slice(0, SUB_AGENT_MAX_TOOLS) });
+    });
 });
 
 describe("dispatching to a worker", () => {
@@ -226,6 +232,47 @@ describe("dispatching to a worker", () => {
         }
     });
 
+    it("keeps the first run's skill on every later run", async () => {
+        const first = await create({ skillSlug: "research" });
+
+        await claim(first.run._id);
+        await finish(first.run._id);
+
+        const second = await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-2" });
+
+        expect(second).toMatchObject({ created: true, run: { skillSlug: "research" } });
+    });
+
+    it("counts a worker once toward the lifetime cap however many runs it had, for a one-shot sub-agent too", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch(userId, { plan: "premium" }));
+
+        const lead = await create();
+        const nested = lead.run.childThreadId as string;
+        const worker = await create({ name: "Only", parentThreadId: nested, toolCallId: "n-0" });
+        let latest: string = worker.run._id;
+
+        for (let index = 0; index < 6; index += 1) {
+            await claim(latest);
+            await finish(latest);
+
+            const again = (await dispatch({ childThreadId: worker.run.childThreadId, parentThreadId: nested, toolCallId: `n-msg-${String(index)}` })) as {
+                run: { _id: string };
+            };
+
+            latest = again.run._id;
+        }
+
+        await claim(latest);
+        await finish(latest);
+
+        // Seven runs, one child: the lifetime cap of five is not reached.
+        const oneShot = await harness.run(
+            async (ctx: any) => await admitSubAgentRun(ctx, { parentThreadId: nested, task: "Side question", toolCallId: "one-shot", userId }),
+        );
+
+        expect(oneShot).not.toHaveProperty("error");
+    });
+
     it("refuses a second distinct worker beyond the lifetime cap at depth 2", async () => {
         const first = await create();
         const nested = first.run.childThreadId as string;
@@ -294,6 +341,37 @@ describe("a worker run's claim", () => {
         const [failed] = await runs();
 
         expect(failed).toMatchObject({ error: expect.stringMatching(DAILY_LIMIT), status: "failed" });
+    });
+});
+
+describe("archiving a worker", () => {
+    const archive = async (threadId: string) => await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { status: "archived" }));
+    const statusOf = async (threadId: string) => ((await harness.run(async (ctx: any) => await ctx.db.get(threadId))) as { status: string }).status;
+
+    it("stays archived after the running run ends, and the next dispatch is refused", async () => {
+        const { run } = await create();
+
+        await claim(run._id);
+        await archive(run.childThreadId!);
+        await finish(run._id);
+
+        expect(await statusOf(run.childThreadId!)).toBe("archived");
+        expect(await dispatch({ childThreadId: run.childThreadId, toolCallId: "call-2" })).toMatchObject({ kind: "archived" });
+    });
+
+    it("cancels a queued run at the claim without charging it", async () => {
+        const { run } = await create();
+
+        await archive(run.childThreadId!);
+
+        expect(await claim(run._id)).toBeNull();
+
+        const [cancelled] = await runs();
+        const keys = await rateLimitKeys();
+
+        expect(cancelled).toMatchObject({ status: "cancelled" });
+        expect(keys.filter((key) => key.includes("chat/dailyText"))).toHaveLength(0);
+        expect(await statusOf(run.childThreadId!)).toBe("archived");
     });
 });
 

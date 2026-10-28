@@ -26,9 +26,12 @@ export interface DelegateToSubAgentInput {
 
 export type DelegateToSubAgentOutput = { error: string; status: "failed" } | { message: string; runId: string; status: "started"; workerId?: string };
 
-/** The tool names the lead run can call — what its worker may use at most. */
-export const leadToolNames = (context: ToolContext): string[] =>
-    Object.keys((context.agent?.options as { tools?: Record<string, unknown> } | undefined)?.tools ?? {});
+/** The tool names the lead run can call — what its worker may use at most; `undefined` when the run's tools cannot be read. */
+export const leadToolNames = (context: ToolContext): string[] | undefined => {
+    const tools = (context.agent?.options as { tools?: Record<string, unknown> } | undefined)?.tools;
+
+    return tools === undefined ? undefined : Object.keys(tools);
+};
 
 /** The registry id of the model this run is on — what `getAgent` built the gateway model with. */
 const parentModelOf = (context: ToolContext): string | undefined => {
@@ -50,11 +53,18 @@ This tool returns as soon as the sub-agent has started. Its result is posted to 
             return { error: "Sign in to use sub-agents.", status: "failed" };
         }
 
+        // A worker is bounded by its lead's tools, so a lead whose tools are unknown starts none.
+        const leadTools = input.persistent ? leadToolNames(context) : undefined;
+
+        if (input.persistent && leadTools === undefined) {
+            return { error: "Workers are unavailable in this run.", status: "failed" };
+        }
+
         const parentModel = parentModelOf(context);
         const created = await context.runMutation(internal.sub_agents.functions.createRun, {
             ...(parentModel !== undefined && { parentModel }),
             parentThreadId: context.threadId,
-            ...(input.persistent && { leadTools: leadToolNames(context), name: input.name, persistent: true }),
+            ...(input.persistent && { leadTools, name: input.name, persistent: true }),
             ...(input.skill && { skillSlug: input.skill }),
             task: input.task,
             ...(input.tools && { toolAllowlist: input.tools }),
