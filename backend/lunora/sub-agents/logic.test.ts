@@ -13,12 +13,16 @@ import {
     SUB_AGENT_MAX_PER_RUN,
     SUB_AGENT_MAX_TOOLS,
     SUB_AGENT_RESULT_MAX,
+    SUB_AGENT_STALE_MS,
+    SUB_WORKER_QUIET_MS,
     stopWhenRequested,
     subAgentCapProblem,
     truncateResult,
     workerCurrentRun,
     workerFollowUp,
     workerPostFailure,
+    workerReapDecision,
+    workerRunToStop,
 } from "./logic";
 
 const DEPTH_CAP = /at most 2 levels/u;
@@ -251,5 +255,64 @@ describe(postsBack, () => {
         expect(postsBack({ mode: "run" })).toBe(true);
         expect(postsBack({ mode: "worker", toolCallId: "call-1" })).toBe(true);
         expect(postsBack({ mode: "worker" })).toBe(false);
+    });
+});
+
+describe(workerReapDecision, () => {
+    const startedAt = 1_000_000;
+    const running = { startedAt, status: "running" } as const;
+
+    it("keeps the quiet notice window inside the reaper's", () => {
+        expect(SUB_WORKER_QUIET_MS).toBeLessThan(SUB_AGENT_STALE_MS);
+    });
+
+    it("leaves a run that is still writing past the old deadline and checks again when its window would end", () => {
+        const lastActivityAt = startedAt + SUB_AGENT_STALE_MS;
+        const now = lastActivityAt + 60_000;
+
+        expect(workerReapDecision({ lastActivityAt, now, run: running })).toStrictEqual({ delayMs: SUB_AGENT_STALE_MS - 60_000, kind: "later" });
+    });
+
+    it("fails a run quiet for the whole window, measured from its claim when it never wrote", () => {
+        expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt + SUB_AGENT_STALE_MS, run: running })).toStrictEqual({ kind: "fail" });
+        expect(workerReapDecision({ lastActivityAt: startedAt + 1, now: startedAt + SUB_AGENT_STALE_MS, run: running })).toMatchObject({ kind: "later" });
+    });
+
+    it("never reaps a queued run, or one that ended", () => {
+        expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt * 100, run: { status: "queued" } })).toStrictEqual({ kind: "skip" });
+        expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt * 100, run: { startedAt, status: "succeeded" } })).toStrictEqual({
+            kind: "skip",
+        });
+        // Cancelled while queued: no loop ever ran.
+        expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt * 100, run: { status: "cancelled" } })).toStrictEqual({ kind: "skip" });
+    });
+
+    it("judges a stopped run whose loop has not exited like a running one, and skips it once it has", () => {
+        expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt + SUB_AGENT_STALE_MS, run: { startedAt, status: "cancelled" } })).toStrictEqual({
+            kind: "fail",
+        });
+        expect(
+            workerReapDecision({
+                lastActivityAt: undefined,
+                now: startedAt + SUB_AGENT_STALE_MS,
+                run: { loopExitedAt: startedAt + 1, startedAt, status: "cancelled" },
+            }),
+        ).toStrictEqual({ kind: "skip" });
+    });
+});
+
+describe(workerRunToStop, () => {
+    it("is the run going, else the head of the queue, and nothing while a stopped loop unwinds", () => {
+        const queuedHead = { status: "queued" } as const;
+        const queuedTail = { status: "queued" } as const;
+        const going = { startedAt: 1, status: "running" } as const;
+        const unwinding = { startedAt: 1, status: "cancelled" } as const;
+        const gone = { loopExitedAt: 2, startedAt: 1, status: "cancelled" } as const;
+
+        expect(workerRunToStop([queuedTail, queuedHead, going])).toBe(going);
+        expect(workerRunToStop([queuedTail, queuedHead])).toBe(queuedHead);
+        expect(workerRunToStop([queuedTail, queuedHead, unwinding])).toBeUndefined();
+        expect(workerRunToStop([queuedTail, queuedHead, gone])).toBe(queuedHead);
+        expect(workerRunToStop([])).toBeUndefined();
     });
 });

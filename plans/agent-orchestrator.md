@@ -336,6 +336,16 @@ quiet notice.
   lead as an error; a worker run that is active across the old fixed deadline is not
   failed, a queued run that waits longer than the deadline is not failed, and a run quiet
   for the full window is.
+- Built (cloud): a cloud worker's activity is its thread's newest message row (the loop writes one
+  per step). The reaper of a worker run is scheduled at the claim and judged by
+  `workerReapDecision`; a queued run has no reaper and a lost job leaves it queued until a stop or
+  the queue reaches it. `SUB_WORKER_QUIET_MS` (20 min) is provisional: it is not measured against real
+  quiet gaps yet. `getWorker` and `listWorkers` return `lastActivityAt` (running run only) and
+  `quietAfterMs`; the client counts the minutes, since a live query does not re-run with the clock.
+- Left for S5: a host run's activity is its host events, read where `workerActivityAt` reads the
+  thread; the quiet notice and the stale clock both pause while a host run waits on a person, which
+  a headless run cannot do (it drops `ask` tools); a host run whose host goes away fails at once with
+  "host did not answer" and posts to the lead as a failure.
 
 **S7 — Receipts.** Receipt fields on dispatch; per-run post-back isolation.
 - Acceptance: `messageWorker` returns `runId` and `state`; when one run's post

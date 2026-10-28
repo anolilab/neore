@@ -38,7 +38,7 @@ import { resolveLeafRow } from "../agent/branch-rows";
 import { addMessagesHandler, getMaxMessage } from "../agent/messages";
 import { insertThread, insertThreadRelationship, patchThread } from "../agent/table-writes";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
-import { claimOnce, releaseClaim, WORKER_DISPATCH_CLAIM_TTL_MS, WORKER_DISPATCH_SCOPE } from "../lib/claim-once";
+import { claimOnce, releaseClaim, WORKER_DISPATCH_CLAIM_TTL_MS, WORKER_DISPATCH_SCOPE, WORKER_STOP_SCOPE } from "../lib/claim-once";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { enqueueJob } from "../lib/job-queue";
 import { patchById } from "../lib/patch";
@@ -68,12 +68,16 @@ import {
     SUB_AGENT_STALE_MS,
     SUB_AGENT_TASK_MAX,
     subAgentCapProblem,
+    SUB_WORKER_QUIET_MS,
     truncateResult,
     WORKER_CLIENT_ID_MAX,
     WORKER_NAME_MAX,
+    WORKER_STALE_MESSAGE,
     workerCurrentRun,
-    workerPostFailure,
     workerFollowUp,
+    workerPostFailure,
+    workerReapDecision,
+    workerRunToStop,
 } from "./logic";
 import { vSubAgentRunMode, vSubAgentRunStatus } from "./validators";
 
@@ -327,13 +331,16 @@ const latestWorkerRuns = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childTh
 };
 
 /**
- * Puts a queued run on the jobs queue and schedules its reaper, in the caller's transaction. A
- * worker run waiting behind another gets neither until its turn, so the reaper's clock does not
- * run down while it waits in line.
+ * Puts a queued run on the jobs queue, in the caller's transaction, with its reaper for a one-shot
+ * run. A worker run's reaper starts at its claim (`claimQueuedRun`), so a run that waits in line, or
+ * for a consumer, never runs its clock down while it has not started.
  */
-const startQueuedRun = async (ctx: Pick<MutationCtx, "scheduler">, runId: Id<"subAgentRuns">): Promise<void> => {
-    await enqueueJob(internal.sub_agents.execute.runSubAgent, { runId });
-    await ctx.scheduler.runAfter(SUB_AGENT_STALE_MS, internal.sub_agents.functions.reapRun, { runId });
+const startQueuedRun = async (ctx: Pick<MutationCtx, "scheduler">, run: Pick<RunDoc, "_id" | "mode">): Promise<void> => {
+    await enqueueJob(internal.sub_agents.execute.runSubAgent, { runId: run._id });
+
+    if (run.mode !== "worker") {
+        await ctx.scheduler.runAfter(SUB_AGENT_STALE_MS, internal.sub_agents.functions.reapRun, { runId: run._id });
+    }
 };
 
 /** Whether `threadId` is a worker's thread — a turn there runs only through a dispatch. */
@@ -569,7 +576,7 @@ export const dispatchWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): 
     }
 
     if (admitted.created && admitted.idle) {
-        await startQueuedRun(ctx, admitted.run._id);
+        await startQueuedRun(ctx, admitted.run);
     }
 
     return { runId: admitted.run._id, state: admitted.run.status, workerId: admitted.run.childThreadId! };
@@ -609,7 +616,7 @@ export const createRun = internalMutation
 
         // Jobs queue (`lib/job-queue.ts`) on this shard — the parent thread
         // owner's; a redelivery is refused by `claimRun`.
-        await startQueuedRun(ctx, runId);
+        await startQueuedRun(ctx, { _id: runId });
 
         return { runId };
     });
@@ -678,6 +685,10 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
     const now = Date.now();
 
     await patchById(ctx.db, run._id, { startedAt: now, status: "running", updatedAt: now });
+
+    if (run.mode === "worker") {
+        await ctx.scheduler.runAfter(SUB_AGENT_STALE_MS, internal.sub_agents.functions.reapRun, { runId: run._id });
+    }
 
     // "running" is what the thread list reads to offer its Stop; `finishRun` puts it back.
     if (worker?.status === "active") {
@@ -823,7 +834,7 @@ const startNextWorkerRun = async (ctx: MutationCtx, childThreadId: string): Prom
     const next = nextQueuedWorkerRun(await latestWorkerRuns(ctx, childThreadId));
 
     if (next) {
-        await startQueuedRun(ctx, next._id);
+        await startQueuedRun(ctx, next);
     }
 };
 
@@ -1016,12 +1027,50 @@ export const completeRun = internalMutation
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => await finishRunFromLoop(ctx, args.runId, args.outcome));
 
-/** Scheduled at admission: fails a run that never reported, which also frees its fan-out slot (and a stopped run's line). */
+/**
+ * When the worker's thread last showed progress: its newest message row. A headless run writes one per
+ * step (the pending row of the step that follows), so a loop that is working keeps this moving.
+ */
+const workerActivityAt = async (ctx: QueryCtx, childThreadId: string): Promise<number | undefined> => {
+    const newest = await getMaxMessage(ctx, childThreadId as Id<"threads">);
+
+    return newest?._creationTime;
+};
+
+/**
+ * Scheduled when a run is admitted (one-shot) or claimed (worker): fails a run that never reported,
+ * which also frees its fan-out slot (and a stopped run's line). A one-shot run fails at its deadline.
+ * A worker run is judged on activity ({@link workerReapDecision}): one still writing is checked again
+ * when its quiet window would end, one quiet for all of it fails (and the lead hears of it as an
+ * error, like any failed run it asked for), and a queued one is left to a stop or the queue.
+ */
+export const reapSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, now: number): Promise<void> => {
+    const run = await ctx.db.get(runId);
+
+    if (run?.mode !== "worker") {
+        await finishRunFromLoop(ctx, runId, { error: "The sub-agent did not finish in time.", kind: "failed" });
+
+        return;
+    }
+
+    const decision = workerReapDecision({
+        lastActivityAt: run.childThreadId === undefined ? undefined : await workerActivityAt(ctx, run.childThreadId),
+        now,
+        run,
+    });
+
+    if (decision.kind === "later") {
+        await ctx.scheduler.runAfter(decision.delayMs, internal.sub_agents.functions.reapRun, { runId });
+    } else if (decision.kind === "fail") {
+        await finishRunFromLoop(ctx, runId, { error: WORKER_STALE_MESSAGE, kind: "failed" });
+    }
+};
+
 export const reapRun = internalMutation
     .input({ runId: v.id("subAgentRuns") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await finishRunFromLoop(ctx, args.runId, { error: "The sub-agent did not finish in time.", kind: "failed" });
+        await reapSubAgentRun(ctx, args.runId, Date.now());
 
         return null;
     });
@@ -1272,6 +1321,54 @@ export const dispatchToWorker = authMutation
         });
     });
 
+/**
+ * Stops a worker for its owner. `current` ends the run going (or, with none going, the head of the
+ * queue); `all_queued` also ends every queued run behind it — newest first, so ending the head does
+ * not start the one behind it just to cancel that too. A run ended while queued was never charged. A
+ * run stopped while running finishes its step, and the next message waits for that loop to exit
+ * (`resumeLineAfterStoppedRun`). The `clientId` dedupes a retried click; a second stop finds nothing
+ * live and ends nothing. Returns how many runs this call ended.
+ */
+export const stopWorker = authMutation
+    .use(rateLimit("chat/update"))
+    .input({
+        clientId: v.string().max(WORKER_CLIENT_ID_MAX),
+        scope: v.union(v.literal("current"), v.literal("all_queued")),
+        workerId: v.id("threads"),
+    })
+    .output(v.object({ cancelled: v.number() }))
+    .mutation(async ({ args, ctx }) => {
+        const origin = await workerOrigin(ctx, args.workerId);
+
+        if (!origin || origin.userId !== ctx.user.userId) {
+            throw new LunoraError("NOT_FOUND", "Worker not found.");
+        }
+
+        if (
+            args.clientId.length === 0 ||
+            !(await claimOnce(ctx, WORKER_STOP_SCOPE, `${args.workerId}:${args.clientId}`, WORKER_DISPATCH_CLAIM_TTL_MS, ctx.user.userId))
+        ) {
+            return { cancelled: 0 };
+        }
+
+        const recent = await latestWorkerRuns(ctx, args.workerId);
+        // Newest queued run first: ending the head earlier would start the one behind it just to cancel that too.
+        const targets =
+            args.scope === "all_queued"
+                ? [...recent.filter((run) => run.status === "queued"), ...recent.filter((run) => run.status === "running")]
+                : [workerRunToStop(recent)].filter((run) => run !== undefined);
+
+        let cancelled = 0;
+
+        for (const run of targets) {
+            if (await cancelSubAgentRun(ctx, run._id)) {
+                cancelled += 1;
+            }
+        }
+
+        return { cancelled };
+    });
+
 const vFollowUp = v.union(v.literal("none"), v.literal("queue"), v.literal("steer"), v.literal("steer-restart"));
 
 const vWorkerView = v.object({
@@ -1279,12 +1376,18 @@ const vWorkerView = v.object({
     archived: v.boolean(),
     // How a message sent while a run is going is handled, from the runner's capabilities.
     followUp: vFollowUp,
+    // When the running run last wrote into the thread, null when none is running: the client shows
+    // "No progress" once `quietAfterMs` has passed since, as a live query does not re-run with the clock.
+    lastActivityAt: v.union(v.number(), v.null()),
     lastRunAt: v.number(),
     lastRunStatus: vSubAgentRunStatus,
     leadThreadId: v.string(),
     name: v.string(),
     // Why the latest run's result never reached the lead, once the post gave up; null when it did or was never owed.
     postFailed: v.union(v.string(), v.null()),
+    // Queued runs waiting behind the one going (or for it to be claimed), for the Stop choice.
+    queuedRuns: v.number(),
+    quietAfterMs: v.number(),
     state: v.union(v.literal("idle"), v.literal("queued"), v.literal("running")),
     workerId: v.string(),
 });
@@ -1303,6 +1406,21 @@ const workerState = (working: RunDoc | undefined, unwinding: boolean): "idle" | 
     }
 
     return working.status === "running" ? "running" : "queued";
+};
+
+/** The progress fields of a worker view: activity only for a running run, so an idle or queued worker's list never re-runs on a message. */
+const progressFields = async (
+    ctx: QueryCtx,
+    group: ReadonlyArray<RunDoc>,
+    working: RunDoc | undefined,
+): Promise<{ lastActivityAt: number | null; queuedRuns: number; quietAfterMs: number }> => {
+    const activityAt = working?.status === "running" && working.childThreadId !== undefined ? await workerActivityAt(ctx, working.childThreadId) : undefined;
+
+    return {
+        lastActivityAt: working?.status === "running" ? Math.max(working.startedAt ?? 0, activityAt ?? 0) : null,
+        queuedRuns: group.filter((run) => run.status === "queued").length,
+        quietAfterMs: SUB_WORKER_QUIET_MS,
+    };
 };
 
 /** Workers shown under one lead, most recently dispatched first. */
@@ -1362,6 +1480,7 @@ export const listWorkers = authQuery
                 activeRunId: working?._id ?? null,
                 archived: thread.status === "archived",
                 followUp: workerFollowUp(run.runner),
+                ...(await progressFields(ctx, group, working)),
                 lastRunAt: run.createdAt,
                 lastRunStatus: run.status,
                 leadThreadId: run.parentThreadId,
@@ -1398,6 +1517,7 @@ export const getWorker = authQuery
             activeRunId: working?._id ?? null,
             archived: thread.status === "archived",
             followUp: workerFollowUp(origin.runner),
+            ...(await progressFields(ctx, recent, working)),
             lastRunAt: latest.createdAt,
             lastRunStatus: latest.status,
             leadThreadId: origin.parentThreadId,

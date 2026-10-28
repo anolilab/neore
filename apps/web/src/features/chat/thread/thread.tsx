@@ -31,6 +31,7 @@ import { useModelStore } from "@/features/chat/core/stores/model-store";
 import ForwardSelectionBar from "@/features/chat/forward/forward-selection-bar";
 import WorkerComposer from "@/features/sub-agents/components/worker-composer";
 import WorkerList from "@/features/sub-agents/components/worker-list";
+import WorkerStopBar from "@/features/sub-agents/components/worker-stop-bar";
 import useWorker from "@/features/sub-agents/hooks/use-worker";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -303,6 +304,16 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
                             {/* Full-featured composer with model selector, language selector, slash commands */}
                             {/* Key by threadId to reset state when switching threads */}
                             {/* A worker's thread takes a turn only through a dispatch, so no chat composer while that is unknown. */}
+                            {worker && (
+                                <WorkerStopBar
+                                    className="w-full pb-2"
+                                    lastActivityAt={worker.lastActivityAt}
+                                    queuedRuns={worker.queuedRuns}
+                                    quietAfterMs={worker.quietAfterMs}
+                                    state={worker.state}
+                                    workerId={worker.workerId}
+                                />
+                            )}
                             {worker && (
                                 <WorkerComposer
                                     archived={worker.archived}

@@ -38285,6 +38285,16 @@
                             }
                           ]
                         },
+                        "lastActivityAt": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "lastRunAt": {
                           "type": "number"
                         },
@@ -38328,6 +38338,12 @@
                             }
                           ]
                         },
+                        "queuedRuns": {
+                          "type": "number"
+                        },
+                        "quietAfterMs": {
+                          "type": "number"
+                        },
                         "state": {
                           "anyOf": [
                             {
@@ -38352,11 +38368,14 @@
                         "activeRunId",
                         "archived",
                         "followUp",
+                        "lastActivityAt",
                         "lastRunAt",
                         "lastRunStatus",
                         "leadThreadId",
                         "name",
                         "postFailed",
+                        "queuedRuns",
+                        "quietAfterMs",
                         "state",
                         "workerId"
                       ],
@@ -38576,6 +38595,16 @@
                           }
                         ]
                       },
+                      "lastActivityAt": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "lastRunAt": {
                         "type": "number"
                       },
@@ -38619,6 +38648,12 @@
                           }
                         ]
                       },
+                      "queuedRuns": {
+                        "type": "number"
+                      },
+                      "quietAfterMs": {
+                        "type": "number"
+                      },
                       "state": {
                         "anyOf": [
                           {
@@ -38643,11 +38678,14 @@
                       "activeRunId",
                       "archived",
                       "followUp",
+                      "lastActivityAt",
                       "lastRunAt",
                       "lastRunStatus",
                       "leadThreadId",
                       "name",
                       "postFailed",
+                      "queuedRuns",
+                      "quietAfterMs",
                       "state",
                       "workerId"
                     ],
@@ -38668,6 +38706,94 @@
           "sub-agents"
         ],
         "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#sub_agents_functions:stopWorker": {
+      "post": {
+        "description": "Invoke the `mutation` `sub_agents_functions:stopWorker` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "sub_agents_functions:stopWorker",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "clientId": {
+                        "type": "string"
+                      },
+                      "scope": {
+                        "anyOf": [
+                          {
+                            "const": "current",
+                            "type": "string"
+                          },
+                          {
+                            "const": "all_queued",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "workerId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "clientId",
+                      "scope",
+                      "workerId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "sub_agents_functions:stopWorker",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "cancelled": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "cancelled"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: sub_agents_functions:stopWorker",
+        "tags": [
+          "sub-agents"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#system_prompts_functions:createPreset": {

@@ -58,6 +58,13 @@ export const SUB_AGENT_RESULT_MAX = 12_000;
 export const SUB_AGENT_STALE_MS = 75 * 60_000;
 
 /**
+ * How long a running worker may go without a new message in its thread before the thread shows
+ * "No progress" with a Stop control. It must stay below {@link SUB_AGENT_STALE_MS}. Provisional: set
+ * from the longest quiet gaps a real run shows, which are not measured yet.
+ */
+export const SUB_WORKER_QUIET_MS = 20 * 60_000;
+
+/**
  * While the parent thread is still streaming, the result post waits — a row
  * inserted mid-run would land between the parent's own steps. It re-checks
  * with a growing delay and posts regardless once the waits add up past the
@@ -247,9 +254,47 @@ export const nextQueuedWorkerRun = <T extends { loopExitedAt?: number; startedAt
     newestFirst: ReadonlyArray<T>,
 ): T | undefined => (newestFirst.some((run) => isWorkerLoopLive(run)) ? undefined : newestFirst.findLast((run) => run.status === "queued"));
 
+/**
+ * What the reaper does when it fires on a worker run. The clock is activity, not admission: a run
+ * that is still writing is left alone and checked again when its quiet window would end, a run quiet
+ * for the whole window is failed, and a queued one is never reaped, since its clock has not started
+ * (a stop, or the queue reaching it, ends it). A run stopped while running is judged the same way:
+ * its loop is gone only once it has been quiet for the window.
+ * `lastActivityAt` is the newest message in the worker's thread; `startedAt` floors it.
+ */
+export const workerReapDecision = (input: {
+    lastActivityAt: number | undefined;
+    now: number;
+    run: { loopExitedAt?: number; startedAt?: number; status: SubAgentStatus };
+}): { kind: "fail" } | { delayMs: number; kind: "later" } | { kind: "skip" } => {
+    const { run } = input;
+
+    if (!isWorkerLoopLive(run) || run.startedAt === undefined) {
+        return { kind: "skip" };
+    }
+
+    const quietFor = input.now - Math.max(run.startedAt, input.lastActivityAt ?? 0);
+
+    return quietFor >= SUB_AGENT_STALE_MS ? { kind: "fail" } : { delayMs: SUB_AGENT_STALE_MS - quietFor, kind: "later" };
+};
+
+/** The error a worker run quiet for the whole window ends with; it reaches the lead as a failed run. */
+export const WORKER_STALE_MESSAGE = `The worker made no progress for ${String(SUB_AGENT_STALE_MS / 60_000)} minutes and was stopped.`;
+
 /** The run a worker is on, from its runs newest first: the one going, else the next in line. A Stop in its thread means this one. */
 export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>
     newestFirst.find((run) => run.status === "running") ?? newestFirst.findLast((run) => run.status === "queued");
+
+/**
+ * What a stop with scope `current` ends, from the runs newest first: the run going, or, when none
+ * is and no stopped loop is still unwinding, the head of the queue. A worker whose only live run is a
+ * stopped one has nothing to stop, so a second stop cannot reach the message behind it.
+ */
+export const workerRunToStop = <T extends { loopExitedAt?: number; startedAt?: number; status: SubAgentStatus }>(
+    newestFirst: ReadonlyArray<T>,
+): T | undefined =>
+    newestFirst.find((run) => run.status === "running") ??
+    (newestFirst.some((run) => isWorkerLoopLive(run)) ? undefined : newestFirst.findLast((run) => run.status === "queued"));
 
 /**
  * Why the lead never got the worker's latest result, from its runs newest first: the newest run the
