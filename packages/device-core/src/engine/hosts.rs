@@ -336,6 +336,7 @@ fn describe_call(tool: &str, input: &Value, host: &str) -> Result<Described, Str
                 detail: format!(
                     "Run on {host} in {}:\n{command}",
                     text("cwd")
+                        .map(str::trim)
                         .filter(|cwd| !cwd.is_empty())
                         .unwrap_or("the first shared folder"),
                 ),
@@ -551,6 +552,14 @@ impl DeviceState {
         }
 
         let link = self.connect_target(&target)?;
+
+        // Unpaired while the person was answering or the connection was opening: nothing may keep it.
+        if usable_pairing(&self.settings()).is_err() {
+            self.retire(&link);
+
+            return Err("this computer was unpaired meanwhile".into());
+        }
+
         let probe = HostProbe::of(link.hello());
         let replaced = self.ssh.probe.lock().unwrap().replace((target, link));
 
