@@ -89,13 +89,14 @@ export class TurnChannel {
             return;
         }
 
-        const isText = event.kind === "text" || event.kind === "reasoning";
-
-        if (isText && this.pendingJson > MAX_PENDING_JSON) {
+        // Over the cap while the backend is out of reach: output is dropped, but the turn's own start and end are kept.
+        if (event.kind !== "turn_start" && event.kind !== "turn_end" && this.pendingJson > MAX_PENDING_JSON) {
             this.dropped += 1;
 
             return;
         }
+
+        const isText = event.kind === "text" || event.kind === "reasoning";
 
         const last = this.pending.at(-1);
 

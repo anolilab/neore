@@ -184,6 +184,35 @@ describe("opening a session", () => {
     });
 });
 
+describe("pairing after a session opened", () => {
+    it("opens the sessions that stayed local, so their next turn is posted", async () => {
+        paired = undefined;
+
+        const host = poster();
+
+        await open(host);
+        paired = "dev1";
+        host.paired();
+        await settle();
+        host.turnStarted("s1", "t1", "hello");
+        await settle(1000);
+
+        expect(backend.chunks.get("t1")?.[0]).toMatchObject({ kind: "turn_start" });
+    });
+
+    it("posts no turn into a session the backend answers as ended", async () => {
+        backend.respond = (post) => post.threadId === undefined ? Response.json({ ended: true, next: 0, threadId: "thread-1" }) : undefined;
+
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "hello");
+        await settle(1000);
+
+        expect(backend.chunks.get("t1")).toBeUndefined();
+    });
+});
+
 describe("a turn", () => {
     it("merges deltas into one post per 250 ms, with consecutive seqs", async () => {
         const host = poster();
