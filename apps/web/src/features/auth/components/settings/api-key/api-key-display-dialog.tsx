@@ -2,7 +2,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/responsive-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import cn from "@neore/ui/utils/cn";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import type { ComponentProps } from "react";
@@ -33,9 +33,11 @@ const APIKeyDisplayDialog = ({ apiKey, classNames, onOpenChange, ...properties }
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="bg-muted rounded-md p-4 font-mono text-sm break-all">{apiKey}</div>
+                <DialogPanel className="space-y-4">
+                    <div className="bg-muted rounded-md p-4 font-mono text-sm break-all">{apiKey}</div>
 
-                {apiKey && <McpConfigSnippet apiKey={apiKey} />}
+                    {apiKey && <McpConfigSnippet apiKey={apiKey} />}
+                </DialogPanel>
 
                 <DialogFooter className={classNames?.dialog?.footer}>
                     <Button className={cn(classNames?.button, classNames?.outlineButton)} onClick={() => copy(apiKey)} type="button" variant="outline">
