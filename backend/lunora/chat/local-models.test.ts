@@ -56,6 +56,7 @@ type Harness = ReturnType<typeof lunoraTest>;
 const NOT_FOUND_RE = /not found or disabled/u;
 const FOREIGN_THREAD_RE = /another user's thread/u;
 const NOT_A_PROMPT_RE = /take a prompt of this thread/u;
+const WORKER_THREAD_RE = /worker's thread/u;
 
 const OWNER = "owner-user";
 const MODEL = "custom:ollama/llama3.2:3b";
@@ -146,6 +147,31 @@ describe(saveLocalTurnHandler, () => {
         const { threadId } = await save(OWNER, {});
 
         await expect(save("intruder", { threadId })).rejects.toThrow(FOREIGN_THREAD_RE);
+    });
+
+    it("refuses a worker's thread, which takes a turn only through a dispatch", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+
+        const { threadId } = await save(OWNER, {});
+        const lead = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "Lead", userId: OWNER }));
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("subAgentRuns", {
+                    childThreadId: threadId,
+                    createdAt: 1,
+                    depth: 1,
+                    mode: "worker",
+                    parentThreadId: lead,
+                    status: "succeeded",
+                    task: "work",
+                    updatedAt: 1,
+                    userId: OWNER,
+                }),
+        );
+
+        await expect(save(OWNER, { prompt: "again", threadId })).rejects.toThrow(WORKER_THREAD_RE);
+        expect(await rowsOf(threadId)).toHaveLength(2);
     });
 });
 
