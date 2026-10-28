@@ -39011,6 +39011,9 @@
                       },
                       "maxDispatchesPerHour": {
                         "type": "number"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [

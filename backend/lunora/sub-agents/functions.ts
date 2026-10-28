@@ -1405,6 +1405,8 @@ export const setWorkerPolicy = authMutation
                 .max(WORKER_POLICY_MAX_PER_HOUR)
                 .check((value) => Number.isSafeInteger(value), { message: "Must be a whole number" }),
         ),
+        /** A locked chat's passcode proof, which every write to it needs. */
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
@@ -1413,6 +1415,9 @@ export const setWorkerPolicy = authMutation
         if (!lead || lead.deleted || lead.userId !== ctx.user.userId) {
             throw new LunoraError("NOT_FOUND", "Conversation not found.");
         }
+
+        // A locked lead's policy is part of its content: the same write gate as every other change to it.
+        throwUnlessGranted(await threadGateOutcome(ctx, { level: "write", threadId: lead._id, unlockProof: args.unlockProof, userId: ctx.user.userId }));
 
         const policy: Infer<typeof vWorkerPolicy> = {
             allowedSources: [...new Set(args.allowedSources)],
@@ -1556,15 +1561,15 @@ const progressFields = async (
         lastActivityAt: working?.status === "running" ? Math.max(working.startedAt ?? 0, activityAt ?? 0) : null,
         queuedRuns: group.filter((run) => run.status === "queued").length,
         quietAfterMs: SUB_WORKER_QUIET_MS,
-        runs: group.slice(0, WORKER_RUNS_SHOWN).map((run) => {
+        // A locked chat shows none of its content: the run list (task, times, delivery, source) is withheld whole.
+        runs: (locked ? [] : group.slice(0, WORKER_RUNS_SHOWN)).map((run) => {
             return {
                 createdAt: run.createdAt,
                 delivery: runDelivery(run),
                 dispatchedBy: run.dispatchedBy ?? null,
                 runId: run._id,
                 state: run.status,
-                // A locked chat shows none of its content, a run's task included.
-                task: locked ? LOCKED_THREAD_TITLE : run.task.split("\n", 1)[0]!.slice(0, 160),
+                task: run.task.split("\n", 1)[0]!.slice(0, 160),
             };
         }),
         stopping: group.some((run) => run.status === "cancelled" && isWorkerLoopLive(run)),

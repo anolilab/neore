@@ -9248,7 +9248,7 @@ export interface Caller {
             messageWorker: (args: { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: (args: { attempt: number; failures?: number; runId: Id<"subAgentRuns"> }) => Promise<null>;
             reapRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<null>;
-            setWorkerPolicy: (args: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; leadThreadId: Id<"threads">; maxDispatchesPerHour?: number }) => Promise<null>;
+            setWorkerPolicy: (args: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; leadThreadId: Id<"threads">; maxDispatchesPerHour?: number; unlockProof?: string }) => Promise<null>;
             shouldRunStop: (args: { runId: Id<"subAgentRuns"> }) => Promise<boolean>;
             stopWorker: (args: { clientId: string; runId?: Id<"subAgentRuns">; scope: "current" | "all_queued"; workerId: Id<"threads"> }) => Promise<{ cancelled: number }>;
         };
