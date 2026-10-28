@@ -78,6 +78,13 @@ mod unix {
             .ok_or("the folder has no name")?
             .as_encoded_bytes()
             .to_vec();
+
+        if name.contains(&b'\\') {
+            return Err(
+                "the folder's name has a backslash, which an archive cannot carry safely".into(),
+            );
+        }
+
         let root = crate::fs::open_folder(roots, folder).map_err(|error| error.to_string())?;
         let stat = stat_fd(&root).ok_or("the folder cannot be read")?;
         let mut walk = Walk {
@@ -428,6 +435,14 @@ mod unix {
             for name in names {
                 self.stopped()?;
 
+                // A backslash separates path parts where the archive may be unpacked (Windows), so `..\..\x` would
+                // climb out of the folder there: such a name is left out, like a link.
+                if name.contains(&b'\\') {
+                    self.summary.skipped += 1;
+
+                    continue;
+                }
+
                 // A name from `readdir` holds no NUL.
                 let Ok(c_name) = CString::new(name.as_slice()) else {
                     self.summary.skipped += 1;
@@ -638,6 +653,24 @@ mod tests {
         );
         assert_eq!(summary.skipped, 5);
         assert!(!text.contains("nope") && !text.contains("outside-content"));
+    }
+
+    #[test]
+    fn a_name_with_a_backslash_is_left_out_so_no_unpacker_reads_it_as_a_path() {
+        let dir = scratch("backslash");
+
+        fs::write(dir.join("root").join("..\\..\\outside"), "x").unwrap();
+
+        let roots = roots(&dir);
+        let (bytes, summary) = archive(&roots, &roots[0]).unwrap();
+        let (names, _) = system_tar(&bytes, &dir, "backslash");
+
+        assert_eq!(
+            names,
+            ["root/", "root/a.txt", "root/sub/", "root/sub/b.txt"]
+        );
+        assert_eq!(summary.skipped, 1);
+        assert!(!String::from_utf8_lossy(&bytes).contains("outside"));
     }
 
     #[test]
