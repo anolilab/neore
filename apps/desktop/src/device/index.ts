@@ -56,8 +56,8 @@ const LOCAL_PRELOAD = path.join(WINDOW_DIR, "preload.cjs");
 export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     const state: {
         acp?: AcpManager;
-        core?: DeviceCore;
         commands?: HostCommands;
+        core?: DeviceCore;
         coreError?: unknown;
         host?: HostPoster;
         local?: BrowserWindowInstance;
@@ -291,6 +291,14 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return state.acp;
     };
 
+    const startRequestedSession = async (command: Extract<AcpCommand, { kind: "start" }>): Promise<void> => {
+        try {
+            await requireAcp().startSession(command.agentKey, command.agentLabel, command.folderPath, { sessionId: command.sessionId, threadId: command.threadId });
+        } catch (error) {
+            console.error("[neore-desktop] a requested coding agent did not start:", (error as Error).message);
+        }
+    };
+
     /** Carries out one command the backend sent, after its receipt is written (`acp/commands.ts`). */
     const applyCommand = (command: AcpCommand): string => {
         const core = requireCore();
@@ -315,9 +323,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             case "start": {
                 // The agent takes a while to start. The command is accepted now; the backend learns the session
                 // is open from its own `session_open`, and a start that fails is logged here.
-                requireAcp()
-                    .startSession(command.agentKey, command.agentLabel, command.folderPath, { sessionId: command.sessionId, threadId: command.threadId })
-                    .catch((error: unknown) => console.error("[neore-desktop] a requested coding agent did not start:", (error as Error).message));
+                startRequestedSession(command);
 
                 return "accepted";
             }

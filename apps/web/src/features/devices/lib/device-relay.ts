@@ -31,8 +31,69 @@ export type DeviceRelayOutcome = "completed" | "not-claimed" | "refused";
 
 const reasonOf = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 500);
 
-export const relayDeviceCall = async (call: PendingDeviceCall, ports: DeviceRelayPorts): Promise<DeviceRelayOutcome> => {
-    if (!(await ports.claim(call.callId))) {
+/** Retries start here and double, with jitter, up to the cap: a backend that failed for one relay is failing for the others. */
+const RETRY_START_MS = 500;
+const RETRY_MAX_MS = 15_000;
+/** A call with no deadline in its envelope is retried for as long as the backend keeps one (`DEVICE_CALL_DEADLINE_MS`). */
+const FALLBACK_DEADLINE_MS = 5 * 60_000;
+/** A call another window holds is looked at again after this: its claim may lapse and come back to the queue. */
+const NOT_CLAIMED_COOLDOWN_MS = 15_000;
+
+export interface RelayClock {
+    now: () => number;
+    random: () => number;
+    sleep: (ms: number) => Promise<void>;
+}
+
+const REAL_CLOCK: RelayClock = {
+    now: () => Date.now(),
+    random: () => Math.random(),
+    sleep: async (ms) => {
+        await new Promise((resolve) => {
+            setTimeout(resolve, ms);
+        });
+    },
+};
+
+/** When the call's own envelope says it is over. The page only reads it to know how long to keep trying; the shell verifies it. */
+const deadlineOf = (call: PendingDeviceCall, now: number): number => {
+    try {
+        const parsed = JSON.parse(call.envelope) as { expiresAt?: unknown };
+
+        return typeof parsed.expiresAt === "number" ? parsed.expiresAt : now + FALLBACK_DEADLINE_MS;
+    } catch {
+        return now + FALLBACK_DEADLINE_MS;
+    }
+};
+
+/**
+ * Runs one step against the backend and tries it again, whatever the error, until the call's deadline. A retry that
+ * covered one status or one kind of failure would strand a call on the next kind: a server error, then a network
+ * reset, is two different failures and the call still has to get through. The last error is thrown once time is up.
+ */
+const untilDeadline = async <T>(step: () => Promise<T>, deadline: number, clock: RelayClock): Promise<T> => {
+    for (let attempt = 0; ; attempt += 1) {
+        try {
+            return await step();
+        } catch (error) {
+            if (clock.now() >= deadline) {
+                throw error;
+            }
+
+            const wait = Math.min(RETRY_MAX_MS, RETRY_START_MS * 2 ** Math.min(attempt, 10)) * (0.5 + clock.random() * 0.5);
+
+            const remaining = Math.max(0, deadline - clock.now());
+
+             
+            await clock.sleep(Math.min(wait, remaining));
+        }
+    }
+};
+
+export const relayDeviceCall = async (call: PendingDeviceCall, ports: DeviceRelayPorts, clock: RelayClock = REAL_CLOCK): Promise<DeviceRelayOutcome> => {
+    const deadline = deadlineOf(call, clock.now());
+
+    if (!(await untilDeadline(async () => await ports.claim(call.callId), deadline, clock))) {
         return "not-claimed";
     }
 
@@ -41,31 +102,46 @@ export const relayDeviceCall = async (call: PendingDeviceCall, ports: DeviceRela
     try {
         result = await ports.execute(call);
     } catch (error) {
-        await ports.release(call.callId, reasonOf(error));
+        await untilDeadline(async () => await ports.release(call.callId, reasonOf(error)), deadline, clock);
 
         return "refused";
     }
 
-    await ports.complete(call.callId, result);
+    await untilDeadline(async () => await ports.complete(call.callId, result), deadline, clock);
 
     return "completed";
 };
 
 /**
- * Relays each call once per page load, however often the live query re-sends
- * the pending list. Calls run concurrently; the shell queues their prompts.
+ * Relays each call once at a time, however often the live query re-sends the pending list. A call that finishes is
+ * forgotten: one that comes back (a claim that lapsed returns the call to the queue) is relayed again, and the
+ * shell acknowledges a command it already received instead of running it twice. Calls run concurrently; the shell
+ * queues their prompts.
  */
-export const createDeviceRelay = (ports: DeviceRelayPorts, onError: (error: unknown) => void = () => {}) => {
-    const seen = new Set<string>();
+export const createDeviceRelay = (ports: DeviceRelayPorts, onError: (error: unknown) => void = () => {}, clock: RelayClock = REAL_CLOCK) => {
+    const inFlight = new Set<string>();
+    const coolingUntil = new Map<string, number>();
+
+    const relayOne = async (call: PendingDeviceCall): Promise<void> => {
+        try {
+            if ((await relayDeviceCall(call, ports, clock)) === "not-claimed") {
+                coolingUntil.set(call.callId, clock.now() + NOT_CLAIMED_COOLDOWN_MS);
+            }
+        } catch (error) {
+            onError(error);
+        } finally {
+            inFlight.delete(call.callId);
+        }
+    };
 
     return (calls: ReadonlyArray<PendingDeviceCall>): void => {
         for (const call of calls) {
-            if (seen.has(call.callId)) {
+            if (inFlight.has(call.callId) || (coolingUntil.get(call.callId) ?? 0) > clock.now()) {
                 continue;
             }
 
-            seen.add(call.callId);
-            relayDeviceCall(call, ports).catch(onError);
+            inFlight.add(call.callId);
+            relayOne(call);
         }
     };
 };

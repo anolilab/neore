@@ -129,6 +129,7 @@ export const listDevices = authQuery
                 name: device.name,
                 platform: device.platform,
                 toolNames: (device.manifest ?? []).map((tool) => tool.name),
+                ...(device.acpOffers !== undefined && device.acpOffers.length > 0 && { acpOffers: device.acpOffers }),
                 ...(device.lastSeenAt !== undefined && { lastSeenAt: device.lastSeenAt }),
             };
         });
@@ -474,6 +475,7 @@ export const listDeviceCalls = authQuery
                 taintedBy: call.taintedBy,
                 threadId: call.threadId as string,
                 toolName: call.toolName,
+                ...(call.claimedAt !== undefined && { claimedAt: call.claimedAt }),
                 ...(call.completedAt !== undefined && { completedAt: call.completedAt }),
                 ...(call.decision !== undefined && { decision: call.decision }),
                 ...(call.error !== undefined && { error: call.error }),

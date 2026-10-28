@@ -178,7 +178,7 @@ describe("a session and turns the backend sent", () => {
         await player.play(steps.slice(4));
         await expect.poll(() => session.snapshot().status).toBe("idle");
 
-        expect(calls.filter(([name]) => name === "turnReceived" || name === "turnStarted" || name === "turnEnded")).toEqual([
+        expect(calls.filter(([name]) => ["turnEnded", "turnReceived", "turnStarted"].includes(name as string))).toEqual([
             ["turnReceived", "turn-1", "say hi"],
             ["turnStarted", "turn-1", "say hi"],
             ["turnEnded", "turn-1", "end_turn", undefined],

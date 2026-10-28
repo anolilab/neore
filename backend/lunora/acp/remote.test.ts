@@ -104,7 +104,30 @@ const pairedDevice = async (userId: string, offers: unknown[] = [OFFER]): Promis
 
 const run = async <T>(read: (ctx: any) => Promise<T>): Promise<T> => (await harness.run(read)) as T;
 
-const rows = async (table: string, where: Row = {}): Promise<Row[]> => (await run(async (ctx) => (await ctx.db[table].findMany({ where })).page)) as Row[];
+const rows = async (table: string, where: Row = {}): Promise<Row[]> =>
+    await run(async (ctx) => {
+        const { page } = await ctx.db[table].findMany({ where });
+
+        return page as Row[];
+    });
+
+const findRow = async (table: string, where: Row, matches: (candidate: Row) => boolean): Promise<Row | undefined> => {
+    const found = await rows(table, where);
+
+    return found.find((candidate) => matches(candidate));
+};
+
+const fieldOf = async (id: string, key: string): Promise<unknown> => {
+    const found = await row(id);
+
+    return found?.[key];
+};
+
+const sessionStatus = async (): Promise<unknown> => {
+    const [session] = await rows("acpSessions");
+
+    return session?.status;
+};
 
 const row = async (id: string): Promise<Row | null> => await run(async (ctx) => await ctx.db.get(id));
 
@@ -119,6 +142,12 @@ const openSession = async (device: Device, hostSessionId = "host-s1"): Promise<s
 
 const sendText = async (threadId: string, text = "fix the bug", requestId = crypto.randomUUID(), userId = ownerId) =>
     await run(async (ctx) => await ctx.runMutation(send.sendToHost, { requestId, text, threadId, userId }));
+
+const outcomeOfSend = async (...args: Parameters<typeof sendText>): Promise<unknown> => {
+    const result = await sendText(...args);
+
+    return result.outcome;
+};
 
 const claim = async (device: Device, callId: string) =>
     await as(ownerId).mutation(devices.claimDeviceCall as never, { callId, deviceId: device.deviceId } as never);
@@ -147,6 +176,12 @@ const sendCall = async (): Promise<Row> => {
     const [call] = await rows("deviceCalls", { toolName: "acp_send" });
 
     return call as Row;
+};
+
+const streamField = async (threadId: string, key: string): Promise<unknown> => {
+    const stream = await streamOf(threadId);
+
+    return stream[key];
 };
 
 const streamOf = async (threadId: string): Promise<Row> => {
@@ -191,14 +226,33 @@ describe("the offers in a manifest", () => {
         expect(device?.acpOffers).toEqual([OFFER]);
     });
 
+    it("shows them on the owner's device list, with the time each command was claimed in the audit list", async () => {
+        const device = await pairedDevice(ownerId);
+        const listed = (await as(ownerId).query(devices.listDevices as never, {} as never)) as Row[];
+
+        expect(listed[0]?.acpOffers).toEqual([OFFER]);
+
+        const threadId = await openSession(device);
+
+        await sendText(threadId);
+
+        const call = await sendCall();
+
+        await claim(device, call._id);
+
+        const audit = (await as(ownerId).query(devices.listDeviceCalls as never, {} as never)) as Row[];
+
+        expect(audit.find((entry) => entry._id === call._id)?.claimedAt).toEqual(expect.any(Number));
+    });
+
     it("clears them when a later manifest offers none, and keeps none for a shell that predates coding agents", async () => {
         const { deviceId, secret } = await pairedDevice(ownerId);
 
         await as(ownerId).mutation(devices.updateDeviceManifest as never, (await manifest(deviceId, secret, { acpOffers: [] })) as never);
-        expect((await row(deviceId))?.acpOffers).toEqual([]);
+        expect(await fieldOf(deviceId, "acpOffers")).toEqual([]);
 
         await as(ownerId).mutation(devices.updateDeviceManifest as never, (await manifest(deviceId, secret, {})) as never);
-        expect((await row(deviceId))?.acpOffers).toEqual([]);
+        expect(await fieldOf(deviceId, "acpOffers")).toEqual([]);
     });
 
     it("refuses a malformed list whole and bounds every field", () => {
@@ -206,7 +260,11 @@ describe("the offers in a manifest", () => {
         expect(parseAcpOffers([{ ...OFFER, folderLabel: "x".repeat(201) }])).toBeNull();
         expect(parseAcpOffers([{ agentKey: "claude" }])).toBeNull();
         expect(parseAcpOffers("claude")).toBeNull();
-        expect(parseAcpOffers(Array.from({ length: 51 }, () => OFFER))).toBeNull();
+        const tooMany = Array.from({ length: 51 }, (_, index) => {
+            return { ...OFFER, folderId: `f${String(index)}` };
+        });
+
+        expect(parseAcpOffers(tooMany)).toBeNull();
         expect(parseAcpOffers([OFFER, OFFER])).toEqual([OFFER]);
     });
 });
@@ -268,23 +326,24 @@ describe("startHostSession", () => {
 
     it("moves to idle when the computer's agent opens the session, and ends if the start is refused", async () => {
         const device = await pairedDevice(ownerId);
-        const { threadId } = (await start("tap-1", {}, device.deviceId)) as { threadId: string };
+
+        await start("tap-1", {}, device.deviceId);
+
         const [session] = await rows("acpSessions");
 
         await run(async (ctx) => await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }));
-        expect((await rows("acpSessions"))[0]?.status).toBe("idle");
+        expect(await sessionStatus()).toBe("idle");
         expect(await rows("acpSessions")).toHaveLength(1);
         expect(await rows("threads", { runner: "host" })).toHaveLength(1);
-        expect(threadId).toBeTruthy();
 
         // A refused start ends its session instead of leaving it starting for ever.
         const second = (await start("tap-2", {}, device.deviceId)) as { threadId: string };
-        const open = (await rows("deviceCalls", { toolName: "acp_start" })).find((call) => call.threadId === second.threadId) as Row;
+        const open = (await findRow("deviceCalls", { toolName: "acp_start" }, (call) => call.threadId === second.threadId)) as Row;
 
         await claim(device, open._id);
         await accept(device, open._id, { error: "refused: not approved on this computer", status: "failed" });
 
-        const ended = (await rows("acpSessions")).find((candidate) => candidate.threadId === second.threadId);
+        const ended = await findRow("acpSessions", {}, (candidate) => candidate.threadId === second.threadId);
 
         expect(ended?.status).toBe("ended");
         expect(await row(open._id)).toMatchObject({ envelope: "", input: "", status: "failed" });
@@ -299,12 +358,12 @@ describe("a start the computer accepted", () => {
                 remote.startHostSession as never,
                 { agentKey: "claude", clientId, deviceId: device.deviceId, folderId: "f1" } as never,
             )) as { threadId: string };
-            const call = (await rows("deviceCalls", { toolName: "acp_start" })).find((candidate) => candidate.threadId === threadId) as Row;
+            const call = (await findRow("deviceCalls", { toolName: "acp_start" }, (candidate) => candidate.threadId === threadId)) as Row;
 
             await claim(device, call._id);
             await accept(device, call._id);
 
-            return (await rows("acpSessions")).find((session) => session.threadId === threadId) as Row;
+            return (await findRow("acpSessions", {}, (session) => session.threadId === threadId)) as Row;
         };
         const end = async (session: Row) =>
             await run(async (ctx) => await ctx.runMutation(calls.endUnopenedSession, { deviceId: device.deviceId, hostSessionId: session.hostSessionId }));
@@ -315,8 +374,8 @@ describe("a start the computer accepted", () => {
         await end(silent);
         await end(opened);
 
-        expect((await row(silent._id))?.status).toBe("ended");
-        expect((await row(opened._id))?.status).toBe("idle");
+        expect(await fieldOf(silent._id, "status")).toBe("ended");
+        expect(await fieldOf(opened._id, "status")).toBe("idle");
     });
 });
 
@@ -343,7 +402,7 @@ describe("sendToHost", () => {
         expect(prompt?.message).toMatchObject({ content: "fix the bug", role: "user" });
         expect(envelope).toMatchObject({ deviceId: device.deviceId, tool: "acp_send" });
         expect(envelope.input).toMatchObject({ sessionId: "host-s1", text: "fix the bug", turnId: stream.hostTurnId });
-        expect((await rows("acpSessions"))[0]?.status).toBe("busy");
+        expect(await sessionStatus()).toBe("busy");
     });
 
     it("answers a retry of the same request with the first try, not a second turn", async () => {
@@ -361,11 +420,11 @@ describe("sendToHost", () => {
         const stranger = await insertUser();
         const cloud = await run(async (ctx) => await ctx.db.insert("threads", { status: "active", title: "Cloud", userId: ownerId }));
 
-        expect((await sendText(threadId, "hi", "r1", stranger)).outcome).toBe("not_found");
-        expect((await sendText(cloud as string, "hi", "r2")).outcome).toBe("not_found");
-        expect((await sendText("nonsense", "hi", "r3")).outcome).toBe("not_found");
-        expect((await sendText(threadId, "one")).outcome).toBe("sent");
-        expect((await sendText(threadId, "two")).outcome).toBe("turn_running");
+        expect(await outcomeOfSend(threadId, "hi", "r1", stranger)).toBe("not_found");
+        expect(await outcomeOfSend(cloud as string, "hi", "r2")).toBe("not_found");
+        expect(await outcomeOfSend("nonsense", "hi", "r3")).toBe("not_found");
+        expect(await outcomeOfSend(threadId, "one")).toBe("sent");
+        expect(await outcomeOfSend(threadId, "two")).toBe("turn_running");
         expect(await rows("messages", { threadId })).toHaveLength(1);
     });
 
@@ -376,24 +435,25 @@ describe("sendToHost", () => {
             { agentKey: "claude", clientId: "t", deviceId: device.deviceId, folderId: "f1" } as never,
         )) as { threadId: string };
 
-        expect((await sendText(threadId)).outcome).toBe("session_starting");
+        expect(await outcomeOfSend(threadId)).toBe("session_starting");
 
         const open = await openSession(device, "host-s2");
 
-        expect((await sendText(open, "x".repeat(40_000))).outcome).toBe("too_large");
+        expect(await outcomeOfSend(open, "x".repeat(40_000))).toBe("too_large");
 
         await run(async (ctx) => {
-            const [session] = (await ctx.db.acpSessions.findMany({ where: { threadId: open } })).page;
+            const { page } = await ctx.db.acpSessions.findMany({ where: { threadId: open } });
+            const [session] = page;
 
             await ctx.db.patch(session._id, { status: "ended" });
         });
-        expect((await sendText(open)).outcome).toBe("session_ended");
+        expect(await outcomeOfSend(open)).toBe("session_ended");
 
         const idle = await openSession(device, "host-s3");
 
         vi.useFakeTimers({ toFake: ["Date"] });
         vi.setSystemTime(Date.now() + 10 * 60_000);
-        expect((await sendText(idle)).outcome).toBe("offline");
+        expect(await outcomeOfSend(idle)).toBe("offline");
         expect(await rows("persistentStreams", { threadId: idle })).toHaveLength(0);
     });
 
@@ -407,7 +467,7 @@ describe("sendToHost", () => {
         await expect(claim(device, call._id)).resolves.toEqual({ claimed: true });
         await expect(accept(device, call._id)).resolves.toEqual({ accepted: true });
 
-        expect((await streamOf(threadId)).hostState).toBe("received");
+        expect(await streamField(threadId, "hostState")).toBe("received");
         expect(await sendCall()).toMatchObject({ envelope: "", input: "", status: "completed" });
     });
 
@@ -422,11 +482,11 @@ describe("sendToHost", () => {
         await accept(device, call._id, { error: "refused: no such session", status: "failed" });
 
         const stream = await streamOf(threadId);
-        const [reply] = (await rows("messages", { threadId })).filter((message) => message.message.role === "assistant");
+        const reply = await findRow("messages", { threadId }, (message) => message.message.role === "assistant");
 
         expect(stream).toMatchObject({ hostEndReason: "failed", hostState: "ended", status: "error" });
         expect(reply?.error).toContain("no such session");
-        expect((await rows("acpSessions"))[0]?.status).toBe("idle");
+        expect(await sessionStatus()).toBe("idle");
     });
 });
 
@@ -446,7 +506,7 @@ describe("the clock on a command", () => {
 
         const expired = await row(call._id);
         const stream = await streamOf(threadId);
-        const [reply] = (await rows("messages", { threadId })).filter((message) => message.message.role === "assistant");
+        const reply = await findRow("messages", { threadId }, (message) => message.message.role === "assistant");
 
         expect(expired).toMatchObject({ error: "host did not answer", input: "", status: "expired" });
         expect(stream).toMatchObject({ hostEndReason: "failed", hostState: "ended" });
@@ -469,19 +529,19 @@ describe("the clock on a command", () => {
         await claim(device, call._id);
         // Not yet: a check that fires early does nothing.
         await check(call._id);
-        expect((await row(call._id))?.status).toBe("claimed");
+        expect(await fieldOf(call._id, "status")).toBe("claimed");
 
         // The main process died between the claim and the receipt: the lease lapses.
         vi.setSystemTime(Date.now() + ACP_CLAIM_LEASE_MS + 1000);
         await check(call._id);
-        expect((await row(call._id))?.status).toBe("pending");
+        expect(await fieldOf(call._id, "status")).toBe("pending");
         await expect(as(ownerId).query(devices.listPendingDeviceCalls as never, { deviceId: device.deviceId } as never)).resolves.toHaveLength(1);
 
         // Past the claim window: the window decides whether a call is ever taken, not a second look.
         vi.setSystemTime(Date.now() + ACP_CLAIM_WINDOW_MS);
         await expect(claim(device, call._id)).resolves.toEqual({ claimed: true });
         await expect(accept(device, call._id)).resolves.toEqual({ accepted: true });
-        expect((await row(call._id))?.status).toBe("completed");
+        expect(await fieldOf(call._id, "status")).toBe("completed");
     });
 
     it("lets a lapsed lease run out the deadline: the command expires there, not before", async () => {
@@ -502,7 +562,7 @@ describe("the clock on a command", () => {
         await expect(claim(device, call._id)).resolves.toEqual({ claimed: false });
         await check(call._id);
         expect(await row(call._id)).toMatchObject({ error: "host did not answer", status: "expired" });
-        expect((await streamOf(threadId)).hostEndReason).toBe("failed");
+        expect(await streamField(threadId, "hostEndReason")).toBe("failed");
     });
 
     it("never moves a command the computer already finished", async () => {
@@ -517,8 +577,8 @@ describe("the clock on a command", () => {
         await accept(device, call._id);
         await check(call._id);
 
-        expect((await row(call._id))?.status).toBe("completed");
-        expect((await streamOf(threadId)).hostState).toBe("received");
+        expect(await fieldOf(call._id, "status")).toBe("completed");
+        expect(await streamField(threadId, "hostState")).toBe("received");
     });
 
     it("times out a turn the computer never acknowledged as one that did not answer, and withdraws the prompt", async () => {
@@ -558,9 +618,11 @@ describe("cancelHostTurn", () => {
 
         const [stop] = await rows("deviceCalls", { toolName: "acp_cancel" });
 
-        expect(JSON.parse(stop?.envelope as string).input).toMatchObject({ sessionId: "host-s1", turnId: (await streamOf(threadId)).hostTurnId });
+        const turnId = await streamField(threadId, "hostTurnId");
+
+        expect(JSON.parse(stop?.envelope as string).input).toMatchObject({ sessionId: "host-s1", turnId });
         await expect(cancel(threadId)).resolves.toEqual({ cancelled: false });
-        expect((await rows("acpSessions"))[0]?.status).toBe("idle");
+        expect(await sessionStatus()).toBe("idle");
     });
 
     it("is the owner's alone", async () => {
@@ -570,7 +632,7 @@ describe("cancelHostTurn", () => {
 
         await sendText(threadId);
         await expect(cancel(threadId, stranger)).rejects.toThrow(NOT_FOUND);
-        expect((await streamOf(threadId)).hostState).toBe("accepted");
+        expect(await streamField(threadId, "hostState")).toBe("accepted");
     });
 });
 
@@ -657,16 +719,19 @@ describe("the last turn's end, for Continue", () => {
 });
 
 describe("POST /hosts/send", () => {
-    const post = async (body: unknown): Promise<number> =>
-        (await send.hostSendHttpAction({} as never, new Request("https://example.test/hosts/send", { body: typeof body === "string" ? body : JSON.stringify(body), method: "POST" })))
-            .status;
+    const post = async (body: unknown): Promise<number> => {
+        const request = new Request("https://example.test/hosts/send", { body: typeof body === "string" ? body : JSON.stringify(body), method: "POST" });
+        const response = await send.hostSendHttpAction({} as never, request);
+
+        return response.status;
+    };
 
     it("refuses a body that is not a send before it asks who is calling", async () => {
         vi.stubEnv("LLM_GATEWAY_SIGNING_SECRET", "secret");
 
         await expect(post("not json")).resolves.toBe(400);
         await expect(post({ requestId: "r", text: "hi" })).resolves.toBe(400);
-        await expect(post({ requestId: "r", text: "   ", threadId: "t" })).resolves.toBe(400);
+        await expect(post({ requestId: "r", text: ' '.repeat(3), threadId: "t" })).resolves.toBe(400);
         await expect(post({ requestId: "r", text: "x".repeat(30_001), threadId: "t" })).resolves.toBe(400);
         await expect(post({ requestId: "", text: "hi", threadId: "t" })).resolves.toBe(400);
     });

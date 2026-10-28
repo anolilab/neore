@@ -188,14 +188,14 @@ describe("a session and turns the backend started", () => {
     it("knows the thread already, so a prompt it received is posted at once, before the open is answered", async () => {
         const host = poster();
 
-        backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "slow" }, { status: 503 }) : undefined);
+        backend.respond = (post) => post.threadId === undefined ? Response.json({ error: "slow" }, { status: 503 }) : undefined;
         host.sessionOpened("s1", INFO, "thread-1");
         host.turnReceived("s1", "t1", "fix it");
         await settle(POST_INTERVAL_MS);
 
-        const turn = backend.posts.filter(({ post }) => post.turnId === "t1");
+        const turn = backend.posts.find(({ post }) => post.turnId === "t1");
 
-        expect(turn[0]?.post).toMatchObject({ events: [{ kind: "turn_start", text: "fix it" }], firstSeq: 0, threadId: "thread-1", turnId: "t1" });
+        expect(turn?.post).toMatchObject({ events: [{ kind: "turn_start", text: "fix it" }], firstSeq: 0, threadId: "thread-1", turnId: "t1" });
     });
 
     it("posts the prompt once when the turn then starts: received and started are one turn, not two", async () => {

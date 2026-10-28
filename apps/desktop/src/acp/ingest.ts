@@ -82,7 +82,7 @@ export class HostPoster implements SessionObserver {
 
     public sessionOpened(sessionId: string, info: HostSessionInfo, threadId?: string): void {
         const link = new SessionLink(sessionId, capSessionInfo(info), {
-            bound: (id, threadId) => this.bindThread(id, threadId),
+            bound: (id, thread) => this.bindThread(id, thread),
             deviceId: () => this.options.deviceId(),
             now: () => this.now(),
             random: () => this.random(),

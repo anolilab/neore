@@ -56,6 +56,7 @@ export const vAcpOffer = v.object({
 /** What `listDevices` returns per device. The secret never leaves the backend. */
 export const vDeviceView = v.object({
     _id: v.string(),
+    acpOffers: v.optional(v.array(vAcpOffer)),
     createdAt: v.number(),
     lastSeenAt: v.optional(v.number()),
     name: v.string(),
@@ -66,6 +67,7 @@ export const vDeviceView = v.object({
 /** One audit row, as `listDeviceCalls` shows it. */
 export const vDeviceCallView = v.object({
     _id: v.string(),
+    claimedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
     createdAt: v.number(),
     decision: v.optional(v.string()),

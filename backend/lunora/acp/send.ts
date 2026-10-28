@@ -89,7 +89,9 @@ export const sendToHost = internalMutation
             return { outcome: "turn_running" as const };
         }
 
-        if (!(await checkRateLimit(ctx, "hosts/send:free", { key: userId })).ok) {
+        const limited = await checkRateLimit(ctx, "hosts/send:free", { key: userId });
+
+        if (!limited.ok) {
             return { outcome: "rate_limited" as const };
         }
 
@@ -167,7 +169,9 @@ export const hostSendHttpAction = async (context: HttpActionCtx, request: Reques
     let userId: string | undefined;
 
     try {
-        userId = (await getCurrentUserInternal(context))?._id;
+        const user = await getCurrentUserInternal(context);
+
+        userId = user?._id;
     } catch {
         return json({ error: "not_authenticated" }, 401);
     }

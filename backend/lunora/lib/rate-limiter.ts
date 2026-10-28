@@ -261,14 +261,14 @@ export const RATE_LIMIT_CONFIGS = {
     // GDPR limits
     "gdpr/request:free": Ratelimit.fixedWindow(3, HOUR),
     "gdpr/request:premium": Ratelimit.fixedWindow(5, HOUR),
-    // Host turn output (`acp/http.ts`), per verified device: a turn posts at most four batches a second,
-    // and a device runs a handful of sessions.
-    "hosts/ingest:free": Ratelimit.fixedWindow(3000, MINUTE),
-    "hosts/ingest:premium": Ratelimit.fixedWindow(3000, MINUTE),
     // Remote control of a coding agent (`acp/remote.ts`, `acp/send.ts`): each one queues a signed command for a
     // computer that holds three open ones, so a person gets a burst, not a stream.
     "hosts/answer:free": Ratelimit.fixedWindow(60, MINUTE),
     "hosts/answer:premium": Ratelimit.fixedWindow(60, MINUTE),
+    // Host turn output (`acp/http.ts`), per verified device: a turn posts at most four batches a second,
+    // and a device runs a handful of sessions.
+    "hosts/ingest:free": Ratelimit.fixedWindow(3000, MINUTE),
+    "hosts/ingest:premium": Ratelimit.fixedWindow(3000, MINUTE),
     "hosts/send:free": Ratelimit.fixedWindow(30, MINUTE),
     "hosts/send:premium": Ratelimit.fixedWindow(30, MINUTE),
     "hosts/start:free": Ratelimit.fixedWindow(10, MINUTE),

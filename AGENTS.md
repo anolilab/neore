@@ -642,6 +642,16 @@ written here is what is not.
   queues `acp_cancel` itself (`devices/lib/acp-call.ts`) because
   `createDeviceCall` refuses anything the manifest does not list.
 
+- **Coding agents on a paired computer** (`backend/lunora/acp/`, `apps/desktop/src/acp/`, plans/acp-agent-host.md) —
+  the web and the phone reach them only through signed `acp_*` device calls (`devices/lib/acp-call.ts`), and the
+  computer's Rust core refuses an `acp_start` for a pair the user did not approve in its local window, whatever the
+  signature. These calls spend NO nonce: a claim is a 30 s lease (`acp/calls.ts` returns a lapsed one to `pending`),
+  the same envelope comes back, and the main process's receipt log (`acp/commands.ts`, keyed by the signed call id,
+  written BEFORE the command is acted on) makes the second delivery an acknowledgement. The page's relay retries a
+  failed claim or completion until the call's deadline, whatever the error. A call's prompt is cleared from `input` and
+  `envelope` on every terminal path (`ACP_CLEARED`). Any new way a call can end must go through `onAcpCallEnded`, or its
+  turn stays "Sending". The numbers they are tuned by were not measured (`plans/acp-s4-throttling.md`).
+
 - **Public v1 API + `neore` CLI** (`backend/lunora/public-api/`, `apps/cli`) —
   one route table (`routes.ts`) feeds both the hono router and
   `/api/v1/openapi.json`; every handler calls an EXISTING public procedure
