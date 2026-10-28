@@ -18,7 +18,7 @@ import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from
 import { agentSwitchOf, lastAgentSwitch, sameAgent } from "./agent-switch-logic";
 import type { AgentRef, AgentSwitchPart } from "./agent-switch-validators";
 import { childrenOf, getThreadRow, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
-import { findPathHandoff, pathTokens } from "./handoff-source";
+import { findDividerLeaving, findPathHandoff, pathTokens } from "./handoff-source";
 import { getMaxMessage, pinFollowingRowParent } from "./messages";
 import { insertAgentSwitchRow, patchAgentSwitchRow, patchThread } from "./table-writes";
 
@@ -98,28 +98,73 @@ const MAX_COLD_START_PAGES = 30;
 export const pathExceedsColdStart = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<boolean> =>
     (await pathTokens(context, threadId, from, { cap: PROMPT_CACHE_COLD_START_TOKENS, maxPages: MAX_COLD_START_PAGES })) > PROMPT_CACHE_COLD_START_TOKENS;
 
+/** Delta dividers followed down to what their own target saw; a chain longer than this stands in as far as it got. */
+const MAX_HANDOFF_DEPTH = 4;
+
 /**
- * The stored handoff a context window needs when it starts below the divider that holds it: the newest one
- * on the path above `belowMessageId`. `null` for a thread that was never switched, which is every thread
- * but the few that were and costs them one thread read.
+ * What stands in for the thread through `from` (inclusive) once the rows themselves have left the context
+ * window: the stored handoff of the newest divider that carries one. A `portable` handoff covers everything
+ * before it; a `delta` handoff covers what its agent missed, so it comes after what that agent saw.
  */
-export const handoffAboveOf = async (context: QueryCtx, args: { belowMessageId: Id<"messages">; threadId: Id<"threads"> }): Promise<string | null> => {
+const handoffBlocksAt = async (context: Reader, threadId: Id<"threads">, from: Row | null, depth: number): Promise<string[]> => {
+    const found = await findPathHandoff(context, threadId, from);
+
+    if (!found?.part.handoff) {
+        return [];
+    }
+
+    const { handoff, mode } = found.part;
+
+    return mode === "delta" && depth > 0 ? [...(await deltaBase(context, threadId, found.part, depth - 1)), handoff] : [handoff];
+};
+
+/** What the target of the `delta` divider `part` saw when it left: the stand-in for the thread through its earlier divider, `[]` when it has none. */
+const deltaBase = async (context: Reader, threadId: Id<"threads">, part: AgentSwitchPart, depth: number): Promise<string[]> => {
+    const start = await getThreadRow(context, threadId, part.startMessageId);
+    const earlier = start && (await findDividerLeaving(context, threadId, start, part.to.model));
+
+    // The earlier divider's own handoff describes the thread up to the point the model left.
+    return earlier ? await handoffBlocksAt(context, threadId, earlier.row, depth) : [];
+};
+
+/**
+ * The stored handoffs a context window needs when it starts below the divider that holds them, oldest first,
+ * for the rows above `belowMessageId`. Empty for a thread that was never switched, which is every thread but
+ * the few that were and costs them one thread read.
+ */
+export const handoffAboveOf = async (context: QueryCtx, args: { belowMessageId: Id<"messages">; threadId: Id<"threads"> }): Promise<string[]> => {
     const thread = await context.db.get(args.threadId);
 
     if (!thread?.activeAgent) {
-        return null;
+        return [];
     }
 
     const below = await getThreadRow(context, args.threadId, args.belowMessageId);
     const from = below && (await parentOf(context, args.threadId, below));
 
-    return (await findPathHandoff(context, args.threadId, from)) ?? null;
+    return await handoffBlocksAt(context, args.threadId, from, MAX_HANDOFF_DEPTH);
 };
 
 export const getHandoffAbove = internalQuery
     .input({ belowMessageId: v.id("messages"), threadId: v.id("threads") })
-    .output(v.union(v.string(), v.null()))
+    .output(v.array(v.string()))
     .query(async ({ args, ctx }) => await handoffAboveOf(ctx, args));
+
+/**
+ * What the target of the `delta` divider `dividerMessageId` saw before it left, for a window that no longer
+ * holds the divider it left through (`agent/handoff-context.ts`, `deltaOrphans`).
+ */
+export const handoffBeforeDeltaOf = async (context: QueryCtx, args: { dividerMessageId: Id<"messages">; threadId: Id<"threads"> }): Promise<string[]> => {
+    const divider = await getThreadRow(context, args.threadId, args.dividerMessageId);
+    const part = divider && agentSwitchOf(divider);
+
+    return part ? await deltaBase(context, args.threadId, part, MAX_HANDOFF_DEPTH) : [];
+};
+
+export const getHandoffBeforeDelta = internalQuery
+    .input({ dividerMessageId: v.id("messages"), threadId: v.id("threads") })
+    .output(v.array(v.string()))
+    .query(async ({ args, ctx }) => await handoffBeforeDeltaOf(ctx, args));
 
 /**
  * Re-points the `activeAgent` cache after the active path moved: a sibling switch, a regenerate's

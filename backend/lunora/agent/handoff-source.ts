@@ -157,11 +157,22 @@ export const rowsSince = async (context: Reader, threadId: Id<"threads">, from: 
     return count;
 };
 
+/** A divider with the row that holds it. */
+export interface DividerRow {
+    part: AgentSwitchPart;
+    row: Row;
+}
+
 /**
- * The newest divider on the path ending at `from` that moved on FROM `model`: the agent had seen the thread
- * through its `startMessageId`. Gives up after {@link MAX_SEARCH_PAGES} pages.
+ * The newest divider on the path ending at `from` (inclusive) that satisfies `accept`, a page at a time.
+ * Gives up after {@link MAX_SEARCH_PAGES} pages.
  */
-export const findDividerLeaving = async (context: Reader, threadId: Id<"threads">, from: Row | null, model: string): Promise<AgentSwitchPart | undefined> => {
+const findDivider = async (
+    context: Reader,
+    threadId: Id<"threads">,
+    from: Row | null,
+    accept: (part: AgentSwitchPart) => boolean,
+): Promise<DividerRow | undefined> => {
     let cursor = from;
 
     for (let page = 0; cursor && page < MAX_SEARCH_PAGES; page += 1) {
@@ -170,8 +181,8 @@ export const findDividerLeaving = async (context: Reader, threadId: Id<"threads"
         for (const row of rows) {
             const part = agentSwitchOf(row);
 
-            if (part?.from.model === model) {
-                return part;
+            if (part && accept(part)) {
+                return { part, row };
             }
         }
 
@@ -181,26 +192,10 @@ export const findDividerLeaving = async (context: Reader, threadId: Id<"threads"
     return undefined;
 };
 
-/**
- * The handoff stored on the newest divider of the path ending at `from` that carries one, for a context window
- * that starts below it. Gives up after {@link MAX_SEARCH_PAGES} pages.
- */
-export const findPathHandoff = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<string | undefined> => {
-    let cursor = from;
+/** The newest divider on the path ending at `from` that moved on FROM `model`: the agent had seen the thread through its `startMessageId`. */
+export const findDividerLeaving = async (context: Reader, threadId: Id<"threads">, from: Row | null, model: string): Promise<DividerRow | undefined> =>
+    await findDivider(context, threadId, from, (part) => part.from.model === model);
 
-    for (let page = 0; cursor && page < MAX_SEARCH_PAGES; page += 1) {
-        const { next, rows } = await walkPath(context, threadId, cursor, { limit: PAGE_ROWS });
-
-        for (const row of rows) {
-            const part = agentSwitchOf(row);
-
-            if (part?.handoff && part.mode !== "full") {
-                return part.handoff;
-            }
-        }
-
-        cursor = next;
-    }
-
-    return undefined;
-};
+/** The newest divider on the path ending at `from` that carries a handoff: what stands in for the thread up to it. */
+export const findPathHandoff = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<DividerRow | undefined> =>
+    await findDivider(context, threadId, from, (part) => Boolean(part.handoff) && part.mode !== "full");

@@ -132,10 +132,15 @@ export const RATE_LIMIT_CONFIGS = {
     "chat-import/start:free": Ratelimit.fixedWindow(5, HOUR),
     "chat-import/start:premium": Ratelimit.fixedWindow(20, HOUR),
 
+    // The summary call of an agent switch (`chat/agent-switch.ts`): a ~48k-token utility-model call made before
+    // anything is charged, so it has a tight budget of its own and cannot be spent through `chat/update`.
+    "chat/agentSwitchSummary:free": Ratelimit.fixedWindow(5, MINUTE),
+    "chat/agentSwitchSummary:premium": Ratelimit.fixedWindow(15, MINUTE),
     // Chat attachments taken into chat files (`file.ts#finalizeChatUpload`):
     // each is up to 25 MB hashed and re-stored. A burst covers dropping a
     // handful of files at once.
     "chat/attachmentUpload:free": Ratelimit.tokenBucket(20, MINUTE, 30),
+
     "chat/attachmentUpload:premium": Ratelimit.tokenBucket(60, MINUTE, 90),
     // Composer ghost text (`chat/autocomplete.ts`): one tiny utility-model call
     // per pause in typing — frequent by design, so generous, but bounded. Its
@@ -145,13 +150,12 @@ export const RATE_LIMIT_CONFIGS = {
     "chat/autocomplete:premium": Ratelimit.tokenBucket(60, MINUTE, 80),
     // Chat CRUD limits
     "chat/create:free": Ratelimit.fixedWindow(20, MINUTE),
-
     "chat/create:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Daily content limits per user tier - AUDIO
     "chat/dailyAudio:anonymous": Ratelimit.fixedWindow(1, DAY),
+
     "chat/dailyAudio:free": Ratelimit.fixedWindow(5, DAY),
     "chat/dailyAudio:premium": Ratelimit.fixedWindow(100, DAY),
-
     // Daily content limits per user tier - IMAGE
     "chat/dailyImage:anonymous": Ratelimit.fixedWindow(1, DAY),
     "chat/dailyImage:free": Ratelimit.fixedWindow(5, DAY),
@@ -172,12 +176,13 @@ export const RATE_LIMIT_CONFIGS = {
     // Daily content limits per user tier - TEXT
     "chat/dailyText:anonymous": Ratelimit.fixedWindow(10, DAY),
     "chat/dailyText:free": Ratelimit.fixedWindow(20, DAY),
+
     "chat/dailyText:premium": Ratelimit.fixedWindow(1000, DAY),
+
     // Daily content limits per user tier - VIDEO
     // Note: "chat/dailyVideo:anonymous" is intentionally omitted (limit=0 means always blocked)
     // The calling code already handles capacity===0 by returning early.
     "chat/dailyVideo:free": Ratelimit.fixedWindow(5, DAY),
-
     "chat/dailyVideo:premium": Ratelimit.fixedWindow(100, DAY),
 
     "chat/delete:free": Ratelimit.fixedWindow(10, MINUTE),

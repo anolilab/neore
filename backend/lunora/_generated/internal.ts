@@ -29,7 +29,8 @@ export interface InternalApiTypes {
     agent: {
         agent_switch: {
             adoptForkAgent: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
-            getHandoffAbove: FunctionReference<"query", { belowMessageId: Id<"messages">; threadId: Id<"threads"> }, string | null>;
+            getHandoffAbove: FunctionReference<"query", { belowMessageId: Id<"messages">; threadId: Id<"threads"> }, Array<string>>;
+            getHandoffBeforeDelta: FunctionReference<"query", { dividerMessageId: Id<"messages">; threadId: Id<"threads"> }, Array<string>>;
             getRunAgentModel: FunctionReference<"query", { promptMessageId?: Id<"messages">; replacedMessageId?: Id<"messages">; threadId: Id<"threads"> }, string | null>;
         };
         auto_archive: {
@@ -293,8 +294,9 @@ export interface InternalApiTypes {
     };
     chat: {
         agent_switch: {
+            beginSwitchSummary: FunctionReference<"mutation", { threadId: Id<"threads">; userId: string }, null | number>;
             commitAgentSwitch: FunctionReference<"mutation", { clientId: string; expectedLeafId: string; handoff?: { mode: "delta" | "portable"; summarized: boolean; text: string }; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string }; coldStartCostly: boolean; messageId: string | null; switched: boolean }>;
-            planAgentSwitch: FunctionReference<"query", { clientId: string; mode?: "full" | "portable"; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string }; leafId?: string; mode?: "full" | "portable" | "delta"; omittedEarlier?: boolean; turns?: Array<{ role: "assistant" | "user"; text: string }> }>;
+            planAgentSwitch: FunctionReference<"query", { clientId: string; mode?: "full" | "portable"; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string }; allowance?: boolean; leafId?: string; mode?: "full" | "portable" | "delta"; omittedEarlier?: boolean; turns?: Array<{ role: "assistant" | "user"; text: string }> }>;
         };
         autocomplete: {
             isComposerAutocompleteEnabled: FunctionReference<"query", { userId: string }, boolean>;
@@ -1083,6 +1085,7 @@ export const internal: InternalApiTypes = {
         agent_switch: {
             adoptForkAgent: { __lunoraRef: "agent_agent_switch:adoptForkAgent" },
             getHandoffAbove: { __lunoraRef: "agent_agent_switch:getHandoffAbove" },
+            getHandoffBeforeDelta: { __lunoraRef: "agent_agent_switch:getHandoffBeforeDelta" },
             getRunAgentModel: { __lunoraRef: "agent_agent_switch:getRunAgentModel" },
         },
         auto_archive: {
@@ -1346,6 +1349,7 @@ export const internal: InternalApiTypes = {
     },
     chat: {
         agent_switch: {
+            beginSwitchSummary: { __lunoraRef: "chat_agent_switch:beginSwitchSummary" },
             commitAgentSwitch: { __lunoraRef: "chat_agent_switch:commitAgentSwitch" },
             planAgentSwitch: { __lunoraRef: "chat_agent_switch:planAgentSwitch" },
         },

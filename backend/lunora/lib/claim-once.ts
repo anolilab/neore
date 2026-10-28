@@ -18,6 +18,7 @@
  * | `switch`           | `<userId>:<threadId>:<clientId>` | 10 min (`AGENT_SWITCH_CLAIM_TTL_MS`) | `chat/agent-switch.ts` |
  * | `worker-dispatch`  | `tool:<userId>:<toolCallId>` or `client:<threadId>:<clientId>` | {@link WORKER_DISPATCH_CLAIM_TTL_MS} | `sub-agents/functions.ts` |
  * | `worker-stop`      | `<threadId>:<clientId>`  | {@link WORKER_DISPATCH_CLAIM_TTL_MS} | `sub-agents/functions.ts` |
+ * | `switch-summary`   | `<threadId>`             | 2 min (`AGENT_SWITCH_SUMMARY_CLAIM_TTL_MS`) | `chat/agent-switch.ts` (one summary call in flight per thread) |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
  * | `video-reservation` | `<requestId>`            | 24 h                          | `auth/billing.ts`            |
@@ -128,7 +129,7 @@ const findClaim = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string) 
  * checks, or `null` when the key is held. A claim can only be taken again after
  * the previous one expired, so each acquisition has a `claimedAt` of its own.
  */
-const claimFence = async (ctx: ClaimCtx, scope: string, key: string, { leaseMs, onLapse, ttlMs, userId }: ClaimOptions): Promise<number | null> => {
+export const claimFence = async (ctx: ClaimCtx, scope: string, key: string, { leaseMs, onLapse, ttlMs, userId }: ClaimOptions): Promise<number | null> => {
     const now = Date.now();
     const existing = await findClaim(ctx, scope, key);
 

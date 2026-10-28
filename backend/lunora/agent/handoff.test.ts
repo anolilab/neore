@@ -8,8 +8,10 @@ import { describe, expect, it } from "vitest";
 import { longThreadFixture } from "./handoff.fixture";
 import {
     assertWithinBudget,
+    capSummary,
     composeHandoff,
     HANDOFF_BUDGET_TOKENS,
+    HANDOFF_REFUSED_OVER_BUDGET,
     HANDOFF_SUMMARY_MAX_TOKENS,
     HandoffTooLargeError,
     handoffTokens,
@@ -100,12 +102,28 @@ describe("planHandoff", () => {
         expect(() => planHandoff([huge])).toThrow(TOO_LONG);
     });
 
-    it("refuses a summary that outgrew its allotment instead of cutting it", () => {
+    it("cuts a summary that outgrew its allotment at a line, so it fits the room planHandoff left it", () => {
         const { tail } = planHandoff(newestFirst);
+        const lines = Array.from({ length: 4000 }, (_, index) => `point ${index}`);
+        const summary = capSummary(lines.join("\n"));
 
-        expect(() => assertWithinBudget(composeHandoff({ kind: "portable", summary: "x".repeat(HANDOFF_BUDGET_TOKENS * 4), tail }))).toThrow(
-            HandoffTooLargeError,
-        );
+        expect(summary.split("\n").length).toBeLessThan(lines.length);
+        expect(lines.join("\n").startsWith(summary)).toBe(true);
+        expect(handoffTokens(assertWithinBudget(composeHandoff({ kind: "portable", summary, tail })))).toBeLessThanOrEqual(HANDOFF_BUDGET_TOKENS);
+    });
+
+    it("cuts a single line longer than the allotment, and leaves a short summary as it was", () => {
+        expect(capSummary("y".repeat(HANDOFF_SUMMARY_MAX_TOKENS * 4 * 3)).length).toBeLessThanOrEqual(HANDOFF_SUMMARY_MAX_TOKENS * 4);
+        expect(capSummary("  two lines\nof summary \n")).toBe("two lines\nof summary");
+    });
+
+    it("refuses, with an error of its own, a handoff that is over budget all the same", () => {
+        const { tail } = planHandoff(newestFirst);
+        const over = () => assertWithinBudget(composeHandoff({ kind: "portable", summary: "x".repeat(HANDOFF_BUDGET_TOKENS * 4), tail }));
+
+        expect(over).toThrow(HandoffTooLargeError);
+        expect(over).toThrow(expect.objectContaining({ code: HANDOFF_REFUSED_OVER_BUDGET }));
+        expect(over).not.toThrow(TOO_LONG);
     });
 
     it("feeds the summary call the older turns quoted, with long ones cut for input only", () => {

@@ -114,3 +114,73 @@ describe("fetchContextWithPrompt after a portable switch", () => {
         expect(third.slice(1).map((m) => m.content)).toStrictEqual(["next question", "r1", "q2", "r2", "q3"]);
     });
 });
+
+describe("fetchContextWithPrompt after a switch back whose earlier divider has left the window", () => {
+    const first = composeHandoff({ kind: "portable", tail: [{ role: "user", text: "the model A era" }] });
+    const delta = composeHandoff({ kind: "delta", tail: [{ role: "user", text: "what model B did" }] });
+    const row = (id: string, order: number, stepOrder: number, role: "assistant" | "user", content: string) => {
+        return { _id: id, message: { content, role }, order, status: "success", stepOrder, threadId: "thread-1" };
+    };
+    const back = {
+        _id: "d2",
+        order: 5,
+        status: "success",
+        stepOrder: 0,
+        threadId: "thread-1",
+        ...agentSwitchRowContent({
+            from: { kind: "model", model: "b" },
+            handoff: delta,
+            mode: "delta",
+            startMessageId: "a2",
+            to: { kind: "model", model: "a" },
+        }),
+    };
+
+    const contextFor = async (rows: unknown[], promptId: string, above: string[]) => {
+        const runQuery = vi.fn(async (ref: unknown) => {
+            if (ref === internal.agent.branches.getContextPathIds) {
+                return null;
+            }
+
+            if (ref === internal.agent.files.getStorageKeys || ref === internal.agent.files.getOwnedStorageKeys) {
+                return {};
+            }
+
+            if (ref === internal.agent.agent_switch.getHandoffAbove) {
+                return above;
+            }
+
+            if (ref === internal.agent.agent_switch.getHandoffBeforeDelta) {
+                return [first];
+            }
+
+            return { page: rows.toReversed() };
+        });
+        const { messages } = await fetchContextWithPrompt(
+            { runQuery } as never,
+            {} as never,
+            { contextOptions: {}, messages: undefined, prompt: undefined, promptMessageId: promptId, threadId: "thread-1", userId: "user-1" } as never,
+        );
+
+        return messages;
+    };
+
+    it("sends what the model saw, then what it missed, and the same bytes on every later turn", async () => {
+        const turn1 = [row("u2", 3, 0, "user", "b question"), row("a2", 3, 1, "assistant", "b answer"), back, row("u3", 6, 0, "user", "back on a")];
+        const turn2 = [...turn1, row("a3", 6, 1, "assistant", "reply"), row("u4", 7, 0, "user", "and more")];
+        const one = await contextFor(turn1, "u3", []);
+        const two = await contextFor(turn2, "u4", []);
+
+        expect(one.map((m) => m.content)).toStrictEqual([first, delta, "back on a"]);
+        expect(two.slice(0, 2)).toStrictEqual(one.slice(0, 2));
+        // One breakpoint across the handoffs: the gateway adds two of its own, and four is the limit.
+        expect(one.filter((m) => m.providerOptions !== undefined)).toHaveLength(1);
+    });
+
+    it("keeps both handoffs once the delta divider has slid out too", async () => {
+        const rows = [row("u3", 6, 0, "user", "back on a"), row("a3", 6, 1, "assistant", "reply"), row("u4", 7, 0, "user", "and more")];
+        const messages = await contextFor(rows, "u4", [first, delta]);
+
+        expect(messages.map((m) => m.content)).toStrictEqual([first, delta, "back on a", "reply", "and more"]);
+    });
+});
