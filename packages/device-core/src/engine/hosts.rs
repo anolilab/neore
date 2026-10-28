@@ -666,15 +666,37 @@ impl DeviceState {
         }
     }
 
-    /// Forgets a server here: its secret, its folders and its pinned key stay on no disk of this computer. The
-    /// backend row is the web's to revoke.
+    /// Forgets a server here: its secret, its folders and, unless another server is at the same address, its
+    /// pinned key stay on no disk of this computer. The backend row is the web's to revoke.
     pub fn host_remove(&self, device_id: &str) -> Result<(), String> {
+        let removed = self
+            .settings()
+            .hosts
+            .into_iter()
+            .find(|host| host.device_id == device_id);
+
         self.change_settings_counted(true, |settings| {
             settings.hosts.retain(|host| host.device_id != device_id);
 
             Ok(())
         })?;
         self.drop_stale_connections();
+
+        if let Some(removed) = removed {
+            let spec = target_of(&removed).host_spec();
+
+            // A key left behind would refuse the server once it is added again after a reinstall.
+            if !self
+                .settings()
+                .hosts
+                .iter()
+                .any(|host| target_of(host).host_spec() == spec)
+            {
+                crate::ssh::forget_keys(&self.ssh.paths, &spec)
+                    .map_err(|error| error.to_string())?;
+            }
+        }
+
         self.emit(Event::Changed);
 
         Ok(())
@@ -1463,6 +1485,44 @@ mod tests {
             json!({ "address": "a", "name": "x", "user": "u", "forwardAgent": true })
         )
         .is_err());
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn removing_a_server_forgets_its_pinned_key_unless_another_server_shares_it() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("forget", &link);
+        let paths = &state.ssh.paths;
+        let key = "AAAAC3NzaC1lZDI1NTE5AAAAIEP+YmaNKEEP9QIxWrDvG/5Np6vN9WsgVWIYBUUjdBTH";
+
+        stdfs::create_dir_all(paths.known_hosts.parent().unwrap()).unwrap();
+        stdfs::write(
+            &paths.known_hosts,
+            format!("build.example.com ssh-ed25519 {key}\n"),
+        )
+        .unwrap();
+        state
+            .change_settings(|settings| {
+                settings.hosts.push(Host {
+                    device_id: "host-2".into(),
+                    name: "twin".into(),
+                    ..server("host-2")
+                });
+
+                Ok(())
+            })
+            .unwrap();
+
+        state.host_remove("host-1").unwrap();
+        assert_eq!(
+            crate::ssh::pinned_keys(paths, "build.example.com").len(),
+            1,
+            "the key the other server needs was dropped"
+        );
+
+        state.host_remove("host-2").unwrap();
+        assert!(crate::ssh::pinned_keys(paths, "build.example.com").is_empty());
 
         let _ = stdfs::remove_dir_all(dir);
     }
