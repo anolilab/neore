@@ -6,7 +6,7 @@
  * values cross the addon as JSON strings and are parsed here, so a transport hands back typed values.
  */
 import { loadDeviceCore } from "./addon";
-import type { CoreEvent, DeviceStatus, Prompt, SettingsView, Signed } from "./types";
+import type { CoreEvent, DeviceCore as DeviceCoreHandle, DeviceStatus, Prompt, SettingsView, Signed } from "./types";
 
 export interface HostTransport {
     auditTail: () => string[];
@@ -27,12 +27,14 @@ export interface HostTransport {
 }
 
 /** Loads the addon and wraps it. Throws when the addon cannot load; the caller keeps the shell running. */
-export const createLocalTransport = (dataDirectory: string, onEvent: (event: CoreEvent) => void): HostTransport => {
+export const createLocalTransport = (dataDirectory: string, onEvent: (event: CoreEvent) => void): HostTransport & { core: DeviceCoreHandle } => {
     const DeviceCore = loadDeviceCore();
     const core = new DeviceCore(dataDirectory, (json) => onEvent(JSON.parse(json) as CoreEvent));
 
     return {
         auditTail: () => core.auditTail(),
+        // The coding-agent handlers address this computer's core directly; they are not part of the seam.
+        core,
         denyPrompts: () => core.denyPrompts(),
         execute: async (envelope, signature) => JSON.parse(await core.execute(envelope, signature)) as Signed,
         kind: "local",

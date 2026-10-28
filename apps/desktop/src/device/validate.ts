@@ -70,3 +70,47 @@ export const readPromptAnswer = (id: unknown, answer: unknown): { answer: string
 
     return { answer, id };
 };
+
+const MAX_PROMPT_CHARS = 100_000;
+const MAX_PATH_CHARS = 4096;
+
+export const readAcpUpdate = (value: unknown): string => {
+    if (!isRecord(value)) {
+        throw new Error("device: agent update is invalid");
+    }
+
+    // A variable's value is in here: nothing quotes it back in an error.
+    const json = JSON.stringify(value);
+
+    if (json.length > MAX_SETTINGS_BYTES) {
+        throw new Error("device: agent update is too large");
+    }
+
+    return json;
+};
+
+export const readAgentKey = (value: unknown): string => text(value, "agent", 40);
+
+export const readSessionId = (value: unknown): string => text(value, "session", 64);
+
+export const readFolder = (value: unknown): string => text(value, "folder", MAX_PATH_CHARS);
+
+export const readPrompt = (value: unknown): string => text(value, "prompt", MAX_PROMPT_CHARS);
+
+export const readRequestId = (value: unknown): number => {
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
+        throw new Error("device: request id is invalid");
+    }
+
+    return value;
+};
+
+export const readOptionId = (value: unknown): string => text(value, "option", 256);
+
+export const readRequestIds = (value: unknown): number[] => {
+    if (!Array.isArray(value) || value.length === 0 || value.length > 50) {
+        throw new Error("device: request ids are invalid");
+    }
+
+    return value.map((id) => readRequestId(id));
+};

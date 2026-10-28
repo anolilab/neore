@@ -33,6 +33,31 @@ export declare class DeviceCore {
   settingsGet(): string
   /** Applies a `SettingsUpdate` (JSON). Validation is in Rust. */
   settingsUpdate(update: string): string
+  /** The registered coding agents and the names of their environment variables, never the values (JSON). */
+  acpView(): string
+  /** Applies an `AcpUpdate` (JSON): save or remove an agent, set or remove a variable. Validation is in Rust. */
+  acpUpdate(update: string): string
+  /**
+   * What to spawn for an agent (JSON): command, arguments, folder and environment. `folder` absent is a
+   * version probe. The environment holds secrets: it goes to the main process and nowhere else.
+   */
+  acpSpawnPlan(agentKey: string, folder?: string | undefined | null): string
+  /**
+   * Registers a permission request from a coding agent and resolves with the outcome the agent receives
+   * (JSON `{"outcome":"selected","optionId":…}` or `{"outcome":"cancelled"}`) once the user has answered it
+   * in the device window, the session was cancelled, or the request timed out.
+   */
+  acpPermissionAsk(request: string): Promise<string>
+  /** The coding-agent requests waiting for the device window (JSON). No "always" option is listed. */
+  acpPermissions(): string
+  /** Answers one request with the agent's own option id. Only "allow once" and "reject once" are accepted. */
+  acpPermissionAnswer(id: number, optionId: string): void
+  /** Says no to one request. */
+  acpPermissionDecline(id: number): void
+  /** Allows exactly the named requests, each once. Resolves how many it answered. */
+  acpPermissionAnswerBatch(ids: Array<number>): number
+  /** Answers every waiting request of one session cancelled. Call when the session is cancelled or ends. */
+  acpPermissionCancelSession(sessionId: string): void
   /** The most recent audit lines, newest first (each a JSON object). */
   auditTail(): Array<string>
   /** Stops local MCP servers idle for ten minutes. Call about once a minute. */

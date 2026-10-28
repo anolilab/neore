@@ -1,7 +1,7 @@
 import { createConfig } from "@anolilab/eslint-config";
 
 const config = await createConfig({
-    ignores: ["./dist/**", "./release/**", "./test-results/**", "./playwright-report/**", "./.eslint.cache.json", "./electron-builder.yml"],
+    ignores: ["./src/acp/testing/fake-agent.mjs", "./dist/**", "./release/**", "./test-results/**", "./playwright-report/**", "./.eslint.cache.json", "./electron-builder.yml"],
     typescript: {
         ignoresTypeAware: ["*.json", "*.md"],
         isTypeAware: false,
@@ -37,6 +37,9 @@ export default [
             "no-confusing-arrow": "off",
             // Boolean functions name a capability or an action (`supportsBadge`, `registerDeviceIpc`), not a predicate prefix.
             "unicorn/consistent-boolean-name": "off",
+            // Two rules that order class members in opposite ways (private first, public first); the TypeScript one
+            // stays, and a class reads top-down from its public methods.
+            "unicorn/consistent-class-member-order": "off",
         },
     },
     {

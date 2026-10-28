@@ -1,0 +1,8 @@
+# A prompt is waiting on a permission request when the user presses stop: the host sends session/cancel and
+# answers the pending request `cancelled` (ACP, cancellation). The agent then ends the turn `cancelled`.
+{"out":{"id":"$1","method":"session/prompt","params":{"sessionId":"sess_1","prompt":[{"type":"text","text":"run it"}]}}}
+{"in":{"method":"session/update","params":{"sessionId":"sess_1","update":{"sessionUpdate":"tool_call","toolCallId":"call_1","title":"Run tests","kind":"execute","status":"pending"}}}}
+{"in":{"id":7,"method":"session/request_permission","params":{"sessionId":"sess_1","toolCall":{"toolCallId":"call_1","title":"Run tests"},"options":[{"optionId":"allow","name":"Allow once","kind":"allow_once"},{"optionId":"reject","name":"Reject","kind":"reject_once"}]}}}
+{"out":{"method":"session/cancel","params":{"sessionId":"sess_1"}}}
+{"out":{"id":7,"result":{"outcome":{"outcome":"cancelled"}}}}
+{"in":{"id":"$1","result":{"stopReason":"cancelled"}}}
