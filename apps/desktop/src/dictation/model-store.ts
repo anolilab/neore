@@ -28,7 +28,7 @@ const isAllowedRedirect = (target: string, pinnedHost: string): boolean => {
 };
 
 export class ModelError extends Error {
-    public readonly code: "cancelled" | "checksum" | "download" | "missing" | "size";
+    public readonly code: "cancelled" | "checksum" | "delete" | "download" | "missing" | "size";
 
     public constructor(code: ModelError["code"], message: string) {
         super(message);
@@ -91,6 +91,17 @@ const hashFile = async (file: string): Promise<string> => {
     }
 
     return hash.digest("hex");
+};
+
+/** Deletes a file that should be there. Only "already gone" is quiet: a file that is still in use must not read as deleted. */
+const removeFile = async (file: string): Promise<void> => {
+    try {
+        await unlink(file);
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+            throw new ModelError("delete", "The model file could not be deleted. It may still be in use.");
+        }
+    }
 };
 
 const removeQuietly = async (file: string): Promise<void> => {
@@ -258,6 +269,12 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
 
         try {
             await fetchToPartial(spec, partial, options, controller);
+
+            // Cancelled after the last byte: the model must not appear once dictation was switched off or the model deleted.
+            if (controller.signal.aborted) {
+                throw controller.signal.reason;
+            }
+
             await rename(partial, target);
         } catch (error) {
             await removeQuietly(partial);
@@ -311,7 +328,7 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
     const remove = async (spec: ModelSpec): Promise<void> => {
         await cancel(spec.id);
         verified.delete(pathOf(spec));
-        await removeQuietly(pathOf(spec));
+        await removeFile(pathOf(spec));
     };
 
     const sweepPartials = async (): Promise<void> => {

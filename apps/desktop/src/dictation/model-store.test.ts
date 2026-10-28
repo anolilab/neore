@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -357,6 +357,36 @@ describe("remove", () => {
         await rejection;
         expect(store.isDownloading(spec)).toBe(false);
         expect(await readdir(directory)).toStrictEqual([]);
+    });
+});
+
+describe("remove, when the file cannot be deleted", () => {
+    it("fails instead of reporting a deletion, and leaves the file", async () => {
+        // A directory where the file should be: the unlink fails with something other than "not found".
+        await mkdir(path.join(directory, spec.file));
+
+        await expect(createModelStore({ directory }).remove(spec)).rejects.toMatchObject({ code: "delete" });
+        expect(await readdir(directory)).toStrictEqual([spec.file]);
+    });
+});
+
+describe("a download cancelled after its last byte", () => {
+    it("does not move the model into place and leaves the folder empty", async () => {
+        let cancelling: Promise<void> | undefined;
+        const store = createModelStore({ directory, fetch: async () => responseOf(split(PAYLOAD)) });
+        const running = store.download(spec, {
+            onProgress: (received) => {
+                // The bytes are all in and verified a moment later: the switch goes off right now.
+                if (received === PAYLOAD.length) {
+                    cancelling = store.cancelDownloads();
+                }
+            },
+        });
+
+        await expect(running).rejects.toMatchObject({ code: "cancelled" });
+        await cancelling;
+        expect(await readdir(directory)).toStrictEqual([]);
+        expect(await store.status(spec)).toStrictEqual({ state: "missing" });
     });
 });
 

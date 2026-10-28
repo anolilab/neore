@@ -38,11 +38,13 @@ export interface SettingsView {
     model: string;
     models: ModelView[];
     shortcut: string;
+    /** True when the switch is on but the OS refused the shortcut (another app holds it). */
+    shortcutUnavailable: boolean;
 }
 
 export interface SettingsApiOptions {
-    /** Ends a dictation that is running now (a deleted model, or a switch turned off, must not be used by it). */
-    cancelDictation: () => void;
+    /** Ends a dictation that is running now (a deleted model, or a switch turned off, must not be used by it) and resolves once its helper has exited. */
+    cancelDictation: () => Promise<void>;
     /** Whether the speech helper exists in this build. */
     hasHelper: () => boolean;
     models: Pick<ModelStore, "cancelDownloads" | "download" | "isDownloading" | "remove" | "status">;
@@ -55,6 +57,8 @@ export interface SettingsApiOptions {
     resolveModel: (settings: DictationSettings) => string;
     settings: SettingsStore;
     shortcut: string;
+    /** Whether the shortcut was refused when it was last registered. */
+    shortcutRefused: () => boolean;
 }
 
 export interface SettingsApi {
@@ -105,11 +109,20 @@ export const createSettingsApi = (options: SettingsApiOptions): SettingsApi => {
             model: options.resolveModel(settings),
             models,
             shortcut: options.shortcut,
+            shortcutUnavailable: settings.enabled && options.shortcutRefused(),
         };
+    };
+
+    const requireHelper = (): void => {
+        if (!options.hasHelper()) {
+            throw new Error("dictation settings: on-device dictation is not available on this computer yet");
+        }
     };
 
     return {
         download: (id) => {
+            requireHelper();
+
             // Off means no model is fetched: the window cannot start one, and a download already running is stopped when the switch goes off.
             if (!options.settings.get().enabled) {
                 throw new Error("dictation settings: turn dictation on before downloading a model");
@@ -135,17 +148,22 @@ export const createSettingsApi = (options: SettingsApiOptions): SettingsApi => {
             const spec = specOf(id);
 
             // A dictation may be loading this very file, and Windows will not delete a file that is open.
-            options.cancelDictation();
+            await options.cancelDictation();
             await options.models.remove(spec);
             options.onNotice(`${spec.label} was deleted from this computer.`);
         },
         update: async (payload) => {
             const update = parseUpdate(payload, known);
+
+            if (update.enabled === true) {
+                requireHelper();
+            }
+
             const before = options.settings.get();
             const after = options.settings.update(update);
 
             if (before.enabled && !after.enabled) {
-                options.cancelDictation();
+                await options.cancelDictation();
                 await options.models.cancelDownloads();
             }
 
