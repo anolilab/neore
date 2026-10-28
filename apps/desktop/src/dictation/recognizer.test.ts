@@ -29,7 +29,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-    await rm(directory, { force: true, recursive: true });
+    await rm(directory, { force: true, maxRetries: 10, recursive: true, retryDelay: 100 });
 });
 
 describe("parseTranscript", () => {

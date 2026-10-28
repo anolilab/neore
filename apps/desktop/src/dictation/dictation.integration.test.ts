@@ -76,7 +76,7 @@ afterEach(async () => {
     }
 
     vi.restoreAllMocks();
-    await rm(root, { force: true, recursive: true });
+    await rm(root, { force: true, maxRetries: 10, recursive: true, retryDelay: 100 });
 });
 
 const run = async (): Promise<{ inserted: string[]; notices: string[]; windowClosed: boolean }> => {
@@ -154,7 +154,7 @@ describe("with the switch off", () => {
 
         const directory = path.join(appData, "dictation", "models");
 
-        await rm(directory, { force: true, recursive: true });
+        await rm(directory, { force: true, maxRetries: 10, recursive: true, retryDelay: 100 });
 
         const opened: unknown[] = [];
         const asked: unknown[] = [];

@@ -154,7 +154,21 @@ const pcmOf = (wav: Buffer): Buffer => wav.subarray(wav.indexOf("data") + 8);
  */
 const dictate = async (app: ElectronApplication, pcm: Buffer = pcmOf(toneWav())): Promise<void> => {
     await call(app, "begin");
-    await expect.poll(() => call<string>(app, "state"), { timeout: 15_000 }).toBe("recording");
+    // A dictation that ends before it records says why (its outcome), instead of only "idle".
+    await expect
+        .poll(
+            async () => {
+                const state = await call<string>(app, "state");
+
+                if (state === "idle") {
+                    throw new Error(`the dictation ended before it recorded: ${await call<string | undefined>(app, "outcome")}`);
+                }
+
+                return state;
+            },
+            { timeout: 15_000 },
+        )
+        .toBe("recording");
 
     if (!USE_MICROPHONE) {
         const page = await findPage(app, (url) => DICTATION_PAGE.test(url));
