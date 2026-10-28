@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { AgentModeConfig, PromptVariable, SkillMetadata, TaskType, UserPersonalization } from "./index";
 import {
@@ -221,6 +221,24 @@ describe("Prompt System Tests", () => {
 
             expect(prompt).toContain("New York, USA");
             expect(prompt).toContain("The current date and hour");
+        });
+
+        it("shows the hour only and puts it last, so the prompt stays the same within an hour", () => {
+            vi.useFakeTimers();
+
+            try {
+                vi.setSystemTime(new Date("2026-10-28T14:01:00Z"));
+                const early = getSystemPrompt("UTC", "Berlin, Germany");
+
+                vi.setSystemTime(new Date("2026-10-28T14:59:00Z"));
+                const late = getSystemPrompt("UTC", "Berlin, Germany");
+
+                expect(late).toBe(early);
+                expect(early).toContain("14:00");
+                expect(early.lastIndexOf("The current date and hour")).toBeGreaterThan(early.indexOf("CODE FORMATTING"));
+            } finally {
+                vi.useRealTimers();
+            }
         });
 
         it("should include language instructions when provided", () => {
