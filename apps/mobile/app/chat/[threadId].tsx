@@ -157,7 +157,7 @@ const ChatScreen = () => {
 
             const started = await startChat({
                 body: { model: DEFAULT_CHAT_MODEL, prompt, threadId },
-                fetch: streamingFetch,
+                fetch,
                 gatewayUrl: config.gatewayUrl,
                 jwt,
             });
@@ -169,7 +169,7 @@ const ChatScreen = () => {
             }
 
             const outcome = await relayReply({
-                fetch,
+                fetch: streamingFetch,
                 gatewayUrl: config.gatewayUrl,
                 onDelta: ({ text }) => setRows((current) => appendToRow(current, assistantId, text)),
                 signal: controller.signal,
