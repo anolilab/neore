@@ -2,13 +2,19 @@
 // of their SHA-256 checksums, into `host-bundle/`. electron-builder ships that folder as `resources/neore-host`.
 //
 //   node scripts/host-bundle.mjs build <rust-target>...   build, check and copy binaries
+//   node scripts/host-bundle.mjs sign   Developer ID sign the macOS binaries (macOS only; skipped without CSC_LINK)
 //   node scripts/host-bundle.mjs manifest [--allow-partial]   hash what is in host-bundle/ and write manifest.json
 //
+// The macOS binaries are signed BEFORE they are hashed, and `mac.signIgnore` in electron-builder.yml keeps the app
+// signing from touching them: signing rewrites a Mach-O, so one signed after hashing no longer matches its checksum
+// and the desktop (rightly) refuses to upload it.
+
 // The host holds no pairing, so it must link no keyring (and on Linux no libdbus): every build here passes
 // `--no-default-features`, and refuses to continue if the crate's dependency tree for the target still has one.
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -69,7 +75,8 @@ const build = (triple) => {
     }
 
     if (triple.endsWith("linux-musl")) {
-        // A static binary runs on any distribution. `file` exists on the Linux runners; elsewhere there is no one to ask.
+        // A static binary runs on any distribution. On Linux `file` must be there to say so; elsewhere (a cross build)
+        // there is no one to ask.
         try {
             const described = execFileSync("file", ["-b", built], { encoding: "utf8" });
 
@@ -80,12 +87,77 @@ const build = (triple) => {
             if (error?.code !== "ENOENT") {
                 throw error;
             }
+
+            if (process.platform === "linux") {
+                fail(`cannot tell whether ${built} is statically linked: the \`file\` command is missing`);
+            }
         }
     }
 
     mkdirSync(bundle, { recursive: true });
     copyFileSync(built, path.join(bundle, binaryName(triple)));
     console.log(`host-bundle: ${triple} ok`);
+};
+
+/** Signs the macOS binaries in `host-bundle/` with the Developer ID certificate in `CSC_LINK` (a path or base64 of the .p12), hardened runtime and timestamp, as notarization needs. */
+const sign = () => {
+    const link = process.env.CSC_LINK;
+
+    if (!link) {
+        console.log("host-bundle: CSC_LINK is not set, the macOS binaries stay unsigned");
+
+        return;
+    }
+
+    if (process.platform !== "darwin") {
+        fail("the macOS binaries can only be signed on macOS");
+    }
+
+    const binaries = TARGETS.filter((triple) => triple.endsWith("apple-darwin")).map((triple) => path.join(bundle, binaryName(triple)));
+
+    for (const binary of binaries) {
+        if (!existsSync(binary)) {
+            fail(`${binary} is missing; build it first`);
+        }
+    }
+
+    const scratch = mkdtempSync(path.join(tmpdir(), "neore-host-sign-"));
+    const keychain = path.join(scratch, "sign.keychain-db");
+    const password = randomUUID();
+    const run = (command, args) => execFileSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+
+    try {
+        const p12 = existsSync(link) ? link : path.join(scratch, "certificate.p12");
+
+        if (p12 !== link) {
+            writeFileSync(p12, Buffer.from(link, "base64"), { mode: 0o600 });
+        }
+
+        run("security", ["create-keychain", "-p", password, keychain]);
+        run("security", ["set-keychain-settings", "-lut", "3600", keychain]);
+        run("security", ["unlock-keychain", "-p", password, keychain]);
+        run("security", ["import", p12, "-k", keychain, "-P", process.env.CSC_KEY_PASSWORD ?? "", "-T", "/usr/bin/codesign"]);
+        run("security", ["set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", password, keychain]);
+
+        const listed = run("security", ["find-identity", "-v", "-p", "codesigning", keychain]);
+        const wanted = process.env.CSC_NAME;
+        const identity = listed
+            .split("\n")
+            .map((line) => /^\s*\d+\) ([0-9A-F]{40}) "(.+)"/.exec(line))
+            .find((found) => found && (wanted ? found[2].includes(wanted) : found[2].startsWith("Developer ID Application")));
+
+        if (!identity) {
+            fail(`no ${wanted ?? "Developer ID Application"} identity in the certificate`);
+        }
+
+        for (const binary of binaries) {
+            run("codesign", ["--force", "--timestamp", "--options", "runtime", "--keychain", keychain, "--sign", identity[1], binary]);
+            run("codesign", ["--verify", "--strict", binary]);
+            console.log(`host-bundle: signed ${path.basename(binary)}`);
+        }
+    } finally {
+        rmSync(scratch, { force: true, recursive: true });
+    }
 };
 
 /** The manifest for `triples`, hashed from the binaries in `dir`. */
@@ -110,8 +182,10 @@ const [command, ...rest] = process.argv.slice(2);
 
 if (command === "build" && rest.length > 0) {
     rest.forEach(build);
+} else if (command === "sign") {
+    sign();
 } else if (command === "manifest") {
     manifest(rest.includes("--allow-partial"));
 } else {
-    fail("usage: host-bundle.mjs build <rust-target>... | manifest [--allow-partial]");
+    fail("usage: host-bundle.mjs build <rust-target>... | sign | manifest [--allow-partial]");
 }

@@ -65,6 +65,10 @@ mac:
         - target: zip
           arch: [arm64, x64]
     hardenedRuntime: true
+    # The macOS `neore-host` binaries are signed and hashed before packaging (scripts/host-bundle.mjs sign); signing
+    # them again would change the bytes the checksum manifest vouches for, and the app would refuse to upload them.
+    signIgnore:
+        - "/Contents/Resources/neore-host/"
     entitlements: build/entitlements.mac.plist
     entitlementsInherit: build/entitlements.mac.plist
     extendInfo:

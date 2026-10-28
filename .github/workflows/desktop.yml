@@ -94,6 +94,17 @@ jobs:
             - name: "Build the host binaries"
               run: "node apps/desktop/scripts/host-bundle.mjs build ${{ matrix.targets }}"
 
+            # Signing rewrites a Mach-O, so it happens before the manifest hashes the binaries and electron-builder is
+            # told to leave them alone (`mac.signIgnore`). Does nothing while CSC_LINK is empty, like the packaging
+            # step's unsigned macOS build. Unverified until a tag run with the certificate set.
+            - name: "Sign the macOS host binaries"
+              if: "matrix.name == 'macos'"
+              env:
+                  CSC_LINK: "${{ secrets.CSC_LINK }}"
+                  CSC_KEY_PASSWORD: "${{ secrets.CSC_KEY_PASSWORD }}"
+                  CSC_NAME: "${{ secrets.CSC_NAME }}"
+              run: "node apps/desktop/scripts/host-bundle.mjs sign"
+
             - name: "Upload the host binaries"
               uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
               with:
