@@ -15,6 +15,7 @@
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
  * | `messenger-ai-disclosure` | `<threadId>`      | {@link AI_DISCLOSURE_CLAIM_TTL_MS} | `messenger/functions.ts` |
+ * | `switch`           | `<userId>:<threadId>:<clientId>` | 10 min (`AGENT_SWITCH_CLAIM_TTL_MS`) | `chat/agent-switch.ts` |
  * | `worker-dispatch`  | `tool:<userId>:<toolCallId>` or `client:<threadId>:<clientId>` | {@link WORKER_DISPATCH_CLAIM_TTL_MS} | `sub-agents/functions.ts` |
  * | `worker-stop`      | `<threadId>:<clientId>`  | {@link WORKER_DISPATCH_CLAIM_TTL_MS} | `sub-agents/functions.ts` |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |

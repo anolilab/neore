@@ -1,3 +1,4 @@
+import { PROMPT_CACHE_COLD_START_TOKENS } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
 import { VerdictCache } from "../routing/cache.js";
@@ -61,6 +62,10 @@ describe("routing/policy", () => {
     });
 
     describe("prompt-cache economics", () => {
+        it("shares its threshold with the thread's agent switch", () => {
+            expect(POLICY_THRESHOLDS.downgradeMaxContextTokens).toBe(PROMPT_CACHE_COLD_START_TOKENS);
+        });
+
         it("refuses a downgrade once the conversation is large", () => {
             const decision = decideTier({
                 ...base,

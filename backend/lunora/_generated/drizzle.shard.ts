@@ -1413,6 +1413,7 @@ export const threadRelationships = sqliteTable("threadRelationships", {
 export const threads = sqliteTable("threads", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    activeAgent: text("activeAgent", { mode: "json" }).$type<{ kind: "model"; model: string }>(),
     activeLeafMessageId: text("activeLeafMessageId"),
     botId: text("botId").references((): AnySQLiteColumn => bots._id),
     category: text("category"),
