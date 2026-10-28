@@ -237,6 +237,15 @@ fn write_owner_only(path: &Path, text: &str) -> Result<(), String> {
         .open(&temporary)
         .map_err(|error| error.to_string())?;
 
+    // The mode above applies only when the file is created: a leftover temporary file keeps its own.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        file.set_permissions(fs::Permissions::from_mode(0o600))
+            .map_err(|error| error.to_string())?;
+    }
+
     file.write_all(text.as_bytes())
         .and_then(|()| file.sync_all())
         .map_err(|error| error.to_string())?;

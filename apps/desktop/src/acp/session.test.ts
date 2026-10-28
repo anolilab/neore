@@ -212,6 +212,30 @@ describe("a request the user declined", () => {
         };
     };
 
+    it("answers 'cancelled' to a request whose turn ended before the user answered it", async () => {
+        let allow: (() => void) | undefined;
+        const held: PermissionGate = {
+            ask: async () =>
+                await new Promise((resolve) => {
+                    allow = () => resolve({ optionId: "allow", outcome: "selected" });
+                }),
+            cancelSession: () => {},
+        };
+        const { agent, session } = await setup(held);
+
+        session.send("go");
+        await expect.poll(() => agent.written.length).toBe(3);
+        agent.say(ask(9, "c1"));
+        await expect.poll(() => allow !== undefined).toBe(true);
+        agent.say({ id: agent.written[2]?.id, jsonrpc: "2.0", result: { stopReason: "end_turn" } });
+        await expect.poll(() => session.snapshot().status).toBe("idle");
+
+        allow?.();
+        await expect.poll(() => agent.written.length).toBe(4);
+
+        expect(agent.written[3]).toMatchObject({ id: 9, result: { outcome: { outcome: "cancelled" } } });
+    });
+
     it("answers a request made while no turn is running 'cancelled', without asking the user", async () => {
         const asked: unknown[] = [];
         const gate: PermissionGate = {
