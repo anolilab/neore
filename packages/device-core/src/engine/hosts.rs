@@ -855,18 +855,27 @@ impl DeviceState {
         // An upgrade can mark the server during the prompt and check connections before this insert and the probe
         // after the link left it. Then the server is paired but not connected: it waits for that upgrade, as
         // `host_connect` does. The two lock steps inside are sequential, never nested, like `session_open`'s.
-        let committed = self.commit_unless_upgrading(&target, || {
-            let previous = self
-                .ssh
-                .connections
-                .lock()
-                .unwrap()
-                .insert(device_id.to_owned(), Arc::clone(&link));
+        // A second probe can also have replaced this one since the check above, which ends the link. `probe_holds`
+        // is read under the same `upgrading` lock the probe's replacement takes, so it is either still ours here or
+        // already gone, and a closed link is never recorded for the new server.
+        let committed = self
+            .commit_unless_upgrading(&target, || {
+                if !self.probe_holds(&link) {
+                    return None;
+                }
 
-            self.leave_probe(&link);
+                let previous = self
+                    .ssh
+                    .connections
+                    .lock()
+                    .unwrap()
+                    .insert(device_id.to_owned(), Arc::clone(&link));
 
-            previous
-        });
+                self.leave_probe(&link);
+
+                Some(previous)
+            })
+            .flatten();
 
         match committed {
             Some(Some(previous)) => self.retire(&previous),
