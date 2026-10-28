@@ -1050,11 +1050,16 @@ impl DeviceState {
         let link = self.connect_target(&target, interactive)?;
         let probe = HostProbe::of(link.hello());
 
-        // Disconnected while the connect was waiting: the user asked for that, and it stays asked.
+        // Disconnected while the connect was waiting: the user asked for that, and it stays asked. A disconnect
+        // removes the keeping, so one still present means the count moved for a restart (a setting changed): the
+        // link is dropped but the next try, with the new setting, is not.
         if self.disconnects_of(device_id) != disconnects {
             self.retire(&link);
 
-            return Err("that server was disconnected meanwhile".into());
+            return Err(ConnectError {
+                message: "that server was disconnected meanwhile".into(),
+                retryable: self.ssh.keeps.lock().unwrap().contains_key(device_id),
+            });
         }
 
         // Dropped from the settings while the user was typing a passphrase: nothing to keep. The same id paired
@@ -1073,7 +1078,10 @@ impl DeviceState {
             Some(current) if target_of(current) != target => {
                 self.retire(&link);
 
-                return Err("that server was changed meanwhile".into());
+                return Err(ConnectError {
+                    message: "that server was changed meanwhile".into(),
+                    retryable: true,
+                });
             }
             Some(_) => {}
         }
@@ -3043,6 +3051,42 @@ mod tests {
             "the keeping came back"
         );
         assert!(state.ssh.attempting.lock().unwrap().is_empty());
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_setting_changed_while_an_attempt_runs_drops_its_link_but_keeps_the_server_kept() {
+        let first = FakeLink::new(true);
+        let second = FakeLink::new(true);
+        let gate = Arc::new(Barrier::new(2));
+        let (next, wait) = (Arc::clone(&second), Arc::clone(&gate));
+        let (state, dir) = kept("restart", &first, move || {
+            wait.wait();
+            wait.wait();
+
+            Ok(Arc::clone(&next) as Arc<dyn HostLink>)
+        });
+        let (id, now) = (host_id("restart"), Instant::now());
+
+        first.alive.store(false, Ordering::SeqCst);
+        state.reconnect_tick(now);
+        state.reconnect_tick(now + Duration::from_secs(2));
+
+        // The attempt is connecting with the old setting. The owner turns agent forwarding off.
+        gate.wait();
+        state.host_restart(&id);
+        gate.wait();
+
+        eventually("the attempt kept a link made with the old setting", || {
+            second.closed.load(Ordering::SeqCst) == 1
+        });
+        eventually("the attempt released its slot", || {
+            state.ssh.attempting.lock().unwrap().is_empty()
+        });
+
+        assert!(state.connection(&id).is_none());
+        assert_eq!(phase_of(&state, "restart").unwrap().phase, "waiting");
 
         let _ = stdfs::remove_dir_all(dir);
     }
