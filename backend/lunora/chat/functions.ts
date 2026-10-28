@@ -3034,6 +3034,7 @@ export const hardDeleteThread = internalMutation
 
         await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
         await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
+        await context.runMutation(internal.acp.functions.deleteSessionsOfThread, { threadId });
 
         // Record audit history for hard delete
         if (threadBeforeDelete) {

@@ -22,6 +22,13 @@ export const MAX_IMPORT_REASONING_CHARS = 65_536;
 /** The backend's `MAX_IMPORT_TURNS`: the first turns are kept. */
 export const MAX_IMPORTED_TURNS = 1000;
 
+/**
+ * All the text of one import, in characters. The per-turn limits alone allow about 230 million (1000 turns of
+ * 230,000), which a hostile agent could make this process hold; a real session is far below this. Turns past it
+ * are dropped like turns past {@link MAX_IMPORTED_TURNS}.
+ */
+export const MAX_IMPORT_TOTAL_CHARS = 8_000_000;
+
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** The text of a content block; anything that is not text shows as its type, in brackets (as the live transcript does). */
@@ -70,11 +77,17 @@ export class ReplayCollector {
 
     private droppedTurns = 0;
 
+    /** The total cap was reached: no more text is kept and no more turns start. */
+    private full = false;
+
     private readonly open: Open[] = [];
+
+    private total = 0;
 
     public constructor(
         private readonly nativeSessionId: string,
         private readonly scrub: (text: string) => string = (text) => text,
+        private readonly maxTotalChars = MAX_IMPORT_TOTAL_CHARS,
     ) {}
 
     /** The `params` of one `session/update`. Anything but the loading session's history is ignored. */
@@ -141,7 +154,7 @@ export class ReplayCollector {
     private begin(userMessageId: string | undefined): Open {
         const turn: Open = { cut: new Set(), reasoning: "", spoke: false, text: "", user: "", userMessageId };
 
-        if (this.open.length >= MAX_IMPORTED_TURNS) {
+        if (this.open.length >= MAX_IMPORTED_TURNS || this.full) {
             // Counted, and collected into nothing: the turn after it still ends this one.
             this.droppedTurns += 1;
             this.current = turn;
@@ -169,15 +182,22 @@ export class ReplayCollector {
         }
 
         const next = turn[field] + chunk;
+        // Masked before it is cut: a value that straddles the cut would otherwise leave its first half readable.
+        const kept = next.length <= limit ? next : this.scrub(next).slice(0, limit);
+        const added = kept.length - turn[field].length;
 
-        if (next.length <= limit) {
-            turn[field] = next;
+        if (this.total + added > this.maxTotalChars) {
+            this.full = true;
+            turn.cut.add(field);
 
             return;
         }
 
-        // Masked before it is cut: a value that straddles the cut would otherwise leave its first half readable.
-        turn.cut.add(field);
-        turn[field] = this.scrub(next).slice(0, limit);
+        if (next.length > limit) {
+            turn.cut.add(field);
+        }
+
+        this.total += added;
+        turn[field] = kept;
     }
 }

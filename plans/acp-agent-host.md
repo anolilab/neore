@@ -645,6 +645,11 @@ saved sessions as threads, with ids derived from (agent key, native session id).
   first turn in the post, as `(turnId, seq)` claims a live event): turns the backend holds are dropped, a post that starts past it
   answers 409 with `next`. `import_end` closes it. Rows go through `addMessagesHandler` and `buildHostReply`. An interrupted import
   resumes from `next`; the transcript is collected before the open, so a session that cannot be loaded leaves no empty thread.
+- A session whose thread was deleted (soft or hard) or is gone is replaced by the next `import_open`, and the hard delete removes the
+  session with the thread (`acp/functions.ts#deleteSessionsOfThread`), so a deleted import can be imported again, also when it was
+  deleted mid-way. An unfinished import can be finished from another computer of the same user: the open hands the session over, and
+  the first computer's later posts are refused. The host also stops keeping text at 8 million characters in all (turns past it count
+  as dropped), so one hostile session cannot fill the main process.
 - The imported session is `ended` (no agent runs for it) and keeps `nativeSessionId` for the native reattach of harness S4.
   `importState` (`importing` | `done`) is unset on a session that ran here, and such a session takes no import turns.
 - Not built: import started from the web (a signed `acp_*` call), a re-import that refreshes a changed session, tool parts in

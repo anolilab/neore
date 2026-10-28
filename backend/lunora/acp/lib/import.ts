@@ -46,7 +46,7 @@ const importTitle = (open: ImportOpen): string => {
     return named.slice(0, MAX_LENGTH.short);
 };
 
-/** `ended: true` = nothing more to send (done, or the session ran here); `next` = turns the backend holds. */
+/** `ended: true` = nothing more to send (done, or the session ran here); `next` = turns the backend holds. A session whose thread is gone is replaced. */
 export const openImport = async (ctx: MutationCtx, device: Doc<"devices">, hostSessionId: string, events: Event[], now: number): Promise<ImportResult> => {
     const [open] = events;
 
@@ -58,7 +58,18 @@ export const openImport = async (ctx: MutationCtx, device: Doc<"devices">, hostS
         where: { agentKey: open.agentKey, nativeSessionId: open.nativeSessionId, userId: device.userId },
     });
 
-    if (found) {
+    // Deleting a thread does not take its session with it at once (a soft delete keeps both until the hard delete), so a
+    // session whose thread is gone or deleted is stale: it is dropped here and the import starts again.
+    const thread = found ? await ctx.db.threads.findFirst({ where: { _id: found.threadId } }) : null;
+
+    if (found && (!thread || thread.deleted === true)) {
+        await ctx.db.delete(found._id);
+    } else if (found) {
+        // An import begun on one of the user's computers can be finished from another: the hand-over is the open.
+        if (found.importState === "importing" && found.deviceId !== device._id) {
+            await ctx.db.patch(found._id, { deviceId: device._id, hostSessionId, updatedAt: now });
+        }
+
         return {
             ended: found.importState !== "importing",
             existing: true,
@@ -140,7 +151,7 @@ export const applyImportTurns = async (
         !Number.isSafeInteger(firstSeq) ||
         firstSeq < 0 ||
         turnCount > MAX_IMPORT_TURNS_PER_POST ||
-        events.some((event) => event.kind !== "import_turn" && event.kind !== "import_end")
+        events.some((event, index) => event.kind !== "import_turn" && !(event.kind === "import_end" && index === events.length - 1))
     ) {
         return REFUSED;
     }
@@ -172,29 +183,22 @@ export const applyImportTurns = async (
         return { next: held, outcome: "gap" };
     }
 
-    const unseen = events.slice(held - firstSeq);
+    // The end closes the post's turns, wherever the backend already stood: it is the last event or it is refused.
+    const closes = events.at(-1)?.kind === "import_end";
+    const unseen = events.slice(held - firstSeq).filter((event) => event.kind === "import_turn");
 
     // Refused before any turn is written: a refusal returns, it does not roll back what the loop already wrote.
-    if (held + unseen.filter((event) => event.kind === "import_turn").length > MAX_IMPORT_TURNS) {
+    if (held + unseen.length > MAX_IMPORT_TURNS) {
         return REFUSED;
     }
 
-    let count = held;
-    let done = false;
-
     for (const event of unseen) {
-        if (event.kind === "import_end") {
-            done = true;
-            break;
-        }
-
-        if (event.kind === "import_turn") {
-            await writeTurn(ctx, session, threadId, event);
-            count += 1;
-        }
+        await writeTurn(ctx, session, threadId, event);
     }
 
-    await ctx.db.patch(session._id, { importedTurns: count, importState: done ? "done" : "importing", lastEventAt: now, updatedAt: now });
+    const count = held + unseen.length;
 
-    return { ended: done, next: count, outcome: "applied" };
+    await ctx.db.patch(session._id, { importedTurns: count, importState: closes ? "done" : "importing", lastEventAt: now, updatedAt: now });
+
+    return { ended: closes, next: count, outcome: "applied" };
 };

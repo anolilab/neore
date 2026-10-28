@@ -102,6 +102,18 @@ describe("ReplayCollector", () => {
         expect(droppedTurns).toBe(3);
     });
 
+    it("stops keeping text at the total cap, counts the turns after it as dropped, and says the turn it cut was shortened", () => {
+        const collector = new ReplayCollector(ID, undefined, 10);
+
+        say(collector, "user_message_chunk", text("12345"));
+        say(collector, "agent_message_chunk", text("678"));
+        say(collector, "agent_message_chunk", text("90123"));
+        say(collector, "user_message_chunk", text("next"));
+        say(collector, "agent_message_chunk", text("more"));
+
+        expect(collector.result()).toEqual({ droppedTurns: 1, shortenedTurns: 1, turns: [{ reasoning: "", text: "678", user: "12345" }] });
+    });
+
     it("drops a turn with nothing in it", () => {
         const collector = new ReplayCollector(ID);
 
