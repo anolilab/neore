@@ -19,6 +19,10 @@ describe("registry format", () => {
     });
 
     it("refuses a file that is not a registry", () => {
+        // Two entries that share an id cannot be told apart at install time, so neither is offered.
+        const twin = { description: "x", distribution: { binary: {} }, id: "twin", license: "MIT", name: "Twin", version: "1.0.0" };
+
+        expect(parseRegistry({ agents: [twin, { ...twin, name: "Twin again" }, { ...twin, id: "solo" }] }).map((agent) => agent.id)).toEqual(["solo"]);
         expect(() => parseRegistry({ agents: "no" })).toThrow("format Neore does not know");
         expect(() => parseRegistry(null)).toThrow("format Neore does not know");
     });
