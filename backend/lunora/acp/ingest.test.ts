@@ -6,6 +6,7 @@
  * The harness is one database for every shard, so "another user's thread is refused" is proven here by the
  * explicit owner comparison in `applyHostEvents`, not by shard isolation.
  */
+import { CLOUD_INTERACTIVE_CAPABILITIES, LOCAL_BROWSER_CAPABILITIES } from "@neore/ai/capabilities";
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -275,7 +276,7 @@ describe("capability reports", () => {
         version: 1,
     };
     const CHANGED = { groups: { turns: { followUp: { degradation: "restart", kind: "steer" } } }, reportedAt: 1_700_000_100_000, version: 1 };
-    const UNKNOWN = { groups: {}, reportedAt: expect.any(Number), version: 1 };
+    const UNKNOWN = { groups: {}, reportedAt: 0, version: 1 };
 
     const openWith = async (device: Paired, capabilities: unknown) => {
         const result = await ingest(device, { events: [{ ...SESSION_OPEN, capabilities }] });
@@ -324,9 +325,123 @@ describe("capability reports", () => {
         await expect(reportOf(threadId)).resolves.toEqual(UNKNOWN);
     });
 
-    it("answers a host thread that never reported with all unknown, and a cloud thread with the cloud declaration", async () => {
+    it("answers a host thread that never reported with all unknown", async () => {
         const device = await pair(ownerId);
-        const hostThread = await openSession(device);
+
+        await expect(reportOf(await openSession(device))).resolves.toEqual(UNKNOWN);
+    });
+
+    it("does not roll the stored report back for an older or replayed open", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, CHANGED);
+
+        await openWith(device, REPORT);
+        await expect(reportOf(threadId)).resolves.toEqual(CHANGED);
+
+        await openWith(device, CHANGED);
+        await expect(reportOf(threadId)).resolves.toEqual(CHANGED);
+    });
+
+    it("keeps a valid stored report when a later open's report is invalid, and lets the next valid one replace the fallback", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, REPORT);
+
+        await openWith(device, "garbage");
+        await expect(reportOf(threadId)).resolves.toEqual(REPORT);
+
+        const other = await pair(ownerId);
+        const fallback = await ingest(other, { events: [{ ...SESSION_OPEN, capabilities: "garbage" }], sessionId: "host-s2" });
+        const fallbackThread = fallback.json.threadId as string;
+
+        await expect(reportOf(fallbackThread)).resolves.toEqual(UNKNOWN);
+        await ingest(other, { events: [{ ...SESSION_OPEN, capabilities: REPORT }], sessionId: "host-s2" });
+        await expect(reportOf(fallbackThread)).resolves.toEqual(REPORT);
+    });
+
+    describe("on a cloud or local thread", () => {
+        const insertThread = async (fields: Record<string, unknown> = {}) =>
+            (await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("threads", {
+                        createdBy: ownerId,
+                        mode: "text",
+                        status: "active",
+                        tags: [],
+                        title: "t",
+                        updatedAt: Date.now(),
+                        userId: ownerId,
+                        ...fields,
+                    }),
+            )) as string;
+
+        const grant = async (threadId: string, userId: string, fields: Record<string, unknown> = {}) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.threadAccess.insert({ grantedAt: Date.now(), grantedBy: ownerId, ownerId, permission: "read", threadId, userId, ...fields }),
+            );
+
+        it("answers the owner with the cloud declaration", async () => {
+            await expect(reportOf(await insertThread())).resolves.toMatchObject({ groups: { turns: { followUp: { kind: "steer" } } }, version: 1 });
+        });
+
+        it("answers a live grantee with the cloud declaration, and an expired one with nothing", async () => {
+            const threadId = await insertThread();
+            const live = await insertUser();
+            const expired = await insertUser();
+
+            await grant(threadId, live);
+            await grant(threadId, expired, { expiresAt: Date.now() - 1000 });
+
+            await expect(reportOf(threadId, live)).resolves.toMatchObject({ groups: { turns: { followUp: { kind: "steer" } } } });
+            await expect(reportOf(threadId, expired)).resolves.toBeNull();
+        });
+
+        it("answers a revoked grantee with nothing", async () => {
+            const threadId = await insertThread();
+            const grantee = await insertUser();
+            const grantId = await grant(threadId, grantee);
+
+            await expect(reportOf(threadId, grantee)).resolves.not.toBeNull();
+            await harness.run(async (ctx: any) => await ctx.db.threadAccess.delete(grantId));
+            await expect(reportOf(threadId, grantee)).resolves.toBeNull();
+        });
+
+        it("answers a viewer of a public-only thread with nothing", async () => {
+            const threadId = await insertThread({ isPublic: true });
+
+            await expect(reportOf(threadId, await insertUser())).resolves.toBeNull();
+        });
+
+        it("answers nobody, the owner included, for a locked thread", async () => {
+            const threadId = await insertThread({ lockedAt: Date.now() });
+            const grantee = await insertUser();
+
+            await grant(threadId, grantee);
+            await expect(reportOf(threadId)).resolves.toBeNull();
+            await expect(reportOf(threadId, grantee)).resolves.toBeNull();
+        });
+
+        it("answers the owner of a thread on a local-browser endpoint with the local declaration, by endpoint type", async () => {
+            const providers = {
+                laptop: { enabled: true, models: [{ id: "shared-name" }], type: "local-browser" },
+                hosted: { enabled: true, models: [{ id: "shared-name" }], type: "openai-compatible" },
+            };
+
+            await harness.run(async (ctx: any) => await ctx.db.insert("aiUserPreferences", { customAIProviders: providers, userId: ownerId }));
+
+            const local = await insertThread({ model: "custom:laptop/shared-name" });
+            const hosted = await insertThread({ model: "custom:hosted/shared-name" });
+            const plain = await insertThread({ model: "shared-name" });
+
+            await expect(reportOf(local)).resolves.toEqual(LOCAL_BROWSER_CAPABILITIES);
+            await expect(reportOf(hosted)).resolves.toEqual(CLOUD_INTERACTIVE_CAPABILITIES);
+            await expect(reportOf(plain)).resolves.toEqual(CLOUD_INTERACTIVE_CAPABILITIES);
+        });
+    });
+
+    it("returns nothing to a stranger, for a host thread, a cloud thread and an id that does not exist", async () => {
+        const device = await pair(ownerId);
+        const hostThread = await openWith(device, REPORT);
         const cloudThread = (await harness.run(
             async (ctx: any) =>
                 await ctx.db.insert("threads", {
@@ -339,18 +454,11 @@ describe("capability reports", () => {
                     userId: ownerId,
                 }),
         )) as string;
-
-        await expect(reportOf(hostThread)).resolves.toEqual({ groups: {}, reportedAt: 0, version: 1 });
-        await expect(reportOf(cloudThread)).resolves.toMatchObject({ groups: { turns: { followUp: { kind: "steer" } } }, version: 1 });
-    });
-
-    it("returns nothing to a stranger, for a host thread, a cloud thread and an id that does not exist", async () => {
-        const device = await pair(ownerId);
-        const hostThread = await openWith(device, REPORT);
         const stranger = await insertUser();
 
         await expect(reportOf(hostThread, stranger)).resolves.toBeNull();
-        await expect(reportOf("not-an-id", ownerId)).resolves.toBeNull();
+        await expect(reportOf(cloudThread, stranger)).resolves.toBeNull();
+        await expect(reportOf("not-an-id", stranger)).resolves.toBeNull();
     });
 });
 

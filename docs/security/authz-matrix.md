@@ -148,7 +148,7 @@ for a schema table that is neither policed nor listed:
 | --- | --- | --- | --- | --- | --- |
 | `acp_functions.getHostSession` | query | authQuery | acpSessions | row.userId == caller AND row.threadId == arg | ok — new; a stranger's or non-host thread id answers null; no device id of anyone else, no path |
 | `acp_functions.listHostSessions` | query | authQuery | acpSessions | caller-scoped (ctx.user) | ok — new; labels, status and the capability report only; paths never reach the backend |
-| `acp_functions.getThreadCapabilities` | query | authQuery | threads, acpSessions | `resolveThreadReadAccess` (owner or live grant, unlocked) AND session.userId == caller | ok — new; a stranger's, locked, public-only or missing thread answers null; a host thread is never shared, so its report is the owner's alone |
+| `acp_functions.getThreadCapabilities` | query | authQuery | threads, acpSessions | `resolveThreadReadAccess` (owner or live grant, unlocked) AND session.userId == caller | ok — new; a stranger's, locked, public-only or missing thread answers null; a host thread is never shared, so its report is the owner's alone; the local-browser answer reads only the owner's own endpoints, a grantee gets the cloud declaration |
 | `admin_audit_log.getAuditLogEntry` | query | adminQuery | auditLog | admin role | ok |
 | `admin_audit_log.getAuditLogs` | query | adminQuery | auditLog | admin role | ok |
 | `admin_audit_log.getAuditLogStats` | query | adminQuery | — | admin role | ok |
