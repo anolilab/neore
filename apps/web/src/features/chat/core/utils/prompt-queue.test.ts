@@ -7,6 +7,7 @@ import {
     dequeuePrompt,
     EMPTY_PROMPT_QUEUE,
     enqueuePrompt,
+    prependPrompt,
     removeQueuedPrompt,
     restorePromptQueue,
     serializePromptQueue,
@@ -31,6 +32,13 @@ describe("prompt queue transitions", () => {
         expect(first.state.items.map((i) => i.id)).toStrictEqual(["b"]);
         expect(dequeuePrompt(first.state).next?.id).toBe("b");
         expect(dequeuePrompt(EMPTY_PROMPT_QUEUE).next).toBeUndefined();
+    });
+
+    it("puts a prepended item first and leaves the rest in order", () => {
+        const state = prependPrompt({ items: [item("a"), item("b")], paused: true }, item("c"));
+
+        expect(state.items.map((i) => i.id)).toStrictEqual(["c", "a", "b"]);
+        expect(state.paused).toBe(true);
     });
 
     it("removes an item by id and unpauses once empty", () => {

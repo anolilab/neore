@@ -62,6 +62,7 @@ import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import useComposerAutocomplete from "./composer-tiptap/use-composer-autocomplete";
+import interruptAndSend from "./interrupt-and-send";
 import { readChatMessages } from "./read-chat-messages";
 import ReplyCompleteAnnouncement from "./reply-complete-announcement";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
@@ -752,23 +753,20 @@ const ComposerInput = ({
         const streamId = sseStreamState;
         const steerText = text;
 
-        if (!canSteer || !threadId || !streamId || !steerText.trim() || disabled) {
+        if (!canSteer || (followUp !== "steer" && followUp !== "steer-restart") || !threadId || !streamId || !steerText.trim() || disabled) {
             return;
         }
 
         promptHistory.reset();
         clear();
 
-        const { enqueue, settleSteer } = usePromptQueueStore.getState();
-
-        // A runner that can only be interrupted: queue the text as an ordinary message and stop
-        // the reply WITHOUT pausing the queue, so the text goes out as soon as the run has ended.
         if (followUp === "steer-restart") {
-            enqueue(threadId, { attachments: [], text: steerText });
-            cancelStream();
+            interruptAndSend(threadId, steerText, cancelStream);
 
             return;
         }
+
+        const { enqueue, settleSteer } = usePromptQueueStore.getState();
 
         // The id is ours, so a call whose answer never came back can still be told
         // apart from a refusal: the chip stays as a steer and the queue's withdrawal
