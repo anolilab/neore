@@ -1,11 +1,14 @@
 // Packaging smoke test for the release directory: the installer for this platform, the
 // unpacked app with its device-execution addon outside the asar, and the update feed exist.
-// Run after `electron-builder` (see the `smoke:artifacts` script and desktop.yml).
+// Run after `electron-builder` (see the `smoke:artifacts` script and desktop.yml). With `--unpacked-only` (an
+// `electron-builder --dir` run, which writes no installer and no feed) only the unpacked apps are checked.
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const release = path.join(fileURLToPath(new URL("..", import.meta.url)), "release");
+
+const unpackedOnly = process.argv.includes("--unpacked-only");
 
 const fail = (message) => {
     console.error(`smoke-artifacts: ${message}`);
@@ -29,7 +32,7 @@ if (!patterns) {
     fail(`no installer rules for platform ${process.platform}`);
 }
 
-for (const pattern of patterns) {
+for (const pattern of unpackedOnly ? [] : patterns) {
     if (!names.some((name) => pattern.test(name))) {
         fail(`no installer matching ${pattern} in ${release} (found: ${names.join(", ") || "nothing"})`);
     }
@@ -94,8 +97,21 @@ if (process.platform === "darwin") {
     }
 }
 
-if (!names.some((name) => /^latest.*\.yml$/.test(name))) {
+// On Windows the host loads node-pty from the unpacked copy: its worker script and the ConPTY binding must be there.
+if (process.platform === "win32") {
+    for (const dir of unpacked) {
+        const files = readdirSync(dir, { recursive: true }).map((entry) => String(entry).replaceAll("\\", "/"));
+
+        for (const needed of ["node-pty/lib/worker/conoutSocketWorker.js", "node-pty/prebuilds/win32-x64/conpty.node", "node-pty/prebuilds/win32-arm64/conpty.node"]) {
+            if (!files.some((file) => file.endsWith(needed))) {
+                fail(`no ${needed} in ${dir}; asarUnpack did not pick it up, and the terminal could not start a shell`);
+            }
+        }
+    }
+}
+
+if (!unpackedOnly && !names.some((name) => /^latest.*\.yml$/.test(name))) {
     fail(`no latest*.yml update feed in ${release}`);
 }
 
-console.log(`smoke-artifacts: ok (${process.platform}: installer, ${unpacked.length} unpacked app(s), update feed)`);
+console.log(`smoke-artifacts: ok (${process.platform}: ${unpackedOnly ? "" : "installer, "}${unpacked.length} unpacked app(s)${unpackedOnly ? "" : ", update feed"})`);

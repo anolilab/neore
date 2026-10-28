@@ -6,9 +6,10 @@ import path from "node:path";
 
 import { runHost } from "./host";
 import type { HostEvent, HostRequest } from "./protocol";
-import { makeSpawnHelperExecutable } from "./spawn-helper";
+import { loadableDirectory, makeSpawnHelperExecutable } from "./spawn-helper";
 
 const port = process.parentPort;
+const ptyDirectory = (): string => path.dirname(require.resolve("node-pty/package.json"));
 
 runHost(
     port === undefined
@@ -26,7 +27,7 @@ runHost(
             post: (event: HostEvent) => port.postMessage(event),
         },
     // node-pty is a native module, so it stays external to the bundle and is loaded here, on the first spawn.
-    // eslint-disable-next-line global-require, @typescript-eslint/no-require-imports -- loaded on demand so a failing load is reported, not fatal
-    () => require("node-pty"),
-    () => makeSpawnHelperExecutable(path.dirname(require.resolve("node-pty/package.json"))),
+    // eslint-disable-next-line global-require, import/no-dynamic-require, @typescript-eslint/no-require-imports -- loaded on demand so a failing load is reported, not fatal
+    () => require(loadableDirectory(ptyDirectory())),
+    () => makeSpawnHelperExecutable(ptyDirectory()),
 );

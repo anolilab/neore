@@ -3,6 +3,7 @@
  * pseudo-terminal. Output is passed to `onData` and kept nowhere here; the counters below hold
  * numbers, not text.
  */
+import { hangUp } from "./hang-up";
 import type { HostEvent, HostRequest, SpawnRequest } from "./protocol";
 
 /** The host process, however it was started (an Electron utility process; a plain fork in tests). */
@@ -107,12 +108,7 @@ export const startSession = (options: SessionOptions): Promise<TerminalSession> 
                     return;
                 }
 
-                try {
-                    process.kill(pid, "SIGHUP");
-                } catch {
-                    // The shell is already gone.
-                }
-
+                hangUp(pid);
                 host.post({ type: "kill" });
                 host.kill();
             },
@@ -171,6 +167,11 @@ export const startSession = (options: SessionOptions): Promise<TerminalSession> 
             }
         });
         host.onExit(() => {
+            // A POSIX shell hangs up when its pty closes with the host; a Windows one is left running by a host that died.
+            if (started && !ended && process.platform === "win32") {
+                hangUp(pid);
+            }
+
             fail("The terminal host stopped before the shell started.");
             end({ crashed: true, exitCode: null });
         });

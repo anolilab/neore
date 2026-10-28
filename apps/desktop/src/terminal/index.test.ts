@@ -12,6 +12,7 @@ import { runInNewContext } from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isTrustedUrl } from "../trust.js";
+import { hangUp } from "./hang-up";
 import type { HostEvent, HostRequest } from "./protocol";
 import type { HostHandle } from "./session";
 
@@ -25,6 +26,11 @@ type Contents = {
 };
 type FakeWindow = { close: () => void; focus: ReturnType<typeof vi.fn>; options: Record<string, unknown>; webContents: Contents };
 type IpcEvent = { sender: Contents; senderFrame: Frame | null };
+
+// Hanging a shell up is platform work (`hang-up.test.ts`); here only that every shell is asked to.
+vi.mock("./hang-up", () => {
+    return { hangUp: vi.fn() };
+});
 
 const fake = vi.hoisted(() => {
     return {
@@ -167,6 +173,7 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.restoreAllMocks();
+    vi.mocked(hangUp).mockClear();
 });
 
 const startShell = async (win: FakeWindow = lastWindow()) => invoke(TERMINAL_CHANNEL.start, pageEvent(win), { cols: 80, rows: 24 });
@@ -248,8 +255,8 @@ describe("opening", () => {
 });
 
 describe("unavailable platforms", () => {
-    it("refuses cleanly on Windows: nothing is opened or started", async () => {
-        const platform = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+    it("refuses cleanly where there is no pseudo-terminal: nothing is opened or started", async () => {
+        const platform = vi.spyOn(process, "platform", "get").mockReturnValue("freebsd");
 
         fake.handlers.clear();
 
@@ -428,7 +435,7 @@ describe("ending a terminal", () => {
     });
 
     it("kills every shell when the app quits", async () => {
-        const signal = vi.spyOn(process, "kill").mockImplementation(() => true);
+        vi.spyOn(process, "kill").mockImplementation(() => true);
 
         await terminals.open(folder);
         await startShell();
@@ -438,8 +445,8 @@ describe("ending a terminal", () => {
         // Electron's order: `before-quit`, then the windows close, then `will-quit`.
         fake.appListeners.get("before-quit")?.();
 
-        expect(signal).toHaveBeenCalledWith(9000, "SIGHUP");
-        expect(signal).toHaveBeenCalledWith(9001, "SIGHUP");
+        expect(hangUp).toHaveBeenCalledWith(9000);
+        expect(hangUp).toHaveBeenCalledWith(9001);
         expect(hosts.every((host) => vi.mocked(host.handle.kill).mock.calls.length > 0)).toBe(true);
 
         for (const window of fake.windows as FakeWindow[]) {

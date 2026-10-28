@@ -1,15 +1,23 @@
 import { accessSync, constants, realpathSync, statSync } from "node:fs";
-import { userInfo } from "node:os";
+import { release as osRelease, userInfo } from "node:os";
 import path from "node:path";
 
 export type Availability = { available: false; reason: string } | { available: true };
 
-/**
- * The pseudo-terminal API differs on Windows (ConPTY), and its tests are a separate slice, so a
- * terminal is offered on macOS and Linux only. Nothing loads the native module before this says yes.
- */
-export const terminalAvailability = (platform: NodeJS.Platform = process.platform): Availability =>
-    platform === "darwin" || platform === "linux" ? { available: true } : { available: false, reason: "The terminal is not available on this platform yet." };
+/** Windows 10 version 1903. `node-pty` uses ConPTY from here; below it falls back to winpty, whose helper binaries are not unpacked from the app. */
+const CONPTY_MIN_BUILD = 18_362;
+const WINDOWS_RELEASE = /^\d+\.\d+\.(?<build>\d+)/u;
+
+/** The terminal is offered on macOS, Linux and Windows with ConPTY. Nothing loads the native module before this says yes. */
+export const terminalAvailability = (platform: NodeJS.Platform = process.platform, release: string = osRelease()): Availability => {
+    if (platform === "win32") {
+        const build = Number(WINDOWS_RELEASE.exec(release)?.groups?.build ?? 0);
+
+        return build >= CONPTY_MIN_BUILD ? { available: true } : { available: false, reason: "The terminal needs Windows 10 version 1903 or later." };
+    }
+
+    return platform === "darwin" || platform === "linux" ? { available: true } : { available: false, reason: "The terminal is not available on this platform." };
+};
 
 const isExecutable = (file: string): boolean => {
     try {
@@ -22,6 +30,29 @@ const isExecutable = (file: string): boolean => {
 };
 
 /**
+ * Windows has no `$SHELL` and no login shell. Windows PowerShell comes with every Windows 10 and later and is what the
+ * system's own terminal opens, so it goes first; `%ComSpec%` (cmd.exe) is the fallback. Both are looked up by absolute
+ * path under `%SystemRoot%`, never by name on the `PATH`, which a folder in the user's `PATH` could shadow.
+ */
+const resolveWindowsShell = (env: NodeJS.ProcessEnv, executable: (file: string) => boolean): { args: string[]; file: string } => {
+    const system32 = path.win32.join(env.SystemRoot ?? env.SYSTEMROOT ?? String.raw`C:\Windows`, "System32");
+    const powershell = path.win32.join(system32, "WindowsPowerShell", "v1.0", "powershell.exe");
+
+    if (executable(powershell)) {
+        return { args: ["-NoLogo"], file: powershell };
+    }
+
+    const comspec = env.ComSpec ?? env.COMSPEC;
+    const command = [comspec, path.win32.join(system32, "cmd.exe")].find((candidate): candidate is string => typeof candidate === "string" && path.win32.isAbsolute(candidate) && executable(candidate));
+
+    if (command === undefined) {
+        throw new Error("terminal: no shell was found on this computer");
+    }
+
+    return { args: [], file: command };
+};
+
+/**
  * The user's login shell: `$SHELL`, else the account's shell, else the platform default. Only an
  * absolute path to an executable file counts, so a stray value never becomes a command lookup.
  */
@@ -31,6 +62,10 @@ export const resolveShell = (
     platform: NodeJS.Platform = process.platform,
     executable: (file: string) => boolean = isExecutable,
 ): { args: string[]; file: string } => {
+    if (platform === "win32") {
+        return resolveWindowsShell(env, executable);
+    }
+
     const fallback = platform === "darwin" ? "/bin/zsh" : "/bin/sh";
     const candidates = [env.SHELL, accountShell(), fallback, "/bin/sh"];
     const file = candidates.find((candidate): candidate is string => typeof candidate === "string" && path.isAbsolute(candidate) && executable(candidate));

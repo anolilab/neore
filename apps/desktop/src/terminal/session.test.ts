@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { hangUp } from "./hang-up";
 import type { HostEvent, HostRequest } from "./protocol";
 import type { HostHandle } from "./session";
 import { HIGH_WATERMARK_CHARS, LOW_WATERMARK_CHARS, startSession } from "./session";
+
+// Signalling a shell is platform work (`hang-up.test.ts`); here only whether and when it is asked for.
+vi.mock("./hang-up", () => {
+    return { hangUp: vi.fn() };
+});
 
 /** A host that records what it is sent and emits what a test tells it to. */
 const fakeHost = () => {
@@ -33,7 +39,10 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.useRealTimers();
+    vi.mocked(hangUp).mockClear();
 });
+
+const asPlatform = (platform: NodeJS.Platform) => vi.spyOn(process, "platform", "get").mockReturnValue(platform);
 
 const started = async (host = fakeHost(), onData = vi.fn(), onExit = vi.fn()) => {
     const promise = startSession({ onData, onExit, spawn, startHost: () => host.handle });
@@ -108,6 +117,29 @@ describe("a running session", () => {
         host.stop();
 
         expect(onExit).toHaveBeenCalledWith({ crashed: true, exitCode: null });
+        // A POSIX shell hangs up by itself when its pty goes.
+        expect(hangUp).not.toHaveBeenCalled();
+    });
+
+    it("on Windows, ends the shell of a host that vanished, which nothing else would", async () => {
+        const platform = asPlatform("win32");
+        const { host } = await started();
+
+        host.stop();
+        platform.mockRestore();
+
+        expect(hangUp).toHaveBeenCalledWith(4242);
+    });
+
+    it("on Windows, leaves a shell that already ended alone", async () => {
+        const platform = asPlatform("win32");
+        const { host } = await started();
+
+        host.emit({ exitCode: 0, signal: 0, type: "exit" });
+        host.stop();
+        platform.mockRestore();
+
+        expect(hangUp).not.toHaveBeenCalled();
     });
 
     it("ignores input and output after the end", async () => {
@@ -132,15 +164,13 @@ describe("a running session", () => {
         expect(host.handle.kill).toHaveBeenCalledTimes(1);
     });
 
-    it("killNow signals the shell before it returns, then kills the host", async () => {
-        const signal = vi.spyOn(process, "kill").mockImplementation(() => true);
+    it("killNow hangs up the shell before it returns, then kills the host", async () => {
         const { host, session } = await started();
 
         session.killNow();
 
-        expect(signal).toHaveBeenCalledWith(4242, "SIGHUP");
+        expect(hangUp).toHaveBeenCalledWith(4242);
         expect(host.handle.kill).toHaveBeenCalled();
-        signal.mockRestore();
     });
 });
 

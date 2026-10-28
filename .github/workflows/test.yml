@@ -570,8 +570,70 @@ jobs:
             - name: "Run the terminal end-to-end tests"
               run: "pnpm --filter @neore/desktop exec playwright test --grep terminal"
 
+    # The Windows half of the desktop check, for the terminal: its shell runs on ConPTY, which only a Windows
+    # runner can exercise. It builds the addon and the bundles, runs the terminal's unit and real-pty tests, packages
+    # the app unpacked (node-pty must sit outside the asar there) and launches the real shell for the terminal
+    # end-to-end cases. Nothing is signed or published.
+    desktop-windows-check:
+        name: "Desktop check (windows-x64)"
+        if: "needs.files-changed.outputs.desktop == 'true'"
+        needs: "files-changed"
+        runs-on: "windows-latest"
+        timeout-minutes: 60
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              with:
+                  node-version: "22"
+                  skip-playwright: "true"
+
+            - name: "Install Rust (stable)"
+              uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # master
+              with:
+                  toolchain: "stable"
+
+            - name: "Cache Rust build"
+              uses: "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6" # v2.9.2
+              with:
+                  workspaces: "packages/device-core-node -> target"
+
+            - name: "Build the device-execution addon"
+              run: "pnpm --filter @neore/device-core-node run build"
+
+            - name: "Bundle the main process and preloads"
+              run: "pnpm --filter @neore/desktop run build"
+
+            - name: "Smoke-test the bundles and the addon"
+              run: "pnpm --filter @neore/desktop run smoke"
+
+            # The shell on a real ConPTY: the host process, the session and the shell selection. The rest of the
+            # desktop unit tests are not part of this job yet.
+            - name: "Run the terminal unit and pseudo-terminal tests"
+              run: "pnpm --filter @neore/desktop exec vitest run src/terminal"
+
+            - name: "Package the unpacked Windows app"
+              run: "pnpm --filter @neore/desktop exec electron-builder --dir --win --x64 --config electron-builder.yml --publish never"
+
+            - name: "Check node-pty sits outside the asar"
+              run: "pnpm --filter @neore/desktop run smoke:artifacts -- --unpacked-only"
+
+            # Launches the real shell: a terminal opens, runs a command and survives a reload, and every
+            # shell is gone after quit. Only the terminal cases run here; the rest of the suite is not green yet.
+            - name: "Run the terminal end-to-end tests"
+              run: "pnpm --filter @neore/desktop exec playwright test --grep terminal"
+
     test-required-check:
-        needs: ["files-changed", "test", "e2e", "device-core", "desktop-package", "desktop-macos-check"]
+        needs: ["files-changed", "test", "e2e", "device-core", "desktop-package", "desktop-macos-check", "desktop-windows-check"]
         name: "Check Test Run"
         # `always()` and nothing else: a job skipped by its own `if:` reports
         # success to a ruleset, so gating this one on its needs' results made the

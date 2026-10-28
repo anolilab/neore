@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { readFolder, resolveShell, shellEnvironment, terminalAvailability } from "./shell";
 
 const NOT_AVAILABLE = /not available/u;
+const TOO_OLD = /Windows 10 version 1903/u;
 
 describe("terminalAvailability", () => {
     it("is offered on macOS and Linux", () => {
@@ -14,11 +15,25 @@ describe("terminalAvailability", () => {
         expect(terminalAvailability("linux")).toEqual({ available: true });
     });
 
-    it("is cleanly unavailable on Windows, with a reason to show", () => {
-        const windows = terminalAvailability("win32");
+    it("is offered on Windows builds that have ConPTY", () => {
+        expect(terminalAvailability("win32", "10.0.22631")).toEqual({ available: true });
+        expect(terminalAvailability("win32", "10.0.18362")).toEqual({ available: true });
+    });
 
-        expect(windows.available).toBe(false);
-        expect("reason" in windows && windows.reason).toMatch(NOT_AVAILABLE);
+    it("is cleanly unavailable on an older Windows, with a reason to show", () => {
+        for (const release of ["10.0.17763", "6.1.7601", "", "garbage"]) {
+            const windows = terminalAvailability("win32", release);
+
+            expect(windows.available).toBe(false);
+            expect("reason" in windows && windows.reason).toMatch(TOO_OLD);
+        }
+    });
+
+    it("is cleanly unavailable on a platform without a pseudo-terminal, with a reason to show", () => {
+        const other = terminalAvailability("freebsd");
+
+        expect(other.available).toBe(false);
+        expect("reason" in other && other.reason).toMatch(NOT_AVAILABLE);
     });
 });
 
@@ -41,6 +56,30 @@ describe("resolveShell", () => {
 
     it("fails clearly when no shell exists", () => {
         expect(() => resolveShell({}, () => undefined, "linux", exists())).toThrow("no shell was found");
+    });
+
+    describe("on Windows", () => {
+        const powershell = String.raw`D:\Win\System32\WindowsPowerShell\v1.0\powershell.exe`;
+        const env = { ComSpec: String.raw`D:\Win\System32\cmd.exe`, SHELL: "/usr/bin/bash", SystemRoot: String.raw`D:\Win` };
+
+        it("starts Windows PowerShell by absolute path, ignoring $SHELL", () => {
+            expect(resolveShell(env, () => "/bin/zsh", "win32", exists(powershell, "/usr/bin/bash"))).toEqual({ args: ["-NoLogo"], file: powershell });
+        });
+
+        it("falls back to %ComSpec%, then to cmd.exe under the system folder", () => {
+            expect(resolveShell(env, () => undefined, "win32", exists(env.ComSpec))).toEqual({ args: [], file: env.ComSpec });
+            expect(resolveShell({ SystemRoot: env.SystemRoot }, () => undefined, "win32", exists(String.raw`D:\Win\System32\cmd.exe`)).file).toBe(String.raw`D:\Win\System32\cmd.exe`);
+        });
+
+        it("does not take a %ComSpec% that is not an absolute path to a file", () => {
+            const system = String.raw`D:\Win\System32\cmd.exe`;
+
+            expect(resolveShell({ ComSpec: "cmd.exe", SystemRoot: env.SystemRoot }, () => undefined, "win32", exists(system)).file).toBe(system);
+        });
+
+        it("fails clearly when there is no shell", () => {
+            expect(() => resolveShell(env, () => undefined, "win32", exists())).toThrow("no shell was found");
+        });
     });
 });
 
@@ -81,7 +120,8 @@ describe("readFolder", () => {
         const link = path.join(directory, "link");
 
         mkdirSync(target);
-        symlinkSync(target, link);
+        // A junction needs no privilege on Windows, where a directory symlink does; elsewhere the type is ignored.
+        symlinkSync(target, link, "junction");
 
         expect(readFolder(`${target}/`)).toBe(target);
         expect(readFolder(link)).toBe(target);
