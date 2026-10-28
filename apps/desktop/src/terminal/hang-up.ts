@@ -1,6 +1,8 @@
 import { execFile } from "node:child_process";
 import path from "node:path";
 
+import { windowsSystem32 } from "./shell";
+
 /**
  * Ends a shell the way a terminal closing would. POSIX shells get `SIGHUP`. Windows has no hangup and `process.kill` can only
  * terminate the one process, so the whole tree is ended by `taskkill`, which is also what the pseudoconsole closing would do to
@@ -11,7 +13,7 @@ import path from "node:path";
 export const hangUp = (pid: number, platform: NodeJS.Platform = process.platform, run: typeof execFile = execFile): void => {
     try {
         if (platform === "win32") {
-            const taskkill = path.win32.join(process.env.SystemRoot ?? String.raw`C:\Windows`, "System32", "taskkill.exe");
+            const taskkill = path.win32.join(windowsSystem32(), "taskkill.exe");
 
             run(taskkill, ["/pid", String(pid), "/t", "/f"], { timeout: 3000, windowsHide: true }, () => {});
         } else {

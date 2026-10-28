@@ -29,16 +29,21 @@ const isExecutable = (file: string): boolean => {
     }
 };
 
+/** `%SystemRoot%\\System32`. A relative root would resolve against the app's working directory, so only an absolute one is believed. */
+export const windowsSystem32 = (env: NodeJS.ProcessEnv = process.env): string => {
+    const configuredRoot = env.SystemRoot ?? env.SYSTEMROOT;
+    const systemRoot = configuredRoot !== undefined && path.win32.isAbsolute(configuredRoot) ? configuredRoot : String.raw`C:\Windows`;
+
+    return path.win32.join(systemRoot, "System32");
+};
+
 /**
  * Windows has no `$SHELL` and no login shell. Windows PowerShell comes with every Windows 10 and later and is what the
  * system's own terminal opens, so it goes first; `%ComSpec%` (cmd.exe) is the fallback. Both are looked up by absolute
  * path under `%SystemRoot%`, never by name on the `PATH`, which a folder in the user's `PATH` could shadow.
  */
 const resolveWindowsShell = (env: NodeJS.ProcessEnv, executable: (file: string) => boolean): { args: string[]; file: string } => {
-    const configuredRoot = env.SystemRoot ?? env.SYSTEMROOT;
-    // A relative root would resolve against the app's working directory, so only an absolute one is believed.
-    const systemRoot = configuredRoot !== undefined && path.win32.isAbsolute(configuredRoot) ? configuredRoot : String.raw`C:\Windows`;
-    const system32 = path.win32.join(systemRoot, "System32");
+    const system32 = windowsSystem32(env);
     const powershell = path.win32.join(system32, "WindowsPowerShell", "v1.0", "powershell.exe");
 
     if (executable(powershell)) {

@@ -6,6 +6,7 @@ const TASKKILL = /\/System32\/taskkill\.exe$/u;
 
 afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
 });
 
 describe("hangUp", () => {
@@ -34,6 +35,17 @@ describe("hangUp", () => {
         expect(args).toEqual(["/pid", "4242", "/t", "/f"]);
         expect(options).toMatchObject({ timeout: 3000, windowsHide: true });
         expect(callback).toBeTypeOf("function");
+    });
+
+    it("never runs a taskkill found relative to the working directory", () => {
+        vi.stubEnv("SystemRoot", "Windows");
+        const run = vi.fn();
+
+        hangUp(4242, "win32", run as never);
+
+        const [file] = run.mock.calls[0] as [string];
+
+        expect(file).toBe(String.raw`C:\Windows\System32\taskkill.exe`);
     });
 
     it("does not fail when the shell is already gone", () => {
