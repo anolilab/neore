@@ -18115,19 +18115,19 @@
     {
       "file": "chat/streaming/persistent/host",
       "kind": "write",
-      "line": 39,
+      "line": 37,
       "reason": "\"createHostStream\" is not a registered function"
     },
     {
       "file": "chat/streaming/persistent/host",
       "kind": "write",
-      "line": 84,
+      "line": 78,
       "reason": "\"extendHostStream\" is not a registered function"
     },
     {
       "file": "chat/streaming/persistent/host",
       "kind": "write",
-      "line": 100,
+      "line": 94,
       "reason": "\"appendHostChunk\" is not a registered function"
     },
     {

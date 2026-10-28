@@ -51,6 +51,9 @@ const { floodAllowed, hostIngestHttpAction, readCappedBody, resetFloodGuard, res
 const { applyHostEvents, reapHostStreams } = await import("./ingest");
 const { createHostStream } = await import("../chat/streaming/persistent/host");
 const { getHostSession, listHostSessions } = await import("./functions");
+const agentThreads = await import("../agent/threads");
+const composite = await import("../chat/composite");
+const { measureDb } = await import("../../test/db-cost");
 const { HOST_STREAM_IDLE_MS, HOST_TURN_MAX_MS, INGEST_FLOOD_LIMIT_PER_MINUTE } = await import("./lib/constants");
 
 registerModule(registry, "lib_shard_routes", await import("../lib/shard-routes"));
@@ -277,6 +280,91 @@ describe("a host turn", () => {
             expect(active).toMatchObject({ hostState: "running", streamId: stream?._id });
             expect(body).toMatchObject({ hostState: "running", reasoning: "hm", status: "streaming", text: "Looking at the code" });
         }
+    });
+
+    it("reads back every host state through the live queries a second client uses", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const stateOf = async () => {
+            const active = (await as(ownerId).query(streaming.getActiveStreamForThread as never, { threadId } as never)) as Record<string, any> | null;
+
+            if (active === null) {
+                return { active, body: null };
+            }
+
+            const body = (await as(ownerId).query(streaming.getStreamBody as never, { streamId: active.streamId } as never)) as Record<string, any>;
+
+            return { active, body };
+        };
+
+        // `accepted`: the backend stored the turn and queued the call (the remote-control slice does this).
+        const prompt = (await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("messages", {
+                    message: { content: "hi", role: "user" },
+                    order: 0,
+                    status: "success",
+                    stepOrder: 0,
+                    text: "hi",
+                    threadId,
+                    tool: false,
+                    userId: ownerId,
+                }),
+        )) as string;
+
+        await harness.run(async (ctx: any) => {
+            await createHostStream(ctx, { hostState: "accepted", messageId: prompt, threadId: threadId as never, turnId: "t1", userId: ownerId }, Date.now());
+        });
+
+        const accepted = await stateOf();
+
+        expect(accepted.active).toMatchObject({ hostState: "accepted" });
+        expect(accepted.body).toMatchObject({ hostState: "accepted", status: "pending" });
+
+        // The first event the agent sends moves it to `running`.
+        await turn(device, threadId, "t1", 0, [TEXT("x")]);
+
+        const running = await stateOf();
+
+        expect(running.body).toMatchObject({ hostState: "running", status: "streaming" });
+
+        // The end: no active stream any more, and the row says `ended`.
+        await turn(device, threadId, "t1", 1, [{ kind: "turn_end", reason: "finished" }]);
+
+        const ended = await stateOf();
+
+        expect(ended.active).toBeNull();
+        expect(await streamField("t1", "hostState")).toBe("ended");
+
+        // A local prompt is `received` as soon as its turn_start lands.
+        await turn(device, threadId, "t2", 0, [START("again")]);
+
+        const received = await stateOf();
+
+        expect(received.body).toMatchObject({ hostState: "received", status: "pending" });
+    });
+
+    it("returns a host thread through the procedures the sidebar and the thread page use", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await expect(as(ownerId).query(agentThreads.getThread as never, { threadId } as never)).resolves.toMatchObject({ runner: "host" });
+
+        const list = (await as(ownerId).query(composite.getThreadListData as never, {} as never)) as { threads?: Record<string, any>[] };
+
+        expect(JSON.stringify(list)).toContain(threadId);
+    });
+
+    it("writes the stream row only when something it shows changed, not on every text post", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("a")]);
+
+        const { cost } = await measureDb(async () => await turn(device, threadId, "t1", 2, [TEXT("b")]));
+
+        // The read by turn id, and no patch: `getActiveStreamForThread` is live over this table.
+        expect(cost.byTable.persistentStreams ?? 0, JSON.stringify(cost.byTable)).toBe(1);
     });
 
     it("drops a redelivered post and fills a gap from the 409", async () => {
