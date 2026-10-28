@@ -1616,10 +1616,16 @@ mod tests {
             "that server is not paired with this computer"
         );
         // The stand-in link has no ssh master behind it, so nothing is offered to run.
+        // (Windows has no multiplexed connection at all, and says so instead.)
+        let reason = if cfg!(unix) {
+            "is not up"
+        } else {
+            "needs a multiplexed connection"
+        };
         assert!(state
             .host_terminal(host_id("terminal").as_str())
             .unwrap_err()
-            .contains("is not up"));
+            .contains(reason));
 
         // Attaching to a connection never makes one, and says where to make it.
         assert_eq!(
@@ -1629,7 +1635,11 @@ mod tests {
         assert!(state
             .host_terminal_attach(host_id("terminal").as_str())
             .unwrap_err()
-            .contains("is not up; connect it in the device window first"));
+            .contains(if cfg!(unix) {
+                "is not up; connect it in the device window first"
+            } else {
+                "needs a multiplexed connection"
+            }));
 
         let _ = stdfs::remove_dir_all(dir);
     }

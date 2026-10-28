@@ -1286,11 +1286,16 @@ mod tests {
 
         let args = build_args(&target, &paths(), Session::Terminal);
         let options = option_values(&args);
+        let known_hosts = format!(
+            "UserKnownHostsFile=\"{}\"",
+            Path::new("/data").join("ssh").join("known_hosts").display()
+        );
+        let global_hosts = format!("GlobalKnownHostsFile={NULL_DEVICE}");
 
         for expected in [
             "StrictHostKeyChecking=yes",
-            "UserKnownHostsFile=\"/data/ssh/known_hosts\"",
-            "GlobalKnownHostsFile=/dev/null",
+            known_hosts.as_str(),
+            global_hosts.as_str(),
             "ClearAllForwardings=yes",
             "PasswordAuthentication=no",
             // Nothing is asked on a terminal, and the agent is not handed to a server's shell.
@@ -1315,7 +1320,7 @@ mod tests {
         assert!(args.contains(&"-t".to_owned()));
         assert!(!args.contains(&"-T".to_owned()));
         assert!(args.windows(2).any(|pair| pair == ["-e", "none"]));
-        assert!(args.windows(2).any(|pair| pair == ["-F", "/dev/null"]));
+        assert!(args.windows(2).any(|pair| pair == ["-F", NULL_DEVICE]));
         assert_eq!(&args[args.len() - 2..], ["--", "build.example.com"]);
     }
 
