@@ -16416,13 +16416,13 @@
     {
       "file": "acp/lib/import",
       "kind": "write",
-      "line": 77,
+      "line": 83,
       "reason": "\"openImport\" is not a registered function"
     },
     {
       "file": "acp/lib/import",
       "kind": "write",
-      "line": 188,
+      "line": 197,
       "reason": "\"applyImportTurns\" is not a registered function"
     },
     {

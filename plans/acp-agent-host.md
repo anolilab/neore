@@ -602,6 +602,7 @@ saved sessions as threads, with ids derived from (agent key, native session id).
   with every `session_open`, together with the agent's own session id (`nativeSessionId`).
 - `session/list` is asked with the approved folder as `cwd`, and any entry for another working directory is dropped (the agent may
   ignore the filter). At most 10 pages and 200 sessions.
+  An import lists the folder's sessions again and refuses an id that is not in the list, since the id comes from the window.
 - `session/load` replays the history as `session/update`s (`acp/replay.ts`): each user message starts a turn, the agent's text and
   reasoning that follow belong to it. Tool calls are not kept, as for a live turn (a reply row holds text and reasoning). Text is
   masked with the user's variable values, cut to the backend's limits, and the first 1000 turns are kept. The window is told how many

@@ -54,7 +54,7 @@ const { getHostSession, listHostSessions } = await import("./functions");
 const agentThreads = await import("../agent/threads");
 const composite = await import("../chat/composite");
 const { measureDb } = await import("../../test/db-cost");
-const { HOST_STREAM_IDLE_MS, HOST_TURN_MAX_MS, INGEST_FLOOD_LIMIT_PER_MINUTE } = await import("./lib/constants");
+const { HOST_STREAM_IDLE_MS, HOST_TURN_MAX_MS, INGEST_FLOOD_LIMIT_PER_MINUTE, MAX_IMPORT_TURNS } = await import("./lib/constants");
 
 registerModule(registry, "lib_shard_routes", await import("../lib/shard-routes"));
 registerModule(registry, "lib_shard_housekeeping", await import("../lib/shard-housekeeping"));
@@ -431,6 +431,48 @@ describe("importing an agent's saved session", () => {
         const { threadId } = await importSession(device, TURNS);
 
         await expect(turn(device, threadId, "t9", 0, [START()])).resolves.toMatchObject({ status: 403 });
+    });
+
+    it("takes the capability report the host builds from a handshake, on a live session and on an import", async () => {
+        const device = await pair(ownerId);
+        // The literal `reportFromHandshake` (apps/desktop/src/acp/capabilities.ts) produces.
+        const capabilities = {
+            groups: { sessions: { listNative: { degradation: "none", supported: true }, load: { reason: "not_offered", supported: false } } },
+            reportedAt: 1_793_179_919_354,
+            version: 1,
+        };
+        const live = await ingest(device, { events: [{ ...SESSION_OPEN, capabilities, nativeSessionId: "native-9" }], sessionId: "live-9" });
+        const imported = await importSession(device, TURNS, { capabilities, nativeSessionId: "native-10" });
+
+        expect(live.status).toBe(200);
+        expect(imported.opened.status).toBe(200);
+
+        const stored = await sessionRows();
+
+        expect(stored.map((session) => session.capabilities)).toEqual([capabilities, capabilities]);
+    });
+
+    it("writes none of a post that would pass the cap", async () => {
+        const device = await pair(ownerId);
+        const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId: "import-1" });
+
+        // A session that already holds all but one of the turns it may take.
+        await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.acpSessions.findMany({});
+
+            await ctx.db.patch(page[0]._id, { importedTurns: MAX_IMPORT_TURNS - 1 });
+        });
+
+        await expect(
+            ingest(device, {
+                events: [IMPORT_TURN("a", "b"), IMPORT_TURN("c", "d")],
+                firstSeq: MAX_IMPORT_TURNS - 1,
+                sessionId: "import-1",
+                threadId: json.threadId,
+            }),
+        ).resolves.toMatchObject({ status: 403 });
+        expect(await messagesOf(json.threadId)).toHaveLength(0);
+        expect(await sessionRows()).toMatchObject([{ importedTurns: MAX_IMPORT_TURNS - 1 }]);
     });
 
     it("takes no more turns than the cap", async () => {
