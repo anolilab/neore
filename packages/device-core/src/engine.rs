@@ -7,7 +7,7 @@
 //! envelope verification, the approval rules, root confinement, sandboxing,
 //! output caps and the audit log — happens in this crate.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs as stdfs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -32,8 +32,10 @@ use crate::ssh::{HostLink, SshPaths, Target};
 use crate::store::{self, Host, Pairing, Settings};
 
 mod hosts;
+mod reconnect;
 
 pub use hosts::{HostProbe, HostSpec, HostUpdate};
+pub use reconnect::ReconnectView;
 
 pub use crate::actions::{cap_utf8, now_ms, MAX_OUTPUT_BYTES};
 
@@ -97,7 +99,8 @@ pub struct DeviceState {
 }
 
 #[cfg(test)]
-type Connector = Box<dyn Fn(&Target) -> Result<Arc<dyn HostLink>, String> + Send + Sync>;
+type Connector =
+    Box<dyn Fn(&Target) -> Result<Arc<dyn HostLink>, reconnect::ConnectError> + Send + Sync>;
 
 /// What the engine keeps for the servers it reaches over SSH.
 struct SshState {
@@ -109,6 +112,13 @@ struct SshState {
     changed_prompts: Arc<Mutex<std::collections::HashSet<String>>>,
     /// Live connections by the server's device id.
     connections: Mutex<HashMap<String, Arc<dyn HostLink>>>,
+    /// The servers (by device id) with a connection attempt running: at most one each, the person's or the keeper's.
+    attempting: Mutex<HashSet<String>>,
+    /// The servers the person connected and has not disconnected, with where their reconnecting stands.
+    keeps: Mutex<HashMap<String, crate::lifecycle::Keep>>,
+    /// The launches of `neore-host` this computer started on each server, so the next session can stop the ones a
+    /// lost connection left running. Never a host this computer did not start.
+    launches: Mutex<HashMap<String, Vec<String>>>,
     /// Counts explicit disconnects, so a connect that was waiting (on a passphrase, say) can tell the user ended
     /// connections meanwhile and not install its link over that.
     disconnects: std::sync::atomic::AtomicU64,
@@ -155,8 +165,11 @@ impl DeviceState {
             sink: Arc::from(sink),
             ssh: SshState {
                 binary: binary.to_owned(),
+                attempting: Mutex::default(),
                 bundle: Err("this build ships no host software".to_owned()),
                 changed_prompts: Arc::default(),
+                keeps: Mutex::default(),
+                launches: Mutex::default(),
                 connections: Mutex::default(),
                 disconnects: std::sync::atomic::AtomicU64::new(0),
                 paths: SshPaths::under(data_dir, sandbox::home().as_deref()),

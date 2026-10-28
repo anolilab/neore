@@ -250,13 +250,40 @@ Where S4 departs from the text above:
 - The Windows desktop cannot install yet: it has no ControlMaster and no askpass (S3), and the bundle has no
   Windows server target.
 
-**S5 — Lifecycle.** Backoff, Retry, ownership-based stop, stale-process
+**S5 — Lifecycle (built).** Backoff, Retry, ownership-based stop, stale-process
 detection, ControlMaster reuse.
 - Acceptance: drop the network for 60 s and restore it; the host reconnects with
   at most two `ssh` processes alive at any moment (the test counts them); a host
   process the desktop did not start survives a disconnect. On a Windows runner,
   record whether ControlMaster works. If it does not, Windows uses one ssh
   process per host with no multiplexing, and the UI says so.
+
+Where S5 departs from the text above:
+- The wait before an attempt is 2, 4, 8, 16, 32 s (cap 60 s), at most 5 attempts per 10 minutes, one attempt per server
+  at a time, 45 s each (`lifecycle.rs`). A failure that waiting cannot fix (changed key, refused login, a passphrase
+  nobody gave, a missing install) skips the backoff and waits for Retry. A background attempt asks nobody anything: no
+  passphrase prompt, no trust prompt. "Retry" is the existing connect channel; the local window offers "Retry now" and
+  "Stop reconnecting" while it waits.
+- A server is kept only after the person connected it, and until they disconnect it. Nothing connects at startup.
+- Reuse of the master: a reconnect closes the dead session first, and ends its master (`ssh -O exit`, which talks to the
+  local socket and so works with the network down) only when ssh gave the connection up (exit status 255 or unknown). A
+  host that merely ended leaves a healthy master for the new session. So an old and a new session are never alive
+  together, and the measured maximum over a 60 s outage is two ssh processes (the master and one session).
+- Ownership (§6): the host is started `--stdio --launch <id>` and files `~/.neore/host/run/<id>.pid`. The new session
+  sends a `reap` frame (protocol 2) naming the launches this computer started and lost; the host stops one only if its
+  pid's command line carries that id. A host it finds that was not named (another computer's session, one left before a
+  desktop restart) is counted and left alone. The list of launches is in memory: after a restart of the desktop a stale
+  host is not recognised as ours and ends when the server drops its dead connection.
+- Agent forwarding (the stable socket path deferred by S3): with it on, the host links the session's `SSH_AUTH_SOCK` from
+  `<run>/agent.sock` (replaced atomically by each launch) and sets that path for itself and its children. A sandboxed
+  `shell_run` gets no agent either way (its environment is an allowlist); the path serves unsandboxed commands and
+  S7's agents.
+- The per-launch log of §6 (`~/.neore/host/logs/<launch-id>.log`) and the pid files in the upgrade's prune (S4's note) are
+  not built.
+- Windows: `ssh::MULTIPLEXING` is false there, so each server has one ssh process and no master, and the local window
+  says so. Whether Win32 OpenSSH could multiplex is NOT yet recorded: the CI step "Measure ssh ControlMaster (Windows)"
+  (`tests/ssh-mux-windows.ps1`) writes the result to the job summary of the `device-core` job on `windows-latest`, and
+  this note is to be updated from its first run. It was not run where this was written.
 
 **S6 — Files on the host.** File tree and reads over the device file actions.
 Folder download as one tar stream.

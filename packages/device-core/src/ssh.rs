@@ -19,7 +19,7 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -31,12 +31,13 @@ use sha2::{Digest, Sha256};
 
 use crate::frame::{read_frame, write_frame};
 use crate::host::PROTOCOL_VERSION;
+use crate::launch::Reaped;
 
 /// The `neore-host` version the desktop expects to find in `~/.neore/host/<version>/` (S4 uploads it).
 pub const HOST_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// How long a connection may take once nobody is being asked anything.
-const CONNECT_PATIENCE: Duration = Duration::from_secs(6 * 60);
+pub const CONNECT_PATIENCE: Duration = Duration::from_secs(6 * 60);
 
 /// A Unix socket path holds 104 bytes on macOS. ssh appends a dot and 16 random characters to the control path
 /// while it binds, and `%C` is 40 hex characters.
@@ -53,6 +54,10 @@ const KEY_TYPES: [&str; 5] = [
     "ecdsa-sha2-nistp521",
     "ssh-rsa",
 ];
+
+/// Whether this computer's `ssh` can share one connection between sessions (`ControlMaster`). Windows' OpenSSH
+/// has no Unix sockets to multiplex over, so a server there gets one ssh process of its own and the window says so.
+pub const MULTIPLEXING: bool = cfg!(unix);
 
 #[cfg(unix)]
 const NULL_DEVICE: &str = "/dev/null";
@@ -284,8 +289,7 @@ fn build_args(target: &Target, paths: &SshPaths, session: Session) -> Vec<String
         option("ProxyCommand=false".into());
     }
 
-    // Windows' OpenSSH has no multiplexing.
-    if cfg!(unix) {
+    if MULTIPLEXING {
         option(
             if terminal {
                 "ControlMaster=no"
@@ -371,16 +375,20 @@ pub fn control_args(target: &Target, paths: &SshPaths, operation: &str) -> Vec<S
 }
 
 /// The command the server's shell runs: a clean environment (no `SSH_AUTH_SOCK` unless forwarding is on, no
-/// inherited variable of any kind) and the host binary. `binary` is trusted text; production passes
-/// [`default_binary`].
-pub fn remote_command(forward_agent: bool, binary: &str) -> String {
+/// inherited variable of any kind) and the host binary, named `launch` (see `launch.rs`). `binary` is trusted text;
+/// production passes [`default_binary`]. `launch` is a [`crate::launch::is_launch_id`].
+pub fn remote_command(forward_agent: bool, binary: &str, launch: &str) -> String {
+    debug_assert!(crate::launch::is_launch_id(launch));
+
     let agent = if forward_agent {
         " SSH_AUTH_SOCK=\"$SSH_AUTH_SOCK\""
     } else {
         ""
     };
 
-    format!("exec env -i HOME=\"$HOME\" PATH=/usr/bin:/bin LANG=C.UTF-8{agent} {binary} --stdio")
+    format!(
+        "exec env -i HOME=\"$HOME\" PATH=/usr/bin:/bin LANG=C.UTF-8{agent} {binary} --stdio --launch {launch}"
+    )
 }
 
 pub fn default_binary() -> String {
@@ -593,7 +601,26 @@ pub enum SshError {
     HostMissing {
         target: String,
     },
+    /// The server could not be reached or did not answer: worth another try later.
+    Unreachable(String),
     Other(String),
+}
+
+impl SshError {
+    /// Whether trying again later can help. A changed key, a refused login or a missing install need the person.
+    pub fn retryable(&self) -> bool {
+        matches!(self, SshError::Unreachable(_))
+    }
+
+    /// What ssh said when a connection failed: a refused login needs a key or an agent, anything else is the
+    /// network's or the server's.
+    fn from_connect_failure(message: String) -> Self {
+        if message.contains("refused the login") {
+            SshError::Other(message)
+        } else {
+            SshError::Unreachable(message)
+        }
+    }
 }
 
 impl fmt::Display for SshError {
@@ -614,7 +641,7 @@ impl fmt::Display for SshError {
                 f,
                 "neore-host {HOST_VERSION} is not installed on {target}. Install it from the server's settings (\"Install host software\")."
             ),
-            SshError::Other(message) => f.write_str(message),
+            SshError::Other(message) | SshError::Unreachable(message) => f.write_str(message),
         }
     }
 }
@@ -643,7 +670,7 @@ pub(crate) fn check_host_key(
     interact: &dyn Interact,
 ) -> Result<(), SshError> {
     let spec = target.host_spec();
-    let presented = scan_keys(target).map_err(SshError::Other)?;
+    let presented = scan_keys(target).map_err(SshError::Unreachable)?;
     let pinned = pinned_keys(paths, &spec);
 
     if pinned.is_empty() {
@@ -867,7 +894,7 @@ pub struct RemoteOutcome {
     pub truncated: bool,
 }
 
-type Reply = Result<RemoteOutcome, String>;
+type Reply = Result<Value, String>;
 type Pending = Arc<Mutex<HashMap<u64, Sender<Reply>>>>;
 
 /// What the engine needs of a connection to a server: the seam that lets its tests stand in for ssh.
@@ -876,6 +903,20 @@ pub trait HostLink: Send + Sync {
     fn close(&self);
     /// Ends the multiplexed master of this server and with it every session on it: for when none is wanted.
     fn exit_master(&self);
+    /// The id this session started `neore-host` under, when it did.
+    fn launch_id(&self) -> Option<&str> {
+        None
+    }
+    /// Whether the master under a closed session may be wedged (the network went away) and should not be reused.
+    /// A host that merely ended leaves a healthy master, which the next session shares. Asked after [`Self::close`].
+    fn master_suspect(&self) -> bool {
+        false
+    }
+    /// Asks the host to stop the launches `ids` that this computer started earlier and left running, leaving every
+    /// other host process alone.
+    fn reap(&self, _ids: &[String]) -> Result<Reaped, String> {
+        Ok(Reaped::default())
+    }
     fn hello(&self) -> &Hello;
     fn is_alive(&self) -> bool;
     /// Where the session goes; `None` for a stand-in that goes nowhere.
@@ -890,6 +931,9 @@ pub struct HostConnection {
     child: Mutex<Child>,
     exit_master: Vec<String>,
     hello: Hello,
+    launch_id: String,
+    /// The ssh child's exit code, read once when the session is closed: `i64::MIN` while unknown.
+    exit_code: AtomicI64,
     next_id: AtomicU64,
     pending: Pending,
     stdin: Mutex<ChildStdin>,
@@ -906,15 +950,28 @@ impl HostConnection {
         binary: &str,
         interact: &Arc<dyn Interact>,
     ) -> Result<HostConnection, SshError> {
+        Self::connect_within(target, paths, binary, interact, CONNECT_PATIENCE)
+    }
+
+    /// [`Self::connect`], giving up (and killing the ssh child) after `patience` once nobody is being asked
+    /// anything: a reconnect in the background must not hold the server for minutes.
+    pub fn connect_within(
+        target: &Target,
+        paths: &SshPaths,
+        binary: &str,
+        interact: &Arc<dyn Interact>,
+        patience: Duration,
+    ) -> Result<HostConnection, SshError> {
         target.validate().map_err(SshError::Other)?;
         paths.prepare().map_err(SshError::Other)?;
         check_host_key(target, paths, interact.as_ref())?;
 
+        let launch_id = crate::install::launch_id();
         let mut command = Command::new("ssh");
 
         command
             .args(ssh_args(target, paths))
-            .arg(remote_command(target.forward_agent, binary))
+            .arg(remote_command(target.forward_agent, binary, &launch_id))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -998,7 +1055,7 @@ impl HostConnection {
             match hello_receiver.recv_timeout(Duration::from_millis(100)) {
                 Ok(Ok(hello)) => break Ok(hello),
                 Ok(Err(reason)) => break Err(reason),
-                Err(_) if started.elapsed() > CONNECT_PATIENCE => {
+                Err(_) if started.elapsed() > patience => {
                     break Err("the server did not answer in time".to_owned());
                 }
                 Err(_) => {
@@ -1040,7 +1097,9 @@ impl HostConnection {
                     });
                 }
 
-                return Err(SshError::Other(explain(target, &reason, &stderr)));
+                return Err(SshError::from_connect_failure(explain(
+                    target, &reason, &stderr,
+                )));
             }
         };
 
@@ -1049,6 +1108,8 @@ impl HostConnection {
             child: Mutex::new(child),
             exit_master: control_args(target, paths, "exit"),
             hello,
+            launch_id,
+            exit_code: AtomicI64::new(i64::MIN),
             next_id: AtomicU64::new(1),
             pending,
             stderr,
@@ -1065,25 +1126,16 @@ impl HostConnection {
     pub fn target(&self) -> &Target {
         &self.target
     }
-}
 
-impl HostLink for HostConnection {
-    fn hello(&self) -> &Hello {
-        &self.hello
-    }
-
-    fn is_alive(&self) -> bool {
-        self.alive.load(Ordering::SeqCst)
-    }
-
-    fn run(&self, params: &Value, wait: Duration) -> Result<RemoteOutcome, String> {
+    /// Sends one request and waits at most `wait` for its answer.
+    fn request(&self, op: &str, params: &Value, wait: Duration) -> Result<Value, String> {
         if !self.is_alive() {
             return Err("the connection to the server was lost".into());
         }
 
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let (sender, receiver) = channel();
-        let frame = json!({ "kind": "request", "id": id, "op": "run", "params": params });
+        let frame = json!({ "kind": "request", "id": id, "op": op, "params": params });
 
         self.pending.lock().unwrap().insert(id, sender);
 
@@ -1113,11 +1165,52 @@ impl HostLink for HostConnection {
             }
         }
     }
+}
+
+impl HostLink for HostConnection {
+    fn hello(&self) -> &Hello {
+        &self.hello
+    }
+
+    fn is_alive(&self) -> bool {
+        self.alive.load(Ordering::SeqCst)
+    }
+
+    fn run(&self, params: &Value, wait: Duration) -> Result<RemoteOutcome, String> {
+        let result = self.request("run", params, wait)?;
+
+        serde_json::from_value::<RemoteOutcome>(result)
+            .map_err(|error| format!("the host's answer was not understood: {error}"))
+    }
+
+    fn launch_id(&self) -> Option<&str> {
+        Some(&self.launch_id)
+    }
+
+    fn master_suspect(&self) -> bool {
+        let code = self.exit_code.load(Ordering::SeqCst);
+
+        code == i64::MIN || code == 255
+    }
+
+    fn reap(&self, ids: &[String]) -> Result<Reaped, String> {
+        let result = self.request("reap", &json!({ "launches": ids }), Duration::from_secs(30))?;
+
+        serde_json::from_value::<Reaped>(result)
+            .map_err(|error| format!("the host's answer was not understood: {error}"))
+    }
 
     fn close(&self) {
         self.alive.store(false, Ordering::SeqCst);
 
         let mut child = self.child.lock().unwrap();
+
+        // What ssh ended with, if it already did: 255 is its own failure (the connection died), anything else the
+        // host's. Once killed, the code says nothing.
+        if let Ok(Some(status)) = child.try_wait() {
+            self.exit_code
+                .store(status.code().map_or(i64::MIN, i64::from), Ordering::SeqCst);
+        }
 
         let _ = child.kill();
         let _ = child.wait();
@@ -1128,7 +1221,7 @@ impl HostLink for HostConnection {
     }
 
     fn exit_master(&self) {
-        if cfg!(unix) {
+        if MULTIPLEXING {
             let _ = Command::new("ssh")
                 .args(&self.exit_master)
                 .stdin(Stdio::null())
@@ -1162,8 +1255,7 @@ fn route(pending: &Pending, frame: &[u8]) {
         return;
     };
     let reply = if value["ok"] == true {
-        serde_json::from_value::<RemoteOutcome>(value["result"].clone())
-            .map_err(|error| format!("the host's answer was not understood: {error}"))
+        Ok(value["result"].clone())
     } else {
         Err(value["error"]
             .as_str()
@@ -1543,14 +1635,15 @@ mod tests {
 
     #[test]
     fn the_remote_command_starts_from_an_empty_environment() {
-        let command = remote_command(false, &default_binary());
+        let launch = "0123456789abcdef0123456789abcdef";
+        let command = remote_command(false, &default_binary(), launch);
 
         assert_eq!(
             command,
-            format!("exec env -i HOME=\"$HOME\" PATH=/usr/bin:/bin LANG=C.UTF-8 \"$HOME/.neore/host/{HOST_VERSION}/neore-host\" --stdio")
+            format!("exec env -i HOME=\"$HOME\" PATH=/usr/bin:/bin LANG=C.UTF-8 \"$HOME/.neore/host/{HOST_VERSION}/neore-host\" --stdio --launch {launch}")
         );
         assert!(!command.contains("SSH_AUTH_SOCK"));
-        assert!(remote_command(true, "x").contains("SSH_AUTH_SOCK=\"$SSH_AUTH_SOCK\""));
+        assert!(remote_command(true, "x", launch).contains("SSH_AUTH_SOCK=\"$SSH_AUTH_SOCK\""));
     }
 
     #[test]
@@ -1713,8 +1806,8 @@ mod tests {
         let outcome = receiver.try_recv().unwrap().unwrap();
 
         assert_eq!(
-            (outcome.status.as_str(), outcome.output.as_deref()),
-            ("completed", Some("hi"))
+            (outcome["status"].as_str(), outcome["output"].as_str()),
+            (Some("completed"), Some("hi"))
         );
         assert!(pending.lock().unwrap().is_empty());
     }

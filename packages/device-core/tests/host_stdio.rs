@@ -172,7 +172,7 @@ fn the_host_says_what_it_can_sandbox_before_anything_else() {
     let confines = device_core::sandbox::policy_for_call(&support, false, false, &[], None).is_ok();
 
     assert_eq!(hello["kind"], "hello");
-    assert_eq!(hello["protocol"], 1);
+    assert_eq!(hello["protocol"], 2);
     assert_eq!(hello["platform"], device_core::actions::platform());
     assert_eq!(hello["sandbox"]["available"], confines);
 }
