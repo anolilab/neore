@@ -25,10 +25,11 @@ import type { HttpActionCtx, Infer } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { isDeviceSignature } from "../devices/lib/signing";
 import { vCapabilityReport } from "../lib/capability-report";
+import { isUploadId } from "../lib/chat-upload-staging";
 import { inShard } from "../lib/http-shard";
 import { threadShardFor } from "../lib/thread-shard";
 import { MAX_LENGTH } from "../lib/validators";
-import { MAX_EVENTS_PER_POST, MAX_INGEST_BYTES, INGEST_FLOOD_LIMIT_PER_MINUTE } from "./lib/constants";
+import { INGEST_FLOOD_LIMIT_PER_MINUTE, MAX_EVENTS_PER_POST, MAX_INGEST_BYTES, MAX_MEDIA_PER_TURN } from "./lib/constants";
 import { vHostEvent } from "./validators";
 
 const json = (body: unknown, status: number): Response => Response.json(body, { status });
@@ -62,8 +63,8 @@ export const floodAllowed = (address: string, now: number): boolean => {
 
 export const resetFloodGuard = (): void => floodWindows.clear();
 
-/** The body as text, or null past `maxBytes`. Counted while reading: `Content-Length` is only the sender's word. */
-export const readCappedBody = async (request: Request, maxBytes: number): Promise<string | null> => {
+/** The body's bytes, or null past `maxBytes`. Counted while reading: `Content-Length` is only the sender's word. */
+export const readCappedBytes = async (request: Request, maxBytes: number): Promise<Uint8Array | null> => {
     const declared = Number(request.headers.get("content-length"));
 
     if (Number.isFinite(declared) && declared > maxBytes) {
@@ -75,7 +76,7 @@ export const readCappedBody = async (request: Request, maxBytes: number): Promis
     const reader = request.body?.getReader();
 
     if (!reader) {
-        return "";
+        return new Uint8Array();
     }
 
     const parts: Uint8Array[] = [];
@@ -107,7 +108,14 @@ export const readCappedBody = async (request: Request, maxBytes: number): Promis
         offset += part.byteLength;
     }
 
-    return new TextDecoder().decode(bytes);
+    return bytes;
+};
+
+/** The body as text, or null past `maxBytes`. */
+export const readCappedBody = async (request: Request, maxBytes: number): Promise<string | null> => {
+    const bytes = await readCappedBytes(request, maxBytes);
+
+    return bytes === null ? null : new TextDecoder().decode(bytes);
 };
 
 // ─── 2. the device's owner ─────────────────────────────────────────────────────
@@ -118,7 +126,7 @@ const ownerCache = new Map<string, { expiresAt: number; ownerId: string }>();
 
 export const resetOwnerCache = (): void => ownerCache.clear();
 
-const deviceOwner = async (context: HttpActionCtx, deviceId: string, now: number): Promise<string | null> => {
+export const deviceOwner = async (context: HttpActionCtx, deviceId: string, now: number): Promise<string | null> => {
     const hit = ownerCache.get(deviceId);
 
     if (hit !== undefined && hit.expiresAt > now) {
@@ -184,6 +192,12 @@ const withValidReport = (raw: unknown, deviceId: string): unknown => {
     return { ...raw, capabilities: unknownCapabilityReport(0) };
 };
 
+type MediaEvent = Extract<Infer<typeof vHostEvent>, { kind: "media" }>;
+
+const withoutStorage = ({ contentType, kind, name, reference, size, uploadId }: MediaEvent): MediaEvent => {
+    return { kind, name, reference, size, ...(contentType !== undefined && { contentType }), ...(uploadId !== undefined && { uploadId }) };
+};
+
 interface Post {
     close: boolean;
     events: Infer<typeof vHostEvent>[];
@@ -223,10 +237,71 @@ const readPost = (payload: Record<string, unknown>, deviceId: string): Post | nu
             return null;
         }
 
-        events.push(parsed.value);
+        // `fileId` and `storageKey` name stored bytes: only the backend sets them (`resolveMedia`), never a device.
+        events.push(parsed.value.kind === "media" ? withoutStorage(parsed.value) : parsed.value);
+    }
+
+    if (events.filter((event) => event.kind === "media").length > MAX_MEDIA_PER_TURN) {
+        return null;
     }
 
     return { close: payload.close === true, events, firstSeq, sessionId: payload.sessionId, threadId, turnId };
+};
+
+/**
+ * Finalizes the uploads the post's `media` events name, for the device's owner, and returns the events as they are
+ * stored: an upload that finalized is attached (`fileId`, `storageKey`); anything else stays a name and a size.
+ * Only events the stream does not have yet are finalized: a redelivered post, or one the backend answers `gap` to,
+ * must not spend an upload that is meant for the resend. A finalize that fails never fails the post (the desktop
+ * would stop posting the whole turn): the file is shown as not attached.
+ */
+const resolveMedia = async (context: HttpActionCtx, ownerId: string, post: Post): Promise<Post["events"]> => {
+    const wanted = post.events.some((event) => event.kind === "media" && event.uploadId !== undefined);
+
+    if (!wanted || post.turnId === undefined || post.firstSeq === undefined) {
+        return post.events.map((event) => (event.kind === "media" ? withoutUpload(event) : event));
+    }
+
+    const next = await context.runQuery(internal.acp.upload.hostStreamNext, { turnId: post.turnId, userId: ownerId });
+    const firstFresh = next === null ? 0 : next - post.firstSeq;
+    const gap = next !== null && post.firstSeq > next;
+    const resolved: Post["events"] = [];
+
+    // One at a time: a finalize holds the whole file in memory (`FINALIZE_MAX_BYTES`), and the host posts one file per
+    // request for the same reason.
+    for (const [index, event] of post.events.entries()) {
+        if (event.kind !== "media") {
+            resolved.push(event);
+        } else if (event.uploadId === undefined || index < firstFresh || gap || !isUploadId(event.uploadId)) {
+            resolved.push(withoutUpload(event));
+        } else {
+            resolved.push(await finalizeMedia(context, ownerId, event, event.uploadId));
+        }
+    }
+
+    return resolved;
+};
+
+/** The event as it is stored once its upload is finalized, or without a file when that fails for any reason. */
+const finalizeMedia = async (context: HttpActionCtx, ownerId: string, event: MediaEvent, uploadId: string): Promise<MediaEvent> => {
+    try {
+        const stored = await context.runAction(internal.acp.upload.finalizeHostUpload, {
+            filename: event.name.slice(0, MAX_LENGTH.short),
+            uploadId,
+            userId: ownerId,
+        });
+
+        return stored === null
+            ? withoutUpload(event)
+            : { ...withoutUpload(event), contentType: stored.mediaType, fileId: stored.fileId, storageKey: stored.storageKey };
+    } catch {
+        // A thrown finalize must not become a 5xx: the host retries those for ever.
+        return withoutUpload(event);
+    }
+};
+
+const withoutUpload = ({ contentType, kind, name, reference, size }: MediaEvent): MediaEvent => {
+    return { kind, name, reference, size, ...(contentType !== undefined && { contentType }) };
 };
 
 const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: string, payload: string, signature: string): Promise<Response> => {
@@ -250,7 +325,7 @@ const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: 
 
     const result = await context.runMutation(internal.acp.ingest.applyHostEvents, {
         deviceId,
-        events: post.events,
+        events: await resolveMedia(context, ownerId, post),
         sessionId: post.sessionId,
         ...(post.close && { close: true }),
         ...(post.firstSeq !== undefined && { firstSeq: post.firstSeq }),

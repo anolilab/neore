@@ -24,6 +24,16 @@ export interface PermissionRequestEvent {
 
 export type PermissionOutcomeKind = "allowed" | "cancelled" | "declined";
 
+/** A file the reply refers to (`media.ts`): uploaded and named by `uploadId`, or, over the size cap, only named. */
+export interface MediaEvent {
+    contentType: string;
+    kind: "media";
+    name: string;
+    reference: string;
+    size: number;
+    uploadId?: string;
+}
+
 /** One file a turn wrote: its path inside the approved folder (never absolute) and its line counts. */
 export interface ChangedFile {
     added: number;
@@ -45,6 +55,7 @@ export interface TurnEndEvent {
 }
 
 export type HostEvent =
+    | MediaEvent
     | PermissionRequestEvent
     | { kind: "child_end"; spawnId: string; status: "cancelled" | "completed" | "failed"; text?: string }
     | { id: string; kind: "child_tool"; spawnId: string; status: string; title: string; toolKind: string }

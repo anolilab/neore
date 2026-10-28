@@ -25,6 +25,8 @@ pub enum Domain {
     Progress,
     /// A batch of a coding agent's turn output, posted by the main process straight to the backend.
     Turn,
+    /// One request to the backend's device upload route (`/hosts/uploads`), signed over what the route checks it against.
+    Upload,
 }
 
 impl Domain {
@@ -35,6 +37,7 @@ impl Domain {
             Domain::Manifest => "neore-device:manifest:v1\n",
             Domain::Progress => "neore-device:progress:v1\n",
             Domain::Turn => "neore-device:turn:v1\n",
+            Domain::Upload => "neore-device:upload:v1\n",
         }
     }
 }
@@ -214,6 +217,28 @@ mod tests {
             sign(SECRET, Domain::Turn, r#"{"v":1,"kind":"turn"}"#),
             "8b75ddba17829fcc48f06be01cd218becd5ebe06877e6b92800587cba4a946b4"
         );
+        assert_eq!(
+            sign(SECRET, Domain::Upload, r#"{"v":1,"kind":"upload"}"#),
+            "2eb42cf81aa660042f1289aa45be5f1625595dbe5575ddde914114cde70a0d1d"
+        );
+    }
+
+    #[test]
+    fn an_upload_signature_is_not_a_turn_signature() {
+        let payload = r#"{"v":1,"kind":"upload"}"#;
+
+        assert!(!verify(
+            SECRET,
+            Domain::Turn,
+            payload,
+            &sign(SECRET, Domain::Upload, payload)
+        ));
+        assert!(!verify(
+            SECRET,
+            Domain::Upload,
+            payload,
+            &sign(SECRET, Domain::Turn, payload)
+        ));
     }
 
     #[test]

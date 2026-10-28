@@ -50,3 +50,48 @@ export const MAX_IMPORT_TURNS_PER_POST = 25;
 /** A turn's summary (plans/acp-agent-host.md §4.9): files listed, and the patch as text. The host keeps its own smaller patch cap to fit a post. */
 export const MAX_SUMMARY_FILES = 200;
 export const MAX_PATCH_CHARS = 256 * 1024;
+
+// ─── Files a host agent writes (plans/acp-agent-host.md §4.8) ──────────────────────────────────────────────────
+//
+// PROVISIONAL, NOT MEASURED. The plan sets the cap and the types from a sample of real agent output before S8
+// starts; none could be taken when this was written. They are chosen to sit inside what a chat attachment may be
+// (`lib/document-limits.ts`: images 20 MB) and to cover what an agent plausibly leaves in a folder: a chart, a
+// screenshot, a report. Change them here and in `packages/device-core/src/media.rs`, which holds the same numbers
+// (`media-limits.test.ts` fails when the two disagree), once a sample exists.
+
+/** An image up to this size is shown in the message; a larger one is offered as a file with its size. */
+export const HOST_MEDIA_MAX_INLINE_IMAGE_BYTES = 8 * 1024 * 1024;
+
+/** A file above this is not uploaded: the reply names it and says how large it is. */
+export const HOST_MEDIA_MAX_BYTES = 20 * 1024 * 1024;
+
+/**
+ * What the device upload route accepts. A strict subset of the chat allowlist: no SVG, HTML, script, stylesheet or
+ * XML, which a browser would run. The desktop decides the same list from a file's bytes and name (`media.rs`).
+ */
+export const HOST_MEDIA_MIME_TYPES: ReadonlyArray<string> = [
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+    "text/plain",
+    "text/markdown",
+    "application/json",
+];
+
+/** The types a message shows as an image. */
+export const HOST_MEDIA_IMAGE_MIME_TYPES: ReadonlyArray<string> = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+
+/** The device upload route (`acp/upload-http.ts`). */
+export const HOST_UPLOAD_PATH = "/hosts/uploads";
+
+/** The largest `PATCH` body the device upload route buffers (the desktop sends 5 MiB chunks, TUS's usual size). */
+export const HOST_UPLOAD_MAX_CHUNK_BYTES = 5 * 1024 * 1024;
+
+/** Request headers of the device upload route: the signed payload (base64url JSON) and its signature (hex). */
+export const HOST_UPLOAD_PAYLOAD_HEADER = "neore-device-request";
+export const HOST_UPLOAD_SIGNATURE_HEADER = "neore-device-signature";
+
+/** Media events one post may carry: a reply refers to a handful of files, and each is uploaded before the post. */
+export const MAX_MEDIA_PER_TURN = 8;

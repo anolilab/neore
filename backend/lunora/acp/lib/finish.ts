@@ -11,7 +11,16 @@ import { endHostStream, isLiveStream } from "../../chat/streaming/persistent/hos
 import { createAcpCancelCall } from "../../devices/lib/acp-call";
 import { streamLogger } from "../../lib/logger";
 import type { HostChanges } from "./changes";
-import { appendChildEvent, appendToTranscript, buildHostReply, emptyTranscript, isChildEvent, isTranscriptFull, type HostReplyReason } from "./reply";
+import {
+    addMediaToTranscript,
+    appendChildEvent,
+    appendToTranscript,
+    buildHostReply,
+    emptyTranscript,
+    isChildEvent,
+    isTranscriptFull,
+    type HostReplyReason,
+} from "./reply";
 import { sessionOfThread, touchSession } from "./sessions";
 import { withdrawPermissionAnswers } from "./withdraw";
 
@@ -41,6 +50,19 @@ const appendChunks = (transcript: ReturnType<typeof emptyTranscript>, chunks: Ch
             appendToTranscript(transcript, chunk);
         } else if (isChildEvent(chunk.event)) {
             appendChildEvent(transcript, chunk.event);
+        }
+
+        if (chunk.event?.kind === "media") {
+            const { contentType, fileId, name, reference, size, storageKey } = chunk.event;
+
+            addMediaToTranscript(transcript, {
+                name,
+                reference,
+                size,
+                ...(contentType !== undefined && { contentType }),
+                ...(fileId !== undefined && { fileId }),
+                ...(storageKey !== undefined && { storageKey }),
+            });
         }
     }
 };

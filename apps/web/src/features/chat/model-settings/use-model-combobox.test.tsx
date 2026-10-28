@@ -18,7 +18,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@neore/backend/api", () => {
-    return { api: { chat: { functions: { updateThread: {} } } } };
+    return { api: { chat: { agent_switch: { switchThreadAgent: { name: "switch" } }, functions: { updateThread: {} } } } };
 });
 
 vi.mock("@tanstack/react-query", () => {
@@ -30,6 +30,13 @@ vi.mock("@tanstack/react-query", () => {
         useQuery: () => {
             return { data: hoisted.thread.current };
         },
+        useQueryClient: () => {
+            return {
+                fetchQuery: async () => {
+                    return { coldStartCostly: false };
+                },
+            };
+        },
     };
 });
 
@@ -39,6 +46,11 @@ vi.mock("@/lib/lunora/crpc", () => {
             return {
                 chat: {
                     agent_switch: {
+                        previewAgentSwitch: {
+                            queryOptions: () => {
+                                return {};
+                            },
+                        },
                         switchThreadAgent: {
                             mutationOptions: () => {
                                 return { mutationFn: hoisted.switchAgent };
@@ -55,8 +67,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                 },
             };
         },
-        useLunoraActionOptions: () => {
-            return { mutationFn: vi.fn() };
+        useLunoraActionOptions: (reference: { name?: string }) => {
+            return { mutationFn: reference.name === "switch" ? hoisted.switchAgent : vi.fn() };
         },
     };
 });

@@ -124,6 +124,8 @@ const stampStagedObjects = (bucket: R2UploadBucket): R2UploadBucket =>
 export interface UserUploadOptions {
     /** Asked on every request that would create an upload; a response refuses it as is. */
     admitCreate: () => Promise<Response | undefined>;
+    /** Narrows the types a create may declare below what its purpose allows (the device route's list). */
+    allowedTypes?: ReadonlyArray<string>;
     bucket: R2UploadBucket;
     /** Called with the staging key of every upload created. */
     onCreated: (key: string) => Promise<void>;
@@ -139,13 +141,13 @@ export interface UserUploadOptions {
  * `filename` and `onCreate` close over the caller too, so `@lunora/storage`'s
  * per-request `stateScope` would not save the build.
  */
-export const createUserUploadHandler = ({ admitCreate, bucket, onCreated, purpose, userId }: UserUploadOptions): UploadHandler =>
+export const createUserUploadHandler = ({ admitCreate, allowedTypes, bucket, onCreated, purpose, userId }: UserUploadOptions): UploadHandler =>
     createUploadHandler({
         authorize: async ({ method }) => method !== "POST" || ((await admitCreate()) ?? true),
         maxFileSize: MAX_REFERENCE_MEDIA_BYTES,
         maxFileSizeFor: ({ contentType }) => sizeCapFor(purpose, normalizeContentType(contentType)),
         storage: createR2BindingUploadStorage(stampStagedObjects(bucket), {
-            allowMIME: [...allowedTypesFor(purpose)],
+            allowMIME: [...(allowedTypes ?? allowedTypesFor(purpose))],
             filename: (file) => stagingKeyFor(userId, file.id, purpose ?? "chat"),
             onCreate: async (file) => {
                 await onCreated(file.name);
@@ -163,7 +165,7 @@ export const isUploadBucket = (value: unknown): value is R2UploadBucket =>
     "resumeMultipartUpload" in value &&
     typeof value.resumeMultipartUpload === "function";
 
-const refusal = (status: number, message: string, headers: Record<string, string> = {}): Response =>
+export const refusal = (status: number, message: string, headers: Record<string, string> = {}): Response =>
     Response.json({ error: { message } }, { headers: { ...headers, "Tus-Resumable": "1.0.0" }, status });
 
 /**
@@ -173,6 +175,56 @@ const refusal = (status: number, message: string, headers: Record<string, string
  */
 export const refuseDeclaredPurpose = (request: Request): Response | undefined =>
     new URL(request.url).searchParams.has("purpose") ? refusal(400, "The upload purpose cannot be set on the public API.") : undefined;
+
+export interface ServeUploadOptions {
+    /** A public API key's scope check; runs first on every request and may refuse it. */
+    admit?: (context: HttpActionCtx, request: Request) => Promise<Response | undefined>;
+    /** See {@link UserUploadOptions.allowedTypes}. */
+    allowedTypes?: ReadonlyArray<string>;
+    bucket: R2UploadBucket;
+    /** The purpose of a create, or `undefined` for a request continuing an upload already created. */
+    purpose: UploadPurpose | undefined;
+    request: Request;
+    scheduler: NonNullable<HttpActionCtx["scheduler"]>;
+    /** The caller's shard (`inShard`). */
+    shardCtx: HttpActionCtx;
+    /** Whoever the request was authenticated as: every key and all state is under this user. */
+    userId: string;
+}
+
+/**
+ * Serve one upload request for `userId` on that user's shard, whoever proved the identity (a session, an API key
+ * or a device signature). `admit` runs first on every request; a create is then charged against `uploads/create`,
+ * and its staging key gets the same reap a finalize would have made moot.
+ */
+export const serveUserUpload = async ({ admit, allowedTypes, bucket, purpose, request, scheduler, shardCtx, userId }: ServeUploadOptions): Promise<Response> => {
+    const refused = await admit?.(shardCtx, request);
+
+    if (refused) {
+        return refused;
+    }
+
+    const handler = createUserUploadHandler({
+        admitCreate: async () => {
+            const limit = await shardCtx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { identifier: userId, key: "uploads/create" });
+
+            return limit.ok
+                ? undefined
+                : refusal(429, "Too many uploads. Try again shortly.", { "Retry-After": String(Math.max(1, Math.ceil((limit.retryAfter ?? 0) / 1000))) });
+        },
+        ...(allowedTypes && { allowedTypes }),
+        bucket,
+        // The reap: if nobody finalizes this upload, its object is deleted
+        // after the TTL. A finalized (or never-finished) one makes it a no-op.
+        onCreated: async (key) => {
+            await scheduler.runAfter(STAGING_TTL_MS, internal.lib.storage_cleanup.deleteObjects, { keys: [key] });
+        },
+        purpose,
+        userId,
+    });
+
+    return await handler.fetch(request);
+};
 
 /**
  * Serve one upload request for whoever `context.auth` resolved, on that
@@ -208,33 +260,7 @@ export const handleUploadRequest = async (
 
     const { scheduler } = context;
 
-    return await inShard(context, userId, async (shardCtx) => {
-        const refused = await admit(shardCtx, request);
-
-        if (refused) {
-            return refused;
-        }
-
-        const handler = createUserUploadHandler({
-            admitCreate: async () => {
-                const limit = await shardCtx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { identifier: userId, key: "uploads/create" });
-
-                return limit.ok
-                    ? undefined
-                    : refusal(429, "Too many uploads. Try again shortly.", { "Retry-After": String(Math.max(1, Math.ceil((limit.retryAfter ?? 0) / 1000))) });
-            },
-            bucket,
-            // The reap: if nobody finalizes this upload, its object is deleted
-            // after the TTL. A finalized (or never-finished) one makes it a no-op.
-            onCreated: async (key) => {
-                await scheduler.runAfter(STAGING_TTL_MS, internal.lib.storage_cleanup.deleteObjects, { keys: [key] });
-            },
-            purpose,
-            userId,
-        });
-
-        return await handler.fetch(request);
-    });
+    return await inShard(context, userId, async (shardCtx) => await serveUserUpload({ admit, bucket, purpose, request, scheduler, shardCtx, userId }));
 };
 
 export { type UploadPurpose } from "./chat-upload-staging";

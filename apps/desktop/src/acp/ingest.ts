@@ -31,6 +31,8 @@ import type { ChildEvent } from "./children";
 import type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, TurnSummary } from "./host-events";
 import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, childHostEvents, endReasonOf } from "./host-events";
 import type { ImportIo } from "./import-post";
+import type { MediaOptions } from "./media";
+import { collectMedia, imageReferences } from "./media";
 import { SessionLink } from "./session-link";
 import type { ChannelHost } from "./turn-channel";
 import { TurnChannel } from "./turn-channel";
@@ -40,6 +42,8 @@ export type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionReque
 export { KEEPALIVE_MS, POST_INTERVAL_MS } from "./turn-channel";
 
 const REQUEST_TIMEOUT_MS = 20_000;
+/** The most of a turn's text kept for its references; a reply is capped at the same length on the backend. */
+const MAX_TURN_TEXT_CHARS = 256_000;
 const REFUSED_STATUSES = new Set([400, 403, 413]);
 /** A run of 401s this long and this many is a device the backend no longer knows, not a clock blip. */
 const REVOKED_AFTER_MS = 60_000;
@@ -54,6 +58,8 @@ export interface PosterOptions {
     endpoint: URL;
     fetch?: typeof fetch;
     log?: (message: string) => void;
+    /** The files a turn's reply refers to (`media.ts`). Without it, a reply's images are text. */
+    media?: Omit<MediaOptions, "deviceId" | "fetch" | "log" | "now">;
     now?: () => number;
     random?: () => number;
     /** `DeviceCore.signTurn`. */
@@ -83,8 +89,13 @@ export class HostPoster implements SessionObserver {
 
     /** Sessions that ended locally and wait for their turns to drain before the backend is told. */
     private readonly closing = new Set<string>();
+    /** What each session shows the backend, to name its agent and folder when a reply's files are read. */
+    private readonly infos = new Map<string, HostSessionInfo>();
 
     private readonly sessions = new Map<string, SessionLink>();
+
+    /** The text of each running turn, kept for the references its reply makes (capped). */
+    private readonly texts = new Map<string, string>();
 
     private stopped = false;
 
@@ -102,6 +113,7 @@ export class HostPoster implements SessionObserver {
             endedByBackend: (channel) => this.options.cancelTurn?.(channel.sessionId, channel.turnId),
             finished: (channel) => {
                 this.channels.delete(channel.turnId);
+                this.texts.delete(channel.turnId);
                 this.persist();
                 this.closeWhenDrained(channel.sessionId);
             },
@@ -116,6 +128,8 @@ export class HostPoster implements SessionObserver {
     // ─── From the sessions ──────────────────────────────────────────────────
 
     public sessionOpened(sessionId: string, info: HostSessionInfo, threadId?: string): void {
+        this.infos.set(sessionId, info);
+
         const link = new SessionLink(sessionId, capSessionInfo(info), {
             bound: (id, thread) => this.bindThread(id, thread),
             deviceId: () => this.options.deviceId(),
@@ -200,7 +214,17 @@ export class HostPoster implements SessionObserver {
     }
 
     public text(_sessionId: string, turnId: string, delta: string): void {
-        this.channels.get(turnId)?.append("text", delta);
+        const channel = this.channels.get(turnId);
+
+        if (channel === undefined) {
+            return;
+        }
+
+        channel.append("text", delta);
+
+        if (this.options.media !== undefined) {
+            this.texts.set(turnId, ((this.texts.get(turnId) ?? "") + delta).slice(0, MAX_TURN_TEXT_CHARS));
+        }
     }
 
     public thought(_sessionId: string, turnId: string, delta: string): void {
@@ -227,8 +251,69 @@ export class HostPoster implements SessionObserver {
         this.channels.get(turnId)?.enqueue({ kind: "permission_resolved", outcome, requestId: capRequestId(requestId) });
     }
 
-    public turnEnded(_sessionId: string, turnId: string, reason: StopReason | "failed", error?: string, summary?: TurnSummary): void {
-        this.channels.get(turnId)?.end(endReasonOf(reason), error, summary);
+    public turnEnded(sessionId: string, turnId: string, reason: StopReason | "failed", error?: string, summary?: TurnSummary): void {
+        const channel = this.channels.get(turnId);
+
+        if (channel === undefined) {
+            return;
+        }
+
+        const text = this.texts.get(turnId) ?? "";
+        const info = this.infos.get(sessionId);
+
+        this.texts.delete(turnId);
+
+        // A turn that failed leaves no reply to show files in; one without an image reference has nothing to read.
+        if (reason === "failed" || this.stopped || info === undefined || this.options.media === undefined || imageReferences(text).length === 0) {
+            channel.end(endReasonOf(reason), error, summary);
+
+            return;
+        }
+
+        // Never rejects: every failure inside is caught, and the turn ends whatever happens.
+        // eslint-disable-next-line unicorn/prefer-await -- turnEnded is synchronous, and the call has no rejection to await
+        this.attachMediaThenEnd(channel, info, text, endReasonOf(reason), error, summary).catch(() => {});
+    }
+
+    /**
+     * Reads and uploads the files the reply refers to, queues their events and only then the end of the turn: the
+     * channel takes nothing after it. The turn stays open meanwhile (its keepalive keeps the backend's reaper off).
+     * Whatever goes wrong, the turn still ends.
+     */
+    private async attachMediaThenEnd(
+        channel: TurnChannel,
+        info: HostSessionInfo,
+        text: string,
+        reason: "cancelled" | "failed" | "finished",
+        error?: string,
+        summary?: TurnSummary,
+    ): Promise<void> {
+        const { media } = this.options;
+
+        try {
+            if (media !== undefined) {
+                const events = await collectMedia(
+                    {
+                        ...media,
+                        deviceId: this.options.deviceId,
+                        ...(this.options.fetch && { fetch: this.options.fetch }),
+                        ...(this.options.log && { log: this.options.log }),
+                        now: () => this.now(),
+                    },
+                    info.agentKey,
+                    info.folderId,
+                    text,
+                );
+
+                for (const event of events) {
+                    channel.enqueue(event);
+                }
+            }
+        } catch (error_) {
+            this.options.log?.(`[acp-host] a reply's files could not be attached: ${(error_ as Error).name}`);
+        } finally {
+            channel.end(reason, error, summary);
+        }
     }
 
     /** What an import needs to post: the same signing, endpoint and clock the turns use. */

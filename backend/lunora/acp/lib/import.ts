@@ -128,7 +128,11 @@ const writeTurn = async (ctx: MutationCtx, session: Doc<"acpSessions">, threadId
         promptMessageId = messages[0]?._id as Id<"messages"> | undefined;
     }
 
-    const reply = buildHostReply({ agentKey: session.agentKey, reason: "finished", transcript: { children: [], reasoning: turn.reasoning ?? "", text: turn.text } });
+    const reply = buildHostReply({
+        agentKey: session.agentKey,
+        reason: "finished",
+        transcript: { children: [], media: [], reasoning: turn.reasoning ?? "", text: turn.text },
+    });
 
     if (reply) {
         await addMessagesHandler(ctx, { messages: [reply], ...(promptMessageId && { promptMessageId }), threadId, userId: session.userId });

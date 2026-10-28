@@ -38,3 +38,18 @@ export const chatMarkdownComponents: Components = {
     table: ChatTable,
     ul: autoDirection("ul"),
 };
+
+type ImageProps = ComponentProps<"img"> & ExtraProps;
+
+/**
+ * An image the reply wrote as Markdown, shown as the Markdown it is. A coding agent's text is untrusted: its
+ * `![](https://…/?q=…)` would be fetched by the reader's browser (a way to leak what the agent read), and a path
+ * names no image the page can load. The files an agent shows are separate attachments the backend saved
+ * (`backend/lunora/acp/`), so nothing is lost by not loading these.
+ */
+const LiteralImage: FC<ImageProps> = ({ alt, src }) => (
+    <span className="text-muted-foreground break-all">{`![${alt ?? ""}](${typeof src === "string" ? src : ""})`}</span>
+);
+
+/** {@link chatMarkdownComponents} for a coding agent's reply on the user's computer: no Markdown image is loaded. */
+export const hostMarkdownComponents: Components = { ...chatMarkdownComponents, img: LiteralImage };

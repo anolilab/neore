@@ -14,7 +14,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@neore/ui/components/ai-elements/reasoning";
 import { Source, Sources, SourcesContent, SourcesTrigger } from "@neore/ui/components/ai-elements/sources";
 import AnimatedTiles from "@neore/ui/components/animated-tiles";
-import { chatMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
+import { chatMarkdownComponents, hostMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
 import type { FileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { getFileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
@@ -29,6 +29,7 @@ import type { SandboxOutputs } from "../types/sandbox";
 import { createCitationMarker, safeHttpUrl } from "../utils/citation-marker";
 import cn from "../utils/cn";
 import { resolveDeviceToolName } from "../utils/device-tool-name";
+import { isHostRunText } from "../utils/host-run-text";
 import { mcpToolMetaKey, resolveMcpToolName } from "../utils/mcp-tool-name";
 import { getPageContextInfo } from "../utils/page-context";
 import { SANDBOX_FILE_TOOL_TYPES, sandboxOutputsOf } from "../utils/sandbox-files";
@@ -83,7 +84,7 @@ interface MessageContentProps {
         /** Files a code-execution or shell run saved to its output directory (`utils/sandbox-files.ts`). */
         SandboxFiles?: FC<SandboxOutputs>;
         SourceGroup?: FC<{ sources: (SourceDocumentPart | SourceUrlPart)[] }>;
-        Text?: FC<{ isAnimating: boolean; text: string }>;
+        Text?: FC<{ isAnimating: boolean; literalImages?: boolean; text: string }>;
         /** Rendered for a tool call awaiting the user's approval (`state: "approval-requested"`). */
         ToolApproval?: FC<{ part: ToolPart }>;
         ToolCall?: FC<{ part: ToolPart }>;
@@ -106,7 +107,7 @@ interface MessageContentProps {
  * Default Text renderer using Streamdown. Math and mermaid load on demand
  * (`useStreamdownPlugins`), so they stay off the startup path.
  */
-const DefaultText: FC<{ isAnimating: boolean; text: string }> = memo(({ isAnimating, text }) => {
+const DefaultText: FC<{ isAnimating: boolean; literalImages?: boolean; text: string }> = memo(({ isAnimating, literalImages, text }) => {
     const plugins = useStreamdownPlugins(text);
     // The user's code / diagram themes and code-block display (Appearance settings), provided by the app.
     const { codeLineNumbers, mermaid, shikiTheme } = useStreamdownAppearance();
@@ -116,7 +117,7 @@ const DefaultText: FC<{ isAnimating: boolean; text: string }> = memo(({ isAnimat
         <Streamdown
             className="streamdown-animate"
             codeBlockMaxHeight="none"
-            components={chatMarkdownComponents}
+            components={literalImages ? hostMarkdownComponents : chatMarkdownComponents}
             isAnimating={isAnimating}
             lineNumbers={codeLineNumbers}
             mermaid={mermaid}
@@ -851,7 +852,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                         default: {
                             renderedParts.push(
                                 <div data-markdown-part={isAnimating ? undefined : textPart.text} key={key}>
-                                    <Text isAnimating={isAnimating} text={textPart.text} />
+                                    <Text isAnimating={isAnimating} literalImages={isHostRunText(textPart)} text={textPart.text} />
                                 </div>,
                             );
                         }

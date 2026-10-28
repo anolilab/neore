@@ -20,6 +20,7 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { HOST_RUN_METADATA } from "@neore/chat-ui/utils/host-run-text";
 import type { StreamSpeaker } from "@neore/chat-ui/utils/stream-line";
 import { parseStreamLine } from "@neore/chat-ui/utils/stream-line";
 import { Message, MessageContent as MessageContentWrapper } from "@neore/ui/components/ai-elements/message";
@@ -675,14 +676,15 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
             // soon as answer text arrives.
             parts: [
                 ...(displayReasoning ? [{ text: displayReasoning, type: "reasoning" }] : []),
-                ...(displayText ? [{ text: displayText, type: "text" }] : []),
+                // A coding agent's text is untrusted: its Markdown images are not loaded (`chat-ui/utils/host-run-text.ts`).
+                ...(displayText ? [{ text: displayText, type: "text", ...(hostState !== undefined && { providerMetadata: HOST_RUN_METADATA }) }] : []),
             ] as UIMessage["parts"],
             role: "assistant",
             status: isStreaming ? "streaming" : "success",
             stepOrder: 0,
             text: displayText,
         };
-    }, [streamId, isStreaming, displayText, displayReasoning, creationTime]);
+    }, [streamId, isStreaming, displayText, displayReasoning, creationTime, hostState]);
 
     // Hide if stream is done AND we have no content (error case)
     // Normal case: parent unmounts us when activeStreamId becomes null

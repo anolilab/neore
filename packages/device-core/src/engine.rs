@@ -733,6 +733,25 @@ impl DeviceState {
         Ok(envelope::sign(&pairing.secret, Domain::Turn, payload))
     }
 
+    /// Signs one request to the backend's device upload route. Only a payload that names itself an upload request
+    /// for THIS device, for one of the three methods the route takes, is signed: no general signing oracle.
+    pub fn sign_upload(&self, payload: &str) -> Result<String, String> {
+        let pairing = usable_pairing(&self.settings())?;
+        let parsed: Value =
+            serde_json::from_str(payload).map_err(|_| "the upload request is not JSON")?;
+        let method = parsed.get("method").and_then(Value::as_str);
+
+        if parsed.get("v") != Some(&json!(1))
+            || parsed.get("kind") != Some(&json!("upload"))
+            || parsed.get("deviceId").and_then(Value::as_str) != Some(pairing.device_id.as_str())
+            || !matches!(method, Some("POST" | "PATCH" | "HEAD"))
+        {
+            return Err("the request is not an upload request for this computer".into());
+        }
+
+        Ok(envelope::sign(&pairing.secret, Domain::Upload, payload))
+    }
+
     /// A manifest time later than every one issued before, so the backend never sees one go backwards.
     fn next_manifest_time(&self) -> u64 {
         let mut last = self.last_manifest_at.lock().unwrap();
@@ -1328,6 +1347,32 @@ mod tests {
             .sign_turn(r#"{"kind":"turn","deviceId":"dev1"}"#)
             .is_err());
         assert!(state.sign_turn("not json").is_err());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn only_an_upload_request_for_this_computer_is_signed_as_one() {
+        let (state, dir, _events) = paired_state("sign-upload");
+        let post = r#"{"v":1,"kind":"upload","deviceId":"dev1","method":"POST"}"#;
+
+        assert_eq!(
+            state.sign_upload(post).unwrap(),
+            envelope::sign(&turn_secret(), Domain::Upload, post)
+        );
+        assert!(state
+            .sign_upload(r#"{"v":1,"kind":"upload","deviceId":"dev1","method":"DELETE"}"#)
+            .is_err());
+        assert!(state
+            .sign_upload(r#"{"v":1,"kind":"upload","deviceId":"dev1"}"#)
+            .is_err());
+        assert!(state
+            .sign_upload(r#"{"v":1,"kind":"turn","deviceId":"dev1","method":"POST"}"#)
+            .is_err());
+        assert!(state
+            .sign_upload(r#"{"v":1,"kind":"upload","deviceId":"dev2","method":"POST"}"#)
+            .is_err());
+        assert!(state.sign_upload("not json").is_err());
 
         let _ = std::fs::remove_dir_all(&dir);
     }

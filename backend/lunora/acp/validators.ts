@@ -105,7 +105,12 @@ export const vHostEvent = v.union(
     }),
     // One of the agent's own children (plans/acp-agent-host.md §4.7). `spawnId` is the tool call that started the child
     // and keys its transcript; the host posts these only when the agent reports its children.
-    v.object({ field: v.union(v.literal("text"), v.literal("reasoning")), kind: v.literal("child_text"), spawnId: v.string().max(128), text: v.string().max(65_536) }),
+    v.object({
+        field: v.union(v.literal("text"), v.literal("reasoning")),
+        kind: v.literal("child_text"),
+        spawnId: v.string().max(128),
+        text: v.string().max(65_536),
+    }),
     v.object({
         id: v.string().max(128),
         kind: v.literal("child_tool"),
@@ -127,6 +132,20 @@ export const vHostEvent = v.union(
         status: v.union(v.literal("completed"), v.literal("failed"), v.literal("cancelled")),
         // Set only for a child that streamed no text: its completion message, whole.
         text: v.optional(v.string().max(65_536)),
+    }),
+    // A file the reply refers to, in the folder the agent was approved for. The desktop reads it (Rust, confined to
+    // the folder), uploads it over the device upload route and names it here by `uploadId`; with no `uploadId` it was
+    // over the size cap and only its name and size are kept. `fileId` and `storageKey` are the BACKEND's: the ingest
+    // finalizes the upload and sets them, and drops any a device sent, so a device cannot name stored bytes.
+    v.object({
+        contentType: v.optional(v.string().max(100)),
+        fileId: v.optional(v.string().max(64)),
+        kind: v.literal("media"),
+        name: v.string().max(255),
+        reference: v.string().max(1024),
+        size: v.number(),
+        storageKey: v.optional(v.string().max(512)),
+        uploadId: v.optional(v.string().max(64)),
     }),
     v.object({
         error: v.optional(v.string().max(1000)),

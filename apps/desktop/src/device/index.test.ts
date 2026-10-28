@@ -212,25 +212,38 @@ const makeCore = () => {
         acpPermissionAnswer: vi.fn(),
         acpPermissionAnswerBatch: vi.fn(() => 2),
         acpPermissionAnswerRemote: vi.fn(),
-        acpPermissionAsk: vi.fn(async () => "{\"outcome\":\"cancelled\"}"),
+        acpPermissionAsk: vi.fn(async () => '{"outcome":"cancelled"}'),
         acpPermissionCancelSession: vi.fn(),
         acpPermissionDecline: vi.fn(),
         acpPermissions: vi.fn(() => "[]"),
-        acpPrepare: vi.fn((): string => JSON.stringify({ callId: "c1", command: null, expiresAt: Date.now() + 60_000, refusal: "not approved on this computer" })),
-        acpSign: vi.fn((_envelope: string, _signature: string, outcome: string) => JSON.stringify({ payload: JSON.stringify({ outcome }), signature: "signed" })),
+        acpPrepare: vi.fn((): string =>
+            JSON.stringify({ callId: "c1", command: null, expiresAt: Date.now() + 60_000, refusal: "not approved on this computer" }),
+        ),
+        acpSign: vi.fn((_envelope: string, _signature: string, outcome: string) =>
+            JSON.stringify({ payload: JSON.stringify({ outcome }), signature: "signed" }),
+        ),
+        acpReadMedia: vi.fn(async () => {
+            return { kind: "", mime: "", name: "", size: 0, status: "refused" };
+        }),
         acpSpawnPlan: vi.fn((): string => {
             throw new Error("that folder is not allowed");
         }),
         acpUpdate: vi.fn(() => JSON.stringify({ agents: [], envNames: [] })),
-        acpView: vi.fn(() => JSON.stringify({ agents: [{ args: [], command: "agent", envNames: [], install: null, key: "alpha", label: "Alpha" }], envNames: [] })),
+        acpView: vi.fn(() =>
+            JSON.stringify({ agents: [{ args: [], command: "agent", envNames: [], install: null, key: "alpha", label: "Alpha" }], envNames: [] }),
+        ),
         auditTail: vi.fn(() => ["{}"]),
         denyPrompts: vi.fn(),
         execute: vi.fn(async () => JSON.stringify({ payload: "{}", signature: "s" })),
         hostConnect: vi.fn(async () => JSON.stringify({ platform: "linux" })),
         hostDisconnect: vi.fn(),
-        hostDownload: vi.fn(async (_deviceId: string, _path: string, _destination: string) => JSON.stringify({ bytes: 5, files: 1, folders: 1, host: "build-box", skipped: 0 })),
+        hostDownload: vi.fn(async (_deviceId: string, _path: string, _destination: string) =>
+            JSON.stringify({ bytes: 5, files: 1, folders: 1, host: "build-box", skipped: 0 }),
+        ),
         hostFileRead: vi.fn(async (_deviceId: string, _path: string) => JSON.stringify({ host: "build-box", path: "a.txt", text: "hi", truncated: false })),
-        hostFilesList: vi.fn(async (_deviceId: string, _path: string, _after?: string) => JSON.stringify({ entries: [], host: "build-box", next: null, path: "/srv/app", truncated: false })),
+        hostFilesList: vi.fn(async (_deviceId: string, _path: string, _after?: string) =>
+            JSON.stringify({ entries: [], host: "build-box", next: null, path: "/srv/app", truncated: false }),
+        ),
         hostForgetKey: vi.fn(),
         hostPair: vi.fn(async (_spec: string, _deviceId: string, _secret: string) => true),
         hostProbe: vi.fn(async (_spec: string) => JSON.stringify({ platform: "linux", sandboxAvailable: true, sandboxDetail: "Landlock", version: "0.1.0" })),
@@ -381,7 +394,7 @@ describe("servers over SSH", () => {
 
         await invoke(DEVICE_CHANNEL.hostPair, siteEvent(), { deviceId: "host-1", secret: "c".repeat(64), spec: { ...spec, identityFile: "/home/me/.ssh/id" } });
 
-        expect(core.hostPair).toHaveBeenCalledWith(expect.stringContaining("\"identityFile\":\"/home/me/.ssh/id\""), "host-1", "c".repeat(64));
+        expect(core.hostPair).toHaveBeenCalledWith(expect.stringContaining('"identityFile":"/home/me/.ssh/id"'), "host-1", "c".repeat(64));
     });
 
     it("reject a malformed server before the core", async () => {
@@ -403,7 +416,13 @@ describe("servers over SSH", () => {
     });
 
     it("keep removing a server and forgetting its key out of the page's reach", () => {
-        for (const channel of [LOCAL_CHANNEL.hostRemove, LOCAL_CHANNEL.hostForgetKey, LOCAL_CHANNEL.hostConnect, LOCAL_CHANNEL.hostDisconnect, LOCAL_CHANNEL.hostUpgrade]) {
+        for (const channel of [
+            LOCAL_CHANNEL.hostRemove,
+            LOCAL_CHANNEL.hostForgetKey,
+            LOCAL_CHANNEL.hostConnect,
+            LOCAL_CHANNEL.hostDisconnect,
+            LOCAL_CHANNEL.hostUpgrade,
+        ]) {
             expect(() => invoke(channel, siteEvent(), "host-1")).toThrow("device: not the device window");
         }
 
@@ -433,7 +452,10 @@ describe("servers over SSH", () => {
         await invoke(LOCAL_CHANNEL.hostFilesList, localEvent(), "host-1", "/srv/app", "m");
         await invoke(LOCAL_CHANNEL.hostFileRead, localEvent(), "host-1", "/srv/app/a.txt");
 
-        expect(core.hostFilesList.mock.calls).toEqual([["host-1", "", undefined], ["host-1", "/srv/app", "m"]]);
+        expect(core.hostFilesList.mock.calls).toEqual([
+            ["host-1", "", undefined],
+            ["host-1", "/srv/app", "m"],
+        ]);
         expect(core.hostFileRead).toHaveBeenCalledWith("host-1", "/srv/app/a.txt");
 
         await expect(invoke(LOCAL_CHANNEL.hostFilesList, localEvent(), 7, "")).rejects.toThrow("device: deviceId is invalid");
@@ -450,7 +472,7 @@ describe("servers over SSH", () => {
         // The window names the folder; it has no way to name where the archive goes.
         await expect(invoke(LOCAL_CHANNEL.hostDownload, localEvent(), "host-1", "/srv/app/my:src", "/etc/passwd")).resolves.toMatchObject({ files: 1 });
         expect(core.hostDownload).toHaveBeenCalledWith("host-1", "/srv/app/my:src", "/home/me/Downloads/app.tar");
-        expect(vi.mocked(dialog.showSaveDialog).mock.calls[0]?.at(-1)).toMatchObject({ defaultPath: path.join("/user-data", "my_src.tar") });
+        expect(vi.mocked(dialog.showSaveDialog).mock.calls[0]?.at(-1)).toMatchObject({ defaultPath: path.join(fake.userData, "my_src.tar") });
 
         vi.mocked(dialog.showSaveDialog).mockResolvedValueOnce({ canceled: true, filePath: "" });
 
@@ -458,7 +480,7 @@ describe("servers over SSH", () => {
         expect(core.hostDownload).toHaveBeenCalledTimes(1);
 
         await expect(invoke(LOCAL_CHANNEL.hostDownload, localEvent(), "host-1", "")).resolves.toMatchObject({ files: 1 });
-        expect(vi.mocked(dialog.showSaveDialog).mock.calls.at(-1)?.at(-1)).toMatchObject({ defaultPath: path.join("/user-data", "folder.tar") });
+        expect(vi.mocked(dialog.showSaveDialog).mock.calls.at(-1)?.at(-1)).toMatchObject({ defaultPath: path.join(fake.userData, "folder.tar") });
     });
 
     it("let the device window manage a server", async () => {
@@ -519,7 +541,10 @@ describe("passphrases", () => {
     it("never forwards a passphrase into an event or a notification", () => {
         invoke(LOCAL_CHANNEL.promptSecret, localEvent(), 4, "correct horse");
         fake.coreEmit?.(
-            JSON.stringify({ prompt: { body: { host: "deploy@build", kind: "passphrase", prompt: "Enter passphrase for key" }, expiresAt: 1, id: 5 }, type: "prompt" }),
+            JSON.stringify({
+                prompt: { body: { host: "deploy@build", kind: "passphrase", prompt: "Enter passphrase for key" }, expiresAt: 1, id: 5 },
+                type: "prompt",
+            }),
         );
 
         expect(JSON.stringify(fake.notifications)).not.toContain("correct horse");
@@ -604,7 +629,7 @@ describe("coding-agent channels", () => {
 
     it("let the core's refusal of an always option reach the window", () => {
         core.acpPermissionAnswer.mockImplementationOnce(() => {
-            throw new Error("\"Always allow\" is not available for coding agents");
+            throw new Error('"Always allow" is not available for coding agents');
         });
 
         expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswer, localEvent(), 7, "always")).toThrow("Always allow");
@@ -618,7 +643,13 @@ describe("coding-agent channels", () => {
         expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswer, localEvent(), 7, "")).toThrow("device: option is invalid");
         expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), [])).toThrow("device: request ids are invalid");
         expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), [1, "2"])).toThrow("device: request id is invalid");
-        expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), Array.from({ length: 51 }, (_, i) => i + 1))).toThrow("device: request ids are invalid");
+        expect(() =>
+            invoke(
+                LOCAL_CHANNEL.acpPermissionAnswerBatch,
+                localEvent(),
+                Array.from({ length: 51 }, (_, i) => i + 1),
+            ),
+        ).toThrow("device: request ids are invalid");
         expect(core.acpPermissionAnswer).not.toHaveBeenCalled();
         expect(core.acpPermissionAnswerBatch).not.toHaveBeenCalled();
     });
@@ -814,12 +845,26 @@ describe("events", () => {
             return fake.notifications.at(-1)?.body;
         };
 
-        expect(notify({ address: "build", identityFile: null, kind: "hostConnect", name: "build-box", port: 22, user: "deploy" })).toBe("Connect to deploy@build?");
-        expect(notify({ fingerprint: "SHA256:x", host: "build", identityFile: null, keyType: "ED25519", kind: "hostKey", port: 22 })).toBe("Trust the key of build?");
+        expect(notify({ address: "build", identityFile: null, kind: "hostConnect", name: "build-box", port: 22, user: "deploy" })).toBe(
+            "Connect to deploy@build?",
+        );
+        expect(notify({ fingerprint: "SHA256:x", host: "build", identityFile: null, keyType: "ED25519", kind: "hostKey", port: 22 })).toBe(
+            "Trust the key of build?",
+        );
         expect(notify({ host: "build", kind: "hostKeyChanged", pinned: [], port: 22, presented: [] })).toBe("The key of build changed");
         expect(notify({ address: "build", identityFile: null, kind: "hostPairing", name: "build-box", port: 22, user: "u" })).toBe("Add the server build-box");
         expect(
-            notify({ allowAlways: false, detail: "ls", host: "build-box", input: "{}", kind: "call", taintedBy: [], threadTitle: "T", tool: "fs_list", toolKind: "fs" }),
+            notify({
+                allowAlways: false,
+                detail: "ls",
+                host: "build-box",
+                input: "{}",
+                kind: "call",
+                taintedBy: [],
+                threadTitle: "T",
+                tool: "fs_list",
+                toolKind: "fs",
+            }),
         ).toBe("fs_list on build-box — T");
     });
 
@@ -897,7 +942,12 @@ describe("a restart that finds a running turn and a held message", () => {
         writeFileSync(path.join(fake.userData, "acp-host-receipts.json"), JSON.stringify({ receipts: [["c2", Date.now() + 60_000, null, envelope, "sig"]] }));
         core.status.mockReturnValue(JSON.stringify({ accountLabel: null, deviceId: "dev1", platform: "macos" }));
         core.acpPrepare.mockReturnValue(
-            JSON.stringify({ callId: "c2", command: { kind: "send", sessionId: "s2", text: "go", turnId: "t2" }, expiresAt: Date.now() + 60_000, refusal: null }),
+            JSON.stringify({
+                callId: "c2",
+                command: { kind: "send", sessionId: "s2", text: "go", turnId: "t2" },
+                expiresAt: Date.now() + 60_000,
+                refusal: null,
+            }),
         );
         fake.handlers.clear();
         registerDeviceIpc(options);
@@ -922,7 +972,7 @@ describe("registry channels (the device window)", () => {
         registryFetch.mockReset();
         vi.mocked(dialog.showMessageBox).mockClear();
         invoke(DEVICE_CHANNEL.openSettings, siteEvent());
-        registryFetch.mockImplementation(async (url: string) => url === REGISTRY_URL ? registryBody() : new Response("archive bytes"));
+        registryFetch.mockImplementation(async (url: string) => (url === REGISTRY_URL ? registryBody() : new Response("archive bytes")));
     });
 
     it("read the registry only when the window searches: loading the view or waiting changes nothing", async () => {

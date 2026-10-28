@@ -32,17 +32,15 @@ import {
     updateHostStream,
 } from "../chat/streaming/persistent/host";
 import { noteShardDue } from "../lib/shard-housekeeping";
-import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
-import { DEVICE_SIGNATURE_WINDOW_MS } from "../devices/lib/constants";
-import { isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "../devices/lib/signing";
 import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
 import { applyImportTurns, isImportEvent, openImport } from "./lib/import";
 import { reapExpiredHostStreams } from "./lib/reap";
 import { sessionOfThread, touchSession } from "./lib/sessions";
+import { verifyDeviceRequest } from "./lib/verify-device";
 import { vHostEvent } from "./validators";
 
 type Event = Infer<typeof vHostEvent>;
@@ -52,22 +50,9 @@ export const verifyHostPost = internalQuery
     .input({ deviceId: v.string().max(MAX_LENGTH.id), now: v.number(), payload: v.string().max(MAX_LENGTH.document), signature: v.string().max(128) })
     .output(v.union(v.null(), v.object({ userId: v.string() })))
     .query(async ({ args, ctx }) => {
-        const deviceId = ctx.db.normalizeId("devices", args.deviceId);
-        const device = deviceId ? await ctx.db.devices.findFirst({ where: { _id: deviceId } }) : null;
+        const verified = await verifyDeviceRequest(ctx, { ...args, domain: "turn" });
 
-        if (!device?.encryptedSecret) {
-            return null;
-        }
-
-        const secret = await decryptKey(device.encryptedSecret, "device-secrets");
-
-        if (!(await verifyDevicePayload(secret, "turn", args.payload, args.signature))) {
-            return null;
-        }
-
-        const post = parseSignedPayload(args.payload, "turn", device._id as string);
-
-        return post && isFreshTimestamp(post.issuedAt, args.now, DEVICE_SIGNATURE_WINDOW_MS) ? { userId: device.userId } : null;
+        return verified ? { userId: verified.userId } : null;
     });
 
 const vApplyResult = v.union(
