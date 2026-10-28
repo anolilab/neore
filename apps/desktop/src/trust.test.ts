@@ -31,6 +31,9 @@ describe("isDraftTarget", () => {
     it("refuses the sign-in screens, other origins, the artifact preview and no page at all", () => {
         expect(isDraftTarget(SITE, "https://app.example.com/auth/sign-in")).toBe(false);
         expect(isDraftTarget(SITE, "https://app.example.com/auth")).toBe(false);
+        expect(isDraftTarget(SITE, "https://app.example.com/de/auth/sign-in")).toBe(false);
+        expect(isDraftTarget(SITE, "https://app.example.com/fr/auth")).toBe(false);
+        expect(isDraftTarget(SITE, "https://app.example.com/de/chat")).toBe(true);
         expect(isDraftTarget(SITE, "https://other.example.com/chat")).toBe(false);
         expect(isDraftTarget(SITE, "https://app.example.com/artifact-preview")).toBe(false);
         expect(isDraftTarget(SITE, "")).toBe(false);

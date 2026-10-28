@@ -81,30 +81,48 @@ const capture = async (): Promise<void> => {
         return;
     }
 
-    const context = new AudioContext({ sampleRate: SAMPLE_RATE });
-    const source = context.createMediaStreamSource(stream);
-    // Deprecated, but the one tap that needs no module script: a worklet cannot be loaded from a file page.
-    const processor = context.createScriptProcessor(BUFFER_SAMPLES, 1, 1);
+    let opened: AudioContext | undefined;
 
-    processor.addEventListener("audioprocess", (event) => {
-        const samples = event.inputBuffer.getChannelData(0);
+    try {
+        const context = new AudioContext({ sampleRate: SAMPLE_RATE });
 
-        api.audio(toInt16(samples).buffer as ArrayBuffer);
+        opened = context;
 
-        if (level !== null) {
-            level.style.transform = `scaleX(${Math.min(1, rms(samples) * 6)})`;
-        }
-    });
-    source.connect(processor);
-    processor.connect(context.destination);
-    show("Listening…");
+        const source = context.createMediaStreamSource(stream);
+        // Deprecated, but the one tap that needs no module script: a worklet cannot be loaded from a file page.
+        const processor = context.createScriptProcessor(BUFFER_SAMPLES, 1, 1);
 
-    capturing.release = async () => {
-        processor.disconnect();
-        source.disconnect();
+        processor.addEventListener("audioprocess", (event) => {
+            const samples = event.inputBuffer.getChannelData(0);
+
+            api.audio(toInt16(samples).buffer as ArrayBuffer);
+
+            if (level !== null) {
+                level.style.transform = `scaleX(${Math.min(1, rms(samples) * 6)})`;
+            }
+        });
+        source.connect(processor);
+        processor.connect(context.destination);
+        show("Listening…");
+
+        capturing.release = async () => {
+            processor.disconnect();
+            source.disconnect();
+            closeStream(stream);
+            await context.close();
+        };
+    } catch {
+        // The microphone is open and nothing will read it: let go of it now rather than when the window is destroyed.
         closeStream(stream);
-        await context.close();
-    };
+        show("The microphone is not available.");
+        api.failed("error");
+
+        try {
+            await opened?.close();
+        } catch {
+            // Already closed.
+        }
+    }
 };
 
 // Registered before the microphone opens, so a release that comes first is not lost.

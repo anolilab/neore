@@ -30,6 +30,8 @@ export const isTrustedUrl = (origin: URL, raw: string | undefined): boolean => {
     }
 };
 
+const LOCALE_PREFIX = /^\/[a-z]{2}(?=\/|$)/;
+
 /**
  * Can this page put text into the composer? A page of the site can, except the sign-in screens (`/auth/…`): the draft
  * would be asked for there, but no composer is behind them to keep it.
@@ -39,7 +41,8 @@ export const isDraftTarget = (origin: URL, raw: string | undefined): boolean => 
         return false;
     }
 
-    const { pathname } = new URL(raw as string);
+    // The site serves its sign-in screens under a locale prefix too (`/de/auth/sign-in`).
+    const pathname = new URL(raw as string).pathname.replace(LOCALE_PREFIX, "");
 
     return pathname !== "/auth" && !pathname.startsWith("/auth/");
 };

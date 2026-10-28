@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { decodeDataUrl, extractComposerRestorePayload, onComposerRestore, requestComposerRestore, restoreFileName } from "./composer-restore";
+import { decodeDataUrl, extractComposerRestorePayload, onComposerRestore, requestComposerRestore, restoreFileName, textAfterRestore } from "./composer-restore";
 
 describe(extractComposerRestorePayload, () => {
     it("collects text and file parts", () => {
@@ -42,6 +42,20 @@ describe(decodeDataUrl, () => {
 
     it("returns null for non-data URLs", () => {
         expect(decodeDataUrl("https://example.com/x.png")).toBeNull();
+    });
+});
+
+describe(textAfterRestore, () => {
+    it("replaces the text unless the request appends", () => {
+        expect(textAfterRestore("typed", { files: [], text: "restored" })).toBe("restored");
+    });
+
+    it("keeps an unsent message and adds the new text after it", () => {
+        expect(textAfterRestore("typed so far  ", { append: true, files: [], text: "dictated" })).toBe("typed so far\ndictated");
+    });
+
+    it("uses the new text alone when the composer is empty", () => {
+        expect(textAfterRestore("  ", { append: true, files: [], text: "dictated" })).toBe("dictated");
     });
 });
 

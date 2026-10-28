@@ -81,7 +81,7 @@ const NativeBridge = (): JSX.Element | null => {
                     // Into the composer, not sent: a link cannot send a message the user did not submit.
                     const { requestComposerRestore } = await import("@/features/chat/core/utils/composer-restore");
 
-                    requestComposerRestore({ files: [], text });
+                    requestComposerRestore({ append: true, files: [], text });
                     await openNewChat();
                 })();
             }),

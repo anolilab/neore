@@ -111,7 +111,8 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
     const fingerprint = async (file: string): Promise<string> => {
         const info = await stat(file);
 
-        return `${info.size}:${info.mtimeMs}`;
+        // ctime moves on every write and cannot be set back, unlike mtime; ino catches a file renamed over the model.
+        return `${info.size}:${info.mtimeMs}:${info.ctimeMs}:${info.ino}`;
     };
 
     const status = async (spec: ModelSpec): Promise<ModelStatus> => {

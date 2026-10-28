@@ -277,4 +277,27 @@ describe("ensureVerified", () => {
 
         await expect(store.ensureVerified(spec)).rejects.toMatchObject({ code: "checksum" });
     });
+
+    it("re-checks a same-size replacement whose modification time was put back", async () => {
+        const file = path.join(directory, spec.file);
+        const store = createModelStore({ directory });
+
+        // Whole seconds, so putting the time back reproduces it exactly.
+        const pinned = 1_700_000_000;
+
+        await writeFile(file, PAYLOAD);
+        await utimes(file, pinned, pinned);
+        await store.ensureVerified(spec);
+
+        const swapped = Buffer.from(PAYLOAD);
+
+        swapped[0] = swapped[0] === 0 ? 1 : 0;
+        await new Promise((resolve) => {
+            setTimeout(resolve, 20);
+        });
+        await writeFile(file, swapped);
+        await utimes(file, pinned, pinned);
+
+        await expect(store.ensureVerified(spec)).rejects.toMatchObject({ code: "checksum" });
+    });
 });
