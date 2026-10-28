@@ -323,14 +323,14 @@ describe("a busy worker", () => {
         expect(last.runId).toBeDefined();
     });
 
-    it("does not show a worker as idle while a stopped run's loop is still unwinding", async () => {
+    it("reports a worker whose stopped run is still unwinding as stopping, not archivable", async () => {
         const workerId = await idleWorker();
         const a = (await message(workerId, "c-a")) as { runId: string };
 
         await claim(a.runId);
         await run(async (context) => await cancelSubAgentRunsForStop(context, workerId, OWNER));
 
-        expect(await as(OWNER).query(getWorker as never, { workerId } as never)).toMatchObject({ activeRunId: null, state: "running" });
+        expect(await as(OWNER).query(getWorker as never, { workerId } as never)).toMatchObject({ activeRunId: null, state: "idle", stopping: true });
     });
 
     it("shows the running run as the worker's current one, with a Stop meaning that run", async () => {
