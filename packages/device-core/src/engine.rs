@@ -12,7 +12,7 @@ use std::fs as stdfs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,12 @@ use crate::approval::{Answer, Prompt, PromptBody, Prompts, SandboxState};
 use crate::envelope::{self, Domain, NonceSet, Signed};
 use crate::mcp::{self, McpManager, McpServerConfig};
 use crate::sandbox;
-use crate::store::{self, Pairing, Settings};
+use crate::ssh::{HostLink, SshPaths, Target};
+use crate::store::{self, Host, Pairing, Settings};
+
+mod hosts;
+
+pub use hosts::{HostProbe, HostSpec, HostUpdate};
 
 pub use crate::actions::{cap_utf8, now_ms, MAX_OUTPUT_BYTES};
 
@@ -50,6 +55,9 @@ pub enum Event {
 /// Receives [`Event`]s. Called from engine threads; must not block.
 pub type Sink = Box<dyn Fn(Event) + Send + Sync>;
 
+/// The same sink, shared with the threads that ask the user about an SSH connection.
+type SharedSink = Arc<dyn Fn(Event) + Send + Sync>;
+
 /// One MCP tool the manifest offered: its server, its own name on that server, and whether it declared itself read-only.
 struct McpToolRef {
     server: String,
@@ -69,14 +77,32 @@ pub struct DeviceState {
     /// anything the owner changed since (folders, shell policy, servers, rules) is seen as one number.
     generation: AtomicU64,
     nonces: Mutex<NonceSet>,
-    prompts: Prompts,
+    prompts: Arc<Prompts>,
     settings: Mutex<Settings>,
     settings_path: PathBuf,
-    sink: Sink,
+    sink: SharedSink,
+    ssh: SshState,
+}
+
+/// What the engine keeps for the servers it reaches over SSH.
+struct SshState {
+    /// The remote path of `neore-host`; shell text, never taken from a page.
+    binary: String,
+    /// Live connections by the server's device id.
+    connections: Mutex<HashMap<String, Arc<dyn HostLink>>>,
+    paths: SshPaths,
+    /// The connection a server was probed over, waiting for its pairing: at most one.
+    probe: Mutex<Option<(Target, Arc<dyn HostLink>)>>,
 }
 
 impl DeviceState {
     pub fn new(data_dir: &Path, sink: Sink) -> Self {
+        Self::with_host_binary(data_dir, sink, &crate::ssh::default_binary())
+    }
+
+    /// [`Self::new`] launching `binary` (remote shell text) on a server instead of the installed `neore-host`.
+    /// For tests that run a throwaway server; nothing a page says reaches it.
+    pub fn with_host_binary(data_dir: &Path, sink: Sink, binary: &str) -> Self {
         let settings_path = data_dir.join("device.json");
         // The stored roots are kept as they are: a folder that is unplugged now must survive a save. The
         // planner and the tools canonicalise and filter them at the point of use (`shareable_roots`).
@@ -93,10 +119,16 @@ impl DeviceState {
                 &data_dir.join("device-nonces.json"),
                 now_ms(),
             )),
-            prompts: Prompts::default(),
+            prompts: Arc::default(),
             settings: Mutex::new(settings),
             settings_path,
-            sink,
+            sink: Arc::from(sink),
+            ssh: SshState {
+                binary: binary.to_owned(),
+                connections: Mutex::default(),
+                paths: SshPaths::under(data_dir, sandbox::home().as_deref()),
+                probe: Mutex::default(),
+            },
         }
     }
 
@@ -133,9 +165,9 @@ impl DeviceState {
     }
 
     fn save(&self, settings: Settings) -> Result<(), String> {
-        let previous = self.settings().pairing;
+        let previous = self.settings();
 
-        store::save_over(&self.settings_path, previous.as_ref(), &settings)?;
+        store::save_over(&self.settings_path, &previous, &settings)?;
         *self.settings.lock().unwrap() = settings;
 
         Ok(())
@@ -151,6 +183,7 @@ impl DeviceState {
 
     pub fn stop_servers(&self) {
         self.mcp.stop_all();
+        self.close_hosts();
     }
 
     fn audit(&self, entry: Value) {
@@ -189,6 +222,11 @@ impl DeviceState {
             .answer(id, Answer::parse(answer).ok_or("unknown answer")?)
     }
 
+    /// Answers a passphrase prompt with what the user typed.
+    pub fn prompt_secret(&self, id: u64, secret: String) -> Result<(), String> {
+        self.prompts.answer_secret(id, secret)
+    }
+
     /// Closing the approval window is a "no" to everything it was asking.
     pub fn deny_prompts(&self) {
         self.prompts.deny_all();
@@ -202,6 +240,7 @@ impl DeviceState {
                 .as_ref()
                 .map(|pairing| pairing.account_label.clone()),
             device_id: pairing.map(|pairing| pairing.device_id),
+            hosts: self.host_statuses(),
             platform: platform(),
         }
     }
@@ -242,6 +281,15 @@ impl DeviceState {
 
         // Counted: a call approved under the previous pairing must not run under this one.
         self.change_settings_counted(true, |settings| {
+            // The servers belong to the pairing that registered them; another device id cannot speak for them.
+            if settings
+                .pairing
+                .as_ref()
+                .is_none_or(|current| current.device_id != device_id)
+            {
+                settings.hosts.clear();
+            }
+
             settings.pairing = Some(Pairing {
                 account_label,
                 device_id: device_id.to_owned(),
@@ -251,12 +299,14 @@ impl DeviceState {
 
             Ok(())
         })?;
+        self.drop_stale_connections();
 
         Ok(true)
     }
 
     pub fn settings_view(&self) -> SettingsView {
         let settings = self.settings();
+        let hosts = self.host_views(&settings);
 
         SettingsView {
             account_label: settings
@@ -266,6 +316,7 @@ impl DeviceState {
             allow_rules: settings.allow_rules,
             allow_shell_network: settings.allow_shell_network,
             audit_path: self.audit_path.to_string_lossy().into_owned(),
+            hosts,
             mcp_servers: settings.mcp_servers,
             paired: settings.pairing.is_some(),
             require_shell_sandbox: !settings.allow_unsandboxed_shell,
@@ -354,14 +405,20 @@ impl DeviceState {
                 settings.allow_rules.retain(|rule| rules.contains(rule));
             }
 
+            if let Some(host) = &update.host {
+                hosts::apply_update(settings, host)?;
+            }
+
             if update.unpair {
                 self.prompts.deny_all();
                 settings.pairing = None;
+                settings.hosts.clear();
                 settings.allow_rules.clear();
             }
 
             Ok(())
         })?;
+        self.drop_stale_connections();
         self.emit(Event::Changed);
 
         Ok(self.settings_view())
@@ -384,6 +441,13 @@ impl DeviceState {
         // Read before the settings, so an update in between only ever makes the call look stale.
         let generation = self.generation.load(Ordering::SeqCst);
         let settings = self.settings();
+
+        // A call for a server this computer speaks for: its envelope names the server, and only that server's
+        // secret verifies it.
+        if let Some(host) = hosts::host_named_by(&settings, &signed.payload) {
+            return self.execute_host(host, signed);
+        }
+
         let pairing = usable_pairing(&settings)?;
         let call = envelope::verify_call(
             &pairing.secret,
@@ -419,6 +483,7 @@ impl DeviceState {
                     let body = PromptBody::Call {
                         allow_always: offer_always,
                         detail: detail.clone(),
+                        host: None,
                         input: serde_json::to_string_pretty(&call.input).unwrap_or_default(),
                         sandbox: sandbox_state(&action),
                         tainted_by: call.tainted_by.clone(),
@@ -428,7 +493,12 @@ impl DeviceState {
                     };
 
                     self.prompts.ask(body, call.expires_at, wait, |prompt| {
-                        self.emit_progress(&pairing, &call.call_id, "prompting");
+                        self.emit_progress(
+                            &pairing.secret,
+                            &pairing.device_id,
+                            &call.call_id,
+                            "prompting",
+                        );
                         self.emit(Event::Prompt {
                             prompt: prompt.clone(),
                         });
@@ -504,25 +574,48 @@ impl DeviceState {
                         Outcome::failed(decision, "approved after the request expired")
                     }
                     _ => {
-                        self.emit_progress(&pairing, &call.call_id, "running");
+                        self.emit_progress(&pairing.secret, &pairing.device_id, &call.call_id, "running");
                         run_action(self, action, Duration::from_millis(remaining), decision)
                     }
                 }
             }
         };
 
+        Ok(self.signed_result(
+            (&pairing.secret, &pairing.device_id, None),
+            &call,
+            &detail,
+            outcome,
+        ))
+    }
+
+    /// Audits one call and signs its result with the secret of the device it was for (`who` is that secret, the
+    /// device id and, for a server, its name).
+    fn signed_result(
+        &self,
+        who: (&str, &str, Option<&str>),
+        call: &envelope::CallEnvelope,
+        detail: &str,
+        outcome: Outcome,
+    ) -> Signed {
+        let (secret, device_id, host) = who;
         let output = outcome
             .output
             .as_deref()
             .map(|text| cap_utf8(text, MAX_OUTPUT_BYTES));
-
-        self.audit(json!({
-            "at": now_ms(), "callId": call.call_id, "decision": outcome.decision, "detail": cap_utf8(&detail, 1000).0,
+        let mut audit = json!({
+            "at": now_ms(), "callId": call.call_id, "decision": outcome.decision, "detail": cap_utf8(detail, 1000).0,
             "status": outcome.status, "taintedBy": call.tainted_by, "thread": call.thread_title, "tool": call.tool,
-        }));
+        });
+
+        if let Some(host) = host {
+            audit["host"] = json!(host);
+        }
+
+        self.audit(audit);
 
         let mut result = json!({
-            "v": 1, "kind": "result", "callId": call.call_id, "deviceId": pairing.device_id,
+            "v": 1, "kind": "result", "callId": call.call_id, "deviceId": device_id,
             "status": outcome.status, "decision": outcome.decision,
             "truncated": outcome.truncated || output.as_ref().is_some_and(|(_, truncated)| *truncated),
         });
@@ -539,18 +632,23 @@ impl DeviceState {
             result["exitCode"] = json!(code);
         }
 
-        Ok(envelope::sign_value(
-            &pairing.secret,
-            Domain::Result,
-            &result,
-        ))
+        envelope::sign_value(secret, Domain::Result, &result)
     }
 
-    fn emit_progress(&self, pairing: &Pairing, call_id: &str, phase: &str) {
+    /// A manifest time later than every one issued before, so the backend never sees one go backwards.
+    fn next_manifest_time(&self) -> u64 {
+        let mut last = self.last_manifest_at.lock().unwrap();
+
+        *last = now_ms().max(*last + 1);
+
+        *last
+    }
+
+    fn emit_progress(&self, secret: &str, device_id: &str, call_id: &str, phase: &str) {
         // Best effort: a lost report only leaves the chat saying "sent to the device".
         self.emit(Event::Progress(progress_report(
-            &pairing.secret,
-            &pairing.device_id,
+            secret,
+            device_id,
             call_id,
             phase,
             now_ms(),
@@ -559,9 +657,25 @@ impl DeviceState {
 
     /// The signed tool list, for the backend to offer the agent.
     pub fn manifest(&self) -> Result<Signed, String> {
+        self.manifest_for(None)
+    }
+
+    /// The signed tool list of this computer (`None`) or of one of its servers. A server's is signed with that
+    /// server's own secret, so the backend sees it as a device of its own.
+    pub fn manifest_for(&self, device_id: Option<&str>) -> Result<Signed, String> {
         let settings = self.settings();
+
+        if let Some(device_id) = device_id.filter(|id| {
+            settings
+                .pairing
+                .as_ref()
+                .is_none_or(|pairing| pairing.device_id != *id)
+        }) {
+            return self.host_manifest(&settings, device_id);
+        }
+
         let pairing = usable_pairing(&settings)?;
-        let mut tools = builtin_tools(&shareable_roots(&settings.roots));
+        let mut tools = builtin_tools(&shareable_roots(&settings.roots), "the user's computer");
         let mut mcp_tools = HashMap::new();
 
         for server in &settings.mcp_servers {
@@ -601,11 +715,7 @@ impl DeviceState {
             *self.mcp_tools.lock().unwrap() = mcp_tools;
         }
 
-        let issued_at = {
-            let mut last = self.last_manifest_at.lock().unwrap();
-            *last = now_ms().max(*last + 1);
-            *last
-        };
+        let issued_at = self.next_manifest_time();
 
         Ok(envelope::sign_value(
             &pairing.secret,
@@ -656,7 +766,8 @@ pub fn decide(tool: &str, tainted: bool, read_only: bool, allow_rules: &[String]
     )
 }
 
-fn builtin_tools(roots: &[PathBuf]) -> Vec<Value> {
+/// The built-in tools over `roots`, worded for where they run (`place`: this computer, or a server by name).
+fn builtin_tools(roots: &[PathBuf], place: &str) -> Vec<Value> {
     if roots.is_empty() {
         return Vec::new();
     }
@@ -670,17 +781,17 @@ fn builtin_tools(roots: &[PathBuf]) -> Vec<Value> {
 
     vec![
         json!({ "name": "fs_list", "kind": "fs", "readOnly": true,
-            "description": format!("List a folder on the user's computer. Shared folders: {shared}."),
+            "description": format!("List a folder on {place}. Shared folders: {shared}."),
             "inputSchema": { "type": "object", "properties": { "path": path } } }),
         json!({ "name": "fs_read", "kind": "fs", "readOnly": true,
-            "description": format!("Read a text file (first 64 KiB) on the user's computer. Shared folders: {shared}."),
+            "description": format!("Read a text file (first 64 KiB) on {place}. Shared folders: {shared}."),
             "inputSchema": { "type": "object", "properties": { "path": path }, "required": ["path"] } }),
         json!({ "name": "fs_write", "kind": "fs", "readOnly": false,
-            "description": format!("Write a text file on the user's computer (at most 1 MiB). Shared folders: {shared}."),
+            "description": format!("Write a text file on {place} (at most 1 MiB). Shared folders: {shared}."),
             "inputSchema": { "type": "object", "properties": { "path": path, "content": { "type": "string" },
                 "overwrite": { "type": "boolean", "description": "Replace an existing file" } }, "required": ["path", "content"] } }),
         json!({ "name": "shell_run", "kind": "shell", "readOnly": false,
-            "description": format!("Run one shell command on the user's computer and return its output (first 64 KiB). The working folder must be inside a shared folder: {shared}. The sandbox may block network access; if a command fails for lack of network, say so instead of retrying."),
+            "description": format!("Run one shell command on {place} and return its output (first 64 KiB). The working folder must be inside a shared folder: {shared}. The sandbox may block network access; if a command fails for lack of network, say so instead of retrying."),
             "inputSchema": { "type": "object", "properties": { "command": { "type": "string" }, "cwd": path,
                 "timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 600 } }, "required": ["command"] } }),
     ]
@@ -797,6 +908,8 @@ fn run_action(
 #[serde(rename_all = "camelCase")]
 pub struct ProgressEvent {
     pub call_id: String,
+    /// The device the report is for: this computer, or one of its servers.
+    pub device_id: String,
     pub payload: String,
     pub signature: String,
 }
@@ -816,6 +929,7 @@ pub fn progress_report(
 
     ProgressEvent {
         call_id: call_id.to_owned(),
+        device_id: device_id.to_owned(),
         payload: signed.payload,
         signature: signed.signature,
     }
@@ -826,6 +940,8 @@ pub fn progress_report(
 pub struct StatusView {
     pub account_label: Option<String>,
     pub device_id: Option<String>,
+    /// The servers this computer speaks for, and whether each is connected right now.
+    pub hosts: Vec<hosts::HostStatus>,
     pub platform: &'static str,
 }
 
@@ -864,6 +980,7 @@ pub struct SettingsView {
     pub allow_rules: Vec<String>,
     pub allow_shell_network: bool,
     pub audit_path: String,
+    pub hosts: Vec<hosts::HostView>,
     pub mcp_servers: Vec<McpServerConfig>,
     pub paired: bool,
     pub require_shell_sandbox: bool,
@@ -877,6 +994,8 @@ pub struct SettingsView {
 pub struct SettingsUpdate {
     pub allow_rules: Option<Vec<String>>,
     pub allow_shell_network: Option<bool>,
+    /// One server's folders and shell policy.
+    pub host: Option<HostUpdate>,
     pub mcp_servers: Option<Vec<McpServerConfig>>,
     pub require_shell_sandbox: Option<bool>,
     pub roots: Option<Vec<String>>,
@@ -1348,13 +1467,14 @@ mod tests {
 
         let event = serde_json::to_value(&report).unwrap();
         assert_eq!(event["callId"], "call1");
+        assert_eq!(event["deviceId"], "dev1");
         assert!(event["signature"].is_string());
     }
 
     #[test]
     fn offers_no_file_or_shell_tools_without_shared_folders() {
-        assert!(builtin_tools(&[]).is_empty());
-        assert_eq!(builtin_tools(&[std::env::temp_dir()]).len(), 4);
+        assert!(builtin_tools(&[], "here").is_empty());
+        assert_eq!(builtin_tools(&[std::env::temp_dir()], "here").len(), 4);
     }
 
     /// The approval gate end to end: a call waits for a person, a refusal runs

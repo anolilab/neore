@@ -390,6 +390,12 @@ jobs:
               if: "matrix.os == 'ubuntu-22.04'"
               run: "sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config"
 
+            # The SSH transport tests (`tests/ssh_host.rs`) start a throwaway `sshd` on 127.0.0.1, as the
+            # runner's own user with its own host key. Ubuntu needs the privilege-separation directory to exist.
+            - name: "Install sshd for the SSH transport tests"
+              if: "matrix.os == 'ubuntu-22.04'"
+              run: "sudo apt-get install -y openssh-server openssh-client && sudo mkdir -p /run/sshd"
+
             # rustfmt is OS-independent, so it runs once, on the Linux leg.
             - name: "Check Rust formatting"
               if: "matrix.os == 'ubuntu-22.04'"
@@ -397,11 +403,12 @@ jobs:
               run: "cargo fmt --manifest-path packages/device-core/Cargo.toml -- --check && cargo fmt --manifest-path packages/device-core-node/Cargo.toml -- --check"
 
             # Linux and macOS have a shell sandbox, so the sandboxed vectors must run there instead of
-            # being skipped when the runner loses it.
+            # being skipped when the runner loses it; they also have an sshd, which the SSH tests need.
             - name: "Run cargo test"
               shell: "bash"
               env:
                   NEORE_REQUIRE_SANDBOX: "${{ matrix.os != 'windows-latest' && '1' || '' }}"
+                  NEORE_REQUIRE_SSHD: "${{ matrix.os != 'windows-latest' && '1' || '' }}"
               run: "cargo test --manifest-path packages/device-core/Cargo.toml"
 
             # `neore-host` is built without the `keychain` feature. This runs the host's own tests

@@ -7,7 +7,7 @@
 //! sandbox, output caps and the audit log.
 //!
 //! The `keychain` feature (default) is that paired side: `approval`, `envelope`,
-//! `engine` and `store`. Without it the crate is what `neore-host` runs: the
+//! `engine`, `ssh` and `store`. Without it the crate is what `neore-host` runs: the
 //! `actions` the desktop already approved, over the [`host`] frame protocol.
 
 pub mod actions;
@@ -25,6 +25,8 @@ pub mod host;
 pub mod mcp;
 pub mod sandbox;
 pub mod shell;
+#[cfg(feature = "keychain")]
+pub mod ssh;
 #[cfg(feature = "keychain")]
 pub mod store;
 

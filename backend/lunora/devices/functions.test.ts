@@ -401,6 +401,8 @@ describe("revokeDevice", () => {
 });
 
 describe("servers reached over SSH", () => {
+    const byId = (a: string, b: string) => a.localeCompare(b);
+
     const registerHost = async (userId: string, viaDeviceId: string, name = "build-box") =>
         (await as(userId).mutation(functions.registerDevice as never, { name, platform: "linux", viaDeviceId } as never)) as {
             deviceId: string;
@@ -453,7 +455,7 @@ describe("servers reached over SSH", () => {
         )) as { devices: { deviceId: string }[] };
 
         // The desktop has a manifest too; the host is offered beside it.
-        expect(context.devices.map((device) => device.deviceId).toSorted()).toEqual([desktop.deviceId, host.deviceId].toSorted());
+        expect(context.devices.map((device) => device.deviceId).toSorted(byId)).toEqual([desktop.deviceId, host.deviceId].toSorted(byId));
 
         const { callId } = await hostCall(ownerId, host.deviceId);
         const pending = (await as(ownerId).query(functions.listPendingDeviceCalls as never, {
@@ -507,7 +509,9 @@ describe("servers reached over SSH", () => {
         // The desktop's own secret, a made-up one: neither is the host's.
         await expect(complete(desktop.secret)).rejects.toThrow(SIGNATURE_ERROR);
         await expect(complete("e".repeat(64))).rejects.toThrow(SIGNATURE_ERROR);
-        await expect(complete(host.secret, (await pairedDevice(ownerId)).deviceId)).rejects.toThrow(NOT_FOUND_ERROR);
+        const { deviceId: otherDesktop } = await pairedDevice(ownerId);
+
+        await expect(complete(host.secret, otherDesktop)).rejects.toThrow(NOT_FOUND_ERROR);
         await expect(complete(host.secret)).resolves.toEqual({ accepted: true });
         expect(await readCall(callId)).toMatchObject({ output: "file body", status: "completed" });
     });
@@ -537,10 +541,10 @@ describe("servers reached over SSH", () => {
         const second = await desktopWithHost(ownerId);
         const { callId } = await hostCall(ownerId, first.host.deviceId);
         const ids = async () =>
-            ((await as(ownerId).query(functions.listDevices as never, {} as never)) as { _id: string }[]).map((device) => device._id).toSorted();
+            ((await as(ownerId).query(functions.listDevices as never, {} as never)) as { _id: string }[]).map((device) => device._id).toSorted(byId);
 
         await as(ownerId).mutation(functions.revokeDevice as never, { deviceId: second.host.deviceId } as never);
-        expect(await ids()).toEqual([first.desktop.deviceId, first.host.deviceId, second.desktop.deviceId].toSorted());
+        expect(await ids()).toEqual([first.desktop.deviceId, first.host.deviceId, second.desktop.deviceId].toSorted(byId));
 
         await as(ownerId).mutation(functions.revokeDevice as never, { deviceId: first.desktop.deviceId } as never);
         expect(await ids()).toEqual([second.desktop.deviceId]);

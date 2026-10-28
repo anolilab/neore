@@ -191,7 +191,7 @@ process.
   process holds no listening socket; `cargo tree` for `neore-host` shows no
   `keyring`, and `ldd` on the Linux build shows no libdbus.
 
-**S3 — SSH transport and host identity.** Spawn `ssh` with the options of §4–§6,
+**S3 — SSH transport and host identity (built).** Spawn `ssh` with the options of §4–§6,
 pin keys, ask for passphrases through the helper, and add `transport` and
 `viaDeviceId`. Relay claims for host devices. Keyed secrets in `store.rs`. The desktop relay heartbeats each connected host device and signs its manifest with that host's secret, so `createDeviceCall` sees the host as online and offering its agents.
 - Acceptance: connect to a test sshd in CI; a changed host key is refused and
@@ -201,6 +201,19 @@ pin keys, ask for passphrases through the helper, and add `transport` and
   check, and a desktop without the host's secret cannot produce a valid result
   (test: sign a result with the wrong secret); revoking the desktop revokes its
   hosts.
+
+Where S3 departs from the text above:
+- `ssh` runs with `-F /dev/null` (and `UpdateHostKeys=no`, `-T`, `ClearAllForwardings`, `IdentitiesOnly` with `-i`):
+  it reads neither the user's nor the system config, so a config cannot add a `RemoteCommand`, a forward or a
+  `ProxyCommand`. Jump hosts stay out of v1 (§11).
+- `ControlPath` is `<appData>/ssh/cm/%C` only when that fits a Unix socket path (104 bytes on macOS, with
+  ssh's temporary suffix); the default macOS userData does not, so it moves to `~/.neore/cm` (0700). Never `/tmp`.
+- The askpass helper is a shell script talking to the desktop over two FIFOs in a private directory (ssh
+  closes inherited descriptors, and a socket would be a listener). POSIX only: a Windows desktop has no
+  passphrase prompt and no multiplexing yet.
+- "Always allow" is not offered for a server's calls yet: the allow rules are keyed by tool name and global.
+- Agent forwarding is a per-server flag that passes `SSH_AUTH_SOCK` through; the stable socket path of §6 is S5.
+- `~/.ssh/config` suggestions (§4) and the Windows-desktop askpass are not built.
 
 **S4 — Install and upgrade.** §8. The release build of `neore-host` must pass
 `--no-default-features`: a plain `cargo build` links the keyring (the binary logs an error at
