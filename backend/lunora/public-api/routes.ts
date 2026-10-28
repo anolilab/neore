@@ -74,6 +74,16 @@ export interface RouteInput {
 /** A handler answers data (serialised as JSON with `status`) or a finished `Response` (streams). */
 export type RouteResult = Response | { data: unknown; status?: number };
 
+/** One MCP tool a route serves. */
+export interface McpToolEntry {
+    description: string;
+    /** Body fields the tool sets itself: the model never sees them as arguments. */
+    fixed?: Readonly<Record<string, unknown>>;
+    tool: string;
+    /** Narrows a body route's input: `threadId` required, or absent. */
+    when?: "no-threadId" | "threadId";
+}
+
 export interface RouteDefinition {
     /** Request body schema (parsed before the handler runs). */
     body?: z.ZodType;
@@ -81,11 +91,13 @@ export interface RouteDefinition {
     handler: (input: RouteInput) => Promise<RouteResult>;
     /** The route can answer 409 `conflict` (documented in the OpenAPI output). */
     mayConflict?: boolean;
+    /** The route starts a turn, so a host-run thread answers 409 `host_thread_read_only` (documented in the OpenAPI output). */
+    mayRefuseHostThread?: boolean;
     /**
      * Tools this route serves to MCP clients (`mcp.ts`). They share the route's handler, scopes and limits;
      * a route without the list is not an MCP tool.
      */
-    mcp?: ReadonlyArray<{ description: string; tool: string }>;
+    mcp?: ReadonlyArray<McpToolEntry>;
     method: "delete" | "get" | "patch" | "post";
     /**
      * Refuse an `Idempotency-Key`: the reply carries a secret shown once, and a replay would store it.
@@ -155,6 +167,10 @@ const chatStartError = (status: number, body: { error?: string; message?: string
         });
     }
 
+    if (status === 409 && body.error === "HOST_RUN_THREAD") {
+        return new PublicApiError("host_thread_read_only", body.message ?? "This thread runs on a paired computer and cannot be written to over the API.");
+    }
+
     if (status === 401) {
         return new PublicApiError("unauthenticated", "The API key's user could not be resolved.");
     }
@@ -175,9 +191,13 @@ const streamSourceFor = (ctx: HttpActionCtx, streamId: string): StreamSource => 
 
     return {
         read: async (afterIndex) => {
-            const { chunks, locked, status } = await ctx.runQuery(internal.chat.streaming.persistent.library.getChunksAfter, { afterIndex, streamId: id });
+            const { chunks, locked, pendingRequest, status } = await ctx.runQuery(internal.chat.streaming.persistent.library.getChunksAfter, {
+                afterIndex,
+                streamId: id,
+                withPendingRequest: true,
+            });
 
-            return { chunks, locked, status };
+            return { chunks, locked, pendingRequest, status };
         },
     };
 };
@@ -228,7 +248,16 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
             throw new PublicApiError("not_found", "Thread not found.");
         }
 
-        return { data: { messageId: body.messageId, reasoning: collected.reasoning, status: collected.status, text: collected.text, threadId: body.threadId } };
+        return {
+            data: {
+                messageId: body.messageId,
+                ...(collected.pendingRequest && { pendingRequest: collected.pendingRequest }),
+                reasoning: collected.reasoning,
+                status: collected.status,
+                text: collected.text,
+                threadId: body.threadId,
+            },
+        };
     }
 
     return { data: { messageId: body.messageId, streamId: body.streamId, streamToken: body.streamToken, threadId: body.threadId }, status: 202 };
@@ -487,6 +516,21 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
         description:
             "Sends a prompt, creating a thread unless `threadId` is given. Counts against the same daily message limit as the app. With `stream: true` (default) answers 202 with a `streamToken` for POST /chat/stream; with `stream: false` blocks until the reply is complete (up to 5 minutes).",
         handler: async (input) => await startChat(input, input.body as z.infer<typeof zChatRequestSchema>),
+        mayRefuseHostThread: true,
+        mcp: [
+            {
+                description: `Start a new Neore thread with a first message and wait for the reply (up to 5 minutes; if it takes longer, read it later with read_messages). Returns the reply text with its threadId and messageId. Counts against the account's daily message limit like a message sent in the app. The agent's tools run in ask mode: a run that needs a person's answer returns status "waiting_on_person" with the pending request, which only a person can answer in the app. Send an idempotencyKey to make a retry safe. ${USER_DATA_NOTE}`,
+                fixed: { stream: false },
+                tool: "create_thread",
+                when: "no-threadId",
+            },
+            {
+                description: `Send a message into an existing thread and wait for the reply (up to 5 minutes; if it takes longer, read it later with read_messages). Returns the reply text with its threadId and messageId. Counts against the account's daily message limit like a message sent in the app. A thread that runs on a paired computer is read-only here and answers host_thread_read_only. A run that needs a person's answer returns status "waiting_on_person" with the pending request, which only a person can answer in the app. Send an idempotencyKey to make a retry safe. ${USER_DATA_NOTE}`,
+                fixed: { stream: false },
+                tool: "send_message",
+                when: "threadId",
+            },
+        ],
         method: "post",
         operationId: "createChat",
         path: "/chat",
@@ -499,7 +543,7 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
     {
         body: zStreamRequestSchema,
         description:
-            'Streams the reply as NDJSON: `{"type":"text","text":…}`, `{"type":"reasoning",…}`, `{"type":"speaker",…}`, `{"type":"reply.restart"}` (the user steered the reply from the app: the text after it continues below their message), then exactly one `{"type":"done","status":…}` or `{"type":"error","error":{…}}`. One request reads a bounded number of times; send `resumable: true` and a long reply ends with `{"type":"resume","lastChunkIndex":n}` instead — request again with that `lastChunkIndex` to continue.',
+            'Streams the reply as NDJSON: `{"type":"text","text":…}`, `{"type":"reasoning",…}`, `{"type":"speaker",…}`, `{"type":"reply.restart"}` (the user steered the reply from the app: the text after it continues below their message), then exactly one `{"type":"done","status":…}` or `{"type":"error","error":{…}}`. A run that paused for a person (a tool approval or a question) ends with `{"type":"done","status":"waiting_on_person","pendingRequest":{"toolCallId":…,"toolName":…,"question"?:…}}`: only a person can answer it, in the app. One request reads a bounded number of times; send `resumable: true` and a long reply ends with `{"type":"resume","lastChunkIndex":n}` instead — request again with that `lastChunkIndex` to continue.',
         handler: async (input) => {
             const signingSecret = process.env.LLM_GATEWAY_SIGNING_SECRET;
 
@@ -702,6 +746,7 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
 
             return await startChat(input, { model: body.model, prompt, stream: body.stream, threadId: body.threadId });
         },
+        mayRefuseHostThread: true,
         method: "post",
         operationId: "runSkill",
         path: "/skills/{skill}/run",

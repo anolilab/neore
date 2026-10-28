@@ -15,6 +15,10 @@
  * narrows that window to the time between the read and the write; what it
  * reliably stops is the common case — a retry while the first attempt is still
  * running answers `idempotency_in_progress` rather than running twice.
+ *
+ * A caller that needs the lock (the MCP write tools) passes a `claim`, taken
+ * atomically before the handler runs: the loser of a race answers
+ * `idempotency_in_progress` and replays the winner's stored response on retry.
  */
 import { PublicApiError } from "./errors";
 import { sha256Hex } from "../lib/crypto";
@@ -82,6 +86,14 @@ export const requestFingerprint = async (method: string, pathAndQuery: string, b
 export const idempotencyStorageKey = async (apiKeyId: string, idempotencyKey: string): Promise<string> =>
     await sha256Hex(`${IDEMPOTENCY_FAMILY}\u{0}${apiKeyId}\u{0}${idempotencyKey}`);
 
+/** An atomic hold on one key for the time its handler runs. */
+export interface IdempotencyClaim {
+    /** `false` when another request holds the key. */
+    acquire: () => Promise<boolean>;
+    /** Gives the key back, for a run that stored no response and so may be retried. */
+    release: () => Promise<void>;
+}
+
 export interface IdempotencyStore {
     get: (key: string) => Promise<unknown>;
     put: (key: string, value: IdempotencyRecord, ttlMs: number) => Promise<void>;
@@ -94,7 +106,15 @@ export interface IdempotencyStore {
  */
 export const withIdempotency = async (
     store: IdempotencyStore,
-    options: { apiKeyId: string; body: string; idempotencyKey: string; method: string; pathAndQuery: string },
+    options: {
+        apiKeyId: string;
+        body: string;
+        /** Builds the hold for this storage key; see {@link IdempotencyClaim}. */
+        claim?: (storageKey: string) => IdempotencyClaim;
+        idempotencyKey: string;
+        method: string;
+        pathAndQuery: string;
+    },
     handler: () => Promise<Response>,
 ): Promise<Response> => {
     const storageKey = await idempotencyStorageKey(options.apiKeyId, options.idempotencyKey);
@@ -116,6 +136,12 @@ export const withIdempotency = async (
         });
     }
 
+    const claim = options.claim?.(storageKey);
+
+    if (claim && !(await claim.acquire())) {
+        throw new PublicApiError("idempotency_in_progress", "A request with this idempotency key is still being processed. Retry shortly.");
+    }
+
     await store.put(storageKey, { fingerprint, state: "pending" }, IDEMPOTENCY_PENDING_TTL_MS);
 
     let response: Response;
@@ -124,6 +150,7 @@ export const withIdempotency = async (
         response = await handler();
     } catch (error) {
         await store.remove(storageKey);
+        await claim?.release();
 
         throw error;
     }
@@ -133,6 +160,7 @@ export const withIdempotency = async (
 
     if (response.status >= 500 || !contentType.includes("application/json")) {
         await store.remove(storageKey);
+        await claim?.release();
 
         return response;
     }

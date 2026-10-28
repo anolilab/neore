@@ -55,6 +55,10 @@ export const queryParameters = (route: RouteDefinition) => {
     });
 };
 
+/** The JSON Schema of a route's request body, for the tools that take its fields as arguments. */
+export const bodyJsonSchema = (route: RouteDefinition): { properties?: Record<string, JsonSchema>; required?: string[] } =>
+    route.body ? (toSchema(route.body, "input") as { properties?: Record<string, JsonSchema>; required?: string[] }) : {};
+
 const operation = (route: RouteDefinition) => {
     const status = String(route.successStatus ?? 200);
     const scopes = route.scopes.map(([resource, action]) => formatScope(resource, action));
@@ -94,7 +98,11 @@ const operation = (route: RouteDefinition) => {
             [status]: { content: successContent, description: "Success" },
             ...(route.method === "post" &&
                 route.noIdempotency !== true && {
-                    409: errorResponse("`conflict` or `idempotency_in_progress`"),
+                    409: errorResponse(
+                        route.mayRefuseHostThread
+                            ? "`host_thread_read_only` (the thread runs on a paired computer), `conflict` or `idempotency_in_progress`"
+                            : "`conflict` or `idempotency_in_progress`",
+                    ),
                     422: errorResponse("`idempotency_conflict`"),
                 }),
             ...(route.mayConflict && route.method !== "post" && { 409: errorResponse("`conflict`") }),

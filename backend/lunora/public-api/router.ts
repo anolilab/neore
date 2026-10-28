@@ -7,7 +7,7 @@
  *   2. scopes     — every scope the route lists; 403 `insufficient_scope`
  *   3. key limit  — `publicApi/read` or `publicApi/write` for this key id; 429
  *   4. body       — size cap, JSON, zod; 400 / 413
- *   5. idempotency — POSTs with `Idempotency-Key`
+ *   5. idempotency — POSTs with `Idempotency-Key` (an MCP write tool also holds a claim-once on it)
  *   6. handler    — an existing procedure, as the key's owner
  *
  * and every failure is rendered by `errors.ts` in the one public error shape.
@@ -24,7 +24,7 @@ import { inShard } from "../lib/http-shard";
 import { httpLogger } from "../lib/logger";
 import { errorResponse, fromProcedureError, PublicApiError } from "./errors";
 import type { IdempotencyRecord, IdempotencyStore } from "./idempotency";
-import { IDEMPOTENCY_FAMILY, IDEMPOTENCY_HEADER, parseIdempotencyKey, withIdempotency } from "./idempotency";
+import { IDEMPOTENCY_FAMILY, IDEMPOTENCY_HEADER, IDEMPOTENCY_TTL_MS, parseIdempotencyKey, withIdempotency } from "./idempotency";
 import type { ApiKeyIdentity } from "./identity";
 import { extractApiKey, MCP_PATH, readApiKeyIdentity } from "./identity";
 import { buildMcpTools, serveMcp, toolRequest } from "./mcp";
@@ -141,6 +141,31 @@ const idempotencyStore = (ctx: HttpActionCtx): IdempotencyStore => {
     };
 };
 
+/** `lib/claim-once.ts` scope of the hold a write tool takes on its idempotency key. */
+const MCP_WRITE_CLAIM_SCOPE = "mcp-write";
+
+const mcpWriteClaim = (ctx: HttpActionCtx, identity: ApiKeyIdentity) => (storageKey: string) => {
+    let claimedAt: number | undefined;
+
+    return {
+        acquire: async () => {
+            const fence = await ctx.runMutation(internal.lib.claim_once.claimKeyFenced, {
+                key: storageKey,
+                scope: MCP_WRITE_CLAIM_SCOPE,
+                ttlMs: IDEMPOTENCY_TTL_MS,
+                userId: identity.userId,
+            });
+
+            claimedAt = fence ?? undefined;
+
+            return fence !== null;
+        },
+        release: async () => {
+            await ctx.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: storageKey, scope: MCP_WRITE_CLAIM_SCOPE });
+        },
+    };
+};
+
 const toResponse = (route: RouteDefinition, result: RouteResult): Response =>
     result instanceof Response ? result : Response.json(result.data, { status: result.status ?? route.successStatus ?? 200 });
 
@@ -156,9 +181,10 @@ const runRoute = async (
     requestId: string,
     request: Request,
     params: Record<string, string>,
+    viaMcp = false,
 ): Promise<Response> => {
     try {
-        return await inShard(lunora, identity.userId, async (ctx) => await handleOnShard(route, ctx, identity, requestId, request, params));
+        return await inShard(lunora, identity.userId, async (ctx) => await handleOnShard(route, ctx, identity, requestId, request, params, viaMcp));
     } catch (error) {
         return failure(route.operationId, error, requestId);
     }
@@ -210,7 +236,7 @@ const handleMcp = async (routes: ReadonlyArray<RouteDefinition>, c: Context<Luno
                         throw error;
                     }
 
-                    return await runRoute(tool.route, c.var.lunora, identity, requestId, call.request, call.params);
+                    return await runRoute(tool.route, c.var.lunora, identity, requestId, call.request, call.params, true);
                 } catch (error) {
                     return failure(tool.route.operationId, error, requestId);
                 }
@@ -264,6 +290,7 @@ const handleOnShard = async (
     requestId: string,
     request: Request,
     params: Record<string, string>,
+    viaMcp: boolean,
 ): Promise<Response> => {
     try {
         await applyKeyRateLimit(ctx, identity, route.method !== "get");
@@ -297,7 +324,15 @@ const handleOnShard = async (
         const response = idempotencyKey
             ? await withIdempotency(
                   idempotencyStore(ctx),
-                  { apiKeyId: identity.apiKeyId, body: body.raw, idempotencyKey, method: request.method, pathAndQuery: url.pathname + url.search },
+                  {
+                      apiKeyId: identity.apiKeyId,
+                      body: body.raw,
+                      // A tool call is retried by an agent that may fire twice at once; the REST header keeps its best-effort marker.
+                      ...(viaMcp && { claim: mcpWriteClaim(ctx, identity) }),
+                      idempotencyKey,
+                      method: request.method,
+                      pathAndQuery: url.pathname + url.search,
+                  },
                   run,
               )
             : await run();

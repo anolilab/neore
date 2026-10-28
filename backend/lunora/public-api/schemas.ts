@@ -209,10 +209,23 @@ export const zChatStartedSchema = z.object({
     threadId: z.string(),
 });
 
+export const zPendingRequestSchema = z.object({
+    question: z.string().optional().meta({ description: "An `askUser` call's question." }),
+    toolCallId: z.string(),
+    toolName: z.string().nullable(),
+});
+
 export const zChatCompletedSchema = z.object({
     messageId: z.string(),
+    pendingRequest: zPendingRequestSchema.optional().meta({
+        description:
+            "With `status: waiting_on_person`: what the run is waiting on. Only a person can answer it, in the app; read the reply from the thread's messages afterwards.",
+    }),
     reasoning: z.string(),
-    status: z.string().meta({ description: "`done` on success; otherwise why the generation stopped." }),
+    status: z.string().meta({
+        description:
+            "`done` on success; `waiting_on_person` when the run paused for an approval or a question (see `pendingRequest`); otherwise why the generation stopped.",
+    }),
     text: z.string(),
     threadId: z.string(),
 });

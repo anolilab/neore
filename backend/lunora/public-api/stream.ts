@@ -13,12 +13,17 @@
  *   {"type":"speaker","name":"Researcher","skillId":"…"}
  *   {"type":"reply.restart"}                   (the reply was steered; see below)
  *   {"type":"done","status":"done"}
+ *   {"type":"done","status":"waiting_on_person","pendingRequest":{…}}   (the run paused for a person)
  *   {"type":"error","error":{"code":"…","message":"…"}}
  *   {"type":"resume","lastChunkIndex":40}      (only with `resumable: true`)
  *
  * `reply.restart` marks the cut when the user steered the reply from the app: everything before it
  * is the text of the reply as it stood, everything after continues below the steering message. A
  * client that wants one text just keeps appending ({@link collectStream} does).
+ *
+ * A run that pauses on a tool approval or an `askUser` question ends `done` like any other, so the relay
+ * reports it as `status: "waiting_on_person"` with the `pendingRequest` (read-only here: a person answers in
+ * the app, and the reply is then in the thread's messages).
  *
  * `done` or `error` is always the last line — or, for a caller that sent
  * `resumable: true`, `resume`: the relay used up its read budget and the caller
@@ -38,12 +43,22 @@
  */
 import { sleep } from "../chat/tools/utilities";
 
+/** A request the run paused on, which only a person can answer in the app. */
+export interface PendingRequest {
+    /** An `askUser` call's question text. */
+    question?: string;
+    toolCallId: string;
+    toolName: string | null;
+}
+
+export const WAITING_ON_PERSON = "waiting_on_person";
+
 export type StreamEvent =
     | { error: { code: string; message: string }; type: "error" }
     | { lastChunkIndex: number; type: "resume" }
     | { name: string; skillId: string; type: "speaker" }
     | { type: "reply.restart" }
-    | { status: string; type: "done" }
+    | { pendingRequest?: PendingRequest; status: string; type: "done" }
     | { text: string; type: "reasoning" }
     | { text: string; type: "text" };
 
@@ -58,7 +73,7 @@ export interface StreamChunk {
 /** One read of the stream: the chunks past `afterIndex` and the status, from ONE query, so they agree. */
 export interface StreamSource {
     /** `locked`: the thread was locked after the stream started, so nothing more may be relayed. */
-    read: (afterIndex: number) => Promise<{ chunks: StreamChunk[]; locked?: boolean; status: string }>;
+    read: (afterIndex: number) => Promise<{ chunks: StreamChunk[]; locked?: boolean; pendingRequest?: PendingRequest; status: string }>;
 }
 
 export const TERMINAL_STREAM_STATUSES: ReadonlySet<string> = new Set(["done", "error", "timeout"]);
@@ -125,6 +140,17 @@ export const chunkToEvents = (chunk: StreamChunk): StreamEvent[] => {
     return events;
 };
 
+const terminalEvent = (status: string, pendingRequest: PendingRequest | undefined): StreamEvent => {
+    if (status === "error" || status === "timeout") {
+        return {
+            error: { code: status === "timeout" ? "stream_timeout" : "generation_failed", message: `The generation ended with status "${status}".` },
+            type: "error",
+        };
+    }
+
+    return pendingRequest ? { pendingRequest, status: WAITING_ON_PERSON, type: "done" } : { status, type: "done" };
+};
+
 /**
  * Poll until the stream is terminal, yielding events as chunks land — or until
  * the read budget is spent (see the module comment).
@@ -143,7 +169,7 @@ export async function* pollStream(source: StreamSource, options: PollOptions = {
     let reads = 0;
 
     while (!options.signal?.aborted) {
-        const { chunks, locked, status } = await source.read(afterIndex);
+        const { chunks, locked, pendingRequest, status } = await source.read(afterIndex);
 
         if (locked) {
             yield { error: { code: "thread_locked", message: "This chat is locked." }, type: "error" };
@@ -159,12 +185,7 @@ export async function* pollStream(source: StreamSource, options: PollOptions = {
         }
 
         if (TERMINAL_STREAM_STATUSES.has(status)) {
-            yield status === "error" || status === "timeout"
-                ? {
-                      error: { code: status === "timeout" ? "stream_timeout" : "generation_failed", message: `The generation ended with status "${status}".` },
-                      type: "error",
-                  }
-                : { status, type: "done" };
+            yield terminalEvent(status, pendingRequest);
 
             return;
         }
@@ -196,6 +217,8 @@ export async function* pollStream(source: StreamSource, options: PollOptions = {
 }
 
 export interface CollectedStream {
+    /** Set with `status: "waiting_on_person"`. */
+    pendingRequest?: PendingRequest;
     reasoning: string;
     status: string;
     text: string;
@@ -210,6 +233,7 @@ export const collectStream = async (source: StreamSource, options: PollOptions =
     let text = "";
     let reasoning = "";
     let status = "unknown";
+    let pendingRequest: PendingRequest | undefined;
 
     const events = pollStream(source, { delay: blockingPollDelay, ...options });
 
@@ -217,6 +241,7 @@ export const collectStream = async (source: StreamSource, options: PollOptions =
         switch (event.type) {
             case "done": {
                 status = event.status;
+                pendingRequest = event.pendingRequest;
                 break;
             }
             case "error": {
@@ -247,7 +272,7 @@ export const collectStream = async (source: StreamSource, options: PollOptions =
         }
     }
 
-    return { reasoning, status, text };
+    return { ...(pendingRequest && { pendingRequest }), reasoning, status, text };
 };
 
 /** Encode the poller as an NDJSON body. */

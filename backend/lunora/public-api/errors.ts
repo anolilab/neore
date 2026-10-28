@@ -16,6 +16,7 @@ export const API_ERROR_CODES = {
     conflict: 409,
     daily_limit_reached: 429,
     forbidden: 403,
+    host_thread_read_only: 409,
     idempotency_conflict: 422,
     idempotency_in_progress: 409,
     insufficient_scope: 403,

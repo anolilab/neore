@@ -7,9 +7,10 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { Hono } from "hono";
 import type { LunoraHttpEnv } from "lunorash/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import z from "zod/v4";
 
+import { runChatStart } from "../chat/http";
 import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import { buildMcpTools } from "./mcp";
 import type { RouteDefinition } from "./routes";
@@ -48,6 +49,8 @@ const READ_SCOPES: ApiScopes = { knowledge: ["read"], tasks: ["read"], threads: 
 const openThread = { _creationTime: 1, _id: "t1", status: "active", title: "Plan", userId: "user1" };
 
 interface Fixture {
+    /** What `getChunksAfter` answers on every read. Default: a finished stream with one chunk. */
+    chunks?: { chunks: { text: string }[]; locked?: boolean; pendingRequest?: object; status: string };
     identity?: object | null;
     limit?: { ok: boolean; retryAfter?: number };
     routes?: ReadonlyArray<RouteDefinition>;
@@ -58,6 +61,9 @@ interface Fixture {
 
 const setup = (fixture: Fixture = {}) => {
     const calls: { args: unknown; name: string }[] = [];
+    // The idempotency store and the claim table, as the runtime keeps them.
+    const stored = new Map<string, unknown>();
+    const claims = new Map<string, number>();
     const run = async (ref: { __lunoraRef: string }, args: unknown) => {
         const name = ref.__lunoraRef;
 
@@ -76,6 +82,40 @@ const setup = (fixture: Fixture = {}) => {
                 }
 
                 return { continueCursor: "", isDone: true, page: [] };
+            }
+            case "chat_streaming_persistent_library:getChunksAfter": {
+                return { locked: false, totalChunks: 0, ...(fixture.chunks ?? { chunks: [{ text: "Hello" }], status: "done" }) };
+            }
+            case "lib_action_cache:get": {
+                const { key } = args as { key: string };
+
+                return stored.has(key) ? { kind: "hit", value: stored.get(key) } : { kind: "miss" };
+            }
+            case "lib_action_cache:put": {
+                stored.set((args as { key: string }).key, (args as { value: unknown }).value);
+
+                return null;
+            }
+            case "lib_action_cache:remove": {
+                stored.delete((args as { key: string }).key);
+
+                return null;
+            }
+            case "lib_claim_once:claimKeyFenced": {
+                const { key } = args as { key: string };
+
+                if (claims.has(key)) {
+                    return null;
+                }
+
+                claims.set(key, 1);
+
+                return 1;
+            }
+            case "lib_claim_once:releaseKey": {
+                claims.delete((args as { key: string }).key);
+
+                return null;
             }
             case "lib_rate_limiter_mutations:applyRateLimit": {
                 return fixture.limit ?? { ok: true };
@@ -98,6 +138,7 @@ const setup = (fixture: Fixture = {}) => {
 
     return {
         calls,
+        claims,
         fetch: async (input: URL | string, init?: RequestInit) => await app.request(input, init),
         post: async (body: unknown, headers: Record<string, string> = {}) =>
             await app.request("https://api.example/api/v1/mcp", {
@@ -289,7 +330,7 @@ describe("MCP tools/list", () => {
         const sendMessage: RouteDefinition = {
             body: z.object({ prompt: z.string() }),
             handler,
-            mcp: [{ description: "Send a message.", tool: "send_message" }],
+            mcp: [{ description: "Send a message.", tool: "fixture_send" }],
             method: "post",
             operationId: "fixtureSend",
             path: "/fixture/send",
@@ -300,9 +341,9 @@ describe("MCP tools/list", () => {
         };
         const fixture = { routes: [...ROUTES, sendMessage] };
 
-        expect(await names(fixture)).not.toContain("send_message");
+        expect(await names(fixture)).not.toContain("fixture_send");
 
-        const { calls, result } = await callTool(fixture, "send_message", {});
+        const { calls, result } = await callTool(fixture, "fixture_send", {});
 
         expect(result?.isError).toBe(true);
         expect(result?.structuredContent).toMatchObject({ error: { code: "insufficient_scope", details: { required: ["chat:write"] } } });
@@ -374,10 +415,9 @@ describe("MCP tools/call", () => {
 
     it("refuses an unknown tool, a missing path argument and an unknown argument", async () => {
         const unknown = setup();
-        const body = await jsonOf(unknown.post(rpc("tools/call", { name: "send_message" })));
+        const body = await jsonOf(unknown.post(rpc("tools/call", { name: "delete_everything" })));
 
-        // No write tool exists in this slice, so a forced call to one names no tool at all.
-        expect(body).toMatchObject({ error: { code: -32_602, message: "Unknown tool: send_message" } });
+        expect(body).toMatchObject({ error: { code: -32_602, message: "Unknown tool: delete_everything" } });
 
         const missing = await callTool({}, "get_thread", {});
 
@@ -387,6 +427,224 @@ describe("MCP tools/call", () => {
 
         expect(extra.result?.structuredContent).toMatchObject({ error: { code: "invalid_request" } });
         expect(extra.calls.map((entry) => entry.name)).not.toContain("chat_functions:getThread");
+    });
+});
+
+describe("MCP write tools", () => {
+    const WRITE_SCOPES: ApiScopes = { chat: ["write"] };
+    const started = { messageId: "m1", streamId: "s1", streamToken: "tok", threadId: "t1" };
+    const startedResponse = () => Response.json(started);
+    const chatStart = vi.mocked(runChatStart);
+
+    beforeEach(() => {
+        chatStart.mockReset();
+        chatStart.mockImplementation(async () => startedResponse());
+        vi.stubEnv("LLM_GATEWAY_SIGNING_SECRET", "secret");
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    const send = async (fixture: Fixture, args: Record<string, unknown>, tool = "send_message") =>
+        await callTool({ scopes: WRITE_SCOPES, ...fixture }, tool, args);
+
+    it("lists both write tools for a chat:write key, with the right arguments", async () => {
+        const { post } = setup({ scopes: WRITE_SCOPES });
+        const body = (await jsonOf(post(rpc("tools/list")))) as { result: { tools: { inputSchema: any; name: string }[] } };
+        const byName = Object.fromEntries(body.result.tools.map((tool) => [tool.name, tool.inputSchema]));
+
+        expect(Object.keys(byName)).toEqual(["create_thread", "send_message"]);
+        expect(byName["create_thread"].required).toEqual(["prompt"]);
+        expect(Object.keys(byName["create_thread"].properties)).toEqual(["model", "prompt", "idempotencyKey"]);
+        expect(byName["send_message"].required).toEqual(["prompt", "threadId"]);
+        expect(Object.keys(byName["send_message"].properties)).toEqual(["model", "prompt", "threadId", "idempotencyKey"]);
+        expect(byName["send_message"].additionalProperties).toBe(false);
+    });
+
+    it("sends with chat:write alone, but cannot list threads", async () => {
+        const sent = await send({}, { prompt: "hello", threadId: "t1" });
+
+        expect(sent.result).toMatchObject({
+            isError: false,
+            structuredContent: { messageId: "m1", status: "done", text: "Hello", threadId: "t1" },
+        });
+
+        const listed = await send({}, {}, "list_threads");
+
+        expect(listed.result?.isError).toBe(true);
+        expect(listed.result?.structuredContent).toMatchObject({ error: { code: "insufficient_scope", details: { required: ["threads:read"] } } });
+    });
+
+    it("runs the chat as a blocking turn on the write limit, like POST /chat", async () => {
+        const { calls } = await send({}, { prompt: "hello", threadId: "t1" });
+
+        expect(chatStart).toHaveBeenCalledOnce();
+        expect(chatStart.mock.calls[0]?.[1]).toMatchObject({ mode: "text", prompt: "hello", threadId: "t1" });
+        expect(rateLimitCalls(calls)).toEqual([
+            { args: { identifier: "key1", key: "publicApi/write:free" }, name: "lib_rate_limiter_mutations:applyRateLimit" },
+        ]);
+    });
+
+    it("starts a thread without a threadId, and refuses one", async () => {
+        const created = await send({}, { prompt: "hello" }, "create_thread");
+
+        expect(created.result).toMatchObject({ isError: false, structuredContent: { threadId: "t1" } });
+        expect(chatStart.mock.calls[0]?.[1]).not.toHaveProperty("threadId");
+
+        const refused = await send({}, { prompt: "hello", threadId: "t1" }, "create_thread");
+
+        expect(refused.result?.structuredContent).toMatchObject({ error: { code: "invalid_request", message: "`create_thread` has no argument `threadId`." } });
+        expect(chatStart).toHaveBeenCalledOnce();
+    });
+
+    it("needs a threadId and a prompt for send_message, and never lets the model ask for a stream", async () => {
+        const noThread = await send({}, { prompt: "hello" });
+        const noPrompt = await send({}, { threadId: "t1" });
+        const stream = await send({}, { prompt: "hello", stream: true, threadId: "t1" });
+
+        expect(noThread.result?.structuredContent).toMatchObject({ error: { code: "invalid_request", message: "`threadId` is required." } });
+        expect(noPrompt.result?.structuredContent).toMatchObject({ error: { code: "invalid_request", message: "`prompt` is required." } });
+        expect(stream.result?.structuredContent).toMatchObject({ error: { code: "invalid_request" } });
+        expect(chatStart).not.toHaveBeenCalled();
+    });
+
+    it("creates one message for the same idempotencyKey twice, and replays the first result", async () => {
+        const harness = setup({ scopes: WRITE_SCOPES });
+        const call = async (args: Record<string, unknown>) => {
+            const response = await harness.post(rpc("tools/call", { arguments: args, name: "send_message" }));
+
+            return ((await response.json()) as { result: ToolResult }).result;
+        };
+        const args = { idempotencyKey: "once-1", prompt: "hello", threadId: "t1" };
+        const first = await call(args);
+        const second = await call(args);
+
+        expect(chatStart).toHaveBeenCalledOnce();
+        expect(second.structuredContent).toEqual(first.structuredContent);
+
+        const different = await call({ ...args, prompt: "something else" });
+
+        expect(different.structuredContent).toMatchObject({ error: { code: "idempotency_conflict" } });
+        expect(chatStart).toHaveBeenCalledOnce();
+    });
+
+    it("treats the same key on another API key as a different request", async () => {
+        const one = setup({ scopes: WRITE_SCOPES });
+        const two = setup({ identity: { apiKeyId: "key2", apiKeyScopes: WRITE_SCOPES, authMethod: "api_key" } });
+        const args = { idempotencyKey: "shared", prompt: "hello", threadId: "t1" };
+
+        for (const harness of [one, two]) {
+            await harness.post(rpc("tools/call", { arguments: args, name: "send_message" }));
+        }
+
+        expect(chatStart).toHaveBeenCalledTimes(2);
+    });
+
+    it("creates one message when two calls with one key arrive at once", async () => {
+        let finish!: () => void;
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node >= 22.11; the configured range starts at 22.0
+        const gate = new Promise<void>((resolve) => {
+            finish = resolve;
+        });
+
+        chatStart.mockImplementation(async () => {
+            await gate;
+
+            return startedResponse();
+        });
+
+        const harness = setup({ scopes: WRITE_SCOPES });
+        const args = { idempotencyKey: "race", prompt: "hello", threadId: "t1" };
+        const call = async (id: number) => {
+            const response = await harness.post(rpc("tools/call", { arguments: args, name: "send_message" }, id));
+
+            return ((await response.json()) as { result: ToolResult }).result;
+        };
+        const winner = call(1);
+
+        await vi.waitFor(() => {
+            expect(chatStart).toHaveBeenCalledOnce();
+        });
+
+        // The first is still running: the second finds the key held, not the stored result.
+        const loser = await call(2);
+
+        expect(loser.structuredContent).toMatchObject({ error: { code: "idempotency_in_progress" } });
+
+        finish();
+
+        const won = await winner;
+
+        expect(won.isError).toBe(false);
+        expect(chatStart).toHaveBeenCalledOnce();
+
+        // The loser retries and reads the winner's stored result.
+        const retried = await call(3);
+
+        expect(retried.structuredContent).toMatchObject({ messageId: "m1" });
+        expect(chatStart).toHaveBeenCalledOnce();
+    });
+
+    it("gives the key back when the send fails, so the retry runs", async () => {
+        chatStart.mockImplementationOnce(async () => Response.json({ error: "boom" }, { status: 500 }));
+
+        const harness = setup({ scopes: WRITE_SCOPES });
+        const args = { idempotencyKey: "retry-me", prompt: "hello", threadId: "t1" };
+        const failed = await harness.post(rpc("tools/call", { arguments: args, name: "send_message" }));
+
+        expect(((await failed.json()) as { result: ToolResult }).result.structuredContent).toMatchObject({ error: { code: "internal_error" } });
+        expect(harness.claims.size).toBe(0);
+
+        const retried = await harness.post(rpc("tools/call", { arguments: args, name: "send_message" }));
+
+        expect(((await retried.json()) as { result: ToolResult }).result.isError).toBe(false);
+        expect(chatStart).toHaveBeenCalledTimes(2);
+    });
+
+    it("rejects an idempotencyKey the header would reject", async () => {
+        const { result } = await send({}, { idempotencyKey: "has space", prompt: "hello", threadId: "t1" });
+
+        expect(result?.structuredContent).toMatchObject({ error: { code: "invalid_request" } });
+        expect(chatStart).not.toHaveBeenCalled();
+    });
+
+    it("counts against the daily message limit, answering daily_limit_reached", async () => {
+        chatStart.mockImplementation(async () => Response.json({ error: "DAILY_MESSAGE_LIMIT", message: "Daily limit reached." }, { status: 403 }));
+
+        const { result } = await send({}, { prompt: "hello", threadId: "t1" });
+
+        expect(chatStart).toHaveBeenCalledOnce();
+        expect(result?.structuredContent).toMatchObject({ error: { code: "daily_limit_reached" } });
+    });
+
+    it("answers host_thread_read_only for a host-run thread, over MCP and REST", async () => {
+        chatStart.mockImplementation(async () => Response.json({ error: "HOST_RUN_THREAD", message: "Send it from the desktop app." }, { status: 409 }));
+
+        const { result } = await send({}, { prompt: "hello", threadId: "t1" });
+
+        expect(result?.isError).toBe(true);
+        expect(result?.structuredContent).toMatchObject({ error: { code: "host_thread_read_only" } });
+
+        const rest = setup({ scopes: WRITE_SCOPES });
+        const response = await rest.request("/chat", {
+            body: JSON.stringify({ prompt: "hello", stream: false, threadId: "t1" }),
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+        });
+
+        expect(response.status).toBe(409);
+        expect(await response.json()).toMatchObject({ error: { code: "host_thread_read_only" } });
+    });
+
+    it("returns waiting_on_person with the pending request as soon as the run pauses", async () => {
+        const pendingRequest = { question: "Which environment?", toolCallId: "call1", toolName: "askUser" };
+        const harness = setup({ chunks: { chunks: [{ text: "Let me check." }], pendingRequest, status: "done" }, scopes: WRITE_SCOPES });
+        const response = await harness.post(rpc("tools/call", { arguments: { prompt: "deploy", threadId: "t1" }, name: "send_message" }));
+        const { result } = (await response.json()) as { result: ToolResult };
+
+        expect(result).toMatchObject({ isError: false, structuredContent: { pendingRequest, status: "waiting_on_person", text: "Let me check." } });
+        expect(harness.calls.filter((entry) => entry.name === "chat_streaming_persistent_library:getChunksAfter")).toHaveLength(1);
     });
 });
 
@@ -401,11 +659,19 @@ describe("MCP tool table", () => {
         }
     });
 
-    it("tags only read routes in this slice, none of them a stream", () => {
+    it("tags reads, and as writes only the two chat tools, never a stream", () => {
+        const writes = tools.filter((tool) => tool.route.method !== "get");
+
+        expect(writes.map((tool) => tool.name)).toEqual(["create_thread", "send_message"]);
+
         for (const tool of tools) {
-            expect(tool.route.method, tool.name).toBe("get");
             expect(tool.route.response, tool.name).not.toBe("ndjson");
-            expect(tool.annotations.readOnlyHint, tool.name).toBe(true);
+            expect(tool.annotations.readOnlyHint, tool.name).toBe(tool.route.method === "get");
+        }
+
+        for (const tool of writes) {
+            expect(tool.route.operationId, tool.name).toBe("createChat");
+            expect(tool.route.scopes, tool.name).toEqual([["chat", "write"]]);
         }
     });
 

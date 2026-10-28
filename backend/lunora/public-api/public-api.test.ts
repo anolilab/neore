@@ -233,6 +233,69 @@ describe("idempotency", () => {
         });
     });
 
+    it("holds a claim so two first attempts that both missed the store run once", async () => {
+        const store = { ...memoryStore(), get: async () => undefined };
+        const held = new Set<string>();
+        const claim = (key: string) => {
+            return {
+                acquire: async () => {
+                    if (held.has(key)) {
+                        return false;
+                    }
+
+                    held.add(key);
+
+                    return true;
+                },
+                release: async () => {
+                    held.delete(key);
+                },
+            };
+        };
+        let finish!: () => void;
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node >= 22.11; the configured range starts at 22.0
+        const gate = new Promise<void>((resolve) => {
+            finish = resolve;
+        });
+        const handler = vi.fn(async () => {
+            await gate;
+
+            return Response.json({ id: "t1" });
+        });
+        const first = withIdempotency(store, { ...options, claim }, handler);
+        const second = withIdempotency(store, { ...options, claim }, handler);
+
+        await expect(second).rejects.toMatchObject({ code: "idempotency_in_progress" });
+        finish();
+        const completed = await first;
+
+        expect(completed.status).toBe(200);
+        expect(handler).toHaveBeenCalledTimes(1);
+        // A stored response keeps the key held; the claim is only given back when nothing was stored.
+        expect(held.size).toBe(1);
+    });
+
+    it("gives the claim back when the handler fails or answers a 5xx", async () => {
+        const held = new Set<string>();
+        const claim = (key: string) => {
+            return {
+                acquire: async () => !held.has(key) && Boolean(held.add(key)),
+                release: async () => {
+                    held.delete(key);
+                },
+            };
+        };
+
+        await withIdempotency(memoryStore(), { ...options, claim }, async () => Response.json({ error: "x" }, { status: 503 }));
+        expect(held.size).toBe(0);
+        await expect(
+            withIdempotency(memoryStore(), { ...options, claim }, async () => {
+                throw new Error("boom");
+            }),
+        ).rejects.toThrow("boom");
+        expect(held.size).toBe(0);
+    });
+
     it("does not store failures, so a retry runs again", async () => {
         const store = memoryStore();
 
@@ -287,6 +350,29 @@ describe("stream relay", () => {
             { text: "lo", type: "text" },
             { status: "done", type: "done" },
         ]);
+    });
+
+    it("ends a run that paused for a person as waiting_on_person, within one read", async () => {
+        const pendingRequest = { question: "Which one?", toolCallId: "c1", toolName: "askUser" };
+        const read = vi.fn(async () => {
+            return { chunks: [{ text: "Checking." }], pendingRequest, status: "done" };
+        });
+
+        expect(await Array.fromAsync(pollStream({ read }, { sleep: async () => {} }))).toEqual([
+            { text: "Checking.", type: "text" },
+            { pendingRequest, status: "waiting_on_person", type: "done" },
+        ]);
+        expect(read).toHaveBeenCalledOnce();
+        expect(await collectStream({ read }, { sleep: async () => {} })).toEqual({
+            pendingRequest,
+            reasoning: "",
+            status: "waiting_on_person",
+            text: "Checking.",
+        });
+    });
+
+    it("keeps a plain done as done when nothing is pending", async () => {
+        expect(await collectStream(source(["done"], [[{ text: "Hi" }]]), { sleep: async () => {} })).toEqual({ reasoning: "", status: "done", text: "Hi" });
     });
 
     it("maps a steering marker chunk to a reply.restart event, before the chunk's own text", () => {
