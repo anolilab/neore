@@ -383,6 +383,29 @@ const button = (label: string, onClick: () => void, description?: string): HTMLB
     return element;
 };
 
+/** What each server's connection said the last time the list was drawn, so only a change is announced. */
+const lastLink = new Map<string, string>();
+
+/** The cards are drawn anew on every change, so a screen reader hears a lost or restored connection through one live region. */
+const announceLinkChanges = (hosts: HostView[]): void => {
+    const changes: string[] = [];
+
+    for (const host of hosts) {
+        const link = host.connected ? "connected" : host.reconnect?.phase ?? "not connected";
+        const before = lastLink.get(host.deviceId);
+
+        lastLink.set(host.deviceId, link);
+
+        if (before !== undefined && before !== link) {
+            changes.push(`${host.name}: ${describeLink(host, Date.now())}`);
+        }
+    }
+
+    if (changes.length > 0) {
+        $("link-announcement").textContent = changes.join(". ");
+    }
+};
+
 const hostCard = (host: HostView): HTMLElement => {
     const card = document.createElement("section");
     const heading = document.createElement("h3");
@@ -612,6 +635,7 @@ const renderSettings = (): void => {
     none.className = "muted";
     none.textContent = "None.";
     $("hosts").replaceChildren(...view.hosts.length === 0 ? [none] : view.hosts.map((host) => hostCard(host)));
+    announceLinkChanges(view.hosts);
     $("roots").replaceChildren(...view.roots.map((root) => rootItem(root)));
     $("servers").replaceChildren(
         ...view.mcpServers.map((server) =>

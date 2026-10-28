@@ -1017,7 +1017,7 @@ impl DeviceState {
         _slot: &AttemptGuard,
     ) -> Result<HostProbe, ConnectError> {
         let (interactive, disconnects) = match attempt {
-            Attempt::Manual => (true, self.ssh.disconnects.load(Ordering::SeqCst)),
+            Attempt::Manual => (true, self.disconnects_of(device_id)),
             Attempt::Background { disconnects } => (false, disconnects),
         };
         let host = self
@@ -1047,7 +1047,7 @@ impl DeviceState {
         let probe = HostProbe::of(link.hello());
 
         // Disconnected while the connect was waiting: the user asked for that, and it stays asked.
-        if self.ssh.disconnects.load(Ordering::SeqCst) != disconnects {
+        if self.disconnects_of(device_id) != disconnects {
             self.retire(&link);
 
             return Err("that server was disconnected meanwhile".into());
@@ -1150,7 +1150,7 @@ impl DeviceState {
     }
 
     pub fn host_disconnect(&self, device_id: &str) {
-        self.ssh.disconnects.fetch_add(1, Ordering::SeqCst);
+        self.note_disconnect(device_id);
         self.keep_forget(device_id);
 
         let link = self.ssh.connections.lock().unwrap().remove(device_id);
@@ -3118,6 +3118,24 @@ mod tests {
 
         assert!(refused.contains("device window"), "{refused}");
         assert!(state.host_connect(&id, true).unwrap_err().contains("down"));
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn disconnecting_one_server_does_not_cancel_the_attempts_of_another() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("count", &link);
+        let id = host_id("count");
+        let before = state.disconnects_of(&id);
+
+        state.note_disconnect(&other_id("count"));
+
+        assert_eq!(state.disconnects_of(&id), before);
+
+        state.note_disconnect(&id);
+
+        assert_eq!(state.disconnects_of(&id), before + 1);
 
         let _ = stdfs::remove_dir_all(dir);
     }
