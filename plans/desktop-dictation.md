@@ -111,15 +111,24 @@ S4 as built (`.github/workflows/dictation-desktop.yml`, `apps/desktop/scripts/bu
   capture, which reports `denied` if it is blocked. Linux has no OS gate; the page's `denied` / `no-device` is the answer.
 - **Models.** Small is the default on every machine without a GPU, as in Appendix A.
 - **Unsupported.** `unsupportedReason` (`catalog.ts`) lists the platforms that are built, packaged and tested;
-  everywhere else settings says so, offers nothing and the shortcut stays off. Windows on ARM is not in the list yet, and
-  neither are Intel Macs. CI runs each runner with `NEORE_DICTATION_EXPECT`, so the table must agree with the runner it
-  runs on, and the Windows on ARM leg asserts the settings page says "unavailable".
+  everywhere else (Intel Macs, any other OS or arch) settings says so, offers nothing and the shortcut stays off.
+  `catalog.test.ts` asserts the table, and against the runner it runs on (`NEORE_DICTATION_EXPECT`).
 - **Budget.** A supported platform's default model must finish a spoken 11 s clip in at most 1.5 times its length on a
-  four-core runner (`real-helper.test.ts`; the slowest build S1 accepted took 0.84 times, the MSVC Windows arm64 build it
-  rejected 4.3). The Windows on ARM leg only records its time (small, base and tiny) in its step summary: when small is
-  inside the budget there, its entry moves into `SUPPORTED`, `desktop.yml` builds it with `-- --arch arm64`, and the
-  smoke test counts it. Until then the clang-cl measurement is pending, and so is Appendix A's row for it (Appendix A is
-  part of the S1 branch, which is not on this one).
+  four-core runner (`real-helper.test.ts`; the MSVC Windows arm64 build S1 rejected took 4.3 times). Measured in CI with
+  the shipped builds (whisper.cpp's `jfk.wav`, 11.0 s, small unless noted; peak memory is not measured here):
+
+  | Platform | Build | Time | Factor |
+  | --- | --- | --- | --- |
+  | Linux x64 | gcc, built on ubuntu-22.04 | 7.7 s | 0.70 |
+  | Linux arm64 | gcc, `armv8.2-a+fp16+dotprod` | 3.9 s | 0.36 |
+  | Windows x64 | MSVC | 8.8 s | 0.80 |
+  | Windows arm64 | clang-cl, `armv8.2-a+fp16+dotprod` | 7.1 s | 0.64 |
+  | Windows arm64, base | clang-cl | 5.5 s | 0.50 |
+  | Windows arm64, tiny | clang-cl | 0.7 s | 0.06 |
+
+  The clang-cl build is four to six times faster than the MSVC one S1 measured (42.9 s for small on a 10 s clip), so
+  Windows on ARM is supported with small as its default. These rows belong in Appendix A, which is part of the S1 branch
+  (#376) and not of this one.
 
 ## 5. Invariants crossed
 

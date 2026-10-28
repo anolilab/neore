@@ -246,18 +246,38 @@ jobs:
             - name: "Write the host checksum manifest"
               run: "pnpm --filter @neore/desktop run host-bundle manifest"
 
-            # On-device dictation (plans/desktop-dictation.md): whisper.cpp at its pinned commit, built for the runner's
-            # architecture. Linux builds on the oldest runner it ships from and fails if the helper needs a newer glibc
-            # than that. Windows builds the x64 helper only: Windows on ARM is not offered (`unsupportedReason` in
-            # `src/dictation/catalog.ts`) until its clang-cl build measures inside the budget, and then this step gains
-            # `-- --arch arm64` and `smoke:artifacts` counts both. The Intel macOS app ships without a helper.
+            # On-device dictation (plans/desktop-dictation.md): whisper.cpp at its pinned commit, built for each architecture the
+            # app ships. Linux builds on the oldest runner it ships from and fails if the helper needs a newer glibc than that.
+            # Windows builds both: arm64 with clang-cl, cross-built on this x64 runner (`dictation-desktop.yml` builds it the same
+            # way on every pull request). The Intel macOS app ships without a helper.
             - name: "Build the on-device speech helper (macOS arm64)"
               if: "matrix.name == 'macos'"
               run: "pnpm --filter @neore/desktop run build:dictation-helper"
 
+            - name: "Make sure clang-cl is installed (Windows)"
+              if: "matrix.name == 'windows'"
+              shell: "pwsh"
+              run: |
+                  $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer"
+                  $path = & "$installer\vswhere.exe" -latest -products * -property installationPath
+                  $clang = Get-ChildItem -Path $path -Recurse -Filter clang-cl.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+                  if (-not $clang) {
+                      Start-Process -FilePath "$installer\setup.exe" -Wait -ArgumentList @(
+                          "modify", "--installPath", "`"$path`"", "--quiet", "--norestart", "--noUpdateInstaller",
+                          "--add", "Microsoft.VisualStudio.Component.VC.Llvm.Clang",
+                          "--add", "Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset"
+                      )
+                      $clang = Get-ChildItem -Path $path -Recurse -Filter clang-cl.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+                  }
+                  if (-not $clang) { throw "clang-cl.exe is not installed" }
+
             - name: "Build the on-device speech helper (Windows x64)"
               if: "matrix.name == 'windows'"
               run: "pnpm --filter @neore/desktop run build:dictation-helper -- --arch x64"
+
+            - name: "Build the on-device speech helper (Windows arm64)"
+              if: "matrix.name == 'windows'"
+              run: "pnpm --filter @neore/desktop run build:dictation-helper -- --arch arm64"
 
             - name: "Build the on-device speech helper (Linux)"
               if: "matrix.name == 'linux'"
