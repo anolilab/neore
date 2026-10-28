@@ -6793,7 +6793,7 @@ msgid "Conversation not available"
 msgstr "Conversa indisponível"
 
 #: src/features/chat/thread/composer-input.tsx:716
-#: src/features/chat/thread/composer-input.tsx:1088
+#: src/features/chat/thread/composer-input.tsx:1082
 msgid "Conversion failed"
 msgstr "Falha na conversão"
 
@@ -7062,7 +7062,7 @@ msgstr "Costa Rica"
 msgid "Could not apply the changes"
 msgstr "Não foi possível aplicar as alterações"
 
-#: src/features/chat/thread/composer-input.tsx:1110
+#: src/features/chat/thread/composer-input.tsx:1104
 msgid "Could not attach the chat"
 msgstr "Não foi possível anexar a conversa"
 
@@ -7218,11 +7218,11 @@ msgstr "Não foi possível baixar {0}: {1}"
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1113
+#: src/features/chat/thread/composer-input.tsx:1107
 msgid "Could not read that chat"
 msgstr "Não foi possível ler essa conversa"
 
-#: src/features/chat/thread/composer-input.tsx:1114
+#: src/features/chat/thread/composer-input.tsx:1108
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Não foi possível ler essa conversa. Se estiver bloqueada, desbloqueie-a primeiro."
 
@@ -9411,7 +9411,7 @@ msgstr "Solte um arquivo ou clique para enviar"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1289
+#: src/features/chat/thread/composer-input.tsx:1283
 msgid "Drop files here"
 msgstr "Solte os arquivos aqui"
 
@@ -11312,7 +11312,7 @@ msgid "Failed to attach collection"
 msgstr "Falha ao anexar a coleção"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:980
+#: src/features/chat/thread/composer-input.tsx:974
 msgid "Failed to attach file"
 msgstr "Falha ao anexar o arquivo"
 
@@ -11716,7 +11716,7 @@ msgstr "Falha ao solicitar a exportação"
 msgid "Failed to reset to defaults"
 msgstr "Falha ao redefinir para o padrão"
 
-#: src/features/chat/thread/composer-input.tsx:1012
+#: src/features/chat/thread/composer-input.tsx:1006
 msgid "Failed to restore attachment"
 msgstr "Falha ao restaurar o anexo"
 
@@ -24951,7 +24951,7 @@ msgstr "Pontuação"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Pontua cada resposta de 0 a 100% em relação à resposta esperada ou à rubrica. Adiciona uma pequena chamada de modelo por caso."
 
-#: src/features/chat/thread/composer-input.tsx:939
+#: src/features/chat/thread/composer-input.tsx:933
 msgid "Screen capture failed. Please try again."
 msgstr "A captura de tela falhou. Tente novamente."
 
@@ -30182,7 +30182,7 @@ msgstr "Digite para pesquisar"
 msgid "Type your answer…"
 msgstr "Digite sua resposta…"
 
-#: src/features/chat/thread/composer-input.tsx:1280
+#: src/features/chat/thread/composer-input.tsx:1274
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:166
 msgid "Type your message..."
 msgstr "Digite sua mensagem..."
@@ -30550,7 +30550,7 @@ msgstr "Documentação atualizada de qualquer biblioteca ou framework"
 msgid "Update Duration"
 msgstr "Atualizar duração"
 
-#: src/features/chat/thread/composer-input.tsx:1145
+#: src/features/chat/thread/composer-input.tsx:1139
 msgid "Update failed"
 msgstr "Falha na atualização"
 
