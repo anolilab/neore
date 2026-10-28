@@ -30,8 +30,8 @@ export interface DeviceWindowApi {
     hostDisconnect: (deviceId: string) => Promise<void>;
     hostForgetKey: (deviceId: string) => Promise<void>;
     hostRemove: (deviceId: string) => Promise<void>;
-    onAcpChanged: (handler: () => void) => () => void;
     hostUpgrade: (deviceId: string) => Promise<HostUpgrade>;
+    onAcpChanged: (handler: () => void) => () => void;
     onPromptQueued: (handler: () => void) => () => void;
     /** Opens a terminal on a paired server, connecting it first (which asks to trust its key). */
     openHostTerminal: (deviceId: string) => Promise<void>;
