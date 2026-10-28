@@ -129,6 +129,9 @@ runner: v.optional(v.union(
   storing it. The existing `normalizeToolAllowlist` only checks names, and the helper that
   applies an allowlist only filters the tools the child run builds for itself, so neither
   enforces this. Test: a tool a headless worker could run but its lead lacks is refused.
+  A worker a person creates (`createWorker`) has no lead run to intersect with, so its
+  allowlist stands as asked and is bounded by the user's own headless permissions instead,
+  which every run applies when it builds its tools.
 - From the user: typing into the worker thread calls `dispatchToWorker`
   (authMutation, owner, `clientId` required). It dedupes through `claimOnce`
   scope `worker-dispatch`, key `<childThreadId>:<clientId>`, TTL 24 h. Add the
