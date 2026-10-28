@@ -378,6 +378,17 @@ describe("before a window opens", () => {
         expect(h.notices[0]).toContain("microphone");
     });
 
+    it("ends the press that the system's first microphone prompt held, and says to hold the shortcut again", async () => {
+        const h = harness({ microphoneAllowed: async () => "prompted" });
+
+        h.controller.press();
+        await settled();
+
+        expect(h.deps.openWindow).not.toHaveBeenCalled();
+        expect(h.controller.lastOutcome()).toBe("no-microphone");
+        expect(h.notices[0]).toContain("Hold the shortcut again");
+    });
+
     it("asks before downloading a missing model, opens no window, and downloads once agreed", async () => {
         const h = harness();
 

@@ -42,8 +42,12 @@ export interface ControllerDependencies {
     hasHelper: () => boolean;
     insert: (text: string) => void;
     log: (message: string) => void;
-    /** The OS-level microphone decision; `false` stops before a window opens. */
-    microphoneAllowed: () => Promise<boolean>;
+
+    /**
+     * The OS-level microphone decision; `false` stops before a window opens. `"prompted"` means the system just asked
+     * the person: the key may be up by now and nothing could see it, so this press ends and the next one records.
+     */
+    microphoneAllowed: () => Promise<boolean | "prompted">;
     model: ModelSpec;
     models: Pick<ModelStore, "download" | "ensureVerified" | "isDownloading" | "status">;
     notify: (title: string, body: string) => void;
@@ -191,6 +195,13 @@ export const createDictationController = (dependencies: ControllerDependencies):
         const allowed = await dependencies.microphoneAllowed();
 
         if (mine !== generation) {
+            return false;
+        }
+
+        if (allowed === "prompted") {
+            settle("no-microphone");
+            dependencies.notify(TITLE, "Microphone access is on. Hold the shortcut again to dictate.");
+
             return false;
         }
 

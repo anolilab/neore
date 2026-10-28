@@ -245,14 +245,19 @@ export const createDictation = (options: DictationOptions): Dictation => {
 
     const helper = (): HelperCommand => testEngine === undefined ? { args: [], command: helperPath() } : { args: testEngine.args, command: testEngine.command };
 
-    const microphoneAllowed = async (): Promise<boolean> => {
+    const microphoneAllowed = async (): Promise<boolean | "prompted"> => {
         if (process.platform !== "darwin") {
             return true;
         }
 
         const status = systemPreferences.getMediaAccessStatus("microphone");
 
-        return status === "not-determined" ? systemPreferences.askForMediaAccess("microphone") : status === "granted";
+        if (status === "not-determined") {
+            // The prompt held this press while the key may have come up, and the key-up is only seen from the capture window.
+            return await systemPreferences.askForMediaAccess("microphone") ? "prompted" : false;
+        }
+
+        return status === "granted";
     };
 
     const confirmDownload = async (spec: typeof model): Promise<boolean> => {
