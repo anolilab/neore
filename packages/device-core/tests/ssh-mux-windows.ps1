@@ -4,6 +4,8 @@
 #
 # It stops at the first stage it cannot get through and says which, so "not measured" is never read as "works".
 $ErrorActionPreference = "Continue"
+# An empty argument must reach the native program as an empty argument.
+$PSNativeCommandArgumentPassing = "Standard"
 
 $summary = [System.Collections.Generic.List[string]]::new()
 $raw = [System.Collections.Generic.List[string]]::new()
@@ -38,7 +40,9 @@ if ((Get-Service sshd).Status -ne "Running") { Finish "not measured: sshd would 
 # Stage 2: a key it accepts. The runner account is an administrator, whose keys sshd reads from this file.
 $key = Join-Path $env:RUNNER_TEMP "mux_key"
 Remove-Item "$key*" -ErrorAction SilentlyContinue
-& ssh-keygen -q -t ed25519 -N '""' -f $key | Out-Null
+& ssh-keygen -q -t ed25519 -N '' -f $key | Out-Null
+& ssh-keygen -y -P '' -f $key | Out-Null
+if ($LASTEXITCODE -ne 0) { Finish "not measured: could not generate a key without a passphrase" }
 $authorized = Join-Path $env:ProgramData "ssh\administrators_authorized_keys"
 Get-Content "$key.pub" | Set-Content -Path $authorized -Encoding ascii
 & icacls $authorized /inheritance:r /grant "SYSTEM:(F)" /grant "BUILTIN\Administrators:(F)" | Out-Null
