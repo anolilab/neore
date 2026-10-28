@@ -63,12 +63,11 @@ export interface RecognizerOptions {
     timeoutMs?: number;
 }
 
-/** A segment that is only an annotation (`[BLANK_AUDIO]`, `(music)`, `*applause*`): the model's note about silence, not speech. */
+/** The timestamps the helper prints before each segment. */
 const TIMESTAMP = /^\[\d+:\d{2}:\d{2}\.\d{3} --> \d+:\d{2}:\d{2}\.\d{3}\]\s*/u;
 const LINE_BREAK = /\r?\n/u;
+/** A segment that is only an annotation (`[BLANK_AUDIO]`, `(music)`, `*applause*`): the model's note about silence, not speech. */
 const ANNOTATION = /^(?:\[[^\]]*\]|\([^)]*\)|\*[^*]*\*)$/u;
-
-/** One segment per line of the recogniser's output; empty lines and annotations are dropped. */
 
 /**
  * How the helper is told to put its text on stdout. With `-f -` it has no file name to derive an output from, and upstream's stdin
@@ -79,6 +78,7 @@ const ANNOTATION = /^(?:\[[^\]]*\]|\([^)]*\)|\*[^*]*\*)$/u;
  */
 const OUTPUT_ARGUMENTS = ["-of", "unused"];
 
+/** One segment per line of the recogniser's output, timestamps removed; empty lines and annotations are dropped. */
 export const parseTranscript = (output: string): Transcript => {
     const segments = output
         .split(LINE_BREAK)
