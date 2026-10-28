@@ -539,6 +539,11 @@ jobs:
             - name: "Build the device-execution addon"
               run: "pnpm --filter @neore/device-core-node run build"
 
+            # The shell bundles `@neore/ai/capabilities` (plain data, read through its built `dist/`), and nothing
+            # else builds that package on this job.
+            - name: "Build the shared capability rules"
+              run: "pnpm --filter @neore/ai run build"
+
             - name: "Bundle the main process and preloads"
               run: "pnpm --filter @neore/desktop run build"
 
@@ -586,6 +591,11 @@ jobs:
 
             - name: "Build the device-execution addon"
               run: "pnpm --filter @neore/device-core-node run build"
+
+            # The shell bundles `@neore/ai/capabilities` (plain data, read through its built `dist/`), and nothing
+            # else builds that package on this job.
+            - name: "Build the shared capability rules"
+              run: "pnpm --filter @neore/ai run build"
 
             - name: "Bundle the main process and preloads"
               run: "pnpm --filter @neore/desktop run build"
