@@ -179,13 +179,15 @@ describe("dispatching to a worker", () => {
 
         await claim(first.run._id);
 
-        const busy = await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-busy" });
+        await harness.run(async (ctx: any) => await ctx.db.patch(first.run.childThreadId, { status: "archived" }));
 
-        expect(busy).toMatchObject({ kind: "busy" });
+        const archived = await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-archived" });
 
-        await finish(first.run._id);
+        expect(archived).toMatchObject({ kind: "archived" });
 
-        expect(await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-busy" })).toMatchObject({ created: true });
+        await harness.run(async (ctx: any) => await ctx.db.patch(first.run.childThreadId, { status: "active" }));
+
+        expect(await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-archived" })).toMatchObject({ created: true });
     });
 
     it("refuses a dispatch to a worker of another lead or another owner as not found", async () => {

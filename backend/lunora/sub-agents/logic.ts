@@ -3,6 +3,8 @@
  * model it runs on and the message its result becomes. No I/O, so every rule
  * is unit-tested directly (`logic.test.ts`).
  */
+import type { FollowUpControl } from "@neore/ai/capabilities";
+import { CLOUD_HEADLESS_CAPABILITIES, followUpControl } from "@neore/ai/capabilities";
 import type { StopCondition, ToolSet } from "ai";
 
 /**
@@ -214,6 +216,25 @@ export const stopWhenRequested = (isStopRequested: () => Promise<boolean>): Stop
         return answered.stop;
     };
 };
+
+/**
+ * The run that starts next on a worker, from its runs newest first: the oldest queued one, or none
+ * while a run is going. A worker runs one message at a time, in the order they were sent.
+ */
+export const nextQueuedWorkerRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>
+    newestFirst.some((run) => run.status === "running") ? undefined : newestFirst.findLast((run) => run.status === "queued");
+
+/** The run a worker is on, from its runs newest first: the one going, else the next in line. A Stop in its thread means this one. */
+export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>
+    newestFirst.find((run) => run.status === "running") ?? newestFirst.findLast((run) => run.status === "queued");
+
+/**
+ * How a message sent to a busy worker is handled, read from what its runner can do. Cloud headless
+ * workers have no stream to steer into, so theirs wait their turn; a host runner reports its own
+ * capabilities (host workers come later) and reads as `none` until it does.
+ */
+export const workerFollowUp = (runner: { kind: "headless" | "host" } | undefined): FollowUpControl =>
+    runner === undefined || runner.kind === "headless" ? followUpControl(CLOUD_HEADLESS_CAPABILITIES) : "none";
 
 /**
  * How many children a parent has started over its life, for the depth > 1 cap. A worker counts once

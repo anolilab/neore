@@ -38265,6 +38265,26 @@
                         "archived": {
                           "type": "boolean"
                         },
+                        "followUp": {
+                          "anyOf": [
+                            {
+                              "const": "none",
+                              "type": "string"
+                            },
+                            {
+                              "const": "queue",
+                              "type": "string"
+                            },
+                            {
+                              "const": "steer",
+                              "type": "string"
+                            },
+                            {
+                              "const": "steer-restart",
+                              "type": "string"
+                            }
+                          ]
+                        },
                         "lastRunAt": {
                           "type": "number"
                         },
@@ -38321,6 +38341,7 @@
                       "required": [
                         "activeRunId",
                         "archived",
+                        "followUp",
                         "lastRunAt",
                         "lastRunStatus",
                         "leadThreadId",
@@ -38524,6 +38545,26 @@
                       "archived": {
                         "type": "boolean"
                       },
+                      "followUp": {
+                        "anyOf": [
+                          {
+                            "const": "none",
+                            "type": "string"
+                          },
+                          {
+                            "const": "queue",
+                            "type": "string"
+                          },
+                          {
+                            "const": "steer",
+                            "type": "string"
+                          },
+                          {
+                            "const": "steer-restart",
+                            "type": "string"
+                          }
+                        ]
+                      },
                       "lastRunAt": {
                         "type": "number"
                       },
@@ -38580,6 +38621,7 @@
                     "required": [
                       "activeRunId",
                       "archived",
+                      "followUp",
                       "lastRunAt",
                       "lastRunStatus",
                       "leadThreadId",

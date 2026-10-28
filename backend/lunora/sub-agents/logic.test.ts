@@ -4,6 +4,7 @@ import {
     applyToolAllowlist,
     buildResultMessage,
     canNest,
+    nextQueuedWorkerRun,
     normalizeToolAllowlist,
     resolveSubAgentModel,
     SUB_AGENT_MAX_CONCURRENT,
@@ -14,6 +15,8 @@ import {
     stopWhenRequested,
     subAgentCapProblem,
     truncateResult,
+    workerCurrentRun,
+    workerFollowUp,
 } from "./logic";
 
 const DEPTH_CAP = /at most 2 levels/u;
@@ -155,5 +158,26 @@ describe(canNest, () => {
         expect(canNest(0)).toBe(true);
         expect(canNest(1)).toBe(true);
         expect(canNest(SUB_AGENT_MAX_DEPTH)).toBe(false);
+    });
+});
+
+describe("a worker's line of messages", () => {
+    const newestFirst = (...statuses: ("cancelled" | "queued" | "running" | "succeeded")[]) => statuses.map((status, index) => {return { id: index, status }});
+
+    it("starts the oldest queued run, and none while one is running", () => {
+        expect(nextQueuedWorkerRun(newestFirst("queued", "queued", "succeeded"))).toMatchObject({ id: 1 });
+        expect(nextQueuedWorkerRun(newestFirst("queued", "running"))).toBeUndefined();
+        expect(nextQueuedWorkerRun(newestFirst("succeeded", "cancelled"))).toBeUndefined();
+    });
+
+    it("names the running run as the current one, else the next in line", () => {
+        expect(workerCurrentRun(newestFirst("queued", "queued", "running"))).toMatchObject({ id: 2 });
+        expect(workerCurrentRun(newestFirst("queued", "queued", "succeeded"))).toMatchObject({ id: 1 });
+        expect(workerCurrentRun(newestFirst("succeeded"))).toBeUndefined();
+    });
+
+    it("queues a follow-up for a cloud worker and offers no steer", () => {
+        expect(workerFollowUp({ kind: "headless" })).toBe("queue");
+        expect(workerFollowUp(undefined)).toBe("queue");
     });
 });

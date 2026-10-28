@@ -25,7 +25,7 @@ const messageWorkerTool = createTool<MessageWorkerInput, MessageWorkerOutput, To
     description: `Send a message to a worker you started with delegateToSubAgent (persistent: true). The worker keeps its thread, so it remembers earlier messages; say what is new, not what it already knows.
 - worker: the workerId delegateToSubAgent returned.
 - message: what the worker should do next; it cannot ask questions.
-A worker handles one message at a time; if it is still working, wait for its result. This tool returns as soon as the message is sent. The worker's result is posted to this conversation as a separate message; do not wait for it or guess it.`,
+A worker handles one message at a time, in the order sent: a message sent while it is working waits its turn, and counts toward the limit of three sub-agents running at once. This tool returns as soon as the message is sent. The worker's result is posted to this conversation as a separate message; do not wait for it or guess it.`,
     execute: async (context, input, options) => {
         if (!context.userId || !context.threadId) {
             return { error: "Sign in to use workers.", status: "failed" };

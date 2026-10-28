@@ -8,7 +8,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { gateThreadActionHandler } from "../chat/functions";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
-import { admitWorkerRun, claimQueuedRun, createWorker, dispatchToWorker, finishRun, getWorker, listActiveWorkerRuns, listWorkers } from "./functions";
+import {
+    admitWorkerRun,
+    cancelSubAgentRunsForStop,
+    claimQueuedRun,
+    createWorker,
+    dispatchToWorker,
+    finishRun,
+    getWorker,
+    listActiveWorkerRuns,
+    listWorkers,
+} from "./functions";
 import schema from "../schema";
 
 const OWNER = "user-owner";
@@ -58,7 +68,7 @@ let harness: Harness;
 let leadId: string;
 
 const ARCHIVED = /archived/u;
-const BUSY = /still working/u;
+const FAN_OUT_CAP = /At most 3/u;
 const LOCKED = /locked/u;
 
 const as = (userId: string) => harness.withIdentity({ userId } as never);
@@ -138,19 +148,103 @@ describe("dispatchToWorker", () => {
         expect(await runRows()).toHaveLength(1);
     });
 
-    it("refuses a worker that is still working on an earlier message", async () => {
-        const workerId = await idleWorker();
-
-        await message(workerId, "client-1");
-        await expect(message(workerId, "client-2")).rejects.toMatchObject({ code: "CONFLICT", message: expect.stringMatching(BUSY) });
-    });
-
     it("answers a stranger as it would a worker that does not exist", async () => {
         const workerId = await idleWorker();
 
         await expect(message(workerId, "client-1", STRANGER)).rejects.toMatchObject({ code: "NOT_FOUND" });
         await expect(message(await newThread(OWNER), "client-2")).rejects.toMatchObject({ code: "NOT_FOUND" });
         expect(await runRows()).toHaveLength(1);
+    });
+});
+
+describe("a busy worker", () => {
+    const startedRuns = () => jobsQueueMessages.filter((queued) => queued.body.functionPath.includes("runSubAgent")).map((queued) => queued.body.args?.runId);
+    const claim = async (runId: string) => await run(async (context) => await claimQueuedRun(context, runId as never));
+    const finish = async (runId: string, kind: "cancelled" | "succeeded" = "succeeded") =>
+        await run(async (context) => await finishRun(context, runId as never, kind === "cancelled" ? { kind } : { kind, result: "done" }));
+    const dailyCounter = async () => {
+        const rows = await run(async (context) => await context.db.query("rateLimits").collect());
+
+        return rows.map((row: { key: string }) => decodeURIComponent(row.key)).filter((key: string) => key.includes("chat/dailyText"));
+    };
+
+    it("queues two more messages behind the running one and runs them in order, the next past the lead's cap refused", async () => {
+        const workerId = await idleWorker();
+        const [a, b, c] = [await message(workerId, "c-a"), await message(workerId, "c-b"), await message(workerId, "c-c")] as { runId: string }[];
+
+        // Only the first found the worker idle; the others wait without a job.
+        expect(startedRuns()).toStrictEqual([a!.runId]);
+        expect(await claim(a!.runId)).toMatchObject({ _id: a!.runId });
+
+        const d = (await message(workerId, "c-d").catch((error: unknown) => error)) as { code: string; message: string };
+
+        expect(d).toMatchObject({ code: "BAD_REQUEST", message: expect.stringMatching(FAN_OUT_CAP) });
+
+        // A job for a run that is not at the head claims nothing and charges nothing.
+        const charged = await dailyCounter();
+
+        expect(await claim(c!.runId)).toBeNull();
+        expect(await claim(b!.runId)).toBeNull();
+        expect(await dailyCounter()).toStrictEqual(charged);
+
+        await finish(a!.runId);
+        expect(startedRuns()).toStrictEqual([a!.runId, b!.runId]);
+        expect(await claim(c!.runId)).toBeNull();
+        expect(await claim(b!.runId)).toMatchObject({ _id: b!.runId });
+
+        await finish(b!.runId);
+        expect(startedRuns()).toStrictEqual([a!.runId, b!.runId, c!.runId]);
+    });
+
+    it("never charges a queued run that is cancelled, and starts nothing when it was not the head", async () => {
+        const workerId = await idleWorker();
+        const [a, b, c] = [await message(workerId, "c-a"), await message(workerId, "c-b"), await message(workerId, "c-c")] as { runId: string }[];
+
+        await claim(a!.runId);
+
+        const charged = await dailyCounter();
+
+        await finish(c!.runId, "cancelled");
+        await finish(b!.runId, "cancelled");
+
+        expect(await dailyCounter()).toStrictEqual(charged);
+        expect(startedRuns()).toStrictEqual([a!.runId]);
+        const rows = await runRows();
+
+        expect(rows.filter((row) => row.status === "cancelled")).toHaveLength(2);
+
+        await finish(a!.runId);
+        expect(startedRuns()).toStrictEqual([a!.runId]);
+    });
+
+    it("moves the line on when the head is cancelled before it starts", async () => {
+        const workerId = await idleWorker();
+        const [a, b] = [await message(workerId, "c-a"), await message(workerId, "c-b")] as { runId: string }[];
+
+        await finish(a!.runId, "cancelled");
+        expect(startedRuns()).toStrictEqual([a!.runId, b!.runId]);
+    });
+
+    it("shows the running run as the worker's current one, with a Stop meaning that run", async () => {
+        const workerId = await idleWorker();
+        const [a, b] = [await message(workerId, "c-a"), await message(workerId, "c-b")] as { runId: string }[];
+
+        await claim(a!.runId);
+
+        expect(await as(OWNER).query(getWorker as never, { workerId } as never)).toMatchObject({ activeRunId: a!.runId, state: "running" });
+        expect(await run(async (context) => await cancelSubAgentRunsForStop(context, workerId, OWNER))).toBe(1);
+        const rows = await runRows();
+
+        expect(rows.find((row) => row._id === a!.runId)).toMatchObject({ status: "cancelled" });
+        // The stopped run's slot goes to the next message.
+        expect(startedRuns()).toStrictEqual([a!.runId, b!.runId]);
+    });
+
+    it("offers no steer: a cloud worker's runner queues", async () => {
+        const workerId = await idleWorker();
+
+        expect(await as(OWNER).query(getWorker as never, { workerId } as never)).toMatchObject({ followUp: "queue" });
+        expect(await as(OWNER).query(listWorkers as never, { leadThreadId: leadId } as never)).toMatchObject([{ followUp: "queue" }]);
     });
 });
 
