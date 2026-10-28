@@ -137,7 +137,7 @@ fn validate(request: &InstallRequest) -> Result<(), String> {
 }
 
 impl DeviceState {
-    fn install_root(&self) -> PathBuf {
+    pub(crate) fn install_root(&self) -> PathBuf {
         self.data_dir().join(INSTALL_DIR)
     }
 
@@ -318,6 +318,9 @@ impl DeviceState {
 
                     if before.command != agent.command
                         || before.args != agent.args
+                        // A launch variable that changed (a registry one the new version adds, drops or sets
+                        // differently) is not the program the folders were approved for.
+                        || before.env != agent.env
                         || before.install.as_ref().map(|pin| &pin.sha256)
                             != agent.install.as_ref().map(|pin| &pin.sha256)
                     {
@@ -431,6 +434,12 @@ fn remove_stale(staging: &Path) {
 }
 
 fn prune_other_versions(key_dir: &Path, keep: &str) {
+    // A symlink where the agent's folder should be is not ours to walk: removing "other versions" there would
+    // delete what it points at.
+    if fs::symlink_metadata(key_dir).map_or(true, |meta| !meta.is_dir()) {
+        return;
+    }
+
     let Ok(entries) = fs::read_dir(key_dir) else {
         return;
     };
@@ -1012,7 +1021,7 @@ mod tests {
             .acp_spawn_plan("demo", Some(&folder.to_string_lossy()))
             .unwrap();
 
-        assert!(plan.command.ends_with("acp-agents/demo/1.2.3/agent"));
+        assert!(Path::new(&plan.command).ends_with("acp-agents/demo/1.2.3/agent"));
 
         let stage = state.acp_install_stage().unwrap();
         let mut newer = request(&stage, &second, ArchiveFormat::TarGz, "agent");
@@ -1140,9 +1149,9 @@ mod tests {
         let save = |command: &str| {
             state
                 .acp_update(
-                    serde_json::from_str(&format!(
-                        r#"{{"op":"saveAgent","key":"demo","label":"Demo!","command":"{command}","args":["acp"]}}"#
-                    ))
+                    serde_json::from_value(json!({
+                        "op": "saveAgent", "key": "demo", "label": "Demo!", "command": command, "args": ["acp"],
+                    }))
                     .unwrap(),
                 )
                 .unwrap()
@@ -1174,6 +1183,35 @@ mod tests {
             .acp_update(AcpUpdate::RemoveAgent { key: "demo".into() })
             .unwrap();
         assert!(!dir.join("acp-agents/demo").exists());
+    }
+
+    #[test]
+    fn editing_only_the_arguments_of_an_installed_agent_keeps_its_program() {
+        let (state, dir) = state("edit-args");
+        let archive = tar_gz(&[("agent", b"x", 0o755)], &[]);
+        let stage = state.acp_install_stage().unwrap();
+        let view = state
+            .acp_install(request(&stage, &archive, ArchiveFormat::TarGz, "agent"))
+            .unwrap();
+        let command = view.agents[0].command.clone();
+        let edited = state
+            .acp_update(
+                serde_json::from_value(json!({
+                    "op": "saveAgent", "key": "demo", "label": "Demo!", "command": command, "args": ["other"],
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+
+        assert!(
+            edited.agents[0].install.is_none(),
+            "different arguments are not the pinned install"
+        );
+        assert!(
+            Path::new(&command).exists(),
+            "its program is still there to start"
+        );
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]

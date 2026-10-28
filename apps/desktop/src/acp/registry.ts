@@ -107,9 +107,18 @@ export const platformKey = (platform: string, arch: string): string | undefined 
     return os !== undefined && cpu !== undefined ? `${os}-${cpu}` : undefined;
 };
 
+const safeDecode = (value: string): string => {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return value;
+    }
+};
+
 /** The format of a download by its URL, or `undefined` for one this build cannot unpack. */
 export const archiveFormat = (url: string): ArchiveFormat | undefined => {
-    const path = new URL(url).pathname.toLowerCase();
+    // Decoded: `%2Ezip` is a ZIP, not a bare binary.
+    const path = safeDecode(new URL(url).pathname).toLowerCase();
 
     for (const [suffix, format] of ARCHIVE_SUFFIXES) {
         if (path.endsWith(suffix)) {
@@ -219,22 +228,24 @@ const unfit = ({ name, publisher, version }: RegistryAgent, target: BinaryTarget
         return "The registry's version is not a plain version number.";
     }
 
-    if (name.trim() === "" || publisher.trim() === "" || publisher.length > MAX_PUBLISHER || CONTROL_CHARACTER.test(publisher)) {
+    if (name.trim() === "" || publisher.trim() === "" || Buffer.byteLength(publisher) > MAX_PUBLISHER || CONTROL_CHARACTER.test(publisher)) {
         return "The registry's name or publisher is empty or too long.";
     }
 
-    if (target.archive.length > MAX_SOURCE) {
+    if (Buffer.byteLength(target.archive) > MAX_SOURCE) {
         return "The download address is too long.";
     }
 
     // A bare download is one file, so its command is that file's name.
     const nested = format === "raw" && PATH_SEPARATOR.test(target.cmd.replace(LEADING_DOT_SLASH, ""));
 
-    if (nested || target.cmd.trim() === "" || leavesFolder(target.cmd) || target.cmd.includes("\0")) {
+    const bareCommand = target.cmd.trim().replace(LEADING_DOT_SLASH, "");
+
+    if (nested || bareCommand === "" || bareCommand === "." || leavesFolder(target.cmd) || target.cmd.includes("\0")) {
         return "The command it starts is not a file inside the download.";
     }
 
-    if (target.args.length > MAX_ARGS || target.args.some((argument) => Buffer.byteLength(argument) > MAX_ARG_BYTES || argument.includes("\0"))) {
+    if (target.args.length > MAX_ARGS || target.args.some((argument) => Buffer.byteLength(argument) > MAX_ARG_BYTES || CONTROL_CHARACTER.test(argument))) {
         return "Its start-up arguments are longer than Neore accepts.";
     }
 
@@ -306,11 +317,40 @@ const readCapped = async (response: Response, max: number): Promise<string> => {
     return Buffer.concat(chunks).toString("utf8");
 };
 
-/** `https:` after redirects: a transport the registry did not name is not followed. */
-export const assertHttps = (response: Response, requested: string): void => {
-    if (new URL(response.url === "" ? requested : response.url).protocol !== "https:") {
-        throw new Error("A download was redirected away from https.");
+const MAX_REDIRECTS = 5;
+
+/**
+ * Fetches `url`, following redirects by hand: every hop must be https BEFORE it is requested, so an http
+ * detour is never contacted (a check on the final URL alone would have sent the request and read the answer first).
+ */
+export const fetchHttps = async (fetchImpl: Fetch, url: string, init: RequestInit): Promise<Response> => {
+    let current = url;
+
+    for (let hops = 0; hops <= MAX_REDIRECTS; hops += 1) {
+        if (new URL(current).protocol !== "https:") {
+            throw new Error("A download was redirected away from https.");
+        }
+
+        // eslint-disable-next-line no-await-in-loop -- each hop depends on the previous answer
+        const response = await fetchImpl(current, { ...init, redirect: "manual" });
+
+        if (response.status < 300 || response.status >= 400) {
+            return response;
+        }
+
+        const location = response.headers.get("location");
+
+        // eslint-disable-next-line no-await-in-loop -- the redirect body is dropped before the next hop
+        await response.body?.cancel();
+
+        if (location === null) {
+            throw new Error("A download was redirected with no destination.");
+        }
+
+        current = new URL(location, current).toString();
     }
+
+    throw new Error("A download was redirected too many times.");
 };
 
 export interface RegistryOptions {
@@ -376,7 +416,7 @@ export class AgentRegistry {
     }
 
     private async load(): Promise<RegistryAgent[]> {
-        const response = await this.fetchImpl(REGISTRY_URL, { headers: { accept: "application/json" }, redirect: "follow", signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS) });
+        const response = await fetchHttps(this.fetchImpl, REGISTRY_URL, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS) });
 
         if (!response.ok) {
             await response.body?.cancel();
@@ -384,7 +424,6 @@ export class AgentRegistry {
             throw new Error(`The registry answered ${String(response.status)}.`);
         }
 
-        assertHttps(response, REGISTRY_URL);
 
         const agents = parseRegistry(JSON.parse(await readCapped(response, MAX_REGISTRY_BYTES)) as unknown);
 

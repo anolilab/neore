@@ -80,13 +80,17 @@ describe("download", () => {
     it("refuses an error status, a redirect off https, a declared size over the cap and a body over it", async () => {
         const file = path.join(scratch, "download");
         const run = (response: () => Response) => download(makeFetch(response) as unknown as typeof fetch, "https://example.com/a.zip", file);
-        const redirected = new Response(BYTES);
+        // The detour is refused before it is asked for: the fetch is only ever called for https addresses.
+        const asked: string[] = [];
+        const toHttp = (async (url: string) => {
+            asked.push(url);
 
-        // eslint-disable-next-line unicorn/prefer-https -- the case under test: a redirect that drops https
-        Object.defineProperty(redirected, "url", { value: "http://evil.test/a.zip" });
+            return new Response(null, { headers: { location: ["http", "://evil.test/a.zip"].join("") }, status: 302 });
+        }) as unknown as typeof fetch;
 
         await expect(run(() => new Response("", { status: 404 }))).rejects.toThrow("failed (404)");
-        await expect(run(() => redirected)).rejects.toThrow("redirected away from https");
+        await expect(download(toHttp, "https://example.com/a.zip", file)).rejects.toThrow("redirected away from https");
+        expect(asked).toEqual(["https://example.com/a.zip"]);
         await expect(run(() => new Response(BYTES, { headers: { "content-length": String(600 * 1024 * 1024) } }))).rejects.toThrow("larger than allowed");
     });
 });

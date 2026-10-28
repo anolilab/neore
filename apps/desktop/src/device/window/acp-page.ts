@@ -37,6 +37,9 @@ const TRAILING_DASH = /-$/u;
 /** Buttons on a bar that just changed stay disabled this long, so a click meant for the old bar cannot land on the new one. */
 const CLICK_THROUGH_GUARD_MS = 800;
 
+/** Counts registry searches: only the answer to the latest one is shown. */
+let searchSerial = 0;
+
 const state: {
     guard?: ReturnType<typeof setTimeout>;
     /** The saved sessions being offered for import, and where they are from. */
@@ -603,7 +606,15 @@ export const initAcp = async (): Promise<void> => {
     $("acp-registry-form").addEventListener("submit", (event) => {
         event.preventDefault();
         guarded(async () => {
+            searchSerial += 1;
+
+            const mine = searchSerial;
             const found = await globalThis.neoreDevice.acpRegistrySearch(field("acp-registry-query"));
+
+            // A newer search was submitted meanwhile: its answer is the one to show.
+            if (mine !== searchSerial) {
+                return;
+            }
 
             renderRegistry(found);
             // The notice is the page's live region: a list that changes silently is invisible to a screen reader.
