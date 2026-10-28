@@ -30,7 +30,8 @@ const flagValue = (name) => {
 
     return index === -1 ? undefined : process.argv[index + 1];
 };
-const work = flagValue("--work") === undefined ? path.join(os.tmpdir(), `neore-whisper.cpp-${WHISPER_CPP_SHA.slice(0, 12)}`) : path.resolve(flagValue("--work"));
+const work =
+    flagValue("--work") === undefined ? path.join(os.tmpdir(), `neore-whisper.cpp-${WHISPER_CPP_SHA.slice(0, 12)}`) : path.resolve(flagValue("--work"));
 const executable = process.platform === "win32" ? "whisper-cli.exe" : "whisper-cli";
 const builderOs = { darwin: "mac", linux: "linux", win32: "win" }[process.platform];
 const targetArch = flagValue("--arch") ?? process.arch;
@@ -81,7 +82,11 @@ const peImports = (file) => {
     const sections = Array.from({ length: sectionCount }, (_, index) => {
         const at = optional + optionalSize + index * 40;
 
-        return { rawPointer: file.readUInt32LE(at + 20), size: Math.max(file.readUInt32LE(at + 8), file.readUInt32LE(at + 16)), virtualAddress: file.readUInt32LE(at + 12) };
+        return {
+            rawPointer: file.readUInt32LE(at + 20),
+            size: Math.max(file.readUInt32LE(at + 8), file.readUInt32LE(at + 16)),
+            virtualAddress: file.readUInt32LE(at + 12),
+        };
     });
     const toOffset = (rva) => {
         const section = sections.find(({ size, virtualAddress }) => rva >= virtualAddress && rva < virtualAddress + size);
@@ -161,7 +166,21 @@ if (process.platform === "linux") {
 }
 
 run("cmake", ["-B", "build", ...flags], work);
-run("cmake", ["--build", "build", "--config", "Release", "--target", "whisper-cli", "-j", String(Math.max(1, os.availableParallelism()))], work);
+const buildArgs = ["--build", "build", "--config", "Release", "--target", "whisper-cli", "-j", String(Math.max(1, os.availableParallelism()))];
+
+if (process.platform !== "darwin" && targetArch === "arm64") {
+    // clang-cl drops an option it does not know with a warning, and a build without the ARM baseline is several times slower
+    // while looking fine: read its output for that warning.
+    const output = execFileSync("cmake", buildArgs, { cwd: work, encoding: "utf8", maxBuffer: 1 << 28 });
+
+    process.stdout.write(output);
+
+    if (/unknown argument ignored in clang-cl: '-march/u.test(output)) {
+        throw new Error(`the compiler ignored -march=${ARM_BASELINE}; the helper would run on bare armv8-a`);
+    }
+} else {
+    run("cmake", buildArgs, work);
+}
 
 const built = [path.join(work, "build", "bin", executable), path.join(work, "build", "bin", "Release", executable)].find((candidate) => existsSync(candidate));
 
@@ -190,7 +209,9 @@ if (process.platform === "darwin") {
 
 if (process.platform === "linux") {
     // Only the C library and what ships with it: anything else (libgomp, libstdc++) may be absent on the user's machine.
-    const needed = [...execFileSync("readelf", ["-d", built], { encoding: "utf8" }).matchAll(/\(NEEDED\)\s+Shared library: \[([^\]]+)\]/gu)].map((match) => match[1]);
+    const needed = [...execFileSync("readelf", ["-d", built], { encoding: "utf8" }).matchAll(/\(NEEDED\)\s+Shared library: \[([^\]]+)\]/gu)].map(
+        (match) => match[1],
+    );
     const unexpected = needed.filter((library) => !/^(?:ld-linux[\w.-]*|libc|libdl|libm|libpthread|librt)\.so(?:\.\d+)*$/u.test(library));
 
     if (unexpected.length > 0) {

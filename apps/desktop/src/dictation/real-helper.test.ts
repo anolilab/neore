@@ -9,7 +9,7 @@
  * `supported` or `unsupported`, as for `catalog.test.ts`.
  */
 import { appendFileSync, readFileSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -64,6 +64,8 @@ describe.runIf(cli !== undefined && clip !== undefined && models.length > 0)("th
         }
 
         expect(text.toLowerCase()).toContain(process.env.NEORE_WHISPER_EXPECT ?? "");
+        // The helper's working folder is where it would leave a transcript if the output name ever opened a file.
+        expect(await readdir(directory)).toStrictEqual([]);
 
         if (name === "small" && process.env.NEORE_DICTATION_EXPECT === "supported") {
             expect(factor, `the default model took ${factor.toFixed(2)} times the clip; this platform is too slow to be offered`).toBeLessThanOrEqual(BUDGET);
