@@ -59,7 +59,12 @@ jobs:
                   cmake -B build -DCMAKE_BUILD_TYPE=Release -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON
                   cmake --build build --config Release -j 4 --target whisper-cli
                   cli="$(find build -type f \( -name whisper-cli -o -name whisper-cli.exe \) | head -n 1)"
-                  echo "WHISPER_CLI=$PWD/$cli" >> "$GITHUB_ENV"
+                  cli="$PWD/$cli"
+                  # Git Bash paths (/d/a/...) mean nothing to the Windows Python that runs the harness.
+                  if command -v cygpath > /dev/null; then
+                      cli="$(cygpath -m "$cli")"
+                  fi
+                  echo "WHISPER_CLI=$cli" >> "$GITHUB_ENV"
 
             - name: "Download the models and verify them"
               shell: "bash"
