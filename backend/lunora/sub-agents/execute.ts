@@ -23,7 +23,7 @@ import { internalAction } from "../_generated/server";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { isTaskModelAllowed } from "../tasks/logic";
-import { buildSubAgentPrompt, canNest, resolveSubAgentModel, SUB_AGENT_SYSTEM, SUB_AGENT_TOOL_NAME, WORKER_SYSTEM } from "./logic";
+import { buildSubAgentPrompt, canNest, MESSAGE_WORKER_TOOL_NAME, resolveSubAgentModel, SUB_AGENT_SYSTEM, SUB_AGENT_TOOL_NAME, WORKER_SYSTEM } from "./logic";
 
 /** A failure this run raised itself, whose message is written for the user. */
 class SubAgentRunError extends Error {}
@@ -83,7 +83,7 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             // check (approved, or set to `auto`), so that consent carries into
             // this child and nesting stays reachable. At the depth cap the
             // grant is withheld, so a default `ask` removes the tool there.
-            ...(canNest(claim.depth) && { approvedTools: [SUB_AGENT_TOOL_NAME] }),
+            ...(canNest(claim.depth) && { approvedTools: [SUB_AGENT_TOOL_NAME, MESSAGE_WORKER_TOOL_NAME] }),
             beforeThread: assertCanRun,
             keepThreadStatus: worker !== undefined,
             memory: false,

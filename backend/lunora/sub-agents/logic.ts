@@ -17,6 +17,9 @@ export const canNest = (depth: number): boolean => depth < SUB_AGENT_MAX_DEPTH;
 /** The delegate tool's name (`chat/tools/delegate-to-sub-agent.ts`), kept here so this module stays import-free. */
 export const SUB_AGENT_TOOL_NAME = "delegateToSubAgent";
 
+/** The tool a lead uses to message a worker it started; the delegation consent covers it. */
+export const MESSAGE_WORKER_TOOL_NAME = "messageWorker";
+
 /** Sub-agents one thread may have queued or running at once. */
 export const SUB_AGENT_MAX_CONCURRENT = 3;
 
