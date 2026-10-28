@@ -254,6 +254,17 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             deviceId: () => (JSON.parse(core.status()) as { deviceId: string | null }).deviceId ?? undefined,
             endpoint: new URL("hosts/ingest", backendOrigin()),
             log: (message) => console.error(message),
+            media: {
+                endpoint: new URL("hosts/uploads", backendOrigin()),
+                // The folder's path stays here: the session knows its agent and its folder's id, and the core
+                // checks that pair against the approvals before it opens anything.
+                read: async (agentKey, folderId, reference) => {
+                    const consent = (JSON.parse(core.acpView()) as AcpView).consents.find((candidate) => candidate.agentKey === agentKey && candidate.folderId === folderId);
+
+                    return consent === undefined ? { kind: "", mime: "", name: "", size: 0, status: "refused" } : await core.acpReadMedia(agentKey, consent.folderPath, reference);
+                },
+                sign: (payload) => core.signUpload(payload),
+            },
             sign: (payload) => core.signTurn(payload),
             stateFile: path.join(app.getPath("userData"), "acp-host-turns.json"),
         });

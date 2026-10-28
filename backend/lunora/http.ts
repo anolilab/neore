@@ -12,6 +12,8 @@ import {
     revokeExtensionSessionHttpAction,
 } from "./auth/extension-grant-http";
 import { hostIngestHttpAction } from "./acp/http";
+import { HOST_UPLOAD_PATH } from "./acp/lib/constants";
+import { hostUploadHttpAction } from "./acp/upload-http";
 import { E2E_INVITATIONS_PATH, e2eSeedInvitationHttpAction } from "./auth/e2e-seed-http";
 import { seedInvitationsHttpAction } from "./auth/seed-invitations-http";
 import {
@@ -254,6 +256,15 @@ app.post(
 // A paired computer's coding-agent turn output (no CORS/session — signed with the device secret). It finds the
 // owner's shard itself (`acp/http.ts`).
 app.post("/hosts/ingest", httpAction(hostIngestHttpAction));
+
+// The same computer's file uploads (TUS), signed with the device secret instead of a session — see
+// `acp/upload-http.ts`. Not under `/uploads`: that route resolves a session or an API key.
+// `GET` is listed for the TUS `HEAD`, as above; a real `GET` is refused there.
+app.on(
+    ["POST", "PATCH", "GET"],
+    [HOST_UPLOAD_PATH, `${HOST_UPLOAD_PATH}/:uploadId`],
+    async (c) => await hostUploadHttpAction(c.var.lunora, c.req.raw, c.env["FILES"]),
+);
 
 // Gateway-first entry point — HMAC-signed by gateway, user JWT forwarded for auth
 // Extension sign-in without cookies (the Firefox build) — PKCE code flow; see

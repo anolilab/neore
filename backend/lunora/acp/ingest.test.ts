@@ -59,6 +59,7 @@ const { HOST_STREAM_IDLE_MS, HOST_TURN_MAX_MS, INGEST_FLOOD_LIMIT_PER_MINUTE } =
 registerModule(registry, "lib_shard_routes", await import("../lib/shard-routes"));
 registerModule(registry, "lib_shard_housekeeping", await import("../lib/shard-housekeeping"));
 registerModule(registry, "acp_ingest", await import("./ingest"));
+registerModule(registry, "acp_upload", await import("./upload"));
 registerModule(registry, "agent_sharing", await import("../agent/sharing"));
 registerModule(registry, "agent_streams", await import("../agent/streams"));
 registerModule(registry, "chat_streaming_persistent_library", await import("../chat/streaming/persistent/library"));
@@ -66,6 +67,7 @@ registerModule(registry, "chat_streaming_persistent_library", await import("../c
 // Documentation addresses (RFC 5737): the guard only keys on the string.
 const FLOODER = "192.0.2.1";
 const NEIGHBOUR = "192.0.2.2";
+const HOST_TEXT = { neore: { runner: "host" } };
 const RESTARTED = /restarted/u;
 const STOPPED_SENDING = /stopped sending output/u;
 const REMOVED = /was removed/u;
@@ -85,11 +87,18 @@ const insertUser = async () =>
             await ctx.db.insert("user", { createdAt: 0, email: `u${String(Math.random())}@example.com`, emailVerified: true, name: "U", updatedAt: 0 }),
     )) as string;
 
+/** What the next `finalizeHostUpload` answers; `undefined` means no action may run. */
+let finalizeStub: ((args: { filename: string; uploadId: string; userId: string }) => Promise<unknown>) | undefined;
+
 /** An `HttpActionCtx` over the harness: every shard is the one database. */
 const httpContext = () => {
     const runners = {
-        runAction: async () => {
-            throw new Error("no actions here");
+        runAction: async (_ref: never, args: never) => {
+            if (!finalizeStub) {
+                throw new Error("no actions here");
+            }
+
+            return await finalizeStub(args);
         },
         runMutation: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runMutation(ref, args)),
         runQuery: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runQuery(ref, args)),
@@ -226,6 +235,7 @@ const row = async (id: string) => (await harness.run(async (ctx: any) => await c
 
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
+    finalizeStub = undefined;
     resetFloodGuard();
     resetOwnerCache();
     ownerId = await insertUser();
@@ -409,7 +419,7 @@ describe("a host turn", () => {
         expect(stream).toMatchObject({ hostEndReason: "finished", hostState: "ended", status: "done" });
         expect(rows.find((message) => message.message.role === "user")?.text).toBe("hello");
         expect(reply).toMatchObject({ provider: "acp-host", reasoning: "thought", status: "success" });
-        expect(reply?.message.content).toEqual([{ text: "Done.", type: "text" }]);
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "Done.", type: "text" }]);
         expect(await row(threadId)).toMatchObject({ status: "active" });
         await expect(as(ownerId).query(streaming.getActiveStreamForThread as never, { threadId } as never)).resolves.toBeNull();
 
@@ -475,7 +485,7 @@ describe("a host turn", () => {
         expect(older?.order).toBe(newer?.order);
         expect(newer?.parentMessageId).toBe(promptId);
         expect(await rowField(threadId, "activeLeafMessageId")).toBe(newer?._id);
-        expect(newer?.message.content).toEqual([{ text: "second answer", type: "text" }]);
+        expect(newer?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "second answer", type: "text" }]);
     });
 
     it("tracks the permission requests the agent is waiting on", async () => {
@@ -653,7 +663,7 @@ describe("the reaper", () => {
 
         expect(others).toHaveLength(0);
         expect(reply).toMatchObject({ finishReason: "error", status: "failed" });
-        expect(reply?.message.content).toEqual([{ text: "working", type: "text" }]);
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "working", type: "text" }]);
         expect(reply?.error).toMatch(STOPPED_SENDING);
         expect(call).toMatchObject({ deviceId: device.deviceId, status: "pending", toolName: "acp_cancel" });
         expect(JSON.parse(call?.envelope)).toMatchObject({ input: { sessionId: "host-s1", turnId: "t1" }, kind: "call", tool: "acp_cancel" });
@@ -723,7 +733,7 @@ describe("the reaper", () => {
 
         const [reply] = await assistantRepliesOf(threadId);
 
-        expect(reply?.message.content).toEqual([{ text: texts.map((event) => event.text).join(""), type: "text" }]);
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: texts.map((event) => event.text).join(""), type: "text" }]);
     });
 
     it("keeps a stopped turn's end reason when the host's end arrives afterwards", async () => {
@@ -800,7 +810,7 @@ describe("stopping and revoking", () => {
         const calls = await cancelCalls();
 
         expect(stream).toMatchObject({ hostEndReason: "stopped", hostState: "ended", status: "done" });
-        expect(reply?.message.content).toEqual([{ text: "partial", type: "text" }]);
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "partial", type: "text" }]);
         expect(calls).toHaveLength(1);
         // The host's own end arrives afterwards and changes nothing.
         await expect(turn(device, threadId, "t1", 2, [{ kind: "turn_end", reason: "cancelled" }])).resolves.toMatchObject({ json: { ended: true } });
@@ -819,7 +829,7 @@ describe("stopping and revoking", () => {
         const [reply] = await assistantRepliesOf(threadId);
 
         expect(reply).toMatchObject({ finishReason: "error", status: "failed" });
-        expect(reply?.message.content).toEqual([{ text: "busy", type: "text" }]);
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "busy", type: "text" }]);
         expect(reply?.error).toMatch(REMOVED);
         await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "ended" });
         expect(await row(threadId)).toMatchObject({ status: "active" });
@@ -927,5 +937,202 @@ describe("the apply mutation", () => {
         );
 
         expect(result).toEqual({ outcome: "limited" });
+    });
+});
+
+describe("files a reply refers to", () => {
+    const KEY = `agent-files/${"b".repeat(64)}`;
+
+    const insertFile = async (): Promise<string> =>
+        (await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("chatFiles", {
+                    filename: "chart.png",
+                    hash: "b".repeat(64),
+                    lastTouchedAt: 0,
+                    mediaType: "image/png",
+                    refcount: 0,
+                    storageId: KEY,
+                }),
+        )) as string;
+
+    const MEDIA = { contentType: "image/png", kind: "media", name: "chart.png", reference: "out/chart.png", size: 1234, uploadId: "u".repeat(21) };
+
+    /** The thread's `index`th assistant reply; a test that expects it fails here, not on a later `undefined`. */
+    const replyAt = async (threadId: string, index: number): Promise<Record<string, any>> => {
+        const replies = await assistantRepliesOf(threadId);
+        const reply = replies[index];
+
+        if (reply === undefined) {
+            throw new Error(`expected a reply at ${String(index)}`);
+        }
+
+        return reply;
+    };
+
+    const setUp = async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const fileId = await insertFile();
+        const finalize = vi.fn(async () => {
+            return { fileId, mediaType: "image/png", storageKey: KEY };
+        });
+
+        finalizeStub = finalize;
+
+        return { device, fileId, finalize, threadId };
+    };
+
+    it("finalizes the upload for the device's owner and saves the file on the reply, counted once", async () => {
+        const { device, fileId, finalize, threadId } = await setUp();
+        const sent = await turn(device, threadId, "t1", 0, [START(), TEXT("Here is the chart: ![c](out/chart.png)"), MEDIA, { kind: "turn_end", reason: "finished" }]);
+
+        expect(sent.status).toBe(200);
+        expect(finalize).toHaveBeenCalledExactlyOnceWith({ filename: "chart.png", uploadId: MEDIA.uploadId, userId: ownerId });
+
+        const stream = await streamFor("t1");
+        const chunks = await chunksOf(stream!._id);
+        const mediaChunk = chunks.find((chunk) => chunk.event?.kind === "media");
+
+        // What is kept is the stored file, never the upload id.
+        expect(mediaChunk!.event).toEqual({ contentType: "image/png", fileId, kind: "media", name: "chart.png", reference: "out/chart.png", size: 1234, storageKey: KEY });
+
+        const reply = await replyAt(threadId, 0);
+
+        expect(reply.message.content).toEqual([
+            { providerMetadata: HOST_TEXT, text: "Here is the chart: c", type: "text" },
+            { data: `storage:${KEY}`, filename: "chart.png", mediaType: "image/png", type: "file" },
+        ]);
+        expect(reply.fileIds).toEqual([fileId]);
+        expect(await rowField(fileId, "refcount")).toBe(1);
+    });
+
+    it("drops a file id and a storage key a device sends: it cannot name stored bytes", async () => {
+        const { device, finalize, threadId } = await setUp();
+        const forged = { ...MEDIA, fileId: "someone-elses", storageKey: `agent-files/${  "c".repeat(64)}`, uploadId: undefined };
+
+        await turn(device, threadId, "t1", 0, [START(), { ...forged }, { kind: "turn_end", reason: "finished" }]);
+
+        const stream = await streamFor("t1");
+        const chunks = await chunksOf(stream!._id);
+        const mediaChunk = chunks.find((chunk) => chunk.event?.kind === "media");
+
+        expect(finalize).not.toHaveBeenCalled();
+        expect(mediaChunk!.event).not.toHaveProperty("storageKey");
+        expect(mediaChunk!.event).not.toHaveProperty("fileId");
+
+        const reply = await replyAt(threadId, 0);
+
+        expect(reply.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`chart.png` (1 KB) could not be attached.", type: "text" }]);
+        expect(reply.fileIds).toBeUndefined();
+    });
+
+    it("does not fail the post when a finalize fails: the file is shown as not attached", async () => {
+        const { device, threadId } = await setUp();
+
+        finalizeStub = async () => null;
+
+        const sent = await turn(device, threadId, "t1", 0, [START(), MEDIA, { kind: "turn_end", reason: "finished" }]);
+
+        expect(sent.status).toBe(200);
+
+        const reply = await replyAt(threadId, 0);
+
+        expect(reply.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`chart.png` (1 KB) could not be attached.", type: "text" }]);
+    });
+
+    it("names a file over the cap with its size, without an upload", async () => {
+        const { device, finalize, threadId } = await setUp();
+
+        await turn(device, threadId, "t1", 0, [START(), { kind: "media", name: "dump.json", reference: "dump.json", size: 30 * 1024 * 1024 }, { kind: "turn_end", reason: "finished" }]);
+
+        const reply = await replyAt(threadId, 0);
+
+        expect(finalize).not.toHaveBeenCalled();
+        expect(reply.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`dump.json` (30.0 MB) is over the 20.0 MB limit and was not attached.", type: "text" }]);
+    });
+
+    it("finalizes a redelivered post's file once, and not at all for a post the backend answers gap to", async () => {
+        const { device, finalize, threadId } = await setUp();
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("a")]);
+
+        const first = await turn(device, threadId, "t1", 2, [MEDIA]);
+        const again = await turn(device, threadId, "t1", 2, [MEDIA]);
+        const gap = await turn(device, threadId, "t1", 9, [{ ...MEDIA, uploadId: "v".repeat(21) }]);
+
+        expect(first.json.next).toBe(3);
+        expect(again.json.next).toBe(3);
+        expect(gap.status).toBe(409);
+        expect(finalize).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves an earlier message as it was when the file changes and is attached again", async () => {
+        const { device, fileId, threadId } = await setUp();
+        const NEW_KEY = `agent-files/${"d".repeat(64)}`;
+
+        await turn(device, threadId, "t1", 0, [START(), MEDIA, { kind: "turn_end", reason: "finished" }]);
+
+        // The file was edited; the next turn uploads the new bytes, which are stored under their own key.
+        finalizeStub = async () => {
+            return { fileId, mediaType: "image/png", storageKey: NEW_KEY };
+        };
+
+        await turn(device, threadId, "t2", 0, [START("again"), { ...MEDIA, uploadId: "w".repeat(21) }, { kind: "turn_end", reason: "finished" }]);
+
+        const first = await replyAt(threadId, 0);
+        const second = await replyAt(threadId, 1);
+        const keysOf = (reply: Record<string, any>) => reply.message.content.filter((part: any) => part.type === "file").map((part: any) => part.data);
+
+        expect(keysOf(first)).toEqual([`storage:${KEY}`]);
+        expect(keysOf(second)).toEqual([`storage:${NEW_KEY}`]);
+    });
+
+    it("answers 200 and shows the file as not attached when a finalize throws, or the upload id is malformed", async () => {
+        const { device, threadId } = await setUp();
+
+        finalizeStub = async () => {
+            throw new Error("storage is down");
+        };
+
+        const thrown = await turn(device, threadId, "t1", 0, [START(), { ...MEDIA, name: "n".repeat(255) }]);
+        const malformed = await turn(device, threadId, "t1", 2, [{ ...MEDIA, uploadId: "../x" }, { kind: "turn_end", reason: "finished" }]);
+
+        expect(thrown.status).toBe(200);
+        expect(malformed.status).toBe(200);
+
+        const reply = await replyAt(threadId, 0);
+
+        expect(reply.message.content[0].text).toContain("could not be attached");
+        expect(reply.fileIds).toBeUndefined();
+    });
+
+    it("finalizes the files of one post one at a time", async () => {
+        const { device, fileId, threadId } = await setUp();
+        let running = 0;
+        let overlapped = false;
+
+        finalizeStub = async () => {
+            running += 1;
+            overlapped ||= running > 1;
+            await new Promise((resolve) => {
+                setTimeout(resolve, 5);
+            });
+            running -= 1;
+
+            return { fileId, mediaType: "image/png", storageKey: KEY };
+        };
+
+        await turn(device, threadId, "t1", 0, [START(), MEDIA, { ...MEDIA, uploadId: "x".repeat(21) }, { ...MEDIA, uploadId: "y".repeat(21) }]);
+
+        expect(overlapped).toBe(false);
+    });
+
+    it("refuses a post carrying more files than one turn may attach", async () => {
+        const { device, finalize, threadId } = await setUp();
+        const sent = await turn(device, threadId, "t1", 0, [START(), ...Array.from({ length: 9 }, () => {return { ...MEDIA }})]);
+
+        expect(sent.status).toBe(400);
+        expect(finalize).not.toHaveBeenCalled();
     });
 });

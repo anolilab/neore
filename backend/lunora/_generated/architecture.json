@@ -7083,6 +7083,27 @@
       "module": "acp"
     },
     {
+      "detail": "action",
+      "id": "function:acp_upload:finalizeHostUpload",
+      "kind": "function",
+      "name": "acp.upload.finalizeHostUpload",
+      "module": "acp"
+    },
+    {
+      "detail": "query",
+      "id": "function:acp_upload:hostStreamNext",
+      "kind": "function",
+      "name": "acp.upload.hostStreamNext",
+      "module": "acp"
+    },
+    {
+      "detail": "query",
+      "id": "function:acp_upload:verifyHostUpload",
+      "kind": "function",
+      "name": "acp.upload.verifyHostUpload",
+      "module": "acp"
+    },
+    {
       "detail": "query",
       "id": "function:admin_audit_log:getAuditLogEntry",
       "kind": "function",
@@ -16341,19 +16362,31 @@
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 125,
+      "line": 133,
+      "reason": "\"deviceOwner\" is not a registered function"
+    },
+    {
+      "file": "acp/http",
+      "kind": "call",
+      "line": 237,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 206,
+      "line": 260,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 223,
+      "line": 275,
+      "reason": "\"hostIngestHttpAction\" is not a registered function"
+    },
+    {
+      "file": "acp/http",
+      "kind": "call",
+      "line": 292,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
@@ -16367,6 +16400,18 @@
       "kind": "write",
       "line": 21,
       "reason": "\"touchSession\" is not a registered function"
+    },
+    {
+      "file": "acp/upload-http",
+      "kind": "call",
+      "line": 220,
+      "reason": "\"hostUploadHttpAction\" is not a registered function"
+    },
+    {
+      "file": "acp/upload-http",
+      "kind": "call",
+      "line": 247,
+      "reason": "\"hostUploadHttpAction\" is not a registered function"
     },
     {
       "file": "admin/audit-log",
@@ -19485,8 +19530,8 @@
     {
       "file": "lib/chat-upload",
       "kind": "schedule",
-      "line": 195,
-      "reason": "\"finalizeStagedUpload\" is not a registered function"
+      "line": 203,
+      "reason": "\"finalizeStagedUploadFile\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
@@ -19707,14 +19752,14 @@
     {
       "file": "lib/upload-route",
       "kind": "call",
-      "line": 220,
-      "reason": "\"handleUploadRequest\" is not a registered function"
+      "line": 209,
+      "reason": "\"serveUserUpload\" is not a registered function"
     },
     {
       "file": "lib/upload-route",
       "kind": "schedule",
-      "line": 230,
-      "reason": "\"handleUploadRequest\" is not a registered function"
+      "line": 220,
+      "reason": "\"serveUserUpload\" is not a registered function"
     },
     {
       "file": "memory/gdpr",

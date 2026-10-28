@@ -326,7 +326,7 @@ the folder and refers to it in its reply. Rules:
   canonicalise it. A path that leaves the folder (`..`, an absolute path elsewhere,
   a symlink that exits the folder) is refused and shown as text. The check runs in
   the main process, never in the page.
-- **Size and type.** A size cap and an allowlist of image types, both set in S8. A
+- **Size and type.** A size cap and an allowlist of image types, both set in S8 (provisional until measured; see "S8 as built"). A
   file over the cap is shown as a download link with its size, not as an image.
 - **Transport.** The bytes never pass through the page. The main process reads
   them through the device file operation and uploads them itself. This needs a
@@ -574,6 +574,28 @@ backend work, listed in §4.8).
   stale device signature is refused.
 - The size cap and the type allowlist are set from a measured sample of real agent
   output before S8 starts.
+
+**S8 as built** (differences from the text above):
+- **The cap and the types are provisional.** No sample of real agent output could be taken, so they are
+  chosen, not measured, and stand in one pair of constants (`backend/lunora/acp/lib/constants.ts`,
+  `packages/device-core/src/media.rs`, pinned equal by `media-limits.test.ts`): an image up to 8 MiB shows inline,
+  a file up to 20 MiB is attached as a download (an image over 8 MiB, a PDF, `.txt`/`.log`, `.md`, `.json`), and a
+  larger one is named with its size and not uploaded. PNG, JPEG, GIF and WebP only; SVG, HTML, scripts, stylesheets
+  and XML are not on the list. A type is the file's bytes AND its extension agreeing. Set them from a sample and
+  re-run the pin.
+- **Only a Markdown image (`![](path)`) is looked at**, not a plain link and not a file a tool call reports as
+  created (that is S9's evidence). An agent links existing files constantly, and a mention is not a request to
+  upload one.
+- **The route is `/hosts/uploads`, not `/uploads`.** The payload rides in a header (`neore-device-request`,
+  base64url JSON) with its signature (`neore-device-signature`); the route checks the signed method, upload id, size,
+  type, `Upload-Offset` and body hash against the request. `serveUserUpload` in `lib/upload-route.ts` is the shared
+  inner handler, so a session, an API key and a device upload take one code path after authentication.
+- **The ingest finalizes the upload.** The `media` event names an upload id; the ingest ACTION finalizes it for the
+  device's verified owner and stores `fileId` and `storageKey` itself, only for events the stream does not have yet. A
+  failed finalize leaves the file named and marked not attached; it never fails the post.
+- **Left out:** attachments on `acp_send` (not in this slice's acceptance and not in the base), files a tool call
+  reports as created (S9), Office documents as downloads, and a measured cap. The phone reads the same message
+  parts; it was not run here.
 
 **S9 — Turn changes.** §4.9. Needs S3.
 - Acceptance: a turn that writes two files shows both with correct line counts; a

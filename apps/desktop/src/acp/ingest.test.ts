@@ -10,6 +10,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HostEvent } from "./ingest";
+import type { PosterOptions } from "./ingest";
 import { HostPoster, KEEPALIVE_MS, POST_INTERVAL_MS } from "./ingest";
 
 interface Post {
@@ -99,12 +100,13 @@ let clock: number;
 
 const hosts: HostPoster[] = [];
 
-const poster = () => {
+const poster = (media?: PosterOptions["media"], fetcher: typeof fetch = backend.fetch as typeof fetch) => {
     const host = new HostPoster({
         deviceId: () => paired,
         endpoint: new URL("https://backend.test/hosts/ingest"),
-        fetch: backend.fetch as typeof fetch,
+        fetch: fetcher,
         log: () => {},
+        ...media && { media },
         now: () => clock,
         random: () => 0.5,
         sign: (payload) => `sig:${String(payload.length)}`,
@@ -156,6 +158,132 @@ afterEach(async () => {
 
     vi.useRealTimers();
     await rm(scratch, { force: true, recursive: true });
+});
+
+describe("a turn's files", () => {
+    const UPLOAD_ID = "abcdefghijklmnopqrstu";
+    const PNG = { bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1]), kind: "image", mime: "image/png", name: "chart.png", size: 5, status: "read" };
+
+    /** The backend for a poster that also uploads: ingest posts go to the stand-in, upload requests are accepted. */
+    const withUploads = () => {
+        const uploads: string[] = [];
+        const fetcher = async (url: URL | string, init?: RequestInit): Promise<Response> => {
+            if (String(url).includes("/hosts/uploads")) {
+                uploads.push(String(init?.method));
+
+                return init?.method === "POST" ? new Response(null, { headers: { Location: `/hosts/uploads/${UPLOAD_ID}` }, status: 201 }) : new Response(null, { status: 204 });
+            }
+
+            return await backend.fetch(url, init);
+        };
+
+        return { fetcher: fetcher as typeof fetch, uploads };
+    };
+
+    const media = (read: (reference: string) => Promise<unknown>): NonNullable<PosterOptions["media"]> => {
+        return { endpoint: new URL("https://backend.test/hosts/uploads"), read: async (_agent, _folder, reference) => (await read(reference)) as never, sign: () => "sig" };
+    };
+
+    it("posts a file's event before the end of the turn, and the end last", async () => {
+        const { fetcher, uploads } = withUploads();
+        const read = vi.fn(async () => PNG);
+        const host = poster(media(read), fetcher);
+
+        await open(host);
+        host.turnStarted("s1", "t1", "draw");
+        host.text("s1", "t1", "Here: ![c](out/chart.png)");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+        await settle(POST_INTERVAL_MS);
+
+        expect(read).toHaveBeenCalledExactlyOnceWith("out/chart.png");
+        expect(uploads).toEqual(["POST", "PATCH"]);
+
+        const kinds = (backend.chunks.get("t1") ?? []).map((event) => event.kind);
+
+        expect(kinds.slice(-2)).toEqual(["media", "turn_end"]);
+        expect(backend.chunks.get("t1")?.at(-2)).toEqual({ contentType: "image/png", kind: "media", name: "chart.png", reference: "out/chart.png", size: 5, uploadId: UPLOAD_ID });
+    });
+
+    it("sends the files one to a post, each with its own seq", async () => {
+        const { fetcher } = withUploads();
+        const host = poster(media(async () => PNG), fetcher);
+
+        await open(host);
+        host.turnStarted("s1", "t1", "draw");
+        host.text("s1", "t1", "![a](a.png) ![b](b.png)");
+        host.turnEnded("s1", "t1", "end_turn");
+
+        for (let step = 0; step < 4; step += 1) {
+            await settle(POST_INTERVAL_MS);
+        }
+
+        const withFiles = backend.posts.filter(({ post }) => post.turnId === "t1" && post.events.some((event) => event.kind === "media"));
+
+        expect(withFiles).toHaveLength(2);
+        expect(withFiles.map(({ post }) => post.events.filter((event) => event.kind === "media").length)).toEqual([1, 1]);
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished" });
+    });
+
+    it("ends a turn with no image reference at once, without reading anything", async () => {
+        const { fetcher, uploads } = withUploads();
+        const read = vi.fn(async () => PNG);
+        const host = poster(media(read), fetcher);
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "See [the file](notes.md)");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+
+        expect(read).not.toHaveBeenCalled();
+        expect(uploads).toEqual([]);
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished" });
+    });
+
+    it("posts nothing for a reference the core refuses, and still ends the turn", async () => {
+        const { fetcher, uploads } = withUploads();
+        const host = poster(media(async () => ({ kind: "", mime: "", name: "", size: 0, status: "refused" })), fetcher);
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "![a](../secret.png)");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+        await settle(POST_INTERVAL_MS);
+
+        expect(uploads).toEqual([]);
+        expect((backend.chunks.get("t1") ?? []).map((event) => event.kind)).toEqual(["turn_start", "text", "turn_end"]);
+    });
+
+    it("reads nothing for a turn that failed", async () => {
+        const { fetcher } = withUploads();
+        const read = vi.fn(async () => PNG);
+        const host = poster(media(read), fetcher);
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "![a](a.png)");
+        host.turnEnded("s1", "t1", "failed", "boom");
+        await settle(POST_INTERVAL_MS);
+
+        expect(read).not.toHaveBeenCalled();
+        expect(backend.chunks.get("t1")?.at(-1)).toMatchObject({ kind: "turn_end", reason: "failed" });
+    });
+
+    it("ends the turn even when reading throws", async () => {
+        const { fetcher } = withUploads();
+        const host = poster(media(async () => { throw new Error("boom"); }), fetcher);
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "![a](a.png)");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished" });
+    });
 });
 
 describe("opening a session", () => {

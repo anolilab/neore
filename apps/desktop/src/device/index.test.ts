@@ -196,6 +196,9 @@ const makeCore = () => {
         acpPermissionCancelSession: vi.fn(),
         acpPermissionDecline: vi.fn(),
         acpPermissions: vi.fn(() => "[]"),
+        acpReadMedia: vi.fn(async () => {
+            return { kind: "", mime: "", name: "", size: 0, status: "refused" };
+        }),
         acpSpawnPlan: vi.fn((): string => {
             throw new Error("that folder is not allowed");
         }),

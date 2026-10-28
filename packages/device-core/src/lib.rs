@@ -28,6 +28,7 @@ pub mod host;
 #[cfg(feature = "keychain")]
 pub mod install;
 pub mod mcp;
+pub mod media;
 pub mod sandbox;
 pub mod shell;
 #[cfg(feature = "keychain")]

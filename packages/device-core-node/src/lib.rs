@@ -18,9 +18,11 @@ use device_core::acp_permission::PermissionRequest;
 use device_core::engine::{HostSpec, SettingsUpdate};
 use device_core::envelope::Signed;
 use device_core::install::{Bundle, Root};
+use device_core::fs::MediaRead;
+use device_core::media::Kind;
 use device_core::{DeviceState, Event};
 use napi::bindgen_prelude::{
-    spawn_blocking, Env, Error, Function, PromiseRaw, Result, ToNapiValue,
+    spawn_blocking, Buffer, Env, Error, Function, PromiseRaw, Result, ToNapiValue,
 };
 use napi::threadsafe_function::ThreadsafeFunctionCallMode;
 use napi_derive::napi;
@@ -52,6 +54,53 @@ fn request_id(id: f64) -> Result<u64> {
         Ok(id as u64)
     } else {
         Err(Error::from_reason("invalid request id"))
+    }
+}
+
+/// A file an agent's reply refers to (`acpReadMedia`). `status` is `read`, `too_large` or `refused`; `bytes` is set
+/// only for `read`, and nothing else is filled for `refused`.
+#[napi(object)]
+pub struct AcpMedia {
+    pub bytes: Option<Buffer>,
+    /// `image` (shown in the message) or `file` (offered for download).
+    pub kind: String,
+    pub mime: String,
+    pub name: String,
+    pub size: f64,
+    pub status: String,
+}
+
+fn media_result(read: MediaRead) -> AcpMedia {
+    let kind = |kind: Kind| match kind {
+        Kind::Image => "image",
+        Kind::File => "file",
+    };
+
+    match read {
+        MediaRead::Read(file) => AcpMedia {
+            bytes: Some(Buffer::from(file.bytes)),
+            kind: kind(file.kind).to_owned(),
+            mime: file.mime.to_owned(),
+            name: file.name,
+            size: file.size as f64,
+            status: "read".to_owned(),
+        },
+        MediaRead::TooLarge { mime, name, size } => AcpMedia {
+            bytes: None,
+            kind: "file".to_owned(),
+            mime: mime.to_owned(),
+            name,
+            size: size as f64,
+            status: "too_large".to_owned(),
+        },
+        MediaRead::Refused => AcpMedia {
+            bytes: None,
+            kind: String::new(),
+            mime: String::new(),
+            name: String::new(),
+            size: 0.0,
+            status: "refused".to_owned(),
+        },
     }
 }
 
@@ -143,6 +192,33 @@ impl DeviceCore {
     #[napi]
     pub fn sign_turn(&self, payload: String) -> Result<String> {
         self.state.sign_turn(&payload).map_err(Error::from_reason)
+    }
+
+    /// Signs one request to the backend's device upload route (hex HMAC under the `upload` domain). Refuses a
+    /// payload that is not an upload request for this paired computer.
+    #[napi]
+    pub fn sign_upload(&self, payload: String) -> Result<String> {
+        self.state.sign_upload(&payload).map_err(Error::from_reason)
+    }
+
+    /// Reads a file that an agent's reply refers to, if it is inside the folder the agent was approved for and an
+    /// allowed type. The pair must be an approved one; the path is checked and opened in Rust, never in the page.
+    /// Runs on the blocking pool: the file can be large.
+    #[napi]
+    pub fn acp_read_media<'env>(
+        &self,
+        env: &'env Env,
+        agent_key: String,
+        folder: String,
+        reference: String,
+    ) -> Result<PromiseRaw<'env, AcpMedia>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            Ok(media_result(
+                state.acp_read_media(&agent_key, &folder, &reference),
+            ))
+        })
     }
 
     /// Verifies, asks about (through `onEvent`), runs and signs one relayed call.

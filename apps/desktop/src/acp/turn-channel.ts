@@ -214,6 +214,11 @@ export class TurnChannel {
             size += length;
             batch.push(next);
             this.pending.shift();
+
+            // A post with a file in it ends there: the backend stores one file per request (it holds the whole file in memory).
+            if (next.kind === "media") {
+                break;
+            }
         }
 
         return batch;

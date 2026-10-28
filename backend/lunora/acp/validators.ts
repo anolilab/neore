@@ -80,6 +80,20 @@ export const vHostEvent = v.union(
         outcome: v.union(v.literal("allowed"), v.literal("declined"), v.literal("cancelled")),
         requestId: v.string().max(128),
     }),
+    // A file the reply refers to, in the folder the agent was approved for. The desktop reads it (Rust, confined to
+    // the folder), uploads it over the device upload route and names it here by `uploadId`; with no `uploadId` it was
+    // over the size cap and only its name and size are kept. `fileId` and `storageKey` are the BACKEND's: the ingest
+    // finalizes the upload and sets them, and drops any a device sent, so a device cannot name stored bytes.
+    v.object({
+        contentType: v.optional(v.string().max(100)),
+        fileId: v.optional(v.string().max(64)),
+        kind: v.literal("media"),
+        name: v.string().max(255),
+        reference: v.string().max(1024),
+        size: v.number(),
+        storageKey: v.optional(v.string().max(512)),
+        uploadId: v.optional(v.string().max(64)),
+    }),
     v.object({
         error: v.optional(v.string().max(1000)),
         kind: v.literal("turn_end"),

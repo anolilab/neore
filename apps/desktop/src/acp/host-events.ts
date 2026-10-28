@@ -19,8 +19,18 @@ export interface PermissionRequestEvent {
 
 export type PermissionOutcomeKind = "allowed" | "cancelled" | "declined";
 
+/** A file the reply refers to (`media.ts`): uploaded and named by `uploadId`, or, over the size cap, only named. */
+export interface MediaEvent {
+    contentType: string;
+    kind: "media";
+    name: string;
+    reference: string;
+    size: number;
+    uploadId?: string;
+}
+
 export type HostEvent
-    = PermissionRequestEvent | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; kind: "session_open" } | { error?: string; kind: "turn_end"; reason: "cancelled" | "failed" | "finished" | "interrupted" } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
+    = MediaEvent | PermissionRequestEvent | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; kind: "session_open" } | { error?: string; kind: "turn_end"; reason: "cancelled" | "failed" | "finished" | "interrupted" } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
 
 export interface HostSessionInfo {
     agentKey: string;

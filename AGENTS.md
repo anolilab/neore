@@ -685,6 +685,27 @@ written here is what is not.
   `applyHostEvents`, not by shard isolation. A host stream ends through
   `endHostStream` from every path (the host's `turn_end`, the reaper, a revoked
   device, Stop), which sets the status and `hostState: ended` in one write.
+  **Files a host reply shows** (plans/acp-agent-host.md §4.8): only a Markdown
+  IMAGE in the reply (`![](path)`, never a plain link) is looked at, at the end
+  of the turn, by the desktop main process. Rust (`DeviceCore.acpReadMedia`,
+  `fs::read_media`) resolves it against the approved folder alone and opens it
+  through the same confined walk as `fs_read`; a path out of the folder (`..`,
+  absolute, a link out) is refused by the canonicalisation BEFORE any open (the
+  test makes the outside files mode 000 to prove it). Type is the file's bytes
+  AND its extension agreeing, from a short list with no SVG/HTML/script. The
+  upload goes over TUS to `/hosts/uploads` (`acp/upload-http.ts`), each request
+  signed in Rust under the `upload` domain (`DeviceCore.signUpload`); the
+  ingest's `media` event carries only the upload id, which the INGEST ACTION
+  finalizes for the device's owner (`acp/upload.ts#finalizeHostUpload`) and
+  stores as `storageKey`/`fileId` itself — a device-sent key is dropped. A
+  finalize failure never fails the post (the desktop would stop posting the
+  turn); the file is noted as not attached. Content-addressed storage makes a
+  later edit of the file leave an earlier message alone. The reply's text parts
+  carry `providerMetadata.neore.runner = "host"`, which makes the reader skip
+  Markdown images (`hostMarkdownComponents`): a remote one would be fetched.
+  The size caps and the type list are PROVISIONAL (not measured) — one pair of
+  constants, `acp/lib/constants.ts` and `device-core/src/media.rs`, pinned
+  equal by `media-limits.test.ts`.
   Host turns write no usage row and charge no credit. `acp_*` device calls have
   their own claim window (60 s) and open-call budget (3 per device); the backend
   queues `acp_cancel` itself (`devices/lib/acp-call.ts`) because

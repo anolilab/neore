@@ -6,7 +6,7 @@
  */
 import { HOST_STREAM_IDLE_MS, HOST_TURN_MAX_MS } from "../../../acp/lib/constants";
 import type { Doc, Id } from "../../../_generated/dataModel";
-import type { MutationCtx } from "../../../_generated/server";
+import type { MutationCtx, QueryCtx } from "../../../_generated/server";
 import { patchThread } from "../../../agent/table-writes";
 import { patchRow, withoutUndefined } from "../../../lib/patch";
 import { noteShardDue } from "../../../lib/shard-housekeeping";
@@ -82,7 +82,7 @@ export const extendHostStream = async (ctx: Pick<MutationCtx, "db">, stream: Str
 };
 
 /** The `seq` the next event must carry: one past the last chunk, read off `by_streamId_seq`. */
-export const nextHostSeq = async (ctx: Pick<MutationCtx, "db">, streamId: Id<"persistentStreams">): Promise<number> => {
+export const nextHostSeq = async (ctx: Pick<QueryCtx, "db">, streamId: Id<"persistentStreams">): Promise<number> => {
     const last = await ctx.db.persistentChunks.findFirst({ orderBy: [{ seq: "desc" }], where: { streamId } });
 
     return last ? last.seq + 1 : 0;

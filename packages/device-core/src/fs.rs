@@ -18,6 +18,8 @@ use std::path::{Component, Path, PathBuf};
 
 use serde_json::{json, Value};
 
+use crate::media::{self, Kind};
+
 /// Largest file `fs_read` opens and `fs_write` writes.
 pub const MAX_FILE_BYTES: u64 = 1024 * 1024;
 /// Directory entries `fs_list` returns.
@@ -661,6 +663,117 @@ pub fn read(roots: &[PathBuf], path: &Path) -> Result<String, String> {
     Ok(text)
 }
 
+/// A file the agent wrote, read for attaching to its reply.
+#[derive(Debug)]
+pub struct MediaFile {
+    pub bytes: Vec<u8>,
+    pub kind: Kind,
+    pub mime: &'static str,
+    pub name: String,
+    pub size: u64,
+}
+
+/// What reading one reference came to. Only `Read` carries bytes.
+#[derive(Debug)]
+pub enum MediaRead {
+    Read(MediaFile),
+    /// Over the upload cap: named, never read past its first bytes.
+    TooLarge {
+        mime: &'static str,
+        name: String,
+        size: u64,
+    },
+    /// Outside the folder, not a plain file, not an allowed type, or not there. Says nothing about which.
+    Refused,
+}
+
+/// A file the agent's reply refers to, if it is inside `roots` and an allowed type (`media`). `reference` is the
+/// path as the reply wrote it: relative to the first root, or absolute.
+///
+/// A path that resolves outside the roots is refused by the canonicalisation, which opens nothing: `..`, an
+/// absolute path elsewhere and a link that leaves the folder are all caught before any file is touched. What
+/// passes is then opened through the same confined walk as `fs_read` (no link followed below the root, so a link
+/// swapped in since the check fails), and its size is taken from the OPEN file, not from an earlier look.
+pub fn read_media(roots: &[PathBuf], reference: &str) -> MediaRead {
+    if !media::is_plain_path(reference) {
+        return MediaRead::Refused;
+    }
+
+    let Ok(path) = resolve_existing(reference, roots) else {
+        return MediaRead::Refused;
+    };
+    let Some(name) = path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+    else {
+        return MediaRead::Refused;
+    };
+    let Ok(mut file) = confined::open_file(roots, &path, Open::Read) else {
+        return MediaRead::Refused;
+    };
+    let Ok(meta) = file.metadata() else {
+        return MediaRead::Refused;
+    };
+
+    if !meta.is_file() {
+        return MediaRead::Refused;
+    }
+
+    let mut head = Vec::new();
+
+    if (&mut file)
+        .take(media::SNIFF_BYTES as u64)
+        .read_to_end(&mut head)
+        .is_err()
+    {
+        return MediaRead::Refused;
+    }
+
+    let Some((mime, kind)) = media::classify(&name, &head) else {
+        return MediaRead::Refused;
+    };
+    let size = meta.len();
+
+    if size > media::MAX_UPLOAD_BYTES {
+        return MediaRead::TooLarge { mime, name, size };
+    }
+
+    // The rest, one byte past the cap so a file that grew since `fstat` is caught instead of truncated.
+    let mut bytes = head;
+
+    if file
+        .take(media::MAX_UPLOAD_BYTES + 1 - bytes.len() as u64)
+        .read_to_end(&mut bytes)
+        .is_err()
+    {
+        return MediaRead::Refused;
+    }
+
+    if bytes.len() as u64 > media::MAX_UPLOAD_BYTES {
+        return MediaRead::TooLarge {
+            mime,
+            name,
+            size: bytes.len() as u64,
+        };
+    }
+
+    let size = bytes.len() as u64;
+    // An image above the inline cap is offered as a file, with its size.
+    let kind = if kind == Kind::Image && size > media::MAX_INLINE_IMAGE_BYTES {
+        Kind::File
+    } else {
+        kind
+    };
+
+    MediaRead::Read(MediaFile {
+        bytes,
+        kind,
+        mime,
+        name,
+        size,
+    })
+}
+
 pub fn write(
     roots: &[PathBuf],
     path: &Path,
@@ -890,6 +1003,150 @@ mod tests {
         assert_eq!(read(&roots, &read_path).unwrap(), "hello");
         assert!(write(&roots, &write_path, "x", true).is_ok());
         assert_eq!(fs::read_to_string(dir.join("root/a.txt")).unwrap(), "x");
+    }
+
+    const PNG_HEAD: [u8; 10] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0];
+
+    fn media_scratch(name: &str) -> (PathBuf, Vec<PathBuf>) {
+        let dir = scratch(name);
+
+        fs::write(dir.join("root/chart.png"), PNG_HEAD).unwrap();
+        fs::write(dir.join("secret.png"), PNG_HEAD).unwrap();
+
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+
+        (dir, roots)
+    }
+
+    #[test]
+    fn an_image_in_the_folder_is_read_with_its_type() {
+        let (_dir, roots) = media_scratch("media-ok");
+
+        match read_media(&roots, "chart.png") {
+            MediaRead::Read(file) => {
+                assert_eq!(file.bytes, PNG_HEAD);
+                assert_eq!(file.mime, "image/png");
+                assert_eq!(file.kind, Kind::Image);
+                assert_eq!(file.name, "chart.png");
+                assert_eq!(file.size, PNG_HEAD.len() as u64);
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// The outside files are made unreadable: a refusal that is an "outside the folder" answer, not a permission
+    /// error from an open, proves the file was never opened.
+    #[cfg(unix)]
+    #[test]
+    fn a_reference_that_leaves_the_folder_is_refused_without_opening_anything() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let (dir, roots) = media_scratch("media-outside");
+        let secret = dir.join("secret.png");
+
+        std::os::unix::fs::symlink(&secret, dir.join("root/link.png")).unwrap();
+        std::os::unix::fs::symlink(&dir, dir.join("root/up")).unwrap();
+        fs::set_permissions(&secret, fs::Permissions::from_mode(0o000)).unwrap();
+
+        for reference in [
+            "../secret.png",
+            &secret.to_string_lossy(),
+            "link.png",
+            "up/secret.png",
+            "sub/../../secret.png",
+        ] {
+            assert!(
+                matches!(read_media(&roots, reference), MediaRead::Refused),
+                "{reference}"
+            );
+            assert!(
+                resolve_existing(reference, &roots)
+                    .unwrap_err()
+                    .ends_with("outside the shared folders"),
+                "{reference} must be refused by the path check, before any open"
+            );
+        }
+
+        fs::set_permissions(&secret, fs::Permissions::from_mode(0o644)).unwrap();
+    }
+
+    #[test]
+    fn a_url_a_missing_file_a_folder_and_a_page_are_refused() {
+        let (dir, roots) = media_scratch("media-refused");
+
+        fs::write(dir.join("root/page.html"), "<script>1</script>").unwrap();
+        fs::write(dir.join("root/fake.png"), "<script>1</script>").unwrap();
+        fs::write(dir.join("root/page.png.html"), PNG_HEAD).unwrap();
+
+        for reference in [
+            "https://example.com/chart.png",
+            "file:///etc/passwd",
+            "missing.png",
+            "sub",
+            "page.html",
+            "fake.png",
+            "page.png.html",
+            "",
+        ] {
+            assert!(
+                matches!(read_media(&roots, reference), MediaRead::Refused),
+                "{reference}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_file_over_the_upload_cap_is_named_with_its_size_and_not_read() {
+        let (dir, roots) = media_scratch("media-large");
+        let big = fs::File::create(dir.join("root/big.png")).unwrap();
+        let size = media::MAX_UPLOAD_BYTES + 5;
+
+        (&big).write_all(&PNG_HEAD).unwrap();
+        big.set_len(size).unwrap();
+
+        match read_media(&roots, "big.png") {
+            MediaRead::TooLarge {
+                name, size: seen, ..
+            } => {
+                assert_eq!(name, "big.png");
+                assert_eq!(seen, size);
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn an_image_over_the_inline_cap_is_offered_as_a_file() {
+        let (dir, roots) = media_scratch("media-inline");
+        let large = fs::File::create(dir.join("root/large.png")).unwrap();
+
+        (&large).write_all(&PNG_HEAD).unwrap();
+        large.set_len(media::MAX_INLINE_IMAGE_BYTES + 1).unwrap();
+
+        match read_media(&roots, "large.png") {
+            MediaRead::Read(file) => {
+                assert_eq!(file.kind, Kind::File);
+                assert_eq!(file.mime, "image/png");
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_size_comes_from_the_bytes_read() {
+        let (dir, roots) = media_scratch("media-size");
+        let exact = fs::File::create(dir.join("root/exact.png")).unwrap();
+
+        (&exact).write_all(&PNG_HEAD).unwrap();
+        exact.set_len(media::MAX_INLINE_IMAGE_BYTES).unwrap();
+
+        match read_media(&roots, "exact.png") {
+            MediaRead::Read(file) => {
+                assert_eq!(file.kind, Kind::Image);
+                assert_eq!(file.bytes.len() as u64, media::MAX_INLINE_IMAGE_BYTES);
+            }
+            other => panic!("{other:?}"),
+        }
     }
 
     #[test]

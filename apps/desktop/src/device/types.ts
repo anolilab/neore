@@ -3,6 +3,8 @@
  * as JSON strings; these are their parsed forms (`device-core/src/engine.rs`).
  */
 
+import type { MediaRead } from "../acp/media";
+
 /** A payload and its HMAC, exactly as the device or the backend signed it. */
 export interface Signed {
     payload: string;
@@ -120,6 +122,8 @@ export interface DeviceCore {
     acpPermissionCancelSession: (sessionId: string) => void;
     acpPermissionDecline: (id: number) => void;
     acpPermissions: () => string;
+    /** Reads a file an agent's reply refers to, in Rust: only inside the folder the agent was approved for, only an allowed type. */
+    acpReadMedia: (agentKey: string, folder: string, reference: string) => Promise<MediaRead>;
     acpSpawnPlan: (agentKey: string, folder: string | null) => string;
     acpUpdate: (update: string) => string;
     acpView: () => string;
@@ -145,6 +149,8 @@ export interface DeviceCore {
     settingsUpdate: (update: string) => string;
     /** Signs one turn post for the backend's ingest route; refuses anything that is not a turn post for this computer. */
     signTurn: (payload: string) => string;
+    /** Signs one request to the backend's device upload route; refuses anything that is not an upload request for this computer. */
+    signUpload: (payload: string) => string;
     status: () => string;
     stop: () => void;
 }

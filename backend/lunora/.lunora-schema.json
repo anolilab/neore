@@ -14940,6 +14940,69 @@
               "optional": false,
               "unique": false,
               "fields": {
+                "contentType": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "fileId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"media\""
+                },
+                "name": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "reference": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "size": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                },
+                "storageKey": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "uploadId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
                 "error": {
                   "kind": "string",
                   "nullable": false,

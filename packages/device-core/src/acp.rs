@@ -22,6 +22,7 @@ use sha2::{Digest, Sha256};
 
 use crate::acp_permission::{Answered, Outcome, PendingView, PermissionRequest};
 use crate::engine::{now_ms, validate_roots, DeviceState, Event};
+use crate::fs::{self as confined_fs, MediaRead};
 use crate::hmac::to_hex;
 
 const MAX_AGENTS: usize = 20;
@@ -620,6 +621,35 @@ impl DeviceState {
 }
 
 impl DeviceState {
+    /// Reads a file an agent's reply refers to, for attaching to it (`fs::read_media`). `folder` is the session's
+    /// folder; the pair must be one the user approved, so nothing is read for a folder no agent was allowed in.
+    /// Only that one folder is searched, not every folder shared with other tools.
+    pub fn acp_read_media(&self, agent_key: &str, folder: &str, reference: &str) -> MediaRead {
+        let Some(folder) = validate_roots(&[folder.to_owned()])
+            .ok()
+            .and_then(|mut canonical| canonical.pop())
+        else {
+            return MediaRead::Refused;
+        };
+        let approved = self
+            .settings()
+            .acp_consents
+            .iter()
+            .any(|c| c.agent_key == agent_key && c.folder_path == folder);
+
+        if !approved {
+            return MediaRead::Refused;
+        }
+
+        let roots = confined_fs::canonical_roots(&[folder]);
+
+        if roots.is_empty() {
+            return MediaRead::Refused;
+        }
+
+        confined_fs::read_media(&roots, reference)
+    }
+
     /// Registers a request from a coding agent and blocks until it is answered, cancelled or times out.
     /// Run it on a worker thread. The outcome is exactly what the agent receives.
     pub fn acp_permission_ask(&self, request: PermissionRequest) -> Outcome {
@@ -1082,6 +1112,41 @@ mod tests {
         assert!(ask("beta", &one).is_err());
         // A path that does not exist is refused too.
         assert!(ask("alpha", &dir.join("missing")).is_err());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_file_is_read_for_an_approved_pair_only() {
+        let (state, dir) = state("media");
+        let (one, two) = (dir.join("one"), dir.join("two"));
+        let png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0];
+
+        fs::create_dir_all(&one).unwrap();
+        fs::create_dir_all(&two).unwrap();
+        fs::write(one.join("chart.png"), png).unwrap();
+        fs::write(two.join("chart.png"), png).unwrap();
+        save(&state, "alpha");
+        save(&state, "beta");
+        grant(&state, "alpha", &one);
+
+        let read = |agent: &str, folder: &Path| {
+            state.acp_read_media(agent, folder.to_str().unwrap(), "chart.png")
+        };
+
+        assert!(matches!(read("alpha", &one), MediaRead::Read(_)));
+        // Another folder, and another agent in the approved folder, are different pairs.
+        assert!(matches!(read("alpha", &two), MediaRead::Refused));
+        assert!(matches!(read("beta", &one), MediaRead::Refused));
+        assert!(matches!(
+            read("alpha", &dir.join("missing")),
+            MediaRead::Refused
+        ));
+        // The folder's sibling is not reachable through the approved one.
+        assert!(matches!(
+            state.acp_read_media("alpha", one.to_str().unwrap(), "../two/chart.png"),
+            MediaRead::Refused
+        ));
 
         let _ = fs::remove_dir_all(&dir);
     }
