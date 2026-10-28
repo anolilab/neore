@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     buildMinimapItems,
     isProvisionalId,
+    lastPromptId,
     mergeOutline,
     MINIMAP_PREVIEW_CHARS,
     minimapGapLabel,
@@ -10,6 +11,24 @@ import {
     shouldShowMinimap,
     toMinimapPreview,
 } from "./minimap-items";
+
+describe("lastPromptId", () => {
+    it("is the newest stored prompt, skipping replies and prompts still sending", () => {
+        const messages = [
+            { id: "u1", role: "user" },
+            { id: "a1", role: "assistant" },
+            { id: "u2", role: "user" },
+            { id: "a2", role: "assistant" },
+            { id: "optimistic-3", role: "user" },
+        ];
+
+        expect(lastPromptId(messages)).toBe("u2");
+    });
+
+    it("is undefined without a stored prompt", () => {
+        expect(lastPromptId([{ id: "a1", role: "assistant" }])).toBeUndefined();
+    });
+});
 
 describe("toMinimapPreview", () => {
     it("collapses whitespace and newlines to one line", () => {
