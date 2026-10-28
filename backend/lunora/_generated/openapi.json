@@ -12729,6 +12729,149 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#chat_agent_switch:switchThreadAgent": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_agent_switch:switchThreadAgent` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_agent_switch:switchThreadAgent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "clientId": {
+                        "type": "string"
+                      },
+                      "target": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "kind": {
+                                "const": "model",
+                                "type": "string"
+                              },
+                              "model": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "model"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "kind": {
+                                "const": "host",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "clientId",
+                      "target",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_agent_switch:switchThreadAgent",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "agent": {
+                      "properties": {
+                        "kind": {
+                          "const": "model",
+                          "type": "string"
+                        },
+                        "model": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "model"
+                      ],
+                      "type": "object"
+                    },
+                    "coldStartCostly": {
+                      "type": "boolean"
+                    },
+                    "messageId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "switched": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "agent",
+                    "coldStartCostly",
+                    "messageId",
+                    "switched"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_agent_switch:switchThreadAgent",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#chat_ask_user:answerAskUser": {
       "post": {
         "description": "Invoke the `mutation` `chat_ask_user:answerAskUser` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -15159,6 +15302,22 @@
                       },
                       "_id": {
                         "type": "string"
+                      },
+                      "activeAgent": {
+                        "properties": {
+                          "kind": {
+                            "const": "model",
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "model"
+                        ],
+                        "type": "object"
                       },
                       "activeLeafMessageId": {
                         "type": "string"

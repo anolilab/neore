@@ -22,6 +22,8 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { withoutUndefined } from "../lib/patch";
+import { agentSwitchRowContent } from "./agent-switch-logic";
+import type { AgentSwitchPart } from "./agent-switch-validators";
 import type { VectorTableName } from "./vector/tables";
 
 type Database = MutationCtx["db"];
@@ -29,7 +31,10 @@ type NewRow<T extends "messages" | "threadRelationships" | "threads"> = Omit<Doc
 
 /** The `threads` columns other modules set. */
 export type ThreadPatch = Partial<
-    Pick<Doc<"threads">, "activeLeafMessageId" | "groupChat" | "lastCompressionStartedAt" | "model" | "status" | "tagIds" | "updatedAt" | "workerPolicy">
+    Pick<
+        Doc<"threads">,
+        "activeAgent" | "activeLeafMessageId" | "groupChat" | "lastCompressionStartedAt" | "model" | "status" | "tagIds" | "updatedAt" | "workerPolicy"
+    >
 >;
 
 /** The `messages` columns other modules set. */
@@ -55,6 +60,33 @@ export const patchThread = async (db: Database, threadId: Id<"threads">, fields:
  */
 export const insertMessageRow = async (db: Database, row: NewRow<"messages">): Promise<Id<"messages">> =>
     await db.insert("messages", { ...row, createdAt: row.createdAt ?? Date.now() });
+
+/**
+ * The row that records an agent switch: a `system` row with no text (`agent-switch-logic.ts`),
+ * checked against `vAgentSwitch` before it is written. The only writer of one, so a reader can
+ * trust that a row carrying the marker holds a well-formed part.
+ *
+ * `parentMessageId` is the row the switch follows. Leave it out in a thread that never
+ * branched, where the previous row is the parent already.
+ */
+export const insertAgentSwitchRow = async (
+    db: Database,
+    row: { order: number; parentMessageId?: string; part: AgentSwitchPart; threadId: Id<"threads">; userId: string },
+): Promise<Id<"messages">> => {
+    const { message, providerMetadata } = agentSwitchRowContent(row.part);
+
+    return await insertMessageRow(db, {
+        message,
+        order: row.order,
+        parentMessageId: row.parentMessageId,
+        providerMetadata,
+        status: "success",
+        stepOrder: 0,
+        threadId: row.threadId,
+        tool: false,
+        userId: row.userId,
+    });
+};
 
 export const patchMessage = async (db: Database, messageId: Id<"messages">, fields: MessagePatch): Promise<void> => {
     await db.patch(messageId, withoutUndefined(fields));

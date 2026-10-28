@@ -28,6 +28,8 @@ export type ThreadRow = NonNullable<ReturnOf<typeof api.chat.functions.getThread
 
 export interface ThreadData {
     _id: string;
+    /** The agent the thread's active path runs on, once it has been switched (`agent/agent-switch.ts`). */
+    activeAgent?: { kind: "model"; model: string };
     /** Set on a bot thread: the bot's model is the one that runs. */
     botId?: string | null;
     branchName?: string;

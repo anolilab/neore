@@ -519,6 +519,24 @@ written here is what is not.
   continuation takes an `order` past EVERY row (`continuationOrder`), not
   `prompt + 1`, which a sibling branch may already hold.
 
+- **Agent switch** (`agent/agent-switch*.ts`, `chat/agent-switch.ts`, plans/harness-switch.md) —
+  switching a text thread's model leaves one `system` row with no text whose payload
+  (`providerMetadata.neoreAgentSwitch`) models never see (`docsToModelMessages` drops it) and the
+  transcript renders as a divider (`data-agentSwitch` part). The agent of a turn is the `to` of the
+  LAST such row on the path it continues, else `threads.model` — which therefore stays the
+  CREATION model: the picker no longer patches it for a text thread (`canSwitchAgent`), or an
+  older branch would change agent retroactively. `threads.activeAgent` caches the active path's
+  agent AND is the "was ever switched" flag: unset, a send keeps its own model and no path is
+  walked. Every writer of `activeLeafMessageId` that can change the path calls `syncActiveAgent`
+  with the row the path now ENDS at (a regenerate's prompt, not its descended leaf — a switch
+  below the prompt is not on its path). A switched thread runs on the derived agent whatever model
+  the send names (`getRunAgentModel`, in `/chat/start` and `/chat/edit`); a send naming a custom
+  endpoint keeps it. A switch needs a write grant, is refused while a stream is pending or
+  streaming, and routing never touches it: a run names its model and `/internal/model/proxy` runs
+  exactly that one (`model: "auto"` and `/internal/route` are for other callers). The cost-notice
+  threshold is `PROMPT_CACHE_COLD_START_TOKENS` (`@neore/ai/models`), shared with the gateway's
+  downgrade policy.
+
 - **Spreadsheets / design canvas** — `"sheet"` artifacts store CSV in
   `documents.content` (Univer editor, code-split XLSX convert). `"design"`
   artifacts store Fabric.js JSON in `contentJson` and a PNG data URL preview in

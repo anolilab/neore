@@ -1,0 +1,338 @@
+/**
+ * Switching a thread's agent (plans/harness-switch.md, S1), driven against the real schema:
+ * the divider row's place in the tree, the agent each path runs on, and the refusals.
+ */
+import { lunoraTest } from "@lunora/testing";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { pathExceedsColdStart, runAgentModelOf, syncActiveAgent } from "../agent/agent-switch";
+import { agentSwitchOf } from "../agent/agent-switch-logic";
+import { buildBranchTree, resolveActivePath } from "../agent/branch-tree";
+import { descendFrom, getThreadRow } from "../agent/branch-rows";
+import { docsToModelMessages } from "../agent/mapping";
+import { addMessagesHandler } from "../agent/messages";
+import schema from "../schema";
+import { AGENT_SWITCH_STREAMING, AGENT_SWITCH_UNSUPPORTED, switchThreadAgentHandler } from "./agent-switch";
+
+type Harness = ReturnType<typeof lunoraTest>;
+
+const NOT_ENABLED = /not an enabled chat model/;
+const PRO_PLAN = /Pro plan/;
+
+const OWNER = "owner-user";
+const COLLABORATOR = "collaborator-user";
+// Three text models on the free tier, so no plan lookup runs.
+const A = "openai/gpt-4.1-mini";
+const B = "google/gemini-2.0-flash-001";
+const C = "openai/gpt-5-nano";
+
+let harness: Harness;
+let threadId: string;
+const ids: Record<string, string> = {};
+
+const run = async <T>(body: (ctx: any) => Promise<T>): Promise<T> => await harness.run(body);
+
+const insertRow = async (name: string, order: number, stepOrder: number, message: unknown, extra: Record<string, unknown> = {}) => {
+    ids[name] = await run(
+        async (ctx) => await ctx.db.insert("messages", { message, order, status: "success", stepOrder, threadId, tool: false, userId: OWNER, ...extra }),
+    );
+};
+
+const text = (role: "assistant" | "user", value: string) =>
+    role === "user" ? { content: value, role } : { content: [{ text: value, type: "text" as const }], role };
+
+const switchTo = async (model: string, clientId: string, userId = OWNER) =>
+    await run(async (ctx) => await switchThreadAgentHandler(ctx, { clientId, target: { kind: "model", model }, threadId: threadId as never, userId }));
+
+const thread = async (): Promise<any> => await run(async (ctx) => await ctx.db.get(threadId));
+const activeAgentOf = async () => {
+    const { activeAgent } = await thread();
+
+    return activeAgent;
+};
+const rows = async (): Promise<any[]> => await run(async (ctx) => await ctx.db.query("messages").collect());
+const runModel = async (extra: Record<string, unknown> = {}) => await run(async (ctx) => await runAgentModelOf(ctx, { threadId: threadId as never, ...extra }));
+const switchRows = async () => {
+    const all = await rows();
+
+    return all.filter((row) => agentSwitchOf(row) !== undefined);
+};
+
+beforeEach(async () => {
+    harness = lunoraTest(schema as never);
+    threadId = await run(async (ctx) => await ctx.db.insert("threads", { model: A, status: "active", title: "T", userId: OWNER }));
+});
+
+afterEach(() => {
+    harness.close();
+});
+
+describe("a switch in a thread that never branched", () => {
+    beforeEach(async () => {
+        await insertRow("u1", 0, 0, text("user", "hello"));
+        await insertRow("a1", 0, 1, text("assistant", "hi"));
+    });
+
+    it("records one divider row after the last row and makes the next turn run on the new model", async () => {
+        expect(await runModel()).toBeNull();
+
+        const result = await switchTo(B, "click-1");
+        const [divider] = await switchRows();
+
+        expect(result).toMatchObject({ agent: { kind: "model", model: B }, messageId: divider._id, switched: true });
+        expect(agentSwitchOf(divider)).toStrictEqual({
+            from: { kind: "model", model: A },
+            mode: "full",
+            startMessageId: ids.a1,
+            to: { kind: "model", model: B },
+        });
+        // A linear thread keeps its implicit parent: no explicit id, no leaf pointer.
+        expect(divider).toMatchObject({ order: 1, status: "success", stepOrder: 0, tool: false });
+        expect(divider.parentMessageId).toBeUndefined();
+        const { activeLeafMessageId } = await thread();
+
+        expect(activeLeafMessageId).toBeUndefined();
+        // The creation model is the fallback of every path without a switch, so it stays.
+        expect(await thread()).toMatchObject({ activeAgent: { kind: "model", model: B }, model: A });
+        expect(await runModel()).toBe(B);
+    });
+
+    it("keeps the divider out of what the model reads, and the conversation carries on after it", async () => {
+        await switchTo(B, "click-1");
+        await run(async (ctx) => {
+            await addMessagesHandler(ctx, {
+                fromUser: true,
+                messages: [{ message: text("user", "next"), status: "success" }],
+                threadId: threadId as never,
+                userId: OWNER,
+            });
+        });
+
+        const all = await rows();
+        const ordered = all.toSorted((a, b) => a.order - b.order || a.stepOrder - b.stepOrder);
+
+        expect(ordered.map((row) => row.order)).toStrictEqual([0, 0, 1, 2]);
+        expect(docsToModelMessages(ordered).map((message) => message.role)).toStrictEqual(["user", "assistant", "user"]);
+        expect(await runModel()).toBe(B);
+    });
+
+    it("answers a repeated clientId once, even when a later switch has moved on", async () => {
+        await switchTo(B, "click-1");
+        await switchTo(C, "click-2");
+
+        // A stale tap of the first click arrives after the second switch.
+        const replay = await switchTo(B, "click-1");
+
+        expect(replay).toMatchObject({ agent: { kind: "model", model: C }, messageId: null, switched: false });
+        expect(await switchRows()).toHaveLength(2);
+        expect(await runModel()).toBe(C);
+    });
+
+    it("writes nothing when the thread is already on the target", async () => {
+        expect(await switchTo(A, "click-1")).toMatchObject({ messageId: null, switched: false });
+        expect(await switchRows()).toHaveLength(0);
+        const { activeAgent } = await thread();
+
+        expect(activeAgent).toBeUndefined();
+    });
+
+    it("is refused while a reply streams, and works again once it finished", async () => {
+        const streamId = await run(
+            async (ctx) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: ids.u1,
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: A },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_STREAMING } });
+        expect(await switchRows()).toHaveLength(0);
+
+        await run(async (ctx) => await ctx.db.patch(streamId, { status: "done" }));
+
+        expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
+    });
+
+    it("refuses a host target with a typed error, and a model that is not an enabled chat model", async () => {
+        await expect(
+            run(async (ctx) => await switchThreadAgentHandler(ctx, { clientId: "c", target: { kind: "host" }, threadId: threadId as never, userId: OWNER })),
+        ).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
+        await expect(switchTo("no/such-model", "c2")).rejects.toThrow(NOT_ENABLED);
+        await expect(switchTo("openai/gpt-image-1", "c3")).rejects.toThrow(NOT_ENABLED);
+        expect(await switchRows()).toHaveLength(0);
+    });
+
+    it("refuses a paid model for a caller whose plan does not run it, before writing", async () => {
+        const noPlan = async (ctx: any) =>
+            await switchThreadAgentHandler(
+                new Proxy(ctx, {
+                    get: (target, property) =>
+                        property === "runQuery"
+                            ? async () => {
+                                  return { isAdmin: false, plan: null };
+                              }
+                            : target[property],
+                }),
+                { clientId: "c", target: { kind: "model", model: "anthropic/claude-opus-4.1" }, threadId: threadId as never, userId: OWNER },
+            );
+
+        await expect(run(noPlan)).rejects.toThrow(PRO_PLAN);
+        expect(await switchRows()).toHaveLength(0);
+    });
+
+    it("refuses a thread that runs on a fixed agent", async () => {
+        await run(async (ctx) => await ctx.db.patch(threadId, { groupChat: { mode: "round-robin", participants: [] } }));
+
+        await expect(switchTo(B, "c")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
+    });
+
+    it("needs a write grant: a reader is refused, a writer switches, and the row carries the writer", async () => {
+        await run(async (ctx) => await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "read", threadId, userId: COLLABORATOR }));
+        await expect(switchTo(B, "c1", COLLABORATOR)).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+        await run(async (ctx) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: COLLABORATOR } });
+
+            await ctx.db.patch(grant._id, { permission: "write" });
+        });
+
+        expect(await switchTo(B, "c2", COLLABORATOR)).toMatchObject({ switched: true });
+        const [written] = await switchRows();
+
+        expect(written).toMatchObject({ userId: COLLABORATOR });
+    });
+
+    it("refuses a stranger as it refuses a missing thread", async () => {
+        await expect(switchTo(B, "c", "stranger")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+});
+
+describe("the agent of each branch", () => {
+    // u1 → { a1 → u2 → a2 , a1b }: a1b is a regenerate of a1, and the conversation carried on from a1
+    // (u2 names its parent, as `pinFollowingRowParent` does when a regenerate lands before it).
+    beforeEach(async () => {
+        await insertRow("u1", 0, 0, text("user", "hello"));
+        await insertRow("a1", 0, 1, text("assistant", "hi"));
+        await insertRow("u2", 1, 0, text("user", "more"), { parentMessageId: ids.a1 });
+        await insertRow("a2", 1, 1, text("assistant", "sure"));
+        await insertRow("a1b", 0, 2, text("assistant", "hey"), { parentMessageId: ids.u1 });
+    });
+
+    const pointAt = async (name: string) => {
+        // The switcher: the leaf reached from the clicked message, then the cache follows it.
+        await run(async (ctx) => {
+            const leaf = await descendFrom(ctx, threadId as never, (await getThreadRow(ctx, threadId as never, ids[name]!))!);
+
+            await ctx.db.patch(threadId, { activeLeafMessageId: leaf._id });
+            await syncActiveAgent(ctx, threadId as never, leaf._id);
+        });
+    };
+
+    it("places the divider under the displayed leaf, past every order, without touching the other branch", async () => {
+        await run(async (ctx) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.a1b }));
+
+        const result = await switchTo(B, "click-1");
+        const all = await rows();
+        const divider = all.find((row) => row._id === result.messageId);
+        const tree = buildBranchTree(all);
+
+        // a2 holds order 1, so the divider takes 2 — an order the sibling branch never reuses.
+        expect(divider).toMatchObject({ order: 2, parentMessageId: ids.a1b });
+        const { activeLeafMessageId } = await thread();
+
+        expect(activeLeafMessageId).toBe(divider._id);
+        expect(resolveActivePath(tree, divider._id)).toStrictEqual([ids.u1, ids.a1b, divider._id]);
+        expect(resolveActivePath(tree, ids.a2)).toStrictEqual([ids.u1, ids.a1, ids.u2, ids.a2]);
+    });
+
+    it("restores each branch's agent when the user moves between them", async () => {
+        await run(async (ctx) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.a2 }));
+        await switchTo(B, "click-1");
+
+        expect(await runModel()).toBe(B);
+
+        await pointAt("a1b");
+        expect(await runModel()).toBe(A);
+        expect(await activeAgentOf()).toStrictEqual({ kind: "model", model: A });
+
+        await pointAt("a1");
+        expect(await runModel()).toBe(B);
+        expect(await activeAgentOf()).toStrictEqual({ kind: "model", model: B });
+
+        // A second switch on the other branch is its own: the first branch keeps B.
+        await pointAt("a1b");
+        await switchTo(C, "click-2");
+        expect(await runModel()).toBe(C);
+        await pointAt("a1");
+        expect(await runModel()).toBe(B);
+    });
+
+    it("runs a regenerate or an edit of an older message on the model recorded on its path", async () => {
+        await run(async (ctx) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.a2 }));
+        await switchTo(B, "click-1");
+        await run(async (ctx) => {
+            await addMessagesHandler(ctx, {
+                fromUser: true,
+                messages: [{ message: text("user", "later"), status: "success" }],
+                threadId: threadId as never,
+                userId: OWNER,
+            });
+        });
+        const all = await rows();
+        const u3 = all.find((row) => row.message?.content === "later");
+
+        // The composer would show B by now; the older prompts still belong to A, the later one to B.
+        expect(await runModel()).toBe(B);
+        expect(await runModel({ promptMessageId: ids.u1 })).toBe(A);
+        expect(await runModel({ promptMessageId: ids.u2 })).toBe(A);
+        expect(await runModel({ promptMessageId: u3._id })).toBe(B);
+        expect(await runModel({ replacedMessageId: ids.u2 })).toBe(A);
+        expect(await runModel({ replacedMessageId: u3._id })).toBe(B);
+    });
+
+    it("keeps the cache in step when a regenerate points the thread at an older prompt", async () => {
+        await run(async (ctx) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.a2 }));
+        await switchTo(B, "click-1");
+
+        // `setActiveLeaf` points AT the prompt without descending: a switch below it is not on its path.
+        await run(async (ctx) => {
+            await ctx.db.patch(threadId, { activeLeafMessageId: ids.u2 });
+            await syncActiveAgent(ctx, threadId as never, ids.u2!);
+        });
+
+        const { activeAgent } = await thread();
+
+        expect(activeAgent).toStrictEqual({ kind: "model", model: A });
+    });
+});
+
+describe("the cost notice", () => {
+    // The shared threshold is 20,000 tokens at 4 characters each.
+    const longRow = async (name: string, order: number, stepOrder: number, role: "assistant" | "user", characters: number) =>
+        await insertRow(name, order, stepOrder, text(role, "x"), { text: "x".repeat(characters) });
+
+    it("is on for a switch above the threshold and off for one below it", async () => {
+        await longRow("u1", 0, 0, "user", 40_000);
+        await longRow("a1", 0, 1, "assistant", 39_996);
+
+        expect(await switchTo(B, "click-1")).toMatchObject({ coldStartCostly: false, switched: true });
+
+        await longRow("u2", 2, 0, "user", 8);
+
+        expect(await switchTo(C, "click-2")).toMatchObject({ coldStartCostly: true, switched: true });
+    });
+
+    it("is off when nothing was switched", async () => {
+        await longRow("u1", 0, 0, "user", 400_000);
+
+        expect(await switchTo(A, "click-1")).toMatchObject({ coldStartCostly: false, switched: false });
+    });
+
+    it("stops counting at the first row of a path that has none", async () => {
+        expect(await run(async (ctx) => await pathExceedsColdStart(ctx, threadId as never, null))).toBe(false);
+    });
+});

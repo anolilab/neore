@@ -3,6 +3,7 @@ import { v } from "lunorash/server";
 
 import { vGroupChat } from "../chat/group/validators";
 import { vWorkerPolicy } from "../sub-agents/validators";
+import { vAgentRef } from "./agent-switch-validators";
 import { vVectorDimension } from "./vector/tables";
 
 export const vProviderOptions = v.record(v.string(), v.record(v.string(), v.any()));
@@ -669,6 +670,8 @@ export const vThreadDocFields = {
     ...vThreadCreateFields,
     _creationTime: v.number(),
     _id: v.string(),
+    // Written only by `agent/agent-switch.ts`, which keeps it in step with the active path.
+    activeAgent: v.optional(vAgentRef),
     // Written only by `agent/branches.ts` (the switcher, regenerate, edit), so
     // deliberately not a create field.
     activeLeafMessageId: v.optional(v.string()),
