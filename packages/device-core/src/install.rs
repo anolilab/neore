@@ -510,9 +510,10 @@ mod tests {
     #[test]
     fn the_server_scripts_are_safe_to_wrap_in_single_quotes() {
         let root = Root::Home;
+        let upload_id = format!("{:016x}", std::process::id());
         let scripts = [
             status_script(&root, HOST_VERSION, SHA),
-            upload_script(&root, HOST_VERSION, SHA, "00112233aabbccdd"),
+            upload_script(&root, HOST_VERSION, SHA, &upload_id),
             prune_script(&root, HOST_VERSION),
         ];
 
@@ -524,7 +525,8 @@ mod tests {
 
     #[test]
     fn the_upload_checks_the_checksum_before_it_makes_anything_executable() {
-        let script = upload_script(&Root::Home, HOST_VERSION, SHA, "00112233aabbccdd");
+        let upload_id = format!("{:016x}", std::process::id());
+        let script = upload_script(&Root::Home, HOST_VERSION, SHA, &upload_id);
         let check = script.find("checksum mismatch").unwrap();
         let chmod = script.find("chmod 700").unwrap();
         let rename = script.find("mv -f").unwrap();
