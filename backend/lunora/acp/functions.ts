@@ -2,11 +2,12 @@
  * Coding-agent sessions, as the web app reads them. Both are the caller's own; a host thread is never shared.
  * Starting, cancelling and answering are the remote-control slice (plans/acp-agent-host.md §8, S4).
  */
-import { CLOUD_INTERACTIVE_CAPABILITIES } from "@neore/ai/capabilities";
+import { CLOUD_INTERACTIVE_CAPABILITIES, LOCAL_BROWSER_CAPABILITIES, unknownCapabilityReport } from "@neore/ai/capabilities";
 import type { Infer } from "lunorash/server";
 import { v } from "lunorash/server";
 
 import { resolveThreadReadAccess } from "../agent/thread-read-access";
+import { isLocalBrowserModel, loadCustomProviders } from "../chat/lib/local-turn";
 import { authQuery } from "../lib/crpc";
 import { vCapabilityReport } from "../lib/capability-report";
 import { MAX_LENGTH } from "../lib/validators";
@@ -81,8 +82,13 @@ export const getHostSession = authQuery
 
 /**
  * What the runner of a thread can do (plans/provider-capabilities.md §6): the report its host sent for a host
- * thread (all unknown while it has sent none), the cloud declaration for any other. Null for a thread the caller
- * cannot read, so a stranger learns nothing, not even that the id exists.
+ * thread (all unknown while it has sent none), the local-browser declaration for a thread on one of the owner's
+ * `local-browser` endpoints, the cloud declaration for any other. Null for a thread the caller cannot read, so a
+ * stranger learns nothing, not even that the id exists.
+ *
+ * A local-browser thread is told by its model's endpoint TYPE (`custom:<endpoint>/<model>` against the owner's
+ * endpoints), never by a model name. Only the owner's endpoints are readable here, so a grantee reads the cloud
+ * declaration for it; the composer that runs a local model picks `LOCAL_BROWSER_CAPABILITIES` itself.
  */
 export const getThreadCapabilities = authQuery
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
@@ -96,10 +102,13 @@ export const getThreadCapabilities = authQuery
         }
 
         if (!isHostRunThread(access.thread)) {
-            return CLOUD_INTERACTIVE_CAPABILITIES;
+            const onLocalEndpoint =
+                access.thread.userId === ctx.user.userId && isLocalBrowserModel(access.thread.model, await loadCustomProviders(ctx, ctx.user.userId));
+
+            return onLocalEndpoint ? LOCAL_BROWSER_CAPABILITIES : CLOUD_INTERACTIVE_CAPABILITIES;
         }
 
         const session = await ctx.db.acpSessions.findFirst({ where: { threadId: access.thread._id, userId: ctx.user.userId } });
 
-        return session?.capabilities ?? { groups: {}, reportedAt: 0, version: 1 };
+        return session?.capabilities ?? unknownCapabilityReport(0);
     });
