@@ -30,11 +30,19 @@ export const API_KEY_PREFIX = "nk_";
 
 export const isPublicApiPath = (pathname: string): boolean => pathname === PUBLIC_API_PREFIX || pathname.startsWith(`${PUBLIC_API_PREFIX}/`);
 
-const BEARER_PATTERN = /^Bearer\s+(\S+)$/iu;
+/** The header, and scheme, `extractApiKey` reads first. Client config snippets (`mcp-client-config.ts`) are built from these, not retyped. */
+export const API_KEY_HEADER = "Authorization";
+
+export const API_KEY_SCHEME = "Bearer";
+
+/** The fallback header, for clients that cannot set `Authorization`. */
+export const API_KEY_FALLBACK_HEADER = "X-API-Key";
+
+const BEARER_PATTERN = new RegExp(String.raw`^${API_KEY_SCHEME}\s+(\S+)$`, "iu");
 
 /** `Authorization: Bearer <key>` first, then `X-API-Key`. Empty values count as absent. */
 export const extractApiKey = (headers: Headers): string | null => {
-    const authorization = headers.get("Authorization")?.trim();
+    const authorization = headers.get(API_KEY_HEADER)?.trim();
 
     if (authorization) {
         const match = BEARER_PATTERN.exec(authorization);
@@ -44,7 +52,7 @@ export const extractApiKey = (headers: Headers): string | null => {
         }
     }
 
-    const header = headers.get("X-API-Key")?.trim();
+    const header = headers.get(API_KEY_FALLBACK_HEADER)?.trim();
 
     return header || null;
 };

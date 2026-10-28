@@ -2,13 +2,15 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/responsive-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import cn from "@neore/ui/utils/cn";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import type { ComponentProps } from "react";
-import { useState } from "react";
 
 import type { SettingsCardClassNames } from "@/components/settings/settings-card";
+
+import McpConfigSnippet from "./mcp-config-snippet";
+import useCopyToClipboard from "./use-copy-to-clipboard";
 
 interface APIKeyDisplayDialogProperties extends ComponentProps<typeof Dialog> {
     apiKey: string;
@@ -17,16 +19,8 @@ interface APIKeyDisplayDialogProperties extends ComponentProps<typeof Dialog> {
 }
 
 const APIKeyDisplayDialog = ({ apiKey, classNames, onOpenChange, ...properties }: APIKeyDisplayDialogProperties) => {
-    const [copied, setCopied] = useState(false);
     const { t } = useLingui();
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(apiKey);
-        setCopied(true);
-        setTimeout(() => {
-            setCopied(false);
-        }, 2000);
-    };
+    const { copied, copy } = useCopyToClipboard();
 
     return (
         <Dialog onOpenChange={onOpenChange} {...properties}>
@@ -39,16 +33,14 @@ const APIKeyDisplayDialog = ({ apiKey, classNames, onOpenChange, ...properties }
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="bg-muted rounded-md p-4 font-mono text-sm break-all">{apiKey}</div>
+                <DialogPanel className="space-y-4">
+                    <div className="bg-muted rounded-md p-4 font-mono text-sm break-all">{apiKey}</div>
+
+                    {apiKey && <McpConfigSnippet apiKey={apiKey} />}
+                </DialogPanel>
 
                 <DialogFooter className={classNames?.dialog?.footer}>
-                    <Button
-                        className={cn(classNames?.button, classNames?.outlineButton)}
-                        disabled={copied}
-                        onClick={handleCopy}
-                        type="button"
-                        variant="outline"
-                    >
+                    <Button className={cn(classNames?.button, classNames?.outlineButton)} onClick={() => copy(apiKey)} type="button" variant="outline">
                         {copied ? (
                             <>
                                 <CheckIcon className={classNames?.icon} />
@@ -61,6 +53,10 @@ const APIKeyDisplayDialog = ({ apiKey, classNames, onOpenChange, ...properties }
                             </>
                         )}
                     </Button>
+
+                    <span aria-live="polite" className="sr-only" role="status">
+                        {copied ? t`Copied to clipboard` : ""}
+                    </span>
 
                     <Button className={cn(classNames?.button, classNames?.primaryButton)} onClick={() => onOpenChange?.(false)} type="button" variant="default">
                         {t`Done`}

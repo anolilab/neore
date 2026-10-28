@@ -5,11 +5,13 @@ import { Button } from "@neore/ui/components/button";
 import { Card } from "@neore/ui/components/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import cn from "@neore/ui/utils/cn";
+import { useQueryClient } from "@tanstack/react-query";
 import { KeyRoundIcon, Loader2 } from "lucide-react";
 import type { ComponentProps } from "react";
-import { useState } from "react";
+import { use, useState } from "react";
 
 import type { SettingsCardClassNames } from "@/components/settings/settings-card";
+import { AuthQueryContext } from "@/features/auth/lib/auth-query-provider";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { DEFAULT_LOCALE } from "@/lib/intl/client";
 
@@ -30,6 +32,8 @@ const ApiKeyDeleteDialog = ({ apiKey, classNames, onOpenChange, refetch, ...prop
         toast,
     } = useAuth();
     const { i18n, t } = useLingui();
+    const { listApiKeysKey } = use(AuthQueryContext);
+    const queryClient = useQueryClient();
 
     const [isLoading, setIsLoading] = useState(false);
 
@@ -38,6 +42,7 @@ const ApiKeyDeleteDialog = ({ apiKey, classNames, onOpenChange, refetch, ...prop
 
         try {
             await deleteApiKey({ keyId: apiKey.id });
+            await queryClient.invalidateQueries({ queryKey: listApiKeysKey });
             await refetch?.();
             onOpenChange?.(false);
         } catch (error) {
@@ -72,7 +77,7 @@ const ApiKeyDeleteDialog = ({ apiKey, classNames, onOpenChange, refetch, ...prop
                     <DialogTitle className={cn("text-lg md:text-xl", classNames?.title)}>{t`Delete API Key`}</DialogTitle>
 
                     <DialogDescription className={cn("text-xs md:text-sm", classNames?.description)}>
-                        {t`Are you sure you want to delete this API key? This action cannot be undone.`}
+                        {t`Are you sure you want to delete this API key? Anything using it, such as a script or an MCP client, is refused from its next request on. This action cannot be undone.`}
                     </DialogDescription>
                 </DialogHeader>
 

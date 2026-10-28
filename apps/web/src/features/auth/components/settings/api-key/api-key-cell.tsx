@@ -46,10 +46,9 @@ const APIKeyCell = ({ apiKey, className, classNames, refetch }: APIKeyCellProper
             return t`Never used`;
         }
 
-        const date = new Date(apiKey.lastRequest).toLocaleDateString(i18n.locale ?? DEFAULT_LOCALE, {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
+        const date = new Date(apiKey.lastRequest).toLocaleString(i18n.locale ?? DEFAULT_LOCALE, {
+            dateStyle: "medium",
+            timeStyle: "short",
         });
 
         return t`Last used ${date}`;

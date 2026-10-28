@@ -3078,7 +3078,7 @@ msgstr "API key"
 msgid "API key (optional)"
 msgstr "API key (optional)"
 
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:35
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:29
 msgid "API Key Created"
 msgstr "API Key Created"
 
@@ -3272,9 +3272,13 @@ msgstr "Are you sure you want to delete {selectedCount, plural, one {# thread} o
 msgid "Are you sure you want to delete <0>{0}</0>?"
 msgstr "Are you sure you want to delete <0>{0}</0>?"
 
+#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:80
+msgid "Are you sure you want to delete this API key? Anything using it, such as a script or an MCP client, is refused from its next request on. This action cannot be undone."
+msgstr "Are you sure you want to delete this API key? Anything using it, such as a script or an MCP client, is refused from its next request on. This action cannot be undone."
+
 #: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:75
-msgid "Are you sure you want to delete this API key? This action cannot be undone."
-msgstr "Are you sure you want to delete this API key? This action cannot be undone."
+#~ msgid "Are you sure you want to delete this API key? This action cannot be undone."
+#~ msgstr "Are you sure you want to delete this API key? This action cannot be undone."
 
 #: src/components/delete-confirmation-dialog.tsx:45
 msgid "Are you sure you want to delete this item? This action cannot be undone."
@@ -4712,7 +4716,7 @@ msgstr "Canada"
 #: src/features/auth/components/organization/remove-member-dialog.tsx:83
 #: src/features/auth/components/organization/update-member-role-dialog.tsx:135
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:141
-#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:104
+#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:109
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:174
 #: src/features/auth/components/team/add-team-member-dialog.tsx:136
 #: src/features/auth/components/team/create-team-dialog.tsx:117
@@ -5418,9 +5422,17 @@ msgstr "city"
 msgid "claude"
 msgstr "claude"
 
+#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:65
+msgid "Claude Code"
+msgstr "Claude Code"
+
 #: src/features/tasks/components/task-form-dialog.tsx:111
 msgid "Claude Code (coding agent)"
 msgstr "Claude Code (coding agent)"
+
+#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:61
+msgid "Claude Code and other MCP clients can reach your account with this key. They only see the tools its permissions allow."
+msgstr "Claude Code and other MCP clients can reach your account with this key. They only see the tools its permissions allow."
 
 #: src/features/marketing/components/gateway-landing-page.tsx:34
 msgid "Claude Opus, Sonnet, Haiku — latest model family"
@@ -6833,6 +6845,8 @@ msgid "cookies"
 msgstr "cookies"
 
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:211
+#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
+#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:34
 #: src/features/local-models/components/local-setup-guide.tsx:44
 #: src/features/pages/components/page-kept-draft.tsx:30
 msgid "Copied"
@@ -6842,7 +6856,8 @@ msgstr "Copied"
 msgid "Copied the last code block"
 msgstr "Copied the last code block"
 
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:55
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:45
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:56
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:133
 msgid "Copied to clipboard"
 msgstr "Copied to clipboard"
@@ -6856,6 +6871,7 @@ msgstr "Copied!"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:76
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
+#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
 #: src/features/chat/thread/message-item.tsx:351
@@ -6944,6 +6960,14 @@ msgstr "Copy selected cells"
 msgid "Copy the Channel secret (Basic settings) and issue a long-lived Channel access token (Messaging API tab)."
 msgstr "Copy the Channel secret (Basic settings) and issue a long-lived Channel access token (Messaging API tab)."
 
+#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:65
+msgid "Copy the Claude Code command"
+msgstr "Copy the Claude Code command"
+
+#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:67
+msgid "Copy the JSON configuration"
+msgstr "Copy the JSON configuration"
+
 #. placeholder {0}: defaultShortcut("copyLastCodeBlock")
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:120
 msgid "Copy the last code block of the latest assistant reply ({0})"
@@ -6959,7 +6983,7 @@ msgstr "Copy this secret now and store it with your webhook sender. It will not 
 
 #: src/components/copy-button.tsx:45
 #: src/components/copy-button.tsx:50
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:60
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:50
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:661
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:800
 msgid "Copy to clipboard"
@@ -7082,6 +7106,7 @@ msgstr "Could not copy automatically. Public link: {publicLink}"
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr "Could not copy the secret. Select it and copy it manually."
 
+#: src/features/auth/components/settings/api-key/use-copy-to-clipboard.ts:18
 #: src/features/chat/thread/copy-last-code-block.tsx:41
 msgid "Could not copy to the clipboard"
 msgstr "Could not copy to the clipboard"
@@ -8296,8 +8321,8 @@ msgstr "Delegate tasks to Devin, the AI software engineer"
 
 #: src/components/delete-confirmation-dialog.tsx:42
 #: src/components/delete-confirmation-dialog.tsx:68
-#: src/features/auth/components/settings/api-key/api-key-cell.tsx:95
-#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:115
+#: src/features/auth/components/settings/api-key/api-key-cell.tsx:94
+#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:120
 #: src/features/auth/components/settings/passkey/passkey-cell.tsx:98
 #: src/features/chat/thread-list/group-header.tsx:150
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:166
@@ -8383,7 +8408,7 @@ msgstr "Delete alert \"{ruleName}\""
 msgid "Delete All"
 msgstr "Delete All"
 
-#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:72
+#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:77
 msgid "Delete API Key"
 msgstr "Delete API Key"
 
@@ -9169,7 +9194,7 @@ msgstr "Dominican Republic"
 msgid "Don't have an account?"
 msgstr "Don't have an account?"
 
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:66
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:60
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:110
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:171
@@ -11015,7 +11040,7 @@ msgid "Expires"
 msgstr "Expires"
 
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:41
-#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:65
+#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:70
 msgid "Expires {date}"
 msgstr "Expires {date}"
 
@@ -16076,7 +16101,7 @@ msgstr "Last updated <0>{0}</0>"
 #~ msgid "Last Used"
 #~ msgstr "Last Used"
 
-#: src/features/auth/components/settings/api-key/api-key-cell.tsx:55
+#: src/features/auth/components/settings/api-key/api-key-cell.tsx:54
 msgid "Last used {date}"
 msgstr "Last used {date}"
 
@@ -18781,7 +18806,7 @@ msgstr "Neutral color, blockbuster look"
 #~ msgstr "Never"
 
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:32
-#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:56
+#: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:61
 msgid "Never expires"
 msgstr "Never expires"
 
@@ -19108,7 +19133,7 @@ msgstr "No aperture selected"
 msgid "No API keys found. Create one to get started."
 msgstr "No API keys found. Create one to get started."
 
-#: src/features/auth/components/settings/api-key/api-key-cell.tsx:62
+#: src/features/auth/components/settings/api-key/api-key-cell.tsx:61
 msgid "No API permissions"
 msgstr "No API permissions"
 
@@ -20952,6 +20977,10 @@ msgstr "Original system prompt"
 #: src/features/settings/components/chat/models-settings.tsx:519
 msgid "Other"
 msgstr "Other"
+
+#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:67
+msgid "Other clients (JSON)"
+msgstr "Other clients (JSON)"
 
 #: src/features/evals/components/case-fields.tsx:136
 msgid "Other file names"
@@ -30874,6 +30903,10 @@ msgstr "Use in Chat"
 msgid "Use in Temp Chat"
 msgstr "Use in Temp Chat"
 
+#: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:57
+msgid "Use it from an MCP client"
+msgstr "Use it from an MCP client"
+
 #: src/features/skills/components/skill-form-dialog.tsx:81
 msgid "Use lowercase letters, numbers and single hyphens only"
 msgstr "Use lowercase letters, numbers and single hyphens only"
@@ -32603,7 +32636,7 @@ msgstr "Your answer in Neore has finished."
 msgid "Your answer:"
 msgstr "Your answer:"
 
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:38
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:32
 msgid "Your API key has been created successfully. Make sure to copy it now as you won't be able to see it again."
 msgstr "Your API key has been created successfully. Make sure to copy it now as you won't be able to see it again."
 

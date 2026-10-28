@@ -13,9 +13,11 @@ Create keys in **Settings → API keys**. Each key has:
 
 - **Permissions**: a read and a write scope per resource (`chat`, `threads`, `skills`, `tasks`, `knowledge`, `memories`, `models`). Write does not imply read. A key that only posts messages can't list your threads.
 - **An expiry** (7 to 365 days, or none).
-- **Last used**: when the key last authenticated a request.
+- **Last used**: the date and time the key last authenticated a request.
 
 The full key is shown **once**, when you create it. Only its first characters are stored in a readable form, so a lost key has to be replaced, not recovered. Revoking a key takes effect on its next request. Guest (anonymous) accounts can't create keys, and you can have at most 25.
+
+The dialog that shows a new key also shows the setup for an [MCP](#mcp) client: a `claude mcp add` command and a JSON config with the key already in them.
 
 Send the key as `Authorization: Bearer <key>` (or `X-API-Key: <key>`). API keys work **only** on `/api/v1`. They can't be used to call the app's internal RPC endpoints.
 
