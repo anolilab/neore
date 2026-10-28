@@ -1398,7 +1398,13 @@ export const setWorkerPolicy = authMutation
     .input({
         allowedSources: v.array(vDispatchSource).max(DISPATCH_SOURCES.length),
         leadThreadId: v.id("threads"),
-        maxDispatchesPerHour: v.optional(v.number().min(1).max(WORKER_POLICY_MAX_PER_HOUR)),
+        maxDispatchesPerHour: v.optional(
+            v
+                .number()
+                .min(1)
+                .max(WORKER_POLICY_MAX_PER_HOUR)
+                .check((value) => Number.isSafeInteger(value), { message: "Must be a whole number" }),
+        ),
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
@@ -1542,6 +1548,7 @@ const progressFields = async (
     ctx: QueryCtx,
     group: ReadonlyArray<RunDoc>,
     working: RunDoc | undefined,
+    locked: boolean,
 ): Promise<{ lastActivityAt: number | null; queuedRuns: number; quietAfterMs: number; runs: Infer<typeof vWorkerRunView>[]; stopping: boolean }> => {
     const activityAt = working?.status === "running" && working.childThreadId !== undefined ? await workerActivityAt(ctx, working.childThreadId) : undefined;
 
@@ -1556,7 +1563,8 @@ const progressFields = async (
                 dispatchedBy: run.dispatchedBy ?? null,
                 runId: run._id,
                 state: run.status,
-                task: run.task.split("\n", 1)[0]!.slice(0, 160),
+                // A locked chat shows none of its content, a run's task included.
+                task: locked ? LOCKED_THREAD_TITLE : run.task.split("\n", 1)[0]!.slice(0, 160),
             };
         }),
         stopping: group.some((run) => run.status === "cancelled" && isWorkerLoopLive(run)),
@@ -1620,7 +1628,7 @@ export const listWorkers = authQuery
                 activeRunId: working?._id ?? null,
                 archived: thread.status === "archived",
                 followUp: workerFollowUp(run.runner),
-                ...(await progressFields(ctx, group, working)),
+                ...(await progressFields(ctx, group, working, isThreadLocked(thread))),
                 lastRunAt: run.createdAt,
                 lastRunStatus: run.status,
                 leadThreadId: run.parentThreadId,
@@ -1654,7 +1662,7 @@ export const getWorker = authQuery
             activeRunId: working?._id ?? null,
             archived: thread.status === "archived",
             followUp: workerFollowUp(origin.runner),
-            ...(await progressFields(ctx, recent, working)),
+            ...(await progressFields(ctx, recent, working, isThreadLocked(thread))),
             lastRunAt: latest.createdAt,
             lastRunStatus: latest.status,
             leadThreadId: origin.parentThreadId,

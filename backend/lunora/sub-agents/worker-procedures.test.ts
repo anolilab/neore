@@ -502,6 +502,11 @@ describe("a locked worker", () => {
         await expect(message(workerId, "client-1")).rejects.toMatchObject({ message: expect.stringMatching(LOCKED) });
         expect(await as(OWNER).query(listWorkers as never, { leadThreadId: leadId } as never)).toMatchObject([{ name: "Locked chat" }]);
         expect(await as(OWNER).query(getWorker as never, { workerId } as never)).toMatchObject({ name: "Locked chat" });
+
+        // Nor a run's task: that is the chat's content too.
+        const view = (await as(OWNER).query(getWorker as never, { workerId } as never)) as { runs: { task: string }[] };
+
+        expect(view.runs.every((entry) => entry.task === "Locked chat")).toBe(true);
         expect(await runRows()).toHaveLength(1);
     });
 });
@@ -1015,5 +1020,9 @@ describe("setWorkerPolicy", () => {
     it("answers a stranger as it would a conversation that does not exist, and refuses an hourly cap past the tier limit", async () => {
         expect(await setPolicy(STRANGER).catch((error: unknown) => error)).toMatchObject({ code: "NOT_FOUND" });
         await expect(setPolicy(OWNER, { maxDispatchesPerHour: 1000 })).rejects.toBeDefined();
+    });
+
+    it("refuses a fractional hourly cap, which would admit one dispatch more than it says", async () => {
+        await expect(setPolicy(OWNER, { maxDispatchesPerHour: 2.5 })).rejects.toBeDefined();
     });
 });
