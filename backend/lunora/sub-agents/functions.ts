@@ -1066,7 +1066,9 @@ export const createWorker = authMutation
     .output(vWorkerReceipt)
     .mutation(async ({ args, ctx }) => {
         // The same gate as every other write to the chat: a locked lead needs its proof before a worker starts under it.
-        throwUnlessGranted(await threadGateOutcome(ctx, { level: "write", threadId: args.leadThreadId, unlockProof: args.unlockProof, userId: ctx.user.userId }));
+        throwUnlessGranted(
+            await threadGateOutcome(ctx, { level: "write", threadId: args.leadThreadId, unlockProof: args.unlockProof, userId: ctx.user.userId }),
+        );
 
         const lead = await ctx.db.get(args.leadThreadId);
 

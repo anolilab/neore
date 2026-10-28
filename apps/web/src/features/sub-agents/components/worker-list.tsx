@@ -30,9 +30,7 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
     const updateThread = useUpdateThread();
     const unlockProof = useUnlockProof(threadId ?? "");
     const { data: workers } = useQuery(
-        crpc.sub_agents.functions.listWorkers.queryOptions(
-            threadId && afterFirstPaint ? { leadThreadId: threadId as Id<"threads">, unlockProof } : skipToken,
-        ),
+        crpc.sub_agents.functions.listWorkers.queryOptions(threadId && afterFirstPaint ? { leadThreadId: threadId as Id<"threads">, unlockProof } : skipToken),
     );
 
     if (!workers || workers.length === 0) {
