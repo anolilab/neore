@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 use std::thread;
 
-use super::reconnect::{ConnectError, ReconnectView};
+use super::reconnect::{Attempt, AttemptGuard, ConnectError, ReconnectView};
 use super::*;
 use crate::install::{self, Installed, Remote};
 use crate::ssh::{Hello, HostConnection, HostKey, Interact, HOST_VERSION, MULTIPLEXING};
@@ -128,8 +128,8 @@ pub struct HostView {
     pub device_id: String,
     pub forward_agent: bool,
     pub identity_file: Option<String>,
-    /// Whether this computer's ssh shares one connection between sessions to the server. Where it cannot
-    /// (Windows), each server has an ssh process of its own.
+    /// Whether Neore shares one connection between sessions to the server. It does not on Windows, where each
+    /// server has an ssh process of its own.
     pub multiplexed: bool,
     pub name: String,
     pub platform: Option<String>,
@@ -506,7 +506,22 @@ impl DeviceState {
     /// install runs over that same master, and exits it itself.
     pub(super) fn retire(&self, link: &Arc<dyn HostLink>) {
         link.close();
+        self.release_master(link);
+    }
 
+    /// Ends a session that the connection dropped. Its master goes only when ssh gave the connection up (the
+    /// network went away and the master may be wedged); a host that merely ended leaves a healthy master for the
+    /// next session to share.
+    pub(super) fn retire_lost(&self, link: &Arc<dyn HostLink>) {
+        link.close();
+
+        if link.master_suspect() {
+            self.release_master(link);
+        }
+    }
+
+    /// Ends `link`'s master unless another live session of the same server rides it.
+    fn release_master(&self, link: &Arc<dyn HostLink>) {
         let Some(target) = link.target() else { return };
         let shared = self
             .ssh
@@ -958,7 +973,7 @@ impl DeviceState {
                     self.retire(&previous);
                 }
 
-                self.note_connected(device_id, &link);
+                self.note_connected(device_id, &link, true);
             }
             None => {
                 self.leave_probe(&link);
@@ -971,12 +986,17 @@ impl DeviceState {
         Ok(true)
     }
 
-    /// Connects a paired server (after a restart, or as a Retry once reconnecting gave up). From here on the server
-    /// is kept connected until it is disconnected: a lost link is retried in the background.
-    pub fn host_connect(&self, device_id: &str) -> Result<HostProbe, String> {
-        self.keep_manual(device_id);
+    /// Connects a paired server (after a restart, or again once reconnecting gave up). From here on the server is
+    /// kept connected until it is disconnected: a lost link is retried in the background. `retry` is the Retry of
+    /// the local window and starts the attempts over; a page's connect counts as one more attempt of the window.
+    pub fn host_connect(&self, device_id: &str, retry: bool) -> Result<HostProbe, String> {
+        let Some(slot) = self.begin_attempt(device_id) else {
+            return Err("that server is already connecting; wait a moment".into());
+        };
 
-        let result = self.connect_host(device_id, true);
+        self.keep_manual(device_id, retry)?;
+
+        let result = self.connect_host(device_id, Attempt::Manual, &slot);
 
         if let Err(error) = &result {
             self.keep_failed(device_id, error);
@@ -987,13 +1007,19 @@ impl DeviceState {
         result.map_err(|error| error.message)
     }
 
-    /// One connection attempt. `interactive` is the person's own: it may ask for a passphrase. The keeper's runs
-    /// silent. Only one attempt runs per server at a time.
+    /// One connection attempt, holding the server's attempt `slot` (the person's or the keeper's: at most one per
+    /// server). A manual attempt may ask for a passphrase and starts keeping the server; a background one runs
+    /// silent, notices a disconnect that landed after it was scheduled, and never creates the keeping.
     pub(super) fn connect_host(
         &self,
         device_id: &str,
-        interactive: bool,
+        attempt: Attempt,
+        _slot: &AttemptGuard,
     ) -> Result<HostProbe, ConnectError> {
+        let (interactive, disconnects) = match attempt {
+            Attempt::Manual => (true, self.ssh.disconnects.load(Ordering::SeqCst)),
+            Attempt::Background { disconnects } => (false, disconnects),
+        };
         let host = self
             .settings()
             .hosts
@@ -1002,7 +1028,7 @@ impl DeviceState {
             .ok_or("that server is not paired with this computer")?;
 
         if let Some(link) = self.connection(device_id).filter(|link| link.is_alive()) {
-            self.note_connected(device_id, &link);
+            self.note_connected(device_id, &link, interactive);
 
             return Ok(HostProbe::of(link.hello()));
         }
@@ -1017,10 +1043,6 @@ impl DeviceState {
             .into());
         }
 
-        let Some(_attempt) = self.begin_attempt(device_id) else {
-            return Err(format!("{} is already connecting", host.name).into());
-        };
-        let disconnects = self.ssh.disconnects.load(Ordering::SeqCst);
         let link = self.connect_target(&target, interactive)?;
         let probe = HostProbe::of(link.hello());
 
@@ -1066,7 +1088,13 @@ impl DeviceState {
             self.retire(&previous);
         }
 
-        self.note_connected(device_id, &link);
+        // A disconnect between the check above and the insert removed the keeping: the link has no one to serve.
+        if !self.note_connected(device_id, &link, interactive) {
+            self.drop_connection(device_id, &link);
+
+            return Err("that server was disconnected meanwhile".into());
+        }
+
         self.emit(Event::Changed);
 
         Ok(probe)
@@ -1078,7 +1106,7 @@ impl DeviceState {
     pub fn host_terminal(&self, device_id: &str) -> Result<Vec<String>, String> {
         let host = self.paired_host(device_id)?;
 
-        self.host_connect(device_id)?;
+        self.host_connect(device_id, false)?;
 
         crate::ssh::terminal_args(&target_of(&host), &self.ssh.paths)
     }
@@ -1099,6 +1127,26 @@ impl DeviceState {
             .into_iter()
             .find(|host| host.device_id == device_id)
             .ok_or_else(|| "that server is not paired with this computer".to_owned())
+    }
+
+    /// Takes `link` out of the connections, if it is still what holds the server's place, and ends it.
+    fn drop_connection(&self, device_id: &str, link: &Arc<dyn HostLink>) {
+        let removed = {
+            let mut connections = self.ssh.connections.lock().unwrap();
+
+            if connections
+                .get(device_id)
+                .is_some_and(|current| std::ptr::addr_eq(Arc::as_ptr(current), Arc::as_ptr(link)))
+            {
+                connections.remove(device_id)
+            } else {
+                None
+            }
+        };
+
+        if removed.is_some() {
+            self.retire(link);
+        }
     }
 
     pub fn host_disconnect(&self, device_id: &str) {
@@ -1419,6 +1467,7 @@ fn run_on_host(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lifecycle::Phase;
     use crate::ssh::{RemoteOutcome, RemoteSandbox};
     use crate::store::test_keychain;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
@@ -2219,7 +2268,7 @@ mod tests {
             .unwrap()
             .push((id.clone(), target_of(&server(&id))));
 
-        let error = state.host_connect(&id).unwrap_err();
+        let error = state.host_connect(&id, true).unwrap_err();
 
         assert!(error.contains("being upgraded"), "{error}");
 
@@ -2303,7 +2352,7 @@ mod tests {
         let connecting = {
             let (state, id) = (Arc::clone(&state), id.clone());
 
-            thread::spawn(move || state.host_connect(&id))
+            thread::spawn(move || state.host_connect(&id, true))
         };
 
         gate.wait();
@@ -2729,7 +2778,11 @@ mod tests {
         let (mut state, dir, _) = engine(name, first);
 
         state.ssh.connector = Some(Box::new(move |_| connector()));
-        state.note_connected(&host_id(name), &(Arc::clone(first) as Arc<dyn HostLink>));
+        state.note_connected(
+            &host_id(name),
+            &(Arc::clone(first) as Arc<dyn HostLink>),
+            true,
+        );
 
         (Arc::new(state), dir)
     }
@@ -2869,12 +2922,12 @@ mod tests {
 
         // The link is gone and the person's own attempt failed: the keeper waits for a Retry.
         state.ssh.connections.lock().unwrap().remove(&id);
-        state.keep_manual(&id);
+        state.keep_manual(&id, true).unwrap();
         state.keep_failed(&id, &"the passphrase was not given".into());
 
         assert_eq!(phase_of(&state, "retry").unwrap().phase, "gaveUp");
 
-        state.host_connect(&id).unwrap();
+        state.host_connect(&id, true).unwrap();
 
         assert!(phase_of(&state, "retry").is_none());
         assert!(state.connection(&id).is_some_and(|link| link.is_alive()));
@@ -2921,13 +2974,13 @@ mod tests {
         let (state, dir, _) = engine("reap", &old);
         let id = host_id("reap");
 
-        state.note_connected(&id, &(Arc::clone(&old) as Arc<dyn HostLink>));
+        state.note_connected(&id, &(Arc::clone(&old) as Arc<dyn HostLink>), true);
         assert!(
             old.reaped.lock().unwrap().is_empty(),
             "the first session reaped something"
         );
 
-        state.note_connected(&id, &(Arc::clone(&new) as Arc<dyn HostLink>));
+        state.note_connected(&id, &(Arc::clone(&new) as Arc<dyn HostLink>), true);
 
         assert_eq!(
             new.reaped.lock().unwrap().as_slice(),
@@ -2939,6 +2992,132 @@ mod tests {
             ["22222222222222222222222222222222"],
             "a reaped launch stays on the list"
         );
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_disconnect_that_lands_while_an_attempt_runs_is_not_undone_by_it() {
+        let first = FakeLink::new(true);
+        let second = FakeLink::new(true);
+        let gate = Arc::new(Barrier::new(2));
+        let (next, wait) = (Arc::clone(&second), Arc::clone(&gate));
+        let (state, dir) = kept("undo", &first, move || {
+            wait.wait();
+            wait.wait();
+
+            Ok(Arc::clone(&next) as Arc<dyn HostLink>)
+        });
+        let (id, now) = (host_id("undo"), Instant::now());
+
+        first.alive.store(false, Ordering::SeqCst);
+        state.reconnect_tick(now);
+        state.reconnect_tick(now + Duration::from_secs(2));
+
+        // The attempt is connecting. The person disconnects now.
+        gate.wait();
+        state.host_disconnect(&id);
+        gate.wait();
+
+        eventually("the attempt kept a link the person ended", || {
+            second.closed.load(Ordering::SeqCst) == 1
+        });
+
+        assert!(state.connection(&id).is_none());
+        assert!(
+            state.ssh.keeps.lock().unwrap().is_empty(),
+            "the keeping came back"
+        );
+        assert!(state.ssh.attempting.lock().unwrap().is_empty());
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_background_connection_never_starts_the_keeping() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("nokeep", &link);
+        let id = host_id("nokeep");
+        let as_link = Arc::clone(&link) as Arc<dyn HostLink>;
+
+        assert!(!state.note_connected(&id, &as_link, false));
+        assert!(state.ssh.keeps.lock().unwrap().is_empty());
+        assert!(state.note_connected(&id, &as_link, true));
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_connect_that_finds_the_slot_taken_leaves_the_keeping_alone() {
+        let first = FakeLink::new(true);
+        let (state, dir) = kept("busy", &first, || Err("down".into()));
+        let id = host_id("busy");
+        let slot = state.begin_attempt(&id).unwrap();
+
+        first.alive.store(false, Ordering::SeqCst);
+
+        let error = state.host_connect(&id, true).unwrap_err();
+
+        assert!(error.contains("already connecting"), "{error}");
+        assert_eq!(
+            *state.ssh.keeps.lock().unwrap()[&id].phase(),
+            Phase::Connected
+        );
+
+        drop(slot);
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_dead_link_is_left_for_the_attempt_that_holds_the_server() {
+        let first = FakeLink::new(true);
+        let (state, dir) = kept("slot", &first, || Err("down".into()));
+        let id = host_id("slot");
+
+        first.alive.store(false, Ordering::SeqCst);
+        first.suspect.store(true, Ordering::SeqCst);
+
+        let slot = state.begin_attempt(&id).unwrap();
+
+        state.reconnect_tick(Instant::now());
+
+        assert_eq!(
+            first.closed.load(Ordering::SeqCst),
+            0,
+            "a session was ended under an attempt"
+        );
+        assert_eq!(
+            first.master_exits.load(Ordering::SeqCst),
+            0,
+            "a master was ended under an attempt"
+        );
+
+        drop(slot);
+        state.reconnect_tick(Instant::now());
+
+        assert_eq!(first.closed.load(Ordering::SeqCst), 1);
+        assert_eq!(first.master_exits.load(Ordering::SeqCst), 1);
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_page_cannot_dial_a_server_past_the_window_but_the_local_retry_can() {
+        let first = FakeLink::new(true);
+        let (state, dir) = kept("page", &first, || Err("down".into()));
+        let id = host_id("page");
+
+        state.ssh.connections.lock().unwrap().remove(&id);
+
+        for _ in 0..crate::lifecycle::MAX_ATTEMPTS {
+            assert!(state.host_connect(&id, false).unwrap_err().contains("down"));
+        }
+
+        let refused = state.host_connect(&id, false).unwrap_err();
+
+        assert!(refused.contains("device window"), "{refused}");
+        assert!(state.host_connect(&id, true).unwrap_err().contains("down"));
 
         let _ = stdfs::remove_dir_all(dir);
     }

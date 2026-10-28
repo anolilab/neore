@@ -21,12 +21,12 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use device_core::install::{self, target_for_uname, Bundle, Installed, Remote, Root};
-use device_core::launch::Reaped;
-use device_core::lifecycle::{Keep, ATTEMPT_PATIENCE};
 use device_core::ssh::{
     control_args, forget_keys, pinned_keys, terminal_args, HostConnection, HostKey, HostLink,
     Interact, SshError, SshPaths, Target, HOST_VERSION,
 };
+use device_core::store::{self, test_keychain, Host, Pairing, Settings};
+use device_core::{DeviceState, Event};
 use serde_json::json;
 
 const PASSPHRASE: &str = "correct horse battery staple 7f3a";
@@ -1323,163 +1323,146 @@ impl Sampler {
     }
 }
 
-/// What the engine's keeper does for one server, over real ssh: it watches the link, closes a dead session (and
-/// its master when ssh gave the connection up), makes one attempt at a time when `Keep` says so, and asks the new
-/// host to stop the launches the old one left.
-struct Driver {
-    attempt: Option<thread::JoinHandle<Result<HostConnection, SshError>>>,
-    binary: String,
-    /// Attempts that failed, with whether trying again could help.
-    failures: Vec<bool>,
-    interact: Arc<dyn Interact>,
-    keep: Keep,
-    launches: Vec<String>,
-    link: Option<HostConnection>,
-    lost_launch: Option<String>,
+/// A whole engine for one server behind `relay`, with the real connector: the server is paired in a throwaway data
+/// folder (the keychain is the in-memory one), its host key is pinned by an earlier connection, and `supervise`
+/// runs the reconnect tick on its own thread, exactly as the desktop does.
+struct Desktop {
+    events: Arc<Mutex<Vec<Event>>>,
+    host_id: String,
     paths: SshPaths,
-    reaped: Vec<Reaped>,
-    started: Instant,
-    target: Target,
+    state: Arc<DeviceState>,
 }
 
-impl Driver {
-    fn new(
-        server: &Server,
-        target: Target,
-        paths: SshPaths,
-        interact: Arc<Scripted>,
-        first: Option<HostConnection>,
-    ) -> Driver {
-        Driver {
-            attempt: None,
-            binary: server.binary(),
-            failures: Vec::new(),
-            interact: interact as Arc<dyn Interact>,
-            keep: Keep::connected(),
-            launches: first
-                .iter()
-                .map(|link| link.launch_id().unwrap().to_owned())
-                .collect(),
-            link: first,
-            lost_launch: None,
+impl Desktop {
+    fn start(server: &Server, relay: &Relay, name: &str) -> Desktop {
+        test_keychain::install();
+
+        let data_dir = server.dir.join(name);
+        // The engine's own layout: what it pins and where it keeps its control sockets.
+        let paths = SshPaths::under(&data_dir, device_core::sandbox::home().as_deref());
+        let host_id = format!("host-{name}");
+        let mut target = server.target("client");
+
+        target.port = relay.port;
+
+        // The first sight of a server asks the person; the key is pinned here so nothing is asked later.
+        let first = connect(server, &target, &paths, &trusting()).unwrap();
+
+        finish(&first);
+        drop(first);
+
+        fs::create_dir_all(&data_dir).unwrap();
+        store::save(
+            &data_dir.join("device.json"),
+            &Settings {
+                hosts: vec![Host {
+                    address: target.address.clone(),
+                    allow_shell_network: false,
+                    allow_unsandboxed_shell: false,
+                    device_id: host_id.clone(),
+                    forward_agent: false,
+                    identity_file: target.identity_file.clone(),
+                    name: "outage-box".into(),
+                    port: relay.port,
+                    roots: Vec::new(),
+                    secret: "a1".repeat(32),
+                    user: target.user.clone(),
+                }],
+                pairing: Some(Pairing {
+                    account_label: "me".into(),
+                    device_id: format!("desk-{name}"),
+                    secret: "b2".repeat(32),
+                }),
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&events);
+        let state = Arc::new(DeviceState::with_host_binary(
+            &data_dir,
+            Box::new(move |event| seen.lock().unwrap().push(event)),
+            &server.binary(),
+        ));
+
+        state.supervise();
+
+        Desktop {
+            events,
+            host_id,
             paths,
-            reaped: Vec::new(),
-            started: Instant::now(),
-            target,
-        }
-    }
-
-    /// Shown when the test fails (and with `--nocapture`).
-    fn note(&self, what: &str) {
-        println!("[{:>6.1}s] {what}", self.started.elapsed().as_secs_f32());
-    }
-
-    fn tick(&mut self) {
-        let now = Instant::now();
-
-        if self
-            .attempt
-            .as_ref()
-            .is_some_and(thread::JoinHandle::is_finished)
-        {
-            match self.attempt.take().unwrap().join().unwrap() {
-                Ok(connection) => {
-                    let current = connection.launch_id().unwrap().to_owned();
-                    let stale: Vec<String> = self
-                        .launches
-                        .iter()
-                        .filter(|id| **id != current)
-                        .cloned()
-                        .collect();
-
-                    if !stale.is_empty() {
-                        let reaped = connection.reap(&stale).unwrap();
-
-                        self.launches
-                            .retain(|id| !reaped.stopped.contains(id) && !reaped.gone.contains(id));
-                        self.reaped.push(reaped);
-                    }
-
-                    self.note(&format!("connected, launch {}", &current[..8]));
-                    self.launches.push(current);
-                    self.keep.up();
-                    self.link = Some(connection);
-                }
-                Err(error) => {
-                    self.note(&format!(
-                        "attempt failed (retryable: {}): {error}",
-                        error.retryable()
-                    ));
-                    self.failures.push(error.retryable());
-                    self.keep.failed(now, error.retryable(), &error.to_string());
-                }
-            }
-        }
-
-        if self.link.as_ref().is_some_and(|link| !link.is_alive()) {
-            let link = self.link.take().unwrap();
-
-            self.note("link lost");
-            self.lost_launch = link.launch_id().map(str::to_owned);
-            link.close();
-
-            if link.master_suspect() {
-                link.exit_master();
-            }
-
-            self.keep.lost(now);
-        }
-
-        if self.link.is_none() && self.attempt.is_none() && self.keep.due(now).is_some() {
-            self.note(&format!("attempt starts ({:?})", self.keep.phase()));
-
-            let (target, paths, binary, interact) = (
-                self.target.clone(),
-                self.paths.clone(),
-                self.binary.clone(),
-                Arc::clone(&self.interact),
-            );
-
-            self.attempt = Some(thread::spawn(move || {
-                HostConnection::connect_within(
-                    &target,
-                    &paths,
-                    &binary,
-                    &interact,
-                    ATTEMPT_PATIENCE,
-                )
-            }));
+            state,
         }
     }
 
     fn connected(&self) -> bool {
-        self.link.as_ref().is_some_and(HostLink::is_alive)
+        self.state.status().hosts[0].connected
+    }
+
+    /// The attempt the server is waiting to make, when it is.
+    fn waiting_attempt(&self) -> Option<u32> {
+        self.state.status().hosts[0]
+            .reconnect
+            .as_ref()
+            .filter(|view| view.phase == "waiting")
+            .and_then(|view| view.attempt)
+    }
+
+    /// The marker that names this desktop's ssh processes.
+    fn marker(&self) -> String {
+        self.paths.control_dir.to_string_lossy().into_owned()
+    }
+
+    /// The launches filed on the server, other than those in `except`.
+    fn launches(server: &Server, except: &[&str]) -> Vec<String> {
+        let mut found: Vec<String> = fs::read_dir(server.run_dir())
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|entry| {
+                entry
+                    .file_name()
+                    .to_str()?
+                    .strip_suffix(".pid")
+                    .map(str::to_owned)
+            })
+            .filter(|id| !except.contains(&id.as_str()))
+            .collect();
+
+        found.sort();
+        found
+    }
+
+    fn prompts(&self) -> usize {
+        self.events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|event| matches!(event, Event::Prompt { .. }))
+            .count()
     }
 }
 
+/// The 50 ms `ps` sampling of [`Sampler`] can miss a process that lives for less than that, so the count of two is
+/// a floor on what ran at once, not a proof; the structure (one attempt per server, the old session closed first)
+/// is what keeps it there.
 #[test]
 fn a_minute_without_network_reconnects_with_at_most_two_ssh_processes_and_stops_only_its_own_stale_host(
 ) {
     let Some(sshd) = sshd_binary() else { return };
     let server = Server::start(&sshd, "outage");
     let relay = Relay::start(server.port);
-    let mut target = server.target("client");
+    let desktop = Desktop::start(&server, &relay, "o");
+    let sampler = Sampler::start(desktop.marker());
 
-    target.port = relay.port;
+    desktop.state.host_connect(&desktop.host_id, true).unwrap();
 
-    let paths = server.paths("o");
-    let interact = trusting();
-    let sampler = Sampler::start(paths.control_dir.to_string_lossy().into_owned());
-    let first = connect(&server, &target, &paths, &interact).unwrap();
-    let first_launch = first.launch_id().unwrap().to_owned();
-    let first_pid = launch_pid(&server, &first_launch).expect("the host filed no launch");
-    let mut driver = Driver::new(
-        &server,
-        target.clone(),
-        paths.clone(),
-        Arc::clone(&interact),
-        Some(first),
-    );
+    let first = Desktop::launches(&server, &[]);
+
+    assert_eq!(first.len(), 1, "{first:?}");
+
+    let (first_launch, first_pid) = (first[0].clone(), launch_pid(&server, &first[0]).unwrap());
     // Another computer's session on the same server, which this one did not start.
     let mut foreign = spawn_host(&server, FOREIGN);
     let foreign_pid = launch_pid(&server, FOREIGN).unwrap();
@@ -1487,18 +1470,15 @@ fn a_minute_without_network_reconnects_with_at_most_two_ssh_processes_and_stops_
     assert!(running(first_pid) && running(foreign_pid));
 
     // The network goes away for a minute and then comes back.
-    let outage = Duration::from_secs(60);
     let began = Instant::now();
+    let mut attempts = Vec::new();
+    let mut lost_at = None;
 
     relay.partition();
 
-    let mut stale_seen = false;
-
-    while began.elapsed() < outage {
-        driver.tick();
-
-        if !stale_seen && driver.lost_launch.is_some() {
-            stale_seen = true;
+    while began.elapsed() < Duration::from_secs(60) {
+        if lost_at.is_none() && !desktop.connected() {
+            lost_at = Some(began.elapsed());
 
             // The server never learned the session is gone: the host from before the loss is still there.
             assert!(
@@ -1507,46 +1487,25 @@ fn a_minute_without_network_reconnects_with_at_most_two_ssh_processes_and_stops_
             );
         }
 
+        if let Some(attempt) = desktop.waiting_attempt() {
+            if attempts.last() != Some(&attempt) {
+                attempts.push(attempt);
+            }
+        }
+
         thread::sleep(Duration::from_millis(100));
     }
 
     relay.restore();
-
-    let root = vectors::fixture("ssh-outage");
-    let list = json!({ "tool": "fs_list", "input": { "path": root }, "roots": [root], "remainingMs": 60_000 });
-    let mut checked = false;
+    println!("link lost after {lost_at:?}; attempts seen while waiting: {attempts:?}");
 
     wait_for(
         "the host did not reconnect within two minutes of the network coming back",
         Duration::from_secs(120),
-        || {
-            driver.tick();
-
-            if !driver.connected()
-                || driver.link.as_ref().unwrap().launch_id() == Some(first_launch.as_str())
-            {
-                return false;
-            }
-
-            checked = true;
-
-            true
-        },
+        || desktop.connected() && !Desktop::launches(&server, &[&first_launch, FOREIGN]).is_empty(),
     );
 
-    assert!(checked);
-
-    let link = driver.link.take().unwrap();
-
-    assert_ne!(
-        link.launch_id().unwrap(),
-        first_launch,
-        "the old session came back"
-    );
-    assert_eq!(
-        link.run(&list, Duration::from_secs(30)).unwrap().status,
-        "completed"
-    );
+    assert!(lost_at.is_some(), "the loss was never seen");
 
     // The stale host of this computer was stopped, and the one it did not start was left alone.
     wait_for(
@@ -1556,22 +1515,6 @@ fn a_minute_without_network_reconnects_with_at_most_two_ssh_processes_and_stops_
     );
 
     assert!(
-        driver
-            .reaped
-            .iter()
-            .any(|reaped| reaped.stopped.contains(&first_launch)),
-        "{:?}",
-        driver.reaped
-    );
-    assert!(
-        driver
-            .reaped
-            .iter()
-            .all(|reaped| !reaped.stopped.contains(&FOREIGN.to_owned())),
-        "{:?}",
-        driver.reaped
-    );
-    assert!(
         running(foreign_pid),
         "a host this computer did not start was stopped"
     );
@@ -1580,13 +1523,16 @@ fn a_minute_without_network_reconnects_with_at_most_two_ssh_processes_and_stops_
         "its launch file was removed"
     );
     assert!(
-        driver.reaped.iter().any(|reaped| reaped.others >= 1),
-        "the other host was not even noticed: {:?}",
-        driver.reaped
+        launch_pid(&server, &first_launch).is_none(),
+        "the stale host's launch file stayed"
+    );
+    assert_eq!(
+        desktop.prompts(),
+        0,
+        "a reconnect in the background asked the person something"
     );
 
-    finish(&link);
-    drop(driver);
+    desktop.state.host_disconnect(&desktop.host_id);
 
     let _ = foreign.kill();
     let _ = foreign.wait();
@@ -1686,7 +1632,9 @@ fn a_forwarded_agent_is_linked_from_a_stable_path_in_the_run_folder() {
 
     let paths = server.paths("a");
     let connection = connect_with_agent(&server, &target, &paths, &trusting(), &socket).unwrap();
-    let stable = server.run_dir().join("agent.sock");
+    // The link is named for this desktop, so another desktop on the account never re-points it.
+    let tag = paths.desktop_tag().unwrap();
+    let stable = server.run_dir().join(format!("agent-{tag}.sock"));
 
     // What the launch started with is the session's own socket, which dies with the session. The host re-points
     // its (and its children's) `SSH_AUTH_SOCK` at a link in the run folder that a later session replaces.
@@ -1711,7 +1659,14 @@ fn a_forwarded_agent_is_linked_from_a_stable_path_in_the_run_folder() {
     )
     .unwrap();
 
-    assert!(!plain.run_dir().join("agent.sock").exists());
+    assert!(
+        Desktop::launches(&plain, &[]).len() == 1
+            && !fs::read_dir(plain.run_dir())
+                .unwrap()
+                .flatten()
+                .any(|entry| entry.file_name().to_string_lossy().starts_with("agent-")),
+        "the host linked an agent that was not forwarded"
+    );
     assert!(!plain.remote_env().contains("SSH_AUTH_SOCK"));
 
     finish(&connection);
@@ -1720,67 +1675,140 @@ fn a_forwarded_agent_is_linked_from_a_stable_path_in_the_run_folder() {
     let _ = agent.wait();
 }
 
+/// Attempts that fail while the server cannot be reached back off, and never stack ssh processes.
 #[test]
 fn attempts_that_fail_while_the_server_is_unreachable_back_off_and_never_stack_ssh_processes() {
     let Some(sshd) = sshd_binary() else { return };
     let server = Server::start(&sshd, "unreachable");
     let relay = Relay::start(server.port);
-    let mut target = server.target("client");
+    let desktop = Desktop::start(&server, &relay, "u");
+    let sampler = Sampler::start(desktop.marker());
 
-    target.port = relay.port;
+    desktop.state.host_connect(&desktop.host_id, true).unwrap();
 
-    let paths = server.paths("u");
-    let interact = trusting();
-    let sampler = Sampler::start(paths.control_dir.to_string_lossy().into_owned());
-
-    // The first sight of the server pins its key; then the network goes away.
-    let first = connect(&server, &target, &paths, &interact).unwrap();
-
-    finish(&first);
-    drop(first);
+    // The network goes away and takes the connection with it at once (a quicker loss than ssh notices on its
+    // own): nothing reaches the server, and what the master and session held is gone.
     relay.partition();
+    Command::new("pkill")
+        .args(["-f", &desktop.marker()])
+        .status()
+        .unwrap();
 
-    let mut driver = Driver::new(&server, target.clone(), paths.clone(), interact, None);
-
-    assert!(driver.keep.lost(Instant::now()));
+    wait_for("the loss was not seen", Duration::from_secs(10), || {
+        !desktop.connected()
+    });
 
     let began = Instant::now();
+    let mut attempts = Vec::new();
 
     while began.elapsed() < Duration::from_secs(30) {
-        driver.tick();
-        assert!(!driver.connected());
-        assert!(
-            !matches!(
-                driver.keep.phase(),
-                device_core::lifecycle::Phase::GaveUp { .. }
-            ),
-            "{:?}",
-            driver.keep.phase()
-        );
+        assert!(!desktop.connected());
+
+        if let Some(attempt) = desktop.waiting_attempt() {
+            if attempts.last() != Some(&attempt) {
+                attempts.push(attempt);
+            }
+        }
+
         thread::sleep(Duration::from_millis(100));
     }
 
+    relay.restore();
+
     assert!(
-        driver.failures.len() >= 2 && driver.failures.iter().all(|retryable| *retryable),
-        "{:?}",
-        driver.failures
+        attempts.contains(&2) && attempts.contains(&3),
+        "attempts did not back off through 2 and 3: {attempts:?}"
+    );
+    assert!(
+        desktop.state.status().hosts[0]
+            .reconnect
+            .as_ref()
+            .is_some_and(|view| view.phase != "gaveUp"),
+        "it gave up"
     );
 
-    relay.restore();
     wait_for(
         "the host did not reconnect once the server was reachable",
         Duration::from_secs(90),
-        || {
-            driver.tick();
-            driver.connected()
-        },
+        || desktop.connected(),
     );
 
-    finish(driver.link.as_ref().unwrap());
-    drop(driver);
+    assert_eq!(desktop.prompts(), 0);
+
+    desktop.state.host_disconnect(&desktop.host_id);
     drop(relay);
 
     let most = sampler.finish();
 
     assert!(most <= 2, "{most} ssh processes were alive at once");
+}
+
+/// A host killed mid-command must take the command with it: only the host's own thread enforces a timeout.
+#[test]
+fn reaping_a_host_ends_the_commands_it_was_running() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "reapgroup");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let connection = connect(&server, &target, &paths, &trusting()).unwrap();
+    let mut stale = spawn_host(&server, SPARE);
+    let root = vectors::fixture("ssh-reap-group");
+    let request = json!({
+        "kind": "request",
+        "id": 1,
+        "op": "run",
+        "params": {
+            "tool": "shell_run",
+            "input": { "command": "echo $$ > command.pid; exec sleep 600", "timeoutSeconds": 600 },
+            "roots": [root],
+            "remainingMs": 700_000,
+            "allowUnsandboxedShell": true,
+        },
+    });
+
+    device_core::frame::write_frame(
+        stale.stdin.as_mut().unwrap(),
+        &serde_json::to_vec(&request).unwrap(),
+    )
+    .unwrap();
+
+    let marker = root.join("command.pid");
+
+    wait_for("the command did not start", Duration::from_secs(20), || {
+        fs::read_to_string(&marker).is_ok_and(|text| text.trim().parse::<i64>().is_ok())
+    });
+
+    let command: i64 = fs::read_to_string(&marker).unwrap().trim().parse().unwrap();
+
+    assert!(running(command));
+
+    let reaped = connection.reap(&[SPARE.to_owned()]).unwrap();
+
+    assert_eq!(reaped.stopped, [SPARE]);
+    wait_for(
+        "the reaped host's command kept running",
+        Duration::from_secs(10),
+        || !running(command),
+    );
+
+    let _ = stale.wait();
+
+    finish(&connection);
+}
+
+/// A host that refuses how it is started (an old binary under the same version) is not a network problem.
+#[test]
+fn a_host_that_refuses_its_command_line_needs_a_reinstall_and_is_not_retried() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "outdated");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let interact: Arc<dyn Interact> = trusting();
+    let outdated = "sh -c 'exit 2'";
+    let error = HostConnection::connect(&target, &paths, outdated, &interact)
+        .err()
+        .expect("a host that exits 2 connected");
+
+    assert!(matches!(error, SshError::HostOutdated { .. }), "{error}");
+    assert!(!error.retryable());
+    assert!(error.to_string().contains("Reinstall"));
+    end_master(&target, &paths);
 }

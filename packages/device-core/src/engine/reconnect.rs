@@ -68,20 +68,23 @@ pub struct ReconnectView {
     pub reason: Option<String>,
 }
 
-/// Releases a server's attempt slot when the attempt ends, however it ends.
-pub(super) struct AttemptGuard<'a> {
-    device_id: String,
-    state: &'a DeviceState,
+/// Who is connecting. The person's attempt may ask questions and starts the keeping; the keeper's runs silent and
+/// carries the disconnect count it was scheduled under, so a disconnect that lands after that is noticed.
+#[derive(Clone, Copy)]
+pub(super) enum Attempt {
+    Manual,
+    Background { disconnects: u64 },
 }
 
-impl Drop for AttemptGuard<'_> {
+/// A server's attempt slot, released when the attempt ends, however it ends.
+pub(super) struct AttemptGuard {
+    attempting: Arc<Mutex<HashSet<String>>>,
+    device_id: String,
+}
+
+impl Drop for AttemptGuard {
     fn drop(&mut self) {
-        self.state
-            .ssh
-            .attempting
-            .lock()
-            .unwrap()
-            .remove(&self.device_id);
+        self.attempting.lock().unwrap().remove(&self.device_id);
     }
 }
 
@@ -102,12 +105,14 @@ impl DeviceState {
     }
 
     /// One look at every kept server: a link seen dead is cleaned up and an attempt scheduled, and an attempt that
-    /// is due starts on a thread of its own.
+    /// is due starts on a thread of its own. A server whose attempt slot is taken (the person is connecting it) is
+    /// left alone, so the cleanup of a dead link never ends a master a fresh attempt is using.
     pub(super) fn reconnect_tick(self: &Arc<Self>, now: Instant) {
         let hosts = self.settings().hosts;
         let mut changed = false;
         let mut dead: Vec<(String, Arc<dyn HostLink>)> = Vec::new();
-        let mut start: Vec<(String, u32)> = Vec::new();
+        let mut start: Vec<(String, AttemptGuard, u64)> = Vec::new();
+        let mut held: Vec<AttemptGuard> = Vec::new();
 
         {
             let mut keeps = self.ssh.keeps.lock().unwrap();
@@ -129,6 +134,10 @@ impl DeviceState {
                     continue;
                 }
 
+                let Some(slot) = self.begin_attempt(&host.device_id) else {
+                    continue;
+                };
+
                 if keep.lost(now) {
                     changed = true;
                 }
@@ -137,26 +146,21 @@ impl DeviceState {
                     dead.push((host.device_id.clone(), link));
                 }
 
-                let busy = self
-                    .ssh
-                    .attempting
-                    .lock()
-                    .unwrap()
-                    .contains(&host.device_id)
-                    || self.upgrade_running(&target_of(host));
+                // The count is read under the keeps lock, which a disconnect takes right after counting.
+                let disconnects = self.ssh.disconnects.load(Ordering::SeqCst);
 
-                if !busy {
-                    if let Some(attempt) = keep.due(now) {
-                        start.push((host.device_id.clone(), attempt));
-                        changed = true;
-                    }
+                if !self.upgrade_running(&target_of(host)) && keep.due(now).is_some() {
+                    start.push((host.device_id.clone(), slot, disconnects));
+                    changed = true;
+                } else {
+                    // Held until the dead link is gone, then released.
+                    held.push(slot);
                 }
             }
         }
 
         // The old session ends before anything new starts, so a reconnect never has an old and a new session
-        // alive together; the master goes too only if it may be wedged (the network went away), and a host that
-        // merely ended leaves a healthy master for the new session to share.
+        // alive together.
         for (id, link) in dead {
             let removed = {
                 let mut connections = self.ssh.connections.lock().unwrap();
@@ -171,23 +175,21 @@ impl DeviceState {
             };
 
             if removed.is_some() {
-                link.close();
-
-                if link.master_suspect() {
-                    link.exit_master();
-                }
+                self.retire_lost(&link);
             }
         }
+
+        drop(held);
 
         if changed {
             self.emit(Event::Changed);
         }
 
-        for (id, _) in start {
+        for (id, slot, disconnects) in start {
             let state = Arc::clone(self);
 
             thread::spawn(move || {
-                let result = state.connect_host(&id, false);
+                let result = state.connect_host(&id, Attempt::Background { disconnects }, &slot);
 
                 state.attempt_done(&id, result.map(|_| ()));
             });
@@ -210,22 +212,24 @@ impl DeviceState {
     }
 
     /// Takes the server's attempt slot, or `None` while another attempt (the person's or the keeper's) has it.
-    pub(super) fn begin_attempt(&self, device_id: &str) -> Option<AttemptGuard<'_>> {
+    pub(super) fn begin_attempt(&self, device_id: &str) -> Option<AttemptGuard> {
         self.ssh
             .attempting
             .lock()
             .unwrap()
             .insert(device_id.to_owned())
             .then(|| AttemptGuard {
+                attempting: Arc::clone(&self.ssh.attempting),
                 device_id: device_id.to_owned(),
-                state: self,
             })
     }
 
-    /// The person is connecting by hand: a kept server starts its attempts over.
-    pub(super) fn keep_manual(&self, device_id: &str) {
-        if let Some(keep) = self.ssh.keeps.lock().unwrap().get_mut(device_id) {
-            keep.manual();
+    /// The person is connecting by hand. A kept server counts the attempt, or starts over on `retry`; `Err` when
+    /// the window has no attempts left for a page to use.
+    pub(super) fn keep_manual(&self, device_id: &str, retry: bool) -> Result<(), String> {
+        match self.ssh.keeps.lock().unwrap().get_mut(device_id) {
+            Some(keep) => keep.manual(retry, Instant::now()),
+            None => Ok(()),
         }
     }
 
@@ -237,19 +241,31 @@ impl DeviceState {
     }
 
     /// A server is connected over `link`: keep it connected, remember the launch and stop the earlier launches of
-    /// this computer that a lost session left running there.
-    pub(super) fn note_connected(&self, device_id: &str, link: &Arc<dyn HostLink>) {
+    /// this computer that a lost session left running there. Only a connection the person made (`create`) starts
+    /// the keeping; `false` means a background attempt found nobody keeping the server any more.
+    pub(super) fn note_connected(
+        &self,
+        device_id: &str,
+        link: &Arc<dyn HostLink>,
+        create: bool,
+    ) -> bool {
         {
             let mut keeps = self.ssh.keeps.lock().unwrap();
-            let keep = keeps
-                .entry(device_id.to_owned())
-                .or_insert_with(Keep::connected);
 
-            keep.up();
+            if create {
+                keeps
+                    .entry(device_id.to_owned())
+                    .or_insert_with(Keep::connected);
+            }
+
+            match keeps.get_mut(device_id) {
+                Some(keep) => keep.up(),
+                None => return false,
+            }
         }
 
         let Some(current) = link.launch_id() else {
-            return;
+            return true;
         };
         let stale: Vec<String> = {
             let mut launches = self.ssh.launches.lock().unwrap();
@@ -262,7 +278,7 @@ impl DeviceState {
         };
 
         if stale.is_empty() {
-            return;
+            return true;
         }
 
         // A failed request leaves them recorded for the next connection.
@@ -271,6 +287,8 @@ impl DeviceState {
                 known.retain(|id| !reaped.stopped.contains(id) && !reaped.gone.contains(id));
             }
         }
+
+        true
     }
 
     /// The person disconnected, removed or unpaired a server: it is no longer kept.

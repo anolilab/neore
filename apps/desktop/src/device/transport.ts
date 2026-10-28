@@ -15,7 +15,8 @@ export interface HostTransport {
     /** Verifies, asks about, runs and signs one relayed call. */
     execute: (envelope: string, signature: string) => Promise<Signed>;
     /** Connects a paired server again. */
-    hostConnect: (deviceId: string) => Promise<HostProbe>;
+    /** `retry` is the local window's Retry: it starts the reconnect attempts over. A page's connect counts as one more attempt. */
+    hostConnect: (deviceId: string, retry: boolean) => Promise<HostProbe>;
     hostDisconnect: (deviceId: string) => void;
     /** Drops the pinned host key, so the next connection asks to trust whatever the server presents. */
     hostForgetKey: (deviceId: string) => void;
@@ -59,7 +60,7 @@ export const createLocalTransport = (dataDirectory: string, onEvent: (event: Cor
         core,
         denyPrompts: () => core.denyPrompts(),
         execute: async (envelope, signature) => JSON.parse(await core.execute(envelope, signature)) as Signed,
-        hostConnect: async (deviceId) => JSON.parse(await core.hostConnect(deviceId)) as HostProbe,
+        hostConnect: async (deviceId, retry) => JSON.parse(await core.hostConnect(deviceId, retry)) as HostProbe,
         hostDisconnect: (deviceId) => core.hostDisconnect(deviceId),
         hostForgetKey: (deviceId) => core.hostForgetKey(deviceId),
         hostPair: (spec, deviceId, secret) => core.hostPair(JSON.stringify(spec), deviceId, secret),

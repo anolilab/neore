@@ -285,6 +285,11 @@ fn nonce() -> String {
     unique_hex(8)
 }
 
+/// The name of this installation (`SshPaths::desktop_tag`): 16 hex characters.
+pub(crate) fn desktop_tag() -> String {
+    unique_hex(8)
+}
+
 /// The id of one `neore-host` launch (`launch.rs`): 32 hex characters.
 pub(crate) fn launch_id() -> String {
     unique_hex(16)

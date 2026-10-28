@@ -69,6 +69,13 @@ impl Backoff {
         self.failures = 0;
     }
 
+    /// Whether the window has no attempts left.
+    pub fn exhausted(&mut self, now: Instant) -> bool {
+        self.prune(now);
+
+        self.attempts.len() as u32 >= MAX_ATTEMPTS
+    }
+
     /// The person asked: forget everything.
     pub fn reset(&mut self) {
         self.attempts.clear();
@@ -119,10 +126,24 @@ impl Keep {
         self.phase = Phase::Connected;
     }
 
-    /// The person is connecting by hand (a Retry, say): all attempts are forgotten and this one is running.
-    pub fn manual(&mut self) {
-        self.backoff.reset();
+    /// The person is connecting by hand and this attempt is running. `retry` is the Retry of the local window, which
+    /// forgets the attempts so far; any other caller (the page) counts as one more attempt and is refused once the
+    /// window is full, so a loop in a page cannot dial a server all day.
+    pub fn manual(&mut self, retry: bool, now: Instant) -> Result<(), String> {
+        if retry {
+            self.backoff.reset();
+        } else if self.backoff.exhausted(now) {
+            return Err(format!(
+                "too many attempts to reach this server: retry from the Neore device window (at most {MAX_ATTEMPTS} in {} minutes)",
+                WINDOW.as_secs() / 60
+            ));
+        } else {
+            self.backoff.attempt(now);
+        }
+
         self.phase = Phase::Connecting { attempt: 0 };
+
+        Ok(())
     }
 
     /// The link was seen dead. Only the first sight counts: a server already waiting or connecting is left be.
@@ -292,7 +313,7 @@ mod tests {
         assert!(keep.lost(now));
         assert!(!keep.lost(now), "a second sight of the same loss");
 
-        keep.manual();
+        keep.manual(true, now).unwrap();
 
         assert_eq!(keep.phase(), &Phase::Connecting { attempt: 0 });
 
@@ -305,6 +326,25 @@ mod tests {
         };
 
         assert_eq!((attempt, at), (1, now + BASE_DELAY));
+    }
+
+    #[test]
+    fn only_the_local_windows_retry_forgets_the_attempts() {
+        let (mut keep, now) = (Keep::connected(), Instant::now());
+
+        for _ in 0..MAX_ATTEMPTS {
+            keep.manual(false, now).unwrap();
+            keep.up();
+        }
+
+        assert!(keep
+            .manual(false, now)
+            .unwrap_err()
+            .contains("device window"));
+
+        keep.manual(true, now).unwrap();
+        keep.up();
+        keep.manual(false, now).unwrap();
     }
 
     #[test]
