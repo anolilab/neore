@@ -1,6 +1,6 @@
-import { MICRODOLLARS_PER_CREDIT } from "../gateway";
 import { describe, expect, it } from "vitest";
 
+import { MICRODOLLARS_PER_CREDIT } from "../gateway";
 import { estimateInputCostMicrodollars, estimateTokensFromCharacters } from "./prompt-cache";
 
 describe("estimateInputCostMicrodollars", () => {

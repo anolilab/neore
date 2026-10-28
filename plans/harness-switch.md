@@ -193,7 +193,8 @@ verbatim tail, and delta on switching back.
 - Built in S2: above the threshold the confirm step shows the credit estimate for the handoff and for the full
   history before the divider is written (`previewAgentSwitch`, priced client-side with the target's catalog price).
   `delta` keeps what the agent saw before it left, adds the stored handoff of what happened since, and then the turns
-  after; when its earlier divider lies outside the 100-row context window only the delta block is sent. Each summary
+  after; when the model's earlier divider lies outside the 100-row context window the switch is `portable` instead,
+  since the context could not give the model what a delta says it already has. Each summary
   call is one metered gateway call; a retry after a failed write summarises again, but is charged (`chargeRound`) once.
   The Anthropic cache breakpoint on the handoff message and the provider's cache reads need a real provider to check.
 

@@ -36,8 +36,9 @@ import {
     type HandoffKind,
     type HandoffTurn,
 } from "../agent/handoff";
-import { collectHandoffSource, findDividerLeaving, pathTokens } from "../agent/handoff-source";
+import { collectHandoffSource, findDividerLeaving, pathTokens, rowsSince } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
+import { DEFAULT_RECENT_MESSAGES } from "../agent/shared";
 import { insertAgentSwitchRow, patchThread } from "../agent/table-writes";
 import { requireThreadPermission } from "../agent/thread-read-access";
 import { hasStreamFor, isThreadStreaming } from "../agent/thread-streaming";
@@ -299,7 +300,13 @@ const modeFor = async (
 
     const earlier = await findDividerLeaving(ctx, checked.thread._id, checked.leaf, checked.to.model);
 
-    return earlier ? { boundaryId: earlier.startMessageId, contextTokens, mode: "delta" } : { contextTokens, mode: "portable" };
+    // A model's earlier context is only sent while it is inside the context window; past it, a delta would tell the
+    // model it had worked on a conversation of which it is given none.
+    if (earlier && (await rowsSince(ctx, checked.thread._id, checked.leaf, earlier.startMessageId, DEFAULT_RECENT_MESSAGES)) < DEFAULT_RECENT_MESSAGES) {
+        return { boundaryId: earlier.startMessageId, contextTokens, mode: "delta" };
+    }
+
+    return { contextTokens, mode: "portable" };
 };
 
 const vTurn = v.object({ role: v.union(v.literal("assistant"), v.literal("user")), text: v.string() });
