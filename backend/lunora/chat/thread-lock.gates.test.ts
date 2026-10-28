@@ -163,7 +163,7 @@ describe("the shared gate outcome", () => {
             harness.run(async (context: any) => await gateThreadActionHandler(context, { level: "write", threadId: threadId as never, unlockProof, userId }));
 
         expect(await answer(OWNER)).toEqual({ outcome: "locked" });
-        expect(await answer(OWNER, proof)).toEqual({ outcome: "ok" });
+        expect(await answer(OWNER, proof)).toEqual({ isWorker: false, outcome: "ok" });
         expect(await answer(STRANGER, proof)).toEqual({ outcome: "denied" });
     });
 
@@ -186,7 +186,7 @@ describe("the shared gate outcome", () => {
         const answer = (userId: string, unlockProof?: string) =>
             harness.run(async (context: any) => await gateThreadActionHandler(context, { level: "write", threadId: threadId as never, unlockProof, userId }));
 
-        expect(await answer(OWNER, proof)).toEqual({ botId, outcome: "ok" });
+        expect(await answer(OWNER, proof)).toEqual({ botId, isWorker: false, outcome: "ok" });
         expect(await answer(OWNER)).toEqual({ outcome: "locked" });
         expect(await answer(STRANGER, proof)).toEqual({ outcome: "denied" });
     });

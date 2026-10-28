@@ -16,8 +16,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/components/settings/settings-modal.tsx:197
-msgid "_-Z5u4"
-msgstr ""
+#~ msgid "_-Z5u4"
+#~ msgstr ""
 
 #: src/features/settings/components/chat/usage-settings.tsx:630
 msgid " · model: {modelFilter}"
@@ -102,7 +102,7 @@ msgstr "({jobFailed} com falha)"
 msgid "(attachments only)"
 msgstr "(apenas anexos)"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:98
+#: src/features/settings/components/chat/default-models-settings.tsx:116
 msgid "(default)"
 msgstr "(padrão)"
 
@@ -876,7 +876,7 @@ msgstr "{minutes}min restantes"
 msgid "{modeLabel} mode — click to change"
 msgstr "Modo {modeLabel} — clique para alterar"
 
-#: src/features/chat/thread/thread.tsx:203
+#: src/features/chat/thread/thread.tsx:208
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, one {Pergunte qualquer coisa a # modelo...} other {Pergunte qualquer coisa a # modelos...}}"
 
@@ -998,7 +998,7 @@ msgstr "{providerName} · sua própria conta Bedrock ({region})"
 msgid "{requestCount} req"
 msgstr "{requestCount} req."
 
-#: src/components/settings/settings-search.tsx:40
+#: src/components/settings/settings-search.tsx:34
 msgid "{resultCount, plural, one {# result} other {# results}}"
 msgstr ""
 
@@ -3204,6 +3204,11 @@ msgstr "O pequeno LLM de raciocínio da Arcee"
 msgid "archive"
 msgstr "arquivar"
 
+#. placeholder {0}: worker.name
+#: src/features/sub-agents/components/worker-list.tsx:60
+msgid "Archive {0}"
+msgstr ""
+
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
 #: src/components/command-palette.tsx:415
 #: src/components/command-palette.tsx:555
@@ -3216,6 +3221,7 @@ msgstr "Arquivar conversa"
 #~ msgstr "Arquivar/desarquivar conversa"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:520
+#: src/features/sub-agents/components/worker-list.tsx:55
 #: src/features/tasks/components/goal-form-dialog.tsx:47
 #: src/features/tasks/components/goal-list.tsx:26
 msgid "Archived"
@@ -3362,7 +3368,7 @@ msgstr "Cresc."
 msgid "Ask"
 msgstr "Perguntar"
 
-#: src/features/chat/thread/thread.tsx:203
+#: src/features/chat/thread/thread.tsx:208
 msgid "Ask all models anything..."
 msgstr "Pergunte qualquer coisa a todos os modelos..."
 
@@ -3750,6 +3756,10 @@ msgstr "O código de backup é obrigatório"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:53
 msgid "Backup Codes"
 msgstr "Códigos de backup"
+
+#: src/features/settings/components/chat/default-models-settings.tsx:167
+msgid "Backup model"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:83
 #: src/features/marketing/data/models-data.ts:225
@@ -5158,15 +5168,15 @@ msgstr "Escolha um nome de usuário único"
 msgid "Choose at least one permission"
 msgstr "Escolha pelo menos uma permissão"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:223
+#: src/features/settings/components/chat/default-models-settings.tsx:283
 msgid "Choose default image models"
 msgstr "Escolher modelos de imagem padrão"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:181
+#: src/features/settings/components/chat/default-models-settings.tsx:239
 msgid "Choose default text models"
 msgstr "Escolher modelos de texto padrão"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:265
+#: src/features/settings/components/chat/default-models-settings.tsx:325
 msgid "Choose default video models"
 msgstr "Escolher modelos de vídeo padrão"
 
@@ -6132,7 +6142,7 @@ msgstr "Configure os valores das variáveis desta conversa. Esses valores vão s
 msgid "Configure Variables"
 msgstr "Configurar variáveis"
 
-#: src/components/settings/settings-modal.tsx:421
+#: src/components/settings/settings-modal.tsx:422
 msgid "Configure your application settings"
 msgstr "Configure o aplicativo"
 
@@ -7101,6 +7111,10 @@ msgstr "Não foi possível guardar a nova ordem de {label}"
 msgid "Could not save the page"
 msgstr "Não foi possível salvar a página"
 
+#: src/features/sub-agents/components/worker-composer.tsx:57
+msgid "Could not send the message."
+msgstr ""
+
 #: src/features/chat/thread/ask-user-prompt.tsx:83
 #: src/features/chat/thread/tool-approval.tsx:63
 msgid "Could not send your answer. Please try again."
@@ -8020,43 +8034,43 @@ msgstr "Idioma padrão atualizado"
 msgid "Default Model"
 msgstr "Modelo padrão"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:280
+#: src/features/settings/components/chat/default-models-settings.tsx:340
 msgid "Default model for animating a single image"
 msgstr "Modelo padrão para animar uma única imagem"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:185
+#: src/features/settings/components/chat/default-models-settings.tsx:243
 msgid "Default model for chat and text generation"
 msgstr "Modelo padrão para chat e geração de texto"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:249
+#: src/features/settings/components/chat/default-models-settings.tsx:309
 msgid "Default model for combining multiple reference images"
 msgstr "Modelo padrão para combinar várias imagens de referência"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:302
+#: src/features/settings/components/chat/default-models-settings.tsx:362
 msgid "Default model for editing or transforming existing video"
 msgstr "Modelo padrão para editar ou transformar vídeos existentes"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:227
+#: src/features/settings/components/chat/default-models-settings.tsx:287
 msgid "Default model for generating images from text prompts"
 msgstr "Modelo padrão para gerar imagens a partir de prompts de texto"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:291
+#: src/features/settings/components/chat/default-models-settings.tsx:351
 msgid "Default model for generating video from multiple images"
 msgstr "Modelo padrão para gerar vídeo a partir de várias imagens"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:269
+#: src/features/settings/components/chat/default-models-settings.tsx:329
 msgid "Default model for generating video from text prompts"
 msgstr "Modelo padrão para gerar vídeo a partir de prompts de texto"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:196
+#: src/features/settings/components/chat/default-models-settings.tsx:254
 msgid "Default model for image understanding and analysis"
 msgstr "Modelo padrão para compreensão e análise de imagens"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:238
+#: src/features/settings/components/chat/default-models-settings.tsx:298
 msgid "Default model for transforming existing images"
 msgstr "Modelo padrão para transformar imagens existentes"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:313
+#: src/features/settings/components/chat/default-models-settings.tsx:373
 msgid "Default model for video generation from mixed inputs"
 msgstr "Modelo padrão para geração de vídeo a partir de entradas mistas"
 
@@ -8064,11 +8078,11 @@ msgstr "Modelo padrão para geração de vídeo a partir de entradas mistas"
 #~ msgid "Default model for video generation with start and end frames"
 #~ msgstr "Modelo padrão para geração de vídeo com quadros inicial e final"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:207
+#: src/features/settings/components/chat/default-models-settings.tsx:265
 msgid "Default model for video understanding and transcription"
 msgstr "Modelo padrão para compreensão e transcrição de vídeos"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:167
+#: src/features/settings/components/chat/default-models-settings.tsx:225
 msgid "Default model updated"
 msgstr "Modelo padrão atualizado"
 
@@ -11067,6 +11081,10 @@ msgstr "Falha ao aplicar a predefinição"
 msgid "Failed to apply system prompt"
 msgstr "Falha ao aplicar o prompt de sistema"
 
+#: src/features/sub-agents/components/worker-list.tsx:63
+msgid "Failed to archive the worker"
+msgstr ""
+
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:207
 msgid "Failed to archive thread"
 msgstr "Falha ao arquivar a conversa"
@@ -11644,6 +11662,10 @@ msgstr "Falha ao desafixar a conversa"
 msgid "Failed to update agent settings"
 msgstr "Falha ao atualizar as configurações do agente"
 
+#: src/features/settings/components/chat/default-models-settings.tsx:158
+msgid "Failed to update backup model"
+msgstr ""
+
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:73
 msgid "Failed to update configuration"
 msgstr "Falha ao atualizar a configuração"
@@ -11652,7 +11674,7 @@ msgstr "Falha ao atualizar a configuração"
 msgid "Failed to update connection"
 msgstr "Falha ao atualizar a conexão"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:161
+#: src/features/settings/components/chat/default-models-settings.tsx:219
 msgid "Failed to update default model"
 msgstr "Falha ao atualizar o modelo padrão"
 
@@ -14399,6 +14421,7 @@ msgid "Identity"
 msgstr "Identidade"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:53
+#: src/features/sub-agents/components/worker-list.tsx:38
 msgid "Idle"
 msgstr "Ocioso"
 
@@ -14406,6 +14429,10 @@ msgstr "Ocioso"
 #: src/components/error-boundaries/route-error-boundary.tsx:139
 msgid "If this problem persists, please contact support."
 msgstr "Se o problema continuar, entre em contato com o suporte."
+
+#: src/features/settings/components/chat/default-models-settings.tsx:163
+msgid "If your chosen model is unavailable, the reply is retried once on this model"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:34
 msgid "illustration"
@@ -14422,7 +14449,7 @@ msgstr "ilustração"
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:165
-#: src/features/settings/components/chat/default-models-settings.tsx:222
+#: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:40
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:71
 #: src/features/workflow/components/gallery/gallery-card.tsx:27
@@ -14493,15 +14520,15 @@ msgstr "Modelo de geração de imagens"
 msgid "Image to apply the style to (or use input from previous node)"
 msgstr "Imagem à qual aplicar o estilo (ou use a entrada do nó anterior)"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:241
+#: src/features/settings/components/chat/default-models-settings.tsx:301
 msgid "Image to image"
 msgstr "Imagem para imagem"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:199
+#: src/features/settings/components/chat/default-models-settings.tsx:257
 msgid "Image to text"
 msgstr "Imagem para texto"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:283
+#: src/features/settings/components/chat/default-models-settings.tsx:343
 msgid "Image to video"
 msgstr "Imagem para vídeo"
 
@@ -14549,11 +14576,11 @@ msgstr "Imagens"
 msgid "Images that require current knowledge, web search context, or complex reasoning about the subject matter"
 msgstr "Imagens que exigem conhecimento atual, contexto de pesquisa na web ou raciocínio complexo sobre o tema"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:252
+#: src/features/settings/components/chat/default-models-settings.tsx:312
 msgid "Images to image"
 msgstr "Imagens para imagem"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:294
+#: src/features/settings/components/chat/default-models-settings.tsx:354
 msgid "Images to video"
 msgstr "Imagens para vídeo"
 
@@ -16425,7 +16452,7 @@ msgstr "Carregando sua visão geral…"
 #: src/features/settings/components/chat/agent-settings.tsx:28
 #: src/features/settings/components/chat/api-keys-settings.tsx:462
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
-#: src/features/settings/components/chat/default-models-settings.tsx:132
+#: src/features/settings/components/chat/default-models-settings.tsx:185
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:165
 #: src/features/settings/components/chat/trigger-settings.tsx:903
@@ -17255,6 +17282,14 @@ msgstr "Entrada de mensagem"
 msgid "Message selection"
 msgstr "Seleção de mensagens"
 
+#: src/features/sub-agents/components/worker-composer.tsx:90
+msgid "Message the worker"
+msgstr ""
+
+#: src/features/sub-agents/components/worker-composer.tsx:99
+msgid "Message the worker..."
+msgstr ""
+
 #: src/features/chat/thread/message-branch-switcher.tsx:55
 msgid "Message versions"
 msgstr "Versões da mensagem"
@@ -17506,7 +17541,7 @@ msgstr "O pequeno LLM de raciocínio da Mistral"
 msgid "Mistral's smallest 3B multi-modal model"
 msgstr "O menor modelo multimodal da Mistral, com 3B"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:316
+#: src/features/settings/components/chat/default-models-settings.tsx:376
 msgid "Mixed to video"
 msgstr "Misto para vídeo"
 
@@ -18940,7 +18975,7 @@ msgstr "Nenhum microfone"
 msgid "No microphone found."
 msgstr "Nenhum microfone encontrado."
 
-#: src/features/settings/components/chat/default-models-settings.tsx:75
+#: src/features/settings/components/chat/default-models-settings.tsx:93
 msgid "No models available"
 msgstr "Nenhum modelo disponível"
 
@@ -19073,7 +19108,7 @@ msgid "No response yet"
 msgstr "Nenhuma resposta ainda"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:221
-#: src/components/settings/settings-search.tsx:83
+#: src/components/settings/settings-search.tsx:69
 #: src/features/vault/components/empty-states.tsx:13
 msgid "No results"
 msgstr "Nenhum resultado"
@@ -19301,6 +19336,7 @@ msgid "Noise Reduction"
 msgstr "Redução de ruído"
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:19
+#: src/features/settings/components/chat/default-models-settings.tsx:165
 #: src/features/skills/components/skill-form-dialog.tsx:320
 #: src/features/skills/components/skill-form-dialog.tsx:334
 msgid "None"
@@ -22344,6 +22380,7 @@ msgstr "Colocar mensagem na fila — será enviada quando a resposta atual termi
 #: src/features/home/components/home-page.tsx:184
 #: src/features/home/components/home-page.tsx:192
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:53
+#: src/features/sub-agents/components/worker-list.tsx:38
 #: src/features/tasks/components/task-status.tsx:19
 msgid "Queued"
 msgstr "Na fila"
@@ -24372,7 +24409,7 @@ msgstr "Rolar uma página de colunas para a esquerda"
 msgid "Scroll right one page of columns"
 msgstr "Rolar uma página de colunas para a direita"
 
-#: src/features/chat/thread/thread.tsx:72
+#: src/features/chat/thread/thread.tsx:75
 msgid "Scroll to bottom"
 msgstr "Rolar até o final"
 
@@ -24543,11 +24580,11 @@ msgstr "Resultados da pesquisa ({0})"
 msgid "Search servers…"
 msgstr "Pesquisar servidores…"
 
-#: src/components/settings/settings-search.tsx:51
+#: src/components/settings/settings-search.tsx:42
 msgid "Search settings"
 msgstr ""
 
-#: src/components/settings/settings-search.tsx:54
+#: src/components/settings/settings-search.tsx:45
 msgid "Search settings..."
 msgstr ""
 
@@ -24907,6 +24944,10 @@ msgstr "Modelo semirrealista com boa aderência ao prompt"
 msgid "Semi-realistic visual style"
 msgstr "Estilo visual semirrealista"
 
+#: src/features/sub-agents/components/worker-composer.tsx:102
+msgid "Send"
+msgstr ""
+
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:192
 msgid "Send <0>X-Hub-Signature-256: sha256=<hex></0>, the HMAC-SHA256 of the raw request body keyed with the secret (the format GitHub webhooks use). This signature has no timestamp, so a captured request can be replayed once the 15-minute duplicate window has passed. Requests with the neore headers are rejected."
 msgstr ""
@@ -25088,8 +25129,8 @@ msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in resp
 msgstr "Configure gatilhos para automatizar tarefas por agendamento, via webhooks ou em resposta a eventos."
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:255
-#: src/components/settings/settings-modal.tsx:321
-#: src/components/settings/settings-modal.tsx:419
+#: src/components/settings/settings-modal.tsx:322
+#: src/components/settings/settings-modal.tsx:420
 #: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
 msgstr "Configurações"
@@ -25099,7 +25140,7 @@ msgstr "Configurações"
 msgid "Settings saved"
 msgstr "Configurações salvas"
 
-#: src/components/settings/settings-search.tsx:89
+#: src/components/settings/settings-search.tsx:73
 msgid "Settings search results"
 msgstr ""
 
@@ -27179,8 +27220,8 @@ msgstr "Sintetizador (pondera os dois lados)"
 #~ msgid "System"
 #~ msgstr "Sistema"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:65
-#: src/features/settings/components/chat/default-models-settings.tsx:101
+#: src/features/settings/components/chat/default-models-settings.tsx:81
+#: src/features/settings/components/chat/default-models-settings.tsx:119
 msgid "System default"
 msgstr "Padrão do sistema"
 
@@ -27613,7 +27654,7 @@ msgstr "texto"
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:117
 #: src/features/marketing/components/landing-footer.tsx:164
-#: src/features/settings/components/chat/default-models-settings.tsx:180
+#: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:44
 #: src/features/workflow/components/gallery/gallery-card.tsx:28
 #: src/features/workflow/components/nodes/output-node.tsx:16
@@ -27698,7 +27739,7 @@ msgstr "Texto que a resposta deve conter (sem diferenciar maiúsculas e minúscu
 msgid "Text the answer must not contain"
 msgstr "Texto que a resposta não deve conter"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:230
+#: src/features/settings/components/chat/default-models-settings.tsx:290
 msgid "Text to image"
 msgstr "Texto para imagem"
 
@@ -27714,11 +27755,11 @@ msgstr "Texto a falar"
 msgid "Text to Speech"
 msgstr "Texto para fala"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:188
+#: src/features/settings/components/chat/default-models-settings.tsx:246
 msgid "Text to text"
 msgstr "Texto para texto"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:272
+#: src/features/settings/components/chat/default-models-settings.tsx:332
 msgid "Text to video"
 msgstr "Texto para vídeo"
 
@@ -28177,6 +28218,10 @@ msgstr "A voz com que o modo mãos-livres lê as respostas. Uma habilidade com v
 msgid "The whole answer, exactly"
 msgstr "A resposta inteira, exatamente"
 
+#: src/features/sub-agents/components/worker-composer.tsx:41
+msgid "The worker is working on an earlier message."
+msgstr ""
+
 #: src/features/workflow/hooks/use-workflow-transfer.ts:26
 msgid "The workflow file contains a node type this version does not support."
 msgstr "O arquivo do fluxo de trabalho contém um tipo de nó que esta versão não suporta."
@@ -28627,6 +28672,10 @@ msgstr "Isso removerá permanentemente estes {0} arquivos da sua base de conheci
 #: src/features/canvas/canvas-panel.tsx:644
 msgid "This workbook has {sheetCount} sheets — only the first sheet was imported."
 msgstr "Esta pasta de trabalho tem {sheetCount} planilhas — só a primeira foi importada."
+
+#: src/features/sub-agents/components/worker-composer.tsx:39
+msgid "This worker is archived. Restore it to message it again."
+msgstr ""
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:27
 msgid "This workflow file uses a version this app cannot read."
@@ -30641,7 +30690,7 @@ msgstr "vídeo"
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:119
 #: src/features/marketing/components/landing-footer.tsx:166
-#: src/features/settings/components/chat/default-models-settings.tsx:264
+#: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:45
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:78
 #: src/features/workflow/components/gallery/gallery-card.tsx:29
@@ -30714,11 +30763,11 @@ msgstr "Resultado em vídeo"
 msgid "Video thumbnail"
 msgstr "Miniatura de vídeo"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:210
+#: src/features/settings/components/chat/default-models-settings.tsx:268
 msgid "Video to text"
 msgstr "Vídeo para texto"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:305
+#: src/features/settings/components/chat/default-models-settings.tsx:365
 msgid "Video to video"
 msgstr "Vídeo para vídeo"
 
@@ -31458,6 +31507,10 @@ msgstr "Documentação para desenvolvedores Wix, assistência com código Velo e
 msgid "Work management and team collaboration"
 msgstr "Gestão de trabalho e colaboração em equipe"
 
+#: src/features/sub-agents/components/worker-list.tsx:41
+msgid "Workers"
+msgstr ""
+
 #: src/features/settings/components/chat/mcp/popular-servers.ts:27
 msgid "Workers, KV, R2, and Cloudflare platform tools"
 msgstr "Workers, KV, R2 e ferramentas da plataforma Cloudflare"
@@ -31492,6 +31545,7 @@ msgid "Workflows"
 msgstr "Fluxos de trabalho"
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:54
+#: src/features/sub-agents/components/worker-list.tsx:38
 msgid "Working"
 msgstr "Trabalhando"
 

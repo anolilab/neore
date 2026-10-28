@@ -27,6 +27,7 @@
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { MODEL_LOOKUP } from "@neore/ai/models";
+import type { Infer } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -45,7 +46,7 @@ import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
-import { isThreadLocked } from "../lib/thread-lock";
+import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import {
     buildResultMessage,
     distinctChildCount,
@@ -259,7 +260,7 @@ export interface WorkerReceipt {
 const WORKER_RUNS_CHECKED = 20;
 
 /** A worker's first run: it holds the lead, the depth, the runner and the tool allowlist every later run copies. */
-const workerOrigin = async (ctx: Pick<MutationCtx, "db">, childThreadId: string): Promise<RunDoc | null> => {
+const workerOrigin = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childThreadId: string): Promise<RunDoc | null> => {
     const origin = await ctx.db
         .query("subAgentRuns")
         .withIndex("by_childThreadId", (q) => q.eq("childThreadId", childThreadId))
@@ -1061,4 +1062,197 @@ export const createWorker = authMutation
             ...(args.toolAllowlist !== undefined && { toolAllowlist: args.toolAllowlist }),
             userId: ctx.user.userId,
         });
+    });
+
+/**
+ * The user types into a worker's thread. One message starts one run: the `clientId` dedupes a retry
+ * or a redelivery, which returns the first run's receipt. An archived worker refuses; a stranger's
+ * id is NOT_FOUND, as an id that does not exist is.
+ */
+export const dispatchToWorker = authMutation
+    .input({
+        clientId: v.string().max(WORKER_CLIENT_ID_MAX),
+        message: v.string().max(SUB_AGENT_TASK_MAX),
+        workerId: v.id("threads"),
+    })
+    .output(vWorkerReceipt)
+    .mutation(async ({ args, ctx }) => {
+        const origin = await workerOrigin(ctx, args.workerId);
+
+        if (!origin || origin.userId !== ctx.user.userId) {
+            throw new LunoraError("NOT_FOUND", "Worker not found.");
+        }
+
+        return await dispatchOrThrow(ctx, {
+            childThreadId: args.workerId,
+            clientId: args.clientId,
+            parentThreadId: origin.parentThreadId,
+            task: args.message,
+            userId: ctx.user.userId,
+        });
+    });
+
+const vWorkerView = v.object({
+    activeRunId: v.union(v.id("subAgentRuns"), v.null()),
+    archived: v.boolean(),
+    lastRunAt: v.number(),
+    lastRunStatus: vSubAgentRunStatus,
+    leadThreadId: v.string(),
+    name: v.string(),
+    state: v.union(v.literal("idle"), v.literal("queued"), v.literal("running")),
+    workerId: v.string(),
+});
+
+/** A worker's name is its thread title, which a locked chat does not show. */
+const workerName = (thread: Doc<"threads">, run: RunDoc): string =>
+    isThreadLocked(thread) ? LOCKED_THREAD_TITLE : (thread.title ?? run.task.split("\n", 1)[0]!.slice(0, WORKER_NAME_MAX));
+
+/** What a worker is doing, from its active run if it has one. */
+const workerState = (working: RunDoc | undefined): "idle" | "queued" | "running" => {
+    if (!working) {
+        return "idle";
+    }
+
+    return working.status === "running" ? "running" : "queued";
+};
+
+/** Workers shown under one lead, most recently dispatched first. */
+const WORKER_LIST_MAX = 20;
+
+const ALL_STATUSES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
+
+/** The workers of one of the caller's threads: name, whether archived, whether working. */
+export const listWorkers = authQuery
+    .input({ leadThreadId: v.id("threads") })
+    .output(v.array(vWorkerView))
+    .query(async ({ args, ctx }) => {
+        const runs: RunDoc[] = [];
+
+        for (const status of ALL_STATUSES) {
+            runs.push(
+                ...(await ctx.db
+                    .query("subAgentRuns")
+                    .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", args.leadThreadId).eq("status", status))
+                    .take(SUB_AGENT_LIFETIME_SCAN)),
+            );
+        }
+
+        const latest = new Map<string, RunDoc>();
+        const active = new Map<string, RunDoc>();
+
+        for (const run of runs) {
+            if (run.mode !== "worker" || run.userId !== ctx.user.userId || run.childThreadId === undefined) {
+                continue;
+            }
+
+            if (!latest.has(run.childThreadId) || latest.get(run.childThreadId)!.createdAt < run.createdAt) {
+                latest.set(run.childThreadId, run);
+            }
+
+            if (isActiveSubAgentStatus(run.status)) {
+                active.set(run.childThreadId, run);
+            }
+        }
+
+        const newest = [...latest.values()].toSorted((a, b) => b.createdAt - a.createdAt).slice(0, WORKER_LIST_MAX);
+        const views: Infer<typeof vWorkerView>[] = [];
+
+        for (const run of newest) {
+            const thread = await ctx.db.get(run.childThreadId as Id<"threads">);
+
+            if (!thread || thread.deleted || thread.userId !== ctx.user.userId) {
+                continue;
+            }
+
+            const working = active.get(run.childThreadId!);
+
+            views.push({
+                activeRunId: working?._id ?? null,
+                archived: thread.status === "archived",
+                lastRunAt: run.createdAt,
+                lastRunStatus: run.status,
+                leadThreadId: run.parentThreadId,
+                name: workerName(thread, run),
+                state: workerState(working),
+                workerId: run.childThreadId!,
+            });
+        }
+
+        return views;
+    });
+
+/** One worker's thread, for the composer in it: its lead, whether it is archived, whether a run is live. Null for any other thread. */
+export const getWorker = authQuery
+    .input({ workerId: v.id("threads") })
+    .output(v.union(vWorkerView, v.null()))
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get(args.workerId);
+        const origin = thread ? await workerOrigin(ctx, args.workerId) : null;
+
+        if (!thread || thread.deleted || thread.userId !== ctx.user.userId || !origin || origin.userId !== ctx.user.userId) {
+            return null;
+        }
+
+        const recent = await latestWorkerRuns(ctx, args.workerId);
+        const latest = recent[0]!;
+        const working = recent.find((run) => isActiveSubAgentStatus(run.status));
+
+        return {
+            activeRunId: working?._id ?? null,
+            archived: thread.status === "archived",
+            lastRunAt: latest.createdAt,
+            lastRunStatus: latest.status,
+            leadThreadId: origin.parentThreadId,
+            name: workerName(thread, origin),
+            state: workerState(working),
+            workerId: args.workerId,
+        };
+    });
+
+const vActiveWorkerRun = v.object({
+    createdAt: v.number(),
+    leadThreadId: v.string(),
+    name: v.string(),
+    runId: v.id("subAgentRuns"),
+    startedAt: v.union(v.number(), v.null()),
+    status: v.union(v.literal("queued"), v.literal("running")),
+    workerId: v.string(),
+});
+
+/** Live worker runs read per status; the fan-out cap keeps real ones to a handful. */
+const ACTIVE_WORKER_RUNS_MAX = 50;
+
+/** The caller's live worker runs, for a rail that shows what is working right now. */
+export const listActiveWorkerRuns = authQuery
+    .input({})
+    .output(v.array(vActiveWorkerRun))
+    .query(async ({ ctx }) => {
+        const views: Infer<typeof vActiveWorkerRun>[] = [];
+
+        for (const status of ["running", "queued"] as const) {
+            const runs = await ctx.db
+                .query("subAgentRuns")
+                .withIndex("by_user_and_status", (q) => q.eq("userId", ctx.user.userId).eq("status", status))
+                .take(ACTIVE_WORKER_RUNS_MAX);
+
+            for (const run of runs) {
+                if (run.mode !== "worker" || run.childThreadId === undefined) {
+                    continue;
+                }
+
+                const thread = await ctx.db.get(run.childThreadId as Id<"threads">);
+
+                views.push({
+                    createdAt: run.createdAt,
+                    leadThreadId: run.parentThreadId,
+                    name: thread ? workerName(thread, run) : run.task.split("\n", 1)[0]!.slice(0, WORKER_NAME_MAX),
+                    runId: run._id,
+                    startedAt: run.startedAt ?? null,
+                    status,
+                    workerId: run.childThreadId,
+                });
+            }
+        }
+
+        return views;
     });

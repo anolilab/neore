@@ -1279,7 +1279,11 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "sub_agents_functions:completeRun": lunora_sub_agents_functions_164.completeRun as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:createRun": lunora_sub_agents_functions_164.createRun as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:createWorker": lunora_sub_agents_functions_164.createWorker as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:dispatchToWorker": lunora_sub_agents_functions_164.dispatchToWorker as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:getRunByToolCall": lunora_sub_agents_functions_164.getRunByToolCall as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:getWorker": lunora_sub_agents_functions_164.getWorker as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:listActiveWorkerRuns": lunora_sub_agents_functions_164.listActiveWorkerRuns as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:listWorkers": lunora_sub_agents_functions_164.listWorkers as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:messageWorker": lunora_sub_agents_functions_164.messageWorker as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:postResult": lunora_sub_agents_functions_164.postResult as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:reapRun": lunora_sub_agents_functions_164.reapRun as unknown as RegisteredLunoraFunction,
@@ -7489,6 +7493,18 @@ __has10 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has2 ? { "leadTools": __val2 } : {}), ...(__has3 ? { "model": __val3 } : {}), ...(__has4 ? { "name": __val4 } : {}), ...(__has5 ? { "parentModel": __val5 } : {}), "parentThreadId": source["parentThreadId"], ...(__has6 ? { "persistent": __val6 } : {}), ...(__has7 ? { "skillSlug": __val7 } : {}), "task": source["task"], ...(__has9 ? { "toolAllowlist": __val9 } : {}), ...(__has10 ? { "toolCallId": __val10 } : {}), "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_sub_agents_functions_164.getWorker.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["workerId"] !== "string") return DEFER;
+return { "workerId": source["workerId"] };
+});
+installCompiledValidatorMap(lunora_sub_agents_functions_164.listWorkers.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["leadThreadId"] !== "string") return DEFER;
+return { "leadThreadId": source["leadThreadId"] };
+});
 installCompiledValidatorMap(lunora_sub_agents_functions_164.messageWorker.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8414,7 +8430,7 @@ export interface Caller {
             deleteThreadRelationship: (args: { threadId: string }) => Promise<null>;
             deleteThreads: (args: { threadIds: Array<string> }) => Promise<{ deletedCount: number; success: boolean }>;
             editImage: (args: { imageUrl: string; mask?: string; operation: string; prompt?: string }) => Promise<{ resultUrl: string; }>;
-            gateThreadAction: (args: { level: "read" | "write" | "admin"; threadId: Id<"threads">; unlockProof?: string; userId: string }) => Promise<{ botId?: Id<"bots">; outcome: "denied" | "locked" | "ok" }>;
+            gateThreadAction: (args: { level: "read" | "write" | "admin"; threadId: Id<"threads">; unlockProof?: string; userId: string }) => Promise<{ botId?: Id<"bots">; isWorker?: boolean; outcome: "denied" | "locked" | "ok" }>;
             generateAudio: (args: { jobId?: string; model: string; prompt: string; promptMessageId?: Id<"messages">; threadId: string; userId: string; voice?: string }) => Promise<{ assets: Array<{ audioUrl: string; mimeType: string }>; modelId: string; prompt: string }>;
             generateBackgroundRemoval: (args: { backgroundColor?: string; imageUrl: string; model?: string; outputFormat?: string; refineMask?: boolean; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; model: string }>;
             generateCharacterRef: (args: { aspectRatio?: string; mode: string; model?: string; negativePrompt?: string; prompt?: string; referenceImages: Array<string>; strength?: number; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; mode: string; model: string }>;
@@ -9409,7 +9425,11 @@ export interface Caller {
             completeRun: (args: { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }) => Promise<boolean>;
             createRun: (args: { leadTools?: Array<string>; model?: string; name?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }) => Promise<{ runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
             createWorker: (args: { clientId: string; leadThreadId: Id<"threads">; model?: string; name: string; skill?: string; task: string; toolAllowlist?: Array<string> }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
+            dispatchToWorker: (args: { clientId: string; message: string; workerId: Id<"threads"> }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
             getRunByToolCall: (args: { toolCallId: string }) => Promise<{ _id: Id<"subAgentRuns">; childThreadId: string | null; completedAt: number | null; createdAt: number; depth: number; error: string | null; result: string | null; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; task: string } | null>;
+            getWorker: (args: { workerId: Id<"threads"> }) => Promise<{ activeRunId: Id<"subAgentRuns"> | null; archived: boolean; lastRunAt: number; lastRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled"; leadThreadId: string; name: string; state: "idle" | "queued" | "running"; workerId: string } | null>;
+            listActiveWorkerRuns: (args?: {}) => Promise<Array<{ createdAt: number; leadThreadId: string; name: string; runId: Id<"subAgentRuns">; startedAt: number | null; status: "queued" | "running"; workerId: string }>>;
+            listWorkers: (args: { leadThreadId: Id<"threads"> }) => Promise<Array<{ activeRunId: Id<"subAgentRuns"> | null; archived: boolean; lastRunAt: number; lastRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled"; leadThreadId: string; name: string; state: "idle" | "queued" | "running"; workerId: string }>>;
             messageWorker: (args: { message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: (args: { attempt: number; runId: Id<"subAgentRuns"> }) => Promise<null>;
             reapRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<null>;
@@ -11055,7 +11075,11 @@ export const createCaller = (context: CallerCtx): Caller => ({
             completeRun: (args) => callRegistered(context, "sub_agents_functions:completeRun", args),
             createRun: (args) => callRegistered(context, "sub_agents_functions:createRun", args),
             createWorker: (args) => callRegistered(context, "sub_agents_functions:createWorker", args),
+            dispatchToWorker: (args) => callRegistered(context, "sub_agents_functions:dispatchToWorker", args),
             getRunByToolCall: (args) => callRegistered(context, "sub_agents_functions:getRunByToolCall", args),
+            getWorker: (args) => callRegistered(context, "sub_agents_functions:getWorker", args),
+            listActiveWorkerRuns: (args) => callRegistered(context, "sub_agents_functions:listActiveWorkerRuns", args),
+            listWorkers: (args) => callRegistered(context, "sub_agents_functions:listWorkers", args),
             messageWorker: (args) => callRegistered(context, "sub_agents_functions:messageWorker", args),
             postResult: (args) => callRegistered(context, "sub_agents_functions:postResult", args),
             reapRun: (args) => callRegistered(context, "sub_agents_functions:reapRun", args),

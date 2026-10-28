@@ -382,6 +382,10 @@ export interface ChatStartBody {
     unlockProof?: string;
 }
 
+/** The answer to a chat turn aimed at a worker's thread, which runs only through `dispatchToWorker`. */
+const workerThreadResponse = (): Response =>
+    Response.json({ error: "This is a worker's thread. Message the worker from its thread instead of starting a chat turn here." }, { status: 400 });
+
 /** The answer to a request that writes into a locked thread without a valid proof. */
 const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED_CODE, error: "This chat is locked." }, { status: 403 });
 
@@ -496,16 +500,17 @@ const runChatStartOnShard = async (
     // continue branch below saved the prompt into whatever thread id it was
     // handed, so a signed-in caller could post into — and trigger replies in —
     // another user's thread. Regenerate has its own owner check further down.
-    // Read while the attachments load; answered after them, as before.
-    const accessPromise =
-        validThreadId && !(body.regenerate && body.parentId)
-            ? context.runQuery(internal.chat.functions.gateThreadAction, {
-                  level: "write",
-                  threadId: validThreadId as Id<"threads">,
-                  unlockProof: body.unlockProof,
-                  userId,
-              })
-            : undefined;
+    // Read while the attachments load; answered after them, as before. A regenerate reads it too, but
+    // only for the worker check below: its lock and owner checks stay with its own gate.
+    const isRegenerate = Boolean(body.regenerate && body.parentId);
+    const accessPromise = validThreadId
+        ? context.runQuery(internal.chat.functions.gateThreadAction, {
+              level: "write",
+              threadId: validThreadId as Id<"threads">,
+              unlockProof: body.unlockProof,
+              userId,
+          })
+        : undefined;
 
     // A refused attachment answers first and never awaits it; it is only a read.
     accessPromise?.catch(() => undefined);
@@ -554,18 +559,22 @@ const runChatStartOnShard = async (
 
     const access = await accessPromise;
 
-    if (access?.outcome === "locked") {
+    if (access?.outcome === "locked" && !isRegenerate) {
         return threadLockedResponse();
     }
 
-    if (access && access.outcome !== "ok") {
+    if (access && access.outcome !== "ok" && !isRegenerate) {
         return Response.json({ error: "Thread not found" }, { status: 404 });
+    }
+
+    if (access?.isWorker) {
+        return workerThreadResponse();
     }
 
     // A bot thread always runs on its bot's model, whatever the composer sent. It is
     // set here, before any write, so the stream config and the agent both see it.
     // Bots chat in text only, so a media model is refused rather than swapped.
-    // A regenerate skips the access check above, so it reads the thread itself.
+    // A regenerate's gate answer is used only for the worker check above, so it reads the thread itself.
     let threadBotId: string | undefined = access?.botId;
 
     if (!threadBotId && validThreadId && body.regenerate && body.parentId) {
@@ -901,6 +910,10 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
             return threadLockedResponse();
         }
 
+        if (gateResult.isWorker) {
+            return workerThreadResponse();
+        }
+
         // An edit regenerates the reply, so it spends the same daily message quota
         // as `/chat/start` — it used to be an uncounted way to generate.
         const editLimit = await chargeDailyLimit(context, user, "Text");
@@ -1190,6 +1203,10 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
 
     if (access.outcome !== "ok") {
         return Response.json({ error: "Forbidden" }, { headers: { "Content-Type": "application/json" }, status: 403 });
+    }
+
+    if (access.isWorker) {
+        return workerThreadResponse();
     }
 
     // Extract config from request body (already validated above)

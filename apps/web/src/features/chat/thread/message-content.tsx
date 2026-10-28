@@ -106,6 +106,7 @@ const TOOL_VIEWS: Record<string, FC<{ part: ToolPart }>> = {
     askUser: AskUserPrompt,
     delegateToCodingAgent: CodingAgentToolView,
     delegateToSubAgent: SubAgentToolView,
+    messageWorker: SubAgentToolView,
 };
 
 interface MessageContentProps {

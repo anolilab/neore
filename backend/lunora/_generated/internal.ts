@@ -301,7 +301,7 @@ export interface InternalApiTypes {
             createTitleChat: FunctionReference<"action", { prompt: string; threadId: string }, void>;
             deleteThreadRelationship: FunctionReference<"mutation", { threadId: string }, null>;
             editImage: FunctionReference<"action", { imageUrl: string; mask?: string; operation: string; prompt?: string }, { resultUrl: string; }>;
-            gateThreadAction: FunctionReference<"query", { level: "read" | "write" | "admin"; threadId: Id<"threads">; unlockProof?: string; userId: string }, { botId?: Id<"bots">; outcome: "denied" | "locked" | "ok" }>;
+            gateThreadAction: FunctionReference<"query", { level: "read" | "write" | "admin"; threadId: Id<"threads">; unlockProof?: string; userId: string }, { botId?: Id<"bots">; isWorker?: boolean; outcome: "denied" | "locked" | "ok" }>;
             generateAudio: FunctionReference<"action", { jobId?: string; model: string; prompt: string; promptMessageId?: Id<"messages">; threadId: string; userId: string; voice?: string }, { assets: Array<{ audioUrl: string; mimeType: string }>; modelId: string; prompt: string }>;
             generateBackgroundRemoval: FunctionReference<"action", { backgroundColor?: string; imageUrl: string; model?: string; outputFormat?: string; refineMask?: boolean; threadId: string; userId: string }, { imageUrl: string; mimeType: string; model: string }>;
             generateCharacterRef: FunctionReference<"action", { aspectRatio?: string; mode: string; model?: string; negativePrompt?: string; prompt?: string; referenceImages: Array<string>; strength?: number; threadId: string; userId: string }, { imageUrl: string; mimeType: string; mode: string; model: string }>;

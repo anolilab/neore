@@ -29,6 +29,9 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import ForwardSelectionBar from "@/features/chat/forward/forward-selection-bar";
+import WorkerComposer from "@/features/sub-agents/components/worker-composer";
+import WorkerList from "@/features/sub-agents/components/worker-list";
+import useWorker from "@/features/sub-agents/hooks/use-worker";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import ChatError from "./chat-error";
@@ -93,6 +96,8 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
 
     // Detect comparison parent instantly from the already-loaded thread doc.
     const isMultiChatThread = thread?.multiChat === true;
+    // A worker takes a turn only through `dispatchToWorker`, so its thread gets its own composer.
+    const worker = useWorker(isNewThread ? undefined : threadId);
 
     const crpc = useCRPC();
     const { data: childThreads } = useQuery(
@@ -264,6 +269,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
                                         maxWidth={maxWidth}
                                     />
                                     <div className="flex-1" />
+                                    {!isNewThread && <WorkerList className="mb-4 w-full" threadId={threadId} />}
                                 </div>
                                 {/* Sticky within the scroll viewport, so it stays in view while the thread scrolls. */}
                                 <ThreadMinimap className="sticky top-4 hidden self-start md:block" />
@@ -283,7 +289,17 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
                             <ForwardSelectionBar threadId={threadId} />
                             {/* Full-featured composer with model selector, language selector, slash commands */}
                             {/* Key by threadId to reset state when switching threads */}
-                            <Composer className="w-full" initialMessage={initialMessage} key={threadId} />
+                            {worker ? (
+                                <WorkerComposer
+                                    archived={worker.archived}
+                                    busy={worker.state !== "idle"}
+                                    className="w-full pb-4"
+                                    key={threadId}
+                                    workerId={worker.workerId}
+                                />
+                            ) : (
+                                <Composer className="w-full" initialMessage={initialMessage} key={threadId} />
+                            )}
                         </div>
                     </div>
                 </ThreadViewport>

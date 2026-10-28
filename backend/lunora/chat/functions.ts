@@ -64,7 +64,7 @@ import { patchBrowserSession } from "../browser/session-writes";
 import { authAction, authMutation, authQuery, liteAuthQuery, optionalAuthQuery, publicQuery, rateLimit } from "../lib/crpc";
 import { throwBadRequest, throwForbidden, throwThreadNotFound, throwUnauthorized } from "../lib/error-helpers";
 import { paginationOptionsValidator, MAX_LENGTH } from "../lib/validators";
-import { cancelSubAgentRunsForStop } from "../sub-agents/functions";
+import { cancelSubAgentRunsForStop, isWorkerThread } from "../sub-agents/functions";
 import { storedRetentionHours } from "../lib/temporary-retention";
 import { chatLogger, streamLogger } from "../lib/logger";
 import type { RateLimitContext } from "../lib/rate-limiter";
@@ -727,7 +727,7 @@ export const createThreadWithInitialMessage = internalMutation
 export const gateThreadActionHandler = async (
     context: Pick<QueryContext, "db">,
     args: { level: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
-): Promise<{ botId?: Id<"bots">; outcome: ThreadGateOutcome }> => {
+): Promise<{ botId?: Id<"bots">; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
     const outcome = await threadGateOutcome(context, args);
 
     if (outcome !== "ok") {
@@ -737,7 +737,8 @@ export const gateThreadActionHandler = async (
     // A bot thread runs on its bot's model, so a granted caller also learns which bot, if any.
     const thread = await context.db.get(args.threadId);
 
-    return { botId: thread?.botId, outcome };
+    // A worker's thread takes a turn only through `dispatchToWorker`; the chat entry points refuse it.
+    return { botId: thread?.botId, ...(args.level === "write" && { isWorker: await isWorkerThread(context, args.threadId) }), outcome };
 };
 
 export const gateThreadAction = internalQuery
@@ -747,7 +748,13 @@ export const gateThreadAction = internalQuery
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         userId: v.string(),
     })
-    .output(v.object({ botId: v.optional(v.id("bots")), outcome: v.union(v.literal("denied"), v.literal("locked"), v.literal("ok")) }))
+    .output(
+        v.object({
+            botId: v.optional(v.id("bots")),
+            isWorker: v.optional(v.boolean()),
+            outcome: v.union(v.literal("denied"), v.literal("locked"), v.literal("ok")),
+        }),
+    )
     .query(async ({ args, ctx: context }) => await gateThreadActionHandler(context, args));
 
 export const getThreadTemporaryStatus = liteAuthQuery
@@ -1024,6 +1031,10 @@ export const continueThread = authAction
         const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "write", threadId, unlockProof, userId });
 
         throwUnlessGranted(gateResult.outcome, "Write access denied to this thread");
+
+        if (gateResult.isWorker) {
+            throw new LunoraError("BAD_REQUEST", "This is a worker's thread. Message the worker from its thread instead.");
+        }
 
         const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
         const threadLanguage = threadData?.language;

@@ -566,7 +566,11 @@ for a schema table that is neither policed nor listed:
 | `skills_marketplace.uninstallSkill` | mutation | authMutation + RL | skills | caller-scoped (ctx.user) | ok |
 | `sub_agents_functions.createWorker` | mutation | authMutation | subAgentRuns, threads, threadRelationships, idempotencyClaims | lead thread owner == caller (else a refusal, nothing created); `clientId` claimed under `worker-dispatch` before the rate limit; admission charges nothing | ok — new |
 | `sub_agents_functions.cancelRun` | mutation | authMutation + RL | subAgentRuns, threads, notifications | run.userId == caller AND parent thread owner == caller (else NOT_FOUND); ended run is a no-op | ok — new |
+| `sub_agents_functions.dispatchToWorker` | mutation | authMutation | subAgentRuns, idempotencyClaims | worker's first run `userId` == caller (else NOT_FOUND, as a missing id); lead owned by caller; `clientId` claimed under `worker-dispatch` before the rate limit; archived, locked or busy worker refused | ok — new |
+| `sub_agents_functions.getWorker` | query | authQuery | subAgentRuns, threads | thread.userId == caller AND first run.userId == caller (else null) | ok — new |
 | `sub_agents_functions.getRunByToolCall` | query | authQuery | subAgentRuns | caller-scoped (ctx.user) — index `by_user_and_toolCallId` pinned to the caller | ok |
+| `sub_agents_functions.listActiveWorkerRuns` | query | authQuery | subAgentRuns, threads | caller-scoped (ctx.user) — index `by_user_and_status` pinned to the caller; bounded | ok — new |
+| `sub_agents_functions.listWorkers` | query | authQuery | subAgentRuns, threads | runs and threads filtered to the caller (`userId`); a stranger's lead id reads nothing | ok — new |
 | `system_prompts_functions.createPreset` | mutation | authMutation | systemPromptPresets | caller-scoped (ctx.user) | accepted — own rows; no rate limit |
 | `system_prompts_functions.deletePreset` | mutation | authMutation | — | row.userId == caller | accepted — own rows; no rate limit |
 | `system_prompts_functions.listPresets` | query | authQuery | — | caller-scoped (ctx.user) | ok |
