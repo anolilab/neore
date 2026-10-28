@@ -20,6 +20,17 @@ export const MAX_OPEN_ACP_CALLS_PER_DEVICE = 3;
 /** The coding-agent call kinds, and the only names `isAcpTool` takes for one. A device cannot advertise any of them as a tool. */
 export const ACP_TOOLS: ReadonlyArray<string> = ["acp_start", "acp_send", "acp_cancel", "acp_permission_answer"];
 
+/**
+ * A claimed `acp_*` call is a lease: not completed within this, it goes back to `pending` and can be claimed
+ * again until its deadline (plans/acp-agent-host.md §4.1). The desktop writes its receipt within a second or two
+ * of the claim, so this covers a relay or main process that died in between. A guess, not a measurement: the
+ * latency it should be set from is the S4 throttling record (`plans/acp-s4-throttling.md`).
+ */
+export const ACP_CLAIM_LEASE_MS = 30_000;
+
+/** Offers a manifest may carry; the desktop sends at most the same number. */
+export const MAX_MANIFEST_OFFERS = 50;
+
 /** Approval wait + run, from creation. Also the envelope's `expiresAt`. */
 export const DEVICE_CALL_DEADLINE_MS = 5 * 60_000;
 

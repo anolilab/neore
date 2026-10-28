@@ -6,11 +6,12 @@
  */
 import type { Infer } from "lunorash/server";
 
-import type { vDeviceManifestTool } from "../validators";
-import { ACP_TOOLS, MAX_MANIFEST_DESCRIPTION_CHARS, MAX_MANIFEST_SCHEMA_BYTES, MAX_MANIFEST_TOOLS } from "./constants";
+import type { vAcpOffer, vDeviceManifestTool } from "../validators";
+import { ACP_TOOLS, MAX_MANIFEST_DESCRIPTION_CHARS, MAX_MANIFEST_OFFERS, MAX_MANIFEST_SCHEMA_BYTES, MAX_MANIFEST_TOOLS } from "./constants";
 import { utf8Length } from "./signing";
 
 export type DeviceManifestTool = Infer<typeof vDeviceManifestTool>;
+export type AcpOffer = Infer<typeof vAcpOffer>;
 
 /** Tool names the device may advertise: `fs_read`, `shell_run`, `mcp__<server>__<tool>`. */
 export const DEVICE_TOOL_NAME = /^[a-z][a-z0-9_]{0,63}$/u;
@@ -58,4 +59,51 @@ export const parseManifestTools = (value: unknown): DeviceManifestTool[] | null 
     }
 
     return tools;
+};
+
+const OFFER_FIELD_LIMITS = { agentKey: 128, agentLabel: 200, folderId: 128, folderLabel: 200 } as const;
+
+/**
+ * The coding-agent pairs a verified manifest offers. A manifest without the field is one from a shell that
+ * predates coding agents and offers none; a malformed list is refused whole, like a malformed tool list. Fields
+ * are bounded here and a pair appears once, so the list the web shows is the list Rust would accept.
+ */
+export const parseAcpOffers = (value: unknown): AcpOffer[] | null => {
+    if (value === undefined) {
+        return [];
+    }
+
+    if (!Array.isArray(value) || value.length > MAX_MANIFEST_OFFERS) {
+        return null;
+    }
+
+    const seen = new Set<string>();
+    const offers: AcpOffer[] = [];
+
+    for (const entry of value as unknown[]) {
+        if (!isRecord(entry)) {
+            return null;
+        }
+
+        const offer = {} as Record<keyof typeof OFFER_FIELD_LIMITS, string>;
+
+        for (const [field, limit] of Object.entries(OFFER_FIELD_LIMITS)) {
+            const text = entry[field];
+
+            if (typeof text !== "string" || text.length === 0 || text.length > limit) {
+                return null;
+            }
+
+            offer[field as keyof typeof OFFER_FIELD_LIMITS] = text;
+        }
+
+        const key = `${offer.agentKey}\n${offer.folderId}`;
+
+        if (!seen.has(key)) {
+            seen.add(key);
+            offers.push(offer);
+        }
+    }
+
+    return offers;
 };

@@ -1,0 +1,249 @@
+/**
+ * Starting, stopping and answering a coding agent from the web or the phone (plans/acp-agent-host.md §3, §4.4, §8 S4).
+ *
+ * Each of these is the OWNER's alone and only queues a signed command (`devices/lib/acp-call.ts`); the computer
+ * decides whether to carry it out. Nothing here can approve a pair the user has not approved in the local window,
+ * pick an "always" option, or answer from chat text: a start names a pair the signed manifest offered, an answer
+ * names an option the agent itself offered, and both are checked again by Rust (`device-core/src/acp_call.rs`).
+ */
+import type { Infer } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
+
+import type { Doc, Id } from "../_generated/dataModel";
+import type { QueryCtx } from "../_generated/server";
+import { insertThread } from "../agent/table-writes";
+import { stopHostTurn } from "./lib/finish";
+import { claimOnce } from "../lib/claim-once";
+import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { MAX_LENGTH } from "../lib/validators";
+import { createAcpCall } from "../devices/lib/acp-call";
+import { isDeviceOnline } from "../devices/lib/state";
+import { withdrawSend } from "./lib/calls";
+import { isHostRunThread } from "./lib/host-thread";
+import { sessionOfThread } from "./lib/sessions";
+import { vPendingPermission } from "./validators";
+
+/** A double tap, or a retry after a lost answer, within this is the same start. */
+const START_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+/** A retry looks for the session its first try made among those started this recently. */
+const RECENT_START_MS = 5 * 60_000;
+
+type Pending = Infer<typeof vPendingPermission>;
+
+/** The owner's host thread, or null: a stranger's thread, a cloud thread and a missing one read the same. */
+const ownHostThread = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">, userId: string): Promise<Doc<"threads"> | null> => {
+    const thread = await ctx.db.threads.findFirst({ where: { _id: threadId, userId } });
+
+    return thread && thread.deleted !== true && isHostRunThread(thread) ? thread : null;
+};
+
+export const liveHostStream = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<Doc<"persistentStreams"> | null> =>
+    await ctx.db.persistentStreams.findFirst({
+        orderBy: [{ _creationTime: "desc" }],
+        where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId },
+    });
+
+/** Chunks looked at when finding a request the agent is waiting on: it is among the newest, since the agent is blocked. */
+const REQUEST_SCAN_CHUNKS = 400;
+
+/**
+ * The permission requests a live host stream is waiting on, as the agent offered them. Only allow-once and
+ * reject-once options are listed, in the agent's own order: an "always" option can neither be shown nor sent.
+ */
+const waitingRequests = async (ctx: Pick<QueryCtx, "db">, stream: Doc<"persistentStreams">): Promise<Pending[]> => {
+    const waiting = new Set(stream.hostPendingPermissions ?? []);
+
+    if (waiting.size === 0) {
+        return [];
+    }
+
+    const { page } = await ctx.db.persistentChunks.findMany({ limit: REQUEST_SCAN_CHUNKS, orderBy: [{ seq: "desc" }], where: { streamId: stream._id } });
+    const found = new Map<string, Pending>();
+
+    for (const chunk of page) {
+        const event = chunk.event;
+
+        if (event?.kind !== "permission_request" || !waiting.has(event.requestId) || found.has(event.requestId)) {
+            continue;
+        }
+
+        found.set(event.requestId, {
+            options: event.options.filter((option) => option.kind === "allow_once" || option.kind === "reject_once"),
+            requestId: event.requestId,
+            tool: event.tool,
+            ...(event.command !== undefined && { command: event.command }),
+            ...(event.folder !== undefined && { folder: event.folder }),
+            ...(event.target !== undefined && { target: event.target }),
+        });
+    }
+
+    // Oldest first, the order the agent asked in.
+    return [...found.values()].reverse();
+};
+
+/**
+ * Starts a coding agent on one of the caller's computers, for a pair the user approved there. Makes the thread and
+ * its session now (`starting`) and queues `acp_start`; the session is `idle` once the computer's agent has opened it.
+ * A double tap starts one session (`host-start`, claim-once).
+ */
+export const startHostSession = authMutation
+    .use(rateLimit("hosts/start"))
+    .input({
+        agentKey: v.string().max(128),
+        clientId: v.string().max(MAX_LENGTH.id),
+        deviceId: v.id("devices"),
+        folderId: v.string().max(128),
+    })
+    .output(v.object({ started: v.boolean(), threadId: v.optional(v.string()) }))
+    .mutation(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
+        const offer = device?.acpOffers?.find((candidate) => candidate.agentKey === args.agentKey && candidate.folderId === args.folderId);
+
+        if (!device?.encryptedSecret || !offer) {
+            throw new LunoraError("BAD_REQUEST", "That agent is not approved for that folder on this computer. Approve it in the desktop app first.");
+        }
+
+        if (!isDeviceOnline(device, ctx.now)) {
+            throw new LunoraError("BAD_REQUEST", "That computer is not online.");
+        }
+
+        if (!(await claimOnce(ctx, "host-start", `${userId}:${args.clientId}`, START_CLAIM_TTL_MS, userId))) {
+            // The first try's answer may have been lost: hand back the session it made.
+            const { page } = await ctx.db.acpSessions.findMany({ limit: 10, where: { status: "starting", userId } });
+            const first = page.find(
+                (session) =>
+                    session.deviceId === device._id && session.agentKey === offer.agentKey && session.folderId === offer.folderId && ctx.now - session.createdAt <= RECENT_START_MS,
+            );
+
+            return { started: false, ...(first && { threadId: first.threadId as string }) };
+        }
+
+        const threadId = await insertThread(ctx.db, {
+            createdBy: userId,
+            mode: "text",
+            model: offer.agentKey,
+            runner: "host",
+            status: "active",
+            tags: ["chat", "host"],
+            title: `${offer.agentLabel} · ${offer.folderLabel}`.slice(0, MAX_LENGTH.short),
+            updatedAt: ctx.now,
+            userId,
+        });
+        const hostSessionId = crypto.randomUUID();
+
+        await ctx.db.insert("acpSessions", {
+            agentKey: offer.agentKey,
+            agentLabel: offer.agentLabel,
+            createdAt: ctx.now,
+            deviceId: device._id,
+            folderId: offer.folderId,
+            folderLabel: offer.folderLabel,
+            hostSessionId,
+            status: "starting",
+            threadId,
+            updatedAt: ctx.now,
+            userId,
+        });
+
+        const call = await createAcpCall(
+            ctx,
+            { deviceId: device._id, input: { agentKey: offer.agentKey, folderId: offer.folderId, sessionId: hostSessionId, threadId: threadId as string }, kind: "acp_start", threadId, userId },
+            ctx.now,
+        );
+
+        if ("error" in call) {
+            // Throwing rolls the thread and the session back with the claim.
+            throw new LunoraError("BAD_REQUEST", call.error === "busy" ? "That computer is busy. Try again in a moment." : "That computer cannot start an agent right now.");
+        }
+
+        ctx.log.event("acp.start_host_session", { started: true });
+
+        return { started: true, threadId: threadId as string };
+    });
+
+/**
+ * Stops the turn a host thread is running: what the host wrote is kept, the stream ends, and the computer is told
+ * to cancel (`stopHostTurn`). A prompt it has not yet received is withdrawn, so it cannot start once the turn is over.
+ */
+export const cancelHostTurn = authMutation
+    .use(rateLimit("hosts/answer"))
+    .input({ threadId: v.id("threads") })
+    .output(v.object({ cancelled: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        if (!(await ownHostThread(ctx, args.threadId, ctx.user.userId))) {
+            throw new LunoraError("NOT_FOUND", "Thread not found");
+        }
+
+        const stream = await liveHostStream(ctx, args.threadId);
+
+        if (!stream) {
+            return { cancelled: false };
+        }
+
+        if (stream.hostState === "accepted") {
+            await withdrawSend(ctx, stream, ctx.now);
+        }
+
+        await stopHostTurn(ctx, stream, ctx.now);
+
+        return { cancelled: true };
+    });
+
+/** The requests the agent in this thread is waiting on, for the web and the phone to show. The owner's thread only. */
+export const getHostPendingPermissions = authQuery
+    .input({ threadId: v.id("threads") })
+    .output(v.array(vPendingPermission))
+    .query(async ({ args, ctx }) => {
+        if (!(await ownHostThread(ctx, args.threadId, ctx.user.userId))) {
+            return [];
+        }
+
+        const stream = await liveHostStream(ctx, args.threadId);
+
+        return stream ? await waitingRequests(ctx, stream) : [];
+    });
+
+/**
+ * Answers a permission request from the web or the phone: allow once or decline, with an option the agent offered.
+ * Queues `acp_permission_answer`; the computer's first answer, here or in its own window, wins, and the later one
+ * is `already_answered` there.
+ */
+export const answerHostPermission = authMutation
+    .use(rateLimit("hosts/answer"))
+    .input({ optionId: v.string().max(128), requestId: v.string().max(128), threadId: v.id("threads") })
+    .output(v.object({ reason: v.optional(v.union(v.literal("busy"), v.literal("not_waiting"), v.literal("offline"))), sent: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+
+        if (!(await ownHostThread(ctx, args.threadId, userId))) {
+            throw new LunoraError("NOT_FOUND", "Thread not found");
+        }
+
+        const stream = await liveHostStream(ctx, args.threadId);
+        const request = stream ? (await waitingRequests(ctx, stream)).find((candidate) => candidate.requestId === args.requestId) : undefined;
+        const session = await sessionOfThread(ctx, args.threadId);
+
+        if (!request || !session || session.status === "ended") {
+            return { reason: "not_waiting" as const, sent: false };
+        }
+
+        // Only an option the agent offered, and only allow-once or reject-once: `waitingRequests` lists no other.
+        if (!request.options.some((option) => option.optionId === args.optionId)) {
+            throw new LunoraError("BAD_REQUEST", "The agent did not offer that option.");
+        }
+
+        const call = await createAcpCall(
+            ctx,
+            { deviceId: session.deviceId, input: { optionId: args.optionId, requestId: args.requestId, sessionId: session.hostSessionId }, kind: "acp_permission_answer", threadId: args.threadId, userId },
+            ctx.now,
+        );
+
+        if ("error" in call) {
+            return { reason: call.error === "offline" ? ("offline" as const) : ("busy" as const), sent: false };
+        }
+
+        ctx.log.event("acp.answer_host_permission", { sent: true });
+
+        return { sent: true };
+    });
