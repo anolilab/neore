@@ -659,6 +659,21 @@ written here is what is not.
   makes OPTIONAL (`npx`/`uvx` entries never have one), so those are listed and refused. The window names an id and
   version; the main process takes archive, checksum and command from its own snapshot and words the native
   consent itself. Rust hashes, unpacks (no links, no `..`) and records the pin; there is no update path, by design.
+  **Server lifecycle** (`lifecycle.rs`, `engine/reconnect.rs`, `launch.rs`): a server the person connected is KEPT
+  connected until they disconnect it. A 1 s tick (`DeviceState::supervise`, a `Weak` thread started by the napi
+  constructor) sees a dead link, closes that session FIRST and `-O exit`s its master only when ssh gave the connection
+  up (exit 255 or unknown: the network went away and the master may be wedged; a host that merely ended leaves a healthy
+  master to share), then retries with 2/4/8/16/32 s waits, at most 5 attempts per 10 minutes, one attempt per server at a
+  time and 45 s each. A background attempt asks NOBODY (no passphrase, no trust prompt): a login that needs a person, a
+  changed key or a missing install stops the retrying at once and waits for "Retry", which is the ordinary `hostConnect`.
+  The host is started `--stdio --launch <id>`, files `<run>/<id>.pid` and removes it on exit; a lost connection leaves it
+  running until the server notices, so the next session sends a `reap` frame naming the launches THIS computer started
+  (kept in memory per server). The host stops an id only after its pid's command line carries `--launch <id>`; any other
+  host (another computer's, one from before a restart) is counted and left alone. The run folder is `~/.neore/host/run`
+  (tests: `NEORE_HOST_RUN_DIR`, which `env -i` keeps out of a real launch). Forwarded agent: the host links the session's
+  `SSH_AUTH_SOCK` from `<run>/agent.sock` and its children inherit that path. `ssh::MULTIPLEXING` is false on Windows (one
+  ssh process per server, said in the window); whether Win32 OpenSSH could multiplex is recorded by the CI step
+  `Measure ssh ControlMaster (Windows)`, not assumed.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay

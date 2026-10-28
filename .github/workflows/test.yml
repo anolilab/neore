@@ -432,6 +432,14 @@ jobs:
                   NEORE_REQUIRE_SSHD: "${{ matrix.os != 'windows-latest' && '1' || '' }}"
               run: "cargo test --manifest-path packages/device-core/Cargo.toml"
 
+            # Records whether this runner's OpenSSH can multiplex (ControlMaster), for the plan's S5 note. It is a
+            # measurement: it needs an sshd the runner may not have, and it never fails the job.
+            - name: "Measure ssh ControlMaster (Windows)"
+              if: "matrix.os == 'windows-latest'"
+              continue-on-error: true
+              shell: "pwsh"
+              run: "./packages/device-core/tests/ssh-mux-windows.ps1"
+
             # `neore-host` is built without the `keychain` feature. This runs the host's own tests
             # (the stdio protocol, the action vectors, the no-socket check) and proves the crate
             # builds and passes without the paired side.

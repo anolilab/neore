@@ -292,11 +292,23 @@ export const completeNativeSignIn = async (signIn: NativeSignIn, fetchImpl: type
 
 export type NativeDevicePlatform = "linux" | "macos" | "windows";
 
+/** Where the connection of a server the person connected stands when it is not simply up. */
+export interface NativeHostReconnect {
+    /** The attempt in the window, once one is scheduled or running. */
+    attempt: number | null;
+    maxAttempts: number;
+    phase: "connecting" | "gaveUp" | "waiting";
+    /** Why it gave up. */
+    reason: string | null;
+}
+
 /** A server this computer speaks for, and whether the shell is connected to it right now. */
 export interface NativeHostStatus {
     connected: boolean;
     deviceId: string;
     name: string;
+    /** Set while the shell reconnects a lost connection, or after it gave up. Absent from an older shell. */
+    reconnect?: NativeHostReconnect;
 }
 
 export interface NativeDeviceStatus {

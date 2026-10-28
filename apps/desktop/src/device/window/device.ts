@@ -6,6 +6,7 @@
  * Everything in a prompt came from a model or the network, so it is rendered
  * with textContent only — never as HTML.
  */
+import { describeLink, multiplexingNote } from "../link-status";
 import type { HostView, Prompt, SettingsView } from "../types";
 import { initAcp } from "./acp-page";
 
@@ -400,16 +401,31 @@ const hostCard = (host: HostView): HTMLElement => {
     card.setAttribute("aria-label", host.name);
     heading.textContent = host.name;
     where.className = "muted";
-    where.textContent = `${host.user}@${host.address}:${String(host.port)} — ${host.connected ? `connected (${host.platform ?? "unknown"})` : "not connected"}`;
+    where.textContent = `${host.user}@${host.address}:${String(host.port)} — ${describeLink(host, Date.now())}`;
+
+    // A server that is being reconnected can be stopped, or tried at once; one that gave up has a Retry.
+    const phase = host.reconnect?.phase;
+    const connect = (text: string): HTMLElement =>
+        button(text, () => hostAction(() => globalThis.neoreDevice.hostConnect(host.deviceId), "Connected."), host.name);
+    const stop = (text: string): HTMLElement =>
+        button(text, () => hostAction(() => globalThis.neoreDevice.hostDisconnect(host.deviceId), "Disconnected."), host.name);
+    const reconnecting = phase === "waiting" || phase === "connecting";
+    let link: HTMLElement[] = [connect(phase === "gaveUp" ? "Retry" : "Connect")];
+
+    if (host.connected) {
+        link = [stop("Disconnect")];
+    } else if (phase === "waiting") {
+        link = [connect("Retry now"), stop("Stop reconnecting")];
+    } else if (phase === "connecting") {
+        link = [stop("Stop reconnecting")];
+    }
 
     actions.className = "row";
     actions.append(
-        host.connected
-            ? button("Disconnect", () => hostAction(() => globalThis.neoreDevice.hostDisconnect(host.deviceId), "Disconnected."), host.name)
-            : button("Connect", () => hostAction(() => globalThis.neoreDevice.hostConnect(host.deviceId), "Connected."), host.name),
+        ...link,
         ...state.terminalAvailable && state.terminalServerReason === null ? [button("Terminal", () => hostAction(() => globalThis.neoreDevice.openHostTerminal(host.deviceId), "Terminal opened."), host.name)] : [],
         // Installing is refused while a session is open, so the button is for a disconnected server.
-        ...host.connected
+        ...reconnecting || host.connected
             ? []
             : [
                 button(
@@ -521,7 +537,15 @@ const hostCard = (host: HostView): HTMLElement => {
 
     row.className = "row";
     row.append(label, typed, addFolder);
-    card.append(heading, where, actions, folders, row, sandbox, network, forward);
+
+    const sharing = multiplexingNote(host.multiplexed);
+    const sharingNote = document.createElement("p");
+
+    sharingNote.className = "muted";
+    sharingNote.textContent = sharing ?? "";
+    sharingNote.hidden = sharing === null;
+
+    card.append(heading, where, sharingNote, actions, folders, row, sandbox, network, forward);
 
     if (state.terminalAvailable && state.terminalServerReason !== null) {
         const why = document.createElement("p");
