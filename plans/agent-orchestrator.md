@@ -353,6 +353,12 @@ the lead marks a run's result as failed, the next dispatch for that task goes to
 the next model up. The gateway's tier router already scores requests; S9 reuses
 its scorer for the first rung instead of adding a second classifier. Host workers
 keep their agent. Every rung passes `requireEnabledModel` and `assertPaidModel`.
+  State: the rung belongs to a task, not to the worker thread. A task is the dispatch the lead
+  made (its tool call id); a retry the lead makes for a failed run carries `retryOf` (the failed
+  run's id) and takes `modelRung = failed run's rung + 1`, stored on the new run row. The
+  worker's thread keeps its own `thread.model` and is never changed by escalation: a run
+  overrides the model for itself only, so a queued dispatch for another task, or a message the
+  user types into the worker's thread, runs on the worker's own model.
 - Acceptance: a failed run's retry uses the next rung; the ladder never moves to a
   model the user did not list; a host worker is never moved; cost per completed
   task on a recorded set of tasks is lower than `own` with the same pass rate, or

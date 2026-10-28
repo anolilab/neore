@@ -118,6 +118,22 @@ Event kinds: `session_open` (capability report, optional native session id),
 command, folder, the agent's options), `permission_resolved`, `turn_end`
 (`finished` | `cancelled` | `failed`).
 
+`turn_end` carries the turn's outcome, so the desktop, the ingest route and the clients
+read one contract:
+
+- `status`: `finished` | `cancelled` | `failed`. A usage-limit stop (§6.1) is `failed` with
+  `reason: "usage_limit"`, not a fourth status, so a client that only knows the three still
+  shows a stopped turn. `resetAt` (epoch ms) rides along when the agent said when it resets;
+  both are bounded strings or numbers and validated like any other event field.
+- `summary` (optional, §4.9): `files` (at most 200 entries of `{ path, added, removed }`,
+  `path` inside the approved folder and at most 1,024 characters, counts non-negative
+  integers) and `patch` (the frozen unified diff as text, at most 256 KiB; over that the
+  entry is `{ tooLarge: true }` and the file list and counts stay).
+
+`applyHostEvents` rejects the whole post on a field outside these bounds, as it does for
+every other event. The exact field names are settled in the wire-format spec before S3's
+route is written; this section fixes the shape and the limits.
+
 Verification, in this order. Every auth failure gets the same answer (401):
 
 1. Parse; reject past 256 KiB. The unauthenticated flood guard is an in-isolate
