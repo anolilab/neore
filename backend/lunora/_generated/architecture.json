@@ -4571,26 +4571,6 @@
       "to": "table:actionCache"
     },
     {
-      "from": "function:lib_claim_once:claimKey",
-      "kind": "read",
-      "to": "table:idempotencyClaims"
-    },
-    {
-      "from": "function:lib_claim_once:claimKey",
-      "kind": "write",
-      "to": "table:idempotencyClaims"
-    },
-    {
-      "from": "function:lib_claim_once:claimKeyFenced",
-      "kind": "read",
-      "to": "table:idempotencyClaims"
-    },
-    {
-      "from": "function:lib_claim_once:claimKeyFenced",
-      "kind": "write",
-      "to": "table:idempotencyClaims"
-    },
-    {
       "from": "function:lib_claim_once:purgeClaimsWithPrefix",
       "kind": "schedule",
       "to": "function:lib_claim_once:purgeClaimsWithPrefix"
@@ -7100,6 +7080,13 @@
     },
     {
       "detail": "query",
+      "id": "function:agent_agent_switch:getHandoffBeforeDelta",
+      "kind": "function",
+      "name": "agent.agent_switch.getHandoffBeforeDelta",
+      "module": "agent"
+    },
+    {
+      "detail": "query",
       "id": "function:agent_agent_switch:getRunAgentModel",
       "kind": "function",
       "name": "agent.agent_switch.getRunAgentModel",
@@ -9078,6 +9065,13 @@
       "kind": "function",
       "name": "changelog.functions.setCachedChangelogs",
       "module": "changelog"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_agent_switch:beginSwitchSummary",
+      "kind": "function",
+      "name": "chat.agent_switch.beginSwitchSummary",
+      "module": "chat"
     },
     {
       "detail": "mutation",
@@ -16376,7 +16370,13 @@
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 113,
+      "line": 112,
+      "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
+    },
+    {
+      "file": "agent/client/search",
+      "kind": "call",
+      "line": 134,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
@@ -16388,31 +16388,25 @@
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 136,
+      "line": 165,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 166,
+      "line": 193,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 194,
+      "line": 196,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 197,
-      "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
-    },
-    {
-      "file": "agent/client/search",
-      "kind": "call",
-      "line": 529,
+      "line": 528,
       "reason": "\"generateAndSaveEmbeddings\" is not a registered function"
     },
     {
@@ -16424,13 +16418,19 @@
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 675,
+      "line": 671,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 676,
+      "line": 689,
+      "reason": "\"fetchContextWithPrompt\" is not a registered function"
+    },
+    {
+      "file": "agent/client/search",
+      "kind": "call",
+      "line": 690,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
@@ -17318,25 +17318,37 @@
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 421,
+      "line": 524,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 446,
+      "line": 542,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 473,
+      "line": 553,
+      "reason": "\"runAgentSwitch\" is not a registered function"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 572,
+      "reason": "\"runAgentSwitch\" is not a registered function"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 595,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 474,
+      "line": 596,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -19364,79 +19376,61 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 110,
-      "reason": "\"claimLease\" is not a registered function"
+      "line": 111,
+      "reason": "\"claimFence\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 110,
-      "reason": "\"claimOnce\" is not a registered function"
-    },
-    {
-      "file": "lib/claim-once",
-      "kind": "read",
-      "line": 110,
+      "line": 111,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 110,
+      "line": 111,
       "reason": "\"hasClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 110,
+      "line": 111,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 129,
-      "reason": "\"claimLease\" is not a registered function"
+      "line": 130,
+      "reason": "\"claimFence\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 129,
-      "reason": "\"claimOnce\" is not a registered function"
+      "line": 133,
+      "reason": "\"claimFence\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 132,
-      "reason": "\"claimLease\" is not a registered function"
-    },
-    {
-      "file": "lib/claim-once",
-      "kind": "write",
-      "line": 132,
-      "reason": "\"claimOnce\" is not a registered function"
-    },
-    {
-      "file": "lib/claim-once",
-      "kind": "write",
-      "line": 186,
+      "line": 187,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 209,
+      "line": 210,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 214,
+      "line": 215,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 331,
+      "line": 332,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -19472,19 +19466,19 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 790,
+      "line": 795,
       "reason": "\"rateLimitGuard\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 886,
+      "line": 891,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 928,
+      "line": 933,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {

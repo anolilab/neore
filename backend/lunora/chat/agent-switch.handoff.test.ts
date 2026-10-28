@@ -7,19 +7,27 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { agentSwitchOf } from "../agent/agent-switch-logic";
-import { handoffAboveOf } from "../agent/agent-switch";
-import { HANDOFF_REFUSED_TOO_LARGE, HANDOFF_BUDGET_TOKENS, handoffTokens } from "../agent/handoff";
+import { handoffAboveOf, handoffBeforeDeltaOf } from "../agent/agent-switch";
+import { HANDOFF_REFUSED_TOO_LARGE, HANDOFF_BUDGET_TOKENS, HANDOFF_SUMMARY_MAX_TOKENS, handoffTokens } from "../agent/handoff";
 import { assembleHandoffContext } from "../agent/handoff-context";
-import { hasClaim } from "../lib/claim-once";
+import { hasClaim, releaseClaim } from "../lib/claim-once";
 import { createRatelimit } from "../lib/rate-limiter";
 import schema from "../schema";
-import { previewAgentSwitchHandler, planAgentSwitchHandler, runAgentSwitch, switchThreadAgentHandler, type Summarise } from "./agent-switch";
+import {
+    beginSwitchSummaryHandler,
+    previewAgentSwitchHandler,
+    planAgentSwitchHandler,
+    runAgentSwitch,
+    switchThreadAgentHandler,
+    type Summarise,
+} from "./agent-switch";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
 // Three text models on the free tier, so no plan lookup runs.
 const A = "openai/gpt-4.1-mini";
 const B = "google/gemini-2.0-flash-001";
+const C = "openai/gpt-4.1-nano";
 
 const QUOTA = "chat/dailyText:free";
 const PAIR = 2000;
@@ -74,9 +82,24 @@ const remaining = async (): Promise<number> =>
 const summaryCalls = vi.fn<Summarise>();
 
 const runner = {
-    runMutation: async (_reference: unknown, args: any) => await run(async (ctx) => await switchThreadAgentHandler(ctx, args)),
+    runMutation: async (reference: any, args: any) =>
+        await run(async (ctx) => {
+            switch (reference.__lunoraRef) {
+                case "chat_agent_switch:beginSwitchSummary": {
+                    return await beginSwitchSummaryHandler(ctx, args);
+                }
+                case "lib_claim_once:releaseKey": {
+                    return await releaseClaim(ctx, args.scope, args.key, args.claimedAt);
+                }
+                default: {
+                    return await switchThreadAgentHandler(ctx, args);
+                }
+            }
+        }),
     runQuery: async (_reference: unknown, args: any) => await run(async (ctx) => await planAgentSwitchHandler(ctx, args)),
 };
+
+const summaryClaim = async (): Promise<boolean> => await run(async (ctx) => await hasClaim(ctx, "switch-summary", threadId));
 
 const switchTo = async (model: string, clientId: string, mode?: "full" | "portable") => {
     const result = await runAgentSwitch(
@@ -151,6 +174,21 @@ describe("a switch above the cold-start threshold", () => {
         expect(await remaining()).toBe(before - 1);
     });
 
+    it("does not undo a later switch when an old click is replayed: no summary, no charge, no divider", async () => {
+        await switchTo(B, "click-1");
+        await addTurn("question for model B", "answer from model B");
+        await switchTo(C, "click-2", "full");
+
+        const before = await remaining();
+        // The thread is on C now: only the claim of click-1 stops this one from switching back to B.
+        const replay = await switchTo(B, "click-1");
+
+        expect(replay).toMatchObject({ agent: { model: C }, messageId: null, switched: false });
+        expect(summaryCalls).toHaveBeenCalledTimes(1);
+        expect(await dividers()).toHaveLength(2);
+        expect(await remaining()).toBe(before);
+    });
+
     it("leaves no claim and no charge behind when the write fails, so the retry goes through", async () => {
         const before = await remaining();
         const plan = await run(
@@ -195,6 +233,9 @@ describe("a switch above the cold-start threshold", () => {
         });
 
         await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: "AGENT_SWITCH_LIMIT" } });
+        // Refused before the summary is paid for, not only at the write.
+        expect(summaryCalls).not.toHaveBeenCalled();
+        expect(await summaryClaim()).toBe(false);
         expect(await dividers()).toHaveLength(0);
         expect(await run(async (ctx) => await hasClaim(ctx, "switch", `${owner}:${threadId}:click-1`))).toBe(false);
     });
@@ -223,13 +264,68 @@ describe("a switch above the cold-start threshold", () => {
         expect(await dividers()).toHaveLength(0);
     });
 
-    it("fails the same way when the summary outgrows what it was given", async () => {
-        summaryCalls.mockResolvedValue("s".repeat(HANDOFF_BUDGET_TOKENS * 4));
+    it("cuts a summary that outgrows what it was given, instead of failing the switch", async () => {
+        summaryCalls.mockResolvedValue(Array.from({ length: 4000 }, (_, index) => `point ${index}`).join("\n"));
+
+        expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
+
+        const [part] = await dividers();
+
+        expect(handoffTokens(part!.handoff!)).toBeLessThanOrEqual(HANDOFF_BUDGET_TOKENS);
+        expect(part!.handoff).toContain("> point 0");
+        expect(part!.handoff).not.toContain("> point 3999");
+        expect(HANDOFF_SUMMARY_MAX_TOKENS).toBeLessThan(HANDOFF_BUDGET_TOKENS);
+    });
+
+    it("summarises once when two clicks with different ids arrive together: the second is told one is under way", async () => {
+        const gates: ((text: string) => void)[] = [];
+
+        summaryCalls.mockImplementationOnce(
+            async () =>
+                await new Promise<string>((resolve) => {
+                    gates.push(resolve);
+                }),
+        );
 
         const before = await remaining();
+        const first = switchTo(B, "click-1");
 
-        await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: HANDOFF_REFUSED_TOO_LARGE } });
-        expect(await remaining()).toBe(before);
+        await vi.waitFor(() => expect(summaryCalls).toHaveBeenCalledTimes(1));
+        expect(await summaryClaim()).toBe(true);
+
+        await expect(switchTo(B, "click-2")).rejects.toMatchObject({ data: { code: "AGENT_SWITCH_BUSY" } });
+
+        gates[0]!("The summary of the older turns.");
+
+        expect(await first).toMatchObject({ switched: true });
+        expect(summaryCalls).toHaveBeenCalledTimes(1);
+        expect(await dividers()).toHaveLength(1);
+        expect(await remaining()).toBe(before - 1);
+        // Given back after the commit, so the thread is free for the next switch.
+        expect(await summaryClaim()).toBe(false);
+    });
+
+    it("frees the thread when the summary call fails, so the retry summarises", async () => {
+        summaryCalls.mockRejectedValueOnce(new Error("gateway down"));
+
+        await expect(switchTo(B, "click-1")).rejects.toThrow("gateway down");
+        expect(await summaryClaim()).toBe(false);
+        expect(await switchTo(B, "click-2")).toMatchObject({ switched: true });
+        expect(summaryCalls).toHaveBeenCalledTimes(2);
+    });
+
+    it("counts each summary against its own rate limit, and refuses past it before calling the model", async () => {
+        await run(async (ctx) => {
+            const limiter = createRatelimit("chat/agentSwitchSummary:free", ctx.db as never);
+
+            for (let index = 0; index < 5; index += 1) {
+                await limiter.limit(owner);
+            }
+        });
+
+        await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: "AGENT_SWITCH_RATE_LIMITED" } });
+        expect(summaryCalls).not.toHaveBeenCalled();
+        expect(await summaryClaim()).toBe(false);
         expect(await dividers()).toHaveLength(0);
     });
 
@@ -343,6 +439,54 @@ describe("switching back", () => {
         expect(back!.handoff).toContain("You are taking over a conversation part-way");
     });
 
+    it("restores what the model saw, with no handoff message, when nothing happened since it left", async () => {
+        await addTurn("first question of the model A era", "first answer of the model A era");
+        await switchTo(B, "click-1", "portable");
+        await switchTo(A, "click-2", "portable");
+
+        const [, back] = await dividers();
+
+        expect(back).toMatchObject({ mode: "delta", to: { model: A } });
+        expect(back!.handoff).toBeUndefined();
+
+        await addTurn("and now back on A", "reply");
+
+        const { blocks, docs } = assembleHandoffContext(await rows());
+
+        expect(blocks).toStrictEqual([]);
+        expect(docs.map((doc: any) => doc.text).filter(Boolean)).toStrictEqual([
+            "first question of the model A era",
+            "first answer of the model A era",
+            "and now back on A",
+            "reply",
+        ]);
+    });
+
+    it("keeps the first half for the model that left, after the divider it left through has slid out of the window", async () => {
+        await addTurn("first question of the model A era", "first answer of the model A era");
+        await switchTo(B, "click-1", "portable");
+        await addTurn("question for model B", "answer from model B");
+        await switchTo(A, "click-2", "portable");
+
+        const [toB, back] = await dividers();
+
+        expect(back).toMatchObject({ mode: "delta" });
+
+        for (let index = 0; index < 60; index += 1) {
+            await addTurn(`question ${index} for model A`, `answer ${index} from model A`);
+        }
+
+        const all = await rows();
+        const late = all.at(-3)!;
+        const dividerRow = all.find((row) => agentSwitchOf(row)?.mode === "delta")!;
+        const above = await run(async (ctx) => await handoffAboveOf(ctx, { belowMessageId: late._id, threadId: threadId as never }));
+        const before = await run(async (ctx) => await handoffBeforeDeltaOf(ctx, { dividerMessageId: dividerRow._id, threadId: threadId as never }));
+
+        // A's first half stands in as the handoff of the divider it left through, then what it missed.
+        expect(before).toStrictEqual([toB!.handoff]);
+        expect(above).toStrictEqual([toB!.handoff, back!.handoff]);
+    });
+
     it("previews a switch back as the old context plus the handoff of what came since", async () => {
         await longThread(30);
         await switchTo(B, "click-1");
@@ -363,7 +507,7 @@ describe("a window that starts below the divider", () => {
         const answered = answer._id;
         const never = await run(async (ctx) => await handoffAboveOf(ctx, { belowMessageId: answered, threadId: threadId as never }));
 
-        expect(never).toBeNull();
+        expect(never).toStrictEqual([]);
 
         await switchTo(B, "click-1", "portable");
         await addTurn("later question", "later answer");
@@ -373,6 +517,6 @@ describe("a window that starts below the divider", () => {
             async (ctx) => await handoffAboveOf(ctx, { belowMessageId: all.find((row) => row.text === "later question")!._id, threadId: threadId as never }),
         );
 
-        expect(above).toBe(all.map((row) => agentSwitchOf(row)).find(Boolean)!.handoff);
+        expect(above).toStrictEqual([all.map((row) => agentSwitchOf(row)).find(Boolean)!.handoff]);
     });
 });

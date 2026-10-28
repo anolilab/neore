@@ -194,9 +194,15 @@ verbatim tail, and delta on switching back.
   history before the divider is written (`previewAgentSwitch`, priced client-side with the target's catalog price).
   `delta` keeps what the agent saw before it left, adds the stored handoff of what happened since, and then the turns
   after; when the model's earlier divider lies outside the 100-row context window the switch is `portable` instead,
-  since the context could not give the model what a delta says it already has. Each summary
-  call is one metered gateway call; a retry after a failed write summarises again, but is charged (`chargeRound`) once.
-  The Anthropic cache breakpoint on the handoff message and the provider's cache reads need a real provider to check.
+  since the context could not give the model what a delta says it already has. Once the divider the model left
+  through has slid out of the window, the handoff of that divider stands in for what it saw (`deltaOrphans`,
+  `getHandoffBeforeDelta`), and a switch back with nothing missed stores no handoff and restores what the model saw.
+  Each summary call is one metered gateway call, fenced before it is paid for: the plan refuses a user whose daily
+  allowance is spent, `beginSwitchSummary` admits one summary per thread at a time (claim `switch-summary:<threadId>`,
+  2 minutes) and counts it against `chat/agentSwitchSummary`, and a summary longer than its room is cut at a line
+  (`capSummary`). A retry after a failed write summarises again, but is charged (`chargeRound`) once. Only the last
+  handoff block carries the Anthropic cache hint, since the provider allows four breakpoints and the gateway sets two.
+  The cache hint and the provider's cache reads need a real provider to check.
 
 **S3 — Host handoff.** Host to host, in the same thread, using the `portable` mode.
 Cloud to host, and host to cloud, create a new thread linked to the source through

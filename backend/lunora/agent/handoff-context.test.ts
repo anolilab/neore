@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { agentSwitchRowContent } from "./agent-switch-logic";
 import type { AgentSwitchPart } from "./agent-switch-validators";
 import { composeHandoff } from "./handoff";
-import { assembleHandoffContext, handoffMessage, withHandoff } from "./handoff-context";
+import { assembleHandoffContext, deltaOrphans, handoffMessage, needsEarlierHandoff, withHandoff } from "./handoff-context";
 import { planHandoff } from "./handoff";
 import { longThreadFixture } from "./handoff.fixture";
 
@@ -80,7 +80,7 @@ describe("a portable switch", () => {
     });
 
     it("uses the handoff of a divider older than the window when the window holds none", () => {
-        const { blocks, docs } = assembleHandoffContext([turn("u9", "user", "late"), turn("a9", "assistant", "reply")], handoff);
+        const { blocks, docs } = assembleHandoffContext([turn("u9", "user", "late"), turn("a9", "assistant", "reply")], [handoff]);
 
         expect(blocks).toStrictEqual([{ before: 0, text: handoff }]);
         expect(docs.map((doc) => doc._id)).toStrictEqual(["u9", "a9"]);
@@ -123,11 +123,87 @@ describe("switching back", () => {
         expect(textsOf(docs, blocks)).toStrictEqual(["hello", "hi", delta, "back on a"]);
     });
 
-    it("falls back to the delta alone when the model's earlier divider is out of the window", () => {
-        const { blocks, docs } = assembleHandoffContext(path.slice(3));
+    it("stands in what the model saw when its earlier divider has left the window, instead of the delta alone", () => {
+        const window = path.slice(3);
+        const first = handoffOf("a1");
 
+        expect(deltaOrphans(window)).toStrictEqual([{ id: "d2", model: A.model }]);
+
+        const { blocks, docs } = assembleHandoffContext(window, [], new Map([[A.model, [first]]]));
+
+        // A's first half stands in as the handoff of the divider it left through, then what A missed.
         expect(docs.map((doc) => doc._id)).toStrictEqual(["u3"]);
-        expect(blocks).toStrictEqual([{ before: 0, text: delta }]);
+        expect(blocks).toStrictEqual([
+            { before: 0, text: first },
+            { before: 0, text: delta },
+        ]);
+    });
+
+    it("sends the same bytes on the turns before and after the divider it left through has slid out", () => {
+        const first = handoffOf("a1");
+        const bases = new Map([[A.model, [first]]]);
+        const early = assembleHandoffContext(path.slice(3), [], bases);
+        const later = assembleHandoffContext([...path.slice(6), turn("a3", "assistant", "r"), turn("u4", "user", "more")], [first, delta]);
+
+        expect(textsOf(early.docs, early.blocks).slice(0, 2)).toStrictEqual([first, delta]);
+        expect(textsOf(later.docs, later.blocks).slice(0, 2)).toStrictEqual([first, delta]);
+    });
+
+    it("needs no stand-in while the divider it left through is in the window", () => {
+        expect(deltaOrphans(path)).toStrictEqual([]);
+        expect(deltaOrphans(path.slice(2))).toStrictEqual([]);
+    });
+
+    it("looks for an earlier handoff unless the window holds a portable one", () => {
+        expect(needsEarlierHandoff(path.slice(3))).toBe(true);
+        expect(needsEarlierHandoff(path.slice(0, 4))).toBe(false);
+        expect(needsEarlierHandoff(path.slice(0, 2))).toBe(true);
+    });
+
+    it("restores what the model saw, and adds no message, when nothing happened since it left", () => {
+        const empty = divider("d2", { from: B, mode: "delta", startMessageId: "a1", to: A });
+        const { blocks, docs } = assembleHandoffContext([path[0]!, path[1]!, path[2]!, empty, turn("u3", "user", "back on a")]);
+
+        expect(docs.map((doc) => doc._id)).toStrictEqual(["u1", "a1", "u3"]);
+        expect(blocks).toStrictEqual([]);
+    });
+});
+
+describe("cache breakpoints", () => {
+    const first = handoffOf("a1");
+    const second = handoffOf("a2", "delta");
+
+    it("puts the hint on the last handoff only, however many there are", () => {
+        const messages = withHandoff([turn("u3", "user", "go on")] as never, [
+            { before: 0, text: first },
+            { before: 0, text: second },
+        ]);
+        const hinted = messages.filter((message) => message.providerOptions !== undefined);
+
+        expect(messages.map((message) => message.content)).toStrictEqual([first, second, "go on"]);
+        expect(hinted).toHaveLength(1);
+        expect(hinted[0]!.content).toBe(second);
+    });
+
+    it("keeps a single handoff hinted, and a chain of switches back to three blocks at most one hinted", () => {
+        const chain = assembleHandoffContext(
+            [
+                turn("u1", "user", "hello"),
+                divider("d1", { from: A, handoff: first, mode: "portable", startMessageId: "u1", to: B }),
+                turn("u2", "user", "b"),
+                divider("d2", { from: B, handoff: second, mode: "delta", startMessageId: "u2", to: A }),
+                turn("u3", "user", "a"),
+                divider("d3", { from: A, handoff: handoffOf("u3", "delta"), mode: "delta", startMessageId: "u3", to: B }),
+                turn("u4", "user", "b again"),
+            ],
+            [],
+            new Map(),
+        );
+        const messages = withHandoff(chain.docs as never, chain.blocks);
+
+        expect(chain.blocks.length).toBeGreaterThan(1);
+        expect(messages.filter((message) => message.providerOptions !== undefined)).toHaveLength(1);
+        expect(withHandoff([] as never, [{ before: 0, text: first }])[0]!.providerOptions).toBeDefined();
     });
 });
 

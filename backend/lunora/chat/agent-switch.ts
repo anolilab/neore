@@ -12,6 +12,10 @@
  * writes the summary — uncharged, nothing is saved yet — and `commitAgentSwitch` (one mutation) takes the
  * claim-once, charges the round and writes the divider, so a write that fails takes the claim and the
  * charge with it and the retry is not refused.
+ *
+ * The summary is the one call made before the charge, so it is fenced instead: the plan refuses a user whose
+ * daily allowance is spent, `beginSwitchSummary` lets one summary run per thread at a time and counts it
+ * against its own rate limit, and only then does the action call the gateway.
  */
 import { PROMPT_CACHE_COLD_START_TOKENS } from "@neore/ai/models";
 import { generateText } from "ai";
@@ -25,9 +29,9 @@ import { sameAgent } from "../agent/agent-switch-logic";
 import { type AgentRef, HANDOFF_MAX_CHARACTERS, vAgentRef, vAgentSwitchMode } from "../agent/agent-switch-validators";
 import {
     assertWithinBudget,
+    capSummary,
     composeHandoff,
     HANDOFF_BUDGET_TOKENS,
-    HANDOFF_REFUSED_TOO_LARGE,
     HANDOFF_SUMMARY_MAX_TOKENS,
     HANDOFF_SUMMARY_SYSTEM,
     HandoffTooLargeError,
@@ -43,13 +47,14 @@ import { insertAgentSwitchRow, patchThread } from "../agent/table-writes";
 import { requireThreadPermission } from "../agent/thread-read-access";
 import { hasStreamFor, isThreadStreaming } from "../agent/thread-streaming";
 import { getUser } from "../auth/lib/better-auth-queries";
-import { claimOnce, hasClaim } from "../lib/claim-once";
+import { claimFence, claimOnce, hasClaim, releaseClaim } from "../lib/claim-once";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
+import { createRatelimit } from "../lib/rate-limiter";
 import { systemDb } from "../lib/rls/scope";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
 import { MAX_LENGTH } from "../lib/validators";
-import { chargeRound, loadTaskAccount } from "../tasks/account";
+import { chargeRound, hasRoundAllowance, loadTaskAccount } from "../tasks/account";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import { findPendingApprovalOnLatestTurn } from "./lib/tool-approval-claim";
 
@@ -86,6 +91,10 @@ export const AGENT_SWITCH_UNSUPPORTED = "AGENT_SWITCH_UNSUPPORTED";
 export const AGENT_SWITCH_STALE = "AGENT_SWITCH_STALE";
 export const AGENT_SWITCH_SUMMARY_FAILED = "AGENT_SWITCH_SUMMARY_FAILED";
 export const AGENT_SWITCH_LIMIT = "AGENT_SWITCH_LIMIT";
+/** Another summary for this thread is being written; the switch it prepares is the one that counts. */
+export const AGENT_SWITCH_BUSY = "AGENT_SWITCH_BUSY";
+/** Too many summaries in a short while (`chat/agentSwitchSummary`). */
+export const AGENT_SWITCH_RATE_LIMITED = "AGENT_SWITCH_RATE_LIMITED";
 
 /**
  * A `clientId` is remembered this long. A double tap is over in seconds; the rest is for a stale
@@ -93,12 +102,23 @@ export const AGENT_SWITCH_LIMIT = "AGENT_SWITCH_LIMIT";
  */
 const AGENT_SWITCH_CLAIM_TTL_MS = 10 * 60 * 1000;
 
+/** A summary call takes seconds; the claim outlasts a slow one and frees the thread soon after an action that died holding it. */
+const AGENT_SWITCH_SUMMARY_CLAIM_TTL_MS = 2 * 60 * 1000;
+const SUMMARY_CLAIM_SCOPE = "switch-summary";
+
 /** The preview counts a conversation up to this many tokens; past it the figure is "at least". */
 const PREVIEW_TOKEN_CAP = 250_000;
 
 const refuse = (code: string, message: string): never => {
     throw new LunoraError("BAD_REQUEST", message, { data: { code } });
 };
+
+const limitReached = (): LunoraError =>
+    new LunoraError(
+        "TOO_MANY_REQUESTS",
+        "You've reached your daily message limit, so the conversation cannot be summarised. Keep the full history, or try again tomorrow.",
+        { data: { code: AGENT_SWITCH_LIMIT } },
+    );
 
 interface SwitchResult {
     agent: AgentRef;
@@ -123,6 +143,7 @@ interface StoredHandoff {
     mode: "delta" | "portable";
     /** The text holds a model's summary: the write charges the round for it. */
     summarized: boolean;
+    /** Empty for a switch back with nothing missed: the divider stores no handoff and the model sees what it saw. */
     text: string;
 }
 
@@ -235,13 +256,7 @@ export const switchThreadAgentHandler = async (
         const account = await loadTaskAccount(ctx, args.userId);
 
         if (!account || !(await chargeRound(ctx, args.userId, account))) {
-            throw new LunoraError(
-                "TOO_MANY_REQUESTS",
-                "You've reached your daily message limit, so the conversation cannot be summarised. Keep the full history, or try again tomorrow.",
-                {
-                    data: { code: AGENT_SWITCH_LIMIT },
-                },
-            );
+            throw limitReached();
         }
     }
 
@@ -254,7 +269,7 @@ export const switchThreadAgentHandler = async (
         ...(thread.activeLeafMessageId && { parentMessageId: leaf._id }),
         part: {
             from,
-            ...(args.handoff && { handoff: args.handoff.text, summarized: args.handoff.summarized }),
+            ...(args.handoff?.text && { handoff: args.handoff.text, summarized: args.handoff.summarized }),
             mode: args.handoff?.mode ?? "full",
             startMessageId: leaf._id,
             to,
@@ -302,8 +317,8 @@ const modeFor = async (
 
     // A model's earlier context is only sent while it is inside the context window; past it, a delta would tell the
     // model it had worked on a conversation of which it is given none.
-    if (earlier && (await rowsSince(ctx, checked.thread._id, checked.leaf, earlier.startMessageId, DEFAULT_RECENT_MESSAGES)) < DEFAULT_RECENT_MESSAGES) {
-        return { boundaryId: earlier.startMessageId, contextTokens, mode: "delta" };
+    if (earlier && (await rowsSince(ctx, checked.thread._id, checked.leaf, earlier.part.startMessageId, DEFAULT_RECENT_MESSAGES)) < DEFAULT_RECENT_MESSAGES) {
+        return { boundaryId: earlier.part.startMessageId, contextTokens, mode: "delta" };
     }
 
     return { contextTokens, mode: "portable" };
@@ -313,11 +328,26 @@ const vTurn = v.object({ role: v.union(v.literal("assistant"), v.literal("user")
 
 const vPlan = v.object({
     agent: vAgentRef,
+    /** Whether the daily limits have room for the round a summary is charged as; unset when the switch needs no summary call. */
+    allowance: v.optional(v.boolean()),
     leafId: v.optional(v.string()),
     mode: v.optional(vAgentSwitchMode),
     omittedEarlier: v.optional(v.boolean()),
     turns: v.optional(v.array(vTurn)),
 });
+
+/** Whether handing these turns over takes a summary call. A thread too large to hand over is reported by the action. */
+const needsSummary = (newestFirst: HandoffTurn[]): boolean => {
+    try {
+        return planHandoff(newestFirst).older.length > 0;
+    } catch (error) {
+        if (error instanceof HandoffTooLargeError) {
+            return false;
+        }
+
+        throw error;
+    }
+};
 
 /**
  * Step one: checks the switch and reads what a handoff is built from. Writes nothing and charges nothing.
@@ -326,7 +356,14 @@ const vPlan = v.object({
 export const planAgentSwitchHandler = async (
     ctx: QueryCtx,
     args: SwitchArgs & { mode?: RequestedMode },
-): Promise<{ agent: AgentRef; leafId?: string; mode?: "delta" | "full" | "portable"; omittedEarlier?: boolean; turns?: HandoffTurn[] }> => {
+): Promise<{
+    agent: AgentRef;
+    allowance?: boolean;
+    leafId?: string;
+    mode?: "delta" | "full" | "portable";
+    omittedEarlier?: boolean;
+    turns?: HandoffTurn[];
+}> => {
     const checked = await checkSwitch(ctx, args);
 
     // A click already answered gets no second summary: the write would refuse it, and the model call is metered.
@@ -341,8 +378,16 @@ export const planAgentSwitchHandler = async (
     }
 
     const source = await collectHandoffSource(ctx, checked.thread._id, checked.leaf, { stopAtId: boundaryId });
+    const base = { agent: checked.from, leafId: checked.leaf._id, mode, omittedEarlier: source.omittedEarlier, turns: source.turns };
 
-    return { agent: checked.from, leafId: checked.leaf._id, mode, omittedEarlier: source.omittedEarlier, turns: source.turns };
+    if (!needsSummary(source.turns)) {
+        return base;
+    }
+
+    // Read now, before the summary is paid for: the commit charges the round, but it comes after the call.
+    const account = await loadTaskAccount(ctx, args.userId);
+
+    return { ...base, allowance: account !== null && (await hasRoundAllowance(ctx, args.userId, account)) };
 };
 
 export const planAgentSwitch = internalQuery
@@ -379,6 +424,41 @@ export const commitAgentSwitch = internalMutation
     .output(vSwitchResult)
     .mutation(async ({ args, ctx }) => await switchThreadAgentHandler(ctx, args));
 
+/**
+ * Lets one summary call run for the thread and counts it against `chat/agentSwitchSummary`. Returns the
+ * claim's fence for {@link releaseClaim}, or `null` when another summary of the thread is in flight, which is
+ * not counted. A summary over the rate limit throws, taking the claim with it.
+ */
+export const beginSwitchSummaryHandler = async (ctx: MutationCtx, args: { threadId: Id<"threads">; userId: string }): Promise<number | null> => {
+    const fence = await claimFence(ctx, SUMMARY_CLAIM_SCOPE, args.threadId, { ttlMs: AGENT_SWITCH_SUMMARY_CLAIM_TTL_MS, userId: args.userId });
+
+    if (fence === null) {
+        return null;
+    }
+
+    const account = await loadTaskAccount(ctx, args.userId);
+    const { ok } = account ? await createRatelimit(`chat/agentSwitchSummary:${account.tier}`, ctx.db as never).limit(args.userId) : { ok: false };
+
+    if (!ok) {
+        await releaseClaim(ctx, SUMMARY_CLAIM_SCOPE, args.threadId, fence);
+
+        throw new LunoraError(
+            "TOO_MANY_REQUESTS",
+            "Too many conversations were summarised in a short while. Try again in a minute, or keep the full history.",
+            {
+                data: { code: AGENT_SWITCH_RATE_LIMITED },
+            },
+        );
+    }
+
+    return fence;
+};
+
+export const beginSwitchSummary = internalMutation
+    .input({ threadId: v.id("threads"), userId: v.string() })
+    .output(v.union(v.null(), v.number()))
+    .mutation(async ({ args, ctx }) => await beginSwitchSummaryHandler(ctx, args));
+
 /** Writes the summary of `older`, or throws a refusal. Costs one utility-model call, metered by the gateway. */
 export type Summarise = (older: HandoffTurn[], omittedEarlier: boolean) => Promise<string>;
 
@@ -413,45 +493,87 @@ interface SwitchRunner {
     runQuery: (reference: unknown, args: unknown) => Promise<unknown>;
 }
 
+type Plan = Awaited<ReturnType<typeof planAgentSwitchHandler>>;
+
+/** The handoff text of a plan, summary included. `held` receives the summary claim's fence once it is taken. */
+const buildHandoff = async (
+    ctx: SwitchRunner,
+    args: SwitchArgs,
+    plan: Plan,
+    kind: HandoffKind,
+    summarise: Summarise,
+    held: { fence: number | null },
+): Promise<StoredHandoff> => {
+    const turns = plan.turns ?? [];
+
+    // Nothing happened since the model left: it is shown what it saw, and no message says so.
+    if (kind === "delta" && turns.length === 0) {
+        return { mode: kind, summarized: false, text: "" };
+    }
+
+    const { older, tail } = planHandoff(turns);
+
+    if (older.length === 0) {
+        return { mode: kind, summarized: false, text: assertWithinBudget(composeHandoff({ kind, tail })) };
+    }
+
+    if (plan.allowance === false) {
+        throw limitReached();
+    }
+
+    const fence = (await ctx.runMutation(internal.chat.agent_switch.beginSwitchSummary, { threadId: args.threadId, userId: args.userId })) as number | null;
+
+    if (fence === null) {
+        throw new LunoraError("CONFLICT", "This conversation is already being prepared for a switch", { data: { code: AGENT_SWITCH_BUSY } });
+    }
+
+    held.fence = fence;
+
+    const summary = capSummary(await summarise(older, plan.omittedEarlier === true));
+
+    return { mode: kind, summarized: true, text: assertWithinBudget(composeHandoff({ kind, summary, tail })) };
+};
+
 /**
  * The action's body, with the summary call passed in so a test can drive it without the gateway. Plans,
- * builds the handoff (summary first, nothing charged), then commits in one mutation.
+ * builds the handoff (the summary first, fenced but not yet charged), then commits in one mutation.
  */
 export const runAgentSwitch = async (ctx: SwitchRunner, args: SwitchArgs & { mode?: RequestedMode }, summarise: Summarise): Promise<SwitchResult> => {
-    const plan = (await ctx.runQuery(internal.chat.agent_switch.planAgentSwitch, args)) as Awaited<ReturnType<typeof planAgentSwitchHandler>>;
+    const plan = (await ctx.runQuery(internal.chat.agent_switch.planAgentSwitch, args)) as Plan;
 
     if (!plan.leafId || !plan.mode) {
         return { agent: plan.agent, coldStartCostly: false, messageId: null, switched: false };
     }
 
-    let handoff: StoredHandoff | undefined;
+    const held: { fence: number | null } = { fence: null };
 
-    if (plan.mode !== "full") {
-        const kind: HandoffKind = plan.mode;
+    try {
+        const handoff = plan.mode === "full" ? undefined : await buildHandoff(ctx, args, plan, plan.mode, summarise, held);
 
-        try {
-            const { older, tail } = planHandoff(plan.turns ?? []);
-            const summary = older.length > 0 ? await summarise(older, plan.omittedEarlier === true) : undefined;
+        return (await ctx.runMutation(internal.chat.agent_switch.commitAgentSwitch, {
+            clientId: args.clientId,
+            expectedLeafId: plan.leafId,
+            ...(handoff && { handoff }),
+            target: args.target,
+            threadId: args.threadId,
+            unlockProof: args.unlockProof,
+            userId: args.userId,
+        })) as SwitchResult;
+    } catch (error) {
+        if (error instanceof HandoffTooLargeError) {
+            return refuse(error.code, error.message);
+        }
 
-            handoff = { mode: kind, summarized: summary !== undefined, text: assertWithinBudget(composeHandoff({ kind, summary, tail })) };
-        } catch (error) {
-            if (error instanceof HandoffTooLargeError) {
-                return refuse(HANDOFF_REFUSED_TOO_LARGE, error.message);
-            }
-
-            throw error;
+        throw error;
+    } finally {
+        if (held.fence !== null) {
+            // After the commit, so a second click planned in between cannot summarise what this one is writing.
+            // A claim that stays is freed by its TTL; it must not turn a finished switch into a failure.
+            await ctx
+                .runMutation(internal.lib.claim_once.releaseKey, { claimedAt: held.fence, key: args.threadId, scope: SUMMARY_CLAIM_SCOPE })
+                .catch(() => undefined);
         }
     }
-
-    return (await ctx.runMutation(internal.chat.agent_switch.commitAgentSwitch, {
-        clientId: args.clientId,
-        expectedLeafId: plan.leafId,
-        ...(handoff && { handoff }),
-        target: args.target,
-        threadId: args.threadId,
-        unlockProof: args.unlockProof,
-        userId: args.userId,
-    })) as SwitchResult;
 };
 
 export const switchThreadAgent = authAction

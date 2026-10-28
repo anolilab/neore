@@ -36,6 +36,7 @@ export const HANDOFF_SUMMARY_INPUT_TOKENS = 48_000;
 export const HANDOFF_SUMMARY_TURN_CHARACTERS = 6000;
 
 export const HANDOFF_REFUSED_TOO_LARGE = "AGENT_SWITCH_HANDOFF_TOO_LARGE";
+export const HANDOFF_REFUSED_OVER_BUDGET = "AGENT_SWITCH_HANDOFF_OVER_BUDGET";
 
 /** One message of the thread as the handoff shows it. */
 export interface HandoffTurn {
@@ -43,8 +44,15 @@ export interface HandoffTurn {
     text: string;
 }
 
-/** Raised when the handoff cannot fit without cutting a message; the switch fails with `message` and charges nothing. */
-export class HandoffTooLargeError extends Error {}
+/** Raised when the handoff cannot fit; the switch fails with `message` and `code` and charges nothing. */
+export class HandoffTooLargeError extends Error {
+    constructor(
+        message: string,
+        readonly code: string = HANDOFF_REFUSED_TOO_LARGE,
+    ) {
+        super(message);
+    }
+}
 
 const LINE_BREAK = /\r?\n/;
 
@@ -139,13 +147,42 @@ export const planHandoff = (newestFirst: ReadonlyArray<HandoffTurn>): HandoffPla
     return { older: newestFirst.slice(count).toReversed(), tail: newestFirst.slice(0, count).toReversed() };
 };
 
-/** Throws when `text` weighs more than the budget: a summary longer than it was asked to be. */
+/** Throws when `text` weighs more than the budget. After {@link capSummary} only a frame larger than planned can do that. */
 export const assertWithinBudget = (text: string): string => {
     if (handoffTokens(text) > HANDOFF_BUDGET_TOKENS) {
-        throw tooLarge();
+        throw new HandoffTooLargeError("The handoff came out too large to hand over. Keep the full history instead.", HANDOFF_REFUSED_OVER_BUDGET);
     }
 
     return text;
+};
+
+/**
+ * The summary cut to the room `planHandoff` left it, quoted as it will be shown, at a line boundary. A model
+ * that runs past its output limit, or ignores the word limit, is shortened rather than refused: asking again at
+ * temperature 0 would give the same text.
+ */
+export const capSummary = (summary: string): string => {
+    const room = HANDOFF_SUMMARY_MAX_TOKENS * CHARACTERS_PER_TOKEN;
+    const kept: string[] = [];
+    let used = 0;
+
+    for (const line of summary.trim().split(LINE_BREAK)) {
+        // The quote prefix and the line break the handoff adds.
+        const size = quoteTranscript(line).length + 1;
+
+        if (used + size > room) {
+            if (kept.length === 0) {
+                kept.push(line.slice(0, room - 3));
+            }
+
+            break;
+        }
+
+        used += size;
+        kept.push(line);
+    }
+
+    return kept.join("\n").trim();
 };
 
 /** The instruction the summary call runs under; the transcript it reads is quoted data like the handoff's own. */

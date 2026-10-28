@@ -3,8 +3,7 @@ import { type EmbeddingModel, embedMany as embedMany_, type ModelMessage } from 
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { assert } from "../../lib/error-helpers";
-import { assembleHandoffContext, withHandoff } from "../handoff-context";
-import { agentSwitchOf } from "../agent-switch-logic";
+import { assembleHandoffContext, deltaOrphans, needsEarlierHandoff, withHandoff } from "../handoff-context";
 import { docsToModelMessages, toModelMessage } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, extractText, getModelName, getProviderName, isTool, sorted } from "../shared";
 import type { MessageDoc as MessageDocument } from "../validators";
@@ -656,13 +655,28 @@ export const fetchContextWithPrompt = async (
     }
 
     // A switch's handoff stands in for the turns before it. A window cut below the divider that holds it asks for
-    // the newest one above (`agent/agent-switch.ts`); a thread that starts inside the window needs no lookup.
+    // the newest ones above (`agent/agent-switch.ts`); a thread that starts inside the window needs no lookup. A
+    // switch back whose model left above the window asks for what that model had seen.
     const oldest = prePromptDocs[0];
-    const earlierHandoff =
-        threadId && oldest && oldest.order > 0 && prePromptDocs.every((doc) => !agentSwitchOf(doc)?.handoff)
+    const earlierHandoffs =
+        threadId && oldest && oldest.order > 0 && needsEarlierHandoff(prePromptDocs)
             ? await context.runQuery(internal.agent.agent_switch.getHandoffAbove, { belowMessageId: oldest._id, threadId: threadId as Id<"threads"> })
-            : null;
-    const handoff = assembleHandoffContext(prePromptDocs, earlierHandoff ?? undefined);
+            : [];
+    const deltaBases = new Map(
+        await Promise.all(
+            (threadId ? deltaOrphans(prePromptDocs) : []).map(
+                async ({ id, model }) =>
+                    [
+                        model,
+                        await context.runQuery(internal.agent.agent_switch.getHandoffBeforeDelta, {
+                            dividerMessageId: id as Id<"messages">,
+                            threadId: threadId as Id<"threads">,
+                        }),
+                    ] as const,
+            ),
+        ),
+    );
+    const handoff = assembleHandoffContext(prePromptDocs, earlierHandoffs, deltaBases);
 
     prePromptDocs = handoff.docs;
 

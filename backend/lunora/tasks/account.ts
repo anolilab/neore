@@ -73,7 +73,7 @@ export const roundQuotaKeys = (account: TaskAccount): string[] =>
 export const DAILY_LIMIT_MESSAGE = "You've reached your daily limit for task runs. Run the task again tomorrow.";
 
 /** Whether every daily limit still has room for one round — a read, nothing is consumed. */
-export const hasRoundAllowance = async (ctx: MutationCtx, userId: string, account: TaskAccount): Promise<boolean> => {
+export const hasRoundAllowance = async (ctx: Pick<QueryCtx, "db">, userId: string, account: TaskAccount): Promise<boolean> => {
     for (const key of roundQuotaKeys(account)) {
         const { remaining } = await createRatelimit(key, ctx.db as never).getRemaining(userId);
 

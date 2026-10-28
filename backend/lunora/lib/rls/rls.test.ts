@@ -13,11 +13,32 @@ import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi } from "../../../test/registered-api";
+import { agentSwitchOf } from "../../agent/agent-switch-logic";
 
 import { schemaWithShardedTables } from "../test-schema";
 import { adminQuery, authMutation, authQuery, internalQuery, mutation, publicQuery, query } from "../crpc";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
+const summaryModel = vi.hoisted(() =>
+    vi.fn(async () => {
+        return { text: "A summary of the older turns." };
+    }),
+);
+
+// The summary is the one model call of a switch; what matters here is whether it is made at all.
+vi.mock("ai", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("ai")>()), generateText: summaryModel };
+});
+vi.mock("../utility-model", () => {
+    return {
+        getUtilityModel: async () => {
+            return {};
+        },
+    };
+});
+vi.mock("../services", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("../services")>()), gatewayFetch: () => async () => new Response("{}") };
+});
 
 vi.mock("../../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
 vi.mock("../../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -27,6 +48,7 @@ const MODULES = {
     chat_agent_switch: async () => await import("../../chat/agent-switch"),
     chat_functions: async () => await import("../../chat/functions"),
     chat_sharing: async () => await import("../../chat/sharing"),
+    lib_claim_once: async () => await import("../claim-once"),
     pages_functions: async () => await import("../../pages/functions"),
     pages_sharing: async () => await import("../../pages/sharing"),
     prompts_functions: async () => await import("../../prompts/functions"),
@@ -235,7 +257,8 @@ const seedThread = async (extra: Record<string, unknown> = {}) =>
 
 beforeEach(() => {
     // The `.global()` tables these tests seed; the harness has no D1 backend (see lib/test-schema.ts).
-    harness = lunoraTest(schemaWithShardedTables(["projects", "prompts", "promptHistory", "userVariableDefaults"]) as never);
+    harness = lunoraTest(schemaWithShardedTables(["projects", "prompts", "promptHistory", "user", "userVariableDefaults"]) as never);
+    summaryModel.mockClear();
 });
 
 afterEach(() => {
@@ -365,6 +388,48 @@ describe("shared access still works", () => {
 
         // The seeded prompt and the paused reply; no divider.
         expect(written.filter((row: any) => row.threadId === threadId)).toHaveLength(2);
+    });
+
+    it("a read-only grantee and a stranger are refused a switch before the summary is paid for; the owner reaches it", async () => {
+        const ownerId: string = await run(
+            async (context) => await context.db.insert("user", { createdAt: 1, email: "owner@example.com", emailVerified: true, name: "Owner", updatedAt: 1 }),
+        );
+        const threadId = await seedThread({ model: "openai/gpt-4.1-mini", userId: ownerId });
+
+        await run(async (context) => {
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: ownerId, permission: "read", threadId, userId: GRANTEE });
+
+            // 30 turns of 4,000 characters: past the cold-start threshold, so the default switch summarises.
+            for (let index = 1; index <= 60; index += 1) {
+                const role = index % 2 === 0 ? "assistant" : "user";
+                const text = `${role} ${index} ${"t".repeat(2000)}`;
+
+                await context.db.insert("messages", {
+                    message: role === "user" ? { content: text, role } : { content: [{ text, type: "text" }], role },
+                    order: Math.ceil(index / 2),
+                    status: "success",
+                    stepOrder: role === "user" ? 0 : 1,
+                    text,
+                    threadId,
+                    tool: false,
+                    userId: ownerId,
+                });
+            }
+        });
+
+        const args = { clientId: "click", target: { kind: "model", model: "google/gemini-2.0-flash-001" }, threadId };
+        const switchAction = procedureAt("chat_agent_switch", "switchThreadAgent");
+
+        await expect(as(GRANTEE).action(switchAction, args as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(as(STRANGER).action(switchAction, args as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        expect(summaryModel).not.toHaveBeenCalled();
+        const written: unknown[] = await run(async (context) => await context.db.query("messages").collect());
+
+        expect(written.filter((row) => agentSwitchOf(row as never))).toHaveLength(0);
+
+        // The control: the same switch by the owner does call the model, so the refusals above are the checks and not a harness that never summarises.
+        expect(await as(ownerId).action(switchAction, args as never)).toMatchObject({ switched: true });
+        expect(summaryModel).toHaveBeenCalledTimes(1);
     });
 
     it("an expired grant admits nothing", async () => {
