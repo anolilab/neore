@@ -755,6 +755,11 @@ const entryRow = (host: HostView, folder: string, entry: FileEntry): HTMLLIEleme
             try {
                 const read = await globalThis.neoreDevice.hostFileRead(host.deviceId, path);
 
+                // A slow read must not land in a folder or server the person has since moved to.
+                if (files.folder !== folder || filesHost()?.deviceId !== host.deviceId) {
+                    return;
+                }
+
                 preview.textContent = read.text;
                 preview.hidden = false;
             } catch (error) {
@@ -802,8 +807,12 @@ const loadFiles = async (reset: boolean): Promise<void> => {
     } catch (error) {
         if (request === files.request) {
             status(String(error));
-            // Above the shared folders, or gone: back to the list of shared folders.
-            showFolder(null);
+
+            // The folder itself is above the shared folders, or gone: back to the list of shared folders. A later
+            // page that failed keeps the list so far, and "Load more" tries it again.
+            if (reset) {
+                showFolder(null);
+            }
         }
     }
 };
