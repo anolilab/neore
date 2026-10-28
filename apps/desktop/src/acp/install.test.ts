@@ -60,6 +60,8 @@ describe("the consent text", () => {
         expect(detail).toContain("License: Apache-2.0");
         expect(detail).toContain("Download: https://example.com/amp-linux-x86_64.zip");
         expect(detail).toContain(`SHA-256 the registry published: ${SHA}`);
+        expect(detail).toContain("Runs: ./amp-acp acp");
+        expect(detail).toContain("Sets: AMP_MODE");
         expect(detail).toContain("never updates it on its own");
     });
 });
