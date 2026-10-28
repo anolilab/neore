@@ -213,12 +213,13 @@ export const SettingsModal: FC = () => {
     // Runs after the destination tab's commit; the tab may still be loading its chunk, which the jump waits for.
     // Moves focus to the row's own control when it has one; a row without one leaves focus in the search field.
     useEffect(() => {
-        if (!pendingJump || !tabContentRef.current) {
+        // A closed modal cancels the wait: the row must not scroll or take focus after the dialog is gone.
+        if (!isOpen || !pendingJump || !tabContentRef.current) {
             return undefined;
         }
 
         return jumpToSettingsRow(tabContentRef.current, pendingJump.label, (control) => control?.focus({ preventScroll: true }));
-    }, [pendingJump]);
+    }, [isOpen, pendingJump]);
 
     // The modal stays mounted, so a query left in the field would greet the next opening.
     // Cleared on any close, including ones that bypass `handleClose`.
