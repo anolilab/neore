@@ -1187,11 +1187,19 @@ fn exited_with(child: &mut Child, code: i32) -> bool {
     false
 }
 
+/// The most of a remote command's stdout or stderr that is kept; a server cannot make this computer hold more.
+const EXEC_OUTPUT_LIMIT: u64 = 1 << 20;
+
+/// Reads `stream` to its end, keeping its first [`EXEC_OUTPUT_LIMIT`] bytes. The rest is read and dropped, so a
+/// chatty server never blocks on a full pipe.
 fn drain(mut stream: impl Read + Send + 'static) -> thread::JoinHandle<Vec<u8>> {
     thread::spawn(move || {
         let mut bytes = Vec::new();
 
-        let _ = stream.read_to_end(&mut bytes);
+        let _ = (&mut stream)
+            .take(EXEC_OUTPUT_LIMIT)
+            .read_to_end(&mut bytes);
+        let _ = io::copy(&mut stream, &mut io::sink());
 
         bytes
     })
@@ -1272,16 +1280,29 @@ pub fn exec(
         });
     }
 
-    let said = String::from_utf8_lossy(&stderr);
-    let said = said.trim();
+    Err(SshError::Other(exec_failure(
+        target,
+        status.code(),
+        String::from_utf8_lossy(&stderr).trim(),
+    )))
+}
 
-    Err(SshError::Other(if said.contains("Permission denied") {
+/// What a failed remote command means to the reader. Only ssh itself exits 255, and only then is a "Permission
+/// denied" a refused login; from the command it is a file the account may not write.
+fn exec_failure(target: &Target, code: Option<i32>, said: &str) -> String {
+    if code == Some(255) && said.contains("Permission denied") {
         explain(target, said, &Mutex::new(said.to_owned()))
     } else if said.is_empty() {
-        format!("the command on {} failed ({status})", target.label())
+        match code {
+            Some(code) => format!(
+                "the command on {} failed (exit status: {code})",
+                target.label()
+            ),
+            None => format!("the command on {} was killed", target.label()),
+        }
     } else {
         format!("on {}: {said}", target.label())
-    }))
+    }
 }
 
 /// What the user needs to read when a connection failed, from what ssh said.
@@ -1351,6 +1372,31 @@ mod tests {
         assert_ne!(first, second);
         assert_ne!(first, control_path(None));
         assert_eq!(first, control_path(Some("/home/me/.ssh/one")));
+    }
+
+    #[test]
+    fn a_permission_error_from_a_remote_command_is_not_called_a_refused_login() {
+        let said = "mkdir: cannot create directory '/home/me/.neore': Permission denied";
+        let message = exec_failure(&target(), Some(1), said);
+
+        assert!(message.contains(said), "{message}");
+        assert!(!message.contains("refused the login"), "{message}");
+
+        let login = exec_failure(
+            &target(),
+            Some(255),
+            "deploy@build.example.com: Permission denied (publickey).",
+        );
+
+        assert!(login.contains("refused the login"), "{login}");
+    }
+
+    #[test]
+    fn a_remote_command_keeps_only_the_start_of_what_it_prints() {
+        let long = vec![b'x'; EXEC_OUTPUT_LIMIT as usize + 4096];
+        let kept = drain(io::Cursor::new(long)).join().unwrap();
+
+        assert_eq!(kept.len(), EXEC_OUTPUT_LIMIT as usize);
     }
 
     fn option_values(args: &[String]) -> Vec<&str> {

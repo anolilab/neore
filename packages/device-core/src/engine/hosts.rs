@@ -475,7 +475,8 @@ impl DeviceState {
     }
 
     /// Ends a session, and the server's master with it when no other session still rides it (a probe of the same
-    /// server, a reconnect that already took its place).
+    /// server, a reconnect that already took its place). Not while host software is being installed there: the
+    /// install runs over that same master, and exits it itself.
     fn retire(&self, link: &Arc<dyn HostLink>) {
         link.close();
 
@@ -501,7 +502,7 @@ impl DeviceState {
                     && other.target() == Some(target)
             });
 
-        if !shared {
+        if !shared && !self.upgrade_running(&target) {
             link.exit_master();
         }
     }
@@ -2136,6 +2137,7 @@ mod tests {
         assert!(error.contains("being installed"), "{error}");
         assert!(state.ssh.probe.lock().unwrap().is_none());
         assert_eq!(probed.closed.load(Ordering::SeqCst), 1);
+        assert_eq!(probed.master_exits.load(Ordering::SeqCst), 0);
 
         let _ = stdfs::remove_dir_all(dir);
     }
@@ -2173,6 +2175,7 @@ mod tests {
         assert!(error.contains("being upgraded"), "{error}");
         assert!(!state.connection(&id).is_some_and(|link| link.is_alive()));
         assert_eq!(again.closed.load(Ordering::SeqCst), 1);
+        assert_eq!(again.master_exits.load(Ordering::SeqCst), 0);
 
         let _ = stdfs::remove_dir_all(dir);
     }
