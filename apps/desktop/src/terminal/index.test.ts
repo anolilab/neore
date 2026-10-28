@@ -255,7 +255,25 @@ describe("opening", () => {
     });
 });
 
-describe("a terminal on a server", () => {
+describe("a terminal on a server, on a Windows desktop", () => {
+    it("is not offered: nothing is asked of the server and no window opens", async () => {
+        const platform = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+
+        fake.handlers.clear();
+
+        const windows = registerTerminalIpc({ startHost });
+        const args = vi.fn(async () => ["-t", "--", "build.example.com"]);
+
+        platform.mockRestore();
+
+        expect(windows.sshAvailability.available).toBe(false);
+        await expect(windows.openSsh({ args, attach: args, deviceId: "host-1", label: "deploy@build.example.com" })).rejects.toThrow();
+        expect(args).not.toHaveBeenCalled();
+        expect(fake.windows).toHaveLength(0);
+    });
+});
+
+describe.skipIf(process.platform === "win32")("a terminal on a server", () => {
     const SSH_ARGS = ["-o", "StrictHostKeyChecking=yes", "-t", "--", "build.example.com"];
     const server = (args: () => Promise<string[]> = async () => SSH_ARGS, attach: () => Promise<string[]> = async () => SSH_ARGS) => {
         return { args, attach, deviceId: "host-1", label: "deploy@build.example.com" };

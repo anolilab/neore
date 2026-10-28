@@ -531,6 +531,7 @@ describe("opening a terminal", () => {
         availability: { available: true } as const,
         open: vi.fn(async (_folder: string | null) => {}),
         openSsh: vi.fn(async (_server: SshTerminal) => {}),
+        sshAvailability: { available: true } as const,
     };
 
     beforeEach(() => {
@@ -554,6 +555,7 @@ describe("opening a terminal", () => {
         expect(terminal.open).toHaveBeenNthCalledWith(1, "/work");
         expect(terminal.open).toHaveBeenNthCalledWith(2, null);
         expect(invoke(LOCAL_CHANNEL.terminalAvailability, localEvent())).toEqual({ available: true });
+        expect(invoke(LOCAL_CHANNEL.terminalSshAvailability, localEvent())).toEqual({ available: true });
     });
 
     it("rejects a folder that is not text", async () => {

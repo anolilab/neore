@@ -1,7 +1,7 @@
 # Desktop terminal: an interactive shell per folder
 
 Status: S1 and S2 built (macOS and Linux), 2026-10-27; S3 built, 2026-10-28; S4 built (Windows, proved by the `desktop-windows-check` CI job). Part of [agent-host-roadmap.md](agent-host-roadmap.md).
-S3 rides the SSH transport ([ssh-environments.md](ssh-environments.md) S3).
+S3 rides the SSH transport ([ssh-environments.md](ssh-environments.md) S3). It is offered on macOS and Linux only: a Windows desktop has no ssh connection sharing yet, so the Devices window shows why and `openSsh` refuses.
 
 ## 1. Goal and decision
 

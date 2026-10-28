@@ -53,6 +53,7 @@ const api: DeviceWindowApi = {
     settingsGet: () => ipcRenderer.invoke(LOCAL_CHANNEL.settingsGet),
     settingsUpdate: (update) => ipcRenderer.invoke(LOCAL_CHANNEL.settingsUpdate, update),
     terminalAvailability: () => ipcRenderer.invoke(LOCAL_CHANNEL.terminalAvailability),
+    terminalSshAvailability: () => ipcRenderer.invoke(LOCAL_CHANNEL.terminalSshAvailability),
 };
 
 contextBridge.exposeInMainWorld("neoreDevice", api);

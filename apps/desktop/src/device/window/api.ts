@@ -44,4 +44,6 @@ export interface DeviceWindowApi {
     settingsGet: () => Promise<SettingsView>;
     settingsUpdate: (update: Record<string, unknown>) => Promise<SettingsView>;
     terminalAvailability: () => Promise<Availability>;
+    /** Whether a terminal on a server is offered (not on Windows yet). */
+    terminalSshAvailability: () => Promise<Availability>;
 }

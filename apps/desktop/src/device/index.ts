@@ -428,6 +428,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     // The terminal is the user's own shell, opened by a click in this window. The folder is checked by the terminal module.
     local(LOCAL_CHANNEL.terminalAvailability, () => options.terminal?.availability ?? { available: false, reason: "The terminal is not available." });
+    local(LOCAL_CHANNEL.terminalSshAvailability, () => options.terminal?.sshAvailability ?? { available: false, reason: "The terminal is not available." });
 
     local(LOCAL_CHANNEL.openTerminal, async (folder) => {
         if (options.terminal === undefined) {

@@ -19,6 +19,10 @@ export const terminalAvailability = (platform: NodeJS.Platform = process.platfor
     return platform === "darwin" || platform === "linux" ? { available: true } : { available: false, reason: "The terminal is not available on this platform." };
 };
 
+/** A shell on a server rides ssh connection sharing, which the Windows desktop does not have yet (plans/ssh-environments.md). */
+export const sshTerminalAvailability = (platform: NodeJS.Platform = process.platform): Availability =>
+    platform === "win32" ? { available: false, reason: "A terminal on a server is not available on Windows yet." } : terminalAvailability(platform);
+
 const isExecutable = (file: string): boolean => {
     try {
         accessSync(file, constants.X_OK);

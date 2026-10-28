@@ -37,11 +37,14 @@ const state: {
     saves: Promise<void>;
     settings: SettingsView | null;
     terminalAvailable: boolean;
+    /** Why a terminal on a server is not offered, or `null` when it is. */
+    terminalServerReason: string | null;
 } = {
     current: null,
     saves: Promise.resolve(),
     settings: null,
     terminalAvailable: false,
+    terminalServerReason: null,
 };
 
 const setText = (id: string, text: string): void => {
@@ -399,7 +402,7 @@ const hostCard = (host: HostView): HTMLElement => {
         host.connected
             ? button("Disconnect", () => hostAction(() => globalThis.neoreDevice.hostDisconnect(host.deviceId), "Disconnected."), host.name)
             : button("Connect", () => hostAction(() => globalThis.neoreDevice.hostConnect(host.deviceId), "Connected."), host.name),
-        ...state.terminalAvailable ? [button("Terminal", () => hostAction(() => globalThis.neoreDevice.openHostTerminal(host.deviceId), "Terminal opened."), host.name)] : [],
+        ...state.terminalAvailable && state.terminalServerReason === null ? [button("Terminal", () => hostAction(() => globalThis.neoreDevice.openHostTerminal(host.deviceId), "Terminal opened."), host.name)] : [],
         button(
             "Forget host key",
             async () => {
@@ -498,6 +501,14 @@ const hostCard = (host: HostView): HTMLElement => {
     row.append(label, typed, addFolder);
     card.append(heading, where, actions, folders, row, sandbox, network, forward);
 
+    if (state.terminalAvailable && state.terminalServerReason !== null) {
+        const why = document.createElement("p");
+
+        why.className = "muted";
+        why.textContent = state.terminalServerReason;
+        card.append(why);
+    }
+
     if (host.sandboxDetail !== null) {
         const detail = document.createElement("p");
 
@@ -592,6 +603,10 @@ const loadTerminalAvailability = async (): Promise<void> => {
     setHidden("open-terminal", !availability.available);
     setHidden("terminal-status", availability.available);
     setText("terminal-status", availability.available ? "" : availability.reason);
+
+    const server = await globalThis.neoreDevice.terminalSshAvailability();
+
+    state.terminalServerReason = server.available ? null : server.reason;
 };
 
 const loadSettings = async (): Promise<void> => {

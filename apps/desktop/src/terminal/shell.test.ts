@@ -4,10 +4,23 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { readFolder, resolveShell, resolveSsh, shellEnvironment, sshEnvironment, terminalAvailability } from "./shell";
+import { readFolder, resolveShell, resolveSsh, shellEnvironment, sshEnvironment, sshTerminalAvailability, terminalAvailability } from "./shell";
 
 const NOT_AVAILABLE = /not available/u;
 const TOO_OLD = /Windows 10 version 1903/u;
+const ON_WINDOWS = /Windows/u;
+
+describe("sshTerminalAvailability", () => {
+    it("is offered where the terminal is, except on Windows, which has no ssh connection sharing yet", () => {
+        expect(sshTerminalAvailability("darwin")).toEqual({ available: true });
+        expect(sshTerminalAvailability("linux")).toEqual({ available: true });
+
+        const windows = sshTerminalAvailability("win32");
+
+        expect(windows.available).toBe(false);
+        expect("reason" in windows && windows.reason).toMatch(ON_WINDOWS);
+    });
+});
 
 describe("terminalAvailability", () => {
     it("is offered on macOS and Linux", () => {
@@ -112,7 +125,8 @@ describe("shellEnvironment", () => {
     });
 });
 
-describe("resolveSsh", () => {
+// POSIX only: a terminal on a server is not offered on Windows (`sshTerminalAvailability`).
+describe.skipIf(process.platform === "win32")("resolveSsh", () => {
     const exists = (...files: string[]) => (file: string) => files.includes(file);
 
     it("is the first ssh on the path, as an absolute path", () => {
@@ -133,7 +147,8 @@ describe("resolveSsh", () => {
     });
 });
 
-describe("sshEnvironment", () => {
+// POSIX only: a terminal on a server is not offered on Windows (`sshTerminalAvailability`).
+describe.skipIf(process.platform === "win32")("sshEnvironment", () => {
     it("hands ssh where things are, who is asking, the agent and the locale, and nothing else", () => {
         const env = sshEnvironment({
             AWS_SECRET_ACCESS_KEY: "secret",

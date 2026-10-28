@@ -19,7 +19,7 @@ import type { HostEvent, HostRequest } from "./protocol";
 import type { HostHandle, TerminalSession } from "./session";
 import { startSession } from "./session";
 import type { Availability } from "./shell";
-import { readFolder, resolveShell, resolveSsh, shellEnvironment, sshEnvironment, terminalAvailability } from "./shell";
+import { readFolder, resolveShell, resolveSsh, shellEnvironment, sshEnvironment, sshTerminalAvailability, terminalAvailability } from "./shell";
 import { readAck, readCopy, readInput, readSize } from "./validate";
 
 const WINDOW_DIR = path.join(__dirname, "terminal-window");
@@ -76,6 +76,8 @@ export interface TerminalOpener {
     open: (folder: string | null) => Promise<void>;
     /** Opens a terminal on a server. Rejects, and opens no window, when the server cannot be reached or trusted. */
     openSsh: (terminal: SshTerminal) => Promise<void>;
+    /** Whether a terminal on a server is offered: not on Windows yet. */
+    sshAvailability: Availability;
 }
 
 export interface TerminalController extends TerminalOpener {
@@ -145,6 +147,7 @@ const lockDownSession = (ses: Session): void => {
 
 export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalController => {
     const availability = terminalAvailability();
+    const sshAvailability = availability.available ? sshTerminalAvailability() : availability;
     const startHost = options.startHost ?? forkHost;
     const entries = new Map<WebContents, Entry>();
     const byFolder = new Map<string, Entry>();
@@ -291,8 +294,8 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
     const connecting = new Map<string, Promise<void>>();
 
     const openSsh = async (terminal: SshTerminal): Promise<void> => {
-        if (!availability.available) {
-            throw new Error(availability.reason);
+        if (!sshAvailability.available) {
+            throw new Error(sshAvailability.reason);
         }
 
         const key = `ssh:${terminal.deviceId}`;
@@ -510,5 +513,6 @@ export const registerTerminalIpc = (options: TerminalOptions = {}): TerminalCont
 
             return pids;
         },
+        sshAvailability,
     };
 };
