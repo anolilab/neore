@@ -86,6 +86,9 @@ export const resolvePathAgent = async (context: Reader, thread: Doc<"threads">, 
     return thread.model ? { kind: "model", model: thread.model } : null;
 };
 
+/** Pages of {@link PATH_PAGE_ROWS} rows read before the path counts as long without reading further. */
+const MAX_COLD_START_PAGES = 30;
+
 /**
  * Whether the path ending at `from` is long enough that a model change re-sends a cold prompt worth
  * warning about (`PROMPT_CACHE_COLD_START_TOKENS`). Counts the stored text of each row with the
@@ -95,7 +98,16 @@ export const pathExceedsColdStart = async (context: Reader, threadId: Id<"thread
     let characters = 0;
     let cursor = from;
 
+    let pages = 0;
+
     while (cursor) {
+        pages += 1;
+
+        // A path this long is past the threshold whatever the rows say: the read stays bounded.
+        if (pages > MAX_COLD_START_PAGES) {
+            return true;
+        }
+
         const { next, rows } = await walkPath(context, threadId, cursor, { limit: PATH_PAGE_ROWS });
 
         for (const row of rows) {

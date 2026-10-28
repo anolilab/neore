@@ -1408,16 +1408,13 @@ export const updateThread = authAction
 
             const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
-            // A switched thread's `model` is where the paths before its first switch recover their agent: the
-            // switch itself is the only way to change what the thread runs on.
-            if (model !== undefined && threadData?.activeAgent && model !== threadData.model) {
-                throw new LunoraError("BAD_REQUEST", "Switch the agent instead of changing this thread's model");
-            }
-
+            // A switched thread's stored `model` is where the paths before its first switch recover their agent: only
+            // a switch changes what it runs on, so the argument is ignored there (the palette's archive passes the model of
+            // whichever thread is open).
             const threadLanguage = threadData?.language;
 
             // Use provided model or fall back to thread's existing model
-            const effectiveModel = model ?? threadData?.model;
+            const effectiveModel = (threadData?.activeAgent ? undefined : model) ?? threadData?.model;
 
             if (!effectiveModel) {
                 throw new LunoraError("BAD_REQUEST", "Model is required when thread has no existing model");
