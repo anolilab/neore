@@ -191,7 +191,9 @@ if (process.platform !== "darwin" && targetArch === "arm64") {
 }
 
 if (process.platform === "win32") {
-    flags.push("-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded");
+    // whisper.cpp asks for CMake 3.5, so the runtime-library variable is ignored (CMP0091 is OLD) and the helper links the DLL
+    // runtime (msvcp140, vcruntime140) that a clean Windows install lacks: the policy has to be set before the project reads it.
+    flags.push("-DCMAKE_POLICY_DEFAULT_CMP0091=NEW", "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded");
     // ggml refuses to build for ARM with MSVC unless it may tune for the build machine (`GGML_NATIVE=ON`), which this build never
     // does: arm64 goes through clang-cl, which takes the baseline above. x64 builds with MSVC proper. The architecture and the
     // toolset are options of the Visual Studio generator, so no developer prompt has to be open.
