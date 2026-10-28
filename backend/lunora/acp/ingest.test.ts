@@ -50,7 +50,7 @@ const { signDevicePayload } = await import("../devices/lib/signing");
 const { floodAllowed, hostIngestHttpAction, readCappedBody, resetFloodGuard, resetOwnerCache } = await import("./http");
 const { applyHostEvents, reapHostStreams } = await import("./ingest");
 const { createHostStream } = await import("../chat/streaming/persistent/host");
-const { getHostSession, listHostSessions } = await import("./functions");
+const { getHostSession, getThreadCapabilities, listHostSessions } = await import("./functions");
 const agentThreads = await import("../agent/threads");
 const composite = await import("../chat/composite");
 const { measureDb } = await import("../../test/db-cost");
@@ -261,6 +261,96 @@ describe("session_open", () => {
 
         await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ threadId });
         await expect(as(stranger).query(getHostSession as never, { threadId } as never)).resolves.toBeNull();
+    });
+});
+
+describe("capability reports", () => {
+    const REPORT = {
+        groups: {
+            permissions: { modes: ["ask"] },
+            streaming: { text: { degradation: "none", supported: true } },
+            turns: { cancel: { degradation: "none", supported: true }, followUp: { kind: "queue" } },
+        },
+        reportedAt: 1_700_000_000_000,
+        version: 1,
+    };
+    const CHANGED = { groups: { turns: { followUp: { degradation: "restart", kind: "steer" } } }, reportedAt: 1_700_000_100_000, version: 1 };
+    const UNKNOWN = { groups: {}, reportedAt: expect.any(Number), version: 1 };
+
+    const openWith = async (device: Paired, capabilities: unknown) => {
+        const result = await ingest(device, { events: [{ ...SESSION_OPEN, capabilities }] });
+
+        expect(result.status).toBe(200);
+
+        return result.json.threadId as string;
+    };
+
+    const reportOf = async (threadId: string, userId = ownerId) => await as(userId).query(getThreadCapabilities as never, { threadId } as never);
+
+    it("stores the report the host sent, and gives it back to the owner", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, REPORT);
+        const session = await harness.run(async (ctx: any) => await ctx.db.acpSessions.findFirst({ where: { threadId } }));
+
+        expect(session).toMatchObject({ capabilities: REPORT });
+        await expect(reportOf(threadId)).resolves.toEqual(REPORT);
+    });
+
+    it("replaces the stored report wholesale when the host reconnects with a changed one", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, REPORT);
+
+        await expect(openWith(device, CHANGED)).resolves.toBe(threadId);
+        await expect(reportOf(threadId)).resolves.toEqual(CHANGED);
+    });
+
+    it("keeps the stored report when a reconnect carries none", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, REPORT);
+
+        await ingest(device, { events: [SESSION_OPEN] });
+        await expect(reportOf(threadId)).resolves.toEqual(REPORT);
+    });
+
+    it.each([
+        ["a string", "supports everything"],
+        ["a wrong version", { ...REPORT, version: 2 }],
+        ["an unknown reason", { groups: { turns: { cancel: { reason: "because", supported: false } } }, reportedAt: 1, version: 1 }],
+        ["null", null],
+    ])("stores %s as all unknown and still opens the session", async (_name, bad) => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, bad);
+
+        await expect(reportOf(threadId)).resolves.toEqual(UNKNOWN);
+    });
+
+    it("answers a host thread that never reported with all unknown, and a cloud thread with the cloud declaration", async () => {
+        const device = await pair(ownerId);
+        const hostThread = await openSession(device);
+        const cloudThread = (await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threads", {
+                    createdBy: ownerId,
+                    mode: "text",
+                    status: "active",
+                    tags: [],
+                    title: "t",
+                    updatedAt: Date.now(),
+                    userId: ownerId,
+                }),
+        )) as string;
+
+        await expect(reportOf(hostThread)).resolves.toEqual({ groups: {}, reportedAt: 0, version: 1 });
+        await expect(reportOf(cloudThread)).resolves.toMatchObject({ groups: { turns: { followUp: { kind: "steer" } } }, version: 1 });
+    });
+
+    it("returns nothing to a stranger, for a host thread, a cloud thread and an id that does not exist", async () => {
+        const device = await pair(ownerId);
+        const hostThread = await openWith(device, REPORT);
+        const stranger = await insertUser();
+
+        await expect(reportOf(hostThread, stranger)).resolves.toBeNull();
+        await expect(reportOf("not-an-id", ownerId)).resolves.toBeNull();
     });
 });
 

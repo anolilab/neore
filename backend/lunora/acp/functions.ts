@@ -2,12 +2,15 @@
  * Coding-agent sessions, as the web app reads them. Both are the caller's own; a host thread is never shared.
  * Starting, cancelling and answering are the remote-control slice (plans/acp-agent-host.md §8, S4).
  */
+import { CLOUD_INTERACTIVE_CAPABILITIES } from "@neore/ai/capabilities";
 import type { Infer } from "lunorash/server";
 import { v } from "lunorash/server";
 
+import { resolveThreadReadAccess } from "../agent/thread-read-access";
 import { authQuery } from "../lib/crpc";
 import { vCapabilityReport } from "../lib/capability-report";
 import { MAX_LENGTH } from "../lib/validators";
+import { isHostRunThread } from "./lib/host-thread";
 import { vAcpSessionStatus } from "./validators";
 
 const MAX_LISTED_SESSIONS = 50;
@@ -74,4 +77,29 @@ export const getHostSession = authQuery
         const row = threadId ? await ctx.db.acpSessions.findFirst({ where: { threadId, userId: ctx.user.userId } }) : null;
 
         return row ? toView(row) : null;
+    });
+
+/**
+ * What the runner of a thread can do (plans/provider-capabilities.md §6): the report its host sent for a host
+ * thread (all unknown while it has sent none), the cloud declaration for any other. Null for a thread the caller
+ * cannot read, so a stranger learns nothing, not even that the id exists.
+ */
+export const getThreadCapabilities = authQuery
+    .input({ threadId: v.string().max(MAX_LENGTH.id) })
+    .output(v.union(v.null(), vCapabilityReport))
+    .query(async ({ args, ctx }) => {
+        const threadId = ctx.db.normalizeId("threads", args.threadId);
+        const access = threadId ? await resolveThreadReadAccess(ctx, threadId, ctx.user.userId) : null;
+
+        if (access?.kind !== "full") {
+            return null;
+        }
+
+        if (!isHostRunThread(access.thread)) {
+            return CLOUD_INTERACTIVE_CAPABILITIES;
+        }
+
+        const session = await ctx.db.acpSessions.findFirst({ where: { threadId: access.thread._id, userId: ctx.user.userId } });
+
+        return session?.capabilities ?? { groups: {}, reportedAt: 0, version: 1 };
     });
