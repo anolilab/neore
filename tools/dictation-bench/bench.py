@@ -11,6 +11,7 @@ Usage: python3 -I bench.py <whisper-cli> <models-dir> <clips-dir> <prompts.tsv> 
 import json
 import os
 import platform
+import signal
 import re
 import subprocess
 import sys
@@ -82,10 +83,16 @@ def peak_rss_and_cpu(cmd):
     is_mac = platform.system() == "Darwin"
     timer = ["/usr/bin/time", "-l"] if is_mac else ["/usr/bin/time", "-v"]
     start = time.monotonic()
+    # Its own process group, so a timeout ends the recogniser too and not only /usr/bin/time,
+    # whose orphaned child would keep the pipes open.
+    proc = subprocess.Popen(timer + cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", errors="replace", start_new_session=True)
     try:
-        proc = subprocess.run(timer + cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=CLIP_TIMEOUT_S)
+        out, err = proc.communicate(timeout=CLIP_TIMEOUT_S)
     except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.communicate()
         return "", time.monotonic() - start, None, None, -1
+    proc = subprocess.CompletedProcess(proc.args, proc.returncode, out, err)
     wall = time.monotonic() - start
     err = proc.stderr
     rss = cpu = None
