@@ -1,5 +1,5 @@
 import type { ImageModelV2, JSONValue, LanguageModelV3 } from "@ai-sdk/provider";
-import { isHostRunThread } from "../acp/lib/host-thread";
+import { isHostRunThread, refuseHostThread } from "../acp/lib/host-thread";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -2323,6 +2323,11 @@ export const updateThreadVisibility = authMutation
         // A locked chat is never public: the public read would bypass its passcode.
         if (isPublic === true && isThreadLocked(thread)) {
             throwThreadLocked();
+        }
+
+        // A coding-agent thread holds commands and targets only its owner reads (the twin of `chat_sharing.toggleThreadVisibility`).
+        if (isPublic === true) {
+            refuseHostThread(thread, "made public");
         }
 
         // The share token is minted here, as `chat_sharing.toggleThreadVisibility`
