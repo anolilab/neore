@@ -142,6 +142,21 @@ export const pathTokens = async (
     return estimateTokensFromCharacters(characters);
 };
 
+/** Rows from `from` (inclusive) up to `stopAtId` (exclusive), counted up to `cap`. */
+export const rowsSince = async (context: Reader, threadId: Id<"threads">, from: Row, stopAtId: string, cap: number): Promise<number> => {
+    let count = 0;
+    let cursor: Row | null = from;
+
+    while (cursor && cursor._id !== stopAtId && count < cap) {
+        const { next, rows } = await walkPath(context, threadId, cursor, { limit: PAGE_ROWS, stopAtId });
+
+        count += rows.length;
+        cursor = next;
+    }
+
+    return count;
+};
+
 /**
  * The newest divider on the path ending at `from` that moved on FROM `model`: the agent had seen the thread
  * through its `startMessageId`. Gives up after {@link MAX_SEARCH_PAGES} pages.

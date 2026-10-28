@@ -327,6 +327,22 @@ describe("switching back", () => {
         expect(blocks).toStrictEqual([{ before: 2, text: back!.handoff }]);
     });
 
+    it("hands over portably when the model's earlier context has left the context window", async () => {
+        await addTurn("first question of the model A era", "first answer of the model A era");
+        await switchTo(B, "click-1", "portable");
+
+        for (let index = 0; index < 60; index += 1) {
+            await addTurn(`question ${index} for model B`, `answer ${index} from model B`);
+        }
+
+        await switchTo(A, "click-2", "portable");
+
+        const [, back] = await dividers();
+
+        expect(back).toMatchObject({ mode: "portable", to: { model: A } });
+        expect(back!.handoff).toContain("You are taking over a conversation part-way");
+    });
+
     it("previews a switch back as the old context plus the handoff of what came since", async () => {
         await longThread(30);
         await switchTo(B, "click-1");
