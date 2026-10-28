@@ -325,6 +325,7 @@ const findDispatchedRun = async (ctx: Pick<MutationCtx, "db">, args: WorkerRunAr
         const runs = await ctx.db
             .query("subAgentRuns")
             .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", args.parentThreadId).eq("status", status))
+            .order("desc")
             .take(SUB_AGENT_LIFETIME_SCAN);
         const found = runs.find((run) => run.clientId === args.clientId && run.userId === args.userId);
 
@@ -553,7 +554,7 @@ export const createRun = internalMutation
  * A lead's message to one of its workers (the `messageWorker` tool). The tool call id dedupes it.
  */
 export const messageWorker = internalMutation
-    .input({ message: v.string(), parentThreadId: v.string(), toolCallId: v.string(), userId: v.string(), workerId: v.string() })
+    .input({ message: v.string().max(SUB_AGENT_TASK_MAX), parentThreadId: v.string(), toolCallId: v.string(), userId: v.string(), workerId: v.string() })
     .output(v.union(v.object({ runId: v.id("subAgentRuns"), state: vSubAgentRunStatus, workerId: v.string() }), v.object({ error: v.string() })))
     .mutation(async ({ args, ctx }) => {
         const dispatched = await dispatchWorkerRun(ctx, {
@@ -1141,6 +1142,8 @@ export const listWorkers = authQuery
                 ...(await ctx.db
                     .query("subAgentRuns")
                     .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", args.leadThreadId).eq("status", status))
+                    // Newest first: the oldest runs of a long-lived lead are not the ones whose state the list shows.
+                    .order("desc")
                     .take(SUB_AGENT_LIFETIME_SCAN)),
             );
         }
@@ -1241,6 +1244,7 @@ export const listActiveWorkerRuns = authQuery
             const runs = await ctx.db
                 .query("subAgentRuns")
                 .withIndex("by_user_and_status", (q) => q.eq("userId", ctx.user.userId).eq("status", status))
+                .order("desc")
                 .take(ACTIVE_WORKER_RUNS_MAX);
 
             for (const run of runs) {

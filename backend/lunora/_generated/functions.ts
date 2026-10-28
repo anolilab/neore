@@ -7505,16 +7505,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["leadThreadId"] !== "string") return DEFER;
 return { "leadThreadId": source["leadThreadId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_164.messageWorker.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["message"] !== "string") return DEFER;
-if (typeof source["parentThreadId"] !== "string") return DEFER;
-if (typeof source["toolCallId"] !== "string") return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-if (typeof source["workerId"] !== "string") return DEFER;
-return { "message": source["message"], "parentThreadId": source["parentThreadId"], "toolCallId": source["toolCallId"], "userId": source["userId"], "workerId": source["workerId"] };
-});
 installCompiledValidatorMap(lunora_sub_agents_functions_164.postResult.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
