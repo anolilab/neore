@@ -136,6 +136,24 @@ pub fn verify_call(
     now: u64,
     nonces: &mut NonceSet,
 ) -> Result<CallEnvelope, String> {
+    let call = verify_call_unrecorded(secret, device_id, signed, now)?;
+
+    if call.nonce.is_empty() || !nonces.insert(&call.nonce, call.expires_at, now) {
+        return Err("the request was already used or could not be recorded".into());
+    }
+
+    Ok(call)
+}
+
+/// Everything [`verify_call`] checks except the nonce. A coding-agent command is redelivered under the
+/// same envelope when its claim lapses (`acp_call.rs`), so its replay defence is the main process's receipt
+/// log, keyed by the signed call id and kept until the envelope expires, not a nonce spent at the first look.
+pub fn verify_call_unrecorded(
+    secret: &str,
+    device_id: &str,
+    signed: &Signed,
+    now: u64,
+) -> Result<CallEnvelope, String> {
     if !verify(secret, Domain::Call, &signed.payload, &signed.signature) {
         return Err("the request is not signed for this device".into());
     }
@@ -153,10 +171,6 @@ pub fn verify_call(
 
     if call.expires_at > now + MAX_ENVELOPE_AHEAD_MS {
         return Err("the request expires too far ahead".into());
-    }
-
-    if call.nonce.is_empty() || !nonces.insert(&call.nonce, call.expires_at, now) {
-        return Err("the request was already used or could not be recorded".into());
     }
 
     Ok(call)

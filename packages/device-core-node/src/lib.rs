@@ -285,6 +285,54 @@ impl DeviceCore {
         self.state.acp_permission_cancel_session(&session_id);
     }
 
+    /// Checks one relayed coding-agent command (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`)
+    /// without acting on it or spending its nonce (JSON `{ callId, expiresAt, command, refusal }`). The main process
+    /// writes its receipt, acts on `command`, then asks for the result with `acp_sign`.
+    #[napi]
+    pub fn acp_prepare(&self, envelope: String, signature: String) -> Result<String> {
+        let prepared = self
+            .state
+            .acp_prepare(&Signed {
+                payload: envelope,
+                signature,
+            })
+            .map_err(Error::from_reason)?;
+
+        to_json(&prepared)
+    }
+
+    /// The signed result of a coding-agent command: `accepted`, or the reason it was not carried out
+    /// (`{ payload, signature }`, JSON).
+    #[napi]
+    pub fn acp_sign(&self, envelope: String, signature: String, outcome: String) -> Result<String> {
+        let signed = self
+            .state
+            .acp_sign(
+                &Signed {
+                    payload: envelope,
+                    signature,
+                },
+                &outcome,
+            )
+            .map_err(Error::from_reason)?;
+
+        to_json(&signed)
+    }
+
+    /// Answers the coding-agent request the backend named, under the device window's rules. Throws
+    /// `already_answered` when it is no longer waiting.
+    #[napi]
+    pub fn acp_permission_answer_remote(
+        &self,
+        session_id: String,
+        request_id: String,
+        option_id: String,
+    ) -> Result<()> {
+        self.state
+            .acp_permission_answer_remote(&session_id, &request_id, &option_id)
+            .map_err(Error::from_reason)
+    }
+
     /// The most recent audit lines, newest first (each a JSON object).
     #[napi]
     pub fn audit_tail(&self) -> Vec<String> {

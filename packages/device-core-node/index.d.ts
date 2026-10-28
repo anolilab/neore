@@ -63,6 +63,19 @@ export declare class DeviceCore {
   acpPermissionAnswerBatch(ids: Array<number>): number
   /** Answers every waiting request of one session cancelled. Call when the session is cancelled or ends. */
   acpPermissionCancelSession(sessionId: string): void
+  /**
+   * Checks one relayed coding-agent command without acting on it or spending its nonce (JSON
+   * `{ callId, expiresAt, command, refusal }`). The main process writes its receipt, acts on `command`, then asks
+   * for the result with `acpSign`.
+   */
+  acpPrepare(envelope: string, signature: string): string
+  /** The signed result of a coding-agent command: `accepted`, or the reason it was not carried out (JSON). */
+  acpSign(envelope: string, signature: string, outcome: string): string
+  /**
+   * Answers the coding-agent request the backend named, under the device window's rules. Throws
+   * `already_answered` when it is no longer waiting.
+   */
+  acpPermissionAnswerRemote(sessionId: string, requestId: string, optionId: string): void
   /** The most recent audit lines, newest first (each a JSON object). */
   auditTail(): Array<string>
   /** Stops local MCP servers idle for ten minutes. Call about once a minute. */
