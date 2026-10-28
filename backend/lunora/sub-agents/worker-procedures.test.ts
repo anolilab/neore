@@ -227,6 +227,32 @@ describe("a busy worker", () => {
         expect(startedRuns()).toStrictEqual([a!.runId, b!.runId]);
     });
 
+    it("keeps seeing the running run behind a long run of cancelled messages", async () => {
+        const workerId = await idleWorker();
+        const a = (await message(workerId, "c-a")) as { runId: string };
+
+        await claim(a.runId);
+
+        // Seeded directly: sending that many messages would hit the dispatch rate limit.
+        const [first] = await runRows();
+
+        await run(async (context) => {
+            for (let index = 1; index <= 25; index += 1) {
+                const { _creationTime, _id, ...fields } = first;
+
+                await context.db.insert("subAgentRuns", { ...fields, createdAt: first.createdAt + index, startedAt: undefined, status: "cancelled", toolCallId: `seed-${String(index)}` });
+            }
+        });
+
+        const last = (await message(workerId, "c-last")) as { runId: string };
+
+        // The first run is older than the newest 20 rows but still going: nothing starts beside it.
+        expect(startedRuns()).toStrictEqual([a.runId]);
+
+        await finish(a.runId);
+        expect(startedRuns()).toStrictEqual([a.runId, last.runId]);
+    });
+
     it("does not show a worker as idle while a stopped run's loop is still unwinding", async () => {
         const workerId = await idleWorker();
         const a = (await message(workerId, "c-a")) as { runId: string };

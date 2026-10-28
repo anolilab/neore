@@ -2298,6 +2298,7 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_parentThreadId_and_status", ["parentThreadId", "status"])
         .index("by_childThreadId", ["childThreadId"])
+        .index("by_childThreadId_and_status", ["childThreadId", "status"])
         .index("by_user_and_status", ["userId", "status"])
         .index("by_user_and_toolCallId", ["userId", "toolCallId"])
         .index("by_user_and_createdAt", ["userId", "createdAt"])

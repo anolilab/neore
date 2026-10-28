@@ -279,17 +279,30 @@ const workerOrigin = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childThread
 };
 
 /**
- * The worker's newest runs, newest first by `createdAt`. Admission keeps that strictly increasing
- * per worker, so the order is the order the messages were sent even when `_creationTime` ties.
+ * The worker's newest runs, newest first by `createdAt`, plus every run still queued or running however
+ * old: a burst of newer cancelled messages must not push the live run out of view, or a second one would
+ * start beside it. Admission keeps `createdAt` strictly increasing per worker, so the order is the order
+ * the messages were sent even when `_creationTime` ties.
  */
 const latestWorkerRuns = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childThreadId: string): Promise<RunDoc[]> => {
-    const runs = await ctx.db
+    const recent = await ctx.db
         .query("subAgentRuns")
         .withIndex("by_childThreadId", (q) => q.eq("childThreadId", childThreadId))
         .order("desc")
         .take(WORKER_RUNS_CHECKED);
+    const seen = new Set<string>(recent.map((run) => run._id));
+    const older: RunDoc[] = [];
 
-    return runs.toSorted((a, b) => b.createdAt - a.createdAt);
+    for (const status of ["running", "queued"] as const) {
+        const live = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", childThreadId).eq("status", status))
+            .take(WORKER_RUNS_CHECKED);
+
+        older.push(...live.filter((run) => !seen.has(run._id)));
+    }
+
+    return [...recent, ...older].toSorted((a, b) => b.createdAt - a.createdAt);
 };
 
 /**

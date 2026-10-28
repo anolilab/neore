@@ -1228,6 +1228,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     by_user_and_createdAt: index("by_user_and_createdAt").on(t.userId, t.createdAt),
     by_user_and_toolCallId: index("by_user_and_toolCallId").on(t.userId, t.toolCallId),
     by_user_and_status: index("by_user_and_status").on(t.userId, t.status),
+    by_childThreadId_and_status: index("by_childThreadId_and_status").on(t.childThreadId, t.status),
     by_childThreadId: index("by_childThreadId").on(t.childThreadId),
     by_parentThreadId_and_status: index("by_parentThreadId_and_status").on(t.parentThreadId, t.status),
 }));
