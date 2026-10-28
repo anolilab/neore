@@ -172,6 +172,20 @@ describe("download", () => {
         expect(calls).toBe(1);
     });
 
+    it("reports a download while it runs and not after", async () => {
+        const store = createModelStore({ directory, fetch: async () => responseOf(split(PAYLOAD)) });
+
+        expect(store.isDownloading(spec)).toBe(false);
+
+        const running = store.download(spec);
+
+        expect(store.isDownloading(spec)).toBe(true);
+
+        await running;
+
+        expect(store.isDownloading(spec)).toBe(false);
+    });
+
     it("sweeps the partial file an interrupted download left behind", async () => {
         await writeFile(path.join(directory, ".ggml-test.bin.abc.partial"), "half");
         await writeFile(path.join(directory, spec.file), PAYLOAD);

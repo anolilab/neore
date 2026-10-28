@@ -12,7 +12,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { BrowserWindow as BrowserWindowInstance, IpcMainEvent, Session } from "electron";
-import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Notification, session, systemPreferences } from "electron";
+import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, net, Notification, session, systemPreferences } from "electron";
 
 import { modelFor } from "./catalog.js";
 import type { CaptureFailure } from "./channels.js";
@@ -274,7 +274,7 @@ export const createDictation = (options: DictationOptions): Dictation => {
             return;
         }
 
-        const models = createModelStore({ directory: path.join(app.getPath("userData"), "dictation", "models") });
+        const models = createModelStore({ directory: path.join(app.getPath("userData"), "dictation", "models"), fetch: (url, init) => net.fetch(String(url), init) });
 
         controller = createDictationController({
             confirmDownload,
@@ -295,6 +295,7 @@ export const createDictation = (options: DictationOptions): Dictation => {
             models: {
                 download: (spec) => models.download(spec),
                 ensureVerified: async (spec) => testEngine?.modelPath ?? models.ensureVerified(spec),
+                isDownloading: (spec) => models.isDownloading(spec),
                 status: async (spec) => testEngine === undefined ? models.status(spec) : { bytes: 0, file: spec.file, state: "present", version: spec.version },
             },
             notify,
@@ -323,8 +324,7 @@ export const createDictation = (options: DictationOptions): Dictation => {
             fromWindow((_event, payload) => {
                 const chunk = toBuffer(payload);
 
-                if (chunk !== undefined) {
-                    controller?.addAudio(chunk);
+                if (chunk !== undefined && controller?.addAudio(chunk) === true) {
                     probe.audioBytes += chunk.length;
                 }
             }),
@@ -374,6 +374,7 @@ export const createDictation = (options: DictationOptions): Dictation => {
 
         app.on("will-quit", () => {
             controller?.cancel();
+            recognizer?.kill();
             globalShortcut.unregister(DICTATION_SHORTCUT);
         });
     };

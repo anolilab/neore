@@ -22,6 +22,7 @@ const buildDependencies = (window: CaptureWindow, recognizer: Recognizer, notice
         models: {
             download: vi.fn(async (_spec: ModelSpec) => "/models/m.bin"),
             ensureVerified: vi.fn(async (_spec: ModelSpec) => "/models/m.bin"),
+            isDownloading: vi.fn((_spec: ModelSpec) => false),
             status: vi.fn(async (_spec: ModelSpec): Promise<ModelStatus> => { return { bytes: 1, file: "m.bin", state: "present", version: "v1" }; }),
         },
         notify: vi.fn((title: string, body: string) => {
@@ -116,6 +117,33 @@ describe("a dictation", () => {
         expect(h.deps.insert).toHaveBeenCalledWith("hi there");
         expect(h.controller.lastOutcome()).toBe("inserted");
         expect(h.controller.state()).toBe("idle");
+    });
+
+    it("keeps the last chunk the page sends while it stops", async () => {
+        const h = harness();
+        const tail = Buffer.alloc(32_000, 9);
+
+        vi.mocked(h.window.stop).mockImplementation(async () => {
+            expect(h.controller.addAudio(tail)).toBe(true);
+        });
+        await speak(h);
+        h.controller.release();
+        await settled();
+
+        expect(h.recognizer.transcribed[0]?.length).toBe(64_000);
+        expect(h.recognizer.transcribed[0]?.subarray(32_000).equals(tail)).toBe(true);
+    });
+
+    it("refuses audio when it is not recording or draining", async () => {
+        const h = harness();
+
+        expect(h.controller.addAudio(ONE_SECOND)).toBe(false);
+
+        await speak(h);
+        h.controller.release();
+        await settled();
+
+        expect(h.controller.addAudio(ONE_SECOND)).toBe(false);
     });
 
     it("keeps no audio once it is over", async () => {
@@ -220,6 +248,35 @@ describe("a dictation", () => {
 
         expect(h.window.closed).toBe(1);
         expect(h.recognizer.kill).toHaveBeenCalled();
+        expect(h.deps.insert).not.toHaveBeenCalled();
+        expect(h.controller.lastOutcome()).toBe("cancelled");
+    });
+
+    it("cancels while transcribing: the helper is stopped and its late result is dropped", async () => {
+        let finishTranscribing: (value: { segments: string[]; text: string }) => void = () => {};
+        // The tsconfig lib predates Promise.withResolvers.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const transcription = new Promise<{ segments: string[]; text: string }>((resolve) => {
+            finishTranscribing = resolve;
+        });
+        const h = harness({}, () => transcription);
+
+        await speak(h);
+        h.controller.release();
+        await settled();
+
+        expect(h.controller.state()).toBe("transcribing");
+
+        h.controller.cancel();
+        await settled();
+
+        expect(h.controller.state()).toBe("idle");
+        expect(h.controller.lastOutcome()).toBe("cancelled");
+        expect(h.recognizer.kill).toHaveBeenCalled();
+
+        finishTranscribing({ segments: ["hi"], text: "hi there" });
+        await settled();
+
         expect(h.deps.insert).not.toHaveBeenCalled();
         expect(h.controller.lastOutcome()).toBe("cancelled");
     });
@@ -333,6 +390,20 @@ describe("before a window opens", () => {
         expect(h.deps.openWindow).not.toHaveBeenCalled();
         expect(h.controller.lastOutcome()).toBe("download-started");
         expect(h.notices.at(-1)).toContain("ready");
+    });
+
+    it("says the model is still downloading, without asking again", async () => {
+        const h = harness();
+
+        h.deps.models.status.mockResolvedValue({ state: "missing" });
+        h.deps.models.isDownloading.mockReturnValue(true);
+        h.controller.press();
+        await settled();
+
+        expect(h.deps.confirmDownload).not.toHaveBeenCalled();
+        expect(h.deps.models.download).not.toHaveBeenCalled();
+        expect(h.controller.lastOutcome()).toBe("downloading");
+        expect(h.notices.at(-1)).toContain("still downloading");
     });
 
     it("downloads nothing when the person declines", async () => {

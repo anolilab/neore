@@ -38,6 +38,8 @@ export interface ModelStore {
     download: (spec: ModelSpec, options?: DownloadOptions) => Promise<string>;
     /** The path of a model whose bytes hash to the pinned checksum; checked once per file state per run. A mismatch deletes the file. */
     ensureVerified: (spec: ModelSpec) => Promise<string>;
+    /** Whether a download of this model is running now. */
+    isDownloading: (spec: ModelSpec) => boolean;
     pathOf: (spec: ModelSpec) => string;
     status: (spec: ModelSpec) => Promise<ModelStatus>;
     /** Removes the leftovers of a download that was interrupted (the process died, the machine slept). */
@@ -224,5 +226,5 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
         await Promise.all(names.filter((name) => name.endsWith(PARTIAL_SUFFIX)).map((name) => removeQuietly(path.join(directory, name))));
     };
 
-    return { download, ensureVerified, pathOf, status, sweepPartials };
+    return { download, ensureVerified, isDownloading: (spec) => inFlight.has(spec.id), pathOf, status, sweepPartials };
 };

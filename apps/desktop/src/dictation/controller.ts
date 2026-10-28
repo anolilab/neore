@@ -20,6 +20,7 @@ export type DictationOutcome
     = | "cancelled"
         | "download-declined"
         | "download-started"
+        | "downloading"
         | "empty"
         | "error"
         | "inserted"
@@ -44,7 +45,7 @@ export interface ControllerDependencies {
     /** The OS-level microphone decision; `false` stops before a window opens. */
     microphoneAllowed: () => Promise<boolean>;
     model: ModelSpec;
-    models: Pick<ModelStore, "download" | "ensureVerified" | "status">;
+    models: Pick<ModelStore, "download" | "ensureVerified" | "isDownloading" | "status">;
     notify: (title: string, body: string) => void;
     now: () => number;
     openWindow: () => CaptureWindow;
@@ -52,8 +53,8 @@ export interface ControllerDependencies {
 }
 
 export interface DictationController {
-    /** A chunk of audio from the page. The caller has already checked who sent it. */
-    addAudio: (chunk: Buffer) => void;
+    /** A chunk of audio from the page. The caller has already checked who sent it. Whether the chunk was kept. */
+    addAudio: (chunk: Buffer) => boolean;
     cancel: () => void;
     /** The page reported a capture failure. */
     captureFailed: (failure: CaptureFailure) => void;
@@ -95,6 +96,8 @@ export const createDictationController = (dependencies: ControllerDependencies):
     let window: CaptureWindow | undefined;
     let chunks: Buffer[] = [];
     let bytes = 0;
+    /** The key is up and the page is flushing its last chunk: audio still counts until `stop()` resolves. */
+    let draining = false;
     let recognizer: Promise<Recognizer> | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -102,6 +105,7 @@ export const createDictationController = (dependencies: ControllerDependencies):
         generation += 1;
         outcome = result;
         state = "idle";
+        draining = false;
         clearTimeout(timer);
         timer = undefined;
         // The audio lives only in this array: dropping it is the whole of "released".
@@ -159,6 +163,13 @@ export const createDictationController = (dependencies: ControllerDependencies):
         const { state: modelState } = await dependencies.models.status(dependencies.model);
 
         if (modelState === "missing") {
+            if (dependencies.models.isDownloading(dependencies.model)) {
+                settle("downloading");
+                dependencies.notify(TITLE, "The speech model is still downloading. You will be told when it is ready.");
+
+                return false;
+            }
+
             const accepted = mine === generation && await dependencies.confirmDownload(dependencies.model);
 
             if (mine !== generation) {
@@ -256,10 +267,17 @@ export const createDictationController = (dependencies: ControllerDependencies):
         const mine = generation;
         const pending = recognizer;
 
+        draining = true;
+
         try {
             await window?.stop();
         } catch {
             // The page is gone; what arrived is what there is.
+        }
+
+        // A newer dictation may have started since; its flag is not ours to clear.
+        if (mine === generation) {
+            draining = false;
         }
 
         // Closed on release: the microphone is off and the page, with any audio it held, is destroyed.
@@ -306,15 +324,18 @@ export const createDictationController = (dependencies: ControllerDependencies):
 
     return {
         addAudio: (chunk) => {
-            if (state !== "recording" || bytes + chunk.length > MAX_AUDIO_BYTES) {
-                return;
+            if ((state !== "recording" && !draining) || bytes + chunk.length > MAX_AUDIO_BYTES) {
+                return false;
             }
 
             chunks.push(chunk);
             bytes += chunk.length;
+
+            return true;
         },
         cancel: () => {
-            if (state === "preparing" || state === "recording") {
+            // Transcribing too: settling kills the helper, and the late result is dropped by the generation check.
+            if (state !== "idle") {
                 settle("cancelled");
             }
         },

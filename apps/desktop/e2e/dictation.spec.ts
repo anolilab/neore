@@ -183,14 +183,23 @@ const walk = async (directory: string): Promise<string[]> => {
     return found;
 };
 
-/** Files in `directories` that look like recorded audio: a RIFF/WAVE header anywhere in them. */
+/** Distinctive samples appended to the audio the suite sends: if any file holds them, the recording was written to disk. Not sent when the page captures the microphone itself. */
+const PCM_MARKER = Buffer.from("NEORE-AUDIO-MARKER-0123456789ABCDEF!!".repeat(64));
+
+/** Files in `directories` that look like recorded audio: a RIFF/WAVE header, or the samples that were sent, anywhere in them. */
 const audioFiles = async (directories: string[]): Promise<string[]> => {
     const found: string[] = [];
 
     const files = (await Promise.all(directories.map((directory) => walk(directory)))).flat();
 
     for (const file of files) {
-        if ((await stat(file)).size >= 44 && (await readFile(file)).includes("WAVEfmt ")) {
+        if ((await stat(file)).size < 44) {
+            continue;
+        }
+
+        const content = await readFile(file);
+
+        if (content.includes("WAVEfmt ") || content.includes(PCM_MARKER)) {
             found.push(file);
         }
     }
@@ -205,7 +214,9 @@ test("with the network blocked, a dictation completes and inserts its text as a 
         const site = await siteWindow(app);
 
         await useFakeRecogniser(app);
-        await dictate(app);
+        const marked = Buffer.concat([pcmOf(toneWav()), PCM_MARKER]);
+
+        await dictate(app, marked);
 
         // The capture window cannot reach anything: not the internet, not the loopback site, not a file outside its own folder.
         const page = await findPage(app, (url) => DICTATION_PAGE.test(url));
@@ -224,6 +235,29 @@ test("with the network blocked, a dictation completes and inserts its text as a 
         }, SITE);
 
         expect(attempts).toStrictEqual(["blocked", "blocked", "blocked"]);
+        // The page's CSP is only the first wall: the session itself cancels everything that is not the window's own assets.
+        const fromSession = await app.evaluate(async ({ session }, urls) => {
+            const results: string[] = [];
+
+            for (const url of urls) {
+                try {
+                    await session.fromPartition("dictation").fetch(url);
+                    results.push("reached");
+                } catch (error) {
+                    results.push(String(error));
+                }
+            }
+
+            return results;
+        }, ["https://example.org/", SITE]);
+
+        // ERR_BLOCKED_BY_CLIENT is the request filter's own cancel, not an offline machine.
+        expect(fromSession).toHaveLength(2);
+
+        for (const result of fromSession) {
+            expect(result).toContain("ERR_BLOCKED_BY_CLIENT");
+        }
+
         // Its bridge is the preload's four functions, nothing of the site's, and no Node.
         expect(new Set(await page.evaluate(() => Object.keys((globalThis as { neoreDictation?: object }).neoreDictation ?? {})))).toStrictEqual(new Set(["audio", "ended", "failed", "onStop"]));
         expect(await page.evaluate(() => [typeof (globalThis as { neoreNative?: unknown }).neoreNative, typeof (globalThis as { require?: unknown }).require])).toStrictEqual(["undefined", "undefined"]);

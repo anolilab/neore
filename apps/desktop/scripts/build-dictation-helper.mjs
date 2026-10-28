@@ -17,6 +17,8 @@ import { fileURLToPath } from "node:url";
 // whisper.cpp v1.9.5.
 const WHISPER_CPP_SHA = "d1be6fde11ac6e0407606b4e42fe72d34add8037";
 const WHISPER_CPP_URL = "https://github.com/ggml-org/whisper.cpp.git";
+// The oldest macOS the app runs on: Electron 44's own LSMinimumSystemVersion. The helper must not require more.
+const MACOS_MINIMUM = "13.0";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const workFlag = process.argv.indexOf("--work");
@@ -56,12 +58,18 @@ const flags = [
     "-DBUILD_SHARED_LIBS=OFF",
     "-DWHISPER_BUILD_TESTS=OFF",
     "-DWHISPER_BUILD_EXAMPLES=ON",
+    // The default tunes for the build machine's own CPU (`-mcpu=native`), which dies with SIGILL on an older chip of the same family.
+    "-DGGML_NATIVE=OFF",
 ];
 
 if (process.platform === "darwin") {
     // Metal on Apple Silicon, with its shader library compiled in; the Intel build runs on the CPU
     // (its GPU is slower than the CPU on the machines measured, plans/desktop-dictation.md Appendix A).
-    flags.push(process.arch === "arm64" ? "-DGGML_METAL_EMBED_LIBRARY=ON" : "-DGGML_METAL=OFF");
+    flags.push(
+        process.arch === "arm64" ? "-DGGML_METAL_EMBED_LIBRARY=ON" : "-DGGML_METAL=OFF",
+        `-DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOS_MINIMUM}`,
+        `-DCMAKE_OSX_ARCHITECTURES=${process.arch === "arm64" ? "arm64" : "x86_64"}`,
+    );
 }
 
 if (process.platform === "win32") {
@@ -75,6 +83,25 @@ const built = [path.join(work, "build", "bin", executable), path.join(work, "bui
 
 if (built === undefined) {
     throw new Error(`whisper-cli was not built under ${path.join(work, "build")}`);
+}
+
+// Checked on the build output, before anything is copied to where electron-builder packs from.
+if (process.platform === "darwin") {
+    const loadCommands = execFileSync("otool", ["-l", built], { encoding: "utf8" });
+    // LC_BUILD_VERSION names it `minos`; the older LC_VERSION_MIN_MACOSX names it `version`.
+    const minimum = /LC_BUILD_VERSION[\s\S]*?minos (\S+)|LC_VERSION_MIN_MACOSX[\s\S]*?version (\S+)/.exec(loadCommands);
+    const found = minimum?.[1] ?? minimum?.[2];
+
+    if (found === undefined) {
+        throw new Error("otool reported no minimum macOS version for the helper");
+    }
+
+    const [foundMajor = 0, foundMinor = 0] = found.split(".").map(Number);
+    const [allowedMajor = 0, allowedMinor = 0] = MACOS_MINIMUM.split(".").map(Number);
+
+    if (foundMajor > allowedMajor || (foundMajor === allowedMajor && foundMinor > allowedMinor)) {
+        throw new Error(`the helper needs macOS ${found}, above the app's minimum ${MACOS_MINIMUM}`);
+    }
 }
 
 // The committed licence text must still be the one the pinned source ships.
