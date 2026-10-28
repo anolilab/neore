@@ -1,0 +1,127 @@
+"""Dictation spike benchmark (plans/desktop-dictation.md S1): run whisper.cpp models over the
+fixed clips and report size, time, peak memory, CPU and accuracy (word error rate, or
+character error rate for ja/zh).
+
+The clips are prompts read by synthetic voices, one per supported language
+(prompts.tsv: language, voice, reference text), plus 00-en-10s, exactly ten seconds.
+
+Usage: python3 -I bench.py <whisper-cli> <models-dir> <clips-dir> <prompts.tsv> [model ...]
+"""
+
+import json
+import os
+import platform
+import re
+import subprocess
+import sys
+import time
+import unicodedata
+
+CHAR_LANGS = {"ja", "zh"}
+
+
+def normalise(text, lang):
+    text = unicodedata.normalize("NFKC", text).lower()
+    text = re.sub(r"[^\w\s]", " ", text)
+    if lang in CHAR_LANGS:
+        return [c for c in text if not c.isspace()]
+    return text.split()
+
+
+def edit_distance(ref, hyp):
+    prev = list(range(len(hyp) + 1))
+    for i, r in enumerate(ref, 1):
+        cur = [i] + [0] * len(hyp)
+        for j, h in enumerate(hyp, 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (r != h))
+        prev = cur
+    return prev[-1]
+
+
+def _run_measured_windows(cmd):
+    import psutil  # Windows has no /usr/bin/time; the workflow installs psutil there.
+
+    start = time.monotonic()
+    proc = psutil.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    peak = cpu = 0.0
+    while proc.poll() is None:
+        try:
+            peak = max(peak, proc.memory_info().peak_wset / 1048576)
+            times = proc.cpu_times()
+            cpu = times.user + times.system
+        except psutil.Error:
+            pass
+        time.sleep(0.02)
+    out, _err = proc.communicate()
+    return out, time.monotonic() - start, peak, cpu, proc.returncode
+
+
+def peak_rss_and_cpu(cmd):
+    """Runs cmd under /usr/bin/time; returns (stdout, wall seconds, peak RSS MiB, cpu seconds)."""
+    if platform.system() == "Windows":
+        return _run_measured_windows(cmd)
+    is_mac = platform.system() == "Darwin"
+    timer = ["/usr/bin/time", "-l"] if is_mac else ["/usr/bin/time", "-v"]
+    start = time.monotonic()
+    proc = subprocess.run(timer + cmd, capture_output=True, text=True)
+    wall = time.monotonic() - start
+    err = proc.stderr
+    rss = cpu = None
+    if is_mac:
+        m = re.search(r"(\d+)\s+maximum resident set size", err)
+        rss = int(m.group(1)) / 1048576 if m else None
+        u = re.search(r"([\d.]+)\s+user", err)
+        s = re.search(r"([\d.]+)\s+sys", err)
+        cpu = float(u.group(1)) + float(s.group(1)) if u and s else None
+    else:
+        m = re.search(r"Maximum resident set size \(kbytes\): (\d+)", err)
+        rss = int(m.group(1)) / 1024 if m else None
+        u = re.search(r"User time \(seconds\): ([\d.]+)", err)
+        s = re.search(r"System time \(seconds\): ([\d.]+)", err)
+        cpu = float(u.group(1)) + float(s.group(1)) if u and s else None
+    return proc.stdout, wall, rss, cpu, proc.returncode
+
+
+def main():
+    cli, models_dir, clips_dir, prompts_path = sys.argv[1:5]
+    models = sys.argv[5:] or ["tiny", "base", "small"]
+    prompts = [line.rstrip("\n").split("\t") for line in open(prompts_path, encoding="utf-8") if line.strip()]
+    clips = sorted(f for f in os.listdir(clips_dir) if f.endswith((".flac", ".wav")) and not f.startswith("00-"))
+    results = []
+    for model in models:
+        path = os.path.join(models_dir, f"ggml-{model}.bin")
+        size_mb = os.path.getsize(path) / 1e6
+        errors = total = 0
+        per_lang = {}
+        walls, rsss, cpus = [], [], []
+        for clip, (lang, _voice, text) in zip(clips, prompts):
+            out, wall, rss, cpu, code = peak_rss_and_cpu([cli, "-m", path, "-f", os.path.join(clips_dir, clip), "-l", lang, "-nt", "-np", "-t", "4"])
+            ref, hyp = normalise(text, lang), normalise(out, lang)
+            err = edit_distance(ref, hyp)
+            errors += err
+            total += len(ref)
+            pl = per_lang.setdefault(lang, [0, 0])
+            pl[0] += err
+            pl[1] += len(ref)
+            walls.append(wall)
+            rsss.append(rss or 0)
+            cpus.append(cpu or 0)
+        ten = next(os.path.join(clips_dir, f) for f in os.listdir(clips_dir) if f.startswith("00-en-10s"))
+        _out, ten_wall, ten_rss, ten_cpu, _code = peak_rss_and_cpu([cli, "-m", path, "-f", ten, "-l", "en", "-nt", "-np", "-t", "4"])
+        results.append(
+            {
+                "model": model,
+                "size_mb": round(size_mb, 1),
+                "error_rate": round(errors / total, 3),
+                "per_lang_error": {k: round(v[0] / v[1], 3) for k, v in per_lang.items()},
+                "ten_second_clip_s": round(ten_wall, 2),
+                "ten_second_cpu_s": round(ten_cpu or 0, 2),
+                "peak_rss_mb": round(max(rsss + [ten_rss or 0]), 0),
+                "mean_clip_s": round(sum(walls) / len(walls), 2),
+            }
+        )
+    print(json.dumps({"platform": f"{platform.system()} {platform.machine()}", "results": results}, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()

@@ -117,3 +117,36 @@ microphone prompt and helper packaging for each.
 2. **Hold key or toggle.** Recommendation: hold, with a toggle in settings.
 3. **Cloud fallback.** Recommendation: none. A failure is shown, and the user
    chooses the cloud path.
+
+## Appendix A — S1 spike measurements
+
+Harness: `tools/dictation-bench/` (`bench.py`, 18 prompts in the nine supported
+languages read by synthetic voices, plus one clip of exactly ten seconds), run by
+`.github/workflows/dictation-bench.yml`. Recogniser: whisper.cpp v1.9.5 (pinned
+commit in the workflow). Error rate is word error rate, character error rate for
+Japanese and Chinese, over all 18 clips. "10 s clip" is the wall time to finish the
+ten-second clip (batch decoding, so first-word latency equals it). Peak memory is
+the process's resident peak.
+
+| Platform | Model | Size | Error rate | 10 s clip | Peak memory |
+| --- | --- | --- | --- | --- | --- |
+| macOS arm64 (M4, Metal, machine under build load) | tiny | 78 MB | 17.8 % | 0.70 s | 279 MB |
+| macOS arm64 | base | 148 MB | 13.3 % | 0.67 s | 383 MB |
+| macOS arm64 | small | 488 MB | 7.0 % | 1.38 s | 857 MB |
+| macOS arm64 | large-v3-turbo q5_0 | 574 MB | 1.9 % | 3.91 s | 852 MB |
+| Linux x64, Linux arm64, macOS Intel, Windows x64, Windows arm64 | all four | — | from the workflow run on this PR | | |
+
+Per language on macOS, large-v3-turbo q5_0: en 0 %, de 0 %, es 5.7 %, fr 0 %, it 0 %,
+pl 0 %, pt 0 %, ja 5.4 %, zh 2.2 %. Every smaller model is much worse on Chinese
+(small 24 %, base 44 %); small is also weak on Italian (14 %).
+
+**Licences.** whisper.cpp is MIT. The Whisper model weights are MIT (released by
+their authors under MIT), and the ggml conversions are published under the same
+terms, so both may be redistributed inside the app with the licence text.
+
+**Recommendation (pending the other platforms).** large-v3-turbo q5_0 as the
+default: it is the only candidate whose accuracy holds in all nine languages, at a
+download (574 MB) close to small's. If the 10 s clip takes more than about 8 s on
+the Intel or Windows runners, offer small as the faster choice for English and
+the Western European languages, and say in settings that it is weaker on Chinese
+and Japanese.

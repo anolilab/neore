@@ -1,0 +1,18 @@
+en	Samantha	Please refactor the login handler so it returns early when the session token is missing, and add a test for the expired token case.
+en	Samantha	Open the settings modal, find the notifications tab, and turn off email alerts for finished tasks.
+de	Anna	Bitte schreib eine Funktion, die alle leeren Zeilen aus der Datei entfernt, und füge danach einen kurzen Test hinzu.
+de	Anna	Erkläre mir den Unterschied zwischen einer Warteschlange und einem Zeitplan in diesem Projekt.
+es	Mónica	Por favor, revisa el archivo de configuración y dime por qué el servidor no arranca en el puerto ocho mil.
+es	Mónica	Crea una nueva rama, corrige el error de traducción y abre una solicitud de cambios.
+fr	Thomas	Peux-tu ajouter une colonne pour la date de création et trier le tableau par ordre décroissant ?
+fr	Thomas	Résume les trois dernières réponses et propose une liste de tâches pour demain.
+it	Alice	Per favore aggiungi un controllo che impedisca di salvare il modulo quando il campo email è vuoto.
+it	Alice	Spiegami perché il test fallisce solo sul server di integrazione continua.
+pl	Zosia	Dodaj proszę obsługę błędów do tej funkcji i zapisz komunikat w dzienniku zdarzeń.
+pl	Zosia	Pokaż mi wszystkie miejsca, w których używamy tej zmiennej środowiskowej.
+pt	Luciana	Por favor, atualize as dependências do projeto e verifique se todos os testes continuam passando.
+pt	Luciana	Escreva um resumo curto desta conversa e envie como rascunho.
+ja	Kyoko	このファイルの重複したコードを関数にまとめて、テストを追加してください。
+ja	Kyoko	昨日の変更点を三つにまとめて説明してください。
+zh	Tingting	请把这个函数改成异步的，并且在出错的时候返回清楚的错误信息。
+zh	Tingting	帮我列出这个项目里所有没有测试的模块。
