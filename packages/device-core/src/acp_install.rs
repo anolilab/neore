@@ -431,6 +431,12 @@ fn remove_stale(staging: &Path) {
 }
 
 fn prune_other_versions(key_dir: &Path, keep: &str) {
+    // A symlink where the agent's folder should be is not ours to walk: removing "other versions" there would
+    // delete what it points at.
+    if fs::symlink_metadata(key_dir).map_or(true, |meta| !meta.is_dir()) {
+        return;
+    }
+
     let Ok(entries) = fs::read_dir(key_dir) else {
         return;
     };
