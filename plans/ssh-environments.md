@@ -212,7 +212,7 @@ Where S3 departs from the text above:
   closes inherited descriptors, and a socket would be a listener). POSIX only: a Windows desktop has no
   passphrase prompt and no multiplexing yet.
 - "Always allow" is not offered for a server's calls yet: the allow rules are keyed by tool name and global.
-- Agent forwarding is a per-server flag that passes `SSH_AUTH_SOCK` through; the stable socket path of §6 is S5.
+- Agent forwarding is a per-server flag that passes `SSH_AUTH_SOCK` through. Only the local window turns it on (behind a confirmation); a page's pairing request cannot carry it. The stable socket path of §6 is S5.
 - `~/.ssh/config` suggestions (§4) and the Windows-desktop askpass are not built.
 
 **S4 — Install and upgrade.** §8. The release build of `neore-host` must pass

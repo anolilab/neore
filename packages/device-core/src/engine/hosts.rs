@@ -12,13 +12,12 @@ use crate::ssh::{Hello, HostConnection, HostKey, Interact};
 /// At most as many servers as the backend lets one account pair devices.
 const MAX_HOSTS: usize = 10;
 
-/// What a page asks to connect to. Validated here: it is the only thing of the connection a page supplies.
+/// What a page asks to connect to. Validated here: it is the only thing of the connection a page supplies. Agent
+/// forwarding is not part of it: that is turned on for a paired server in the local window alone.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostSpec {
     pub address: String,
-    #[serde(default)]
-    pub forward_agent: bool,
     #[serde(default)]
     pub identity_file: Option<String>,
     pub name: String,
@@ -41,7 +40,7 @@ impl HostSpec {
 
         let target = Target {
             address: self.address.clone(),
-            forward_agent: self.forward_agent,
+            forward_agent: false,
             identity_file: self.identity_file.clone(),
             port: self.port,
             user: self.user.clone(),
@@ -108,6 +107,8 @@ pub struct HostView {
 pub struct HostUpdate {
     pub allow_shell_network: Option<bool>,
     pub device_id: String,
+    /// Lets the server's session use this computer's SSH agent. Takes effect on the next connection.
+    pub forward_agent: Option<bool>,
     pub require_shell_sandbox: Option<bool>,
     pub roots: Option<Vec<String>>,
 }
@@ -162,6 +163,10 @@ pub(super) fn apply_update(settings: &mut Settings, update: &HostUpdate) -> Resu
 
     if let Some(allowed) = update.allow_shell_network {
         host.allow_shell_network = allowed;
+    }
+
+    if let Some(forward) = update.forward_agent {
+        host.forward_agent = forward;
     }
 
     Ok(())
@@ -413,6 +418,38 @@ impl DeviceState {
             .collect()
     }
 
+    /// Ends a session, and the server's master with it when no other session still rides it (a probe of the same
+    /// server, a reconnect that already took its place).
+    fn retire(&self, link: &Arc<dyn HostLink>) {
+        link.close();
+
+        let Some(target) = link.target() else { return };
+        let shared = self
+            .ssh
+            .connections
+            .lock()
+            .unwrap()
+            .values()
+            .cloned()
+            .chain(
+                self.ssh
+                    .probe
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|(_, other)| Arc::clone(other)),
+            )
+            .any(|other| {
+                !std::ptr::addr_eq(Arc::as_ptr(&other), Arc::as_ptr(link))
+                    && other.is_alive()
+                    && other.target() == Some(target)
+            });
+
+        if !shared {
+            link.exit_master();
+        }
+    }
+
     /// Closes the connection of every server that is no longer one of ours.
     pub(super) fn drop_stale_connections(&self) {
         let settings = self.settings();
@@ -430,7 +467,7 @@ impl DeviceState {
         };
 
         for link in stale {
-            link.close();
+            self.retire(&link);
         }
     }
 
@@ -446,7 +483,7 @@ impl DeviceState {
             .collect();
 
         for link in links {
-            link.close();
+            self.retire(&link);
         }
     }
 
@@ -624,7 +661,7 @@ impl DeviceState {
         let link = self.ssh.connections.lock().unwrap().remove(device_id);
 
         if let Some(link) = link {
-            link.close();
+            self.retire(&link);
             self.emit(Event::Changed);
         }
     }
@@ -849,6 +886,8 @@ mod tests {
         outcome: Mutex<Result<RemoteOutcome, String>>,
         runs: Mutex<Vec<Value>>,
         closed: AtomicUsize,
+        master_exits: AtomicUsize,
+        target: Option<Target>,
     }
 
     impl FakeLink {
@@ -856,6 +895,8 @@ mod tests {
             Arc::new(FakeLink {
                 alive: AtomicBool::new(true),
                 closed: AtomicUsize::new(0),
+                master_exits: AtomicUsize::new(0),
+                target: Some(target_of(&server("host-1"))),
                 hello: Hello {
                     platform: "linux".into(),
                     protocol: 1,
@@ -883,12 +924,20 @@ mod tests {
             self.alive.store(false, Ordering::SeqCst);
         }
 
+        fn exit_master(&self) {
+            self.master_exits.fetch_add(1, Ordering::SeqCst);
+        }
+
         fn hello(&self) -> &Hello {
             &self.hello
         }
 
         fn is_alive(&self) -> bool {
             self.alive.load(Ordering::SeqCst)
+        }
+
+        fn target(&self) -> Option<&Target> {
+            self.target.as_ref()
         }
 
         fn run(&self, params: &Value, _wait: Duration) -> Result<RemoteOutcome, String> {
@@ -1356,6 +1405,64 @@ mod tests {
             serde_json::to_value(state.status()).unwrap()["hosts"][0]["connected"],
             false
         );
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn disconnecting_ends_the_master_only_when_no_other_session_rides_it() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("master", &link);
+        let probed = FakeLink::new(true);
+
+        // A probe of the same server is still using the master: only this session ends.
+        *state.ssh.probe.lock().unwrap() = Some((
+            target_of(&server("host-1")),
+            Arc::clone(&probed) as Arc<dyn HostLink>,
+        ));
+        state.host_disconnect("host-1");
+
+        assert_eq!(link.closed.load(Ordering::SeqCst), 1);
+        assert_eq!(link.master_exits.load(Ordering::SeqCst), 0);
+
+        // Nothing else on it any more: the master goes too.
+        state
+            .ssh
+            .connections
+            .lock()
+            .unwrap()
+            .insert("host-1".into(), Arc::clone(&link) as Arc<dyn HostLink>);
+        state.ssh.probe.lock().unwrap().take();
+        state.host_disconnect("host-1");
+
+        assert_eq!(link.master_exits.load(Ordering::SeqCst), 1);
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn agent_forwarding_is_the_local_windows_to_turn_on_and_restarts_the_connection() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("forward", &link);
+        let turn_on: SettingsUpdate = serde_json::from_value(
+            json!({ "host": { "deviceId": "host-1", "forwardAgent": true } }),
+        )
+        .unwrap();
+
+        assert!(!state.settings().hosts[0].forward_agent);
+
+        let view = state.settings_update(turn_on).unwrap();
+
+        assert!(view.hosts[0].forward_agent);
+        assert!(
+            !view.hosts[0].connected,
+            "the connection kept running without the change"
+        );
+        // A page that asks for it is refused outright, not ignored.
+        assert!(serde_json::from_value::<HostSpec>(
+            json!({ "address": "a", "name": "x", "user": "u", "forwardAgent": true })
+        )
+        .is_err());
 
         let _ = stdfs::remove_dir_all(dir);
     }

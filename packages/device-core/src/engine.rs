@@ -419,6 +419,12 @@ impl DeviceState {
             Ok(())
         })?;
         self.drop_stale_connections();
+
+        // Forwarding is chosen when ssh starts, so the connection it changes for is ended.
+        if let Some(host) = update.host.filter(|host| host.forward_agent.is_some()) {
+            self.host_disconnect(&host.device_id);
+        }
+
         self.emit(Event::Changed);
 
         Ok(self.settings_view())

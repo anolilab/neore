@@ -252,6 +252,12 @@ fn connect(
     HostConnection::connect(target, paths, &server.binary(), &interact)
 }
 
+/// Ends the session and the master it rode, so no ssh outlives the test.
+fn finish(connection: &HostConnection) {
+    connection.close();
+    connection.exit_master();
+}
+
 /// Whether the ssh control master for `target` is up, asked of ssh itself.
 fn master_is_running(target: &Target, paths: &SshPaths) -> bool {
     Command::new("ssh")
@@ -322,7 +328,7 @@ fn it_connects_pins_the_key_and_runs_an_action_on_the_server() {
         );
     }
 
-    connection.close();
+    finish(&connection);
 }
 
 #[test]
@@ -447,7 +453,7 @@ fn a_passphrase_goes_through_the_helper_and_is_written_nowhere() {
         0o700
     );
 
-    connection.close();
+    finish(&connection);
 }
 
 #[test]
@@ -469,7 +475,7 @@ fn a_cancelled_passphrase_fails_the_login_instead_of_hanging() {
 }
 
 #[test]
-fn one_master_serves_the_server_and_closing_ends_it() {
+fn closing_one_session_leaves_the_others_and_the_master_alone() {
     let Some(sshd) = sshd_binary() else { return };
     let server = Server::start(&sshd, "master");
     let (target, paths) = (server.target("client_enc"), server.paths("a"));
@@ -478,7 +484,7 @@ fn one_master_serves_the_server_and_closing_ends_it() {
         trust: true,
         ..Scripted::default()
     });
-    let connection = connect(&server, &target, &paths, &interact).unwrap();
+    let first = connect(&server, &target, &paths, &interact).unwrap();
     let asked = interact.prompts.lock().unwrap().len();
 
     assert!(
@@ -490,12 +496,26 @@ fn one_master_serves_the_server_and_closing_ends_it() {
     let second = connect(&server, &target, &paths, &interact).unwrap();
 
     assert_eq!(interact.prompts.lock().unwrap().len(), asked);
-    assert!(second.is_alive());
 
-    second.close();
-    connection.close();
+    // Closing the first must not take the second down with it.
+    first.close();
+    drop(first);
+
+    let root = vectors::fixture("ssh-shared");
+    let params = json!({ "tool": "fs_list", "input": { "path": root }, "roots": [root], "remainingMs": 60_000 });
+
+    assert_eq!(
+        second.run(&params, Duration::from_secs(30)).unwrap().status,
+        "completed"
+    );
+    assert!(
+        master_is_running(&target, &paths),
+        "closing a session ended the master"
+    );
+
+    finish(&second);
     assert!(
         !master_is_running(&target, &paths),
-        "closing left the master running"
+        "ending the master left it running"
     );
 }

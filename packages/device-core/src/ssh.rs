@@ -738,9 +738,14 @@ type Pending = Arc<Mutex<HashMap<u64, Sender<Reply>>>>;
 
 /// What the engine needs of a connection to a server: the seam that lets its tests stand in for ssh.
 pub trait HostLink: Send + Sync {
+    /// Ends this session only. Other sessions to the same server share its master and are left running.
     fn close(&self);
+    /// Ends the multiplexed master of this server and with it every session on it: for when none is wanted.
+    fn exit_master(&self);
     fn hello(&self) -> &Hello;
     fn is_alive(&self) -> bool;
+    /// Where the session goes; `None` for a stand-in that goes nowhere.
+    fn target(&self) -> Option<&Target>;
     /// Runs one approved action (`host::RunParams` as JSON) and waits at most `wait` for its answer.
     fn run(&self, params: &Value, wait: Duration) -> Result<RemoteOutcome, String>;
 }
@@ -967,17 +972,20 @@ impl HostLink for HostConnection {
         }
     }
 
-    /// Ends the session, and with it the multiplexed master this app started for the server.
     fn close(&self) {
         self.alive.store(false, Ordering::SeqCst);
 
-        {
-            let mut child = self.child.lock().unwrap();
+        let mut child = self.child.lock().unwrap();
 
-            let _ = child.kill();
-            let _ = child.wait();
-        }
+        let _ = child.kill();
+        let _ = child.wait();
+    }
 
+    fn target(&self) -> Option<&Target> {
+        Some(&self.target)
+    }
+
+    fn exit_master(&self) {
         if cfg!(unix) {
             let _ = Command::new("ssh")
                 .args(&self.exit_master)
