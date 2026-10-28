@@ -594,6 +594,9 @@ export class AgentSession {
         // The request reaches the core's queue a moment after it is sent, so a turn's end can slip between the two:
         // an answer for a turn that is no longer the running one authorizes nothing.
         if (this.current !== turn || this.cancelRequested || this.status !== "busy") {
+            // The host still hears how the request ended.
+            this.observe((observer) => observer.permissionResolved(this.id, turn.id, requestId, "cancelled"));
+
             return { outcome: { outcome: "cancelled" } };
         }
 
