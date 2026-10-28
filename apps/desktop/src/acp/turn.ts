@@ -25,6 +25,11 @@ export class Turn implements TurnState {
     ) {}
 
     public append(field: "text" | "thought", chunk: string): void {
+        // Already at the cap: later chunks are dropped without re-scrubbing the whole text for each one.
+        if (this.truncated && this[field].length >= MAX_TURN_TEXT) {
+            return;
+        }
+
         const next = this[field] + chunk;
 
         if (next.length <= MAX_TURN_TEXT) {
