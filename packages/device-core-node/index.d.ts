@@ -60,6 +60,18 @@ export declare class DeviceCore {
    * is open to it. Resolves `{ alreadyCurrent, version }` (JSON).
    */
   hostUpgrade(deviceId: string): Promise<string>
+  /**
+   * One page of a folder on a connected server (`{ entries, next, host, … }`, JSON), for the file tree of the
+   * local window. `after` is the `next` of the page before.
+   */
+  hostFilesList(deviceId: string, path: string, after?: string | undefined | null): Promise<string>
+  /** A file of a connected server as text (`{ text, truncated, host, path }`, JSON). */
+  hostFileRead(deviceId: string, path: string): Promise<string>
+  /**
+   * Downloads a folder of a connected server as one tar archive into `destination`, a file path the person chose.
+   * Resolves what the archive holds (`{ files, folders, bytes, skipped, host }`, JSON).
+   */
+  hostDownload(deviceId: string, path: string, destination: string): Promise<string>
   hostDisconnect(deviceId: string): void
   /** Forgets a server on this computer: its secret, folders and connection. */
   hostRemove(deviceId: string): void

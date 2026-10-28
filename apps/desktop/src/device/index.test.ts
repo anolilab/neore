@@ -100,6 +100,9 @@ vi.mock("electron", () => {
             showOpenDialog: vi.fn(async () => {
                 return { canceled: false, filePaths: ["/shared/picked"] };
             }),
+            showSaveDialog: vi.fn(async (..._args: unknown[]) => {
+                return { canceled: false, filePath: "/home/me/Downloads/app.tar" };
+            }),
         },
         ipcMain: {
             handle: (channel: string, handler: (...args: unknown[]) => unknown) => fake.handlers.set(channel, handler),
@@ -225,6 +228,9 @@ const makeCore = () => {
         execute: vi.fn(async () => JSON.stringify({ payload: "{}", signature: "s" })),
         hostConnect: vi.fn(async () => JSON.stringify({ platform: "linux" })),
         hostDisconnect: vi.fn(),
+        hostDownload: vi.fn(async (_deviceId: string, _path: string, _destination: string) => JSON.stringify({ bytes: 5, files: 1, folders: 1, host: "build-box", skipped: 0 })),
+        hostFileRead: vi.fn(async (_deviceId: string, _path: string) => JSON.stringify({ host: "build-box", path: "a.txt", text: "hi", truncated: false })),
+        hostFilesList: vi.fn(async (_deviceId: string, _path: string, _after?: string) => JSON.stringify({ entries: [], host: "build-box", next: null, path: "/srv/app", truncated: false })),
         hostForgetKey: vi.fn(),
         hostPair: vi.fn(async (_spec: string, _deviceId: string, _secret: string) => true),
         hostProbe: vi.fn(async (_spec: string) => JSON.stringify({ platform: "linux", sandboxAvailable: true, sandboxDetail: "Landlock", version: "0.1.0" })),
@@ -414,6 +420,45 @@ describe("servers over SSH", () => {
 
         await expect(invoke(LOCAL_CHANNEL.hostUpgrade, localEvent(), 7)).rejects.toThrow("device: deviceId is invalid");
         expect(core.hostUpgrade).toHaveBeenCalledTimes(1);
+    });
+
+    it("keep a server's files out of the page's reach and validate what the device window asks for", async () => {
+        for (const channel of [LOCAL_CHANNEL.hostFilesList, LOCAL_CHANNEL.hostFileRead, LOCAL_CHANNEL.hostDownload]) {
+            expect(() => invoke(channel, siteEvent(), "host-1", "/srv/app")).toThrow("device: not the device window");
+        }
+
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+
+        await expect(invoke(LOCAL_CHANNEL.hostFilesList, localEvent(), "host-1", "", undefined)).resolves.toMatchObject({ host: "build-box", next: null });
+        await invoke(LOCAL_CHANNEL.hostFilesList, localEvent(), "host-1", "/srv/app", "m");
+        await invoke(LOCAL_CHANNEL.hostFileRead, localEvent(), "host-1", "/srv/app/a.txt");
+
+        expect(core.hostFilesList.mock.calls).toEqual([["host-1", "", undefined], ["host-1", "/srv/app", "m"]]);
+        expect(core.hostFileRead).toHaveBeenCalledWith("host-1", "/srv/app/a.txt");
+
+        await expect(invoke(LOCAL_CHANNEL.hostFilesList, localEvent(), 7, "")).rejects.toThrow("device: deviceId is invalid");
+        await expect(invoke(LOCAL_CHANNEL.hostFilesList, localEvent(), "host-1", 3)).rejects.toThrow("device: path is invalid");
+        await expect(invoke(LOCAL_CHANNEL.hostFileRead, localEvent(), "host-1", 7)).rejects.toThrow("device: path is invalid");
+        expect(core.hostFilesList).toHaveBeenCalledTimes(2);
+    });
+
+    it("download a folder only into a file the person picks in a native dialog", async () => {
+        const { dialog } = await import("electron");
+
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+
+        // The window names the folder; it has no way to name where the archive goes.
+        await expect(invoke(LOCAL_CHANNEL.hostDownload, localEvent(), "host-1", "/srv/app/my:src", "/etc/passwd")).resolves.toMatchObject({ files: 1 });
+        expect(core.hostDownload).toHaveBeenCalledWith("host-1", "/srv/app/my:src", "/home/me/Downloads/app.tar");
+        expect(vi.mocked(dialog.showSaveDialog).mock.calls[0]?.at(-1)).toMatchObject({ defaultPath: path.join("/user-data", "my_src.tar") });
+
+        vi.mocked(dialog.showSaveDialog).mockResolvedValueOnce({ canceled: true, filePath: "" });
+
+        await expect(invoke(LOCAL_CHANNEL.hostDownload, localEvent(), "host-1", "/srv/app")).resolves.toBeNull();
+        expect(core.hostDownload).toHaveBeenCalledTimes(1);
+
+        await expect(invoke(LOCAL_CHANNEL.hostDownload, localEvent(), "host-1", "")).resolves.toMatchObject({ files: 1 });
+        expect(vi.mocked(dialog.showSaveDialog).mock.calls.at(-1)?.at(-1)).toMatchObject({ defaultPath: path.join("/user-data", "folder.tar") });
     });
 
     it("let the device window manage a server", async () => {

@@ -20,7 +20,7 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{channel, sync_channel, Receiver, RecvTimeoutError, Sender, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -29,7 +29,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-use crate::frame::{read_frame, write_frame};
+use crate::frame::{chunk_of, read_frame, write_frame};
 use crate::host::PROTOCOL_VERSION;
 use crate::launch::Reaped;
 
@@ -954,7 +954,19 @@ pub struct RemoteOutcome {
 }
 
 type Reply = Result<Value, String>;
-type Pending = Arc<Mutex<HashMap<u64, Sender<Reply>>>>;
+type Pending = Arc<Mutex<HashMap<u64, Waiter>>>;
+
+/// A request in flight: where its response goes, and where the chunks of a streaming one go.
+struct Waiter {
+    chunks: Option<SyncSender<Vec<u8>>>,
+    reply: Sender<Reply>,
+}
+
+/// Chunks queued between the reader of the connection and whoever writes them out. The reader waits when this
+/// is full, so a slow disk slows the download instead of filling memory.
+const CHUNK_QUEUE: usize = 8;
+/// How long a download may go without a byte before it is given up.
+pub const DOWNLOAD_IDLE: Duration = Duration::from_secs(60);
 
 /// What the engine needs of a connection to a server: the seam that lets its tests stand in for ssh.
 pub trait HostLink: Send + Sync {
@@ -982,6 +994,20 @@ pub trait HostLink: Send + Sync {
     fn target(&self) -> Option<&Target>;
     /// Runs one approved action (`host::RunParams` as JSON) and waits at most `wait` for its answer.
     fn run(&self, params: &Value, wait: Duration) -> Result<RemoteOutcome, String>;
+    /// One page of a folder (`host::FilesParams` as JSON), as the server lists it.
+    fn list_files(&self, _params: &Value, _wait: Duration) -> Result<Value, String> {
+        Err("this connection cannot list files".into())
+    }
+    /// Writes the tar of a folder (`host::FilesParams` as JSON) to `out` as it arrives, giving up after `idle`
+    /// without a byte. What the server held is the answer; `out` is not an archive if this fails.
+    fn download(
+        &self,
+        _params: &Value,
+        _out: &mut dyn Write,
+        _idle: Duration,
+    ) -> Result<Value, String> {
+        Err("this connection cannot download files".into())
+    }
 }
 
 /// A live `neore-host --stdio` behind an `ssh` child.
@@ -1202,8 +1228,13 @@ impl HostConnection {
         &self.target
     }
 
-    /// Sends one request and waits at most `wait` for its answer.
-    fn request(&self, op: &str, params: &Value, wait: Duration) -> Result<Value, String> {
+    /// Sends one request. Its response arrives on the receiver; with `chunks` the bytes it streams arrive there first.
+    fn send(
+        &self,
+        op: &str,
+        params: &Value,
+        chunks: Option<SyncSender<Vec<u8>>>,
+    ) -> Result<(u64, Receiver<Reply>), String> {
         if !self.is_alive() {
             return Err("the connection to the server was lost".into());
         }
@@ -1212,7 +1243,13 @@ impl HostConnection {
         let (sender, receiver) = channel();
         let frame = json!({ "kind": "request", "id": id, "op": op, "params": params });
 
-        self.pending.lock().unwrap().insert(id, sender);
+        self.pending.lock().unwrap().insert(
+            id,
+            Waiter {
+                chunks,
+                reply: sender,
+            },
+        );
 
         let sent = serde_json::to_vec(&frame)
             .map_err(|error| error.to_string())
@@ -1227,6 +1264,11 @@ impl HostConnection {
             return Err(format!("the request could not be sent: {error}"));
         }
 
+        Ok((id, receiver))
+    }
+
+    /// Waits at most `wait` for the response to request `id`.
+    fn await_reply(&self, id: u64, receiver: &Receiver<Reply>, wait: Duration) -> Reply {
         match receiver.recv_timeout(wait) {
             Ok(reply) => reply,
             Err(_) => {
@@ -1239,6 +1281,18 @@ impl HostConnection {
                 })
             }
         }
+    }
+
+    /// Sends one request and waits at most `wait` for its answer.
+    fn request(&self, op: &str, params: &Value, wait: Duration) -> Result<Value, String> {
+        let (id, receiver) = self.send(op, params, None)?;
+
+        self.await_reply(id, &receiver, wait)
+    }
+
+    /// Asks the server to stop request `target`. Its answer is not waited for: nobody is listening for it.
+    fn cancel(&self, target: u64) {
+        let _ = self.send("cancel", &json!({ "target": target }), None);
     }
 }
 
@@ -1256,6 +1310,50 @@ impl HostLink for HostConnection {
 
         serde_json::from_value::<RemoteOutcome>(result)
             .map_err(|error| format!("the host's answer was not understood: {error}"))
+    }
+
+    fn list_files(&self, params: &Value, wait: Duration) -> Result<Value, String> {
+        self.request("list", params, wait)
+    }
+
+    fn download(
+        &self,
+        params: &Value,
+        out: &mut dyn Write,
+        idle: Duration,
+    ) -> Result<Value, String> {
+        let (chunks, incoming) = sync_channel(CHUNK_QUEUE);
+        let (id, reply) = self.send("tar", params, Some(chunks))?;
+        let mut failure = None;
+
+        loop {
+            match incoming.recv_timeout(idle) {
+                Ok(bytes) if failure.is_none() => {
+                    if let Err(error) = out.write_all(&bytes) {
+                        failure = Some(format!("the file could not be written: {error}"));
+
+                        self.cancel(id);
+                    }
+                }
+                // The server is stopping; what is still on the way is dropped.
+                Ok(_) => {}
+                // The response arrived (or the connection ended): every chunk before it was queued.
+                Err(RecvTimeoutError::Disconnected) => break,
+                Err(RecvTimeoutError::Timeout) => {
+                    self.pending.lock().unwrap().remove(&id);
+                    self.cancel(id);
+
+                    return Err(failure.unwrap_or_else(|| "the server stopped sending".to_owned()));
+                }
+            }
+        }
+
+        let answer = self.await_reply(id, &reply, Duration::from_secs(30));
+
+        match failure {
+            Some(failure) => Err(failure),
+            None => answer,
+        }
     }
 
     fn launch_id(&self) -> Option<&str> {
@@ -1332,8 +1430,24 @@ impl Drop for HostConnection {
     }
 }
 
-/// Hands a response frame to the request waiting for it; events and strays are dropped.
+/// Hands a response frame to the request waiting for it, and a chunk to the download it belongs to; events and
+/// strays are dropped.
 fn route(pending: &Pending, frame: &[u8]) {
+    if let Some((id, bytes)) = chunk_of(frame) {
+        // The lock is not held while waiting for room in the queue.
+        let chunks = pending
+            .lock()
+            .unwrap()
+            .get(&id)
+            .and_then(|waiter| waiter.chunks.clone());
+
+        if let Some(chunks) = chunks {
+            let _ = chunks.send(bytes.to_vec());
+        }
+
+        return;
+    }
+
     let Ok(value) = serde_json::from_slice::<Value>(frame) else {
         return;
     };
@@ -1345,6 +1459,7 @@ fn route(pending: &Pending, frame: &[u8]) {
     let Some(sender) = value["id"]
         .as_u64()
         .and_then(|id| pending.lock().unwrap().remove(&id))
+        .map(|waiter| waiter.reply)
     else {
         return;
     };
@@ -1892,7 +2007,13 @@ mod tests {
         let pending: Pending = Arc::default();
         let (sender, receiver) = channel();
 
-        pending.lock().unwrap().insert(7, sender);
+        pending.lock().unwrap().insert(
+            7,
+            Waiter {
+                chunks: None,
+                reply: sender,
+            },
+        );
         route(&pending, br#"{"kind":"event","name":"x","data":{}}"#);
         route(
             &pending,

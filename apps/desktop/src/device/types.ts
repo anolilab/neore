@@ -65,6 +65,42 @@ export interface HostUpgrade {
     version: string;
 }
 
+/** One entry of a folder on a server. What it says is the server's word: show it as text, never as markup. */
+export interface FileEntry {
+    name: string;
+    size: number;
+    type: "dir" | "file" | "symlink" | "unknown";
+}
+
+/** One page of a folder on a connected server (`host_files_list`). */
+export interface FilesPage {
+    entries: FileEntry[];
+    /** The server the page came from. */
+    host: string;
+    /** Pass as `after` for the page that follows; `null` on the last. */
+    next: string | null;
+    path: string;
+    /** The folder had more entries than the server reads at all. */
+    truncated: boolean;
+}
+
+/** A file of a server as text (`host_file_read`). */
+export interface FileRead {
+    host: string;
+    path: string;
+    text: string;
+    truncated: boolean;
+}
+
+/** What a downloaded folder holds (`archive::Summary`). Symlinks and special files are not in the archive. */
+export interface Download {
+    bytes: number;
+    files: number;
+    folders: number;
+    host: string;
+    skipped: number;
+}
+
 /** A server as the local window lists it (`HostView`). */
 export interface HostView {
     address: string;
@@ -155,6 +191,9 @@ export interface DeviceCore {
     execute: (envelope: string, signature: string) => Promise<string>;
     hostConnect: (deviceId: string, retry: boolean) => Promise<string>;
     hostDisconnect: (deviceId: string) => void;
+    hostDownload: (deviceId: string, path: string, destination: string) => Promise<string>;
+    hostFileRead: (deviceId: string, path: string) => Promise<string>;
+    hostFilesList: (deviceId: string, path: string, after?: string) => Promise<string>;
     hostForgetKey: (deviceId: string) => void;
     hostPair: (spec: string, deviceId: string, secret: string) => Promise<boolean>;
     hostProbe: (spec: string) => Promise<string>;

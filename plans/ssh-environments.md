@@ -294,10 +294,33 @@ Where S5 departs from the text above:
   exit -1; check exit -1`), so ControlMaster does not work there and the fixed `false` stands. The step fails only when
   it cannot reach a verdict (no sshd, no login), so a broken setup still gets fixed.
 
-**S6 — Files on the host.** File tree and reads over the device file actions.
+**S6 — Files on the host (built).** File tree and reads over the device file actions.
 Folder download as one tar stream.
 - Acceptance: a 10,000-file folder lists and downloads within a budget set from
   a first measurement and then pinned in the test.
+
+Where S6 departs from the text above:
+- The tree, reads and the download are for the person at the LOCAL window, not for the agent or a page: three
+  channels of the local window (`hostFilesList`, `hostFileRead`, `hostDownload`), no signed call and no prompt, because
+  the person is the one asking and "Always allow" does not exist for a server. Nothing about them reaches a model, so
+  they add nothing to `taintedBy`; what an agent's `fs_list`/`fs_read` on a server returns is a `device_*` result and
+  is already `device`-tainted. What a server lists or holds is shown as text and labelled with the server's name.
+- `fs_list` keeps its 1000-entry cut (the agent's); the tree uses a new host op `list` that pages a folder by name
+  (`after` cursor, 2,000 per page). A page reads the folder whole, so it costs the folder's size, not the page's. Reads
+  go through the existing `fs_read` action (1 MiB, text).
+- The download is the host op `tar` (protocol 3, which a protocol-2 host does not speak: install the host software
+  again). The host writes ustar by hand over the descriptor walk of `fs.rs` (a tar library opens by name); long paths
+  use a prefix or a PAX `path` record. Symlinks (inside the folder or out), FIFOs, devices and sockets are left out and
+  counted as `skipped`; modes lose setuid/setgid/sticky, owners are 0. Limits: 200,000 entries, 4 GiB, 64 levels.
+  The archive streams as raw chunk frames (256 KiB) followed by the normal response with what it holds; a `cancel` op
+  stops it, and so does a connection that ends. The desktop writes `<file>.part` and renames it when the answer says the
+  archive is complete, and never unpacks it.
+- A Windows host does not archive (no `openat`; the handle walk of `fs.rs` has no directory recursion yet).
+- Measured (debug build, local sshd, Apple silicon macOS 26, 10,000 files of 440 bytes in one folder, six runs): listing
+  the 10,001 entries in six pages took 0.46–0.78 s; the 10.2 MB tar took 0.69–1.29 s. Pinned in `tests/ssh_host.rs`:
+  5 s and 8 s.
+- Not built: a progress bar or cancel button for a download (a disconnect or an idle minute ends one), and listing a
+  whole tree in one request.
 
 **S7 — ACP on the host.** `HostTransport = ssh` for ACP sessions. Needs ACP S3.
 - Acceptance: an ACP turn on the SSH host streams into the thread through the

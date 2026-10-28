@@ -678,6 +678,16 @@ written here is what is not.
   `SSH_AUTH_SOCK` from `<run>/agent-<desktop tag>.sock` and its children inherit that path. `ssh::MULTIPLEXING` is a fixed
   `false` on Windows (one ssh process per server, said in the window), not a measurement; the CI step
   `Measure ssh ControlMaster (Windows)` records whether Win32 OpenSSH could multiplex and fails when it cannot say.
+  **Files on a server** (protocol 3): `list` (one folder, name-sorted, a page at a time with an `after` cursor), `tar` and
+  `cancel` are host ops of the stdio pipe, reached from the LOCAL window only (`host_files_list` / `host_file_read` /
+  `host_download`; no signed call, no prompt, the person is the one asking) and never by the agent, so none of it enters
+  `taintedBy`. `tar` is hand-written ustar (`archive.rs`) walked by `openat` + `O_NOFOLLOW` from the folder's descriptor, the
+  same confinement as `fs_list`: symlinks (inside or out), FIFOs and devices are LEFT OUT, not followed and not archived,
+  and the desktop never unpacks the file it saves — the host's word is not trusted to name paths or plant links. Chunks are
+  raw frames (`frame.rs` `CHUNK_TAG`), not JSON, followed by the ordinary response; the reader of the connection blocks when
+  the disk is slow (bounded queue), and an idle minute ends a download. The save path comes from a native dialog in the main
+  process, never from the window. Unix hosts only: a Windows host answers "not supported". The 10,000-file budget is pinned
+  in `tests/ssh_host.rs` with the numbers it was set from.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay

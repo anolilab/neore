@@ -35,6 +35,7 @@ import type { CoreEvent, DeviceCore, Prompt } from "./types";
 import {
     readAcpUpdate,
     readAgentKey,
+    readAfter,
     readAgentVersion,
     readDeviceId,
     readFolder,
@@ -51,10 +52,19 @@ import {
     readSearchQuery,
     readSecretAnswer,
     readSessionId,
+    readServerPath,
     readSessionTitle,
     readSettingsUpdate,
     readSigned,
 } from "./validate";
+
+/** A file name for the archive of a server folder: the folder's own name, without anything a file name may not hold. */
+const archiveName = (serverPath: string): string => {
+    // eslint-disable-next-line no-control-regex -- control characters are what is being removed
+    const name = path.posix.basename(serverPath).replaceAll(/[\u{0}-\u{1F}"*/:<>?\\|]/gu, "_");
+
+    return `${["", ".", ".."].includes(name) ? "folder" : name}.tar`;
+};
 
 /** Stopping idle MCP servers runs once a minute. */
 const REAP_INTERVAL_MS = 60_000;
@@ -533,6 +543,28 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     // Local window only: it puts software on a server and removes its older versions, so a page cannot ask for it.
     local(LOCAL_CHANNEL.hostUpgrade, async (deviceId) => requireTransport().hostUpgrade(readDeviceId(deviceId)));
+
+    // The file tree of a connected server. Local window only, and nothing here reaches the agent: what a server
+    // lists or holds is its own word, shown as text.
+    local(LOCAL_CHANNEL.hostFilesList, async (deviceId, folder, after) =>
+        requireTransport().hostFilesList(readDeviceId(deviceId), readServerPath(folder), readAfter(after)));
+
+    local(LOCAL_CHANNEL.hostFileRead, async (deviceId, file) => requireTransport().hostFileRead(readDeviceId(deviceId), readServerPath(file)));
+
+    // The destination is chosen here, in a native dialog, and never taken from the window: it is a file this
+    // process writes. Resolves `null` when the person cancels.
+    local(LOCAL_CHANNEL.hostDownload, async (deviceId, folder) => {
+        const id = readDeviceId(deviceId);
+        const serverPath = readServerPath(folder);
+        const dialogOptions = {
+            defaultPath: path.join(app.getPath("downloads"), archiveName(serverPath)),
+            filters: [{ extensions: ["tar"], name: "tar archive" }],
+        };
+        const parent = liveLocal();
+        const result = parent === undefined ? await dialog.showSaveDialog(dialogOptions) : await dialog.showSaveDialog(parent, dialogOptions);
+
+        return result.canceled || result.filePath === "" ? null : requireTransport().hostDownload(id, serverPath, result.filePath);
+    });
 
     local(LOCAL_CHANNEL.hostRemove, (deviceId) => {
         requireTransport().hostRemove(readDeviceId(deviceId));
