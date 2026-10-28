@@ -17,6 +17,7 @@ export interface InternalApiTypes {
     };
     agent: {
         agent_switch: {
+            adoptForkAgent: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
             getRunAgentModel: FunctionReference<"query", { promptMessageId?: Id<"messages">; replacedMessageId?: Id<"messages">; threadId: Id<"threads"> }, string | null>;
         };
         auto_archive: {
@@ -1052,6 +1053,7 @@ export const internal: InternalApiTypes = {
     },
     agent: {
         agent_switch: {
+            adoptForkAgent: { __lunoraRef: "agent_agent_switch:adoptForkAgent" },
             getRunAgentModel: { __lunoraRef: "agent_agent_switch:getRunAgentModel" },
         },
         auto_archive: {

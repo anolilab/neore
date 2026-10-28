@@ -5,12 +5,13 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { pathExceedsColdStart, runAgentModelOf, syncActiveAgent } from "../agent/agent-switch";
+import { adoptForkAgentOf, pathExceedsColdStart, runAgentModelOf, syncActiveAgent } from "../agent/agent-switch";
 import { agentSwitchOf } from "../agent/agent-switch-logic";
 import { buildBranchTree, resolveActivePath } from "../agent/branch-tree";
 import { descendFrom, getThreadRow } from "../agent/branch-rows";
 import { docsToModelMessages } from "../agent/mapping";
 import { addMessagesHandler } from "../agent/messages";
+import { omit } from "../lib/collections";
 import schema from "../schema";
 import { AGENT_SWITCH_STREAMING, AGENT_SWITCH_UNSUPPORTED, switchThreadAgentHandler } from "./agent-switch";
 
@@ -184,6 +185,59 @@ describe("a switch in a thread that never branched", () => {
         expect(await switchRows()).toHaveLength(0);
     });
 
+    it("is refused while the latest turn waits on an approval, and once the request is stale", async () => {
+        const approval = {
+            content: [
+                { input: {}, toolCallId: "call-1", toolName: "mcp_Files__delete", type: "tool-call" },
+                { approvalId: "approval-1", toolCallId: "call-1", type: "tool-approval-request" },
+            ],
+            role: "assistant",
+        };
+
+        await run(async (ctx) => await ctx.db.delete(ids.a1));
+        await insertRow("paused", 0, 1, approval, { tool: true });
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("toolApprovalRuns", {
+                    approvalId: "approval-1",
+                    config: {
+                        autoMediaEnrichment: false,
+                        instructions: "",
+                        mcpServerNames: [],
+                        model: A,
+                        researchDepth: "balanced",
+                        searchMode: "chat",
+                        shouldAutoContinue: false,
+                        toolNames: [],
+                    },
+                    createdAt: Date.now(),
+                    status: "pending",
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_STREAMING } });
+        expect(await switchRows()).toHaveLength(0);
+
+        // The user carried on without answering: the request is stale.
+        await insertRow("u2", 1, 0, text("user", "never mind"));
+
+        expect(await switchTo(B, "click-2")).toMatchObject({ switched: true });
+    });
+
+    it("is refused for a guest", async () => {
+        const guestId = await run(
+            async (ctx) =>
+                await ctx.db.insert("user", { createdAt: 1, email: "guest@example.com", emailVerified: false, isAnonymous: true, name: "Guest", updatedAt: 1 }),
+        );
+
+        await run(async (ctx) => await ctx.db.patch(threadId, { userId: guestId }));
+        await insertRow("u1", 0, 0, text("user", "hello"), { userId: guestId });
+
+        await expect(switchTo(B, "c", guestId)).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
+    });
+
     it("refuses a thread that runs on a fixed agent", async () => {
         await run(async (ctx) => await ctx.db.patch(threadId, { groupChat: { mode: "round-robin", participants: [] } }));
 
@@ -307,6 +361,36 @@ describe("the agent of each branch", () => {
         const { activeAgent } = await thread();
 
         expect(activeAgent).toStrictEqual({ kind: "model", model: A });
+    });
+});
+
+describe("a fork of a switched thread", () => {
+    const forkWith = async (rowsToCopy: any[]): Promise<string> =>
+        await run(async (ctx) => {
+            const forkId = await ctx.db.insert("threads", { model: A, status: "active", title: "fork", userId: OWNER });
+
+            for (const row of rowsToCopy) {
+                await ctx.db.insert("messages", { ...omit(row, ["_creationTime", "_id", "threadId"]), threadId: forkId });
+            }
+
+            await adoptForkAgentOf(ctx, forkId);
+
+            return forkId;
+        });
+
+    it("runs on the agent its copied divider names, and keeps the model of a fork cut before it", async () => {
+        await insertRow("u1", 0, 0, text("user", "hello"));
+        await insertRow("a1", 0, 1, text("assistant", "hi"));
+        await switchTo(B, "click-1");
+
+        const stored = await rows();
+        const all = stored.toSorted((x, y) => x.order - y.order || x.stepOrder - y.stepOrder);
+        const switched = await forkWith(all);
+        const before = await forkWith(all.slice(0, 2));
+        const agentOf = async (id: string) => await run(async (ctx) => await runAgentModelOf(ctx, { threadId: id as never }));
+
+        expect(await agentOf(switched)).toBe(B);
+        expect(await agentOf(before)).toBeNull();
     });
 });
 
