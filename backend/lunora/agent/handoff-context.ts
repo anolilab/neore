@@ -26,8 +26,6 @@ export interface HandoffContext<D extends PathRow> {
     blocks: { before: number; text: string }[];
     /** The rows that stay in the context, in order. */
     docs: D[];
-    /** Whether a divider with a handoff was met, so the caller knows an older one is not needed. */
-    handedOff: boolean;
 }
 
 type Item<D> = { block: string } | { doc: D };
@@ -39,7 +37,6 @@ type Item<D> = { block: string } | { doc: D };
  */
 export const assembleHandoffContext = <D extends PathRow>(docs: ReadonlyArray<D>, earlierHandoff?: string): HandoffContext<D> => {
     let items: Item<D>[] = earlierHandoff ? [{ block: earlierHandoff }] : [];
-    let handedOff = earlierHandoff !== undefined;
     // What each agent had when it last left, keyed by its model: the state before the divider that moved on from it.
     const seenBy = new Map<string, Item<D>[]>();
 
@@ -58,8 +55,6 @@ export const assembleHandoffContext = <D extends PathRow>(docs: ReadonlyArray<D>
             continue;
         }
 
-        handedOff = true;
-
         items = part.mode === "delta" && seenBy.has(part.to.model) ? [...seenBy.get(part.to.model)!, { block: part.handoff }] : [{ block: part.handoff }];
     }
 
@@ -74,7 +69,7 @@ export const assembleHandoffContext = <D extends PathRow>(docs: ReadonlyArray<D>
         }
     }
 
-    return { blocks, docs: kept, handedOff };
+    return { blocks, docs: kept };
 };
 
 /**

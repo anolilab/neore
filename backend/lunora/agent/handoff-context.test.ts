@@ -48,9 +48,8 @@ describe("a portable switch", () => {
     const switched = divider("d1", { from: A, handoff, mode: "portable", startMessageId: "a1", summarized: true, to: B });
 
     it("replaces everything before the divider with the stored handoff, first, then the turns after it", () => {
-        const { blocks, docs, handedOff } = assembleHandoffContext([...history, switched, ...after]);
+        const { blocks, docs } = assembleHandoffContext([...history, switched, ...after]);
 
-        expect(handedOff).toBe(true);
         expect(docs.map((doc) => doc._id)).toStrictEqual(["u2"]);
         expect(blocks).toStrictEqual([{ before: 0, text: handoff }]);
         expect(textsOf(docs, blocks)).toStrictEqual([handoff, "next question"]);
@@ -74,9 +73,8 @@ describe("a portable switch", () => {
 
     it("leaves a full divider, or one with no handoff, as it was", () => {
         const full = divider("d1", { from: A, mode: "full", startMessageId: "a1", to: B });
-        const { blocks, docs, handedOff } = assembleHandoffContext([...history, full, ...after]);
+        const { blocks, docs } = assembleHandoffContext([...history, full, ...after]);
 
-        expect(handedOff).toBe(false);
         expect(blocks).toStrictEqual([]);
         expect(docs.map((doc) => doc._id)).toStrictEqual(["u1", "a1", "u2"]);
     });
