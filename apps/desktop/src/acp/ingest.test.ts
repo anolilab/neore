@@ -241,6 +241,32 @@ describe("a session that never gets a thread", () => {
     });
 });
 
+describe("a turn that changed files", () => {
+    it("ends with its summary on the turn_end event, and the whole post stays under the backend's body cap", async () => {
+        const host = poster();
+        const summary = { files: [{ added: 2, path: "src/a.ts", removed: 1 }], patch: "--- a/src/a.ts\n+++ b/src/a.ts\n" };
+
+        await open(host);
+        host.turnStarted("s1", "t1", "edit it");
+        host.turnEnded("s1", "t1", "end_turn", undefined, summary);
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished", summary });
+        expect(Math.max(...backend.bodyBytes)).toBeLessThan(256 * 1024);
+    });
+
+    it("sends a turn with nothing changed exactly as before", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "hi");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished" });
+    });
+});
+
 describe("a turn", () => {
     it("merges deltas into one post per 250 ms, with consecutive seqs", async () => {
         const host = poster();

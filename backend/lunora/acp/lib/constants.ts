@@ -30,3 +30,7 @@ export const INGEST_FLOOD_LIMIT_PER_MINUTE = 1200;
 
 /** `lastEventAt` on a session moves at most this often, so a live session list is not re-run per post. */
 export const SESSION_TOUCH_MS = 30_000;
+
+/** A turn's summary (plans/acp-agent-host.md §4.9): files listed, and the patch as text. The host keeps its own smaller patch cap to fit a post. */
+export const MAX_SUMMARY_FILES = 200;
+export const MAX_PATCH_CHARS = 256 * 1024;

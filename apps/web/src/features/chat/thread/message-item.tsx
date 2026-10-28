@@ -57,6 +57,7 @@ import { showError } from "@/lib/toast";
 import ForkBranchDialog from "./fork-branch-dialog";
 import formatMessageTime from "./format-message-time";
 import GenerationModelMenu from "./generation-model-menu";
+import HostChanges from "./host-changes";
 import MemoryUsageAction from "./memory-usage-action";
 import MessageBranchSwitcher from "./message-branch-switcher";
 import MessageContent from "./message-content";
@@ -523,6 +524,7 @@ const MessageItem: FC<MessageItemProps> = memo(
             <>
                 {message.role !== "system" && <MessageSelectCheckbox disabled={messageIsStreaming || message.status === "pending"} message={message} />}
                 <MessageContent isStreaming={messageIsStreaming} message={message} />
+                {message.role === "assistant" && message.hostChanges && <HostChanges changes={message.hostChanges} />}
             </>
         );
 

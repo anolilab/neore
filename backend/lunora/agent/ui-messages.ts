@@ -16,6 +16,8 @@ import {
 } from "ai";
 import type { Infer } from "lunorash/server";
 
+import type { HostChanges } from "../acp/lib/changes";
+import { readHostChanges } from "../acp/lib/changes";
 import { omit, pick } from "../lib/collections";
 import type { MessageBranch } from "./branch-tree";
 import { fromModelMessage, toModelMessage, toUIFilePart } from "./mapping";
@@ -58,6 +60,8 @@ export type UIMessage<METADATA = unknown, DATA_PARTS extends UIDataTypes = UIDat
     /** Gateway cost of the whole assistant turn, summed across its steps. */
     cost?: MessageCost;
     error?: string;
+    /** A host-run turn's changed files and, when kept, its patch (`acp/lib/changes.ts`); older builds ignore it. */
+    hostChanges?: HostChanges;
     key: string;
     /**
      * Set when memories were injected into this reply's prompt: how many, and the
@@ -409,6 +413,19 @@ const memoryUsageOf = (group: ReadonlyArray<MessageDoc>): { memoryUsage?: { coun
     return row ? { memoryUsage: { count: row.retrievedMemories!.length, messageId: row._id } } : {};
 };
 
+/** The group's row that recorded what a host turn changed (the reply, saved once at the end of the turn). */
+const hostChangesOf = (group: ReadonlyArray<MessageDoc>): { hostChanges?: HostChanges } => {
+    for (const row of group) {
+        const hostChanges = readHostChanges(row.providerMetadata);
+
+        if (hostChanges) {
+            return { hostChanges };
+        }
+    }
+
+    return {};
+};
+
 const createAssistantUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataTypes = UIDataTypes, TOOLS extends UITools = UITools>(
     groupUnordered: (ExtraFields<METADATA> & MessageDoc)[],
 ): UIMessage<METADATA, DATA_PARTS, TOOLS> => {
@@ -429,6 +446,7 @@ const createAssistantUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataT
         order: firstMessage.order,
         ...(firstMessage.speakerSkillId && { speakerSkillId: firstMessage.speakerSkillId }),
         ...memoryUsageOf(group),
+        ...hostChangesOf(group),
         stepOrder: firstMessage.stepOrder,
         userId: firstMessage.userId,
     };

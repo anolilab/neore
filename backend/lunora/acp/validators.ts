@@ -1,6 +1,8 @@
 import { v } from "lunorash/server";
 
 import { vCapabilityReport } from "../lib/capability-report";
+import { MAX_PATCH_CHARS, MAX_SUMMARY_FILES } from "./lib/constants";
+import { isFolderRelativePath } from "./lib/changes";
 
 /**
  * Host-run threads: validators shared by the schema, the ingest route and the readers
@@ -84,5 +86,21 @@ export const vHostEvent = v.union(
         error: v.optional(v.string().max(1000)),
         kind: v.literal("turn_end"),
         reason: v.union(v.literal("finished"), v.literal("cancelled"), v.literal("failed"), v.literal("interrupted")),
+        // What the turn's own tool calls wrote (plans/acp-agent-host.md §4.9). Paths are relative to the approved folder.
+        summary: v.optional(
+            v.object({
+                files: v
+                    .array(
+                        v.object({
+                            added: v.number().check((count) => Number.isSafeInteger(count) && count >= 0, { message: "Counts are non-negative integers" }),
+                            path: v.string().min(1).max(1024).check(isFolderRelativePath, { message: "A path inside the folder, relative to it" }),
+                            removed: v.number().check((count) => Number.isSafeInteger(count) && count >= 0, { message: "Counts are non-negative integers" }),
+                        }),
+                    )
+                    .check((files) => files.length <= MAX_SUMMARY_FILES, { message: "Too many files" }),
+                // The unified diff, or `{ tooLarge: true }` when the host could not keep it.
+                patch: v.optional(v.union(v.string().max(MAX_PATCH_CHARS), v.object({ tooLarge: v.literal(true) }))),
+            }),
+        ),
     }),
 );

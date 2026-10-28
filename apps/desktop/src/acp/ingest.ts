@@ -22,7 +22,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver } from "./host-events";
+import type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, TurnSummary } from "./host-events";
 import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, endReasonOf } from "./host-events";
 import { SessionLink } from "./session-link";
 import type { ChannelHost } from "./turn-channel";
@@ -152,8 +152,8 @@ export class HostPoster implements SessionObserver {
         this.channels.get(turnId)?.enqueue({ kind: "permission_resolved", outcome, requestId: capRequestId(requestId) });
     }
 
-    public turnEnded(_sessionId: string, turnId: string, reason: StopReason | "failed", error?: string): void {
-        this.channels.get(turnId)?.end(endReasonOf(reason), error);
+    public turnEnded(_sessionId: string, turnId: string, reason: StopReason | "failed", error?: string, summary?: TurnSummary): void {
+        this.channels.get(turnId)?.end(endReasonOf(reason), error, summary);
     }
 
     // ─── Start and stop ─────────────────────────────────────────────────────

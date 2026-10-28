@@ -3,6 +3,7 @@
  * pinned without a database. Nothing here bills: the agent bills its own account, and host turns write no usage
  * row and charge no credit (`scheduleReplyUsage` is deliberately not called; plans/acp-agent-host.md §5.2).
  */
+import type { HostChanges } from "./changes";
 import { MAX_HOST_REPLY_CHARS } from "./constants";
 
 export const HOST_PROVIDER = "acp-host";
@@ -48,13 +49,14 @@ const finishReasonOf = (reason: HostReplyReason): "error" | "other" | "stop" => 
 
 /**
  * `null` when there is nothing to save: a finished or stopped turn that wrote nothing. A turn that failed, was
- * interrupted, timed out or lost its device is always saved, so the thread says what happened.
+ * interrupted, timed out or lost its device is always saved, so the thread says what happened. A turn that
+ * changed files is saved too, even with no words, since the summary lives on the reply.
  */
-export const buildHostReply = (input: { agentKey: string; error?: string; reason: HostReplyReason; transcript: HostTranscript }) => {
+export const buildHostReply = (input: { agentKey: string; changes?: HostChanges; error?: string; reason: HostReplyReason; transcript: HostTranscript }) => {
     const failed = isFailure(input.reason);
     const { reasoning, text } = input.transcript;
 
-    if (!failed && text.length === 0 && reasoning.length === 0) {
+    if (!failed && text.length === 0 && reasoning.length === 0 && input.changes === undefined) {
         return null;
     }
 
@@ -86,7 +88,7 @@ export const buildHostReply = (input: { agentKey: string; error?: string; reason
         message: { content: text ? [{ text, type: "text" as const }] : [], role: "assistant" as const },
         model: input.agentKey,
         provider: HOST_PROVIDER,
-        providerMetadata: { neore: { billed: false, runtime: HOST_PROVIDER } },
+        providerMetadata: { neore: { billed: false, runtime: HOST_PROVIDER, ...(input.changes !== undefined && { hostChanges: input.changes }) } },
         ...(reasoning && { reasoning }),
         status: failed ? ("failed" as const) : ("success" as const),
     };

@@ -929,3 +929,146 @@ describe("the apply mutation", () => {
         expect(result).toEqual({ outcome: "limited" });
     });
 });
+
+describe("what a turn changed", () => {
+    const SUMMARY = {
+        files: [
+            { added: 2, path: "src/a.ts", removed: 1 },
+            { added: 4, path: "b.md", removed: 0 },
+        ],
+        patch: "--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1,1 +1,2 @@\n-old\n+new\n+more\n",
+    };
+
+    /** The UI message a client reads for the thread's reply. */
+    const replyFor = async (threadId: string) => {
+        const { toUIMessages } = await import("../agent/ui-messages");
+        const ui = toUIMessages((await messagesOf(threadId)) as never);
+
+        return ui.find((message) => message.role === "assistant");
+    };
+
+    it("shows the two files a turn wrote with their counts, and the patch, on the reply a client reads", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("edit"), TEXT("Done."), { kind: "turn_end", reason: "finished", summary: SUMMARY }]);
+
+        const reply = await replyFor(threadId);
+
+        expect(reply?.hostChanges).toEqual(SUMMARY);
+        expect(reply?.text).toBe("Done.");
+    });
+
+    it("saves a reply for a turn that only changed files, and for a cancelled one", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("edit"), { kind: "turn_end", reason: "cancelled", summary: { files: SUMMARY.files, patch: SUMMARY.patch } }]);
+
+        const replies = await assistantRepliesOf(threadId);
+
+        expect(replies).toHaveLength(1);
+        expect(replies[0]?.providerMetadata.neore.hostChanges.files).toEqual(SUMMARY.files);
+    });
+
+    it("keeps the file list and counts of a patch the host could not keep", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("edit"), TEXT("ok"), { kind: "turn_end", reason: "finished", summary: { files: SUMMARY.files, patch: { tooLarge: true } } }]);
+
+        const reply = await replyFor(threadId);
+
+        expect(reply?.hostChanges).toEqual({ files: SUMMARY.files, patch: { tooLarge: true } });
+    });
+
+    it("leaves an earlier reply's patch as it was when a later turn changes the same file", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const later = { files: [{ added: 9, path: "src/a.ts", removed: 9 }], patch: "--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1,9 +1,9 @@\n" };
+
+        await turn(device, threadId, "t1", 0, [START("one"), TEXT("first"), { kind: "turn_end", reason: "finished", summary: SUMMARY }]);
+        await turn(device, threadId, "t2", 0, [START("two"), TEXT("second"), { kind: "turn_end", reason: "finished", summary: later }]);
+
+        const { toUIMessages } = await import("../agent/ui-messages");
+        const replies = toUIMessages((await messagesOf(threadId)) as never).filter((message) => message.role === "assistant");
+
+        expect(replies.map((reply) => reply.hostChanges)).toEqual([SUMMARY, later]);
+
+        // A redelivery of the first turn's end, even with a different summary, is dropped.
+        await turn(device, threadId, "t1", 0, [START("one"), TEXT("first"), { kind: "turn_end", reason: "finished", summary: later }]);
+        expect(toUIMessages((await messagesOf(threadId)) as never).find((message) => message.role === "assistant")?.hostChanges).toEqual(SUMMARY);
+    });
+
+    it("ignores a summary that lists no file, so a turn that said nothing still saves no reply", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("edit"), { kind: "turn_end", reason: "finished", summary: { files: [] } }]);
+
+        expect(await assistantRepliesOf(threadId)).toHaveLength(0);
+    });
+
+    it("keeps each reply under its own prompt when the next prompt arrives before the previous turn's end", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("one"), TEXT("first")]);
+        await turn(device, threadId, "t2", 0, [START("two")]);
+        await turn(device, threadId, "t1", 2, [{ kind: "turn_end", reason: "finished", summary: SUMMARY }]);
+        await turn(device, threadId, "t2", 1, [TEXT("second"), { kind: "turn_end", reason: "finished" }]);
+
+        const { toUIMessages } = await import("../agent/ui-messages");
+        const ui = toUIMessages((await messagesOf(threadId)) as never);
+
+        expect(ui.map((message) => `${message.role}:${message.text}`)).toEqual(["user:one", "assistant:first", "user:two", "assistant:second"]);
+        expect(ui[1]?.hostChanges).toEqual(SUMMARY);
+        expect(ui[3]?.hostChanges).toBeUndefined();
+    });
+
+    it("keeps the patch out of the stream's chunks, which every reader of the stream pays for", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("edit"), { kind: "turn_end", reason: "finished", summary: SUMMARY }]);
+
+        const stream = await streamFor("t1");
+        const chunks = await chunksOf(stream?._id);
+
+        expect(JSON.stringify(chunks)).not.toContain("+more");
+        expect(chunks.at(-1)?.event).toEqual({ kind: "turn_end", reason: "finished" });
+    });
+
+    it("refuses a whole post whose summary is outside the bounds", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const bad = [
+            { files: [{ added: 1, path: "/etc/passwd", removed: 0 }] },
+            { files: [{ added: 1, path: "../outside.txt", removed: 0 }] },
+            { files: [{ added: 1, path: String.raw`C:\Windows\x`, removed: 0 }] },
+            { files: [{ added: 1, path: "a\n+++ b/forged", removed: 0 }] },
+            { files: [{ added: -1, path: "a.ts", removed: 0 }] },
+            { files: [{ added: 1.5, path: "a.ts", removed: 0 }] },
+            { files: [{ added: 1, path: "x".repeat(1025), removed: 0 }] },
+            { files: Array.from({ length: 201 }, (_, index) => {return { added: 1, path: `f${String(index)}.ts`, removed: 0 }}) },
+            { files: SUMMARY.files, patch: "x".repeat(256 * 1024 + 1) },
+            { files: SUMMARY.files, patch: { tooLarge: false } },
+        ];
+
+        await turn(device, threadId, "t1", 0, [START("edit")]);
+
+        for (const summary of bad) {
+             
+            const result = await turn(device, threadId, "t1", 1, [{ kind: "turn_end", reason: "finished", summary }]);
+
+            // A patch past the post's body cap is refused by the route itself (413) before the validator sees it.
+            expect([400, 413]).toContain(result.status);
+        }
+
+        expect(await assistantRepliesOf(threadId)).toHaveLength(0);
+        // The accepted bounds themselves are not refused.
+        const edge = { files: Array.from({ length: 200 }, (_, index) => {return { added: 0, path: `${"d/".repeat(5)}f${String(index)}.ts`, removed: 0 }}), patch: "x".repeat(100 * 1024) };
+
+        await expect(turn(device, threadId, "t1", 1, [{ kind: "turn_end", reason: "finished", summary: edge }])).resolves.toMatchObject({ status: 200 });
+    });
+});

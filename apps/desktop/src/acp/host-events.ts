@@ -19,8 +19,28 @@ export interface PermissionRequestEvent {
 
 export type PermissionOutcomeKind = "allowed" | "cancelled" | "declined";
 
+/** One file a turn wrote: its path inside the approved folder (never absolute) and its line counts. */
+export interface ChangedFile {
+    added: number;
+    path: string;
+    removed: number;
+}
+
+/** What a turn changed (plan §4.9). `patch` is the frozen unified diff, or `{ tooLarge: true }` when it did not fit. */
+export interface TurnSummary {
+    files: ChangedFile[];
+    patch?: string | { tooLarge: true };
+}
+
+export interface TurnEndEvent {
+    error?: string;
+    kind: "turn_end";
+    reason: "cancelled" | "failed" | "finished" | "interrupted";
+    summary?: TurnSummary;
+}
+
 export type HostEvent
-    = PermissionRequestEvent | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; kind: "session_open" } | { error?: string; kind: "turn_end"; reason: "cancelled" | "failed" | "finished" | "interrupted" } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
+    = PermissionRequestEvent | TurnEndEvent | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; kind: "session_open" } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
 
 export interface HostSessionInfo {
     agentKey: string;
@@ -38,7 +58,7 @@ export interface SessionObserver {
     text: (sessionId: string, turnId: string, delta: string) => void;
     thought: (sessionId: string, turnId: string, delta: string) => void;
     tool: (sessionId: string, turnId: string, tool: { id: string; kind: string; status: string; title: string }) => void;
-    turnEnded: (sessionId: string, turnId: string, reason: StopReason | "failed", error?: string) => void;
+    turnEnded: (sessionId: string, turnId: string, reason: StopReason | "failed", error?: string, summary?: TurnSummary) => void;
     turnStarted: (sessionId: string, turnId: string, user: string) => void;
 }
 
@@ -95,6 +115,37 @@ export const capPrompt = (text: string): string => {
 };
 
 const LIMIT_STOPS: ReadonlySet<StopReason | "failed"> = new Set(["failed", "max_tokens", "max_turn_requests"]);
+
+/** The files a turn may list, and the paths in them (`backend/lunora/acp/validators.ts`). */
+export const MAX_SUMMARY_FILES = 200;
+export const MAX_SUMMARY_PATH_CHARS = 1024;
+
+/**
+ * The end of a turn with its summary, held to what one post can carry. The backend allows a 256 KiB patch, but a post
+ * is capped at 256 KiB whole and this event must fit one post alone, escaped twice, so the patch gives way first
+ * (`{ tooLarge: true }`, the file list and counts stay) and only then the tail of the file list.
+ */
+export const turnEndEvent = (reason: TurnEndEvent["reason"], error: string | undefined, summary: TurnSummary | undefined): TurnEndEvent => {
+    const base: TurnEndEvent = { kind: "turn_end", reason, ...error !== undefined && { error: error.slice(0, 1000) } };
+
+    if (summary === undefined || summary.files.length === 0) {
+        return base;
+    }
+
+    let files = summary.files.slice(0, MAX_SUMMARY_FILES);
+    let { patch } = summary;
+    const fits = (): boolean => wireBytes({ ...base, summary: { files, ...patch !== undefined && { patch } } }) <= MAX_EVENT_BYTES;
+
+    if (typeof patch === "string" && !fits()) {
+        patch = { tooLarge: true };
+    }
+
+    while (!fits() && files.length > 1) {
+        files = files.slice(0, Math.ceil(files.length / 2));
+    }
+
+    return { ...base, summary: { files, ...patch !== undefined && { patch } } };
+};
 
 /** How a stop reason is told to the backend. */
 export const endReasonOf = (reason: StopReason | "failed"): "cancelled" | "failed" | "finished" => {

@@ -1,6 +1,6 @@
 /** One turn's output on its way to the backend, in order, one batch at a time (`ingest.ts` has the rules). */
-import type { HostEvent, PostResult } from "./host-events";
-import { jitteredBackoff, wireBytes } from "./host-events";
+import type { HostEvent, PostResult, TurnSummary } from "./host-events";
+import { jitteredBackoff, turnEndEvent, wireBytes } from "./host-events";
 
 /** At most one post per turn in this interval. */
 export const POST_INTERVAL_MS = 250;
@@ -119,12 +119,12 @@ export class TurnChannel {
     }
 
     /** Queues the end of the turn. The channel takes nothing after it. */
-    public end(reason: "cancelled" | "failed" | "finished" | "interrupted", error?: string): void {
+    public end(reason: "cancelled" | "failed" | "finished" | "interrupted", error?: string, summary?: TurnSummary): void {
         if (this.sealed) {
             return;
         }
 
-        this.enqueue({ kind: "turn_end", reason, ...error !== undefined && { error: error.slice(0, 1000) } });
+        this.enqueue(turnEndEvent(reason, error, summary));
         this.sealed = true;
     }
 
