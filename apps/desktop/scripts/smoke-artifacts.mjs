@@ -133,14 +133,15 @@ const findHostBundles = (dir, depth = 0) => {
     });
 };
 
-const hostBundles = findHostBundles(release);
+// `--unpacked-only` runs in CI jobs that package without building the host bundle, so it checks no bundle.
+const hostBundles = unpackedOnly ? [] : findHostBundles(release);
 
-if (hostBundles.length === 0) {
+if (!unpackedOnly && hostBundles.length === 0) {
     fail(`no resources/neore-host bundle under ${release}; extraResources did not pick up host-bundle/`);
 }
 
 // One run packages several architectures; each app's bundle sits in its own `resources`, next to its `app.asar.unpacked`.
-for (const dir of unpacked) {
+for (const dir of unpackedOnly ? [] : unpacked) {
     const bundle = path.join(path.dirname(dir), "neore-host");
 
     if (!existsSync(path.join(bundle, "manifest.json"))) {
