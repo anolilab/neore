@@ -4,13 +4,14 @@
 //
 // Also makes node-pty's `spawn-helper` (macOS prebuilds only) executable: its tarball ships the file without
 // the execute bit, and a terminal cannot start a shell without it. This runs before signing, so the signed app keeps the mode.
+// The same for the dictation helper (`whisper-cli`), which is spawned from outside the asar.
 const { chmodSync, readdirSync } = require("node:fs");
 const path = require("node:path");
 
 /** @param {string} directory @returns {string[]} */
 const findSpawnHelpers = (directory) =>
     readdirSync(directory, { recursive: true, withFileTypes: true })
-        .filter((entry) => entry.isFile() && entry.name === "spawn-helper")
+        .filter((entry) => entry.isFile() && (entry.name === "spawn-helper" || entry.name === "whisper-cli"))
         .map((entry) => path.join(entry.parentPath, entry.name));
 
 /** @param {import("electron-builder").AfterPackContext} context */

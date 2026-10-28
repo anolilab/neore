@@ -71,6 +71,28 @@ for (const dir of unpacked) {
     }
 }
 
+// The dictation helper (`scripts/build-dictation-helper.mjs`) sits next to `app.asar.unpacked`, outside the asar, with its licence
+// texts: one folder for each arch the helper was built for. Where none was built (Windows on ARM is not offered), none is packed.
+const helperRoot = path.join(fileURLToPath(new URL("..", import.meta.url)), "helper");
+const built = existsSync(helperRoot) ? readdirSync(helperRoot).length : 0;
+const packedHelpers = unpacked.map((dir) => path.join(path.dirname(dir), "dictation")).filter((dir) => existsSync(dir));
+
+if (packedHelpers.length !== built) {
+    fail(`${built} dictation helper(s) were built, and ${packedHelpers.length} were packed (${helperRoot})`);
+}
+
+for (const dir of packedHelpers) {
+    const executable = process.platform === "win32" ? "whisper-cli.exe" : "whisper-cli";
+
+    if (!existsSync(path.join(dir, executable)) || !existsSync(path.join(dir, "licenses", "whisper.cpp-LICENSE.txt"))) {
+        fail(`${dir} lacks ${executable} or its licence text`);
+    }
+
+    if (process.platform !== "win32" && (statSync(path.join(dir, executable)).mode & 0o111) === 0) {
+        fail(`${executable} in ${dir} is not executable; dictation could not start it`);
+    }
+}
+
 // The terminal starts a shell through node-pty's `spawn-helper`, which must sit outside the asar and be
 // executable. It is built on macOS only: Linux forks the shell itself, and Windows uses ConPTY.
 // A `build/Release` copy of the addon is loaded in preference to the per-arch `prebuilds/`, and a local rebuild has

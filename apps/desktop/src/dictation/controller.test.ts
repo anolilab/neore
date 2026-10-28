@@ -391,6 +391,15 @@ describe("before a window opens", () => {
         expect(h.notices[0]).toContain("Hold the shortcut again");
     });
 
+    it("says where this OS keeps the microphone switch, when it was told", async () => {
+        const h = harness({ microphoneAllowed: async () => false, microphoneSettings: "Settings → Privacy & security → Microphone" });
+
+        h.controller.press();
+        await settled();
+
+        expect(h.notices[0]).toBe("Dictation: Neore can't use the microphone. Allow it in Settings → Privacy & security → Microphone and try again.");
+    });
+
     it("asks before downloading a missing model, opens no window, and downloads once agreed", async () => {
         const h = harness();
 

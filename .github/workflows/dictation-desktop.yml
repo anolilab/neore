@@ -1,0 +1,193 @@
+# On-device dictation on every OS the desktop ships to (plans/desktop-dictation.md, S4): builds the real
+# whisper.cpp helper with `apps/desktop/scripts/build-dictation-helper.mjs`, then runs the S2 acceptance tests on
+# each runner — the dictation unit and integration suites, the helper itself on a spoken clip, and the Electron
+# end-to-end suite (network blocked, checksum mismatch, killed helper, no audio on disk, microphone only for the
+# dictation window).
+#
+# Windows on ARM is the one platform marked unsupported in settings (`unsupportedReason`, `src/dictation/catalog.ts`):
+# its leg builds the helper with clang-cl, measures it, and asserts that settings says "unavailable". The measurement is in
+# each job's step summary; when the default model is inside the budget there, it moves into the supported list.
+#
+# Runs on a pull request that touches dictation or the desktop shell, or by hand. Nothing else depends on it.
+
+name: "Dictation (desktop)"
+
+on: # yamllint disable-line rule:truthy
+    pull_request:
+        paths:
+            - ".github/workflows/dictation-desktop.yml"
+            - "apps/desktop/**"
+    workflow_dispatch:
+
+concurrency:
+    group: "${{ github.workflow }}-${{ github.ref }}"
+    cancel-in-progress: true
+
+permissions:
+    contents: "read" # to fetch code (actions/checkout)
+
+env:
+    # The same revision as `MODEL_REVISION` in `apps/desktop/src/dictation/catalog.ts`, so these are the files users download.
+    MODEL_REVISION: "5359861c739e955e79d9a303bcbc70fb988958b1"
+
+jobs:
+    dictation:
+        name: "Dictation (${{ matrix.os }})"
+        runs-on: "${{ matrix.os }}"
+        timeout-minutes: 90
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: "ubuntu-24.04"
+                      expect: "supported"
+                      helper: "linux-x64"
+                      models: "small"
+                    - os: "ubuntu-24.04-arm"
+                      expect: "supported"
+                      helper: "linux-arm64"
+                      models: "small"
+                    - os: "windows-latest"
+                      expect: "supported"
+                      helper: "win-x64"
+                      models: "small"
+                    # Unsupported until measured: the smaller models are measured too, for the choice of its default.
+                    - os: "windows-11-arm"
+                      expect: "unsupported"
+                      helper: "win-arm64"
+                      models: "small base tiny"
+        env:
+            NEORE_DICTATION_EXPECT: "${{ matrix.expect }}"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              with:
+                  node-version: "22"
+                  skip-playwright: "true"
+
+            # Windows on ARM builds with clang-cl (ggml cannot build ARM with MSVC without tuning for the build machine).
+            # The component is part of Visual Studio's "Desktop development with C++" workload; if the runner image lacks
+            # it, it is added with the installer, and the build fails here, not later, when clang-cl is still missing.
+            - name: "Make sure clang-cl is installed (Windows on ARM)"
+              if: "matrix.helper == 'win-arm64'"
+              shell: "pwsh"
+              run: |
+                  $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer"
+                  $path = & "$installer\vswhere.exe" -latest -products * -property installationPath
+                  Write-Host "Visual Studio: $path"
+                  & "$installer\vswhere.exe" -latest -products * -property catalog_productDisplayVersion
+                  $clang = Get-ChildItem -Path $path -Recurse -Filter clang-cl.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+                  if (-not $clang) {
+                      Start-Process -FilePath "$installer\setup.exe" -Wait -ArgumentList @(
+                          "modify", "--installPath", "`"$path`"", "--quiet", "--norestart", "--noUpdateInstaller",
+                          "--add", "Microsoft.VisualStudio.Component.VC.Llvm.Clang",
+                          "--add", "Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset"
+                      )
+                      $clang = Get-ChildItem -Path $path -Recurse -Filter clang-cl.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+                  }
+                  if (-not $clang) { throw "clang-cl.exe is not installed" }
+                  Write-Host "clang-cl: $($clang.FullName)"
+
+            # Electron's sandbox needs unprivileged user namespaces, which Ubuntu 24.04 restricts through AppArmor. The app is
+            # never started with --no-sandbox: the runner is changed instead.
+            - name: "Allow unprivileged user namespaces for the Electron sandbox (Linux)"
+              if: "runner.os == 'Linux'"
+              run: |
+                  sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+                  sudo apt-get update
+                  sudo apt-get install -y xvfb
+
+            - name: "Build the speech helper"
+              shell: "bash"
+              run: 'pnpm --filter @neore/desktop run build:dictation-helper -- --work "$RUNNER_TEMP/whisper.cpp"'
+
+            - name: "Download the models and verify them"
+              shell: "bash"
+              env:
+                  MODELS: "${{ matrix.models }}"
+              run: |
+                  set -euo pipefail
+                  mkdir -p "$RUNNER_TEMP/models"
+                  cd "$RUNNER_TEMP/models"
+                  for model in $MODELS; do
+                      case "$model" in
+                          tiny) sum=be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21 ;;
+                          base) sum=60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe ;;
+                          small) sum=1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b ;;
+                          *)
+                              echo "no checksum recorded for $model" >&2
+                              exit 1
+                              ;;
+                      esac
+                      curl -fsSL -o "ggml-$model.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/$MODEL_REVISION/ggml-$model.bin"
+                      actual="$(node -e 'const { createHash } = require("node:crypto"); process.stdout.write(createHash("sha256").update(require("node:fs").readFileSync(process.argv[1])).digest("hex"))' "ggml-$model.bin")"
+                      if [[ "$actual" != "$sum" ]]; then
+                          echo "checksum mismatch for $model" >&2
+                          exit 1
+                      fi
+                  done
+
+            # Paths for the tests: Git Bash paths (/d/a/...) mean nothing to the Windows node that reads them.
+            - name: "Point the tests at the helper, the models and the clip"
+              shell: "bash"
+              env:
+                  HELPER: "${{ matrix.helper }}"
+                  MODELS: "${{ matrix.models }}"
+                  RUNNER_LABEL: "${{ matrix.os }}"
+              run: |
+                  set -euo pipefail
+                  native() { if command -v cygpath > /dev/null; then cygpath -m "$1"; else echo "$1"; fi; }
+                  cli="$PWD/apps/desktop/helper/$HELPER/whisper-cli"
+                  if [[ "$HELPER" == win-* ]]; then cli="$cli.exe"; fi
+                  entries=""
+                  for model in $MODELS; do
+                      entries="$entries,$model=$(native "$RUNNER_TEMP/models/ggml-$model.bin")"
+                  done
+                  {
+                      echo "NEORE_WHISPER_CLI=$(native "$cli")"
+                      echo "NEORE_WHISPER_CLIP=$(native "$RUNNER_TEMP/whisper.cpp/samples/jfk.wav")"
+                      echo "NEORE_WHISPER_EXPECT=country"
+                      echo "NEORE_WHISPER_MODELS=${entries#,}"
+                      echo "NEORE_WHISPER_MODEL=$(native "$RUNNER_TEMP/models/ggml-${MODELS%% *}.bin")"
+                  } >> "$GITHUB_ENV"
+                  {
+                      echo "### Speech helper: $RUNNER_LABEL"
+                      echo ""
+                      echo "| Platform | Model | Time | Clip | Factor | Budget |"
+                      echo "| --- | --- | --- | --- | --- | --- |"
+                  } >> "$GITHUB_STEP_SUMMARY"
+
+            # The helper alone: the same arguments the app gives it, a spoken clip in, its text out, and the time it took.
+            - name: "Unit and integration tests, and the real helper on a spoken clip"
+              run: "pnpm --filter @neore/desktop exec vitest run src/dictation"
+
+            - name: "End-to-end tests (supported platform)"
+              if: "matrix.expect == 'supported' && runner.os != 'Linux'"
+              run: 'pnpm --filter @neore/desktop exec playwright test e2e/dictation.spec.ts --grep-invert "unsupported platform"'
+
+            # No display on the runner: Xvfb gives Electron one.
+            - name: "End-to-end tests (supported platform, Linux)"
+              if: "matrix.expect == 'supported' && runner.os == 'Linux'"
+              run: 'xvfb-run -a pnpm --filter @neore/desktop exec playwright test e2e/dictation.spec.ts --grep-invert "unsupported platform"'
+
+            - name: "End-to-end test: an unsupported platform says so (Windows on ARM)"
+              if: "matrix.expect == 'unsupported'"
+              run: 'pnpm --filter @neore/desktop exec playwright test e2e/dictation.spec.ts --grep "unsupported platform"'
+
+            - name: "Upload the Playwright results"
+              if: "failure()"
+              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              with:
+                  name: "dictation-desktop-${{ matrix.os }}"
+                  if-no-files-found: "ignore"
+                  path: "apps/desktop/test-results"

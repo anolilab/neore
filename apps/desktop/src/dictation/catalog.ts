@@ -41,6 +41,22 @@ export const SMALL: ModelSpec = {
     version: MODEL_REVISION,
 };
 
+/**
+ * Where on-device dictation is offered: the platforms whose speech helper is built, packaged and tested in CI (S2 to S4).
+ * Anywhere else settings says so and dictation stays off, whatever else is on the machine. Windows on ARM is not here until the
+ * clang-cl build's measured speed on the default model is inside the budget in plans/desktop-dictation.md (S4); then it is one line.
+ */
+const SUPPORTED = new Set(["darwin-arm64", "linux-arm64", "linux-x64", "win32-x64"]);
+
+const UNSUPPORTED_REASONS: Record<string, string> = {
+    "darwin-x64": "On-device dictation is not available on Intel Macs yet.",
+    "win32-arm64": "On-device dictation is not available on Windows on ARM yet: it is still being tested there.",
+};
+
+/** Why this platform is not offered on-device dictation, or `undefined` where it is. */
+export const unsupportedReason = (platform: NodeJS.Platform, arch: string): string | undefined =>
+    SUPPORTED.has(`${platform}-${arch}`) ? undefined : UNSUPPORTED_REASONS[`${platform}-${arch}`] ?? "On-device dictation is not available on this system.";
+
 /** One model as settings offers it on this machine. */
 export interface OfferedModel {
     isDefault: boolean;
