@@ -89,6 +89,33 @@ microphone prompt and helper packaging for each.
 - Acceptance: the S2 acceptance tests pass on each OS in CI, or the platform is
   marked unsupported in settings.
 
+S4 as built (`.github/workflows/dictation-desktop.yml`, `apps/desktop/scripts/build-dictation-helper.mjs`):
+
+- **Helper.** The same whisper.cpp pin on Windows x64, Linux x64 and Linux arm64, plus Windows arm64 built with
+  clang-cl (ggml refuses to build ARM with MSVC unless it may tune for the build machine, which the portable build
+  never does). `GGML_NATIVE=OFF` on ARM leaves bare armv8-a, which has no half-precision or dot-product instructions, so
+  arm64 builds set `armv8.2-a+fp16+dotprod` (Cortex-A75 and later; a Raspberry Pi 4 is below it). `GGML_OPENMP=OFF`
+  everywhere but macOS: its runtime (`vcomp140`, `libgomp`) is not inside a single file. The script checks the finished
+  binary: Linux links only the C library (and the glibc it needs is printed and, with `--max-glibc`, capped, which the
+  release does with the 22.04 runners' 2.35), Windows imports no Visual C++ runtime DLL.
+- **Text on Windows.** At the pin, `-f - -otxt` writes its text to the console (`CON`) on Windows, not to our pipe, so a
+  Windows dictation would come back empty. There the helper is given an output name that is not `-` and no format flag,
+  which makes it print each segment to stdout itself. Only the real helper shows this, so CI runs it on a spoken clip.
+- **Microphone.** macOS asks once (unchanged). Windows has no prompt for a desktop app, only a switch in Settings →
+  Privacy & security → Microphone: an explicit refusal stops the dictation with that path in the message, anything else is left to the
+  capture, which reports `denied` if it is blocked. Linux has no OS gate; the page's `denied` / `no-device` is the answer.
+- **Models.** Small is the default on every machine without a GPU, as in Appendix A.
+- **Unsupported.** `unsupportedReason` (`catalog.ts`) lists the platforms that are built, packaged and tested;
+  everywhere else settings says so, offers nothing and the shortcut stays off. Windows on ARM is not in the list yet, and
+  neither are Intel Macs. CI runs each runner with `NEORE_DICTATION_EXPECT`, so the table must agree with the runner it
+  runs on, and the Windows on ARM leg asserts the settings page says "unavailable".
+- **Budget.** A supported platform's default model must finish a spoken 11 s clip in at most 1.5 times its length on a
+  four-core runner (`real-helper.test.ts`; the slowest build S1 accepted took 0.84 times, the MSVC Windows arm64 build it
+  rejected 4.3). The Windows on ARM leg only records its time (small, base and tiny) in its step summary: when small is
+  inside the budget there, its entry moves into `SUPPORTED`, `desktop.yml` builds it with `-- --arch arm64`, and the
+  smoke test counts it. Until then the clang-cl measurement is pending, and so is Appendix A's row for it (Appendix A is
+  part of the S1 branch, which is not on this one).
+
 ## 5. Invariants crossed
 
 - The site origin gets no audio and no new IPC method. Every native channel is

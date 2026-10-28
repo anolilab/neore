@@ -4,9 +4,13 @@
 // `<os>` and `<arch>` are electron-builder's `${os}` and `${arch}` (mac, linux, win; x64, arm64):
 // `electron-builder.yml` packs that folder as `extraResources`, and `src/dictation/index.ts` reads it in a dev run.
 //
-//   node scripts/build-dictation-helper.mjs [--work <dir>]
+//   node scripts/build-dictation-helper.mjs [--work <dir>] [--arch x64|arm64] [--max-glibc 2.35]
 //
-// Needs git, cmake and a C++ toolchain. The same pin is used by the benchmark in
+// `--arch` builds for the other architecture of the same OS (Windows only; the result cannot run here, so the
+// start-up check is skipped). `--max-glibc` fails a Linux build that needs a newer glibc than that: the release
+// builds on the oldest runner it ships from, so a helper that links against a newer one never reaches users.
+//
+// Needs git, cmake and a C++ toolchain; Windows on arm64 needs the "C++ Clang tools for Windows" component (clang-cl). The same pin is used by the benchmark in
 // plans/desktop-dictation.md (Appendix A), so the shipped build is the one that was measured.
 import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
@@ -21,16 +25,29 @@ const WHISPER_CPP_URL = "https://github.com/ggml-org/whisper.cpp.git";
 const MACOS_MINIMUM = "13.0";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const workFlag = process.argv.indexOf("--work");
-const work = workFlag === -1 ? path.join(os.tmpdir(), `neore-whisper.cpp-${WHISPER_CPP_SHA.slice(0, 12)}`) : path.resolve(process.argv[workFlag + 1]);
+const flagValue = (name) => {
+    const index = process.argv.indexOf(name);
+
+    return index === -1 ? undefined : process.argv[index + 1];
+};
+const work = flagValue("--work") === undefined ? path.join(os.tmpdir(), `neore-whisper.cpp-${WHISPER_CPP_SHA.slice(0, 12)}`) : path.resolve(flagValue("--work"));
 const executable = process.platform === "win32" ? "whisper-cli.exe" : "whisper-cli";
 const builderOs = { darwin: "mac", linux: "linux", win32: "win" }[process.platform];
+const targetArch = flagValue("--arch") ?? process.arch;
 
 if (builderOs === undefined) {
     throw new Error(`no helper build for ${process.platform}`);
 }
 
-const outDirectory = path.join(root, "helper", `${builderOs}-${process.arch}`);
+if (!["arm64", "x64"].includes(targetArch)) {
+    throw new Error(`no helper build for ${targetArch}`);
+}
+
+if (targetArch !== process.arch && process.platform !== "win32") {
+    throw new Error("--arch other than the machine's own is supported on Windows only");
+}
+
+const outDirectory = path.join(root, "helper", `${builderOs}-${targetArch}`);
 
 const run = (command, args, cwd) => {
     execFileSync(command, args, { cwd, stdio: "inherit" });
@@ -52,6 +69,45 @@ if (head !== WHISPER_CPP_SHA) {
     throw new Error(`whisper.cpp checked out ${head}, expected ${WHISPER_CPP_SHA}`);
 }
 
+/** The names of the DLLs a PE file imports: the NT headers' import directory, read without a Windows toolchain. */
+const peImports = (file) => {
+    const peOffset = file.readUInt32LE(0x3c);
+    const sectionCount = file.readUInt16LE(peOffset + 6);
+    const optionalSize = file.readUInt16LE(peOffset + 20);
+    const optional = peOffset + 24;
+    // The import directory is the second data directory; PE32+ (0x20b) keeps them 16 bytes later than PE32.
+    const directory = optional + (file.readUInt16LE(optional) === 0x20b ? 120 : 104);
+    const importRva = file.readUInt32LE(directory);
+    const sections = Array.from({ length: sectionCount }, (_, index) => {
+        const at = optional + optionalSize + index * 40;
+
+        return { rawPointer: file.readUInt32LE(at + 20), size: Math.max(file.readUInt32LE(at + 8), file.readUInt32LE(at + 16)), virtualAddress: file.readUInt32LE(at + 12) };
+    });
+    const toOffset = (rva) => {
+        const section = sections.find(({ size, virtualAddress }) => rva >= virtualAddress && rva < virtualAddress + size);
+
+        if (section === undefined) {
+            throw new Error("the helper's import table points outside its sections");
+        }
+
+        return rva - section.virtualAddress + section.rawPointer;
+    };
+    const names = [];
+
+    if (importRva === 0) {
+        return names;
+    }
+
+    // One 20-byte descriptor per DLL, ended by an all-zero one; the name's RVA is its fourth field.
+    for (let at = toOffset(importRva); file.readUInt32LE(at + 12) !== 0; at += 20) {
+        const start = toOffset(file.readUInt32LE(at + 12));
+
+        names.push(file.toString("latin1", start, file.indexOf(0, start)));
+    }
+
+    return names;
+};
+
 const flags = [
     "-DCMAKE_BUILD_TYPE=Release",
     // One file to ship and sign: no libwhisper/libggml next to it.
@@ -72,8 +128,36 @@ if (process.platform === "darwin") {
     );
 }
 
+// OpenMP is a runtime we cannot ship inside one file (vcomp140.dll, libgomp.so), and ggml's own thread pool does the same work.
+if (process.platform !== "darwin") {
+    flags.push("-DGGML_OPENMP=OFF");
+}
+
+// Without `-DGGML_NATIVE=ON` ggml targets bare armv8-a on ARM, which has no half-precision or dot-product instructions and runs
+// the model several times slower. This floor is Cortex-A75/A55 (2017) and everything after it, which covers every Windows on
+// ARM device and the Linux servers and boards that matter. An older core (a Raspberry Pi 4) dies with SIGILL, which dictation
+// reports as an error from the helper, like any other crash.
+const ARM_BASELINE = "armv8.2-a+fp16+dotprod";
+
+if (process.platform !== "darwin" && targetArch === "arm64") {
+    flags.push(`-DGGML_CPU_ARM_ARCH=${ARM_BASELINE}`);
+}
+
 if (process.platform === "win32") {
     flags.push("-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded");
+    // ggml refuses to build for ARM with MSVC unless it may tune for the build machine (`GGML_NATIVE=ON`), which this build never
+    // does: arm64 goes through clang-cl, which takes the baseline above. x64 builds with MSVC proper. The architecture and the
+    // toolset are options of the Visual Studio generator, so no developer prompt has to be open.
+    flags.push("-G", process.env.NEORE_CMAKE_GENERATOR ?? "Visual Studio 17 2022", "-A", targetArch === "arm64" ? "ARM64" : "x64");
+
+    if (targetArch === "arm64") {
+        flags.push("-T", "ClangCL");
+    }
+}
+
+if (process.platform === "linux") {
+    // A helper that needs the build machine's libstdc++ or libgcc runtime would not start on a minimal system.
+    flags.push("-DCMAKE_EXE_LINKER_FLAGS=-static-libstdc++ -static-libgcc");
 }
 
 run("cmake", ["-B", "build", ...flags], work);
@@ -104,6 +188,42 @@ if (process.platform === "darwin") {
     }
 }
 
+if (process.platform === "linux") {
+    // Only the C library and what ships with it: anything else (libgomp, libstdc++) may be absent on the user's machine.
+    const needed = [...execFileSync("readelf", ["-d", built], { encoding: "utf8" }).matchAll(/\(NEEDED\)\s+Shared library: \[([^\]]+)\]/gu)].map((match) => match[1]);
+    const unexpected = needed.filter((library) => !/^(?:ld-linux[\w.-]*|libc|libdl|libm|libpthread|librt)\.so(?:\.\d+)*$/u.test(library));
+
+    if (unexpected.length > 0) {
+        throw new Error(`the helper depends on ${unexpected.join(", ")}, which a user's machine may not have`);
+    }
+
+    const maxGlibc = flagValue("--max-glibc");
+    const symbols = execFileSync("objdump", ["-T", built], { encoding: "utf8" });
+    const versions = [...symbols.matchAll(/GLIBC_(\d+)\.(\d+)/gu)].map((match) => [Number(match[1]), Number(match[2])]);
+    const [newestMajor = 0, newestMinor = 0] = versions.sort((a, b) => b[0] - a[0] || b[1] - a[1])[0] ?? [];
+
+    process.stdout.write(`the helper needs glibc ${newestMajor}.${newestMinor}\n`);
+
+    if (maxGlibc !== undefined) {
+        const [allowedMajor = 0, allowedMinor = 0] = maxGlibc.split(".").map(Number);
+
+        if (newestMajor > allowedMajor || (newestMajor === allowedMajor && newestMinor > allowedMinor)) {
+            throw new Error(`the helper needs glibc ${newestMajor}.${newestMinor}, above the ${maxGlibc} the release is built for`);
+        }
+    }
+}
+
+if (process.platform === "win32") {
+    // The static C++ runtime is linked in; what is left must be DLLs every Windows has. A Visual C++ redistributable DLL
+    // (vcruntime140, msvcp140, vcomp140) is not on a clean machine.
+    const imports = peImports(readFileSync(built));
+    const unexpected = imports.filter((library) => /^(?:concrt|msvcp|vcomp|vcruntime)/iu.test(library));
+
+    if (unexpected.length > 0) {
+        throw new Error(`the helper imports ${unexpected.join(", ")}, which a clean Windows install does not have`);
+    }
+}
+
 // The committed licence text must still be the one the pinned source ships.
 const shipped = path.join(root, "dictation-licenses", "whisper.cpp-LICENSE.txt");
 
@@ -119,6 +239,9 @@ for (const file of ["whisper.cpp-LICENSE.txt", "whisper-model-LICENSE.txt"]) {
     copyFileSync(path.join(root, "dictation-licenses", file), path.join(outDirectory, "licenses", file));
 }
 
-// `--help` exits 0 only if the binary starts, so a bad link fails here and not on the first dictation.
-run(path.join(outDirectory, executable), ["--help"], root);
+// `--help` exits 0 only if the binary starts, so a bad link fails here and not on the first dictation. A cross-built binary cannot run here.
+if (targetArch === process.arch) {
+    run(path.join(outDirectory, executable), ["--help"], root);
+}
+
 process.stdout.write(`built ${path.join(outDirectory, executable)}\n`);

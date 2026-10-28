@@ -59,6 +59,8 @@ export interface RecognizerOptions {
     /** What the user is dictating in; `auto` lets the model detect it. Checked here too, since it ends up in the helper's arguments. */
     language: Language;
     modelPath: string;
+    /** The OS the helper runs on: how it hands back its text differs on Windows. */
+    platform?: NodeJS.Platform;
     spawn?: (command: string, args: ReadonlyArray<string>, options: SpawnOptions) => ChildProcess;
     timeoutMs?: number;
 }
@@ -76,6 +78,14 @@ export const parseTranscript = (output: string): Transcript => {
 
     return { segments, text: segments.join(" ") };
 };
+
+/**
+ * How the helper is told to put its text on stdout. With `-f -` it has no file name to derive an output from, and upstream's stdin
+ * mode (`-otxt`) writes to `/dev/stdout`, or to the console (`CON`) on Windows: not our pipe, so a Windows dictation would always come
+ * back empty. There an output name that is not `-` makes the helper print each segment to stdout itself, and with no `-o*`
+ * format flag no file is opened under that name. The text then arrives without the line breaks `-otxt` adds between segments.
+ */
+const outputArguments = (platform: NodeJS.Platform): string[] => platform === "win32" ? ["-of", "unused"] : ["-otxt"];
 
 const helperEnvironment = (): NodeJS.ProcessEnv => {
     const env: NodeJS.ProcessEnv = {};
@@ -101,9 +111,8 @@ export const startRecognizer = (options: RecognizerOptions): Recognizer => {
 
     const spawn = options.spawn ?? nodeSpawn;
     const timeoutMs = options.timeoutMs ?? TRANSCRIBE_TIMEOUT_MS;
-    // `-l`: the default is English, which would turn other languages into English, so it is always given (`auto` detects). With `-f -` the recogniser has no file
-    // name to derive an output from, so `-otxt` writes the text to stdout (upstream's stdin mode; Windows uses the console there, S4).
-    const args = [...options.helper.args, "-m", options.modelPath, "-f", "-", "-otxt", "-nt", "-np", "-l", options.language];
+    // `-l`: the default is English, which would turn other languages into English, so it is always given (`auto` detects).
+    const args = [...options.helper.args, "-m", options.modelPath, "-f", "-", ...outputArguments(options.platform ?? process.platform), "-nt", "-np", "-l", options.language];
     const child = spawn(options.helper.command, args, {
         cwd: options.cwd,
         env: helperEnvironment(),

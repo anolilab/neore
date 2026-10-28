@@ -50,6 +50,17 @@ const responseOf = (chunks: Buffer[], options: { signal?: AbortSignal; stall?: b
 
 const split = (bytes: Buffer): Buffer[] => [bytes.subarray(0, 40), bytes.subarray(40, 90), bytes.subarray(90)];
 
+/** What a promise rejects with, or `undefined` if it does not. */
+const rejectionOf = async (promise: Promise<unknown>): Promise<unknown> => {
+    try {
+        await promise;
+
+        return undefined;
+    } catch (error) {
+        return error;
+    }
+};
+
 let directory: string;
 
 beforeEach(async () => {
@@ -348,7 +359,8 @@ describe("remove", () => {
             fetch: async (_url, init) => responseOf([PAYLOAD.subarray(0, 30)], { signal: init?.signal as AbortSignal, stall: true }),
         });
         const running = store.download(spec);
-        const rejection = expect(running).rejects.toMatchObject({ code: "cancelled" });
+        // Observed from the start, so a slow machine cannot see it reject unhandled; asserted once the cancel has happened.
+        const rejection = rejectionOf(running);
 
         await new Promise((resolve) => {
             setTimeout(resolve, 20);
@@ -397,13 +409,14 @@ describe("cancelDownloads", () => {
             fetch: async (_url, init) => responseOf([PAYLOAD.subarray(0, 30)], { signal: init?.signal as AbortSignal, stall: true }),
         });
         const running = store.download(spec);
-        const rejection = expect(running).rejects.toMatchObject({ code: "cancelled" });
+        // Observed from the start, so a slow machine cannot see it reject unhandled; asserted once the cancel has happened.
+        const rejection = rejectionOf(running);
 
         await new Promise((resolve) => {
             setTimeout(resolve, 20);
         });
         await store.cancelDownloads();
-        await rejection;
+        expect(await rejection).toMatchObject({ code: "cancelled" });
         expect(await readdir(directory)).toStrictEqual([]);
     });
 

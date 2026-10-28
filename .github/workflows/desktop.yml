@@ -247,11 +247,21 @@ jobs:
               run: "pnpm --filter @neore/desktop run host-bundle manifest"
 
             # On-device dictation (plans/desktop-dictation.md): whisper.cpp at its pinned commit, built for the runner's
-            # architecture with Metal. Only Apple Silicon has it for now; the x64 macOS app and the other OSes ship without
-            # the helper and dictation refuses cleanly there (S4 adds them). Runs on `macos-latest`, which is arm64.
+            # architecture. Linux builds on the oldest runner it ships from and fails if the helper needs a newer glibc
+            # than that. Windows builds the x64 helper only: Windows on ARM is not offered (`unsupportedReason` in
+            # `src/dictation/catalog.ts`) until its clang-cl build measures inside the budget, and then this step gains
+            # `-- --arch arm64` and `smoke:artifacts` counts both. The Intel macOS app ships without a helper.
             - name: "Build the on-device speech helper (macOS arm64)"
               if: "matrix.name == 'macos'"
               run: "pnpm --filter @neore/desktop run build:dictation-helper"
+
+            - name: "Build the on-device speech helper (Windows x64)"
+              if: "matrix.name == 'windows'"
+              run: "pnpm --filter @neore/desktop run build:dictation-helper -- --arch x64"
+
+            - name: "Build the on-device speech helper (Linux)"
+              if: "matrix.name == 'linux'"
+              run: "pnpm --filter @neore/desktop run build:dictation-helper -- --max-glibc 2.35"
 
             # The shell bundles `@neore/ai/capabilities` (plain data, read through its built `dist/`), and nothing
             # else builds that package on this job.
