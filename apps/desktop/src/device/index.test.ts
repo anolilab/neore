@@ -212,6 +212,7 @@ const makeCore = () => {
         hostRemove: vi.fn(),
         hostTerminal: vi.fn(async (_deviceId: string) => JSON.stringify(["-t", "--", "build.example.com"])),
         hostTerminalAttach: vi.fn(async (_deviceId: string) => JSON.stringify(["-t", "--", "build.example.com"])),
+        hostUpgrade: vi.fn(async (_deviceId: string) => JSON.stringify({ alreadyCurrent: false, version: "0.1.0" })),
         manifest: vi.fn(async (_deviceId?: string) => JSON.stringify({ payload: "{}", signature: "m" })),
         pair: vi.fn(async () => true),
         promptAnswer: vi.fn(),
@@ -328,12 +329,23 @@ describe("servers over SSH", () => {
     });
 
     it("keep removing a server and forgetting its key out of the page's reach", () => {
-        for (const channel of [LOCAL_CHANNEL.hostRemove, LOCAL_CHANNEL.hostForgetKey, LOCAL_CHANNEL.hostConnect, LOCAL_CHANNEL.hostDisconnect]) {
+        for (const channel of [LOCAL_CHANNEL.hostRemove, LOCAL_CHANNEL.hostForgetKey, LOCAL_CHANNEL.hostConnect, LOCAL_CHANNEL.hostDisconnect, LOCAL_CHANNEL.hostUpgrade]) {
             expect(() => invoke(channel, siteEvent(), "host-1")).toThrow("device: not the device window");
         }
 
         expect(core.hostRemove).not.toHaveBeenCalled();
         expect(core.hostForgetKey).not.toHaveBeenCalled();
+        expect(core.hostUpgrade).not.toHaveBeenCalled();
+    });
+
+    it("let only the device window install a server's host software, for a valid device id", async () => {
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+
+        await expect(invoke(LOCAL_CHANNEL.hostUpgrade, localEvent(), "host-1")).resolves.toStrictEqual({ alreadyCurrent: false, version: "0.1.0" });
+        expect(core.hostUpgrade).toHaveBeenCalledWith("host-1");
+
+        await expect(invoke(LOCAL_CHANNEL.hostUpgrade, localEvent(), 7)).rejects.toThrow("device: deviceId is invalid");
+        expect(core.hostUpgrade).toHaveBeenCalledTimes(1);
     });
 
     it("let the device window manage a server", async () => {

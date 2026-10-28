@@ -27,6 +27,15 @@ extraResources:
     - from: "helper/${os}-${arch}"
       to: dictation
 asar: true
+# The `neore-host` binaries the app uploads to a server over SSH, with the checksums they are verified against
+# (scripts/host-bundle.mjs). Plain files in `resources/`, outside the asar: the Rust side reads them with the
+# filesystem API, and the checksums must not be reachable by a page.
+extraResources:
+    - from: host-bundle
+      to: neore-host
+      filter:
+          - manifest.json
+          - neore-host-*
 # node-pty ships N-API binaries for macOS (both archs) and Windows, and builds on Linux at install time. They are
 # valid for Electron as they are, and a rebuild here would produce the runner's arch only (a mac x64 build on an
 # arm64 runner would get an arm64 binary, which node-pty prefers over the right prebuild). The other native

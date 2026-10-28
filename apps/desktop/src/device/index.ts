@@ -50,6 +50,10 @@ const WINDOW_DIR = path.join(__dirname, "device-window");
 const LOCAL_PAGE = path.join(WINDOW_DIR, "device.html");
 const LOCAL_PRELOAD = path.join(WINDOW_DIR, "preload.cjs");
 
+/** The folder with the `neore-host` binaries and checksums this build ships: in the app's resources once packaged. */
+const hostBundleDirectory = (): string | undefined =>
+    app.isPackaged ? path.join(process.resourcesPath, "neore-host") : process.env.NEORE_HOST_BUNDLE;
+
 /**
  * Registers the device handlers. Returns whether the core loaded: the shell advertises `device` only then
  * (`main.ts`), so the page never sees a relay that would only answer "unavailable".
@@ -237,7 +241,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     };
 
     try {
-        const created = createLocalTransport(app.getPath("userData"), onEvent);
+        const created = createLocalTransport(app.getPath("userData"), onEvent, hostBundleDirectory());
 
         state.transport = created;
         state.core = created.core;
@@ -338,6 +342,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     local(LOCAL_CHANNEL.hostForgetKey, (deviceId) => {
         requireTransport().hostForgetKey(readDeviceId(deviceId));
     });
+
+    // Local window only: it puts software on a server and removes its older versions, so a page cannot ask for it.
+    local(LOCAL_CHANNEL.hostUpgrade, async (deviceId) => requireTransport().hostUpgrade(readDeviceId(deviceId)));
 
     local(LOCAL_CHANNEL.hostRemove, (deviceId) => {
         requireTransport().hostRemove(readDeviceId(deviceId));

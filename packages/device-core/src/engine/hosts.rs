@@ -8,7 +8,8 @@ use std::path::PathBuf;
 use std::thread;
 
 use super::*;
-use crate::ssh::{Hello, HostConnection, HostKey, Interact};
+use crate::install::{self, Installed, Remote};
+use crate::ssh::{Hello, HostConnection, HostKey, Interact, HOST_VERSION};
 
 /// At most as many servers as the backend lets one account pair devices.
 const MAX_HOSTS: usize = 10;
@@ -73,6 +74,32 @@ impl HostProbe {
             sandbox_detail: hello.sandbox.detail.clone(),
             version: hello.version.clone(),
         }
+    }
+}
+
+/// What an install or upgrade of a server's host software did.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostUpgrade {
+    /// The server already had this exact binary: nothing was uploaded.
+    pub already_current: bool,
+    pub version: String,
+}
+
+/// Marks a server as being installed or upgraded until dropped, so no session starts on it meanwhile.
+struct UpgradeGuard<'a> {
+    device_id: String,
+    state: &'a DeviceState,
+}
+
+impl Drop for UpgradeGuard<'_> {
+    fn drop(&mut self) {
+        self.state
+            .ssh
+            .upgrading
+            .lock()
+            .unwrap()
+            .retain(|(id, _)| *id != self.device_id);
     }
 }
 
@@ -522,6 +549,30 @@ impl DeviceState {
         Ok(link)
     }
 
+    /// Whether host software is being installed on `target` right now.
+    fn upgrade_running(&self, target: &Target) -> bool {
+        self.ssh
+            .upgrading
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(_, upgrading)| upgrading == target)
+    }
+
+    /// Whether a session (a live connection or the probe) is open to `target`.
+    fn session_open(&self, target: &Target) -> bool {
+        let live = |link: &Arc<dyn HostLink>| link.is_alive() && link.target() == Some(target);
+
+        self.ssh.connections.lock().unwrap().values().any(live)
+            || self
+                .ssh
+                .probe
+                .lock()
+                .unwrap()
+                .as_ref()
+                .is_some_and(|(_, link)| live(link))
+    }
+
     /// Connects to a server that is not paired yet, so the page can register it (it needs the server's platform)
     /// and then call [`Self::host_pair`]. Nothing leaves this computer before the person at the local window
     /// approves the connection: a page alone must not scan hosts or log in anywhere. Then asks to trust the
@@ -534,6 +585,7 @@ impl DeviceState {
             PromptBody::HostConnect {
                 address: target.address.clone(),
                 identity_file: target.identity_file.clone(),
+                install_version: self.ssh.bundle.is_ok().then(|| HOST_VERSION.to_owned()),
                 name: spec.name.trim().to_owned(),
                 port: target.port,
                 user: target.user.clone(),
@@ -551,6 +603,25 @@ impl DeviceState {
             return Err("the connection was not approved on this computer".into());
         }
 
+        // The person agreed above to the connection, which includes putting the host software there if the pinned
+        // version is not. Removing other versions is not part of it: that is `host_upgrade`, from the local window.
+        if self.upgrade_running(&target) {
+            return Err(
+                "that server's host software is being installed; try again in a moment".into(),
+            );
+        }
+
+        if let Ok(bundle) = &self.ssh.bundle {
+            let interact = self.ask_user();
+            let remote = Remote {
+                interact: &interact,
+                paths: &self.ssh.paths,
+                target: &target,
+            };
+
+            install::install(&remote, bundle, &self.ssh.root)?;
+        }
+
         let link = self.connect_target(&target)?;
 
         // Unpaired while the person was answering or the connection was opening: nothing may keep it.
@@ -558,6 +629,14 @@ impl DeviceState {
             self.retire(&link);
 
             return Err("this computer was unpaired meanwhile".into());
+        }
+
+        if self.upgrade_running(&target) {
+            self.retire(&link);
+
+            return Err(
+                "that server's host software is being installed; try again in a moment".into(),
+            );
         }
 
         let probe = HostProbe::of(link.hello());
@@ -698,9 +777,29 @@ impl DeviceState {
             return Ok(HostProbe::of(link.hello()));
         }
 
+        let target = target_of(&host);
+
+        if self.upgrade_running(&target) {
+            return Err(format!(
+                "{}'s host software is being upgraded; connect again in a moment",
+                host.name
+            ));
+        }
+
         let disconnects = self.ssh.disconnects.load(Ordering::SeqCst);
-        let link = self.connect_target(&target_of(&host))?;
+        let link = self.connect_target(&target)?;
         let probe = HostProbe::of(link.hello());
+
+        // An upgrade began while this was connecting (a passphrase prompt can take a while): it was checked for
+        // open sessions before this one existed, so this one yields.
+        if self.upgrade_running(&target) {
+            self.retire(&link);
+
+            return Err(format!(
+                "{}'s host software is being upgraded; connect again in a moment",
+                host.name
+            ));
+        }
 
         // Disconnected while the connect was waiting: the user asked for that, and it stays asked.
         if self.ssh.disconnects.load(Ordering::SeqCst) != disconnects {
@@ -843,6 +942,74 @@ impl DeviceState {
 
         crate::ssh::forget_keys(&self.ssh.paths, &target_of(&host).host_spec())
             .map_err(|error| error.to_string())
+    }
+
+    /// Installs (or reinstalls) the pinned `neore-host` on a paired server and removes its other versions. Local
+    /// window only. Refused while any session is open to that server, this computer's or the probe's, and no
+    /// session can start meanwhile. The old versions go only after the new binary answered its handshake.
+    pub fn host_upgrade(&self, device_id: &str) -> Result<HostUpgrade, String> {
+        let host = self
+            .settings()
+            .hosts
+            .into_iter()
+            .find(|host| host.device_id == device_id)
+            .ok_or("that server is not paired with this computer")?;
+        let bundle = self.ssh.bundle.as_ref().map_err(Clone::clone)?;
+        let target = target_of(&host);
+        let _guard = {
+            let mut upgrading = self.ssh.upgrading.lock().unwrap();
+
+            if upgrading.iter().any(|(_, running)| *running == target) {
+                return Err(format!("{} is already being upgraded", host.name));
+            }
+
+            upgrading.push((device_id.to_owned(), target.clone()));
+
+            UpgradeGuard {
+                device_id: device_id.to_owned(),
+                state: self,
+            }
+        };
+
+        // Checked after the mark above, so a session that starts now sees the mark and yields.
+        if self.session_open(&target) {
+            return Err(format!(
+                "{} has an open session. Disconnect it before upgrading its host software.",
+                host.name
+            ));
+        }
+
+        let interact = self.ask_user();
+        let remote = Remote {
+            interact: &interact,
+            paths: &self.ssh.paths,
+            target: &target,
+        };
+        let installed = install::install(&remote, bundle, &self.ssh.root)?;
+        let link = HostConnection::connect(
+            &target,
+            &self.ssh.paths,
+            &self.ssh.root.binary(HOST_VERSION),
+            &interact,
+        )?;
+        let version = link.hello().version.clone();
+
+        link.close();
+        link.exit_master();
+
+        if version != HOST_VERSION {
+            return Err(format!(
+                "the installed host reports version {version}, not {HOST_VERSION}; the old versions were kept"
+            ));
+        }
+
+        install::prune(&remote, &self.ssh.root)?;
+        self.emit(Event::Changed);
+
+        Ok(HostUpgrade {
+            already_current: installed == Installed::Current,
+            version,
+        })
     }
 
     /// A server's signed tool list: its built-in tools over ITS folders, worded for it, signed with its secret.
@@ -1669,6 +1836,106 @@ mod tests {
         state.host_disconnect(host_id("master").as_str());
 
         assert_eq!(link.master_exits.load(Ordering::SeqCst), 1);
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    /// A bundle with one entry, in a folder of its own. Nothing here reaches a server.
+    fn bundle_in(dir: &std::path::Path) -> crate::install::Bundle {
+        let folder = dir.join("bundle");
+
+        stdfs::create_dir_all(&folder).unwrap();
+        stdfs::write(
+            folder.join("manifest.json"),
+            json!({
+                "version": HOST_VERSION,
+                "targets": { "x86_64-unknown-linux-musl": { "file": "neore-host-linux", "sha256": "0".repeat(64) } },
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        crate::install::Bundle::load(&folder).unwrap()
+    }
+
+    #[test]
+    fn an_upgrade_is_refused_while_any_session_is_open_to_the_server() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("upgrade", &link);
+        let state = state.with_host_bundle(
+            Ok(bundle_in(&dir)),
+            crate::install::Root::dir(&dir.join("remote").to_string_lossy()).unwrap(),
+        );
+        let id = host_id("upgrade");
+
+        // The server's own connection.
+        let error = state.host_upgrade(&id).unwrap_err();
+
+        assert!(error.contains("open session"), "{error}");
+        assert_eq!(
+            link.closed.load(Ordering::SeqCst),
+            0,
+            "the session was ended for it"
+        );
+
+        // A probe of the same server counts as well.
+        link.close();
+
+        let probed = FakeLink::new(true);
+
+        *state.ssh.probe.lock().unwrap() = Some((
+            target_of(&server(&id)),
+            Arc::clone(&probed) as Arc<dyn HostLink>,
+        ));
+
+        assert!(state
+            .host_upgrade(&id)
+            .unwrap_err()
+            .contains("open session"));
+        assert!(
+            state.ssh.upgrading.lock().unwrap().is_empty(),
+            "a refused upgrade left the server marked"
+        );
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn an_upgrade_needs_the_host_software_to_be_part_of_the_build() {
+        let link = FakeLink::new(false);
+        let (state, dir, _) = engine("nobundle", &link);
+
+        link.close();
+
+        assert!(state
+            .host_upgrade(&host_id("nobundle"))
+            .unwrap_err()
+            .contains("no host software"));
+        assert!(state
+            .host_upgrade("not-a-server")
+            .unwrap_err()
+            .contains("not paired"));
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn no_session_starts_on_a_server_while_its_host_software_is_upgraded() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("during", &link);
+        let id = host_id("during");
+
+        link.close();
+        state
+            .ssh
+            .upgrading
+            .lock()
+            .unwrap()
+            .push((id.clone(), target_of(&server(&id))));
+
+        let error = state.host_connect(&id).unwrap_err();
+
+        assert!(error.contains("being upgraded"), "{error}");
 
         let _ = stdfs::remove_dir_all(dir);
     }

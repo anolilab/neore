@@ -57,6 +57,8 @@ pub enum PromptBody {
     HostConnect {
         address: String,
         identity_file: Option<String>,
+        /// The `neore-host` version this will put on the server when it is not there yet.
+        install_version: Option<String>,
         name: String,
         port: u16,
         user: String,

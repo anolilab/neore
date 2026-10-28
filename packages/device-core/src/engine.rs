@@ -25,6 +25,7 @@ use crate::actions::{
 };
 use crate::approval::{Answer, Prompt, PromptBody, Prompts, SandboxState};
 use crate::envelope::{self, Domain, NonceSet, Signed};
+use crate::install::{Bundle, Root};
 use crate::mcp::{self, McpManager, McpServerConfig};
 use crate::sandbox;
 use crate::ssh::{HostLink, SshPaths, Target};
@@ -92,6 +93,8 @@ pub struct DeviceState {
 struct SshState {
     /// The remote path of `neore-host`; shell text, never taken from a page.
     binary: String,
+    /// The host binaries this build ships, or why there are none (a build that did not package them).
+    bundle: Result<Bundle, String>,
     /// The servers (`host:port`) with a "key changed" prompt on screen, so a retry does not queue another.
     changed_prompts: Arc<Mutex<std::collections::HashSet<String>>>,
     /// Live connections by the server's device id.
@@ -102,6 +105,10 @@ struct SshState {
     paths: SshPaths,
     /// The connection a server was probed over, waiting for its pairing: at most one.
     probe: Mutex<Option<(Target, Arc<dyn HostLink>)>>,
+    /// Where the host versions live on a server.
+    root: Root,
+    /// The servers (by device id) whose host software is being installed or upgraded. No session may start on one.
+    upgrading: Mutex<Vec<(String, Target)>>,
 }
 
 impl DeviceState {
@@ -135,13 +142,27 @@ impl DeviceState {
             sink: Arc::from(sink),
             ssh: SshState {
                 binary: binary.to_owned(),
+                bundle: Err("this build ships no host software".to_owned()),
                 changed_prompts: Arc::default(),
                 connections: Mutex::default(),
                 disconnects: std::sync::atomic::AtomicU64::new(0),
                 paths: SshPaths::under(data_dir, sandbox::home().as_deref()),
                 probe: Mutex::default(),
+                root: Root::Home,
+                upgrading: Mutex::default(),
             },
         }
+    }
+
+    /// Gives this engine the host binaries to install, under `root` on a server. The binary it launches there is
+    /// the pinned version in that folder.
+    #[must_use]
+    pub fn with_host_bundle(mut self, bundle: Result<Bundle, String>, root: Root) -> Self {
+        self.ssh.binary = root.binary(crate::ssh::HOST_VERSION);
+        self.ssh.bundle = bundle;
+        self.ssh.root = root;
+
+        self
     }
 
     pub(crate) fn settings(&self) -> Settings {

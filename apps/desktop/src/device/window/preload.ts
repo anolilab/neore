@@ -37,6 +37,7 @@ const api: DeviceWindowApi = {
 
         return () => ipcRenderer.removeListener(LOCAL_EVENT.acp, listener);
     },
+    hostUpgrade: (deviceId) => ipcRenderer.invoke(LOCAL_CHANNEL.hostUpgrade, deviceId),
     onPromptQueued: (handler) => {
         const listener = () => handler();
 

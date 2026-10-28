@@ -41,6 +41,13 @@ export interface HostProbe {
     version: string;
 }
 
+/** What installing or upgrading a server's host software did (`HostUpgrade`). */
+export interface HostUpgrade {
+    /** The server already had this exact binary: nothing was uploaded. */
+    alreadyCurrent: boolean;
+    version: string;
+}
+
 /** A server as the local window lists it (`HostView`). */
 export interface HostView {
     address: string;
@@ -61,7 +68,7 @@ export interface HostView {
 export interface Prompt {
     body:
         | { accountLabel: string; kind: "pairing" }
-        | { address: string; identityFile: string | null; kind: "hostConnect"; name: string; port: number; user: string }
+        | { address: string; identityFile: string | null; installVersion: string | null; kind: "hostConnect"; name: string; port: number; user: string }
         | { address: string; identityFile: string | null; kind: "hostPairing"; name: string; port: number; user: string }
         | { fingerprint: string; host: string; identityFile: string | null; keyType: string; kind: "hostKey"; port: number }
         | { host: string; kind: "hostKeyChanged"; pinned: string[]; port: number; presented: string[] }
@@ -126,6 +133,7 @@ export interface DeviceCore {
     hostRemove: (deviceId: string) => void;
     hostTerminal: (deviceId: string) => Promise<string>;
     hostTerminalAttach: (deviceId: string) => Promise<string>;
+    hostUpgrade: (deviceId: string) => Promise<string>;
     manifest: (deviceId?: string) => Promise<string>;
     pair: (deviceId: string, secret: string, accountLabel: string) => Promise<boolean>;
     promptAnswer: (id: number, answer: string) => void;
@@ -138,4 +146,4 @@ export interface DeviceCore {
     stop: () => void;
 }
 
-export type DeviceCoreConstructor = new (dataDirectory: string, onEvent: (json: string) => void) => DeviceCore;
+export type DeviceCoreConstructor = new (dataDirectory: string, onEvent: (json: string) => void, hostBundle?: string) => DeviceCore;

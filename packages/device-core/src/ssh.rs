@@ -384,7 +384,7 @@ pub fn remote_command(forward_agent: bool, binary: &str) -> String {
 }
 
 pub fn default_binary() -> String {
-    format!("\"$HOME/.neore/host/{HOST_VERSION}/neore-host\"")
+    crate::install::Root::Home.binary(HOST_VERSION)
 }
 
 // ─── Host keys ───────────────────────────────────────────────────────────
@@ -589,6 +589,10 @@ pub enum SshError {
     },
     /// The user did not trust the key on first use.
     HostKeyDeclined,
+    /// The server's shell could not find `neore-host` (exit status 127): it is not installed there yet.
+    HostMissing {
+        target: String,
+    },
     Other(String),
 }
 
@@ -606,6 +610,10 @@ impl fmt::Display for SshError {
                 presented.join(", ")
             ),
             SshError::HostKeyDeclined => f.write_str("the server's host key was not trusted"),
+            SshError::HostMissing { target } => write!(
+                f,
+                "neore-host {HOST_VERSION} is not installed on {target}. Install it from the server's settings (\"Install host software\")."
+            ),
             SshError::Other(message) => f.write_str(message),
         }
     }
@@ -629,7 +637,7 @@ pub trait Interact: Send + Sync {
 
 /// Pins the server's key after the user trusts it, or refuses a key that changed. Read before ssh runs; ssh then
 /// enforces the same store itself.
-fn check_host_key(
+pub(crate) fn check_host_key(
     target: &Target,
     paths: &SshPaths,
     interact: &dyn Interact,
@@ -1021,8 +1029,16 @@ impl HostConnection {
                 )));
             }
             Err(reason) => {
+                let missing = exited_with(&mut child, 127);
+
                 let _ = child.kill();
                 let _ = child.wait();
+
+                if missing {
+                    return Err(SshError::HostMissing {
+                        target: target.label(),
+                    });
+                }
 
                 return Err(SshError::Other(explain(target, &reason, &stderr)));
             }
@@ -1156,6 +1172,102 @@ fn route(pending: &Pending, frame: &[u8]) {
     };
 
     let _ = sender.send(reply);
+}
+
+/// Whether `child` ends with `code` within a moment: a shell reports a command it cannot find as 127.
+fn exited_with(child: &mut Child, code: i32) -> bool {
+    for _ in 0..20 {
+        if let Ok(Some(status)) = child.try_wait() {
+            return status.code() == Some(code);
+        }
+
+        thread::sleep(Duration::from_millis(100));
+    }
+
+    false
+}
+
+/// What one remote command printed.
+pub struct Exec {
+    pub stdout: String,
+}
+
+/// Runs `command` on the server with `input` on its stdin, over the same options, pinned key and master as a host
+/// session: the key is checked first, and a passphrase is asked through the helper. A non-zero exit is an error
+/// carrying what ssh and the command said. An `input` that fails kills the ssh child, which is what a dropped
+/// upload looks like to the server.
+pub fn exec(
+    target: &Target,
+    paths: &SshPaths,
+    interact: &Arc<dyn Interact>,
+    command: &str,
+    input: &mut dyn Read,
+) -> Result<Exec, SshError> {
+    target.validate().map_err(SshError::Other)?;
+    paths.prepare().map_err(SshError::Other)?;
+    check_host_key(target, paths, interact.as_ref())?;
+
+    let mut process = Command::new("ssh");
+
+    process
+        .args(ssh_args(target, paths))
+        .arg(command)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    #[cfg(unix)]
+    let askpass = Askpass::start(paths, target.clone(), Arc::clone(interact))
+        .map_err(|error| SshError::Other(format!("the passphrase channel failed: {error}")))?;
+
+    #[cfg(unix)]
+    process.envs(askpass.environment(paths));
+
+    let mut child = process
+        .spawn()
+        .map_err(|error| SshError::Other(format!("ssh could not run: {error}")))?;
+    let mut stdin = child.stdin.take().expect("piped stdin");
+
+    // The server may stop reading (a failed `mkdir`, say): its stderr then says why, and that is the error.
+    match io::copy(input, &mut stdin) {
+        Err(error) if error.kind() != io::ErrorKind::BrokenPipe => {
+            let _ = child.kill();
+            let _ = child.wait();
+
+            return Err(SshError::Other(format!("the upload stopped: {error}")));
+        }
+        _ => {}
+    }
+
+    drop(stdin);
+
+    let output = child
+        .wait_with_output()
+        .map_err(|error| SshError::Other(format!("ssh failed: {error}")))?;
+
+    #[cfg(unix)]
+    drop(askpass);
+
+    if output.status.success() {
+        return Ok(Exec {
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        });
+    }
+
+    let said = String::from_utf8_lossy(&output.stderr);
+    let said = said.trim();
+
+    Err(SshError::Other(if said.contains("Permission denied") {
+        explain(target, said, &Mutex::new(said.to_owned()))
+    } else if said.is_empty() {
+        format!(
+            "the command on {} failed ({})",
+            target.label(),
+            output.status
+        )
+    } else {
+        format!("on {}: {said}", target.label())
+    }))
 }
 
 /// What the user needs to read when a connection failed, from what ssh said.

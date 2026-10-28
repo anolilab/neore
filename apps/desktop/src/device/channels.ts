@@ -42,6 +42,7 @@ export const LOCAL_CHANNEL = {
     hostDisconnect: "neore:device-local:host-disconnect",
     hostForgetKey: "neore:device-local:host-forget-key",
     hostRemove: "neore:device-local:host-remove",
+    hostUpgrade: "neore:device-local:host-upgrade",
     openHostTerminal: "neore:device-local:open-host-terminal",
     openTerminal: "neore:device-local:open-terminal",
     pickFolder: "neore:device-local:pick-folder",

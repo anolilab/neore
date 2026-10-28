@@ -19,9 +19,10 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use device_core::install::{self, target_for_uname, Bundle, Installed, Remote, Root};
 use device_core::ssh::{
     control_args, forget_keys, pinned_keys, terminal_args, HostConnection, HostKey, HostLink,
-    Interact, SshError, SshPaths, Target,
+    Interact, SshError, SshPaths, Target, HOST_VERSION,
 };
 use serde_json::json;
 
@@ -659,4 +660,302 @@ fn a_data_folder_with_a_space_that_is_too_deep_for_a_socket_still_connects_over_
 
     finish(&connection);
     assert!(!master_is_running(&target, &paths));
+}
+
+// ─── Install and upgrade ─────────────────────────────────────────────────
+
+/// The platform of this machine, as the install module names it.
+fn local_triple() -> &'static str {
+    target_for_uname(&run("uname", &["-sm"])).unwrap()
+}
+
+/// A bundle holding the real `neore-host` for this machine's platform (and nothing for any other), and a remote
+/// root inside the server's folder: the tests must never write to the real `~/.neore`.
+fn bundle_and_root(server: &Server, triple: &str) -> (Bundle, Root, Vec<u8>, String) {
+    let folder = server.dir.join("bundle");
+    let bytes = fs::read(env!("CARGO_BIN_EXE_neore-host")).unwrap();
+    let sha256 = sha256_hex(&bytes);
+
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("neore-host-test"), &bytes).unwrap();
+    fs::write(
+        folder.join("manifest.json"),
+        json!({
+            "version": HOST_VERSION,
+            "targets": { triple: { "file": "neore-host-test", "sha256": sha256 } },
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let root = Root::dir(&server.dir.join("host-root").to_string_lossy()).unwrap();
+
+    (Bundle::load(&folder).unwrap(), root, bytes, sha256)
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn end_master(target: &Target, paths: &SshPaths) {
+    let _ = Command::new("ssh")
+        .args(control_args(target, paths, "exit"))
+        .output();
+}
+
+/// Every file under the remote root that can be executed.
+fn executables_under(root: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+
+    files_under(root, &mut files);
+    files.retain(|file| fs::metadata(file).unwrap().permissions().mode() & 0o111 != 0);
+
+    files
+}
+
+fn temporaries_under(root: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+
+    files_under(root, &mut files);
+    files.retain(|file| file.to_string_lossy().contains("neore-host.tmp-"));
+
+    files
+}
+
+/// Waits for the server to finish tidying after a dropped upload (its shell runs the cleanup after the channel closes).
+fn wait_until_no_temporaries(root: &Path) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+
+    while !temporaries_under(root).is_empty() {
+        assert!(
+            Instant::now() < deadline,
+            "a temporary upload was left: {:?}",
+            temporaries_under(root)
+        );
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[test]
+fn the_bundled_host_installs_once_starts_and_a_second_install_uploads_nothing() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "install");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let (bundle, root, _, _) = bundle_and_root(&server, local_triple());
+    let interact: Arc<dyn Interact> = trusting();
+    let remote = Remote {
+        interact: &interact,
+        paths: &paths,
+        target: &target,
+    };
+
+    assert_eq!(
+        install::install(&remote, &bundle, &root).unwrap(),
+        Installed::Uploaded
+    );
+
+    let installed = server
+        .dir
+        .join("host-root")
+        .join(HOST_VERSION)
+        .join("neore-host");
+
+    assert_eq!(
+        fs::metadata(&installed).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+    assert!(temporaries_under(&server.dir.join("host-root")).is_empty());
+
+    // The installed binary is the one the connection starts, and it is the pinned version.
+    let connection =
+        HostConnection::connect(&target, &paths, &root.binary(HOST_VERSION), &interact).unwrap();
+
+    assert_eq!(connection.hello().version, HOST_VERSION);
+    finish(&connection);
+
+    assert_eq!(
+        install::install(&remote, &bundle, &root).unwrap(),
+        Installed::Current
+    );
+
+    end_master(&target, &paths);
+}
+
+#[test]
+fn a_wrong_checksum_leaves_nothing_executable_at_the_final_path() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "wrongsum");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let (_, root, bytes, sha256) = bundle_and_root(&server, local_triple());
+    let interact: Arc<dyn Interact> = trusting();
+    let remote = Remote {
+        interact: &interact,
+        paths: &paths,
+        target: &target,
+    };
+    // The bytes are right and the shipped digest is not (the last digit changed): the server must refuse.
+    let wrong = format!(
+        "{}{}",
+        &sha256[..63],
+        if sha256.ends_with('0') { '1' } else { '0' }
+    );
+    let error = install::upload(&remote, &root, &mut bytes.as_slice(), &wrong).unwrap_err();
+    let host_root = server.dir.join("host-root");
+
+    assert!(error.contains("checksum"), "{error}");
+    assert!(
+        !host_root.join(HOST_VERSION).join("neore-host").exists(),
+        "a binary with the wrong checksum reached the final path"
+    );
+    assert!(executables_under(&host_root).is_empty());
+    wait_until_no_temporaries(&host_root);
+
+    end_master(&target, &paths);
+}
+
+/// Yields `before` bytes, then fails: the upload is cut off in the middle.
+struct CutOff {
+    before: usize,
+    sent: usize,
+}
+
+impl std::io::Read for CutOff {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        if self.sent >= self.before {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::ConnectionAborted,
+                "cut off",
+            ));
+        }
+
+        let count = buffer.len().min(self.before - self.sent).min(4096);
+
+        buffer[..count].fill(0x7f);
+        self.sent += count;
+
+        Ok(count)
+    }
+}
+
+#[test]
+fn a_killed_upload_leaves_nothing_executable_at_the_final_path() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "killed");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let (_, root, _, sha256) = bundle_and_root(&server, local_triple());
+    let interact: Arc<dyn Interact> = trusting();
+    let remote = Remote {
+        interact: &interact,
+        paths: &paths,
+        target: &target,
+    };
+    let mut cut = CutOff {
+        before: 200_000,
+        sent: 0,
+    };
+    let error = install::upload(&remote, &root, &mut cut, &sha256).unwrap_err();
+    let host_root = server.dir.join("host-root");
+
+    assert!(error.contains("upload stopped"), "{error}");
+    assert!(cut.sent > 0, "nothing was sent before the cut");
+    assert!(!host_root.join(HOST_VERSION).join("neore-host").exists());
+    assert!(executables_under(&host_root).is_empty());
+    wait_until_no_temporaries(&host_root);
+
+    // The next install is not confused by what was left.
+    let (bundle, _, _, _) = bundle_and_root(&server, local_triple());
+
+    assert_eq!(
+        install::install(&remote, &bundle, &root).unwrap(),
+        Installed::Uploaded
+    );
+
+    end_master(&target, &paths);
+}
+
+#[test]
+fn a_platform_the_bundle_has_no_binary_for_is_refused_before_anything_is_created_there() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "arch");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    // Only a platform this machine is not.
+    let other = if local_triple() == "x86_64-unknown-linux-musl" {
+        "aarch64-unknown-linux-musl"
+    } else {
+        "x86_64-unknown-linux-musl"
+    };
+    let (bundle, root, _, _) = bundle_and_root(&server, other);
+    let interact: Arc<dyn Interact> = trusting();
+    let remote = Remote {
+        interact: &interact,
+        paths: &paths,
+        target: &target,
+    };
+    let error = install::install(&remote, &bundle, &root).unwrap_err();
+
+    assert!(error.contains("ships no neore-host"), "{error}");
+    assert!(
+        !server.dir.join("host-root").exists(),
+        "the refusal came after the server was touched"
+    );
+
+    end_master(&target, &paths);
+}
+
+#[test]
+fn pruning_removes_the_other_versions_and_keeps_the_run_and_log_folders() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "prune");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let (bundle, root, _, _) = bundle_and_root(&server, local_triple());
+    let interact: Arc<dyn Interact> = trusting();
+    let remote = Remote {
+        interact: &interact,
+        paths: &paths,
+        target: &target,
+    };
+    let host_root = server.dir.join("host-root");
+
+    for kept in ["run", "logs"] {
+        fs::create_dir_all(host_root.join(kept)).unwrap();
+        fs::write(host_root.join(kept).join("keep"), "x").unwrap();
+    }
+
+    for old in ["0.0.1", "0.0.9"] {
+        fs::create_dir_all(host_root.join(old)).unwrap();
+        fs::write(host_root.join(old).join("neore-host"), "old").unwrap();
+    }
+
+    install::install(&remote, &bundle, &root).unwrap();
+    install::prune(&remote, &root).unwrap();
+
+    assert!(!host_root.join("0.0.1").exists());
+    assert!(!host_root.join("0.0.9").exists());
+    assert!(host_root.join("run").join("keep").exists());
+    assert!(host_root.join("logs").join("keep").exists());
+    assert!(host_root.join(HOST_VERSION).join("neore-host").exists());
+
+    end_master(&target, &paths);
+}
+
+#[test]
+fn a_missing_host_is_reported_as_not_installed_and_not_as_a_dead_connection() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "missing");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let interact: Arc<dyn Interact> = trusting();
+    let root = Root::dir(&server.dir.join("nothing-here").to_string_lossy()).unwrap();
+    let error = HostConnection::connect(&target, &paths, &root.binary(HOST_VERSION), &interact)
+        .err()
+        .expect("there is no host to start");
+
+    assert!(matches!(error, SshError::HostMissing { .. }), "{error}");
+    assert!(error.to_string().contains("not installed"), "{error}");
+
+    end_master(&target, &paths);
 }
