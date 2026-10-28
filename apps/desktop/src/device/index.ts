@@ -18,9 +18,11 @@ import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 import type { AcpCommand } from "../acp/commands";
 import { HostCommands, isAcpEnvelope } from "../acp/commands";
 import { HostPoster } from "../acp/ingest";
+import { AgentInstaller } from "../acp/install";
 import { AcpManager } from "../acp/manager";
 import { coreGate } from "../acp/permission";
 import { spawnAgent } from "../acp/process";
+import { AgentRegistry } from "../acp/registry";
 import type { AcpView, PermissionView, SpawnPlan } from "../acp/types";
 import { backendOrigin } from "../site";
 import type { TerminalOpener } from "../terminal/index";
@@ -31,6 +33,7 @@ import type { CoreEvent, DeviceCore, Prompt } from "./types";
 import {
     readAcpUpdate,
     readAgentKey,
+    readAgentVersion,
     readFolder,
     readOptionId,
     readPairing,
@@ -38,6 +41,7 @@ import {
     readPromptAnswer,
     readRequestId,
     readRequestIds,
+    readSearchQuery,
     readSessionId,
     readSettingsUpdate,
     readSigned,
@@ -60,7 +64,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         core?: DeviceCore;
         coreError?: unknown;
         host?: HostPoster;
+        installer?: AgentInstaller;
         local?: BrowserWindowInstance;
+        registry?: AgentRegistry;
         transport?: HostTransport;
     } = {};
     /** Every site window that has made a trusted relay call and is still open: progress and changes go to each. */
@@ -442,6 +448,41 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     local(LOCAL_CHANNEL.acpUpdate, (update) => updateAcp(readAcpUpdate(update)));
 
+    // The registry is read when the window searches, never otherwise: there is no timer and no check of installed
+    // agents against it, so nothing updates an agent but an install the user confirms again.
+    const requireRegistry = (): AgentRegistry => {
+        state.registry ??= new AgentRegistry({ fetch: options.fetch });
+
+        return state.registry;
+    };
+
+    local(LOCAL_CHANNEL.acpRegistrySearch, (query) => requireRegistry().search(readSearchQuery(query)));
+
+    local(LOCAL_CHANNEL.acpRegistryInstall, async (id, version) => {
+        state.installer ??= new AgentInstaller({
+            // A native dialog worded here from the registry entry, not by the window.
+            confirm: async ({ detail, message }) => {
+                const dialogOptions = { buttons: ["Cancel", "Install"], cancelId: 0, defaultId: 0, detail, message, noLink: true, type: "question" as const };
+                const parent = liveLocal();
+                const result = parent === undefined ? await dialog.showMessageBox(dialogOptions) : await dialog.showMessageBox(parent, dialogOptions);
+
+                return result.response === 1;
+            },
+            core: requireCore,
+            fetch: options.fetch,
+            registry: requireRegistry(),
+        });
+
+        const view = await state.installer.install(readAgentKey(id), readAgentVersion(version));
+
+        if (view !== null) {
+            // A reinstall drops the folder approvals of the old version; a running session was started under them.
+            await state.acp?.closeUnapproved(view);
+        }
+
+        return view;
+    });
+
     local(LOCAL_CHANNEL.acpProbe, (agentKey) => requireAcp().probe(readAgentKey(agentKey)));
 
     local(LOCAL_CHANNEL.acpStart, async (agentKey, folder) => {
@@ -496,6 +537,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 };
 
 export interface DeviceIpcOptions {
+    /** Replaces `fetch` for the registry and its downloads; tests only. */
+    fetch?: typeof fetch;
     /** True when the sender is the site's main window (see `trust.ts`). */
     isTrusted: (event: IpcMainInvokeEvent) => boolean;
     /** Opens a terminal from the device window. Absent in tests that do not cover it. */

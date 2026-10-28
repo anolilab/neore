@@ -109,6 +109,17 @@
                     <textarea id="acp-args" rows="3" spellcheck="false"></textarea>
                     <button type="submit">Add agent</button>
                 </form>
+                <h2 id="acp-registry-heading">Agent registry</h2>
+                <p class="muted">
+                    Search the official Agent Client Protocol registry. Only agents that publish a checksum for a download can be installed. Before anything is downloaded you see the
+                    publisher, version and source; the file is checked against the published checksum and kept under Neore's app data. Neore never updates an installed agent.
+                </p>
+                <form id="acp-registry-form" novalidate>
+                    <label for="acp-registry-query">Search</label>
+                    <input id="acp-registry-query" type="search" maxlength="100" autocomplete="off" />
+                    <button type="submit">Search</button>
+                </form>
+                <ul id="acp-registry-results" aria-labelledby="acp-registry-heading"></ul>
                 <p class="muted">An app opened from the Dock or Finder has a short PATH. If the command is not found, give its full path or set PATH for the agent below.</p>
 
                 <h2 id="acp-env-heading">Environment variables</h2>

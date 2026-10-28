@@ -42,6 +42,13 @@ export declare class DeviceCore {
   acpView(): string
   /** Applies an `AcpUpdate` (JSON): save or remove an agent, set or remove a variable. Validation is in Rust. */
   acpUpdate(update: string): string
+  /** A fresh folder for one registry download (its path). Only a file inside it can be installed. */
+  acpInstallStage(): string
+  /**
+   * Verifies a downloaded registry archive against its published SHA-256, unpacks it, and registers the agent
+   * with its pinned version (`InstallRequest`, JSON). Not reachable through `acp_update`. Validation is in Rust.
+   */
+  acpInstall(request: string): string
   /**
    * What to spawn for an agent (JSON): command, arguments, folder and environment. `folder` absent is a
    * version probe. The environment holds secrets: it goes to the main process and nowhere else.

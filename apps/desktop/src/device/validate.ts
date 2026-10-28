@@ -93,6 +93,10 @@ export const readAgentKey = (value: unknown): string => text(value, "agent", 40)
 
 export const readSessionId = (value: unknown): string => text(value, "session", 64);
 
+export const readSearchQuery = (value: unknown): string => value === "" ? "" : text(value, "search", 100);
+
+export const readAgentVersion = (value: unknown): string => text(value, "version", 40);
+
 export const readFolder = (value: unknown): string => text(value, "folder", MAX_PATH_CHARS);
 
 export const readPrompt = (value: unknown): string => text(value, "prompt", MAX_PROMPT_CHARS);

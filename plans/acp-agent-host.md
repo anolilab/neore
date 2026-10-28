@@ -546,6 +546,34 @@ directory, local consent for each install.
 - Acceptance: a checksum mismatch is refused; publisher and version are shown
   before install; there is no automatic update.
 
+**S5 as built:**
+- Source: the registry the protocol publishes, `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`
+  (`{ version, agents[] }`; entry format `agent.schema.json` in `agentclientprotocol/registry`). Read by the
+  desktop main process (`acp/registry.ts`) when the local window searches, with a 15 s deadline and a 5 MiB cap;
+  nothing reads it at any other time.
+- **Installable = a `binary` download for this platform with a published `sha256`.** The schema makes `sha256`
+  optional (42 of 107 targets carry none on the day this was written), and `npx`/`uvx` entries carry none at
+  all. Those are listed with the reason and cannot be installed: without a checksum there is nothing to verify,
+  and an `npx` launch would run whatever the package manager resolves that day. `.tar.gz`, `.zip` and a bare
+  binary unpack; `.tar.bz2` (4 targets) is refused with a reason.
+- The window sends only an agent id and the version it listed. The main process takes the entry from its own
+  snapshot (at most 15 minutes old, same version or "search again"), words a native confirmation from it
+  (publisher, version, license, source, the checksum) and downloads only after a "yes", https only (also after
+  redirects), 10 min deadline, 500 MiB cap, into a staging folder the core made.
+- The core (`device-core/src/acp_install.rs`, reachable through the addon only, not `acp_update`) hashes the file
+  and refuses a mismatch, unpacks refusing absolute paths, `..`, links and anything over 2 GiB / 20,000 entries,
+  resolves the command inside the unpacked folder (a bare name never reaches PATH), sets the executable bit only
+  then, renames into `<data dir>/acp-agents/<key>/<version>` and records the agent with an `install` pin
+  (version, publisher, source, sha256). Registry `env` goes through the same checks as a typed variable and a
+  program-changing name refuses the install. Only the pinned version stays on disk.
+- An install approves no folder. Installing over an installed key is another explicit install and drops its
+  folder approvals (a different program); a key registered by hand is never replaced. Saving a different command
+  clears the pin; removing an installed agent deletes its files.
+- No update path: the registry is not compared with installed agents, there is no timer, and a newer version is
+  a new install the user confirms. Tests: no fetch from registering the handlers, loading the view or waiting a
+  week; the spawn plan keeps the recorded command and version until an install changes it.
+- Not built: re-hashing the installed binary at spawn, `.tar.bz2`, uninstalling an old version separately.
+
 **S6 — Native session import and capability-driven controls.** Import an agent's
 saved sessions as threads, with ids derived from (agent key, native session id).
 - Acceptance: importing twice yields one thread; a missing capability hides its

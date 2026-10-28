@@ -108,6 +108,13 @@ impl DeviceState {
         }
     }
 
+    /// The folder `device.json` lives in: what else the device keeps on disk (agent installs) goes beside it.
+    pub(crate) fn data_dir(&self) -> PathBuf {
+        self.settings_path
+            .parent()
+            .map_or_else(PathBuf::new, Path::to_path_buf)
+    }
+
     pub(crate) fn settings(&self) -> Settings {
         self.settings.lock().unwrap().clone()
     }

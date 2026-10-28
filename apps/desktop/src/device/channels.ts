@@ -26,6 +26,8 @@ export const LOCAL_CHANNEL = {
     acpPermissionDecline: "neore:device-local:acp-permission-decline",
     acpPermissions: "neore:device-local:acp-permissions",
     acpProbe: "neore:device-local:acp-probe",
+    acpRegistryInstall: "neore:device-local:acp-registry-install",
+    acpRegistrySearch: "neore:device-local:acp-registry-search",
     acpSend: "neore:device-local:acp-send",
     acpSession: "neore:device-local:acp-session",
     acpSessions: "neore:device-local:acp-sessions",
