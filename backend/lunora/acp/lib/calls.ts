@@ -14,10 +14,12 @@
  * envelope by the time the call ends.
  */
 import type { Doc, Id } from "../../_generated/dataModel";
+import { internal } from "../../_generated/internal";
 import type { MutationCtx } from "../../_generated/server";
 import { isForwardHostState, updateHostStream } from "../../chat/streaming/persistent/host";
 import { patchDeviceCall } from "../../devices/lib/call-writes";
 import { isAcpTool } from "../../devices/lib/state";
+import { START_GRACE_MS } from "./constants";
 import { finishHostTurn } from "./finish";
 import { sessionOfThread } from "./sessions";
 
@@ -51,6 +53,15 @@ const reasonOf = (end: AcpCallEnd): string => {
     return reason === "" ? "The host did not carry out the message." : `The host did not carry out the message: ${reason.slice(0, 300)}.`;
 };
 
+/** A session still waiting for its agent to open ends. One that opened meanwhile is left alone. */
+export const endStartingSession = async (ctx: Pick<MutationCtx, "db">, deviceId: Id<"devices">, hostSessionId: string, now: number): Promise<void> => {
+    const session = await ctx.db.acpSessions.findFirst({ where: { deviceId, hostSessionId } });
+
+    if (session?.status === "starting") {
+        await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+    }
+};
+
 /**
  * Run with the call as it was BEFORE its terminal write, since the effects read the prompt's ids from `input`.
  * Does nothing for a device tool.
@@ -80,12 +91,14 @@ export const onAcpCallEnded = async (ctx: MutationCtx, call: Call, end: AcpCallE
         return;
     }
 
-    if (call.toolName === "acp_start" && end.status !== "completed" && typeof input.sessionId === "string") {
-        const session = await ctx.db.acpSessions.findFirst({ where: { deviceId: call.deviceId, hostSessionId: input.sessionId } });
+    if (call.toolName === "acp_start" && typeof input.sessionId === "string") {
+        if (end.status === "completed") {
+            await ctx.scheduler.runAfter(START_GRACE_MS, internal.acp.calls.endUnopenedSession, { deviceId: call.deviceId, hostSessionId: input.sessionId });
 
-        if (session?.status === "starting") {
-            await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+            return;
         }
+
+        await endStartingSession(ctx, call.deviceId, input.sessionId, now);
     }
 };
 

@@ -291,6 +291,35 @@ describe("startHostSession", () => {
     });
 });
 
+describe("a start the computer accepted", () => {
+    it("ends the session if its agent never opens it, and leaves one that did", async () => {
+        const device = await pairedDevice(ownerId);
+        const start = async (clientId: string) => {
+            const { threadId } = (await as(ownerId).mutation(
+                remote.startHostSession as never,
+                { agentKey: "claude", clientId, deviceId: device.deviceId, folderId: "f1" } as never,
+            )) as { threadId: string };
+            const call = (await rows("deviceCalls", { toolName: "acp_start" })).find((candidate) => candidate.threadId === threadId) as Row;
+
+            await claim(device, call._id);
+            await accept(device, call._id);
+
+            return (await rows("acpSessions")).find((session) => session.threadId === threadId) as Row;
+        };
+        const end = async (session: Row) =>
+            await run(async (ctx) => await ctx.runMutation(calls.endUnopenedSession, { deviceId: device.deviceId, hostSessionId: session.hostSessionId }));
+        const silent = await start("a");
+        const opened = await start("b");
+
+        await run(async (ctx) => await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: opened.hostSessionId }));
+        await end(silent);
+        await end(opened);
+
+        expect((await row(silent._id))?.status).toBe("ended");
+        expect((await row(opened._id))?.status).toBe("idle");
+    });
+});
+
 describe("sendToHost", () => {
     const readyThread = async () => {
         const device = await pairedDevice(ownerId);
