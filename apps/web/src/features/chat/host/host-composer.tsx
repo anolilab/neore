@@ -29,6 +29,7 @@ const CONTINUABLE: ReadonlySet<string> = new Set(["interrupted", "timeout"]);
 interface PendingRequest {
     command?: string;
     folder?: string;
+    incomplete?: boolean;
     options: { kind: string; name: string; optionId: string }[];
     requestId: string;
     target?: string;
@@ -49,6 +50,11 @@ const PermissionRequestCard: FC<{ busy: boolean; onAnswer: (optionId: string) =>
             {request.target !== undefined && <p className="text-muted-foreground mt-1 font-mono text-xs break-all">{request.target}</p>}
             {request.command !== undefined && <pre className="mt-1 max-h-32 overflow-auto rounded border p-2 font-mono text-xs whitespace-pre-wrap">{request.command}</pre>}
             {request.folder !== undefined && <p className="text-muted-foreground mt-1 text-xs">{t`In ${request.folder}`}</p>}
+            {request.incomplete === true && (
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="note">
+                    {t`This request was too long to show whole. You can decline it here; to allow it, answer on your computer.`}
+                </p>
+            )}
             <div className="mt-2 flex gap-2">
                 {allow !== undefined && (
                     <Button disabled={busy} onClick={() => onAnswer(allow.optionId)} size="sm" type="button">
@@ -71,7 +77,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const id = threadId as Id<"threads">;
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
-    const requestId = useRef<string | undefined>(undefined);
+    const attempt = useRef<{ id: string; text: string } | undefined>(undefined);
     const { data: session } = useQuery(crpc.acp.functions.getHostSession.queryOptions({ threadId }));
     const { data: live } = useQuery(crpc.chat.streaming.getActiveStreamForThread.queryOptions({ threadId: id }));
     const running = live !== null && live !== undefined;
@@ -93,16 +99,21 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     };
 
     const send = async (prompt: string) => {
-        // One request id per attempt at one message: a retry of a lost answer finds the first try, not a second turn.
-        requestId.current ??= crypto.randomUUID();
+        // One request id per message: a retry of a lost answer finds the first try, not a second turn. A different
+        // text (an edit after a failure, or Continue) is a different message and gets its own, or the backend would
+        // call it a repeat of the first and drop it.
+        if (attempt.current?.text !== prompt) {
+            attempt.current = { id: crypto.randomUUID(), text: prompt };
+        }
+
         setSending(true);
 
-        const result = await sendHostMessage({ requestId: requestId.current, text: prompt, threadId });
+        const result = await sendHostMessage({ requestId: attempt.current.id, text: prompt, threadId });
 
         setSending(false);
 
         if (result.ok) {
-            requestId.current = undefined;
+            attempt.current = undefined;
             setText("");
 
             return;

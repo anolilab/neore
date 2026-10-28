@@ -283,6 +283,21 @@ describe("the relay", () => {
         expect(await readCall(callId)).toMatchObject({ output: "file body" });
     });
 
+    it("tells a window whose claim was saved but whose answer was lost that it still holds it, and no other window", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const threadId = await insertThread(ownerId);
+        const { callId } = (await createCall({ deviceId, threadId, userId: ownerId })) as { callId: string };
+        const claim = async (claimId?: string) =>
+            await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId, ...(claimId !== undefined && { claimId }) } as never);
+
+        // The first request saved the claim and its answer never arrived; the window asks again with the same id.
+        await expect(claim("window-a")).resolves.toEqual({ claimed: true });
+        await expect(claim("window-a")).resolves.toEqual({ claimed: true });
+        await expect(claim("window-b")).resolves.toEqual({ claimed: false });
+        await expect(claim()).resolves.toEqual({ claimed: false });
+        expect(await readCall(callId)).toMatchObject({ claimId: "window-a", status: "claimed" });
+    });
+
     it("caps what a device returns, whatever it claims", async () => {
         const { deviceId, secret } = await pairedDevice(ownerId);
         const threadId = await insertThread(ownerId);

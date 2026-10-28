@@ -8,7 +8,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AcpCommand } from "./commands";
 import { HostCommands, isAcpEnvelope } from "./commands";
@@ -124,7 +124,7 @@ describe("a coding-agent command", () => {
         expect(() => readFileSync(receiptFile, "utf8")).toThrow();
     });
 
-    it("signs a refusal when the command cannot be carried out, and looks at it again if it comes back", async () => {
+    it("signs a refusal when the command cannot be carried out, and refuses a delivery that comes back the same way", async () => {
         const applied: AcpCommand[] = [];
         const refusing = make(applied, {
             apply: () => {
@@ -133,9 +133,36 @@ describe("a coding-agent command", () => {
         });
 
         expect(await deliver(refusing, "c1")).toBe("this session is still starting");
-        // It did not run, so it holds no receipt: a delivery that comes back is a second try, and runs.
-        expect(await deliver(make(applied), "c1")).toBe("accepted");
-        expect(applied).toEqual([SEND]);
+        // The call ended refused on the backend. The same envelope must not run later, in this process or after a restart.
+        expect(await deliver(refusing, "c1")).toBe("this session is still starting");
+        expect(await deliver(make(applied), "c1")).toBe("this session is still starting");
+        expect(applied).toEqual([]);
+    });
+
+    it("makes a delivery that arrives while the first is being handled wait for its outcome", async () => {
+        const applied: AcpCommand[] = [];
+        const release: { go?: () => void } = {};
+        const commands = make(applied, {
+            apply: async (command) => {
+                applied.push(command);
+                await new Promise<void>((resolve) => {
+                    release.go = resolve;
+                });
+
+                throw new Error("no such session");
+            },
+        });
+        const first = deliver(commands, "c1");
+
+        await vi.waitFor(() => expect(release.go).toBeDefined());
+
+        const second = deliver(commands, "c1");
+
+        release.go?.();
+
+        // Not "accepted" because a receipt exists: the second sees what the first came to.
+        expect(await Promise.all([first, second])).toEqual(["no such session", "no such session"]);
+        expect(applied).toHaveLength(1);
     });
 
     it("forgets a receipt once its envelope is long expired, and keeps the ones still live", async () => {

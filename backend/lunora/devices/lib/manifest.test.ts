@@ -21,6 +21,7 @@ describe("parseManifestTools", () => {
 
     it.each([
         ["a bad name", { name: "Fs Read" }],
+        ["a coding-agent command name", { name: "acp_send" }],
         ["an unknown kind", { kind: "network" }],
         ["a non-object schema", { inputSchema: { type: "string" } }],
         ["a missing readOnly", { readOnly: undefined }],

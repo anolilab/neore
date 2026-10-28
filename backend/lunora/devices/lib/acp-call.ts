@@ -12,7 +12,7 @@ import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import type { MutationCtx } from "../../_generated/server";
 import { decryptKey } from "../../lib/encryption";
-import { ACP_CLAIM_WINDOW_MS, DEVICE_CALL_DEADLINE_MS, MAX_DEVICE_INPUT_BYTES, MAX_OPEN_ACP_CALLS_PER_DEVICE } from "./constants";
+import { ACP_CLAIM_WINDOW_MS, DEVICE_CALL_DEADLINE_MS, MAX_DEVICE_INPUT_BYTES, MAX_OPEN_ACP_CALLS_PER_DEVICE, MAX_OPEN_ACP_CANCELS_PER_DEVICE } from "./constants";
 import { signDevicePayload, utf8Length } from "./signing";
 import { isAcpTool, isDeviceOnline, OPEN_CALL_STATUSES } from "./state";
 
@@ -46,16 +46,20 @@ export const createAcpCall = async (
         return { error: "input_too_large" };
     }
 
+    // Stop has a budget of its own: three answers waiting to be delivered must not be able to swallow it.
     let open = 0;
 
     for (const status of OPEN_CALL_STATUSES) {
         const { page } = await ctx.db.deviceCalls.findMany({ limit: 50, where: { deviceId, status } });
 
         // A pending call past its claim window can no longer be claimed (it expires on its own): it must not block a cancel.
-        open += page.filter((call) => isAcpTool(call.toolName) && !(call.status === "pending" && now - call.createdAt > ACP_CLAIM_WINDOW_MS)).length;
+        open += page.filter(
+            (call) =>
+                isAcpTool(call.toolName) && !(call.status === "pending" && now - call.createdAt > ACP_CLAIM_WINDOW_MS) && (call.toolName === "acp_cancel") === (kind === "acp_cancel"),
+        ).length;
     }
 
-    if (open >= MAX_OPEN_ACP_CALLS_PER_DEVICE) {
+    if (open >= (kind === "acp_cancel" ? MAX_OPEN_ACP_CANCELS_PER_DEVICE : MAX_OPEN_ACP_CALLS_PER_DEVICE)) {
         return { error: "busy" };
     }
 

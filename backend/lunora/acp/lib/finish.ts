@@ -12,6 +12,7 @@ import { createAcpCancelCall } from "../../devices/lib/acp-call";
 import { streamLogger } from "../../lib/logger";
 import { appendToTranscript, buildHostReply, emptyTranscript, isTranscriptFull, type HostReplyReason } from "./reply";
 import { sessionOfThread, touchSession } from "./sessions";
+import { withdrawPermissionAnswers } from "./withdraw";
 
 type Stream = Doc<"persistentStreams">;
 
@@ -156,6 +157,7 @@ export const endHostTurn = async (ctx: MutationCtx, stream: Stream, end: { error
     }
 
     await saveHostReply(ctx, stream, end.reason, end.error);
+    await withdrawPermissionAnswers(ctx, stream, now);
 
     return await endHostStream(ctx, stream, { reason: end.reason, status: STATUS_OF[end.reason] }, now);
 };

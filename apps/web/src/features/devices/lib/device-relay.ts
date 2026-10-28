@@ -74,17 +74,31 @@ const deadlineOf = (call: PendingDeviceCall, now: number): number => {
     }
 };
 
+/** Attempts at one step. With the backoff cap this is a few minutes, well inside a call's deadline, and bounds what retries spend of the relay's rate limit. */
+const MAX_ATTEMPTS = 20;
+
+/** The backend's answers that the same request will get again: not allowed, malformed, not there. A reset or a 5xx is not among them. */
+const PERMANENT_CODES: ReadonlySet<unknown> = new Set(["BAD_REQUEST", "FORBIDDEN", "NOT_FOUND", "UNAUTHORIZED", "UNPROCESSABLE"]);
+
+const isPermanent = (error: unknown): boolean => {
+    const { code, data } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; data?: { code?: unknown } };
+
+    return PERMANENT_CODES.has(code) || PERMANENT_CODES.has(data?.code);
+};
+
 /**
- * Runs one step against the backend and tries it again, whatever the error, until the call's deadline. A retry that
- * covered one status or one kind of failure would strand a call on the next kind: a server error, then a network
- * reset, is two different failures and the call still has to get through. The last error is thrown once time is up.
+ * Runs one step against the backend and tries it again until the call's deadline, whatever the transient error. A
+ * retry that covered one status or one kind of failure would strand a call on the next kind: a server error, then
+ * a network reset, is two different failures and the call still has to get through. An answer that cannot change
+ * (a bad signature is FORBIDDEN, a malformed result BAD_REQUEST) is not retried, and neither is a step past
+ * {@link MAX_ATTEMPTS}. The last error is thrown.
  */
 const untilDeadline = async <T>(step: () => Promise<T>, deadline: number, clock: RelayClock): Promise<T> => {
     for (let attempt = 0; ; attempt += 1) {
         try {
             return await step();
         } catch (error) {
-            if (clock.now() >= deadline) {
+            if (clock.now() >= deadline || attempt + 1 >= MAX_ATTEMPTS || isPermanent(error)) {
                 throw error;
             }
 

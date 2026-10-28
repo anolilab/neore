@@ -13,7 +13,8 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { ACP_CLEARED, onAcpCallEnded } from "../acp/lib/calls";
+import { ACP_CLEARED } from "../acp/lib/constants";
+import { onAcpCallEnded } from "../acp/lib/calls";
 import { endHostSessionsOfDevice } from "../acp/lib/revoke";
 import { internal } from "../_generated/internal";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
@@ -357,12 +358,18 @@ export const listPendingDeviceCalls = authQuery
  */
 export const claimDeviceCall = authMutation
     .use(rateLimit("devices/relay"))
-    .input({ callId: v.id("deviceCalls"), deviceId: v.id("devices"), viaDeviceId: vViaDeviceId })
+    .input({ callId: v.id("deviceCalls"), claimId: v.optional(v.string().max(MAX_LENGTH.id)), deviceId: v.id("devices"), viaDeviceId: vViaDeviceId })
     .output(v.object({ claimed: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
         const call = await ctx.db.deviceCalls.findFirst({ where: { _id: args.callId, deviceId: args.deviceId, userId } });
         const { now } = ctx;
+
+        // The same window asking again: its claim was saved and the answer was lost, so it is told so. No other
+        // window, and no claim without an id, is ever handed a call that is already taken.
+        if (call?.status === "claimed" && args.claimId !== undefined && call.claimId === args.claimId) {
+            return { claimed: true };
+        }
 
         if (call?.status !== "pending" || now >= call.deadline) {
             return { claimed: false };
@@ -377,7 +384,7 @@ export const claimDeviceCall = authMutation
 
         await requireOwnDevice(ctx, args.deviceId, userId, args.viaDeviceId);
 
-        await ctx.db.patch(call._id, { claimedAt: now, status: "claimed" });
+        await ctx.db.patch(call._id, { claimedAt: now, status: "claimed", ...(args.claimId !== undefined && { claimId: args.claimId }) });
 
         if (isAcpTool(call.toolName)) {
             await ctx.scheduler.runAfter(ACP_CLAIM_LEASE_MS + 1000, internal.acp.calls.checkAcpCall, { callId: call._id });

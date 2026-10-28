@@ -112,6 +112,28 @@ describe("retrying a call until its deadline", () => {
         expect(release).toHaveBeenCalledTimes(2);
     });
 
+    it("does not retry an answer that cannot change, and stops after a bounded number of tries", async () => {
+        const { clock, relayClock } = fakeClock();
+        const forbidden = Object.assign(new Error("Result signature is invalid"), { code: "FORBIDDEN" });
+        const wrapped = Object.assign(new Error("bad"), { data: { code: "BAD_REQUEST" } });
+        const complete = vi.fn<DeviceRelayPorts["complete"]>().mockRejectedValueOnce(forbidden);
+
+        await expect(relayDeviceCall(callExpiringAt(clock.now + 600_000), ports({ complete }), relayClock)).rejects.toBe(forbidden);
+        expect(complete).toHaveBeenCalledTimes(1);
+
+        const claim = vi.fn<DeviceRelayPorts["claim"]>().mockRejectedValue(wrapped);
+
+        await expect(relayDeviceCall(callExpiringAt(clock.now + 600_000), ports({ claim }), relayClock)).rejects.toBe(wrapped);
+        expect(claim).toHaveBeenCalledTimes(1);
+
+        const failing = vi.fn(async () => {
+            throw SERVER_ERROR;
+        });
+
+        await expect(relayDeviceCall(callExpiringAt(clock.now + 10 * 60 * 60_000), ports({ claim: failing }), relayClock)).rejects.toBe(SERVER_ERROR);
+        expect(failing).toHaveBeenCalledTimes(20);
+    });
+
     it("gives up, with the last error, once the call's deadline has passed", async () => {
         const { clock, relayClock } = fakeClock();
         const claim = vi.fn(async () => {

@@ -16,6 +16,8 @@ export const DEVICE_CLAIM_WINDOW_MS = 20_000;
  */
 export const ACP_CLAIM_WINDOW_MS = 60_000;
 export const MAX_OPEN_ACP_CALLS_PER_DEVICE = 3;
+/** `acp_cancel` is counted apart: Stop must go out however many sends and answers are waiting. */
+export const MAX_OPEN_ACP_CANCELS_PER_DEVICE = 3;
 
 /**
  * A claimed `acp_*` call is a lease: not completed within this, it goes back to `pending` and can be claimed

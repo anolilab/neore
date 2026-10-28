@@ -99,8 +99,13 @@ let clock: number;
 
 const hosts: HostPoster[] = [];
 
+const cancelled: string[][] = [];
+
 const poster = () => {
     const host = new HostPoster({
+        cancelTurn: (sessionId, turnId) => {
+            cancelled.push([sessionId, turnId]);
+        },
         deviceId: () => paired,
         endpoint: new URL("https://backend.test/hosts/ingest"),
         fetch: backend.fetch as typeof fetch,
@@ -139,6 +144,7 @@ beforeEach(async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     scratch = await mkdtemp(path.join(tmpdir(), "neore-acp-ingest-"));
     backend = new FakeBackend();
+    cancelled.length = 0;
     paired = "dev1";
     clock = 1_000_000;
 });
@@ -282,6 +288,34 @@ describe("a session and turns the backend started", () => {
             { kind: "turn_start", text: "later" },
             { kind: "turn_end", reason: "cancelled" },
         ]);
+    });
+});
+
+describe("a turn the backend ended first", () => {
+    it("stops the agent on this computer, which makes good a cancel that never arrived", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "hello");
+        await settle(POST_INTERVAL_MS);
+        // Stop, the reaper or a revoke ended it on the backend; the cancel call to this computer was lost.
+        backend.ended.add("t1");
+        host.text("s1", "t1", "still going");
+        await settle(POST_INTERVAL_MS);
+
+        expect(cancelled).toEqual([["s1", "t1"]]);
+        expect(host.busy).toBe(false);
+    });
+
+    it("leaves a turn alone that this computer ended itself", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "hello");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+
+        expect(cancelled).toEqual([]);
     });
 });
 

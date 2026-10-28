@@ -36,6 +36,8 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const REFUSED_STATUSES = new Set([400, 403, 413]);
 
 export interface PosterOptions {
+    /** Stops a turn the backend ended while this computer's agent was still on it (`AcpManager.cancelTurn`). */
+    cancelTurn?: (sessionId: string, turnId: string) => void;
     /** This computer's paired device id; undefined while it is not paired. */
     deviceId: () => string | undefined;
     /** `&lt;backend origin>/hosts/ingest`. */
@@ -71,6 +73,7 @@ export class HostPoster implements SessionObserver {
 
     public constructor(private readonly options: PosterOptions) {
         this.channelHost = {
+            endedByBackend: (channel) => this.options.cancelTurn?.(channel.sessionId, channel.turnId),
             finished: (channel) => {
                 this.channels.delete(channel.turnId);
                 this.persist();
