@@ -799,7 +799,30 @@ $("server-form").addEventListener("submit", async (event) => {
 // A link that drops or comes back while this window stays open: show the Retry / Stop reconnecting it now needs.
 globalThis.neoreDevice.onChanged(async () => {
     state.settings = await globalThis.neoreDevice.settingsGet();
+
+    // The redraw rebuilds every server card; carry over a folder path that is half typed there, and the caret in it.
+    const values = [...document.querySelectorAll<HTMLInputElement>("input[id^='host-root-']")]
+        .filter((input) => input.value !== "")
+        .map((input) => [input.id, input.value] as const);
+    const active = document.activeElement instanceof HTMLInputElement && document.activeElement.id.startsWith("host-root-") ? document.activeElement : null;
+    const focused = active === null ? null : { end: active.selectionEnd, id: active.id, start: active.selectionStart };
+
     renderSettings();
+
+    for (const [id, value] of values) {
+        const input = document.querySelector(`[id="${CSS.escape(id)}"]`);
+
+        if (input instanceof HTMLInputElement) {
+            input.value = value;
+        }
+    }
+
+    const input = focused === null ? null : document.querySelector(`[id="${CSS.escape(focused.id)}"]`);
+
+    if (focused !== null && input instanceof HTMLInputElement) {
+        input.focus();
+        input.setSelectionRange(focused.start, focused.end);
+    }
 });
 globalThis.neoreDevice.onPromptQueued(() => refreshPrompt());
 window.addEventListener("focus", () => refreshPrompt());
