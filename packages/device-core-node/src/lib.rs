@@ -138,6 +138,13 @@ impl DeviceCore {
         })
     }
 
+    /// Signs one turn post for the backend's ingest route (hex HMAC under the `turn` domain). Refuses a payload
+    /// that is not a turn post for this paired computer, so it cannot sign anything else.
+    #[napi]
+    pub fn sign_turn(&self, payload: String) -> Result<String> {
+        self.state.sign_turn(&payload).map_err(Error::from_reason)
+    }
+
     /// Verifies, asks about (through `onEvent`), runs and signs one relayed call.
     /// Resolves the signed result (`{ payload, signature }`, JSON).
     #[napi]

@@ -6,6 +6,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
+import { isHostRunThread } from "../acp/lib/host-thread";
 import { getFile } from "../agent/client";
 import { getCurrentUserInternal } from "../auth/lib/helper";
 import type { BetterAuthUser } from "../auth/lib/types";
@@ -398,6 +399,9 @@ const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED
  * runs the SAME path — same limits, same thread creation, same stream — with
  * an API-key identity instead of the gateway's HMAC plus forwarded JWT.
  */
+const hostRunThreadResponse = (): Response =>
+    Response.json({ error: "HOST_RUN_THREAD", message: "This thread runs on a paired computer. Send the message from the desktop app." }, { status: 409 });
+
 export const runChatStart = async (
     context: HttpActionCtx,
     body: ChatStartBody,
@@ -591,16 +595,27 @@ const runChatStartOnShard = async (
         return workerThreadResponse();
     }
 
+    // A coding agent's thread runs on its paired device, not on a cloud model. This is the one turn-start path
+    // every caller shares (the app, the public API, the MCP server), so it is also the refusal they hit.
+    if (access?.hostRun) {
+        return hostRunThreadResponse();
+    }
+
     // A bot thread always runs on its bot's model, whatever the composer sent. It is
     // set here, before any write, so the stream config and the agent both see it.
     // Bots chat in text only, so a media model is refused rather than swapped.
     // A regenerate's gate answer is used only for the worker check above, so it reads the thread itself.
     let threadBotId: string | undefined = access?.botId;
 
-    if (!threadBotId && validThreadId && body.regenerate && body.parentId) {
+    if (validThreadId && body.regenerate && body.parentId) {
         const ownThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> });
 
-        threadBotId = ownThread?.botId;
+        // The regenerate branch skips the access gate above, so the host-run refusal is repeated here.
+        if (isHostRunThread(ownThread)) {
+            return hostRunThreadResponse();
+        }
+
+        threadBotId ??= ownThread?.botId;
     }
 
     // A chat whose bot was deleted is a plain chat again, so the bot rules apply only to a bot that still exists.

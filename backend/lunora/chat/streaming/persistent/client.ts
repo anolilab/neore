@@ -19,6 +19,8 @@ import type { StreamStatus } from "./schema";
 export type StreamId = Id<"persistentStreams">;
 export const StreamIdValidator = v.string();
 export type StreamBody = {
+    /** A coding agent's turn only: where the host is with it (`acp/`). */
+    hostState?: "accepted" | "ended" | "received" | "running";
     reasoning: string;
     speaker?: { name: string; skillId: string };
     status: StreamStatus;
@@ -87,9 +89,10 @@ export class PersistentTextStreaming {
      * @returns The body of the stream including text, reasoning, and status.
      */
     async getStreamBody(ctx: RunQueryContext, streamId: StreamId): Promise<StreamBody> {
-        const { reasoning, speaker, status, text } = await ctx.runQuery(this.api.getStreamText, { streamId });
+        const { hostState, reasoning, speaker, status, text } = await ctx.runQuery(this.api.getStreamText, { streamId });
 
         return {
+            ...(hostState !== undefined && { hostState }),
             reasoning: reasoning ?? "",
             ...(speaker && { speaker }),
             status: status as StreamStatus,

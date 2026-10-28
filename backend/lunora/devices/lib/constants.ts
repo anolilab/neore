@@ -10,6 +10,13 @@ export const DEVICE_ONLINE_WINDOW_MS = 75_000;
 /** A call nobody claimed within this is "device offline". */
 export const DEVICE_CLAIM_WINDOW_MS = 20_000;
 
+/**
+ * `acp_*` calls (a coding agent's start, send, cancel and permission answers) are not device tools: they have
+ * their own claim window and their own open-call budget, so a stuck send never blocks the cancel.
+ */
+export const ACP_CLAIM_WINDOW_MS = 60_000;
+export const MAX_OPEN_ACP_CALLS_PER_DEVICE = 3;
+
 /** Approval wait + run, from creation. Also the envelope's `expiresAt`. */
 export const DEVICE_CALL_DEADLINE_MS = 5 * 60_000;
 

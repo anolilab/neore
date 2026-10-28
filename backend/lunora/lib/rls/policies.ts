@@ -167,6 +167,7 @@ const orgShared = (options: { orgAdminWrites: boolean }): TableRules => {
 /** Every row keyed to one user by `userId`, with no sharing a client procedure uses. */
 const OWNER_TABLES = [
     "account",
+    "acpSessions",
     "aiUserPreferences",
     "bots",
     "browserExtensions",

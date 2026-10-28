@@ -1,4 +1,5 @@
 import type { ImageModelV2, JSONValue, LanguageModelV3 } from "@ai-sdk/provider";
+import { isHostRunThread } from "../acp/lib/host-thread";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -727,18 +728,24 @@ export const createThreadWithInitialMessage = internalMutation
 export const gateThreadActionHandler = async (
     context: Pick<QueryContext, "db">,
     args: { level: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
-): Promise<{ botId?: Id<"bots">; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
+): Promise<{ botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
     const outcome = await threadGateOutcome(context, args);
 
     if (outcome !== "ok") {
         return { outcome };
     }
 
-    // A bot thread runs on its bot's model, so a granted caller also learns which bot, if any.
+    // A bot thread runs on its bot's model, so a granted caller also learns which bot, if any. A host-run thread
+    // runs on a paired device, never on a cloud model: `runChatStart` refuses it.
     const thread = await context.db.get(args.threadId);
 
     // A worker's thread takes a turn only through `dispatchToWorker`; the chat entry points refuse it.
-    return { botId: thread?.botId, ...(args.level === "write" && { isWorker: await isWorkerThread(context, args.threadId) }), outcome };
+    return {
+        botId: thread?.botId,
+        ...(args.level === "write" && { isWorker: await isWorkerThread(context, args.threadId) }),
+        outcome,
+        ...(isHostRunThread(thread) && { hostRun: true }),
+    };
 };
 
 export const gateThreadAction = internalQuery
@@ -751,6 +758,7 @@ export const gateThreadAction = internalQuery
     .output(
         v.object({
             botId: v.optional(v.id("bots")),
+            hostRun: v.optional(v.boolean()),
             isWorker: v.optional(v.boolean()),
             outcome: v.union(v.literal("denied"), v.literal("locked"), v.literal("ok")),
         }),
