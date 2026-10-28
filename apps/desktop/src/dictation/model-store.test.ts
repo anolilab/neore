@@ -196,6 +196,45 @@ describe("download", () => {
     });
 });
 
+describe("download redirects", () => {
+    const redirectTo = (location: string): Response => new Response(null, { headers: { location }, status: 302 });
+
+    it("follows a redirect to the model's file host and leaves a model on disk", async () => {
+        const seen: string[] = [];
+        const store = createModelStore({
+            directory,
+            fetch: (async (url: string) => {
+                seen.push(url);
+
+                return seen.length === 1 ? redirectTo("https://cdn-lfs.huggingface.co/file") : responseOf(split(PAYLOAD));
+            }) as unknown as typeof fetch,
+        });
+
+        await store.download(spec);
+
+        expect(seen).toEqual(["https://models.example/ggml-test.bin", "https://cdn-lfs.huggingface.co/file"]);
+    });
+
+    it("stops before asking a host that is not the model's, or one over plain http", async () => {
+        for (const location of ["https://169.254.169.254/latest", ["http", "://models.example/file"].join(""), "https://models.example.evil.test/file"]) {
+            const asked: string[] = [];
+            const store = createModelStore({
+                directory,
+                fetch: (async (url: string) => {
+                    asked.push(url);
+
+                    return redirectTo(location);
+                }) as unknown as typeof fetch,
+            });
+
+            await expect(store.download(spec)).rejects.toMatchObject({ code: "download" });
+            // Every attempt (the store retries) asked only the pinned URL, never the redirect target.
+            expect([...new Set(asked)]).toEqual([spec.url]);
+            expect(await readdir(directory)).toEqual([]);
+        }
+    });
+});
+
 describe("ensureVerified", () => {
     it("returns the path of a model whose bytes match", async () => {
         await writeFile(path.join(directory, spec.file), PAYLOAD);

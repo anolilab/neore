@@ -238,7 +238,10 @@ export const createDictationController = (dependencies: ControllerDependencies):
                 return;
             }
         } catch (error) {
-            failFrom(error);
+            // A cancelled attempt's late error is not a newer press's to carry.
+            if (mine === generation) {
+                failFrom(error);
+            }
 
             return;
         }
@@ -266,23 +269,27 @@ export const createDictationController = (dependencies: ControllerDependencies):
 
         const mine = generation;
         const pending = recognizer;
+        const mineWindow = window;
 
         draining = true;
 
         try {
-            await window?.stop();
+            await mineWindow?.stop();
         } catch {
             // The page is gone; what arrived is what there is.
         }
 
-        // A newer dictation may have started since; its flag is not ours to clear.
+        // A newer dictation may have started since; its flag and window are not ours to clear.
         if (mine === generation) {
             draining = false;
         }
 
         // Closed on release: the microphone is off and the page, with any audio it held, is destroyed.
-        window?.close();
-        window = undefined;
+        mineWindow?.close();
+
+        if (window === mineWindow) {
+            window = undefined;
+        }
 
         if (mine !== generation) {
             return;

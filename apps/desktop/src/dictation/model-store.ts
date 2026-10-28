@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream } from "node:fs";
+import type { FileHandle } from "node:fs/promises";
 import { mkdir, open, readdir, rename, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 
@@ -10,7 +11,21 @@ const STALL_TIMEOUT_MS = 30_000;
 
 const PARTIAL_SUFFIX = ".partial";
 
-export type ModelStatus = { state: "missing" } | { bytes: number; file: string; state: "present"; version: string };
+const MAX_REDIRECTS = 5;
+
+/** Hosts the model's own file server may hand a download to, besides the host it was pinned on. */
+const FILE_HOST_SUFFIXES = [".huggingface.co", ".hf.co"] as const;
+
+/** A redirect target is HTTPS and on the pinned host or one of its file hosts. */
+const isAllowedRedirect = (target: string, pinnedHost: string): boolean => {
+    try {
+        const { hostname, protocol } = new URL(target);
+
+        return protocol === "https:" && (hostname === pinnedHost || hostname === "huggingface.co" || hostname === "hf.co" || FILE_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix)));
+    } catch {
+        return false;
+    }
+};
 
 export class ModelError extends Error {
     public readonly code: "checksum" | "download" | "missing" | "size";
@@ -21,6 +36,24 @@ export class ModelError extends Error {
         this.code = code;
     }
 }
+
+/** `FileHandle.write` may write less than it was given: keep going until the whole chunk is on disk. */
+const writeFully = async (handle: FileHandle, chunk: Uint8Array): Promise<void> => {
+    let offset = 0;
+
+    while (offset < chunk.byteLength) {
+        // eslint-disable-next-line no-await-in-loop -- the next write starts where this one ended
+        const { bytesWritten } = await handle.write(chunk, offset, chunk.byteLength - offset);
+
+        if (bytesWritten === 0) {
+            throw new ModelError("download", "The model file could not be written");
+        }
+
+        offset += bytesWritten;
+    }
+};
+
+export type ModelStatus = { state: "missing" } | { bytes: number; file: string; state: "present"; version: string };
 
 export interface ModelStoreOptions {
     directory: string;
@@ -72,6 +105,8 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
     const pathOf = (spec: ModelSpec): string => path.join(directory, spec.file);
     const verified = new Map<string, string>();
     const inFlight = new Map<string, Promise<string>>();
+    // Partial files a download is writing now: a sweep that starts late must not unlink one.
+    const activePartials = new Set<string>();
 
     const fingerprint = async (file: string): Promise<string> => {
         const info = await stat(file);
@@ -117,6 +152,39 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
         return file;
     };
 
+    // The pinned URL may redirect to the file host; any other host, or a plain-http hop, ends the download before
+    // the next request is sent, so a compromised or misconfigured upstream cannot point this machine at an internal one.
+    const fetchFollowingSafeRedirects = async (start: string, signal: AbortSignal): Promise<Response> => {
+        const pinnedHost = new URL(start).hostname;
+        let url = start;
+
+        for (let hops = 0; hops <= MAX_REDIRECTS; hops += 1) {
+            if (hops > 0 && !isAllowedRedirect(url, pinnedHost)) {
+                throw new ModelError("download", "The model server redirected to a host that is not allowed");
+            }
+
+            // eslint-disable-next-line no-await-in-loop -- each hop depends on the previous answer
+            const response = await fetchFunction(url, { redirect: "manual", signal });
+
+            if (response.status < 300 || response.status >= 400) {
+                return response;
+            }
+
+            const location = response.headers.get("location");
+
+            // eslint-disable-next-line no-await-in-loop -- the redirect body is dropped before the next hop
+            await response.body?.cancel();
+
+            if (location === null) {
+                throw new ModelError("download", "The model server sent a redirect with no location");
+            }
+
+            url = new URL(location, url).href;
+        }
+
+        throw new ModelError("download", "The model server redirected too many times");
+    };
+
     const fetchToPartial = async (spec: ModelSpec, partial: string, options: DownloadOptions): Promise<void> => {
         const controller = new AbortController();
         let timer: ReturnType<typeof setTimeout> | undefined;
@@ -130,7 +198,7 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
         const handle = await open(partial, "wx", 0o600);
 
         try {
-            const response = await fetchFunction(spec.url, { redirect: "follow", signal: controller.signal });
+            const response = await fetchFollowingSafeRedirects(spec.url, controller.signal);
 
             if (!response.ok || response.body === null) {
                 await response.body?.cancel();
@@ -151,7 +219,7 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
                 }
 
                 hash.update(chunk);
-                await handle.write(chunk);
+                await writeFully(handle, chunk);
                 options.onProgress?.(received, spec.bytes);
             }
 
@@ -182,6 +250,8 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
         // Beside the target, so the rename stays on one volume and is atomic.
         const partial = path.join(directory, `.${spec.file}.${randomBytes(6).toString("hex")}${PARTIAL_SUFFIX}`);
 
+        activePartials.add(path.basename(partial));
+
         try {
             await fetchToPartial(spec, partial, options);
             await rename(partial, target);
@@ -189,6 +259,8 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
             await removeQuietly(partial);
 
             throw error;
+        } finally {
+            activePartials.delete(path.basename(partial));
         }
 
         return target;
@@ -223,7 +295,7 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
             return;
         }
 
-        await Promise.all(names.filter((name) => name.endsWith(PARTIAL_SUFFIX)).map((name) => removeQuietly(path.join(directory, name))));
+        await Promise.all(names.filter((name) => name.endsWith(PARTIAL_SUFFIX) && !activePartials.has(name)).map((name) => removeQuietly(path.join(directory, name))));
     };
 
     return { download, ensureVerified, isDownloading: (spec) => inFlight.has(spec.id), pathOf, status, sweepPartials };
