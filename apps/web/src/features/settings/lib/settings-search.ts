@@ -6,6 +6,8 @@ import type { SettingsNavGroup, SettingsTab } from "./settings-navigation";
 export interface SettingsSearchEntry {
     /** The navigation group the tab sits in. */
     group: string;
+    /** A tab of the navigation, or one setting its keyword list declares. */
+    kind: "setting" | "tab";
     /** What the user sees for this result. */
     label: string;
     section?: string;
@@ -38,6 +40,7 @@ export const buildSettingsSearchIndex = (
         group.items.flatMap((item) => {
             const tabEntry: SettingsSearchEntry = {
                 group: group.label,
+                kind: "tab",
                 label: item.label,
                 tab: item.tab,
                 tabLabel: item.label,
@@ -48,6 +51,7 @@ export const buildSettingsSearchIndex = (
 
                 return {
                     group: group.label,
+                    kind: "setting",
                     label,
                     section: setting.section && translate(setting.section),
                     tab: item.tab,

@@ -125,7 +125,7 @@ describe("settings search", () => {
 
         expect(group?.tab).toBe("app-keyboard");
         expect(group?.entries.map((entry) => entry.label)).toEqual(["Send message shortcut"]);
-        expect(foundTabs(index, "send message")).toEqual(["app-keyboard"]);
+        expect(foundTabs(index, "send message shortcut")).toEqual(["app-keyboard"]);
     });
 
     it("finds nothing for an empty or blank query, or one nothing matches", () => {

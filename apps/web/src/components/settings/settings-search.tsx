@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 
 import { SETTINGS_KEYWORDS } from "@/features/settings/lib/settings-keywords";
 import type { SettingsNavGroup, SettingsTab } from "@/features/settings/lib/settings-navigation";
+import type { SettingsSearchEntry } from "@/features/settings/lib/settings-search";
 import { buildSettingsSearchIndex, searchSettings } from "@/features/settings/lib/settings-search";
 
 /** The query, and what it finds in the navigation the user can see. */
@@ -57,7 +58,7 @@ export const SettingsSearchField: FC<
 
 /** The matches as buttons in tab order: the field is a plain search input, so arrow keys are not promised. */
 export const SettingsSearchResults: FC<
-    Pick<SettingsSearchState, "groups" | "isSearching"> & { onPreview: (tab: SettingsTab) => void; onSelect: (tab: SettingsTab) => void }
+    Pick<SettingsSearchState, "groups" | "isSearching"> & { onPreview: (tab: SettingsTab) => void; onSelect: (entry: SettingsSearchEntry) => void }
 > = ({ groups, isSearching, onPreview, onSelect }) => {
     const { t } = useLingui();
 
@@ -77,7 +78,7 @@ export const SettingsSearchResults: FC<
                         <button
                             className="text-muted-foreground hover:bg-muted hover:text-foreground flex w-full flex-col rounded-md px-3 py-2 text-left text-sm transition-colors"
                             key={`${entry.tab}-${entry.section ?? ""}-${entry.label}`}
-                            onClick={() => onSelect(entry.tab)}
+                            onClick={() => onSelect(entry)}
                             onFocus={() => onPreview(entry.tab)}
                             onMouseEnter={() => onPreview(entry.tab)}
                             type="button"

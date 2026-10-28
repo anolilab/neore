@@ -17,8 +17,10 @@ import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from "@
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useModalState } from "@/features/layout/hooks/use-ui-state";
+import { jumpToSettingsRow } from "@/features/settings/lib/settings-jump";
 import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
 import { resolveSettingsNavigation } from "@/features/settings/lib/settings-navigation";
+import type { SettingsSearchEntry } from "@/features/settings/lib/settings-search";
 import { ErrorUtilities } from "@/lib/errors";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -207,6 +209,18 @@ export const SettingsModal: FC = () => {
         setQuery: setSearchQuery,
     } = useSettingsSearch(navigationGroups);
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const tabContentRef = useRef<HTMLDivElement>(null);
+    // The setting a search result asked to scroll to; a new object per pick, so choosing the same one again jumps again.
+    const [pendingJump, setPendingJump] = useState<{ label: string } | null>(null);
+
+    // Runs after the destination tab's commit; the tab may still be loading its chunk, which the jump waits for.
+    useEffect(() => {
+        if (!pendingJump || !tabContentRef.current) {
+            return undefined;
+        }
+
+        return jumpToSettingsRow(tabContentRef.current, pendingJump.label);
+    }, [pendingJump]);
 
     // The modal stays mounted, so a query left in the field would greet the next opening.
     // Cleared on any close, including ones that bypass `handleClose`.
@@ -278,8 +292,9 @@ export const SettingsModal: FC = () => {
         setCurrentTab(tab);
     };
 
-    const handleSearchSelect = (tab: SettingsTab) => {
-        handleTabChange(tab);
+    const handleSearchSelect = (entry: SettingsSearchEntry) => {
+        handleTabChange(entry.tab);
+        setPendingJump(entry.kind === "setting" ? { label: entry.label } : null);
         setSearchQuery("");
         // The chosen result unmounts with the list; keep focus in the dialog.
         searchInputRef.current?.focus();
@@ -506,7 +521,9 @@ export const SettingsModal: FC = () => {
                             >
                                 {/* Under the dialog title and this tab's h2: a card title in the tab is an h3. */}
                                 <HeadingLevelProvider level={3}>
-                                    <Suspense fallback={<SettingsLoadingFallback />}>{renderContent()}</Suspense>
+                                    <div ref={tabContentRef}>
+                                        <Suspense fallback={<SettingsLoadingFallback />}>{renderContent()}</Suspense>
+                                    </div>
                                 </HeadingLevelProvider>
                             </ErrorBoundary>
                         </DialogPanel>
