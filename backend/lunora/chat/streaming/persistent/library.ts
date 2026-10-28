@@ -6,6 +6,7 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
+import { syncActiveAgent } from "../../../agent/agent-switch";
 import { addMessagesHandler, deleteMessage } from "../../../agent/messages";
 import { parentOf } from "../../../agent/branch-rows";
 import { patchThread } from "../../../agent/table-writes";
@@ -244,6 +245,10 @@ const removeEmptyPending = async (ctx: MutationCtx, threadId: Id<"threads">, pen
 
     if (thread?.activeLeafMessageId === pending._id) {
         await patchRow(ctx.db, thread, { activeLeafMessageId: parent?._id });
+
+        if (parent) {
+            await syncActiveAgent(ctx, threadId, parent._id);
+        }
     }
 };
 

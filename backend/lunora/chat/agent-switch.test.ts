@@ -222,6 +222,7 @@ describe("a switch in a thread that never branched", () => {
 
         // The user carried on without answering: the request is stale.
         await insertRow("u2", 1, 0, text("user", "never mind"));
+        await insertRow("a2", 1, 1, text("assistant", "ok"));
 
         expect(await switchTo(B, "click-2")).toMatchObject({ switched: true });
     });
@@ -242,6 +243,44 @@ describe("a switch in a thread that never branched", () => {
         await run(async (ctx) => await ctx.db.patch(threadId, { groupChat: { mode: "round-robin", participants: [] } }));
 
         await expect(switchTo(B, "c")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
+    });
+
+    it("refuses a messenger thread, which replies on its connection's model", async () => {
+        const connectionId = await run(async (ctx) => await ctx.db.insert("messengerConnections", { platform: "telegram", userId: OWNER } as never));
+
+        await run(async (ctx) => await ctx.db.patch(threadId, { messengerConnectionId: connectionId }));
+
+        await expect(switchTo(B, "c")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
+        expect(await switchRows()).toHaveLength(0);
+    });
+
+    it("is refused while the path ends on a prompt no reply answers yet, and works once the reply exists", async () => {
+        // The prompt is saved before its stream is created: a divider now would sit under the prompt the reply hangs off.
+        await insertRow("u2", 1, 0, text("user", "and now?"));
+
+        await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_STREAMING } });
+        expect(await switchRows()).toHaveLength(0);
+
+        await insertRow("a2", 1, 1, text("assistant", "this"));
+
+        expect(await switchTo(B, "click-2")).toMatchObject({ switched: true });
+    });
+
+    it("works on a prompt whose run was stopped before the first token, so the user can leave a model that is not answering", async () => {
+        await insertRow("u2", 1, 0, text("user", "and now?"));
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: ids.u2,
+                    status: "aborted",
+                    streamingConfig: { contentType: "text", model: A },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
     });
 
     it("needs a write grant: a reader is refused, a writer switches, and the row carries the writer", async () => {
@@ -392,6 +431,32 @@ describe("a fork of a switched thread", () => {
         expect(await agentOf(switched)).toBe(B);
         expect(await agentOf(before)).toBeNull();
     });
+
+    it("points a copied divider at the row before it in the fork, not at a row of the source", async () => {
+        await insertRow("u1", 0, 0, text("user", "hello"));
+        await insertRow("a1", 0, 1, text("assistant", "hi"));
+        await switchTo(B, "click-1");
+        await insertRow("u2", 2, 0, text("user", "more"));
+        await insertRow("a2", 2, 1, text("assistant", "sure"));
+        await switchTo(C, "click-2");
+
+        const source = await rows();
+        const all = source.toSorted((x, y) => x.order - y.order || x.stepOrder - y.stepOrder);
+        const forkId = await forkWith(all);
+        const stored = await rows();
+        const ordered = stored.filter((row) => row.threadId === forkId).toSorted((x, y) => x.order - y.order || x.stepOrder - y.stepOrder);
+        const dividers = ordered.flatMap((row, index) => {
+            const part = agentSwitchOf(row);
+
+            return part ? [{ before: ordered[index - 1], part }] : [];
+        });
+
+        expect(dividers).toHaveLength(2);
+
+        for (const { before, part } of dividers) {
+            expect(part.startMessageId).toBe(before._id);
+        }
+    });
 });
 
 describe("the cost notice", () => {
@@ -406,6 +471,7 @@ describe("the cost notice", () => {
         expect(await switchTo(B, "click-1")).toMatchObject({ coldStartCostly: false, switched: true });
 
         await longRow("u2", 2, 0, "user", 8);
+        await longRow("a2", 2, 1, "assistant", 0);
 
         expect(await switchTo(C, "click-2")).toMatchObject({ coldStartCostly: true, switched: true });
     });

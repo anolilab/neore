@@ -24,6 +24,7 @@ vi.mock("../../_generated/internal", async (importOriginal) => registeredApi(awa
 
 const MODULES = {
     agent_messages: async () => await import("../../agent/messages"),
+    chat_agent_switch: async () => await import("../../chat/agent-switch"),
     chat_functions: async () => await import("../../chat/functions"),
     chat_sharing: async () => await import("../../chat/sharing"),
     pages_functions: async () => await import("../../pages/functions"),
@@ -312,6 +313,57 @@ describe("shared access still works", () => {
         const other = await seedThread();
 
         expect(await as(GRANTEE).query(leakyGet as never, { id: other } as never)).toBeNull();
+    });
+
+    it("a collaborator with a write grant is refused a switch while the owner's tool approval is open", async () => {
+        const threadId = await seedThread({ model: "openai/gpt-4.1-mini" });
+        const switchArgs = { clientId: "click", target: { kind: "model", model: "google/gemini-2.0-flash-001" }, threadId };
+
+        await run(async (context) => {
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: GRANTEE });
+            await context.db.insert("messages", {
+                message: {
+                    content: [
+                        { input: {}, toolCallId: "call-1", toolName: "mcp_Files__delete", type: "tool-call" },
+                        { approvalId: "approval-1", toolCallId: "call-1", type: "tool-approval-request" },
+                    ],
+                    role: "assistant",
+                },
+                order: 0,
+                status: "success",
+                stepOrder: 1,
+                threadId,
+                tool: true,
+                userId: OWNER,
+            });
+            // Stored under the thread's owner, so the collaborator's own scope never sees it.
+            await context.db.insert("toolApprovalRuns", {
+                approvalId: "approval-1",
+                config: {
+                    autoMediaEnrichment: false,
+                    instructions: "",
+                    mcpServerNames: [],
+                    model: "openai/gpt-4.1-mini",
+                    researchDepth: "balanced",
+                    searchMode: "chat",
+                    shouldAutoContinue: false,
+                    toolNames: [],
+                },
+                createdAt: Date.now(),
+                status: "pending",
+                threadId,
+                userId: OWNER,
+            });
+        });
+
+        await expect(as(GRANTEE).mutation(procedureAt("chat_agent_switch", "switchThreadAgent"), switchArgs as never)).rejects.toMatchObject({
+            data: { code: "AGENT_SWITCH_STREAMING" },
+        });
+
+        const written = await run(async (context) => await context.db.query("messages").collect());
+
+        // The seeded prompt and the paused reply; no divider.
+        expect(written.filter((row: any) => row.threadId === threadId)).toHaveLength(2);
     });
 
     it("an expired grant admits nothing", async () => {

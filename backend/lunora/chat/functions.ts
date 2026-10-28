@@ -1,5 +1,6 @@
 import type { ImageModelV2, JSONValue, LanguageModelV3 } from "@ai-sdk/provider";
 import { isHostRunThread, refuseHostThread } from "../acp/lib/host-thread";
+import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -728,7 +729,7 @@ export const createThreadWithInitialMessage = internalMutation
 export const gateThreadActionHandler = async (
     context: Pick<QueryContext, "db">,
     args: { level: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
-): Promise<{ botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
+): Promise<{ activeAgent?: AgentRef; botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
     const outcome = await threadGateOutcome(context, args);
 
     if (outcome !== "ok") {
@@ -736,11 +737,13 @@ export const gateThreadActionHandler = async (
     }
 
     // A bot thread runs on its bot's model, so a granted caller also learns which bot, if any. A host-run thread
-    // runs on a paired device, never on a cloud model: `runChatStart` refuses it.
+    // runs on a paired device, never on a cloud model: `runChatStart` refuses it. A switched thread runs on its
+    // path's agent (`agent/agent-switch.ts`); the send only looks that up for one that was.
     const thread = await context.db.get(args.threadId);
 
     // A worker's thread takes a turn only through `dispatchToWorker`; the chat entry points refuse it.
     return {
+        activeAgent: thread?.activeAgent,
         botId: thread?.botId,
         ...(args.level === "write" && { isWorker: await isWorkerThread(context, args.threadId) }),
         outcome,
@@ -757,6 +760,7 @@ export const gateThreadAction = internalQuery
     })
     .output(
         v.object({
+            activeAgent: v.optional(vAgentRef),
             botId: v.optional(v.id("bots")),
             hostRun: v.optional(v.boolean()),
             isWorker: v.optional(v.boolean()),

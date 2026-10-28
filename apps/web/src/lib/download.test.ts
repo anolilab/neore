@@ -4,7 +4,7 @@ import type { Doc } from "@neore/backend/dataModel";
 import JsZip from "jszip";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { handleDownload } from "./download";
+import { formatAsMarkdown, handleDownload } from "./download";
 
 const thread = { _creationTime: Date.UTC(2026, 9, 19), title: "Plan" } as Doc<"threads">;
 const toolRow = {
@@ -139,6 +139,49 @@ describe("chat export", () => {
 
         expect(await blob.text()).toContain("Assistant: Let me check.");
         expect(await blob.text()).not.toContain("Tool Output");
+    });
+
+    describe("a thread that was switched to another model", () => {
+        const divider = {
+            _creationTime: 2,
+            message: { content: "", role: "system" },
+            providerMetadata: {
+                neoreAgentSwitch: {
+                    from: { kind: "model", model: "openai/gpt-4.1-mini" },
+                    mode: "full",
+                    startMessageId: "m1",
+                    to: { kind: "model", model: "custom/unlisted" },
+                },
+            },
+            tool: false,
+        } as unknown as Doc<"messages">;
+        const switched = [
+            { _creationTime: 1, message: { content: "hello", role: "user" }, text: "hello" },
+            divider,
+            { _creationTime: 3, message: { role: "assistant" }, text: "Hi again." },
+        ] as unknown as Doc<"messages">[];
+
+        it("exports the divider as a line in text, Markdown and Word instead of failing", async () => {
+            const textBlob = await exported("txt", switched);
+            const text = await textBlob.text();
+            const markdown = formatAsMarkdown(thread, switched);
+            const docxBlob = await exported("docx", switched);
+            const zip = await JsZip.loadAsync(await docxBlob.arrayBuffer());
+            const xml = (await zip.file("word/document.xml")?.async("string")) ?? "";
+
+            expect(text).toContain("User: hello\nSystem: Switched from GPT-4.1 Mini to custom/unlisted\nAssistant: Hi again.");
+            expect(markdown).toContain("_Switched from GPT-4.1 Mini to custom/unlisted_");
+            expect(markdown).not.toContain("### System");
+            expect(xml).toContain("Switched from GPT-4.1 Mini to custom/unlisted");
+        });
+
+        it("keeps a row whose stored content is not a list out of the way of its neighbours", async () => {
+            const bare = { _creationTime: 2, message: { content: "", role: "system" }, tool: false } as unknown as Doc<"messages">;
+            const blob = await exported("txt", [bare]);
+
+            expect(await blob.text()).toContain("System: ");
+            expect(formatAsMarkdown(thread, [bare])).toContain("### System");
+        });
     });
 
     it("writes a Word document with the thread's messages", async () => {
