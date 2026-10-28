@@ -12532,6 +12532,12 @@
           "optional": true,
           "unique": false
         },
+        "clientId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "completedAt": {
           "kind": "number",
           "nullable": false,
@@ -12555,6 +12561,28 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "mode": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"run\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"worker\""
+            }
+          ]
         },
         "organizationId": {
           "kind": "string",
@@ -12585,6 +12613,51 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "runner": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "deviceId": {
+                  "kind": "id",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "ref": "devices"
+                },
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"host\""
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"headless\""
+                }
+              }
+            }
+          ]
         },
         "skillSlug": {
           "kind": "string",

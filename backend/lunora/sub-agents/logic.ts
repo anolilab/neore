@@ -17,6 +17,9 @@ export const canNest = (depth: number): boolean => depth < SUB_AGENT_MAX_DEPTH;
 /** The delegate tool's name (`chat/tools/delegate-to-sub-agent.ts`), kept here so this module stays import-free. */
 export const SUB_AGENT_TOOL_NAME = "delegateToSubAgent";
 
+/** The tool a lead uses to message a worker it started; the delegation consent covers it. */
+export const MESSAGE_WORKER_TOOL_NAME = "messageWorker";
+
 /** Sub-agents one thread may have queued or running at once. */
 export const SUB_AGENT_MAX_CONCURRENT = 3;
 
@@ -35,6 +38,12 @@ export const SUB_AGENT_SKILL_SLUG_MAX = 100;
 
 /** Tool names an allowlist may carry. */
 export const SUB_AGENT_MAX_TOOLS = 30;
+
+/** Characters of a worker's name, which is its thread title. */
+export const WORKER_NAME_MAX = 80;
+
+/** Characters of the id a client sends to dedupe one dispatch. */
+export const WORKER_CLIENT_ID_MAX = 128;
 
 /** Characters of the child's answer kept on the row and posted back. */
 export const SUB_AGENT_RESULT_MAX = 12_000;
@@ -113,6 +122,34 @@ export const normalizeToolAllowlist = (tools: ReadonlyArray<string> | undefined)
 };
 
 /**
+ * What a worker is allowed to call: the requested names that the lead could call itself, or the
+ * lead's set (at most {@link SUB_AGENT_MAX_TOOLS} names) when none are requested. A worker never widens its lead, so a requested name the
+ * lead lacks is refused rather than dropped. `leadTools` is the lead run's effective tool names, after
+ * the user's permissions; `undefined` means no lead run vouches for the request (a person creating the
+ * worker), and the request stands.
+ */
+export const intersectWithLeadTools = (
+    requested: ReadonlyArray<string> | undefined,
+    leadTools: ReadonlyArray<string> | undefined,
+): { error: string } | { tools: string[] | undefined } => {
+    if (leadTools === undefined) {
+        return { tools: requested === undefined ? undefined : [...requested] };
+    }
+
+    if (requested === undefined) {
+        // Capped like a requested list, so a lead with many tools yields a worker with the first few.
+        return { tools: leadTools.slice(0, SUB_AGENT_MAX_TOOLS) };
+    }
+
+    const available = new Set(leadTools);
+    const missing = requested.find((name) => !available.has(name));
+
+    return missing === undefined
+        ? { tools: [...requested] }
+        : { error: `A worker cannot use ${missing.slice(0, 64)}: this conversation does not have that tool.` };
+};
+
+/**
  * Narrows a built tool set to an allowlist. It only ever removes: a name the
  * set does not contain (off, unavailable, `ask` in a headless run) stays absent.
  */
@@ -129,6 +166,11 @@ export const applyToolAllowlist = (tools: ToolSet, allowlist: ReadonlyArray<stri
 export const SUB_AGENT_SYSTEM = `You are a sub-agent: another assistant delegated one task to you and is not watching while you work.
 Complete the task on your own, using your tools where they help. You cannot ask anyone questions — make reasonable assumptions and state them.
 Finish with a self-contained answer: the result first, then the key details, sources and any assumptions. It is posted back to the conversation that delegated the task.`;
+
+/** The system text of a worker run: the same headless loop, but the thread is the worker's and it is messaged again. */
+export const WORKER_SYSTEM = `You are a worker: a long-lived agent that the user, or another assistant, messages again and again in this thread.
+Messages arrive one at a time, and the thread holds everything said so far, so use it. You cannot ask anyone questions mid-run — make reasonable assumptions and state them.
+Finish each message with a self-contained answer: the result first, then the key details, sources and any assumptions.`;
 
 export const buildSubAgentPrompt = (task: string): string => `Task delegated to you:\n\n${task}`;
 
@@ -172,6 +214,13 @@ export const stopWhenRequested = (isStopRequested: () => Promise<boolean>): Stop
         return answered.stop;
     };
 };
+
+/**
+ * How many children a parent has started over its life, for the depth > 1 cap. A worker counts once
+ * however often it was messaged; a one-shot run, or one with no thread yet, counts itself.
+ */
+export const distinctChildCount = (runs: ReadonlyArray<{ _id: string; childThreadId?: string }>): number =>
+    new Set(runs.map((run) => run.childThreadId ?? run._id)).size;
 
 /** The follow-up message posted to the parent thread when a run ends. */
 export const buildResultMessage = (input: {

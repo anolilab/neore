@@ -1,6 +1,8 @@
 /**
  * One sub-agent run: a headless agent run (`runHeadlessAgent`) in a new thread,
- * then its answer posted back to the thread that delegated it.
+ * then its answer posted back to the thread that delegated it. A worker's run
+ * (`mode: "worker"`) continues the worker's own thread instead, so it sees every
+ * earlier run's messages, and runs on that thread's model.
  *
  * On the jobs queue (at-least-once): the run claims its row first
  * (`claimRun`), so only one delivery ever runs it, and reports once at the end
@@ -21,7 +23,7 @@ import { internalAction } from "../_generated/server";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { isTaskModelAllowed } from "../tasks/logic";
-import { buildSubAgentPrompt, canNest, resolveSubAgentModel, SUB_AGENT_SYSTEM, SUB_AGENT_TOOL_NAME } from "./logic";
+import { buildSubAgentPrompt, canNest, MESSAGE_WORKER_TOOL_NAME, resolveSubAgentModel, SUB_AGENT_SYSTEM, SUB_AGENT_TOOL_NAME, WORKER_SYSTEM } from "./logic";
 
 /** A failure this run raised itself, whose message is written for the user. */
 class SubAgentRunError extends Error {}
@@ -51,31 +53,39 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
         }
 
         const skill = skillRun?.invocation ? { config: skillRun.invocation.config, instructions: skillRun.invocation.instructions } : undefined;
+        const worker = claim.mode === "worker" && claim.childThreadId !== undefined ? claim.childThreadId : undefined;
+        // A worker keeps its own model: the thread's, not the lead's and not a skill's.
         const model = resolveSubAgentModel({
             defaultModel: DEFAULT_CHAT_MODEL,
             isAllowed: (id) => isTaskModelAllowed(id, (lookupId) => MODEL_LOOKUP.get(lookupId)),
-            parentModel: claim.parentModel,
-            preferredModel: skill?.config?.preferredModel,
+            parentModel: worker ? claim.model : claim.parentModel,
+            preferredModel: worker ? undefined : skill?.config?.preferredModel,
         });
+        // An account deletion may have started since the claim; a thread created now would land behind the
+        // step that erased the threads, and a worker's thread is about to be written to.
+        const assertCanRun = async () => {
+            if (!(await ctx.runQuery(internal.tasks.internal.canRunForUser, { userId }))) {
+                throw new SubAgentRunError("This account is being deleted.");
+            }
+
+            // Cancelled between the claim and now: no thread, no first step.
+            if (await ctx.runQuery(internal.sub_agents.functions.shouldRunStop, { runId })) {
+                throw new SubAgentRunError("This sub-agent was stopped.");
+            }
+        };
+
+        if (worker) {
+            await assertCanRun();
+        }
 
         const { text } = await runHeadlessAgent(ctx, {
             // The parent's `delegateToSubAgent` call only ran past its permission
             // check (approved, or set to `auto`), so that consent carries into
             // this child and nesting stays reachable. At the depth cap the
             // grant is withheld, so a default `ask` removes the tool there.
-            ...(canNest(claim.depth) && { approvedTools: [SUB_AGENT_TOOL_NAME] }),
-            // An account deletion may have started since the claim; a thread
-            // created now would land behind the step that erased the threads.
-            beforeThread: async () => {
-                if (!(await ctx.runQuery(internal.tasks.internal.canRunForUser, { userId }))) {
-                    throw new SubAgentRunError("This account is being deleted.");
-                }
-
-                // Cancelled between the claim and now: no thread, no first step.
-                if (await ctx.runQuery(internal.sub_agents.functions.shouldRunStop, { runId })) {
-                    throw new SubAgentRunError("This sub-agent was stopped.");
-                }
-            },
+            ...(canNest(claim.depth) && { approvedTools: [SUB_AGENT_TOOL_NAME, MESSAGE_WORKER_TOOL_NAME] }),
+            beforeThread: assertCanRun,
+            keepThreadStatus: worker !== undefined,
             memory: false,
             model,
             onThread: async (childThreadId) => {
@@ -92,7 +102,8 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
                 }
             },
             personalization: "full",
-            prompt: buildSubAgentPrompt(claim.task),
+            // A message the user typed into the worker's thread is the prompt as written.
+            prompt: worker && claim.clientId !== undefined ? claim.task : buildSubAgentPrompt(claim.task),
             // A failed read is not a stop request: the run goes on and asks again after the next step.
             shouldStop: async () =>
                 await ctx.runQuery(internal.sub_agents.functions.shouldRunStop, { runId }).catch((error: unknown) => {
@@ -101,8 +112,8 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
                     return false;
                 }),
             skill,
-            system: SUB_AGENT_SYSTEM,
-            thread: { tags: ["sub-agent"], title: `Sub-agent: ${claim.task}`.split("\n", 1)[0]!.slice(0, 120) },
+            system: worker ? WORKER_SYSTEM : SUB_AGENT_SYSTEM,
+            thread: worker ? { threadId: worker } : { tags: ["sub-agent"], title: `Sub-agent: ${claim.task}`.split("\n", 1)[0]!.slice(0, 120) },
             toolAllowlist: claim.toolAllowlist,
             tools: "headless",
             ...(claim.skillSlug &&

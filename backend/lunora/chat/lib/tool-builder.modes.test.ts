@@ -40,6 +40,7 @@ vi.mock("../tools", () => {
         "knowledgeSearch",
         "listCurrencies",
         "listLanguages",
+        "messageWorker",
         "movieTvSearch",
         "musicGeneration",
         "nearbyPlacesSearch",

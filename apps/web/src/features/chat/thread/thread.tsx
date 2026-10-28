@@ -29,6 +29,10 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import ForwardSelectionBar from "@/features/chat/forward/forward-selection-bar";
+import WorkerComposer from "@/features/sub-agents/components/worker-composer";
+import WorkerList from "@/features/sub-agents/components/worker-list";
+import useWorker from "@/features/sub-agents/hooks/use-worker";
+import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import ChatError from "./chat-error";
@@ -109,24 +113,22 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
 
     // Detect comparison parent instantly from the already-loaded thread doc.
     const isMultiChatThread = thread?.multiChat === true;
+    // A worker takes a turn only through `dispatchToWorker`, so its thread gets its own composer.
+    const { isLoading: isWorkerLoading, worker } = useWorker(isNewThread ? undefined : threadId);
 
     const crpc = useCRPC();
+    const afterFirstPaint = useAfterFirstPaint();
+    // A comparison parent needs its children at once; any other thread reads them after first paint,
+    // to learn whether it has workers to list.
     const { data: childThreads } = useQuery(
-        crpc.chat.functions.getChildThreads.queryOptions(threadId && isMultiChatThread ? { parentThreadId: threadId as Id<"threads"> } : skipToken),
+        crpc.chat.functions.getChildThreads.queryOptions(
+            threadId && (isMultiChatThread || (!isNewThread && afterFirstPaint)) ? { parentThreadId: threadId as Id<"threads"> } : skipToken,
+        ),
     );
+    const hasWorkers = childThreads?.some((child) => child.branchType === "subagent") === true;
 
-    // Check if this is a comparison parent thread
-    const isComparisonThread = useMemo(() => {
-        if (isMultiChatThread) {
-            return true;
-        }
-
-        if (!childThreads || childThreads.length === 0) {
-            return false;
-        }
-
-        return childThreads.some((child: any) => child.branchType === "comparison");
-    }, [isMultiChatThread, childThreads]);
+    // A comparison parent is flagged on its own thread document.
+    const isComparisonThread = isMultiChatThread;
 
     // Build comparison branches from child threads
     const comparisonBranches = useMemo((): ComparisonBranch[] => {
@@ -280,6 +282,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
                                         maxWidth={maxWidth}
                                     />
                                     <div className="flex-1" />
+                                    {hasWorkers && <WorkerList className="mb-4 w-full" threadId={threadId} />}
                                 </div>
                                 {/* Sticky within the scroll viewport, so it stays in view while the thread scrolls. */}
                                 <ThreadMinimap className="sticky top-4 hidden self-start md:block" />
@@ -299,7 +302,17 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
                             <ForwardSelectionBar threadId={threadId} />
                             {/* Full-featured composer with model selector, language selector, slash commands */}
                             {/* Key by threadId to reset state when switching threads */}
-                            <Composer className="w-full" initialMessage={initialMessage} key={threadId} />
+                            {/* A worker's thread takes a turn only through a dispatch, so no chat composer while that is unknown. */}
+                            {worker && (
+                                <WorkerComposer
+                                    archived={worker.archived}
+                                    busy={worker.state !== "idle"}
+                                    className="w-full pb-4"
+                                    key={threadId}
+                                    workerId={worker.workerId}
+                                />
+                            )}
+                            {!worker && !isWorkerLoading && <Composer className="w-full" initialMessage={initialMessage} key={threadId} />}
                         </div>
                     </div>
                 </ThreadViewport>

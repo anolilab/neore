@@ -24,6 +24,7 @@ import { saveEditedSiblingHandler } from "../agent/branches";
 import { addMessagesHandler } from "../agent/messages";
 import { insertThread, patchThread } from "../agent/table-writes";
 import { authMutation, rateLimit } from "../lib/crpc";
+import { isWorkerThread } from "../sub-agents/functions";
 import { storedRetentionHours } from "../lib/temporary-retention";
 import { MAX_LENGTH } from "../lib/validators";
 import type { StoredCustomProvider } from "./lib/custom-providers";
@@ -112,6 +113,11 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
 
         // Owner, admitted for the rows below; a locked chat needs its proof.
         await requireOwnedThread(ctx, args.threadId, userId, args.unlockProof);
+
+        // A worker's thread takes a turn only through `dispatchToWorker`, as the hosted entry points enforce.
+        if (await isWorkerThread(ctx, args.threadId)) {
+            throw new LunoraError("BAD_REQUEST", "This is a worker's thread. Message the worker from its thread instead of saving a chat turn here.");
+        }
 
         threadId = args.threadId;
         await patchThread(ctx.db, threadId, { model: args.model, updatedAt: now });

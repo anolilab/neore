@@ -15,6 +15,7 @@
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
  * | `messenger-ai-disclosure` | `<threadId>`      | {@link AI_DISCLOSURE_CLAIM_TTL_MS} | `messenger/functions.ts` |
+ * | `worker-dispatch`  | `tool:<userId>:<toolCallId>` or `client:<threadId>:<clientId>` | {@link WORKER_DISPATCH_CLAIM_TTL_MS} | `sub-agents/functions.ts` |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
  * | `video-reservation` | `<requestId>`            | 24 h                          | `auth/billing.ts`            |
@@ -83,6 +84,12 @@ export const TRIGGER_DELIVERY_SCOPE = "trigger-delivery";
 
 /** Queue jobs: well past the queue's retry window (seconds to minutes); a day is plenty. */
 export const JOB_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** A worker dispatch (`sub-agents/functions.ts`): the lead's tool call or the user's `clientId`, redelivered or retried within a day. */
+export const WORKER_DISPATCH_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** The scope of those claims. */
+export const WORKER_DISPATCH_SCOPE = "worker-dispatch";
 
 /** Rows deleted per purge call; a full batch reschedules the purge at once. */
 export const CLAIM_PURGE_BATCH = 500;
