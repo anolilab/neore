@@ -25,9 +25,11 @@ import { Buffer } from "node:buffer";
 import { MaskedStream, MAX_CHILD_TEXT } from "./masked-stream";
 
 /**
- * Bytes of child events held for a spawn call that has not appeared. **Not measured:** a provisional figure derived
- * from the caps around it (plans/acp-s7-children.md): the agent's own buffer for the same ordering problem holds at
- * most 256 updates, and one post carries 200 KB (`MAX_BATCH_BYTES`), a turn's unsent output 4 MB.
+ * Bytes of child events held for a spawn call that has not appeared, per session. The manager runs at most 8 sessions
+ * at once (`MAX_SESSIONS`), and an ended session empties its buffer, so everything held across sessions stays under 8
+ * times this. **Not measured:** a provisional figure derived from the caps around it (plans/acp-s7-children.md): the
+ * agent's own buffer for the same ordering problem holds at most 256 updates, and one post carries 200 KB
+ * (`MAX_BATCH_BYTES`), a turn's unsent output 4 MB. Pending measurement on a real child-heavy session.
  */
 export const CHILD_BUFFER_BUDGET_BYTES = 512 * 1024;
 
@@ -57,11 +59,12 @@ export interface ChildLedgerOptions {
 }
 
 interface Card {
+    /** Set once the card ended. What it held is released then; the card stays as the record that it ended, so a repeat is ignored. */
     ended: boolean;
     /** Whether the child has said anything: a spawn call with no children is not a card the thread shows. */
     hasChildren: boolean;
-    reasoning: MaskedStream;
-    text: MaskedStream;
+    reasoning?: MaskedStream;
+    text?: MaskedStream;
 }
 
 const bytesOf = (event: ChildEvent): number => Buffer.byteLength(JSON.stringify(event));
@@ -89,7 +92,7 @@ export class ChildLedger {
             return;
         }
 
-        this.cards.set(spawnId, { ended: false, hasChildren: false, reasoning: new MaskedStream(this.options), text: new MaskedStream(this.options) });
+        this.cards.set(spawnId, { ended: false, hasChildren: false });
 
         const held = this.buffer.get(spawnId) ?? [];
 
@@ -145,9 +148,18 @@ export class ChildLedger {
         }
     }
 
-    /** What no spawn call claimed is dropped, and said so. */
+    /**
+     * What no spawn call claimed is dropped, and said so. So are the cards of spawn calls whose child never said
+     * anything: they would be kept for as long as the session lives, one per tool call.
+     */
     public discardUnclaimed(): void {
         let count = 0;
+
+        for (const [spawnId, card] of this.cards) {
+            if (!card.hasChildren) {
+                this.cards.delete(spawnId);
+            }
+        }
 
         for (const events of this.buffer.values()) {
             count += events.length;
@@ -171,6 +183,9 @@ export class ChildLedger {
         card.hasChildren = true;
 
         if (event.kind === "text" || event.kind === "reasoning") {
+            card.text ??= new MaskedStream(this.options);
+            card.reasoning ??= new MaskedStream(this.options);
+
             const delta = (event.kind === "text" ? card.text : card.reasoning).take(event.text);
 
             if (delta !== "") {
@@ -191,11 +206,15 @@ export class ChildLedger {
 
     private end(spawnId: string, event: Extract<ChildEvent, { kind: "end" }>): void {
         const card = this.cards.get(spawnId) as Card;
+        const streamed = { reasoning: card.reasoning, text: card.text };
 
+        // Released at once: the card is a tombstone from here, a few bytes however much the child said.
         card.ended = true;
+        delete card.reasoning;
+        delete card.text;
 
         for (const kind of ["text", "reasoning"] as const) {
-            const rest = card[kind].take("", true);
+            const rest = streamed[kind]?.take("", true) ?? "";
 
             if (rest !== "") {
                 this.options.emit(spawnId, { kind, text: rest });
@@ -203,7 +222,7 @@ export class ChildLedger {
         }
 
         // The completion's own text stands in for a child that streamed none; after streamed text it would repeat it.
-        const text = card.text.isEmpty && event.text !== undefined ? this.options.scrub(event.text).slice(0, MAX_CHILD_TEXT) : undefined;
+        const text = streamed.text?.isEmpty !== false && event.text !== undefined ? this.options.scrub(event.text).slice(0, MAX_CHILD_TEXT) : undefined;
 
         this.options.emit(spawnId, { kind: "end", status: event.status, ...text !== undefined && text !== "" && { text } });
     }

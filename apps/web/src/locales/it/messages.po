@@ -26978,6 +26978,10 @@ msgstr "Avvio dell'importazione..."
 msgid "Starting test drive…"
 msgstr "Avvio della prova…"
 
+#: src/features/chat/host/host-composer.tsx:166
+msgid "Starting the agent on your computer. A message you send now goes out once it is up."
+msgstr ""
+
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:34
 msgid "Starting the coding agent…"
 msgstr "Avvio dell'agente di coding…"

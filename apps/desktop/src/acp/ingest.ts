@@ -54,6 +54,13 @@ export interface PosterOptions {
     stateFile: string;
 }
 
+/** A turn recorded on disk while it runs. */
+export interface RunningTurn {
+    sessionId: string;
+    threadId: string;
+    turnId: string;
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 export class HostPoster implements SessionObserver {
@@ -64,6 +71,9 @@ export class HostPoster implements SessionObserver {
     private readonly sessions = new Map<string, SessionLink>();
 
     private stopped = false;
+
+    /** What the last run left running, until `recover` has ended it. */
+    private unrecovered: RunningTurn[] = [];
 
     /** Serialises writes of the state file; a write never overtakes the one before it. */
     private writing: Promise<void> = Promise.resolve();
@@ -128,8 +138,8 @@ export class HostPoster implements SessionObserver {
         this.persist();
     }
 
-    /** Ends a turn whose message was held past its expiry while the app was down: a stream waiting for it fails with the reason instead of reaping as silent. */
-    public endLapsedTurn(sessionId: string, turnId: string, threadId: string, error: string): void {
+    /** Ends a turn whose message was held while the app went down: a stream waiting for it ends with the reason instead of reaping as silent. */
+    public endLapsedTurn(sessionId: string, turnId: string, threadId: string, end: { error?: string; reason: "failed" | "interrupted" }): void {
         if (this.stopped || this.channels.has(turnId)) {
             return;
         }
@@ -137,7 +147,7 @@ export class HostPoster implements SessionObserver {
         const channel = new TurnChannel(this.channelHost, sessionId, turnId, threadId, true);
 
         this.channels.set(turnId, channel);
-        channel.end("failed", error);
+        channel.end(end.reason, end.error);
     }
 
     /** The first call for a turn opens its channel with the user's prompt; a later one (the turn it was queued for now running) finds it open. */
@@ -197,20 +207,35 @@ export class HostPoster implements SessionObserver {
 
     // ─── Start and stop ─────────────────────────────────────────────────────
 
-    /** Ends, as `interrupted`, every turn a previous run left behind. Call once after the core is up. */
-    public async recover(): Promise<void> {
-        const leftovers = await this.readState();
+    /**
+     * The turns a previous run left running, read from disk. Read BEFORE anything that opens a channel (the replay of held
+     * messages does): the file is rewritten by the first one. Until `recover` has ended them they are kept in the file.
+     */
+    public async readLeftovers(): Promise<RunningTurn[]> {
+        this.unrecovered = await this.readState();
 
-        for (const left of leftovers) {
-            if (this.channels.has(left.turnId)) {
+        return this.unrecovered;
+    }
+
+    /**
+     * Ends, as `interrupted`, every turn a previous run left behind, except the ones that have a channel since (a held
+     * message the replay took up again). Call once after the core is up, with what `readLeftovers` returned.
+     */
+    public async recover(leftovers?: RunningTurn[]): Promise<void> {
+        const left = leftovers ?? await this.readLeftovers();
+
+        for (const turn of left) {
+            if (this.channels.has(turn.turnId)) {
                 continue;
             }
 
-            const channel = new TurnChannel(this.channelHost, left.sessionId, left.turnId, left.threadId, true);
+            const channel = new TurnChannel(this.channelHost, turn.sessionId, turn.turnId, turn.threadId, true);
 
-            this.channels.set(left.turnId, channel);
+            this.channels.set(turn.turnId, channel);
             channel.end("interrupted");
         }
+
+        this.unrecovered = [];
     }
 
     /** Stops every timer. Output not yet sent is lost, as the process is going away; the next start ends those turns as interrupted. */
@@ -315,7 +340,7 @@ export class HostPoster implements SessionObserver {
 
     // ─── The turns that are running, on disk ────────────────────────────────
 
-    private async readState(): Promise<{ sessionId: string; threadId: string; turnId: string }[]> {
+    private async readState(): Promise<RunningTurn[]> {
         try {
             const parsed: unknown = JSON.parse(await readFile(this.options.stateFile, "utf8"));
             const turns = isRecord(parsed) && Array.isArray(parsed.turns) ? parsed.turns : [];
@@ -331,11 +356,18 @@ export class HostPoster implements SessionObserver {
     }
 
     private async writeState(): Promise<void> {
-        const turns: { sessionId: string; threadId: string; turnId: string }[] = [];
+        const turns: RunningTurn[] = [];
 
         for (const channel of this.channels.values()) {
             if (channel.threadId !== undefined) {
                 turns.push({ sessionId: channel.sessionId, threadId: channel.threadId, turnId: channel.turnId });
+            }
+        }
+
+        // A turn the last run left is still to be ended: a crash before then must not lose it.
+        for (const left of this.unrecovered) {
+            if (!this.channels.has(left.turnId)) {
+                turns.push(left);
             }
         }
 

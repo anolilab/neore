@@ -179,6 +179,36 @@ describe("a card ending", () => {
     });
 });
 
+describe("the cards a session keeps", () => {
+    it("drops those whose child never spoke when the turn ends, and keeps the ones that did", () => {
+        const { emitted, ledger } = rig();
+
+        ledger.spawn("quiet");
+        ledger.spawn("spoke");
+        ledger.receive("spoke", text("hi"));
+        ledger.discardUnclaimed();
+
+        // The quiet card is gone: an event for it now waits for a spawn call, as for any call that has not appeared.
+        ledger.receive("quiet", text("late"));
+        ledger.receive("spoke", text("again"));
+
+        expect(emitted.map(([spawnId]) => spawnId)).toEqual(["spoke", "spoke"]);
+    });
+
+    it("lets an ended card go of its text, and still ignores what comes after it", () => {
+        const { emitted, ledger } = rig();
+
+        ledger.spawn("a");
+        ledger.receive("a", text("x".repeat(1000)));
+        ledger.settle("a", "completed");
+        ledger.receive("a", text("late"));
+        ledger.settle("a", "failed");
+
+        expect(emitted.map(([, event]) => event.kind)).toEqual(["text", "end"]);
+        expect(JSON.stringify((ledger as unknown as { cards: Map<string, unknown> }).cards.get("a"))).toBe("{\"ended\":true,\"hasChildren\":true}");
+    });
+});
+
 describe("a child's text and the user's masked values", () => {
     it("is held back until a masked value can be recognised, and released when the card ends", () => {
         const secret = "hunter22";

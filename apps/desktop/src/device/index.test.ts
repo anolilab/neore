@@ -4,7 +4,7 @@
  * relay, who may call the local window's commands, where events go, and what
  * happens to a prompt when its window closes.
  */
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -229,6 +229,7 @@ const makeCore = () => {
         reapIdleServers: vi.fn(),
         settingsGet: vi.fn(() => JSON.stringify({ paired: false, roots: [] })),
         settingsUpdate: vi.fn(() => JSON.stringify({ paired: false, roots: ["/x"] })),
+        signTurn: vi.fn((payload: string) => `sig:${String(payload.length)}`),
         status: vi.fn(() => JSON.stringify({ accountLabel: null, deviceId: null, platform: "macos" })),
         stop: vi.fn(),
     };
@@ -609,6 +610,44 @@ describe("shutdown", () => {
         fake.appListeners.get("will-quit")?.();
 
         expect(core.stop).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("a restart that finds a running turn and a held message", () => {
+    it("ends the running turn and the held message as interrupted, and runs neither", async () => {
+        const posts: { events: { kind: string; reason?: string }[]; threadId?: string; turnId?: string }[] = [];
+
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (_url: unknown, init?: { body?: string }) => {
+                const { payload } = JSON.parse(String(init?.body)) as { payload: string };
+
+                posts.push(JSON.parse(payload) as (typeof posts)[number]);
+
+                return Response.json({ ended: false, next: 0, threadId: "thread-1" });
+            }),
+        );
+        // The last run died with turn t1 running, and with a message for session s2 (turn t2) received but not acted on.
+        writeFileSync(path.join(fake.userData, "acp-host-turns.json"), JSON.stringify({ turns: [{ sessionId: "s1", threadId: "thread-1", turnId: "t1" }] }));
+
+        const envelope = JSON.stringify({ callId: "c2", input: { sessionId: "s2", text: "go", turnId: "t2" }, threadId: "thread-2", tool: "acp_send" });
+
+        writeFileSync(path.join(fake.userData, "acp-host-receipts.json"), JSON.stringify({ receipts: [["c2", Date.now() + 60_000, null, envelope, "sig"]] }));
+        core.status.mockReturnValue(JSON.stringify({ accountLabel: null, deviceId: "dev1", platform: "macos" }));
+        core.acpPrepare.mockReturnValue(
+            JSON.stringify({ callId: "c2", command: { kind: "send", sessionId: "s2", text: "go", turnId: "t2" }, expiresAt: Date.now() + 60_000, refusal: null }),
+        );
+        fake.handlers.clear();
+        registerDeviceIpc(options);
+
+        // The replay opened channels before the leftovers were ended, and t1 still ends. No start replays for s2, so the
+        // held message cannot run: its turn ends as interrupted too, and nothing is sent to an agent.
+        await vi.waitFor(() => {
+            expect(posts.find((post) => post.turnId === "t1")?.events).toEqual([{ kind: "turn_end", reason: "interrupted" }]);
+            expect(posts.find((post) => post.turnId === "t2")?.events).toEqual([{ kind: "turn_end", reason: "interrupted" }]);
+        });
+        expect(spawnAgent).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
     });
 });
 
