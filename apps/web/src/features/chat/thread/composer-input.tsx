@@ -14,6 +14,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { followUpControl } from "@neore/ai/capabilities";
 import type { Id } from "@neore/backend/dataModel";
 import { isThreadLockedError } from "@neore/client-runtime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
@@ -36,6 +37,7 @@ import {
 } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import { useChatActions, useChatIsStreaming, useChatLunora, useChatThread } from "@/features/chat/core/context/chat-context";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
+import useRunnerCapabilities from "@/features/chat/core/hooks/use-runner-capabilities";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import { selectAttachedReferences, selectRemoveAttachedReference, useChatUIStore, useComposerState } from "@/features/chat/core/stores/chat-ui-store";
 import { MIN_COMPARISON_MODELS, useModelStore } from "@/features/chat/core/stores/model-store";
@@ -743,7 +745,14 @@ const ComposerInput = ({
     // reply has no step boundary) is sent after it, like a queued message. A
     // refused steer (a group chat, a reply that just ended) is simply queued.
     const { mutateAsync: steerRun } = useMutation(crpc.chat.steering.steerRun.mutationOptions());
-    const canSteer = isThreadComposer && !isComparisonValid && Boolean(sseStreamState) && attachments.length === 0 && attachedReferences.length === 0;
+    const followUp = followUpControl(useRunnerCapabilities());
+    const canSteer =
+        isThreadComposer &&
+        !isComparisonValid &&
+        Boolean(sseStreamState) &&
+        attachments.length === 0 &&
+        attachedReferences.length === 0 &&
+        (followUp === "steer" || followUp === "steer-restart");
 
     const handleSteer = useCallback(() => {
         const streamId = sseStreamState;
@@ -757,6 +766,15 @@ const ComposerInput = ({
         clear();
 
         const { enqueue, settleSteer } = usePromptQueueStore.getState();
+
+        // A runner that can only be interrupted: queue the text as an ordinary message and stop
+        // the reply WITHOUT pausing the queue, so the text goes out as soon as the run has ended.
+        if (followUp === "steer-restart") {
+            enqueue(threadId, { attachments: [], text: steerText });
+            cancelStream();
+
+            return;
+        }
 
         // The id is ours, so a call whose answer never came back can still be told
         // apart from a refusal: the chip stays as a steer and the queue's withdrawal
@@ -774,7 +792,7 @@ const ComposerInput = ({
             .then(() => settleSteer(threadId, steerId, "accepted"))
             .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"))
             .finally(() => clearTimeout(unanswered));
-    }, [canSteer, clear, disabled, promptHistory, sseStreamState, steerRun, text, threadId]);
+    }, [canSteer, cancelStream, clear, disabled, followUp, promptHistory, sseStreamState, steerRun, text, threadId]);
 
     // Handle submit — fully synchronous, fire-and-forget network call.
     // Optimistic state (user message + Thinking...) is shown immediately inside
@@ -1242,6 +1260,7 @@ const ComposerInput = ({
                 canQueueWhileStreaming={isThreadComposer && !isComparisonValid}
                 currentThreadId={threadId}
                 disabled={disabled || isComparisonLoading}
+                followUp={followUp}
                 isHistoryRecalled={isThreadComposer ? promptHistory.isRecalled : undefined}
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}

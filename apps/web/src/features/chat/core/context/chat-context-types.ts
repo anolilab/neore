@@ -70,6 +70,8 @@ export interface ChatStreamingContextValue {
     activeStreamId: string | null;
     /** Gateway URL for edge streaming */
     gatewayUrl: string | null;
+    /** The model runs on a `local-browser` endpoint: the browser streams it and the backend saves text only. */
+    isLocalModel: boolean;
     isStreaming: boolean;
 
     /**

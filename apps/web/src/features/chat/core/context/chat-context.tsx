@@ -875,12 +875,13 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         return {
             activeStreamId,
             gatewayUrl: gatewayInfo.gatewayUrl,
+            isLocalModel: localTarget !== undefined,
             isStreaming,
             pendingStreamId: gatewayInfo.streamId,
             streamingMessageId,
             streamToken: gatewayInfo.streamToken,
         };
-    }, [isStreaming, streamingMessageId, activeStreamId, gatewayInfo]);
+    }, [isStreaming, localTarget, streamingMessageId, activeStreamId, gatewayInfo]);
 
     const actionsContextValue = useMemo((): ChatActionsContextValue => {
         return {
