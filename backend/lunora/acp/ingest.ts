@@ -292,10 +292,18 @@ const applyTurnPost = async (
     }
 
     const expiresAt = bumpedExpiry(stream, now);
-    const pendingChanged = pending.length !== (stream.hostPendingPermissions?.length ?? 0);
+    const pendingChanged = pending.join("\n") !== (stream.hostPendingPermissions ?? []).join("\n");
+    const stateChanged = hostState !== stream.hostState;
+    const startsStreaming = sawContent && stream.status === "pending";
 
-    if (hostState !== stream.hostState || sawContent || expiresAt !== undefined || pendingChanged) {
-        await updateHostStream(ctx, stream, { expiresAt, hostState, pending, streaming: sawContent });
+    // The stream row is read by a live query, so a plain text post (none of these) writes nothing to it.
+    if (stateChanged || startsStreaming || expiresAt !== undefined || pendingChanged) {
+        await updateHostStream(ctx, stream, {
+            expiresAt,
+            hostState: stateChanged ? hostState : undefined,
+            pending: pendingChanged ? pending : undefined,
+            streaming: startsStreaming,
+        });
 
         if (expiresAt !== undefined) {
             await noteShardDue(ctx, expiresAt);

@@ -56,24 +56,20 @@ export const createHostStream = async (
 /**
  * What one post changes on the stream row, in a single write: the first content moves `pending` to `streaming`,
  * `hostState` moves forward, the reaper window moves on (rarely: see {@link bumpedExpiry}), and the list of
- * permission requests the agent is waiting on follows the posted events. The caller writes only when something
- * changed, since this row is read by a live query.
+ * permission requests the agent is waiting on follows the posted events (`pending`, only when it changed). The
+ * caller writes only when something changed, since this row is read by a live query.
  */
 export const updateHostStream = async (
     ctx: Pick<MutationCtx, "db">,
     stream: Stream,
-    changes: { expiresAt?: number; hostState?: HostState; pending: string[]; streaming: boolean },
+    changes: { expiresAt?: number; hostState?: HostState; pending?: string[]; streaming: boolean },
 ): Promise<void> => {
+    const { pending } = changes;
+
     await patchRow(ctx.db, stream, {
-        ...withoutUndefined({
-            expiresAt: changes.expiresAt,
-            hostState: changes.hostState,
-            status: changes.streaming && stream.status === "pending" ? "streaming" : undefined,
-        }),
+        ...withoutUndefined({ expiresAt: changes.expiresAt, hostState: changes.hostState, status: changes.streaming ? "streaming" : undefined }),
         // `patchRow` removes a key set to `undefined`: only the permission list is ever meant to go.
-        ...(changes.pending.length > 0
-            ? { hostPendingPermissions: changes.pending }
-            : stream.hostPendingPermissions !== undefined && { hostPendingPermissions: undefined }),
+        ...(pending !== undefined && (pending.length > 0 ? { hostPendingPermissions: pending } : { hostPendingPermissions: undefined })),
     });
 };
 
