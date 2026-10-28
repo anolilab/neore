@@ -46,3 +46,7 @@ export const MAX_IMPORT_TURNS = 1000;
 
 /** Turns in one import post. Each is written as messages in the same mutation, so a post is kept small. */
 export const MAX_IMPORT_TURNS_PER_POST = 25;
+
+/** A turn's summary (plans/acp-agent-host.md §4.9): files listed, and the patch as text. The host keeps its own smaller patch cap to fit a post. */
+export const MAX_SUMMARY_FILES = 200;
+export const MAX_PATCH_CHARS = 256 * 1024;

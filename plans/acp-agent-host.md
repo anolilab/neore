@@ -742,6 +742,23 @@ backend work, listed in §4.8).
   later edit leaves the stored patch unchanged; a write outside the folder is not
   read; a patch over the cap keeps its file list.
 
+**S9 as built** (differences from the text above):
+- A file is recorded from a completed tool call only: ACP `diff` content (both sides are in the message, nothing is read), or
+  an edit, delete or move call that names `locations` with no diff, whose earlier text is read when the call or its permission
+  request first names the path and whose later text is read at completion (`apps/desktop/src/acp/changes.ts`). Declined,
+  failed and cancelled calls, binary files, files over 1 MiB and a call already complete when first seen are left out.
+  Every path is resolved against the approved folder, links followed, before anything is read or listed
+  (`folder-files.ts`); the summary carries paths relative to the folder.
+- **The host's patch cap is 96 KiB, not 256 KiB.** A post is capped at 256 KiB whole and the `turn_end` event, escaped twice,
+  must fit one post alone, so a 256 KiB patch could never be sent. The backend still accepts the plan's bounds (200 files,
+  256 KiB patch); the host falls back to `{ tooLarge: true }` for the patch and then trims the tail of the file list until the
+  event fits (`turnEndEvent`). `MAX_INGEST_BYTES` is unchanged.
+- The summary is stored on the reply row as `providerMetadata.neore.hostChanges`, not as a new content part (which would reach
+  model conversion on a fork), and reaches clients as `UIMessage.hostChanges`. The turn's `turn_end` chunk keeps no copy of it.
+  A turn that only changed files still saves a reply.
+- Not built: a rename shown as a rename (a move is a delete plus a create when both paths are named), and fetching the patch
+  lazily on Open diff (it rides on the message).
+
 Additions to earlier slices:
 - S1 adds user-set environment variables (§6): a variable set for one agent
   reaches that agent and no other; a reserved name is refused; no value appears in

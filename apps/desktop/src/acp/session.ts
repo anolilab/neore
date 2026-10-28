@@ -19,6 +19,7 @@ import { reportFromHandshake } from "./capabilities";
 import { childEventOf, childParentOf, completionText, contentText, isRecord, text } from "./child-updates";
 import type { ChildEvent } from "./children";
 import { ChildLedger } from "./children";
+import { TurnChanges } from "./changes";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate, PermissionOutcome } from "./permission";
@@ -111,6 +112,9 @@ export class AgentSession {
 
     private readonly queue: QueuedPrompt[] = [];
 
+    /** What each turn's tool calls wrote (`changes.ts`); kept only for a session whose turns are saved. */
+    private readonly changes = new WeakMap<Turn, TurnChanges>();
+
     /** How much of each turn's text has been handed to the observer, in characters of the scrubbed text. */
     private readonly sent = new WeakMap<Turn, { text: number; thought: number }>();
 
@@ -190,7 +194,7 @@ export class AgentSession {
             const opened = {
                 ...hostInfo,
                 nativeSessionId: this.agentSessionId,
-                ...this.report !== undefined && { capabilities: this.report },
+                ...(this.report !== undefined && { capabilities: this.report }),
             };
 
             this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
@@ -339,6 +343,10 @@ export class AgentSession {
 
     private run(prompt: string, turnId?: string): void {
         const turn = new Turn(prompt, this.options.process.scrub, turnId);
+
+        if (this.options.observer !== undefined) {
+            this.changes.set(turn, new TurnChanges(this.options.folder, this.options.process.scrub));
+        }
 
         this.turns.push(turn);
         this.current = turn;
@@ -541,7 +549,7 @@ export class AgentSession {
         const delta = scrubbed.slice(sent[field], end);
 
         sent[field] = end;
-        this.observe((observer) => field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta));
+        this.observe((observer) => (field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta)));
     }
 
     private observeTool(tool: ToolState): void {
@@ -575,8 +583,28 @@ export class AgentSession {
         this.observeDelta(turn, "thought", true);
 
         const reason = turn.stopReason ?? "failed";
+        const said = reason === "failed" ? error : undefined;
+        const changes = this.changes.get(turn);
 
-        this.observe((observer) => observer.turnEnded(this.id, turn.id, reason, reason === "failed" ? error : undefined));
+        // The turn stays in `turns` for the transcript; what its calls wrote is not kept with it.
+        this.changes.delete(turn);
+
+        if (changes?.active !== true) {
+            this.observe((observer) => observer.turnEnded(this.id, turn.id, reason, said));
+
+            return;
+        }
+
+        // Reads for the files the turn named may still be running; the turn ends once they have.
+        this.observeEndWithChanges(turn, changes, reason, said);
+    }
+
+    private async observeEndWithChanges(turn: Turn, changes: TurnChanges, reason: StopReason | "failed", error: string | undefined): Promise<void> {
+        const summary = await changes.summary();
+
+        this.observe((observer) =>
+            summary === undefined ? observer.turnEnded(this.id, turn.id, reason, error) : observer.turnEnded(this.id, turn.id, reason, error, summary),
+        );
     }
 
     /** What the backend is told of a request: the tool, target and command as the user sees them, and the options the agent offered, never an "always" one. */
@@ -589,13 +617,15 @@ export class AgentSession {
                 kind: "permission_request",
                 options: described.options
                     .filter((option) => !option.kind.includes("always"))
-                    .map((option) => { return { ...option, kind: this.options.process.scrub(option.kind), optionId: this.options.process.scrub(option.optionId) }; }),
+                    .map((option) => {
+                        return { ...option, kind: this.options.process.scrub(option.kind), optionId: this.options.process.scrub(option.optionId) };
+                    }),
                 requestId,
                 tool: described.tool,
                 // The label the user chose for the folder, never its path.
-                ...this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel },
-                ...described.command !== undefined && { command: described.command },
-                ...described.target !== undefined && { target: described.target },
+                ...(this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel }),
+                ...(described.command !== undefined && { command: described.command }),
+                ...(described.target !== undefined && { target: described.target }),
             }),
         );
     }
@@ -701,6 +731,12 @@ export class AgentSession {
 
         this.observeTool(tool);
 
+        const owner = this.toolOwner.get(id);
+
+        if (owner !== undefined) {
+            this.changes.get(owner)?.note({ id, kind: tool.kind, status: tool.status }, update);
+        }
+
         // The card is on the wire now: whatever a child said about this call before it appeared follows it.
         if (created) {
             this.children.spawn(id);
@@ -738,6 +774,11 @@ export class AgentSession {
             sessionId: this.id,
         };
         const turn = this.current;
+
+        // A request that names the file to be written is the last moment its earlier text can be read.
+        if (isRecord(params.toolCall)) {
+            this.changes.get(turn)?.note({ id: text(params.toolCall.toolCallId), kind: text(params.toolCall.kind), status: "pending" }, params.toolCall);
+        }
 
         this.observePermission(turn, requestId, request);
         this.pendingPermissions.set(requestId, turn);

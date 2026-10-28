@@ -12,6 +12,22 @@ const RESTARTED = /restarted/u;
 const STOPPED_SENDING = /stopped sending output/u;
 const REMOVED = /was removed/u;
 
+describe("buildHostReply with changes", () => {
+    const changes = { files: [{ added: 1, path: "a.ts", removed: 0 }], patch: "+x\n" };
+
+    it("keeps what the turn changed on the reply, even when the agent said nothing", () => {
+        expect(buildHostReply({ agentKey: "claude", changes, reason: "finished", transcript: transcript("") })).toMatchObject({
+            message: { content: [], role: "assistant" },
+            providerMetadata: { neore: { billed: false, hostChanges: changes, runtime: "acp-host" } },
+            status: "success",
+        });
+    });
+
+    it("adds nothing to a reply that changed nothing", () => {
+        expect(buildHostReply({ agentKey: "claude", reason: "finished", transcript: transcript("Done.") })?.providerMetadata.neore).not.toHaveProperty("hostChanges");
+    });
+});
+
 describe("buildHostReply", () => {
     it("saves a finished turn as a successful, unbilled reply", () => {
         expect(buildHostReply({ agentKey: "claude", reason: "finished", transcript: transcript("Done.", "thought") })).toEqual({

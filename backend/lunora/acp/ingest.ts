@@ -197,7 +197,12 @@ const chunkFor = (event: Event): Pick<Doc<"persistentChunks">, "event" | "reason
         return { reasoning: event.text, text: "" };
     }
 
-    // The prompt is the user's saved message; the chunk only claims the slot.
+    // The prompt is the user's saved message; the chunk only claims the slot. A turn's summary lives on the saved
+    // reply, so its patch is not kept a second time for every reader of the stream.
+    if (event.kind === "turn_end") {
+        return { event: { kind: "turn_end", reason: event.reason, ...event.error !== undefined && { error: event.error } }, text: "" };
+    }
+
     return { event: event.kind === "turn_start" ? { kind: "turn_start", text: "" } : event, text: "" };
 };
 
@@ -348,7 +353,7 @@ const applyTurnPost = async (
         const end = fresh.find((event) => event.kind === "turn_end");
 
         if (end?.kind === "turn_end") {
-            await finishHostTurn(ctx, live, { error: end.error, reason: end.reason }, now);
+            await finishHostTurn(ctx, live, { changes: end.summary?.files.length ? end.summary : undefined, error: end.error, reason: end.reason }, now);
         }
 
         return { ended: true, next: seq, outcome: "applied" };

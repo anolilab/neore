@@ -4,6 +4,7 @@
  * row and charge no credit (`scheduleReplyUsage` is deliberately not called; plans/acp-agent-host.md §5.2).
  */
 import type { Doc } from "../../_generated/dataModel";
+import type { HostChanges } from "./changes";
 import { MAX_HOST_REPLY_CHARS } from "./constants";
 
 export const HOST_PROVIDER = "acp-host";
@@ -82,7 +83,8 @@ export const appendChildEvent = (transcript: HostTranscript, event: ChildEvent):
     }
 };
 
-export const isChildEvent = (event: Doc<"persistentChunks">["event"]): event is ChildEvent => event?.kind === "child_text" || event?.kind === "child_tool" || event?.kind === "child_end";
+export const isChildEvent = (event: Doc<"persistentChunks">["event"]): event is ChildEvent =>
+    event?.kind === "child_text" || event?.kind === "child_tool" || event?.kind === "child_end";
 
 /** Adds one chunk's text to the transcript, cut at the reply cap; only the part that still fits is joined on. */
 export const appendToTranscript = (transcript: HostTranscript, chunk: { reasoning?: string | null; text: string }): void => {
@@ -112,13 +114,14 @@ const finishReasonOf = (reason: HostReplyReason): "error" | "other" | "stop" => 
 
 /**
  * `null` when there is nothing to save: a finished or stopped turn that wrote nothing. A turn that failed, was
- * interrupted, timed out or lost its device is always saved, so the thread says what happened.
+ * interrupted, timed out or lost its device is always saved, so the thread says what happened. A turn that
+ * changed files is saved too, even with no words, since the summary lives on the reply.
  */
-export const buildHostReply = (input: { agentKey: string; error?: string; reason: HostReplyReason; transcript: HostTranscript }) => {
+export const buildHostReply = (input: { agentKey: string; changes?: HostChanges; error?: string; reason: HostReplyReason; transcript: HostTranscript }) => {
     const failed = isFailure(input.reason);
     const { children, reasoning, text } = input.transcript;
 
-    if (!failed && text.length === 0 && reasoning.length === 0 && children.length === 0) {
+    if (!failed && text.length === 0 && reasoning.length === 0 && children.length === 0 && input.changes === undefined) {
         return null;
     }
 
@@ -153,7 +156,14 @@ export const buildHostReply = (input: { agentKey: string; error?: string; reason
         // The children's transcripts ride beside the reply, keyed by the call that spawned each. The reply has no tool
         // parts to hang them on (a host turn keeps text and reasoning only), and a content part type of their own would
         // touch every reader of message content.
-        providerMetadata: { neore: { billed: false, runtime: HOST_PROVIDER, ...children.length > 0 && { subagentTranscripts: children } } },
+        providerMetadata: {
+            neore: {
+                billed: false,
+                runtime: HOST_PROVIDER,
+                ...(children.length > 0 && { subagentTranscripts: children }),
+                ...(input.changes !== undefined && { hostChanges: input.changes }),
+            },
+        },
         ...(reasoning && { reasoning }),
         status: failed ? ("failed" as const) : ("success" as const),
     };
