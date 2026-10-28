@@ -137,7 +137,7 @@ fn validate(request: &InstallRequest) -> Result<(), String> {
 }
 
 impl DeviceState {
-    fn install_root(&self) -> PathBuf {
+    pub(crate) fn install_root(&self) -> PathBuf {
         self.data_dir().join(INSTALL_DIR)
     }
 
@@ -318,6 +318,9 @@ impl DeviceState {
 
                     if before.command != agent.command
                         || before.args != agent.args
+                        // A launch variable that changed (a registry one the new version adds, drops or sets
+                        // differently) is not the program the folders were approved for.
+                        || before.env != agent.env
                         || before.install.as_ref().map(|pin| &pin.sha256)
                             != agent.install.as_ref().map(|pin| &pin.sha256)
                     {
@@ -1180,6 +1183,35 @@ mod tests {
             .acp_update(AcpUpdate::RemoveAgent { key: "demo".into() })
             .unwrap();
         assert!(!dir.join("acp-agents/demo").exists());
+    }
+
+    #[test]
+    fn editing_only_the_arguments_of_an_installed_agent_keeps_its_program() {
+        let (state, dir) = state("edit-args");
+        let archive = tar_gz(&[("agent", b"x", 0o755)], &[]);
+        let stage = state.acp_install_stage().unwrap();
+        let view = state
+            .acp_install(request(&stage, &archive, ArchiveFormat::TarGz, "agent"))
+            .unwrap();
+        let command = view.agents[0].command.clone();
+        let edited = state
+            .acp_update(
+                serde_json::from_value(json!({
+                    "op": "saveAgent", "key": "demo", "label": "Demo!", "command": command, "args": ["other"],
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+
+        assert!(
+            edited.agents[0].install.is_none(),
+            "different arguments are not the pinned install"
+        );
+        assert!(
+            Path::new(&command).exists(),
+            "its program is still there to start"
+        );
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]
