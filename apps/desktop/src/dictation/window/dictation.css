@@ -1,0 +1,51 @@
+:root {
+    color-scheme: light dark;
+    font: 13px/1.4 system-ui, sans-serif;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    user-select: none;
+    -webkit-app-region: drag;
+}
+
+main {
+    box-sizing: border-box;
+    display: grid;
+    gap: 6px;
+    height: 100%;
+    padding: 14px 16px;
+    align-content: center;
+}
+
+p {
+    margin: 0;
+}
+
+.hint {
+    opacity: 0.65;
+}
+
+.meter {
+    background: color-mix(in srgb, currentcolor 15%, transparent);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+}
+
+#level {
+    background: currentcolor;
+    height: 100%;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 80ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #level {
+        transition: none;
+    }
+}

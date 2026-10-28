@@ -53,6 +53,16 @@ export default [
         },
     },
     {
+        // The package declares no `engines`, so the linter assumes Node 16. The app runs on Electron's Node 22+ and the page
+        // script on Chromium, which have `fetch`, `Response`, `navigator`, `DOMException`, `Array#at`.
+        files: ["src/dictation/**/*.ts", "e2e/dictation.spec.ts"],
+        name: "neore/desktop/dictation-runtime",
+        rules: {
+            "n/no-unsupported-features/es-syntax": "off",
+            "n/no-unsupported-features/node-builtins": "off",
+        },
+    },
+    {
         // Tests mock `electron`, which only exists inside the Electron runtime, so a module mock is the only seam.
         // Their fixtures include PKCE vectors and accelerator strings that look like secrets to the entropy check.
         files: ["**/*.test.ts", "e2e/**/*.ts"],
@@ -62,6 +72,17 @@ export default [
             "no-secrets/no-secrets": "off",
             // Each test resets the shared fakes and the core it reads in `beforeEach`.
             "unicorn/no-top-level-assignment-in-function": "off",
+        },
+    },
+    {
+        // The dictation tests walk folders and files in order and read a result before they assert on it, and they make
+        // scratch folders under the OS temp folder on purpose (the helper's TMPDIR points at one).
+        files: ["src/dictation/**/*.test.ts", "e2e/dictation.spec.ts"],
+        name: "neore/desktop/dictation-tests",
+        rules: {
+            "no-await-in-loop": "off",
+            "sonarjs/publicly-writable-directories": "off",
+            "unicorn/no-await-expression-member": "off",
         },
     },
 ];

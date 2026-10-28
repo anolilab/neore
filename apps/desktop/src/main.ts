@@ -15,6 +15,8 @@ import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, Notific
 import { createSetBadgeHandler } from "./badge.js";
 import { CAPABILITIES_ARG, CHANNEL, SITE_ORIGIN_ARG } from "./channels.js";
 import { registerDeviceIpc } from "./device/index.js";
+import type { DictationProbe } from "./dictation/index.js";
+import { createDictation } from "./dictation/index.js";
 import type { DroppedFile } from "./dropped-files.js";
 import { queueDroppedFiles, readDroppedFiles } from "./dropped-files.js";
 import { loginItemMenuState } from "./login-item.js";
@@ -24,7 +26,7 @@ import { clampText, MAX_COMPOSE_CHARS, newChatUrl, parseDeepLink, SCHEME, siteOr
 import type { TerminalController } from "./terminal/index.js";
 import { registerTerminalIpc } from "./terminal/index.js";
 import { threadWindowUrl } from "./thread-window.js";
-import { classifyUrl, isLocalPage, isTrustedUrl } from "./trust.js";
+import { classifyUrl, isDraftTarget, isLocalPage, isTrustedUrl } from "./trust.js";
 import { createDebouncer, DEFAULT_SIZE, readWindowState, restorableState, SAVE_DEBOUNCE_MS, WINDOW_STATE_FILE, writeWindowState } from "./window-state.js";
 
 interface ShellState {
@@ -85,7 +87,14 @@ const pendingDeepLinks: string[] = [];
  * What the e2e suite (`e2e/shell.spec.ts`) reads through `app.evaluate`: Electron
  * has no API to list trays, so the shell reports what it created.
  */
-const shellProbe = {
+const shellProbe: {
+    device: boolean;
+    dictation?: DictationProbe;
+    openTerminal: (folder: string) => Promise<void>;
+    quickComposer: boolean;
+    terminalPids: () => number[];
+    tray: boolean;
+} = {
     device: false,
     openTerminal: async (_folder: string): Promise<void> => {},
     quickComposer: false,
@@ -861,15 +870,22 @@ const drainPendingDeepLinks = (): void => {
 };
 
 const start = (): void => {
-    // Electron grants every permission unless told otherwise. Only the site gets any.
+    // Electron grants every permission unless told otherwise. Only the site gets any, and the dictation window its microphone:
+    // one policy answers for both sessions (`dictation/permissions.ts`), so they cannot drift apart.
+    const dictation = createDictation({
+        canTakeDraft: () => state.mainWindow !== undefined && !state.mainWindow.isDestroyed() && isDraftTarget(origin, state.mainWindow.webContents.getURL()),
+        // The temporary internal flag for S2; the opt-in switch in settings (S3) replaces it. Baked in at build time like the site origin.
+        enabled: process.env.NEORE_DICTATION === "1",
+        handOffDraft,
+        isSiteUrl: (url) => isTrustedUrl(origin, url),
+        log,
+        sitePermissions: ALLOWED_PERMISSIONS,
+    });
     const ses = session.defaultSession;
 
-    ses.setPermissionRequestHandler((_webContents, permission, callback, details) => {
-        callback(ALLOWED_PERMISSIONS.has(permission) && isTrustedUrl(origin, details.requestingUrl));
-    });
-    ses.setPermissionCheckHandler(
-        (_webContents, permission, requestingOrigin) => ALLOWED_PERMISSIONS.has(permission) && isTrustedUrl(origin, requestingOrigin),
-    );
+    ses.setPermissionRequestHandler(dictation.policy.request);
+    ses.setPermissionCheckHandler(dictation.policy.check);
+    shellProbe.dictation = dictation.probe;
 
     registerIpc();
     registerSchemeInDev();
@@ -877,6 +893,7 @@ const start = (): void => {
     createQuickComposer();
     createTray();
     registerQuickComposerShortcut();
+    dictation.register();
     checkForUpdates();
 
     // Windows and Linux pass a deep link on the command line at first launch.

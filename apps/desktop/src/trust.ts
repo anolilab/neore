@@ -31,6 +31,20 @@ export const isTrustedUrl = (origin: URL, raw: string | undefined): boolean => {
 };
 
 /**
+ * Can this page put text into the composer? A page of the site can, except the sign-in screens (`/auth/…`): the draft
+ * would be asked for there, but no composer is behind them to keep it.
+ */
+export const isDraftTarget = (origin: URL, raw: string | undefined): boolean => {
+    if (!isTrustedUrl(origin, raw)) {
+        return false;
+    }
+
+    const { pathname } = new URL(raw as string);
+
+    return pathname !== "/auth" && !pathname.startsWith("/auth/");
+};
+
+/**
  * The same question for a LOCAL page (the Quick Composer). A `file:` origin is
  * the string `"null"`, so the page's own URL is compared: scheme and path.
  * Nothing else on disk, and no site page, passes.
