@@ -42,7 +42,7 @@ def _run_measured_windows(cmd):
     import psutil  # Windows has no /usr/bin/time; the workflow installs psutil there.
 
     start = time.monotonic()
-    proc = psutil.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = psutil.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", errors="replace")
     peak = cpu = 0.0
     while proc.poll() is None:
         try:
@@ -53,7 +53,7 @@ def _run_measured_windows(cmd):
             pass
         time.sleep(0.02)
     out, _err = proc.communicate()
-    return out, time.monotonic() - start, peak, cpu, proc.returncode
+    return out or "", time.monotonic() - start, peak, cpu, proc.returncode
 
 
 def peak_rss_and_cpu(cmd):
@@ -63,7 +63,7 @@ def peak_rss_and_cpu(cmd):
     is_mac = platform.system() == "Darwin"
     timer = ["/usr/bin/time", "-l"] if is_mac else ["/usr/bin/time", "-v"]
     start = time.monotonic()
-    proc = subprocess.run(timer + cmd, capture_output=True, text=True)
+    proc = subprocess.run(timer + cmd, capture_output=True, encoding="utf-8", errors="replace")
     wall = time.monotonic() - start
     err = proc.stderr
     rss = cpu = None
@@ -83,6 +83,8 @@ def peak_rss_and_cpu(cmd):
 
 
 def main():
+    # whisper.cpp writes UTF-8; Windows would otherwise decode and print in its ANSI code page.
+    sys.stdout.reconfigure(encoding="utf-8")
     cli, models_dir, clips_dir, prompts_path = sys.argv[1:5]
     models = sys.argv[5:] or ["tiny", "base", "small"]
     prompts = [line.rstrip("\n").split("\t") for line in open(prompts_path, encoding="utf-8") if line.strip()]
