@@ -17,8 +17,10 @@ import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from "@
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useModalState } from "@/features/layout/hooks/use-ui-state";
+import { jumpToSettingsRow } from "@/features/settings/lib/settings-jump";
 import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
 import { resolveSettingsNavigation } from "@/features/settings/lib/settings-navigation";
+import type { SettingsSearchEntry } from "@/features/settings/lib/settings-search";
 import { ErrorUtilities } from "@/lib/errors";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -199,19 +201,33 @@ export const SettingsModal: FC = () => {
 
         return resolveSettingsNavigation(flags, t);
     }, [t, apiKey, organization, activeOrganization]);
-    const {
-        groups: searchGroups,
-        isSearching,
-        query: searchQuery,
-        resultCount: searchResultCount,
-        setQuery: setSearchQuery,
-    } = useSettingsSearch(navigationGroups);
+    const settingsSearch = useSettingsSearch(navigationGroups);
+    const { query: searchQuery, setQuery: setSearchQuery } = settingsSearch;
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const tabContentRef = useRef<HTMLDivElement>(null);
+    // The setting a search result asked to scroll to; a new object per pick, so choosing the same one again jumps again.
+    const [pendingJump, setPendingJump] = useState<{ label: string } | null>(null);
+    // Where the last pick led, for the live region: the field is empty after a pick, so nothing else tells a screen reader it worked.
+    const [announcement, setAnnouncement] = useState("");
+
+    // Runs after the destination tab's commit; the tab may still be loading its chunk, which the jump waits for.
+    // Moves focus to the row's own control when it has one; a row without one leaves focus in the search field.
+    useEffect(() => {
+        // A closed modal cancels the wait: the row must not scroll or take focus after the dialog is gone.
+        if (!isOpen || !pendingJump || !tabContentRef.current) {
+            return undefined;
+        }
+
+        return jumpToSettingsRow(tabContentRef.current, pendingJump.label, (control) => control?.focus({ preventScroll: true }));
+    }, [isOpen, pendingJump]);
 
     // The modal stays mounted, so a query left in the field would greet the next opening.
     // Cleared on any close, including ones that bypass `handleClose`.
-    if (!isOpen && searchQuery !== "") {
+    if (!isOpen && (searchQuery !== "" || announcement !== "" || pendingJump !== null)) {
         setSearchQuery("");
+        setAnnouncement("");
+        // A jump that was cancelled by closing must not replay when the dialog opens again.
+        setPendingJump(null);
     }
 
     // Compute query options at render time — queryOptions() calls hooks internally
@@ -276,10 +292,16 @@ export const SettingsModal: FC = () => {
         // The current tab is not written to the URL during a session; the initial
         // tab is read from the URL on mount so deep-links (?settingsTab=privacy) still work.
         setCurrentTab(tab);
+        // A jump still waiting on the old tab is over.
+        setPendingJump(null);
     };
 
-    const handleSearchSelect = (tab: SettingsTab) => {
+    const handleSearchSelect = (entry: SettingsSearchEntry) => {
+        const { label, tab, tabLabel } = entry;
+
         handleTabChange(tab);
+        setPendingJump(entry.kind === "setting" ? { label } : null);
+        setAnnouncement(entry.kind === "setting" ? t`Opened ${tabLabel}: ${label}` : t`Opened ${tabLabel}`);
         setSearchQuery("");
         // The chosen result unmounts with the list; keep focus in the dialog.
         searchInputRef.current?.focus();
@@ -303,6 +325,28 @@ export const SettingsModal: FC = () => {
 
         return locked;
     }, [isAnonymous, navigationGroups]);
+
+    // Loads a tab's chunk and data ahead of opening it; a tab the navigation locks for a guest loads nothing.
+    const previewTab = (tab: SettingsTab) => {
+        if (lockedTabs.has(tab)) {
+            return;
+        }
+
+        preloadTab[tab]?.();
+        prefetchTabData(tab);
+    };
+
+    // The selected result is the one Enter opens, whether it is on top after typing, reached with the arrow keys or hovered.
+    const activeResultTab = settingsSearch.activeEntry?.tab;
+    const previewActiveResult = useEffectEvent(() => {
+        if (activeResultTab) {
+            previewTab(activeResultTab);
+        }
+    });
+
+    useEffect(() => {
+        previewActiveResult();
+    }, [activeResultTab]);
 
     // Don't mount until first opened; once mounted, keep alive so the Dialog's
     // Activity component can deactivate/reactivate content without remounting.
@@ -422,29 +466,35 @@ export const SettingsModal: FC = () => {
                         <DialogDescription className="sr-only">{t`Configure your application settings`}</DialogDescription>
                     </DialogHeader>
                     <SettingsSearchField
+                        activeOptionId={settingsSearch.activeOptionId}
+                        announcement={announcement}
                         inputRef={searchInputRef}
-                        isSearching={isSearching}
+                        isSearching={settingsSearch.isSearching}
+                        listboxId={settingsSearch.listboxId}
+                        onActivate={() => settingsSearch.activeEntry && handleSearchSelect(settingsSearch.activeEntry)}
+                        onMove={settingsSearch.moveActive}
                         query={searchQuery}
-                        resultCount={searchResultCount}
-                        setQuery={setSearchQuery}
+                        resultCount={settingsSearch.resultCount}
+                        setQuery={(value) => {
+                            setAnnouncement("");
+                            // Typing starts a new search: a row still being waited for must not take focus meanwhile.
+                            setPendingJump(null);
+                            setSearchQuery(value);
+                        }}
                     />
                     {/* Keyed on the mode: the results are a new list, so they start at the top instead of at the navigation's scroll offset. */}
-                    <ScrollArea className="flex-1" key={isSearching ? "search" : "navigation"}>
+                    <ScrollArea className="flex-1" key={settingsSearch.isSearching ? `search-${searchQuery}` : "navigation"}>
                         <SettingsSearchResults
-                            groups={searchGroups}
-                            isSearching={isSearching}
-                            onPreview={(tab) => {
-                                // A tab the navigation locks for a guest loads nothing ahead.
-                                if (isAnonymous && navigationGroups.some((group) => group.items.some((item) => item.tab === tab && item.requiresAuth))) {
-                                    return;
-                                }
-
-                                preloadTab[tab]?.();
-                                prefetchTabData(tab);
-                            }}
+                            activeIndex={settingsSearch.activeIndex}
+                            groups={settingsSearch.groups}
+                            isSearching={settingsSearch.isSearching}
+                            listboxId={settingsSearch.listboxId}
+                            lockedTabs={lockedTabs}
                             onSelect={handleSearchSelect}
+                            optionId={settingsSearch.optionId}
+                            setActive={settingsSearch.setActive}
                         />
-                        {!isSearching && (
+                        {!settingsSearch.isSearching && (
                             <nav className="flex flex-col gap-1 p-2">
                                 {navigationGroups.map((group) => (
                                     <div className="mb-2" key={group.label}>
@@ -506,7 +556,9 @@ export const SettingsModal: FC = () => {
                             >
                                 {/* Under the dialog title and this tab's h2: a card title in the tab is an h3. */}
                                 <HeadingLevelProvider level={3}>
-                                    <Suspense fallback={<SettingsLoadingFallback />}>{renderContent()}</Suspense>
+                                    <div ref={tabContentRef}>
+                                        <Suspense fallback={<SettingsLoadingFallback />}>{renderContent()}</Suspense>
+                                    </div>
                                 </HeadingLevelProvider>
                             </ErrorBoundary>
                         </DialogPanel>
