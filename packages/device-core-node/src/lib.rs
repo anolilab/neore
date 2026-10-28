@@ -389,6 +389,13 @@ impl DeviceCore {
         to_json(&view)
     }
 
+    /// Deletes the installed versions of an agent other than the pinned one. Run it after closing the sessions
+    /// the install took the approval from.
+    #[napi]
+    pub fn acp_install_prune(&self, agent_key: String) {
+        self.state.acp_install_prune(&agent_key);
+    }
+
     /// What to spawn for an agent (JSON): command, arguments, folder and environment. `folder` absent is a
     /// version probe. The environment holds secrets: it goes to the main process and nowhere else.
     #[napi]

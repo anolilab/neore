@@ -597,8 +597,16 @@ directory, local consent for each install.
   (version, publisher, source, sha256). Registry `env` goes through the same checks as a typed variable and a
   program-changing name refuses the install. Only the pinned version stays on disk.
 - An install approves no folder. Installing over an installed key is another explicit install and drops its
-  folder approvals (a different program); a key registered by hand is never replaced. Saving a different command
-  clears the pin; removing an installed agent deletes its files.
+  folder approvals unless it is the same program (same command, arguments and verified archive checksum): a new
+  version, or the same version republished with different bytes, loses them. A same-version reinstall moves the
+  old folder aside until the new one is recorded and puts it back on failure. The old version's folder is pruned
+  by a separate core call (`acp_install_prune`) the main process makes after it closed the sessions that lost
+  their approval. A key registered by hand is never replaced. Saving a different command clears the pin and
+  deletes the installed files; removing an installed agent deletes them too.
+- The registry client mirrors the core's checks (version rule, program-changing variable names, argument and
+  name limits, command inside the download) so such entries are listed as not installable with the reason; the
+  core stays the authority. A search within a minute of the last filters that answer instead of fetching again.
+  Installs are refused where coding agents cannot run (`acpSupported`).
 - No update path: the registry is not compared with installed agents, there is no timer, and a newer version is
   a new install the user confirms. Tests: no fetch from registering the handlers, loading the view or waiting a
   week; the spawn plan keeps the recorded command and version until an install changes it.

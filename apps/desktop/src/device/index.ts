@@ -21,7 +21,7 @@ import { HostPoster } from "../acp/ingest";
 import { AgentInstaller } from "../acp/install";
 import { AcpManager } from "../acp/manager";
 import { coreGate } from "../acp/permission";
-import { spawnAgent } from "../acp/process";
+import { acpSupported, spawnAgent } from "../acp/process";
 import { AgentRegistry } from "../acp/registry";
 import type { AcpView, PermissionView, SpawnPlan } from "../acp/types";
 import { backendOrigin } from "../site";
@@ -514,7 +514,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     // The registry is read when the window searches, never otherwise: there is no timer and no check of installed
     // agents against it, so nothing updates an agent but an install the user confirms again.
     const requireRegistry = (): AgentRegistry => {
-        state.registry ??= new AgentRegistry({ fetch: options.fetch });
+        state.registry ??= new AgentRegistry({ fetch: options.fetch, supported: acpSupported });
 
         return state.registry;
     };
@@ -536,11 +536,14 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             registry: requireRegistry(),
         });
 
-        const view = await state.installer.install(readAgentKey(id), readAgentVersion(version));
+        const key = readAgentKey(id);
+        const view = await state.installer.install(key, readAgentVersion(version));
 
         if (view !== null) {
             // A reinstall drops the folder approvals of the old version; a running session was started under them.
             await state.acp?.closeUnapproved(view);
+            // Only now, with nothing running from it, does the old version's folder go.
+            requireCore().acpInstallPrune(key);
         }
 
         return view;

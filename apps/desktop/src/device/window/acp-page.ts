@@ -524,7 +524,11 @@ export const initAcp = async (): Promise<void> => {
     $("acp-registry-form").addEventListener("submit", (event) => {
         event.preventDefault();
         guarded(async () => {
-            renderRegistry(await globalThis.neoreDevice.acpRegistrySearch(field("acp-registry-query")));
+            const found = await globalThis.neoreDevice.acpRegistrySearch(field("acp-registry-query"));
+
+            renderRegistry(found);
+            // The notice is the page's live region: a list that changes silently is invisible to a screen reader.
+            $("acp-notice").textContent = `${String(found.length)} ${found.length === 1 ? "agent" : "agents"} found.`;
         });
     });
 

@@ -88,6 +88,11 @@ export declare class DeviceCore {
    */
   acpInstall(request: string): string
   /**
+   * Deletes the installed versions of an agent other than the pinned one. Run it after closing the sessions
+   * the install took the approval from.
+   */
+  acpInstallPrune(agentKey: string): void
+  /**
    * What to spawn for an agent (JSON): command, arguments, folder and environment. `folder` absent is a
    * version probe. The environment holds secrets: it goes to the main process and nowhere else.
    */

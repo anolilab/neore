@@ -29,7 +29,7 @@ export interface ConsentText {
 export const consentText = ({ agent, format, sha256, target }: ResolvedInstall): ConsentText => {
     return {
         detail: [
-            `Publisher: ${agent.publisher}`,
+            `Publisher (as listed in the registry): ${agent.publisher}`,
             `Version: ${agent.version}`,
             `License: ${agent.license}`,
             agent.repository === "" ? undefined : `Repository: ${agent.repository}`,

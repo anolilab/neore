@@ -55,7 +55,7 @@ describe("the consent text", () => {
         const { detail, message } = consentText(registry.resolve("amp-acp", "0.10.0"));
 
         expect(message).toBe("Install “Amp” 0.10.0 from the ACP registry?");
-        expect(detail).toContain("Publisher: Ada Lovelace, Grace Hopper");
+        expect(detail).toContain("Publisher (as listed in the registry): Ada Lovelace, Grace Hopper");
         expect(detail).toContain("Version: 0.10.0");
         expect(detail).toContain("License: Apache-2.0");
         expect(detail).toContain("Download: https://example.com/amp-linux-x86_64.zip");
