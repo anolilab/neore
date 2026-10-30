@@ -308,6 +308,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
                                     archived={worker.archived}
                                     busy={worker.state !== "idle"}
                                     className="w-full pb-4"
+                                    followUp={worker.followUp}
                                     key={threadId}
                                     workerId={worker.workerId}
                                 />

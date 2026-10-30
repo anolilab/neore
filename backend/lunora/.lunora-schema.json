@@ -12562,6 +12562,12 @@
           "optional": true,
           "unique": false
         },
+        "loopExitedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "mode": {
           "kind": "union",
           "nullable": false,
@@ -12600,6 +12606,12 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "postFailed": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "result": {

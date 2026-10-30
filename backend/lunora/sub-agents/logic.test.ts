@@ -4,7 +4,9 @@ import {
     applyToolAllowlist,
     buildResultMessage,
     canNest,
+    nextQueuedWorkerRun,
     normalizeToolAllowlist,
+    postsBack,
     resolveSubAgentModel,
     SUB_AGENT_MAX_CONCURRENT,
     SUB_AGENT_MAX_DEPTH,
@@ -14,6 +16,9 @@ import {
     stopWhenRequested,
     subAgentCapProblem,
     truncateResult,
+    workerCurrentRun,
+    workerFollowUp,
+    workerPostFailure,
 } from "./logic";
 
 const DEPTH_CAP = /at most 2 levels/u;
@@ -155,5 +160,96 @@ describe(canNest, () => {
         expect(canNest(0)).toBe(true);
         expect(canNest(1)).toBe(true);
         expect(canNest(SUB_AGENT_MAX_DEPTH)).toBe(false);
+    });
+});
+
+describe("a worker's line of messages", () => {
+    const newestFirst = (...statuses: ("cancelled" | "queued" | "running" | "succeeded")[]) =>
+        statuses.map((status, index) => {
+            return { id: index, status };
+        });
+
+    it("starts the oldest queued run, and none while one is running", () => {
+        expect(nextQueuedWorkerRun(newestFirst("queued", "queued", "succeeded"))).toMatchObject({ id: 1 });
+        expect(nextQueuedWorkerRun(newestFirst("queued", "running"))).toBeUndefined();
+        expect(nextQueuedWorkerRun(newestFirst("succeeded", "cancelled"))).toBeUndefined();
+    });
+
+    it("holds the line while a stopped run's loop has not exited, and releases it once it has", () => {
+        const stopped = { startedAt: 1, status: "cancelled" as const };
+
+        expect(
+            nextQueuedWorkerRun([
+                { id: 1, status: "queued" as const },
+                { id: 0, ...stopped },
+            ]),
+        ).toBeUndefined();
+        expect(
+            nextQueuedWorkerRun([
+                { id: 1, status: "queued" as const },
+                { id: 0, ...stopped, loopExitedAt: 2 },
+            ]),
+        ).toMatchObject({ id: 1 });
+        // Cancelled while queued: it never had a loop.
+        expect(
+            nextQueuedWorkerRun([
+                { id: 1, status: "queued" as const },
+                { id: 0, status: "cancelled" as const },
+            ]),
+        ).toMatchObject({ id: 1 });
+    });
+
+    it("names the running run as the current one, else the next in line", () => {
+        expect(workerCurrentRun(newestFirst("queued", "queued", "running"))).toMatchObject({ id: 2 });
+        expect(workerCurrentRun(newestFirst("queued", "queued", "succeeded"))).toMatchObject({ id: 1 });
+        expect(workerCurrentRun(newestFirst("succeeded"))).toBeUndefined();
+    });
+
+    it("reports a failed post only while it is the newest run the lead asked for", () => {
+        const asked = { mode: "worker", toolCallId: "call" } as const;
+        const typed = { mode: "worker" } as const;
+
+        expect(
+            workerPostFailure([
+                { ...asked, postFailed: "gone" },
+                { ...asked, resultPostedAt: 1 },
+            ]),
+        ).toBe("gone");
+        expect(
+            workerPostFailure([
+                { ...asked, resultPostedAt: 2 },
+                { ...asked, postFailed: "gone" },
+            ]),
+        ).toBeNull();
+        // A run the person typed is never owed a post, so it neither shows a failure nor hides one.
+        expect(
+            workerPostFailure([
+                { ...typed, postFailed: "ignored" },
+                { ...asked, postFailed: "gone" },
+            ]),
+        ).toBe("gone");
+        expect(
+            workerPostFailure([
+                { ...typed, resultPostedAt: 3 },
+                { ...asked, postFailed: "gone" },
+            ]),
+        ).toBe("gone");
+        expect(workerPostFailure([asked, typed])).toBeNull();
+        // A newer result still on its way may yet be delivered, so an older failure does not show.
+        expect(workerPostFailure([asked, { ...asked, postFailed: "gone" }])).toBeNull();
+    });
+
+    it("queues a follow-up for a cloud worker and offers no steer", () => {
+        expect(workerFollowUp({ kind: "headless" })).toBe("queue");
+        expect(workerFollowUp(undefined)).toBe("queue");
+    });
+});
+
+describe(postsBack, () => {
+    it("owes the lead a result for every run but a worker run nobody delegated", () => {
+        expect(postsBack({})).toBe(true);
+        expect(postsBack({ mode: "run" })).toBe(true);
+        expect(postsBack({ mode: "worker", toolCallId: "call-1" })).toBe(true);
+        expect(postsBack({ mode: "worker" })).toBe(false);
     });
 });

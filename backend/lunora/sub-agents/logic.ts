@@ -3,6 +3,8 @@
  * model it runs on and the message its result becomes. No I/O, so every rule
  * is unit-tested directly (`logic.test.ts`).
  */
+import type { FollowUpControl } from "@neore/ai/capabilities";
+import { CLOUD_HEADLESS_CAPABILITIES, followUpControl } from "@neore/ai/capabilities";
 import type { StopCondition, ToolSet } from "ai";
 
 /**
@@ -66,12 +68,25 @@ export const SUB_AGENT_POST_MAX_ATTEMPTS = 40;
 /** Delay before re-check `attempt` (0-based): 2s doubling, capped at one minute. */
 export const postRetryDelayMs = (attempt: number): number => Math.min(2000 * 2 ** attempt, 60_000);
 
+/**
+ * Re-checks of a parent thread that cannot take the post (deleted, not the run's owner's, locked)
+ * before the run is given up on as `postFailed`. With {@link postRetryDelayMs} that is a few minutes,
+ * long enough to ride out a lock the user lifts straight away.
+ */
+export const SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS = 8;
+
 /** The name the posted-back result carries in the parent thread. */
 export const SUB_AGENT_NAME = "Sub-agent";
 
 const TOOL_NAME_RE = /^[\w.:-]{1,128}$/;
 
 export type SubAgentStatus = "cancelled" | "failed" | "queued" | "running" | "succeeded";
+
+/**
+ * Whether an ended run posts its result to the lead. A worker run the user typed (or created) has no
+ * delegating tool call behind it, so the lead never asked for an answer and hears nothing.
+ */
+export const postsBack = (run: { mode?: "run" | "worker"; toolCallId?: string }): boolean => run.mode !== "worker" || run.toolCallId !== undefined;
 
 export const isActiveSubAgentStatus = (status: SubAgentStatus): boolean => status === "queued" || status === "running";
 
@@ -214,6 +229,44 @@ export const stopWhenRequested = (isStopRequested: () => Promise<boolean>): Stop
         return answered.stop;
     };
 };
+
+/**
+ * Whether a run's loop may still write into the worker's thread: it is running, or it was stopped
+ * while running and has not exited yet (`loopExitedAt` is set when `completeRun` or the reaper sees it
+ * gone). A run cancelled while queued never started a loop.
+ */
+export const isWorkerLoopLive = (run: { loopExitedAt?: number; startedAt?: number; status: SubAgentStatus }): boolean =>
+    run.status === "running" || (run.status === "cancelled" && run.startedAt !== undefined && run.loopExitedAt === undefined);
+
+/**
+ * The run that starts next on a worker, from its runs newest first: the oldest queued one, or none
+ * while a loop is live. A worker runs one message at a time, in the order they were sent
+ * (`latestWorkerRuns` sorts by `createdAt`, which admission makes strictly increasing per worker).
+ */
+export const nextQueuedWorkerRun = <T extends { loopExitedAt?: number; startedAt?: number; status: SubAgentStatus }>(
+    newestFirst: ReadonlyArray<T>,
+): T | undefined => (newestFirst.some((run) => isWorkerLoopLive(run)) ? undefined : newestFirst.findLast((run) => run.status === "queued"));
+
+/** The run a worker is on, from its runs newest first: the one going, else the next in line. A Stop in its thread means this one. */
+export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>
+    newestFirst.find((run) => run.status === "running") ?? newestFirst.findLast((run) => run.status === "queued");
+
+/**
+ * Why the lead never got the worker's latest result, from its runs newest first: the newest run the
+ * lead asked for decides, so a failure shows only while that run gave up posting. Null when it posted,
+ * is still on its way, or the lead asked for none.
+ */
+export const workerPostFailure = (
+    newestFirst: ReadonlyArray<{ mode?: "run" | "worker"; postFailed?: string; resultPostedAt?: number; toolCallId?: string }>,
+): string | null => newestFirst.find((run) => postsBack(run))?.postFailed ?? null;
+
+/**
+ * How a message sent to a busy worker is handled, read from what its runner can do. Cloud headless
+ * workers have no stream to steer into, so theirs wait their turn; a host runner reports its own
+ * capabilities (host workers come later) and reads as `none` until it does.
+ */
+export const workerFollowUp = (runner: { kind: "headless" | "host" } | undefined): FollowUpControl =>
+    runner === undefined || runner.kind === "headless" ? followUpControl(CLOUD_HEADLESS_CAPABILITIES) : "none";
 
 /**
  * How many children a parent has started over its life, for the depth > 1 cap. A worker counts once

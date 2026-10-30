@@ -2267,6 +2267,9 @@ export const schema = defineSchema({
         createdAt: v.number(),
         depth: v.number(),
         error: v.optional(v.string()),
+        // Set when the loop of a run that was stopped while running is known to be gone (it reported, or the
+        // reaper fired): until then it may still write into the worker's thread, so the next message waits.
+        loopExitedAt: v.optional(v.number()),
         // Unset = a one-shot run. A worker's child thread is created with its first run and every later
         // dispatch is one more row on it; the worker is the thread, not a table.
         mode: v.optional(vSubAgentRunMode),
@@ -2274,9 +2277,12 @@ export const schema = defineSchema({
         // The delegating run's model, inherited when still allowed.
         parentModel: v.optional(v.string()),
         parentThreadId: v.string(),
+        // Why the result never reached the parent thread, once the retries ran out. Terminal: set
+        // instead of `resultPostedAt`, never with it.
+        postFailed: v.optional(v.string()),
         result: v.optional(v.string()),
-        // When the result reached the parent thread. The post waits while the
-        // parent is still streaming (`sub-agents/functions.ts:postRunResult`).
+        // When the result was written to the parent thread, in the same transaction as the message.
+        // The post waits while the parent is still streaming (`sub-agents/functions.ts:postRunResult`).
         resultPostedAt: v.optional(v.number()),
         runner: v.optional(vSubAgentRunner),
         skillSlug: v.optional(v.string()),
@@ -2292,6 +2298,7 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_parentThreadId_and_status", ["parentThreadId", "status"])
         .index("by_childThreadId", ["childThreadId"])
+        .index("by_childThreadId_and_status", ["childThreadId", "status"])
         .index("by_user_and_status", ["userId", "status"])
         .index("by_user_and_toolCallId", ["userId", "toolCallId"])
         .index("by_user_and_createdAt", ["userId", "createdAt"])

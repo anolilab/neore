@@ -57,6 +57,11 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                                 {worker.archived ? t`Archived` : stateLabels[worker.state]}
                             </span>
                         </Badge>
+                        {worker.postFailed !== null && (
+                            <Badge title={worker.postFailed} variant="destructive">
+                                <span role="status">{t`Result not delivered`}</span>
+                            </Badge>
+                        )}
                         {!worker.archived && worker.state === "idle" && (
                             <Button
                                 aria-label={t`Archive ${worker.name}`}

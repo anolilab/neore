@@ -23,10 +23,12 @@ interface WorkerComposerProps {
     archived: boolean;
     busy: boolean;
     className?: string;
+    /** How a message sent while a run is going is handled; only `queue` is offered, since only it is built. */
+    followUp: "none" | "queue" | "steer" | "steer-restart";
     workerId: string;
 }
 
-const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, workerId }) => {
+const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, followUp, workerId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const [text, setText] = useState("");
@@ -38,11 +40,11 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, wo
     if (archived) {
         notice = t`This worker is archived. Restore it to message it again.`;
     } else if (busy) {
-        notice = t`The worker is working on an earlier message.`;
+        notice = followUp === "queue" ? t`The worker is busy. Your message runs after the earlier ones.` : t`The worker is working on an earlier message.`;
     }
 
     const message = text.trim();
-    const canSend = message.length > 0 && !archived && !busy && !send.isPending;
+    const canSend = message.length > 0 && !archived && (!busy || followUp === "queue") && !send.isPending;
 
     const submit = () => {
         if (!canSend) {

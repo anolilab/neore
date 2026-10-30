@@ -19,7 +19,7 @@ import {
     postRunResult,
     runShouldStop,
 } from "./functions";
-import { SUB_AGENT_MAX_CONCURRENT, SUB_AGENT_MAX_PER_RUN, SUB_AGENT_POST_MAX_ATTEMPTS, stopWhenRequested } from "./logic";
+import { SUB_AGENT_MAX_CONCURRENT, SUB_AGENT_MAX_PER_RUN, SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS, SUB_AGENT_POST_MAX_ATTEMPTS, stopWhenRequested } from "./logic";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -79,6 +79,8 @@ const ONLY_OWNER = /Only the owner/u;
 const FAN_OUT_CAP = /At most 3 sub-agents/u;
 const DEPTH_CAP = /at most 2 levels/u;
 const PER_RUN_CAP = /at most 5 sub-agents of its own/u;
+const GONE_PARENT = /is gone/u;
+const LOCKED_PARENT = /is locked/u;
 
 const messagesIn = async (id: string) =>
     await harness.run(
@@ -338,16 +340,118 @@ describe("finishRun", () => {
         expect(notifications[0]).toMatchObject({ link: `/chat/${threadId}`, outcome: "success", type: "sub_agent", userId });
     });
 
-    it("does not post into a thread that was deleted meanwhile", async () => {
-        await admit();
+    describe("when the parent cannot take the post", () => {
+        const postJobs = () => harness.scheduler.list().filter((job) => job.functionPath?.includes("postResult") === true);
 
-        const [run] = await runs();
+        it("ends in postFailed at once for a deleted thread, which will not come back", async () => {
+            await admit();
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true }));
-        await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { error: "boom", kind: "failed" }));
+            const [run] = await runs();
 
-        expect(await messagesIn(threadId)).toHaveLength(0);
-        expect(await firstRun()).toMatchObject({ error: "boom", status: "failed" });
+            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true }));
+            await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { error: "boom", kind: "failed" }));
+
+            expect(await messagesIn(threadId)).toHaveLength(0);
+
+            const ended = await firstRun();
+
+            expect(ended).toMatchObject({ error: "boom", status: "failed" });
+            expect(ended).not.toHaveProperty("resultPostedAt");
+            expect(ended).toMatchObject({ postFailed: expect.stringMatching(GONE_PARENT) });
+            expect(postJobs()).toHaveLength(0);
+        });
+
+        it("posts a retry that finds the parent unlocked, and a run is not posted twice", async () => {
+            await admit();
+
+            const [run] = await runs();
+
+            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: Date.now() }));
+            await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "succeeded", result: "Held." }));
+
+            expect(await messagesIn(threadId)).toHaveLength(0);
+            expect(await firstRun()).not.toHaveProperty("resultPostedAt");
+
+            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: null }));
+
+            expect(await harness.run(async (ctx: any) => await postRunResult(ctx, run._id, 0, 1))).toBe(true);
+            expect(await harness.run(async (ctx: any) => await postRunResult(ctx, run._id, 0, 1))).toBe(false);
+            expect(await messagesIn(threadId)).toHaveLength(1);
+            expect(await firstRun()).toHaveProperty("resultPostedAt");
+        });
+
+        it("ends in postFailed after the bound, with a locked parent, and posts nothing", async () => {
+            await admit();
+
+            const [run] = await runs();
+
+            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: Date.now() }));
+            await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "succeeded", result: "Held." }));
+
+            const before = postJobs().length;
+
+            expect(await harness.run(async (ctx: any) => await postRunResult(ctx, run._id, 0, SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS - 1))).toBe(false);
+
+            const ended = await firstRun();
+
+            expect(ended).toMatchObject({ postFailed: expect.stringMatching(LOCKED_PARENT) });
+            expect(ended).not.toHaveProperty("resultPostedAt");
+            expect(postJobs()).toHaveLength(before);
+            expect(await messagesIn(threadId)).toHaveLength(0);
+
+            // Terminal: unlocking later does not revive it.
+            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: null }));
+            expect(await harness.run(async (ctx: any) => await postRunResult(ctx, run._id, 0))).toBe(false);
+            expect(await messagesIn(threadId)).toHaveLength(0);
+        });
+    });
+
+    describe("a worker's runs", () => {
+        const insertWorkerRun = async (fields: Record<string, unknown>) =>
+            await harness.run(async (ctx: any) => {
+                const childThreadId = await ctx.db.insert("threads", { status: "active", title: "Worker", userId });
+
+                return await ctx.db.insert("subAgentRuns", {
+                    childThreadId,
+                    createdAt: 1,
+                    depth: 1,
+                    mode: "worker",
+                    parentThreadId: threadId,
+                    status: "running",
+                    task: "Do it",
+                    updatedAt: 1,
+                    userId,
+                    ...fields,
+                });
+            });
+
+        it("posts a lead-dispatched run back, once", async () => {
+            const runId = await insertWorkerRun({ toolCallId: "call-1" });
+
+            await harness.run(async (ctx: any) => await finishRun(ctx, runId, { kind: "succeeded", result: "Done." }));
+            await harness.run(async (ctx: any) => await postRunResult(ctx, runId, 0));
+
+            const posted = await messagesIn(threadId);
+
+            expect(posted).toHaveLength(1);
+            expect(posted[0].message.content).toContain("Done.");
+        });
+
+        it("posts nothing to the lead for a run the user typed, and links its notification to the worker", async () => {
+            const runId = await insertWorkerRun({ clientId: "client-1" });
+
+            await harness.run(async (ctx: any) => await finishRun(ctx, runId, { kind: "succeeded", result: "Done." }));
+            await harness.run(async (ctx: any) => await postRunResult(ctx, runId, 0));
+
+            const [run] = await runs();
+            const [notification] = await harness.run(async (ctx: any) => await ctx.db.query("notifications").collect());
+
+            expect(await messagesIn(threadId)).toHaveLength(0);
+            expect(run).toMatchObject({ status: "succeeded" });
+            expect(run).not.toHaveProperty("resultPostedAt");
+            expect(run).not.toHaveProperty("postFailed");
+            expect(notification.link).toBe(`/chat/${run.childThreadId as string}`);
+        });
     });
 
     describe("while the parent thread is still streaming", () => {
@@ -363,6 +467,20 @@ describe("finishRun", () => {
                         userId,
                     }),
             );
+
+        it("records a gone parent at once instead of waiting out a stream it left behind", async () => {
+            await admit();
+
+            const [run] = await runs();
+
+            await insertStream("streaming");
+            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true }));
+            await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "succeeded", result: "Lost." }));
+
+            expect(await messagesIn(threadId)).toHaveLength(0);
+            expect(await firstRun()).toMatchObject({ postFailed: expect.stringMatching(GONE_PARENT), status: "succeeded" });
+            expect(harness.scheduler.list().filter((job) => job.functionPath?.includes("postResult") === true)).toHaveLength(0);
+        });
 
         it("ends the run at once but holds the post until the stream is done, then posts once", async () => {
             await admit();

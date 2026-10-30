@@ -179,13 +179,15 @@ describe("dispatching to a worker", () => {
 
         await claim(first.run._id);
 
-        const busy = await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-busy" });
+        await harness.run(async (ctx: any) => await ctx.db.patch(first.run.childThreadId, { status: "archived" }));
 
-        expect(busy).toMatchObject({ kind: "busy" });
+        const archived = await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-archived" });
 
-        await finish(first.run._id);
+        expect(archived).toMatchObject({ kind: "archived" });
 
-        expect(await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-busy" })).toMatchObject({ created: true });
+        await harness.run(async (ctx: any) => await ctx.db.patch(first.run.childThreadId, { status: "active" }));
+
+        expect(await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-archived" })).toMatchObject({ created: true });
     });
 
     it("refuses a dispatch to a worker of another lead or another owner as not found", async () => {
@@ -393,6 +395,41 @@ describe("a Stop in the lead", () => {
 
         expect(all.find((run) => run._id === typed.run._id)).toMatchObject({ status: "running" });
         expect(all.find((run) => run._id === dispatched.run._id)).toMatchObject({ status: "cancelled" });
+    });
+});
+
+describe("a loop unwinding after a Stop", () => {
+    it("keeps the next message queued behind it however many newer runs were cancelled while queued", async () => {
+        const first = await create();
+
+        await claim(first.run._id);
+        await harness.run(async (ctx: any) => await cancelSubAgentRunsForStop(ctx, first.run.childThreadId!, userId));
+
+        const [live] = await runs();
+
+        // Runs cancelled before they started carry no `startedAt`; enough of them bury the unwinding loop from a fixed-size read.
+        await harness.run(async (ctx: any) => {
+            for (let index = 1; index <= 25; index += 1) {
+                const { _creationTime, _id, ...fields } = live;
+
+                await ctx.db.insert("subAgentRuns", {
+                    ...fields,
+                    clientId: `buried-${String(index)}`,
+                    createdAt: live.createdAt + index,
+                    // `insert` drops undefined keys: these runs never started.
+                    loopExitedAt: undefined,
+                    startedAt: undefined,
+                    status: "cancelled",
+                    toolCallId: `buried-${String(index)}`,
+                });
+            }
+        });
+
+        const next = (await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-after" })) as { run: { _id: string } };
+
+        const started = await claim(next.run._id);
+
+        expect(started).toBeNull();
     });
 });
 

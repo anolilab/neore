@@ -38265,6 +38265,26 @@
                         "archived": {
                           "type": "boolean"
                         },
+                        "followUp": {
+                          "anyOf": [
+                            {
+                              "const": "none",
+                              "type": "string"
+                            },
+                            {
+                              "const": "queue",
+                              "type": "string"
+                            },
+                            {
+                              "const": "steer",
+                              "type": "string"
+                            },
+                            {
+                              "const": "steer-restart",
+                              "type": "string"
+                            }
+                          ]
+                        },
                         "lastRunAt": {
                           "type": "number"
                         },
@@ -38298,6 +38318,16 @@
                         "name": {
                           "type": "string"
                         },
+                        "postFailed": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "state": {
                           "anyOf": [
                             {
@@ -38321,10 +38351,12 @@
                       "required": [
                         "activeRunId",
                         "archived",
+                        "followUp",
                         "lastRunAt",
                         "lastRunStatus",
                         "leadThreadId",
                         "name",
+                        "postFailed",
                         "state",
                         "workerId"
                       ],
@@ -38524,6 +38556,26 @@
                       "archived": {
                         "type": "boolean"
                       },
+                      "followUp": {
+                        "anyOf": [
+                          {
+                            "const": "none",
+                            "type": "string"
+                          },
+                          {
+                            "const": "queue",
+                            "type": "string"
+                          },
+                          {
+                            "const": "steer",
+                            "type": "string"
+                          },
+                          {
+                            "const": "steer-restart",
+                            "type": "string"
+                          }
+                        ]
+                      },
                       "lastRunAt": {
                         "type": "number"
                       },
@@ -38557,6 +38609,16 @@
                       "name": {
                         "type": "string"
                       },
+                      "postFailed": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "state": {
                         "anyOf": [
                           {
@@ -38580,10 +38642,12 @@
                     "required": [
                       "activeRunId",
                       "archived",
+                      "followUp",
                       "lastRunAt",
                       "lastRunStatus",
                       "leadThreadId",
                       "name",
+                      "postFailed",
                       "state",
                       "workerId"
                     ],

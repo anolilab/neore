@@ -1460,10 +1460,12 @@ export interface Doc_subAgentRuns {
     createdAt: number;
     depth: number;
     error?: string;
+    loopExitedAt?: number;
     mode?: "run" | "worker";
     organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
+    postFailed?: string;
     result?: string;
     resultPostedAt?: number;
     runner?: { kind: "headless" } | { deviceId: Id<"devices">; kind: "host" };
@@ -2291,7 +2293,7 @@ export interface IndexNamesByTable {
     skillStats: "by_usage" | "by_skillId";
     streamDeltas: "streamId_start_end";
     streamingMessages: "by_userId" | "threadId_state_order_stepOrder";
-    subAgentRuns: "by_createdAt" | "by_user_and_createdAt" | "by_user_and_toolCallId" | "by_user_and_status" | "by_childThreadId" | "by_parentThreadId_and_status";
+    subAgentRuns: "by_createdAt" | "by_user_and_createdAt" | "by_user_and_toolCallId" | "by_user_and_status" | "by_childThreadId_and_status" | "by_childThreadId" | "by_parentThreadId_and_status";
     systemPromptPresets: "by_userId_modelId";
     taskRuns: "by_user" | "by_cycle_and_round" | "by_task_and_startedAt";
     tasks: "by_status_and_updatedAt" | "by_recurring_and_nextRunAt" | "by_user_and_goal" | "by_user_and_status";
@@ -4203,10 +4205,12 @@ export interface Insert_subAgentRuns {
     createdAt: number;
     depth: number;
     error?: string;
+    loopExitedAt?: number;
     mode?: "run" | "worker";
     organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
+    postFailed?: string;
     result?: string;
     resultPostedAt?: number;
     runner?: { kind: "headless" } | { deviceId: Id<"devices">; kind: "host" };
