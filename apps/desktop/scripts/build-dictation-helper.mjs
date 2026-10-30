@@ -17,7 +17,7 @@
 // (AVX2, FMA, F16C, BMI2), so a CPU older than Haswell (2013) or an AMD one older than Excavator dies with SIGILL at
 // start; dictation reports that as a helper error. ARM builds target armv8.2-a with half-precision and dot-product
 // instructions (Cortex-A75 and later). Nothing detects an older CPU at run time; the plan lists both floors.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -217,11 +217,21 @@ const buildArgs = ["--build", "build", "--config", "Release", "--target", "whisp
 if (process.platform !== "darwin" && targetArch === "arm64") {
     // clang-cl drops an option it does not know with a warning, and a build without the ARM baseline is several times slower
     // while looking fine: read its output for that warning.
-    const output = execFileSync("cmake", buildArgs, { cwd: work, encoding: "utf8", maxBuffer: 1 << 28 });
+    // The compiler's warnings go to stderr as often as to stdout: both are read, and both are echoed even when the build fails.
+    const build = spawnSync("cmake", buildArgs, { cwd: work, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] });
 
-    process.stdout.write(output);
+    process.stdout.write(build.stdout ?? "");
+    process.stderr.write(build.stderr ?? "");
 
-    if (/unknown argument ignored in clang-cl: '-march/u.test(output)) {
+    if (build.error !== undefined) {
+        throw build.error;
+    }
+
+    if (build.status !== 0) {
+        throw new Error(`cmake --build exited with ${String(build.status ?? build.signal)}`);
+    }
+
+    if (/unknown argument ignored in clang-cl: '-march/u.test(`${build.stdout}\n${build.stderr}`)) {
         throw new Error(`the compiler ignored -march=${ARM_BASELINE}; the helper would run on bare armv8-a`);
     }
 } else {
