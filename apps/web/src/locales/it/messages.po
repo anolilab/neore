@@ -6889,8 +6889,8 @@ msgstr "Copiato"
 msgid "Copied the last code block"
 msgstr ""
 
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:45
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:56
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:47
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:58
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:133
 msgid "Copied to clipboard"
 msgstr "Copiato negli appunti"
@@ -7016,7 +7016,7 @@ msgstr "Copia ora questo segreto e conservalo presso il mittente del webhook. No
 
 #: src/components/copy-button.tsx:45
 #: src/components/copy-button.tsx:50
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:50
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:52
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:661
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:800
 msgid "Copy to clipboard"
@@ -9253,7 +9253,7 @@ msgstr "Repubblica Dominicana"
 msgid "Don't have an account?"
 msgstr "Non hai un account?"
 
-#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:60
+#: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:62
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:110
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:171
