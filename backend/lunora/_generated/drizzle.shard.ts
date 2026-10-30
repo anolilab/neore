@@ -230,8 +230,8 @@ export const dailyBriefState = sqliteTable("dailyBriefState", {
 export const deviceCalls = sqliteTable("deviceCalls", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
-    claimId: text("claimId"),
     claimedAt: real("claimedAt"),
+    claimId: text("claimId"),
     completedAt: real("completedAt"),
     createdAt: real("createdAt").notNull(),
     deadline: real("deadline").notNull(),

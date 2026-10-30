@@ -356,8 +356,8 @@ export interface Doc_dailyBriefState {
 export interface Doc_deviceCalls {
     _id: Id<"deviceCalls">;
     _creationTime: number;
-    claimId?: string;
     claimedAt?: number;
+    claimId?: string;
     completedAt?: number;
     createdAt: number;
     deadline: number;
@@ -3137,8 +3137,8 @@ export interface Insert_dailyBriefState {
 export interface Insert_deviceCalls {
     _id?: Id<"deviceCalls">;
     _creationTime?: number;
-    claimId?: string;
     claimedAt?: number;
+    claimId?: string;
     completedAt?: number;
     createdAt: number;
     deadline: number;
