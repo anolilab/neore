@@ -36,6 +36,17 @@ describe("createBoundRequester", () => {
         expect(seen).toEqual([{ authorization: "Bearer tkn", url: "https://api.github.com/repos/o/r/pulls?page=2" }]);
     });
 
+    it("never sends the token to a plain-http origin", async () => {
+        const { seen, via } = transport(() => Response.json({}));
+
+        await expect(createBoundRequester({ origin: "http://git.example", token: "tkn", via })("/repos/o/r")).rejects.toMatchObject({
+            name: "HostApiError",
+            status: 0,
+        });
+
+        expect(seen).toEqual([]);
+    });
+
     it("never sends the token to another host that a redirect names", async () => {
         const { seen, via } = transport((url) => (new URL(url).origin === ORIGIN ? redirect("https://evil.example/steal") : Response.json({})));
 

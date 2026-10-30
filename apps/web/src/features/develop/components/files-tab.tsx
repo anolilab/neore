@@ -87,7 +87,10 @@ const FilesTab = ({
     const files = usePullRequestFiles(address, true);
     const { fetchNextPage, hasNextPage, isFetchingNextPage } = files;
     const pages = files.data?.pages ?? [];
-    const listed = pages.flatMap((page) => (page.status === "ok" ? page.files : []));
+    // Pages are read one after another, so a push in between can move a file onto a second page: keep its first place.
+    const listed = [
+        ...new Map(pages.flatMap((page) => (page.status === "ok" ? page.files : [])).map((file) => [`${file.previousPath ?? ""}→${file.path}`, file])).values(),
+    ];
     const failure = pages.find((page) => page.status !== "ok")?.status ?? (files.isError ? "host_error" : undefined);
 
     // Keep loading until the host has nothing more to list: the pages are bounded by the host's own ceiling.
