@@ -99,6 +99,16 @@ describe("the files a turn wrote", () => {
         expect(reads).toEqual([]);
     });
 
+    it("drops a call's earlier diff of a file when its final update of that file is too big to list", async () => {
+        const changes = recorder();
+        const huge = "x".repeat(1024 * 1024 + 1);
+
+        changes.note({ id: "1", kind: "edit", status: "in_progress" }, diffCall("1", "a.ts", "one\n", "two\n", "in_progress"));
+        changes.note({ id: "1", kind: "edit", status: "completed" }, diffCall("1", "a.ts", "one\n", huge));
+
+        expect((await changes.summary())?.files ?? []).toEqual([]);
+    });
+
     it("joins two calls on one file: the first earlier text, the last later text", async () => {
         const changes = recorder();
 

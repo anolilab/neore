@@ -261,13 +261,23 @@ export class TurnChanges {
             const oldText = typeof item.oldText === "string" ? item.oldText : null;
 
             // Characters are never more than bytes, so a text with too many of them is too big without measuring it.
-            if (relative === undefined || item.newText.length > MAX_FILE_BYTES || (oldText?.length ?? 0) > MAX_FILE_BYTES) {
+            if (relative === undefined) {
                 continue;
             }
 
-            const size = sizeOf(item.newText) + sizeOf(oldText);
+            // Characters are never more than bytes, so a text with too many of them is too big without measuring it.
+            const tooBig = item.newText.length > MAX_FILE_BYTES || (oldText?.length ?? 0) > MAX_FILE_BYTES;
+            const size = tooBig ? Number.POSITIVE_INFINITY : sizeOf(item.newText) + sizeOf(oldText);
 
-            if (size > 2 * MAX_FILE_BYTES || !this.admit(call, relative)) {
+            // The latest update wins: an earlier, smaller diff of this path is not what the call ended with.
+            if (size > 2 * MAX_FILE_BYTES) {
+                this.held -= call.diffs.get(relative)?.size ?? 0;
+                call.diffs.delete(relative);
+
+                continue;
+            }
+
+            if (!this.admit(call, relative)) {
                 continue;
             }
 
