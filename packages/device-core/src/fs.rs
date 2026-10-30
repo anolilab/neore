@@ -451,6 +451,7 @@ mod confined {
 #[cfg(windows)]
 mod confined {
     use super::{outside_roots, within_roots, Listing, Open, Page};
+    use std::collections::BinaryHeap;
     use std::ffi::OsString;
     use std::fs::{File, OpenOptions};
     use std::io;
@@ -666,8 +667,13 @@ mod confined {
     }
 
     /// Lists the folder through the handle that was checked, so there is no second path to resolve. The directory
-    /// info classes report attributes without following anything: a reparse point is listed as a link.
-    pub fn entries(roots: &[PathBuf], path: &Path, max: usize) -> io::Result<Listing> {
+    /// info classes report attributes without following anything: a reparse point is listed as a link. `visit` is
+    /// given each entry and says whether to go on; `false` stops the walk.
+    fn walk(
+        roots: &[PathBuf],
+        path: &Path,
+        mut visit: impl FnMut(String, &'static str, u64) -> bool,
+    ) -> io::Result<()> {
         let dir = options(false).open(path)?;
 
         confirm(&dir, roots)?;
@@ -677,10 +683,8 @@ mod confined {
         // 8-byte aligned, as the entries are.
         let mut buffer = vec![0u64; 8192];
         let mut class = FileIdBothDirectoryRestartInfo;
-        let mut listed = Vec::new();
-        let mut truncated = false;
 
-        'read: loop {
+        loop {
             // SAFETY: the handle is open and the buffer is writable for the length passed.
             let read = unsafe {
                 GetFileInformationByHandleEx(
@@ -696,7 +700,7 @@ mod confined {
 
                 // ERROR_NO_MORE_FILES: the end of the folder.
                 return if error.raw_os_error() == Some(18) {
-                    Ok((listed, truncated))
+                    Ok(())
                 } else {
                     Err(error)
                 };
@@ -725,11 +729,6 @@ mod confined {
                 let name = String::from_utf16_lossy(name);
 
                 if name != "." && name != ".." {
-                    if listed.len() >= max {
-                        truncated = true;
-                        break 'read;
-                    }
-
                     // With a reparse point set, `EaSize` carries its tag. Only a name surrogate is a link.
                     let link = entry.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
                         && super::is_name_surrogate(entry.EaSize);
@@ -741,7 +740,9 @@ mod confined {
                         "file"
                     };
 
-                    listed.push((name, kind, entry.EndOfFile.max(0) as u64));
+                    if !visit(name, kind, entry.EndOfFile.max(0) as u64) {
+                        return Ok(());
+                    }
                 }
 
                 if entry.NextEntryOffset == 0 {
@@ -751,12 +752,31 @@ mod confined {
                 offset += entry.NextEntryOffset as usize;
             }
         }
+    }
+
+    /// The folder's entries, at most `max` of them; the flag says it had more.
+    pub fn entries(roots: &[PathBuf], path: &Path, max: usize) -> io::Result<Listing> {
+        let mut listed = Vec::new();
+        let mut truncated = false;
+
+        walk(roots, path, |name, kind, size| {
+            if listed.len() >= max {
+                truncated = true;
+
+                return false;
+            }
+
+            listed.push((name, kind, size));
+
+            true
+        })?;
 
         Ok((listed, truncated))
     }
 
     /// A page of the folder in name order. Windows lists a folder in one call that already carries every
-    /// entry's attributes, so it is read whole (up to `scan` entries) and cut to the page.
+    /// entry's attributes, so no second look is needed; only the `limit + 1` smallest names after `after` are kept
+    /// (a heap, as on Unix), so memory is one page however large the folder is. At most `scan` names are read.
     pub fn page(
         roots: &[PathBuf],
         path: &Path,
@@ -764,15 +784,34 @@ mod confined {
         limit: usize,
         scan: usize,
     ) -> io::Result<Page> {
-        let (mut listed, cut) = entries(roots, path, scan)?;
+        // Largest on top, so the one to give up is always at hand.
+        let mut kept: BinaryHeap<(String, &'static str, u64)> = BinaryHeap::new();
+        let (mut scanned, mut cut) = (0usize, false);
 
-        listed.sort();
-        listed.drain(
-            ..after.map_or(0, |after| {
-                listed.partition_point(|(name, _, _)| name.as_str() <= after)
-            }),
-        );
+        walk(roots, path, |name, kind, size| {
+            if scanned >= scan {
+                cut = true;
 
+                return false;
+            }
+
+            scanned += 1;
+
+            if after.is_some_and(|after| name.as_str() <= after) {
+                return true;
+            }
+
+            if kept.len() <= limit {
+                kept.push((name, kind, size));
+            } else if kept.peek().is_some_and(|largest| name < largest.0) {
+                kept.pop();
+                kept.push((name, kind, size));
+            }
+
+            true
+        })?;
+
+        let mut listed = kept.into_sorted_vec();
         let more = listed.len() > limit;
 
         listed.truncate(limit);
@@ -1536,6 +1575,27 @@ mod tests {
         assert!(seen
             .iter()
             .any(|(name, size)| name == "f02499" && *size == 1));
+    }
+
+    #[test]
+    fn a_page_keeps_the_smallest_names_after_the_cursor_whatever_order_the_folder_lists_them_in() {
+        let dir = scratch("smallest");
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+
+        for name in ["m", "z", "b", "k", "a", "y"] {
+            fs::write(dir.join("root").join(name), name).unwrap();
+        }
+
+        let page = confined::page(&roots, &roots[0], Some("a.txt"), 2, 100).unwrap();
+        let names: Vec<&str> = page
+            .entries
+            .iter()
+            .map(|(name, _, _)| name.as_str())
+            .collect();
+
+        assert_eq!(names, ["b", "k"]);
+        assert!(page.more);
+        assert!(!page.cut);
     }
 
     #[test]
