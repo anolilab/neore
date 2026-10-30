@@ -57,15 +57,18 @@ type NavLinkDef = {
     matcher: (pathname: string) => boolean;
     /** Hide this link for anonymous / guest users. */
     requiresAuth?: boolean;
+    /** Visible text where the row shows a label (phone sheet). */
+    shortLabelKey: MessageDescriptor;
     to: string;
     /** Replace `to` with the user's last-opened chat URL at runtime. */
     useChatLink?: boolean;
 };
 
-const NAV_LINK_DEFS: NavLinkDef[] = [
+export const NAV_LINK_DEFS: NavLinkDef[] = [
     {
         icon: House,
         labelKey: msg`Open Home`,
+        shortLabelKey: msg`Home`,
         matcher: (p) => p === "/dashboard" || p === "/dashboard/",
         requiresAuth: true,
         to: "/dashboard",
@@ -73,6 +76,7 @@ const NAV_LINK_DEFS: NavLinkDef[] = [
     {
         icon: MessageSquare,
         labelKey: msg`Open messages`,
+        shortLabelKey: msg`Chat`,
         matcher: (p) => p.startsWith("/chat"),
         to: "/chat",
         useChatLink: true,
@@ -80,18 +84,21 @@ const NAV_LINK_DEFS: NavLinkDef[] = [
     {
         icon: FileText,
         labelKey: msg`Open Prompts`,
+        shortLabelKey: msg`Prompts`,
         matcher: (p) => p.startsWith("/prompts"),
         to: "/prompts",
     },
     {
         icon: Zap,
         labelKey: msg`Open Skills`,
+        shortLabelKey: msg`Skills`,
         matcher: (p) => p.startsWith("/skills"),
         to: "/skills",
     },
     {
         icon: ListChecks,
         labelKey: msg`Open Tasks`,
+        shortLabelKey: msg`Tasks`,
         matcher: (p) => p.startsWith("/tasks"),
         requiresAuth: true,
         to: "/tasks",
@@ -99,6 +106,7 @@ const NAV_LINK_DEFS: NavLinkDef[] = [
     {
         icon: FlaskConical,
         labelKey: msg`Open Evals`,
+        shortLabelKey: msg`Evals`,
         matcher: (p) => p.startsWith("/evals"),
         requiresAuth: true,
         to: "/evals",
@@ -113,6 +121,7 @@ const NAV_LINK_DEFS: NavLinkDef[] = [
     {
         icon: NotebookText,
         labelKey: msg`Open Pages`,
+        shortLabelKey: msg`Pages`,
         matcher: (p) => p.startsWith("/pages"),
         requiresAuth: true,
         to: "/pages",
@@ -121,54 +130,28 @@ const NAV_LINK_DEFS: NavLinkDef[] = [
         featureFlag: "workflow",
         icon: Workflow,
         labelKey: msg`Open Workflows`,
+        shortLabelKey: msg`Workflows`,
         matcher: (p) => p.startsWith("/workflow"),
         to: "/workflow",
     },
     {
         icon: File,
         labelKey: msg`Open Vault`,
+        shortLabelKey: msg`Vault`,
         matcher: (p) => p.startsWith("/vault"),
         requiresAuth: true,
         to: "/vault",
     },
 ];
 
-// ---------------------------------------------------------------------------
-
-interface SidebarShortcutProps {
-    /**
-     * When true, clicking the user avatar opens the full user dropdown menu
-     * (same as NavUser in the full sidebar footer). Use this when there is no
-     * collapsible sidebar panel — e.g. vault, workflow, prompts, skills pages.
-     *
-     * When false (default), the avatar is rendered as a static display; the
-     * full sidebar panel is expected to contain a NavUser footer instead.
-     */
-    userDropdown?: boolean;
-}
-
-const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => {
-    const location = useLocation();
-    const { t } = useLingui();
+/** The nav entries a signed-in or guest user may see, with the chat entry pointing at their last chat. */
+export const useNavLinks = () => {
     const { isAnonymous } = useIsAnonymous();
     const userSettings = useUserSettings();
-    const { hidePersonalInfo } = useUserPreferences();
     const posthog = usePostHog();
-    const { authClient } = useAuth();
-    const { data: sessionData } = useSession(authClient);
-    const user = sessionData?.user;
-
     const chatLink = userSettings?.data?.lastChatId ? `/chat/${userSettings.data.lastChatId}` : "/chat";
-    const { isOpen: isSettingsOpen, open: openSettingsModal } = useModalState("settings");
-    // The admin link is not something first paint has to draw.
-    const afterFirstPaint = useAfterFirstPaint();
-    const { data: adminStatus } = useIsAdmin({ enabled: afterFirstPaint });
-    const isAdmin = adminStatus?.isAdmin ?? false;
-    const { unreadCount } = useChangelog();
-    const openChangelogPanel = useChangelogStore((s) => s.open);
 
-    // Build the resolved link list from static config, injecting runtime values
-    const navLinks = useMemo(
+    return useMemo(
         () =>
             NAV_LINK_DEFS.filter((def) => {
                 if (def.requiresAuth && isAnonymous) {
@@ -188,6 +171,40 @@ const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => 
             }),
         [isAnonymous, chatLink, posthog],
     );
+};
+
+// ---------------------------------------------------------------------------
+
+interface SidebarShortcutProps {
+    /**
+     * When true, clicking the user avatar opens the full user dropdown menu
+     * (same as NavUser in the full sidebar footer). Use this when there is no
+     * collapsible sidebar panel — e.g. vault, workflow, prompts, skills pages.
+     *
+     * When false (default), the avatar is rendered as a static display; the
+     * full sidebar panel is expected to contain a NavUser footer instead.
+     */
+    userDropdown?: boolean;
+}
+
+const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => {
+    const location = useLocation();
+    const { t } = useLingui();
+    const { isAnonymous } = useIsAnonymous();
+    const { hidePersonalInfo } = useUserPreferences();
+    const { authClient } = useAuth();
+    const { data: sessionData } = useSession(authClient);
+    const user = sessionData?.user;
+
+    const { isOpen: isSettingsOpen, open: openSettingsModal } = useModalState("settings");
+    // The admin link is not something first paint has to draw.
+    const afterFirstPaint = useAfterFirstPaint();
+    const { data: adminStatus } = useIsAdmin({ enabled: afterFirstPaint });
+    const isAdmin = adminStatus?.isAdmin ?? false;
+    const { unreadCount } = useChangelog();
+    const openChangelogPanel = useChangelogStore((s) => s.open);
+
+    const navLinks = useNavLinks();
 
     const avatarElement = (
         <Avatar className={cn("size-8", hidePersonalInfo && "blur-sm")}>
@@ -213,7 +230,7 @@ const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => 
     );
 
     return (
-        <div className="z-20 hidden h-screen w-16 shrink-0 py-1 pl-1 md:block" id="sidebar-shortcut">
+        <div className="z-20 hidden h-dvh w-16 shrink-0 py-1 pl-1 md:block" id="sidebar-shortcut">
             <div className="bg-sidebar dark:bg-brand-obsidian ring-sidebar-border flex h-full flex-col items-center rounded-lg ring-1">
                 <Neore
                     className="fill-brand-black dark:fill-brand-white mt-3 mb-4 size-7 opacity-90 transition-opacity hover:opacity-70"

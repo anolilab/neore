@@ -5,7 +5,7 @@ import { Button } from "@neore/ui/components/button";
 import { FileX } from "lucide-react";
 
 export const NoResults = () => (
-    <div className="flex h-screen w-full flex-col items-center justify-center">
+    <div className="flex h-dvh w-full flex-col items-center justify-center">
         <div className="-mt-[160px] flex flex-col items-center">
             <FileX className="text-muted-foreground mb-4 h-12 w-12" />
             <div className="mb-6 space-y-2 text-center">
@@ -25,7 +25,7 @@ export const NoResults = () => (
 );
 
 export const GetStarted = () => (
-    <div className="flex h-[calc(100vh-250px)] items-center justify-center">
+    <div className="flex h-[calc(100dvh-250px)] items-center justify-center">
         <div className="relative z-20 m-auto flex w-full max-w-[380px] flex-col">
             <div className="relative flex w-full flex-col text-center">
                 <div className="pb-4">
