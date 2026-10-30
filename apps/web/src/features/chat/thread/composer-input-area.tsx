@@ -25,6 +25,7 @@ import type { ReactNode } from "react";
 import { lazy, Suspense, useImperativeHandle, useRef } from "react";
 
 import type { PromptHistoryDirection } from "@/features/chat/core/utils/prompt-history";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { PromptVariable } from "@/features/prompts/lib/prompt-variables";
 
 import type { ChatReference } from "./chat-reference";
@@ -34,6 +35,7 @@ import { ComposerTiptapEditor } from "./composer-tiptap/composer-tiptap-editor";
 import type { BannedWordMatch } from "./composer-tiptap/extensions/banned-word-decoration";
 import type { VaultFileRef } from "./composer-tiptap/file-mention-popup";
 import type { GhostRequest } from "./composer-tiptap/ghost-completion-controller";
+import { sendShortcutLabel } from "./composer-tiptap/send-behavior";
 
 const ComposerVoiceInput = lazy(() => import("./composer-voice-input"));
 
@@ -145,6 +147,8 @@ const ComposerInputArea = ({
     value,
 }: ComposerInputAreaProps & { ref?: React.RefObject<ComposerInputAreaRef | null> }) => {
     const { t } = useLingui();
+    const sendShortcut = useUIStateStore((state) => sendShortcutLabel(state.preferences.sendBehavior));
+    const sendTooltip = sendShortcut ? t`Send message (${sendShortcut})` : t`Send message`;
     const tiptapRef = useRef<ComposerTiptapEditorRef>(null);
 
     useImperativeHandle(ref, () => {
@@ -378,7 +382,7 @@ const ComposerInputArea = ({
                                         </button>
                                     }
                                 />
-                                <TooltipContent side="bottom">{isUploading ? t`Waiting for uploads to complete…` : t`Send message`}</TooltipContent>
+                                <TooltipContent side="bottom">{isUploading ? t`Waiting for uploads to complete…` : sendTooltip}</TooltipContent>
                             </Tooltip>
                         )}
                     </>

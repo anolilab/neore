@@ -47,6 +47,8 @@ import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/cha
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
+import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
@@ -482,6 +484,16 @@ const ComposerInput = ({
     // Composer state from store
     const { addAttachment, attachments, clear, removeAttachment, setText, text, updateAttachment } = useComposerState();
 
+    // The editor's key handler reads the send preference from the UI-state store at key time; the account
+    // setting (server-backed) is mirrored there so a new device honours it too.
+    const { sendBehavior } = useUserPreferences();
+
+    useEffect(() => {
+        if (useUIStateStore.getState().preferences.sendBehavior !== sendBehavior) {
+            useUIStateStore.getState().setUserPreferences({ sendBehavior });
+        }
+    }, [sendBehavior]);
+
     // Prompt history and queue-while-streaming: only for a plain thread composer.
     // The comparison parent fans out through `onSubmitOverride`, and the compact
     // landing bar has no thread to recall from or queue against.
@@ -816,7 +828,11 @@ const ComposerInput = ({
     // sendMessage before the first await. The network request runs in the background.
     // Content safety (banned words) is validated server-side in the /chat/stream endpoint.
     const handleSubmit = useCallback(() => {
-        if (!text.trim() && attachments.length === 0) {
+        // Read the draft from the store, not the render: a key pressed right after typing runs the handler of
+        // the previous render, which still sees the old (possibly empty) draft.
+        const { composerAttachments: draftAttachments, composerText: draftText } = useChatUIStore.getState();
+
+        if (!draftText.trim() && draftAttachments.length === 0) {
             return;
         }
 
@@ -826,7 +842,7 @@ const ComposerInput = ({
             return;
         }
 
-        const pendingAttachments = attachments.filter((a) => a.status !== "complete");
+        const pendingAttachments = draftAttachments.filter((a) => a.status !== "complete");
 
         if (pendingAttachments.length > 0) {
             return;
@@ -846,7 +862,9 @@ const ComposerInput = ({
                 return;
             }
 
-            usePromptQueueStore.getState().enqueue(threadId, { attachments, references: useChatUIStore.getState().attachedReferences, text });
+            usePromptQueueStore
+                .getState()
+                .enqueue(threadId, { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText });
             clear();
 
             return;
@@ -857,14 +875,14 @@ const ComposerInput = ({
 
         if (onSubmitOverride) {
             // Comparison parent: fan-out to all child threads
-            void onSubmitOverride(text, attachments).then(() => {
+            void onSubmitOverride(draftText, draftAttachments).then(() => {
                 clear();
                 useChatUIStore.getState().setIsSubmitting(false);
 
                 return undefined;
             });
         } else if (isComparisonValid) {
-            void sendComparisonMessage(text, selectedModelsForComparison, attachments).then(() => {
+            void sendComparisonMessage(draftText, selectedModelsForComparison, draftAttachments).then(() => {
                 useChatUIStore.getState().setIsSubmitting(false);
 
                 return undefined;
@@ -872,13 +890,11 @@ const ComposerInput = ({
         } else {
             // Fire-and-forget: sendMessage updates optimistic state synchronously
             // (clears composer, shows Thinking...) then runs the fetch in the background
-            void sendMessage(text, attachments);
+            void sendMessage(draftText, draftAttachments);
         }
 
         onSubmitProp?.();
     }, [
-        text,
-        attachments,
         disabled,
         sendMessage,
         onSubmitProp,
