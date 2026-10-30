@@ -151,7 +151,7 @@ describe("parseRepoRemote", () => {
             ];
 
             expect(parseRepoRemote("git@example.com:team/app.git", declared)?.hostKind).toBe("unknown");
-            expect(parseRepoRemote("git@example.com:team/app.git", [...declared].reverse())?.hostKind).toBe("unknown");
+            expect(parseRepoRemote("git@example.com:team/app.git", declared.toReversed())?.hostKind).toBe("unknown");
         });
 
         it("ignores a declaration whose origin is not a URL", () => {
