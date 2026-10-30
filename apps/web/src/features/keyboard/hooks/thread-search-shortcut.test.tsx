@@ -80,7 +80,7 @@ const Shortcuts = ({ children }: { children?: ReactNode }) => {
     const onShortcut = useKeyboardShortcutHandler();
 
     return (
-        <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ focusSearch: "ctrl+f" }}>
+        <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ findInThread: "ctrl+shift+9", focusSearch: "ctrl+f" }}>
             {children}
         </KeyboardShortcutsManager>
     );

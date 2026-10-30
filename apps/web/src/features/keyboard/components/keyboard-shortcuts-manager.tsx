@@ -4,6 +4,7 @@ import { HotkeysProvider, useHotkeys } from "react-hotkeys-hook";
 import { useKeyboardShortcuts as useUIKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
+import { hasFindInThreadTarget } from "../lib/find-in-thread-target";
 import { convertRecordedShortcutToHotkeysHook, effortCommandsToRegister } from "../lib/recorded-shortcut-converter";
 import convertShortcutToHotkeysHook from "../lib/shortcut-converter";
 import { hasThreadSearchTarget } from "../lib/thread-search-target";
@@ -69,6 +70,7 @@ const KeyboardShortcutsHandler: React.FC<{
             copyLastCodeBlock: convertShortcutToHotkeysHook(shortcuts.copyLastCodeBlock),
             decreaseEffort: convertRecordedShortcutToHotkeysHook(shortcuts.decreaseEffort),
             escape: convertShortcutToHotkeysHook(shortcuts.escape),
+            findInThread: convertShortcutToHotkeysHook(shortcuts.findInThread),
             firstItem: convertShortcutToHotkeysHook(shortcuts.firstItem),
             focusSearch: convertShortcutToHotkeysHook(shortcuts.focusSearch),
             help: convertShortcutToHotkeysHook(shortcuts.help),
@@ -87,6 +89,7 @@ const KeyboardShortcutsHandler: React.FC<{
         shortcuts.copyLastCodeBlock,
         shortcuts.decreaseEffort,
         shortcuts.escape,
+        shortcuts.findInThread,
         shortcuts.firstItem,
         shortcuts.focusSearch,
         shortcuts.help,
@@ -137,6 +140,19 @@ const KeyboardShortcutsHandler: React.FC<{
         (event: KeyboardEvent) => {
             event.preventDefault();
             onShortcut?.("firstItem", event);
+        },
+        [onShortcut],
+    );
+
+    const handleFindInThread = useCallback(
+        (event: KeyboardEvent) => {
+            // Off a thread page the chord keeps its older meaning: the thread list's search, else the browser's find.
+            if (!(hasFindInThreadTarget() || hasThreadSearchTarget()) || isTextEntryKeystroke(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            onShortcut?.("findInThread", event);
         },
         [onShortcut],
     );
@@ -300,6 +316,20 @@ const KeyboardShortcutsHandler: React.FC<{
             preventDefault: true,
         },
         [convertedShortcuts.firstItem, handleFirstItem],
+    );
+
+    useHotkeys(
+        convertedShortcuts.findInThread,
+        handleFindInThread,
+        {
+            description: "Find in thread",
+            enabled: !!shortcuts.findInThread && typeof shortcuts.findInThread === "string",
+            // A modifier chord must work from the composer and from the find field itself; a bare key stays with the field.
+            enableOnContentEditable: true,
+            enableOnFormTags: true,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event) && (hasFindInThreadTarget() || hasThreadSearchTarget()),
+        },
+        [convertedShortcuts.findInThread, handleFindInThread],
     );
 
     useHotkeys(

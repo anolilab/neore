@@ -3,6 +3,7 @@ import { useCallback } from "react";
 
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
+import { FIND_IN_THREAD_EVENT, hasFindInThreadTarget } from "../lib/find-in-thread-target";
 import { focusThreadSearch } from "../lib/thread-search-target";
 
 // No-op handler for SSR - keyboard shortcuts only work on client
@@ -55,6 +56,17 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                     } else {
                         // Dispatch escape event to close any open dialogs
                         document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+                    }
+
+                    break;
+                }
+                case "findInThread": {
+                    if (hasFindInThreadTarget()) {
+                        // The open thread's find bar owns the query and the highlights (`thread-find-bar.tsx`).
+                        globalThis.dispatchEvent(new CustomEvent(FIND_IN_THREAD_EVENT));
+                    } else {
+                        // Not on a thread: the chord's older meaning.
+                        focusThreadSearch();
                     }
 
                     break;

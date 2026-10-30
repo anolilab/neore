@@ -12089,6 +12089,9 @@
                           "escape": {
                             "type": "string"
                           },
+                          "findInThread": {
+                            "type": "string"
+                          },
                           "firstItem": {
                             "type": "string"
                           },
