@@ -415,6 +415,8 @@ const useStream = (
                     const event = chunk.toolProgress;
 
                     setToolProgress((previous) => applyToolProgress(previous, event));
+                    // Any chunk proves the stream is back, even one that carries no text.
+                    setIsReconnecting(false);
 
                     return;
                 }
