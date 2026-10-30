@@ -645,6 +645,16 @@ export interface ApiTypes {
             uninstallSkill: FunctionReference<"mutation", { skillId: Id<"skills"> }, { removed: boolean }>;
         };
     };
+    source_control: {
+        functions: {
+            getDevelopHost: FunctionReference<"action", {}, { connected: boolean; host: { capabilities: { groups: Record<string, Record<string, { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }>>; reportedAt: number; version: 1 }; connectorSlug: string; label: string; limits: { commits: number; files: number }; requestNoun: "merge request" | "pull request" } }>;
+            getInbox: FunctionReference<"action", { page?: number; section: "needsMyReview" | "mine" | "readyToMerge" | "drafts" }, { hasMore: boolean; items: Array<{ authorLogin: string; commentCount: number; createdAt: number; draft: boolean; labels: Array<string>; number: number; repository: string; title: string; updatedAt: number; url: string }>; page: number; status: "ok"; total: number } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
+            getPullRequest: FunctionReference<"action", { number: number; repository: string }, { detail: { additions: number; authorLogin: string; baseBranch: string; body: string; bodyTruncated: boolean; changedFiles: number; commitCount: number; createdAt: number; deletions: number; draft: boolean; headBranch: string; headSha: string; number: number; repository: string; state: "closed" | "merged" | "open"; title: string; updatedAt: number; url: string }; leftOut: { commits: number; files: number }; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
+            getPullRequestChecks: FunctionReference<"action", { number: number; repository: string; headSha: string }, { checks: Array<{ name: string; state: "cancelled" | "failure" | "neutral" | "pending" | "skipped" | "success"; url: string | null }>; status: "ok"; total: number } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
+            getPullRequestCommits: FunctionReference<"action", { number: number; repository: string; page?: number }, { commits: Array<{ authorName: string; committedAt: number; message: string; sha: string }>; hasMore: boolean; page: number; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
+            getPullRequestFiles: FunctionReference<"action", { number: number; repository: string; page?: number }, { files: Array<{ additions: number; deletions: number; patch: string | null; patchState: "full" | "host_omitted" | "over_budget" | "truncated"; path: string; previousPath: string | null; status: "added" | "changed" | "copied" | "modified" | "removed" | "renamed" | "unchanged" }>; hasMore: boolean; page: number; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
+        };
+    };
     sub_agents: {
         functions: {
             cancelRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, { cancelled: boolean }>;
@@ -1406,6 +1416,16 @@ export const api: ApiTypes = {
             rateSkill: { __lunoraRef: "skills_marketplace:rateSkill" },
             searchSkills: { __lunoraRef: "skills_marketplace:searchSkills" },
             uninstallSkill: { __lunoraRef: "skills_marketplace:uninstallSkill" },
+        },
+    },
+    source_control: {
+        functions: {
+            getDevelopHost: { __lunoraRef: "source_control_functions:getDevelopHost" },
+            getInbox: { __lunoraRef: "source_control_functions:getInbox" },
+            getPullRequest: { __lunoraRef: "source_control_functions:getPullRequest" },
+            getPullRequestChecks: { __lunoraRef: "source_control_functions:getPullRequestChecks" },
+            getPullRequestCommits: { __lunoraRef: "source_control_functions:getPullRequestCommits" },
+            getPullRequestFiles: { __lunoraRef: "source_control_functions:getPullRequestFiles" },
         },
     },
     sub_agents: {
