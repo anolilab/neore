@@ -32837,3 +32837,92 @@ msgstr ""
 #: src/features/develop/components/failure-notice.tsx:18
 msgid "Your {label} sign-in has expired. Connect it again to keep reading."
 msgstr ""
+
+#. placeholder {0}: detail.authorLogin
+#. placeholder {1}: detail.commitCount
+#. placeholder {2}: detail.baseBranch
+#. placeholder {3}: detail.headBranch
+#: src/features/develop/components/pull-request-view.tsx:90
+msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
+msgstr ""
+
+#: src/features/develop/components/inbox-list.tsx:56
+msgid "Approved and not a draft. Branch protection is not checked."
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:32
+#: src/features/develop/components/files-tab.tsx:57
+msgid "Changed"
+msgstr ""
+
+#: src/features/develop/components/failure-notice.tsx:19
+msgid "Connect {label} to see what needs your review here."
+msgstr ""
+
+#. placeholder {0}: detail.changedFiles
+#: src/features/develop/components/pull-request-view.tsx:95
+msgid "in {0, plural, one {# file} other {# files}}"
+msgstr ""
+
+#: src/features/develop/components/inbox-list.tsx:68
+msgid "Inbox sections"
+msgstr ""
+
+#. placeholder {0}: listed.length
+#. placeholder {1}: Math.min(fileCount, fileLimit)
+#: src/features/develop/components/files-tab.tsx:122
+msgid "Loaded {0} of {1, plural, one {# file} other {# files}}…"
+msgstr ""
+
+#: src/features/develop/components/checks-tab.tsx:29
+msgid "Loading checks"
+msgstr ""
+
+#: src/features/develop/components/commits-tab.tsx:18
+msgid "Loading commits"
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:101
+msgid "Loading files"
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:118
+msgid "Loading files…"
+msgstr ""
+
+#: src/features/develop/lib/use-request-noun.ts:8
+msgid "merge request"
+msgstr ""
+
+#: src/features/develop/lib/use-request-noun.ts:8
+msgid "pull request"
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:35
+msgid "Removed"
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:36
+msgid "Renamed"
+msgstr ""
+
+#: src/features/develop/components/develop-page.tsx:56
+msgid "Selected {requestNoun}"
+msgstr ""
+
+#. placeholder {0}: list.length
+#: src/features/develop/components/checks-tab.tsx:59
+msgid "Showing {0} of {total, plural, one {# check} other {# checks}}."
+msgstr ""
+
+#: src/features/develop/components/commits-tab.tsx:38
+msgid "The host lists at most {commitLimit, plural, one {# commit} other {# commits}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:131
+msgid "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
+msgstr ""
+
+#: src/features/develop/components/pull-request-view.tsx:99
+msgid "This host does not offer any view of a {requestNoun} yet."
+msgstr ""

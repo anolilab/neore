@@ -16,7 +16,7 @@ const FailureNotice = ({ label, status }: { label: string; status: ReadFailureSt
         },
         host_error: { description: t`${label} could not be reached or answered unexpectedly. Try again in a moment.`, title: t`Could not load this` },
         needs_reconnect: { description: t`Your ${label} sign-in has expired. Connect it again to keep reading.`, title: t`Sign in to ${label} again` },
-        not_connected: { description: t`Connect ${label} to read your pull requests here.`, title: t`${label} is not connected` },
+        not_connected: { description: t`Connect ${label} to see what needs your review here.`, title: t`${label} is not connected` },
         not_found: { description: t`It does not exist, or your ${label} account cannot see it.`, title: t`Not found` },
         rate_limited: { description: t`${label} is limiting requests for this account. Try again in a few minutes.`, title: t`Rate limited` },
     };
@@ -24,7 +24,7 @@ const FailureNotice = ({ label, status }: { label: string; status: ReadFailureSt
     const needsConnection = status === "needs_reconnect" || status === "not_connected";
 
     return (
-        <Alert role="alert" variant={needsConnection ? "default" : "destructive"}>
+        <Alert role={needsConnection ? "status" : "alert"} variant={needsConnection ? "default" : "destructive"}>
             <AlertTitle>{title}</AlertTitle>
             <AlertDescription>
                 {description}

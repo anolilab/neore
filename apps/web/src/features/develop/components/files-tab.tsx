@@ -1,6 +1,7 @@
 "use client";
 
-import { useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import cn from "@neore/ui/utils/cn";
@@ -26,6 +27,15 @@ const FileRow = ({ file, showDiff }: { file: FileEntry; showDiff: boolean }) => 
     const { t } = useLingui();
     const [open, setOpen] = useState(false);
     const panelId = useId();
+    const statuses: Record<string, string> = {
+        added: t`Added`,
+        changed: t`Changed`,
+        copied: t`Copied`,
+        modified: t`Modified`,
+        removed: t`Removed`,
+        renamed: t`Renamed`,
+        unchanged: t`Unchanged`,
+    };
     const notes: Record<FileEntry["patchState"], string | undefined> = {
         full: undefined,
         host_omitted: t`The host sent no diff for this file (binary, or too large for it).`,
@@ -44,7 +54,7 @@ const FileRow = ({ file, showDiff }: { file: FileEntry; showDiff: boolean }) => 
             >
                 <ChevronRight aria-hidden className={cn("size-4 shrink-0 transition-transform", open && "rotate-90")} />
                 <span className="min-w-0 flex-1 truncate font-mono text-xs">{file.previousPath ? `${file.previousPath} → ${file.path}` : file.path}</span>
-                <span className="text-muted-foreground shrink-0 text-xs">{file.status}</span>
+                <span className="text-muted-foreground shrink-0 text-xs">{statuses[file.status] ?? t`Changed`}</span>
                 <span className="shrink-0 font-mono text-xs text-emerald-600 dark:text-emerald-400">+{file.additions}</span>
                 <span className="shrink-0 font-mono text-xs text-red-600 dark:text-red-400">−{file.deletions}</span>
             </button>
@@ -88,7 +98,7 @@ const FilesTab = ({
     }, [failure, fetchNextPage, hasNextPage, isFetchingNextPage]);
 
     if (files.isPending) {
-        return <Skeleton className="h-24 w-full" />;
+        return <Skeleton aria-label={t`Loading files`} className="h-24 w-full" role="status" />;
     }
 
     if (files.isError) {
@@ -99,14 +109,26 @@ const FilesTab = ({
         return <FailureNotice label={hostLabel} status={failure.status} />;
     }
 
+    const loading = hasNextPage || isFetchingNextPage;
+
     return (
         <div className="space-y-3">
-            <p aria-live="polite" className="text-muted-foreground text-sm" role="status">
-                {hasNextPage || isFetchingNextPage ? t`Loaded ${listed.length} of ${Math.min(fileCount, fileLimit)} files…` : t`${listed.length} files`}
+            {/* Screen readers hear the start and the final count only; the running count below is for the eye. */}
+            <p className="sr-only" role="status">
+                {loading ? t`Loading files…` : <Plural one="# file" other="# files" value={listed.length} />}
+            </p>
+            <p aria-hidden className="text-muted-foreground text-sm">
+                {loading ? (
+                    <Trans>
+                        Loaded {listed.length} of <Plural one="# file" other="# files" value={Math.min(fileCount, fileLimit)} />…
+                    </Trans>
+                ) : (
+                    <Plural one="# file" other="# files" value={listed.length} />
+                )}
             </p>
             {leftOut > 0 && (
                 <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
-                    {t`The host lists at most ${fileLimit} files for one change. ${leftOut} more are not shown here.`}
+                    {t`The host lists at most ${plural(fileLimit, { one: "# file", other: "# files" })} for one change. ${plural(leftOut, { one: "# more is not shown here.", other: "# more are not shown here." })}`}
                 </p>
             )}
             <ul className="rounded-md border">

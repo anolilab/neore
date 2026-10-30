@@ -8,7 +8,6 @@ import { INBOX_SECTIONS } from "@neore/backend/source-control/types";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Skeleton } from "@neore/ui/components/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
 import cn from "@neore/ui/utils/cn";
 
 import { useInbox } from "../lib/use-develop";
@@ -53,24 +52,32 @@ const InboxList = ({
         needsMyReview: t`Needs my review`,
         readyToMerge: t`Ready to merge`,
     };
+    const approximations: Partial<Record<InboxSection, string>> = {
+        readyToMerge: t`Approved and not a draft. Branch protection is not checked.`,
+    };
     const capability = hostCapabilityOf(host.capabilities, SECTION_CAPABILITY[section]);
-    // A section the host only approximates says how, in the driver's own words.
-    const note = capability.supported && capability.degradation !== "none" ? capability.note : undefined;
+    // A section the host only approximates says how, in words the client translates; the driver's own note is English.
+    const approximated = capability.supported && capability.degradation !== "none";
+    const note = approximated ? approximations[section] : undefined;
     const pages = inbox.data?.pages ?? [];
     const failure = pages.find((page) => page.status !== "ok");
     const items = pages.flatMap((page) => (page.status === "ok" ? page.items : []));
 
     return (
         <div className="space-y-3">
-            <Tabs onValueChange={(value) => onSectionChange(value as InboxSection)} value={section}>
-                <TabsList className="flex-wrap">
-                    {sections.map((candidate) => (
-                        <TabsTrigger key={candidate} value={candidate}>
-                            {labels[candidate]}
-                        </TabsTrigger>
-                    ))}
-                </TabsList>
-            </Tabs>
+            <div aria-label={t`Inbox sections`} className="flex flex-wrap gap-1" role="group">
+                {sections.map((candidate) => (
+                    <Button
+                        aria-pressed={candidate === section}
+                        key={candidate}
+                        onClick={() => onSectionChange(candidate)}
+                        size="sm"
+                        variant={candidate === section ? "default" : "outline"}
+                    >
+                        {labels[candidate]}
+                    </Button>
+                ))}
+            </div>
             {note && <p className="text-muted-foreground text-xs">{note}</p>}
             {inbox.isPending && (
                 <div aria-label={t`Loading`} className="space-y-2" role="status">

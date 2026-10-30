@@ -5,5 +5,5 @@ export interface HostInfo {
     capabilities: HostCapabilityReportInput;
     label: string;
     limits: { commits: number; files: number };
-    requestNoun: string;
+    requestNoun: "merge request" | "pull request";
 }
