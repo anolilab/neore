@@ -13,6 +13,8 @@ import type { UIMessage } from "@/lib/agent";
 const harness = vi.hoisted(() => {
     return {
         contentPaints: 0,
+        /** What the persisted body read (`getStreamBody`) answers; null reads as "no body yet". */
+        body: null as unknown,
         /** Ends the stream the test is feeding. */
         finish: undefined as (() => void) | undefined,
         lastText: "",
@@ -34,7 +36,7 @@ vi.mock("@/lib/lunora/crpc", async () => {
     const { skipToken } = await import("@tanstack/react-query");
     const leaf = {
         queryOptions: (args: unknown) => {
-            return { queryFn: args === skipToken ? skipToken : async () => null, queryKey: ["stream-body", args] };
+            return { queryFn: args === skipToken ? skipToken : async () => harness.body, queryKey: ["stream-body", args] };
         },
     };
     // Any depth of namespace (`crpc.a.b.fn`) ends at `leaf`.
@@ -103,6 +105,7 @@ describe("streaming placeholder render cost", () => {
         vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", false);
         harness.contentPaints = 0;
         harness.lastText = "";
+        harness.body = null;
     });
 
     afterEach(() => {
@@ -206,7 +209,7 @@ describe("streaming placeholder render cost", () => {
         harness.push?.(JSON.stringify({ text: "", toolProgress: { ...tool, message: "Page 2", progress: 2, total: 4 } }));
         await vi.waitFor(() => expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("50"));
 
-        expect(screen.getByText("Page 2")).toBeDefined();
+        expect(screen.getByText("Page 2", { selector: "p" })).toBeDefined();
         expect(screen.getAllByRole("progressbar")).toHaveLength(1);
         expect(harness.contentPaints - baseline).toBe(0);
 
@@ -214,6 +217,25 @@ describe("streaming placeholder render cost", () => {
         await vi.waitFor(() => expect(screen.queryByRole("progressbar")).toBeNull());
 
         expect(harness.lastText).toBe("Looking.");
+    });
+
+    it("keeps showing a running call's progress from the persisted body when there is no live stream", async () => {
+        harness.body = {
+            reasoning: "",
+            status: "streaming",
+            text: "Looking.",
+            toolProgress: [{ message: "Page 3", progress: 3, serverName: "Docs", toolCallId: "call_1", toolName: "index", total: 4 }],
+        };
+
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <StreamingPlaceholder streamId="stream-1" />
+            </QueryClientProvider>,
+        );
+
+        await vi.waitFor(() => expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("75"));
+
+        expect(screen.getByText("Page 3", { selector: "p" })).toBeDefined();
     });
 
     it("shows the final text when the stream ends", async () => {

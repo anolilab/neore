@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ToolProgressEvent } from "./stream-line";
 import type { ToolProgressState } from "./tool-progress";
-import { applyToolProgress, NO_TOOL_PROGRESS, progressFraction } from "./tool-progress";
+import { applyToolProgress, NO_TOOL_PROGRESS, progressFraction, toolProgressOfBody } from "./tool-progress";
 
 const event = (toolCallId: string, extra: Partial<ToolProgressEvent> = {}): ToolProgressEvent => {
     return { progress: 1, serverName: "Docs", toolCallId, toolName: "index", ...extra };
@@ -60,5 +60,31 @@ describe(progressFraction, () => {
         expect(progressFraction({ progress: 3 })).toBeUndefined();
         expect(progressFraction({ progress: 3, total: 0 })).toBeUndefined();
         expect(progressFraction({ progress: 3, total: NaN })).toBeUndefined();
+    });
+});
+
+describe(toolProgressOfBody, () => {
+    it("reads the persisted body's calls as the running state", () => {
+        const state = toolProgressOfBody([
+            { message: "Page 2", progress: 2, serverName: "Docs", toolCallId: "call_1", toolName: "index", total: 4 },
+            { progress: 7, serverName: "Docs", toolCallId: "call_2", toolName: "crawl" },
+        ]);
+
+        expect(state).toStrictEqual([
+            { message: "Page 2", progress: 2, serverName: "Docs", toolCallId: "call_1", toolName: "index", total: 4 },
+            { progress: 7, serverName: "Docs", toolCallId: "call_2", toolName: "crawl" },
+        ]);
+    });
+
+    it("shows nothing when the body carries none, and skips an entry that is not a report", () => {
+        expect(toolProgressOfBody(undefined)).toBe(NO_TOOL_PROGRESS);
+        expect(toolProgressOfBody([])).toBe(NO_TOOL_PROGRESS);
+        expect(toolProgressOfBody([{ progress: -1, serverName: "Docs", toolCallId: "call_1", toolName: "index" }, "nope"])).toStrictEqual([]);
+    });
+
+    it("sanitises the message like a live report", () => {
+        const [entry] = toolProgressOfBody([{ message: "a\u202Eb", progress: 1, serverName: "Docs", toolCallId: "call_1", toolName: "index" }]);
+
+        expect(entry?.message).toBe("ab");
     });
 });

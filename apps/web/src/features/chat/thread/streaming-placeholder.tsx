@@ -23,7 +23,7 @@ import type { Id } from "@neore/backend/dataModel";
 import type { StreamSpeaker, ToolProgressEvent } from "@neore/chat-ui/utils/stream-line";
 import { parseStreamLine } from "@neore/chat-ui/utils/stream-line";
 import type { ToolProgressState } from "@neore/chat-ui/utils/tool-progress";
-import { applyToolProgress, NO_TOOL_PROGRESS } from "@neore/chat-ui/utils/tool-progress";
+import { applyToolProgress, NO_TOOL_PROGRESS, toolProgressOfBody } from "@neore/chat-ui/utils/tool-progress";
 import { Message, MessageContent as MessageContentWrapper } from "@neore/ui/components/ai-elements/message";
 import cn from "@neore/ui/utils/cn";
 import { skipToken, useQuery } from "@tanstack/react-query";
@@ -452,12 +452,17 @@ const useStream = (
         }
     }, [driven, streamUrl, streamId, options?.headers, options?.streamToken]);
 
+    // The calls the persisted body says are running: what is left on screen when the live stream is not the source.
+    // Query results are structurally shared, so this array keeps its identity (and the rows their memo) between polls.
+    const persistedProgress = (persistentBody as { toolProgress?: unknown } | undefined)?.toolProgress;
+    const persistedToolProgress = useMemo(() => toolProgressOfBody(persistedProgress), [persistedProgress]);
+
     const body = useMemo<StreamBody & { isReconnecting?: boolean; toolProgress: ToolProgressState }>(() => {
         if (persistentBody) {
             // The generated return type for `getStreamBody` points at a module path that
             // does not exist in `_generated`, so it lands as an empty object here. The
             // backend returns the shape declared as `StreamBody` above.
-            return { ...(persistentBody as StreamBody), isReconnecting: false, toolProgress: NO_TOOL_PROGRESS };
+            return { ...(persistentBody as StreamBody), isReconnecting: false, toolProgress: persistedToolProgress };
         }
 
         let status: StreamStatus;
@@ -481,7 +486,7 @@ const useStream = (
             text: streamBody.text,
             toolProgress,
         };
-    }, [persistentBody, persistentReadFailed, streamBody, streamEnded, isReconnecting, toolProgress]);
+    }, [persistentBody, persistedToolProgress, persistentReadFailed, streamBody, streamEnded, isReconnecting, toolProgress]);
 
     return body;
 };

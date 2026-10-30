@@ -54,11 +54,11 @@ export interface BuildAgentToolsOptions {
     headless?: boolean;
     /** Headless only: built-ins whose `ask` the run inherited an approval for (`ToolPermissionOptions.headlessApproved`). */
     headlessApproved?: ReadonlyArray<string>;
+    /** Interactive runs: where a long MCP call's progress is shown. Omitted, none is relayed. */
+    mcpProgress?: ToolProgressSink;
     /** Restrict MCP servers to these names; empty/undefined means every enabled server. */
     mcpServerNames?: string[];
     model: LanguageModel | string;
-    /** Interactive runs: where a long MCP call's progress is shown. Omitted, none is relayed. */
-    mcpProgress?: ToolProgressSink;
     /** Who started the run, when not the person at the app: an API key's run gets no device tools and no `auto` tool. */
     origin?: RunOrigin;
     searchMode: SearchMode;
@@ -156,7 +156,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
     const noDevices: DeviceToolsResult = { descriptors: new Map(), tools: {} };
     const [mcpResult, deviceResult] = await Promise.all([
-        getMCPTools(selectedServers, { progress: mcpProgress }),
+        // An outside agent's (public API) event mapping drops progress chunks, so its runs write none.
+        getMCPTools(selectedServers, { progress: origin === "outside_agent" ? undefined : mcpProgress }),
         // A device problem must never take the run down with it.
         deviceThreadId === undefined || headless || origin === "outside_agent"
             ? noDevices

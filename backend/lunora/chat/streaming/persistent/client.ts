@@ -25,6 +25,8 @@ export type StreamBody = {
     speaker?: { name: string; skillId: string };
     status: StreamStatus;
     text: string;
+    /** The MCP tool calls running now, each with its latest report; absent when none. */
+    toolProgress?: { message?: string; progress: number; serverName: string; toolCallId: string; toolName: string; total?: number }[];
 };
 
 export type StreamChunk = string | { reasoning?: string; text: string };
@@ -89,7 +91,7 @@ export class PersistentTextStreaming {
      * @returns The body of the stream including text, reasoning, and status.
      */
     async getStreamBody(ctx: RunQueryContext, streamId: StreamId): Promise<StreamBody> {
-        const { hostState, reasoning, speaker, status, text } = await ctx.runQuery(this.api.getStreamText, { streamId });
+        const { hostState, reasoning, speaker, status, text, toolProgress } = await ctx.runQuery(this.api.getStreamText, { streamId });
 
         return {
             ...(hostState !== undefined && { hostState }),
@@ -97,6 +99,7 @@ export class PersistentTextStreaming {
             ...(speaker && { speaker }),
             status: status as StreamStatus,
             text,
+            ...(toolProgress && { toolProgress }),
         };
     }
 

@@ -53,6 +53,20 @@ const readSpeaker = (value: unknown): StreamSpeaker | undefined => {
 
 const MAX_MESSAGE_LENGTH = 200;
 
+/**
+ * The server's status message made safe to show: line breaks and tabs become a space, other control characters and
+ * the bidi overrides and isolates (which can reorder the text around them) are removed, and it is cut by code point.
+ */
+const sanitizeMessage = (message: string): string =>
+    [
+        ...message
+            .replaceAll(/[\t\n\r]+/gu, " ")
+            .replaceAll(/[\p{Cc}\u{202A}-\u{202E}\u{2066}-\u{2069}]/gu, "")
+            .trim(),
+    ]
+        .slice(0, MAX_MESSAGE_LENGTH)
+        .join("");
+
 /** A `toolProgress` field off the wire, or `undefined` when it is not one. The numbers and text are the server's: clamped here. */
 export const readToolProgress = (value: unknown): ToolProgressEvent | undefined => {
     if (typeof value !== "object" || value === null) {
@@ -83,7 +97,7 @@ export const readToolProgress = (value: unknown): ToolProgressEvent | undefined 
         return undefined;
     }
 
-    const text = typeof message === "string" ? message.trim().slice(0, MAX_MESSAGE_LENGTH) : "";
+    const text = typeof message === "string" ? sanitizeMessage(message) : "";
 
     return {
         ...event,

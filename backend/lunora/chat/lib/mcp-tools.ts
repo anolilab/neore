@@ -12,7 +12,7 @@ import type { ToolSet } from "ai";
 import { toolsLogger } from "../../lib/logger";
 import { validateDomain } from "../tools/utilities";
 import { createAuthRetrySession, renewBearer, retryOnUnauthorized } from "./mcp-auth-retry";
-import { runWithProgressCall } from "./mcp-progress";
+import { createProgressCall, runWithProgressCall } from "./mcp-progress";
 import type { ToolProgressSink } from "./mcp-progress";
 import { attachProgressTokens } from "./mcp-progress-transport";
 import type { ToolAnnotationHints } from "./tool-permissions";
@@ -202,10 +202,12 @@ const withProgress = (tool: Tool, label: { serverName: string; toolName: string 
         }
 
         const progress = sink({ ...label, toolCallId });
+        const call = createProgressCall({ onProgress: progress.push, token: toolCallId });
 
         try {
-            return await runWithProgressCall({ onProgress: progress.push, token: toolCallId }, async () => await run(input, options));
+            return await runWithProgressCall(call, async () => await run(input, options));
         } finally {
+            call.release();
             await progress.finish();
         }
     };

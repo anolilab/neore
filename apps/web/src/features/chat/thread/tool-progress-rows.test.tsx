@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -62,5 +62,75 @@ describe("tool progress rows", () => {
         );
 
         expect(screen.getAllByRole("progressbar")).toHaveLength(2);
+    });
+
+    describe("live region", () => {
+        beforeEach(() => {
+            vi.useFakeTimers();
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        const row = (message: string) => <ToolProgressRows state={[{ ...entry, message, total: 100 }]} />;
+
+        it("announces a changed message at most every 3 seconds, and the latest one", () => {
+            const { rerender } = render(row("Page 1"));
+
+            expect(screen.getByRole("status").textContent).toBe("Page 1");
+
+            act(() => {
+                vi.advanceTimersByTime(1000);
+            });
+            rerender(row("Page 2"));
+            act(() => {
+                vi.advanceTimersByTime(500);
+            });
+            rerender(row("Page 3"));
+
+            // The sighted row follows at once; the announcement waits for the window to pass.
+            expect(screen.getByText("Page 3", { selector: "p" })).toBeDefined();
+            expect(screen.getByRole("status").textContent).toBe("Page 1");
+
+            act(() => {
+                vi.advanceTimersByTime(1499);
+            });
+
+            expect(screen.getByRole("status").textContent).toBe("Page 1");
+
+            act(() => {
+                vi.advanceTimersByTime(1);
+            });
+
+            expect(screen.getByRole("status").textContent).toBe("Page 3");
+        });
+
+        it("announces a change straight away once the window has passed", () => {
+            const { rerender } = render(row("Page 1"));
+
+            act(() => {
+                vi.advanceTimersByTime(5000);
+            });
+            rerender(row("Page 2"));
+            act(() => {
+                vi.advanceTimersByTime(0);
+            });
+
+            expect(screen.getByRole("status").textContent).toBe("Page 2");
+        });
+
+        it("does not announce again when the message is unchanged", () => {
+            const { rerender } = render(row("Page 1"));
+            const region = screen.getByRole("status");
+
+            rerender(<ToolProgressRows state={[{ ...entry, message: "Page 1", progress: 60, total: 100 }]} />);
+            act(() => {
+                vi.advanceTimersByTime(10_000);
+            });
+
+            expect(screen.getByRole("status")).toBe(region);
+            expect(region.textContent).toBe("Page 1");
+        });
     });
 });

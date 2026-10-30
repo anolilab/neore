@@ -13,11 +13,44 @@ import { progressFraction } from "@neore/chat-ui/utils/tool-progress";
 import { Progress, ProgressIndicator, ProgressTrack } from "@neore/ui/components/progress";
 import { Loader2 } from "lucide-react";
 import type { FC } from "react";
-import { memo } from "react";
+import { memo, useEffect, useRef, useState } from "react";
+
+/** A screen reader hears a changed message at most this often; a bar that ticks twice a second would drown it out. */
+const ANNOUNCE_EVERY_MS = 3000;
+
+/** `message`, but changing at most every {@link ANNOUNCE_EVERY_MS}: the newest one waits for the window to pass. */
+const useAnnouncedMessage = (message: string | undefined): string | undefined => {
+    const [announced, setAnnounced] = useState(message);
+    const announcedAt = useRef(0);
+
+    // The first message is announced as the row mounts: the window starts there.
+    useEffect(() => {
+        announcedAt.current = Date.now();
+    }, []);
+
+    useEffect(() => {
+        if (message === announced) {
+            return undefined;
+        }
+
+        const timer = setTimeout(
+            () => {
+                announcedAt.current = Date.now();
+                setAnnounced(message);
+            },
+            Math.max(0, announcedAt.current + ANNOUNCE_EVERY_MS - Date.now()),
+        );
+
+        return () => clearTimeout(timer);
+    }, [message, announced]);
+
+    return announced;
+};
 
 const ToolProgressRow: FC<{ entry: ToolProgressEntry }> = memo(({ entry }) => {
     const { t } = useLingui();
     const fraction = progressFraction(entry);
+    const announced = useAnnouncedMessage(entry.message);
     const { serverName, toolName } = entry;
 
     return (
@@ -35,9 +68,10 @@ const ToolProgressRow: FC<{ entry: ToolProgressEntry }> = memo(({ entry }) => {
                         <ProgressIndicator className="data-indeterminate:w-full data-indeterminate:animate-pulse motion-reduce:animate-none" />
                     </ProgressTrack>
                 </Progress>
-                <p aria-live="polite" className="text-muted-foreground min-h-4 text-xs wrap-break-word" role="status">
-                    {entry.message}
-                </p>
+                <p className="text-muted-foreground min-h-4 text-xs wrap-break-word">{entry.message}</p>
+                <span aria-live="polite" className="sr-only" role="status">
+                    {announced}
+                </span>
             </div>
         </div>
     );

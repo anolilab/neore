@@ -52,12 +52,25 @@ export const attachProgressTokens = (client: MCPClient): void => {
             return await send.call(transport, message, options);
         }
 
+        const forget = (): void => {
+            calls.delete(call.token);
+            tokenOfRequest.delete(id);
+        };
+
         calls.set(call.token, call);
         tokenOfRequest.set(id, call.token);
+        // State never outlives its request: the call's owner releases it when the tool returns or throws.
+        call.onRelease?.(forget);
 
         const params = { ...message.params, _meta: { ...(message.params?._meta as object), progressToken: call.token } };
 
-        return await send.call(transport, { ...message, params }, options);
+        try {
+            return await send.call(transport, { ...message, params }, options);
+        } catch (error) {
+            forget();
+
+            throw error;
+        }
     };
 
     // The client set `onmessage` in its constructor; a transport reads it at call time, so replacing it takes effect.

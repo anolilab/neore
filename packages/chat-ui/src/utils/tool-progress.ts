@@ -4,6 +4,7 @@
  * leaves when its `ended` marker arrives, and the whole set when the reply restarts.
  */
 import type { ToolProgressEvent } from "./stream-line";
+import { readToolProgress } from "./stream-line";
 
 export interface ToolProgressEntry {
     message?: string;
@@ -37,6 +38,28 @@ export const applyToolProgress = (state: ToolProgressState, event: ToolProgressE
     };
 
     return index === -1 ? [...state, entry] : state.with(index, entry);
+};
+
+/**
+ * The running calls of a persisted stream body (`getStreamBody`'s `toolProgress`): what a viewer that lost the live
+ * stream shows. Each entry is read like a relayed report, so an unusable one is skipped and the message is sanitised.
+ */
+export const toolProgressOfBody = (entries: unknown): ToolProgressState => {
+    if (!Array.isArray(entries) || entries.length === 0) {
+        return NO_TOOL_PROGRESS;
+    }
+
+    let state = NO_TOOL_PROGRESS;
+
+    for (const entry of entries) {
+        const event = readToolProgress(entry);
+
+        if (event) {
+            state = applyToolProgress(state, event);
+        }
+    }
+
+    return state;
 };
 
 /**

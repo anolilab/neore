@@ -71,3 +71,54 @@ describe("tool progress chunks", () => {
         await expect(write({ text: "", toolProgress: { ...tool, progress: 1 } })).rejects.toThrow();
     });
 });
+
+describe("tool progress in the persisted body", () => {
+    const body = async () =>
+        (await harness.run(async (context: any) => await context.runQuery(getStreamText, { streamId }))) as { text: string; toolProgress?: unknown[] };
+
+    it("returns the latest report of each call that has not ended, in the order they first reported", async () => {
+        await write({ text: "Looking." });
+        await write({ text: "", toolProgress: { ...tool, message: "Page 1", progress: 1, total: 4 } });
+        await write({ text: "", toolProgress: { ...tool, progress: 7, toolCallId: "call_2" } });
+        await write({ text: "", toolProgress: { ...tool, message: "Page 2", progress: 2, total: 4 } });
+        await write({ text: "", toolProgress: { ...tool, ended: true, toolCallId: "call_2" } });
+
+        const { text, toolProgress } = await body();
+
+        expect(text).toBe("Looking.");
+        expect(toolProgress).toStrictEqual([{ ...tool, message: "Page 2", progress: 2, total: 4 }]);
+    });
+
+    it("returns none when no call reported, or every call ended", async () => {
+        await write({ text: "Hello" });
+
+        const before = await body();
+
+        expect(before.toolProgress).toBeUndefined();
+
+        await write({ text: "", toolProgress: { ...tool, progress: 1 } });
+        await write({ text: "", toolProgress: { ...tool, ended: true } });
+
+        const after = await body();
+
+        expect(after.toolProgress).toBeUndefined();
+    });
+
+    it("forgets the calls of a reply that restarted below a steered message", async () => {
+        await write({ text: "", toolProgress: { ...tool, progress: 1 } });
+        await write({ restart: true, text: "Again." });
+
+        const result = await body();
+
+        expect(result.toolProgress).toBeUndefined();
+    });
+
+    it("returns none once the stream is over", async () => {
+        await write({ text: "", toolProgress: { ...tool, progress: 1 } });
+        await write({ final: true, text: "Done." });
+
+        const result = await body();
+
+        expect(result.toolProgress).toBeUndefined();
+    });
+});

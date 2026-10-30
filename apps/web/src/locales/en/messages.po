@@ -412,7 +412,7 @@ msgid "{0} deleted"
 msgstr "{0} deleted"
 
 #. placeholder {0}: formatDuration(elapsedMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:579
+#: src/features/chat/thread/streaming-placeholder.tsx:584
 msgid "{0} elapsed"
 msgstr "{0} elapsed"
 
@@ -577,7 +577,7 @@ msgid "{0} tok/s"
 msgstr "{0} tok/s"
 
 #. placeholder {0}: tokPerSec.toFixed(1)
-#: src/features/chat/thread/streaming-placeholder.tsx:569
+#: src/features/chat/thread/streaming-placeholder.tsx:574
 msgid "{0} tokens/s"
 msgstr "{0} tokens/s"
 
@@ -979,7 +979,7 @@ msgid "{name} is installed"
 msgstr "{name} is installed"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:241
-#: src/features/chat/thread/streaming-placeholder.tsx:497
+#: src/features/chat/thread/streaming-placeholder.tsx:502
 msgid "{name} is responding"
 msgstr "{name} is responding"
 
@@ -1191,7 +1191,7 @@ msgstr "<0>Schedule</0> — Run on a cron schedule (e.g., daily at 8 AM). Uses s
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 
-#: src/features/chat/thread/streaming-placeholder.tsx:570
+#: src/features/chat/thread/streaming-placeholder.tsx:575
 msgid "~{approxTokenCount} tokens"
 msgstr "~{approxTokenCount} tokens"
 
@@ -3425,8 +3425,8 @@ msgid "Assistant replied:"
 msgstr "Assistant replied:"
 
 #: src/features/chat/thread/message-item.tsx:203
-#: src/features/chat/thread/streaming-placeholder.tsx:746
-#: src/features/chat/thread/streaming-placeholder.tsx:784
+#: src/features/chat/thread/streaming-placeholder.tsx:751
+#: src/features/chat/thread/streaming-placeholder.tsx:789
 msgid "Assistant Reply:"
 msgstr "Assistant Reply:"
 
@@ -12617,7 +12617,7 @@ msgid "First slide"
 msgstr "First slide"
 
 #. placeholder {0}: formatDuration(ttftMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:571
+#: src/features/chat/thread/streaming-placeholder.tsx:576
 msgid "First token {0}"
 msgstr "First token {0}"
 
@@ -22486,7 +22486,7 @@ msgstr "Profile Information"
 msgid "Progress"
 msgstr "Progress"
 
-#: src/features/chat/thread/tool-progress-rows.tsx:33
+#: src/features/chat/thread/tool-progress-rows.tsx:66
 msgid "Progress of {toolName}"
 msgstr "Progress of {toolName}"
 
@@ -23287,7 +23287,7 @@ msgstr "Reconnecting"
 msgid "Reconnecting to the server…"
 msgstr "Reconnecting to the server…"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:561
+#: src/features/chat/thread/streaming-placeholder.tsx:566
 msgid "Reconnecting…"
 msgstr "Reconnecting…"
 
@@ -25534,7 +25534,7 @@ msgstr "Send Verification Code"
 msgid "Sending your message and waiting for the reply"
 msgstr "Sending your message and waiting for the reply"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:609
+#: src/features/chat/thread/streaming-placeholder.tsx:614
 msgid "Sending…"
 msgstr "Sending…"
 
@@ -28986,7 +28986,7 @@ msgstr "Thinking-enabled vision-language model"
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1036
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
-#: src/features/chat/thread/streaming-placeholder.tsx:788
+#: src/features/chat/thread/streaming-placeholder.tsx:793
 msgid "Thinking..."
 msgstr "Thinking..."
 
@@ -31850,7 +31850,7 @@ msgstr "Waiting for approval on {device}"
 msgid "Waiting for output…"
 msgstr "Waiting for output…"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:616
+#: src/features/chat/thread/streaming-placeholder.tsx:621
 msgid "Waiting for the agent…"
 msgstr "Waiting for the agent…"
 
@@ -32313,7 +32313,7 @@ msgstr "Workflows"
 msgid "Working"
 msgstr "Working"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:623
+#: src/features/chat/thread/streaming-placeholder.tsx:628
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"

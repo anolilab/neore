@@ -6,7 +6,14 @@ import { createMCPClient } from "@ai-sdk/mcp";
 import type { MCPTransport } from "@ai-sdk/mcp";
 import { describe, expect, it, vi } from "vitest";
 
-import { createLatestThrottle, createToolProgressWriter, readProgressParams, runWithProgressCall } from "./mcp-progress";
+import {
+    createLatestThrottle,
+    createProgressCall,
+    createToolProgressWriter,
+    readProgressParams,
+    runWithProgressCall,
+    sanitizeProgressMessage,
+} from "./mcp-progress";
 import type { McpProgress, ToolProgressChunk } from "./mcp-progress";
 import { attachProgressTokens } from "./mcp-progress-transport";
 
@@ -21,7 +28,7 @@ const fakeClock = () => {
             const end = time + ms;
 
             for (;;) {
-                const due = [...timers.entries()].filter(([, timer]) => timer.at <= end).sort(([, a], [, b]) => a.at - b.at)[0];
+                const due = [...timers].filter(([, timer]) => timer.at <= end).sort(([, a], [, b]) => a.at - b.at)[0];
 
                 if (!due) {
                     break;
@@ -35,6 +42,10 @@ const fakeClock = () => {
             }
 
             time = end;
+
+            for (let i = 0; i < 10; i += 1) {
+                await Promise.resolve();
+            }
         },
         clearTimer: (id: unknown) => {
             timers.delete(id as number);
@@ -62,12 +73,12 @@ describe(readProgressParams, () => {
     it("treats a missing, zero or non-finite total as unknown", () => {
         expect(readProgressParams({ progress: 1 })).toStrictEqual({ progress: 1 });
         expect(readProgressParams({ progress: 1, total: 0 })).toStrictEqual({ progress: 1 });
-        expect(readProgressParams({ progress: 1, total: Number.POSITIVE_INFINITY })).toStrictEqual({ progress: 1 });
+        expect(readProgressParams({ progress: 1, total: Infinity })).toStrictEqual({ progress: 1 });
         expect(readProgressParams({ progress: 1, total: -4 })).toStrictEqual({ progress: 1 });
     });
 
     it("drops a report with no usable progress", () => {
-        expect(readProgressParams({ progress: Number.NaN })).toBeUndefined();
+        expect(readProgressParams({ progress: NaN })).toBeUndefined();
         expect(readProgressParams({ progress: -1 })).toBeUndefined();
         expect(readProgressParams({ progress: "3" })).toBeUndefined();
         expect(readProgressParams(null)).toBeUndefined();
@@ -75,7 +86,33 @@ describe(readProgressParams, () => {
 
     it("cuts a long message and drops a blank one", () => {
         expect(readProgressParams({ message: "x".repeat(5000), progress: 1 })?.message).toHaveLength(200);
-        expect(readProgressParams({ message: "   ", progress: 1 })).toStrictEqual({ progress: 1 });
+        expect(readProgressParams({ message: " ".repeat(3), progress: 1 })).toStrictEqual({ progress: 1 });
+    });
+
+    it("sanitises the untrusted message", () => {
+        expect(readProgressParams({ message: "\u{202E}evil\u{202C}\u{2066}x\u{2069}", progress: 1 })?.message).toBe("evilx");
+        expect(readProgressParams({ message: "\u{202E}\u{2066}", progress: 1 })).toStrictEqual({ progress: 1 });
+    });
+});
+
+describe(sanitizeProgressMessage, () => {
+    it("removes control characters and bidi overrides and isolates", () => {
+        expect(sanitizeProgressMessage("a\u{0}b\u{7}c\u{7F}d\u{9F}e")).toBe("abcde");
+
+        for (const code of [0x20_2a, 0x20_2b, 0x20_2c, 0x20_2d, 0x20_2e, 0x20_66, 0x20_67, 0x20_68, 0x20_69]) {
+            expect(sanitizeProgressMessage(`a${String.fromCodePoint(code)}b`)).toBe("ab");
+        }
+    });
+
+    it("keeps words apart where a line break or tab was", () => {
+        expect(sanitizeProgressMessage("page 1\r\npage\t2")).toBe("page 1 page 2");
+    });
+
+    it("cuts by code point, so a surrogate pair is never split", () => {
+        const text = sanitizeProgressMessage("😀".repeat(300));
+
+        expect([...text]).toHaveLength(200);
+        expect(text).toBe("😀".repeat(200));
     });
 });
 
@@ -236,6 +273,76 @@ describe(createToolProgressWriter, () => {
         await expect(call.finish()).resolves.toBeUndefined();
     });
 
+    it("skips a write that repeats the last one for the call", async () => {
+        const clock = fakeClock();
+        const write = vi.fn(async (_chunk: ToolProgressChunk) => {});
+        const call = createToolProgressWriter(write, clock)(tool);
+
+        call.push({ message: "page", progress: 1, total: 4 });
+        await clock.advance(600);
+        call.push({ message: "page", progress: 1, total: 4 });
+        await clock.advance(600);
+        call.push({ message: "page", progress: 2, total: 4 });
+        await clock.advance(600);
+        call.push({ message: "page", progress: 2, total: 4 });
+        await clock.advance(600);
+        call.push({ message: "other", progress: 2, total: 4 });
+        await clock.advance(600);
+        await call.finish();
+
+        expect(write.mock.calls.map(([chunk]) => chunk)).toStrictEqual([
+            { ...tool, message: "page", progress: 1, total: 4 },
+            { ...tool, message: "page", progress: 2, total: 4 },
+            { ...tool, message: "other", progress: 2, total: 4 },
+            { ...tool, ended: true },
+        ]);
+    });
+
+    it("writes at most every 500 ms at first, and every 2 s once the call has run a minute", async () => {
+        const clock = fakeClock();
+        const write = vi.fn(async (_chunk: ToolProgressChunk) => {});
+        const call = createToolProgressWriter(write, clock)(tool);
+
+        call.push({ progress: 1 });
+        await clock.advance(1);
+        call.push({ progress: 2 });
+        await clock.advance(499);
+
+        expect(write).toHaveBeenCalledTimes(2);
+
+        await clock.advance(60_000);
+        call.push({ progress: 3 });
+        await clock.advance(1);
+        call.push({ progress: 4 });
+        await clock.advance(1000);
+
+        expect(write).toHaveBeenCalledTimes(3);
+
+        await clock.advance(1000);
+
+        expect(write).toHaveBeenCalledTimes(4);
+        expect(write.mock.calls.at(-1)?.[0].progress).toBe(4);
+    });
+
+    it("caps a call at 300 reports, then writes only the ended marker", async () => {
+        const clock = fakeClock();
+        const write = vi.fn(async (_chunk: ToolProgressChunk) => {});
+        const call = createToolProgressWriter(write, clock)(tool);
+
+        for (let i = 1; i <= 320; i += 1) {
+            call.push({ progress: i });
+            await clock.advance(2000);
+        }
+
+        await call.finish();
+
+        const chunks = write.mock.calls.map(([chunk]) => chunk);
+
+        expect(chunks).toHaveLength(301);
+        expect(chunks.filter((chunk) => chunk.progress !== undefined)).toHaveLength(300);
+        expect(chunks.at(-1)).toStrictEqual({ ...tool, ended: true });
+    });
+
     it("keeps names within the column cap", async () => {
         const write = vi.fn(async (_chunk: ToolProgressChunk) => {});
         const call = createToolProgressWriter(write, fakeClock())({ ...tool, serverName: "s".repeat(900) });
@@ -266,10 +373,6 @@ const fakeServer = (script: (token: unknown, notify: (params: Record<string, unk
                     reply({ capabilities: { tools: {} }, protocolVersion: "2025-06-18", serverInfo: { name: "fake", version: "1" } });
                     break;
                 }
-                case "tools/list": {
-                    reply({ tools: [{ description: "Index it", inputSchema: { properties: {}, type: "object" }, name: "index" }] });
-                    break;
-                }
                 case "tools/call": {
                     const token = request.params?._meta?.progressToken;
 
@@ -277,6 +380,10 @@ const fakeServer = (script: (token: unknown, notify: (params: Record<string, unk
                         script(token, (params) => transport.onmessage?.({ jsonrpc: "2.0", method: "notifications/progress", params } as never));
                         reply({ content: [{ text: "done", type: "text" }] });
                     });
+                    break;
+                }
+                case "tools/list": {
+                    reply({ tools: [{ description: "Index it", inputSchema: { properties: {}, type: "object" }, name: "index" }] });
                     break;
                 }
                 default: {
@@ -313,7 +420,12 @@ describe(attachProgressTokens, () => {
                 notify({ progress: 2, progressToken: token });
                 notify({ progress: 9, progressToken: "someone-else" });
             },
-            { onProgress: (progress) => seen.push(progress), token: "call_1" },
+            {
+                onProgress: (progress) => {
+                    seen.push(progress);
+                },
+                token: "call_1",
+            },
         );
 
         expect(requests.find((request) => request.method === "tools/call")?.params?._meta?.progressToken).toBe("call_1");
@@ -339,10 +451,87 @@ describe(attachProgressTokens, () => {
         const tools = await client.tools();
 
         await runWithProgressCall(
-            { onProgress: (progress) => seen.push(progress), token: "call_1" },
+            {
+                onProgress: (progress) => {
+                    seen.push(progress);
+                },
+                token: "call_1",
+            },
             async () => await (tools["index"] as any).execute({}, { messages: [], toolCallId: "call_1" }),
         );
         server.transport.onmessage?.({ jsonrpc: "2.0", method: "notifications/progress", params: { progress: 5, progressToken: "call_1" } } as never);
+
+        expect(seen).toStrictEqual([{ progress: 1 }]);
+    });
+
+    it("forgets a call whose request was refused", async () => {
+        const seen: McpProgress[] = [];
+        const server = fakeServer(() => {});
+        const send = server.transport.send.bind(server.transport);
+
+        // The wire refuses a tool call; the hook sits above it.
+        server.transport.send = async (message, options) => {
+            if ((message as { method?: string }).method === "tools/call") {
+                throw new Error("offline");
+            }
+
+            await send(message, options);
+        };
+
+        const client = await createMCPClient({ transport: server.transport });
+
+        attachProgressTokens(client);
+
+        const tools = await client.tools();
+        const progressCall = createProgressCall({
+            onProgress: (progress) => {
+                seen.push(progress);
+            },
+            token: "call_1",
+        });
+
+        await expect(
+            runWithProgressCall(progressCall, async () => await (tools["index"] as any).execute({}, { messages: [], toolCallId: "call_1" })),
+        ).rejects.toThrow("offline");
+
+        server.transport.onmessage?.({ jsonrpc: "2.0", method: "notifications/progress", params: { progress: 5, progressToken: "call_1" } } as never);
+
+        expect(seen).toStrictEqual([]);
+    });
+
+    it("forgets a call when its owner releases it, even though no response came", async () => {
+        const seen: McpProgress[] = [];
+        const server = fakeServer(() => {});
+        const send = server.transport.send.bind(server.transport);
+
+        // The server never answers a tool call.
+        server.transport.send = async (message, options) => {
+            if ((message as { method?: string }).method !== "tools/call") {
+                await send(message, options);
+            }
+        };
+
+        const client = await createMCPClient({ transport: server.transport });
+
+        attachProgressTokens(client);
+
+        const tools = await client.tools();
+
+        const progressCall = createProgressCall({
+            onProgress: (progress) => {
+                seen.push(progress);
+            },
+            token: "call_1",
+        });
+
+        void runWithProgressCall(progressCall, async () => await (tools["index"] as any).execute({}, { messages: [], toolCallId: "call_1" })).catch(() => {});
+        await new Promise((resolve) => {
+            setTimeout(resolve, 10);
+        });
+
+        server.transport.onmessage?.({ jsonrpc: "2.0", method: "notifications/progress", params: { progress: 1, progressToken: "call_1" } } as never);
+        progressCall.release();
+        server.transport.onmessage?.({ jsonrpc: "2.0", method: "notifications/progress", params: { progress: 2, progressToken: "call_1" } } as never);
 
         expect(seen).toStrictEqual([{ progress: 1 }]);
     });

@@ -17,6 +17,15 @@ import { AsyncLocalStorage } from "node:async_hooks";
 /** At most one update per call and this many ms. */
 export const PROGRESS_INTERVAL_MS = 500;
 
+/** The interval once a call has run {@link PROGRESS_SLOW_AFTER_MS}: a long call's bar moves slowly anyway. */
+export const PROGRESS_SLOW_INTERVAL_MS = 2000;
+
+/** How long a call runs before its reports back off to {@link PROGRESS_SLOW_INTERVAL_MS}. */
+export const PROGRESS_SLOW_AFTER_MS = 60_000;
+
+/** The most reports one call writes; after that only the `ended` marker, so a chatty server cannot grow the stream without bound. */
+export const MAX_PROGRESS_REPORTS = 300;
+
 /** The longest status message that is relayed; the server's text is untrusted. */
 export const MAX_PROGRESS_MESSAGE_LENGTH = 200;
 
@@ -43,10 +52,25 @@ export interface ToolProgressChunk {
 }
 
 /**
+ * An untrusted status message made safe to show: line breaks and tabs become a space, other control
+ * characters and the bidi overrides and isolates (which can reorder the text around them) are removed,
+ * and it is cut to {@link MAX_PROGRESS_MESSAGE_LENGTH} code points, so a surrogate pair is never split.
+ */
+export const sanitizeProgressMessage = (message: string): string =>
+    [
+        ...message
+            .replaceAll(/[\t\n\r]+/gu, " ")
+            .replaceAll(/[\p{Cc}\u{202A}-\u{202E}\u{2066}-\u{2069}]/gu, "")
+            .trim(),
+    ]
+        .slice(0, MAX_PROGRESS_MESSAGE_LENGTH)
+        .join("");
+
+/**
  * The numbers of a `notifications/progress` params object, or `undefined` when
  * there is nothing usable. The server is untrusted: a non-finite or negative
  * `progress` is dropped, a `total` that is not a positive finite number reads
- * as "unknown" (indeterminate), and the message is cut short.
+ * as "unknown" (indeterminate), and the message is sanitised ({@link sanitizeProgressMessage}).
  */
 export const readProgressParams = (params: unknown): McpProgress | undefined => {
     if (typeof params !== "object" || params === null) {
@@ -59,13 +83,40 @@ export const readProgressParams = (params: unknown): McpProgress | undefined => 
         return undefined;
     }
 
-    const text = typeof message === "string" ? message.trim().slice(0, MAX_PROGRESS_MESSAGE_LENGTH) : "";
+    const text = typeof message === "string" ? sanitizeProgressMessage(message) : "";
 
     return {
         ...(text && { message: text }),
         progress,
         ...(typeof total === "number" && Number.isFinite(total) && total > 0 && { total }),
     };
+};
+
+/** A call's latest report, as the persisted body hands it to a viewer that lost the live stream. */
+export type OpenToolProgress = Omit<ToolProgressChunk, "ended" | "progress"> & { progress: number };
+
+/**
+ * The latest report of every call that has not ended, in the order the calls first reported: all a viewer
+ * needs to show what is running, however many reports were written. A chunk that is not progress is skipped.
+ */
+export const openToolProgress = (chunks: Iterable<{ toolProgress?: ToolProgressChunk | null }>): OpenToolProgress[] => {
+    const open = new Map<string, OpenToolProgress>();
+
+    for (const { toolProgress } of chunks) {
+        if (!toolProgress) {
+            continue;
+        }
+
+        const { ended, progress, ...report } = toolProgress;
+
+        if (ended) {
+            open.delete(report.toolCallId);
+        } else if (progress !== undefined) {
+            open.set(report.toolCallId, { ...report, progress });
+        }
+    }
+
+    return [...open.values()];
 };
 
 export interface ThrottleClock {
@@ -82,7 +133,7 @@ export interface LatestThrottle<T> {
 }
 
 /**
- * Lets at most one value through per `intervalMs`, newest wins: the first goes
+ * Lets at most one value through per interval (a number, or a function read on every push so it can back off), newest wins: the first goes
  * out at once, the rest collapse into the latest and leave when the interval is
  * over. A new value never starts while an earlier `emit` is still running, so
  * writes cannot overlap or land out of order. Time is injected for the tests.
@@ -90,8 +141,9 @@ export interface LatestThrottle<T> {
 export const createLatestThrottle = <T>(
     emit: (value: T) => Promise<void> | void,
     { clearTimer = (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>), now = Date.now, setTimer = setTimeout }: ThrottleClock = {},
-    intervalMs = PROGRESS_INTERVAL_MS,
+    interval: number | (() => number) = PROGRESS_INTERVAL_MS,
 ): LatestThrottle<T> => {
+    const intervalMs = typeof interval === "function" ? interval : () => interval;
     let waiting: { value: T } | undefined;
     let lastSentAt: number | undefined;
     let timer: unknown;
@@ -104,7 +156,7 @@ export const createLatestThrottle = <T>(
             return;
         }
 
-        const wait = lastSentAt === undefined ? 0 : Math.max(0, lastSentAt + intervalMs - now());
+        const wait = lastSentAt === undefined ? 0 : Math.max(0, lastSentAt + intervalMs() - now());
 
         if (wait === 0) {
             send();
@@ -187,19 +239,38 @@ export type ToolProgressSink = (tool: ToolProgressTool) => ToolCallProgress;
  * throttle, so two tools running side by side each report at their own pace.
  */
 export const createToolProgressWriter = (write: (chunk: ToolProgressChunk) => Promise<void>, clock?: ThrottleClock): ToolProgressSink => {
+    const now = clock?.now ?? Date.now;
+
     return (called) => {
         // The column caps names; a longer one would be refused on every write.
         const tool = { ...called, serverName: called.serverName.slice(0, MAX_TOOL_LABEL_LENGTH), toolName: called.toolName.slice(0, MAX_TOOL_LABEL_LENGTH) };
+        const startedAt = now();
         let reported = false;
-        const throttle = createLatestThrottle(async (progress: McpProgress) => {
-            reported = true;
+        let written = 0;
+        let last: McpProgress | undefined;
+        const throttle = createLatestThrottle(
+            async (progress: McpProgress) => {
+                // A repeat tells the viewer nothing, and a report past the cap is dropped: only `ended` follows.
+                if (
+                    written >= MAX_PROGRESS_REPORTS ||
+                    (last && last.progress === progress.progress && last.total === progress.total && last.message === progress.message)
+                ) {
+                    return;
+                }
 
-            try {
-                await write({ ...tool, ...progress });
-            } catch {
-                // Best effort: a stopped stream refuses the write, and the tool carries on.
-            }
-        }, clock);
+                last = progress;
+                written += 1;
+                reported = true;
+
+                try {
+                    await write({ ...tool, ...progress });
+                } catch {
+                    // Best effort: a stopped stream refuses the write, and the tool carries on.
+                }
+            },
+            clock,
+            () => (now() - startedAt >= PROGRESS_SLOW_AFTER_MS ? PROGRESS_SLOW_INTERVAL_MS : PROGRESS_INTERVAL_MS),
+        );
 
         return {
             finish: async () => {
@@ -223,8 +294,30 @@ export const createToolProgressWriter = (write: (chunk: ToolProgressChunk) => Pr
 /** The call a progress notification belongs to: its token on the wire, and who to tell. */
 export interface ProgressCall {
     onProgress: (progress: McpProgress) => void;
+    /** Registers what to forget when the call is released (the transport's bookkeeping for its request). */
+    onRelease?: (cleanup: () => void) => void;
     token: string;
 }
+
+/** A {@link ProgressCall} that runs the cleanups registered with it when `release` is called, once. */
+export const createProgressCall = ({ onProgress, token }: Pick<ProgressCall, "onProgress" | "token">): ProgressCall & { release: () => void } => {
+    const cleanups = new Set<() => void>();
+
+    return {
+        onProgress,
+        onRelease: (cleanup) => {
+            cleanups.add(cleanup);
+        },
+        release: () => {
+            for (const cleanup of cleanups) {
+                cleanup();
+            }
+
+            cleanups.clear();
+        },
+        token,
+    };
+};
 
 const progressCalls = new AsyncLocalStorage<ProgressCall>();
 
