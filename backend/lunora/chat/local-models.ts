@@ -111,12 +111,14 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
 
         threadId = args.threadId;
         // A switched thread keeps its stored model: it is where the paths before the first switch recover their agent,
-        // and a local model there would stop the send from taking its path's model (`MODEL_LOOKUP`).
-        await patchThread(ctx.db, threadId, { ...(!thread.activeAgent && { model: args.model }), updatedAt: now });
+        // and a local model there would stop the send from taking its path's model (`MODEL_LOOKUP`). `lastReplyAt` also
+        // ends any pause the thread was waiting on (`patchThread`).
+        await patchThread(ctx.db, threadId, { lastReplyAt: now, ...(!thread.activeAgent && { model: args.model }), updatedAt: now });
     } else {
         threadId = (await insertThread(ctx.db, {
             createdBy: userId,
             ...(args.language && { language: args.language }),
+            lastReplyAt: now,
             mode: "text",
             model: args.model,
             status: "active",

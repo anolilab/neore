@@ -17492,6 +17492,18 @@
                       "activeLeafMessageId": {
                         "type": "string"
                       },
+                      "awaitingInput": {
+                        "anyOf": [
+                          {
+                            "const": "approval",
+                            "type": "string"
+                          },
+                          {
+                            "const": "question",
+                            "type": "string"
+                          }
+                        ]
+                      },
                       "botId": {
                         "type": "string"
                       },
@@ -17558,7 +17570,13 @@
                         ],
                         "type": "object"
                       },
+                      "lastReplyAt": {
+                        "type": "number"
+                      },
                       "lastUserMessageAt": {
+                        "type": "number"
+                      },
+                      "lastViewedAt": {
                         "type": "number"
                       },
                       "lockedAt": {
@@ -17570,6 +17588,9 @@
                       "runner": {
                         "const": "host",
                         "type": "string"
+                      },
+                      "snoozedUntil": {
+                        "type": "number"
                       },
                       "status": {
                         "anyOf": [
@@ -24431,6 +24452,207 @@
           }
         },
         "summary": "mutation: chat_tags_functions:updateThreadTag",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_thread_state:markThreadViewed": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_thread_state:markThreadViewed` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_thread_state:markThreadViewed",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_thread_state:markThreadViewed",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "updated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "updated"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_thread_state:markThreadViewed",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_thread_state:snoozeThread": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_thread_state:snoozeThread` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_thread_state:snoozeThread",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "until": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "threadId",
+                      "until"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_thread_state:snoozeThread",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_thread_state:snoozeThread",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_thread_state:unsnoozeThread": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_thread_state:unsnoozeThread` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_thread_state:unsnoozeThread",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_thread_state:unsnoozeThread",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_thread_state:unsnoozeThread",
         "tags": [
           "chat"
         ],

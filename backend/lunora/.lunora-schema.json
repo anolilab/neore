@@ -23355,6 +23355,28 @@
           "optional": true,
           "unique": false
         },
+        "awaitingInput": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"approval\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"question\""
+            }
+          ]
+        },
         "botId": {
           "kind": "id",
           "nullable": false,
@@ -23541,7 +23563,19 @@
           "optional": true,
           "unique": false
         },
+        "lastReplyAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "lastUserMessageAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "lastViewedAt": {
           "kind": "number",
           "nullable": false,
           "optional": true,
@@ -23633,6 +23667,12 @@
           "optional": true,
           "unique": false,
           "literal": "\"host\""
+        },
+        "snoozedUntil": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         },
         "source": {
           "kind": "string",

@@ -199,6 +199,10 @@ export const RATE_LIMIT_CONFIGS = {
     // for several at once, hence the burst.
     "chat/linkPreview:free": Ratelimit.tokenBucket(30, MINUTE, 60),
     "chat/linkPreview:premium": Ratelimit.tokenBucket(90, MINUTE, 150),
+    // Marking a thread's latest reply as seen (`chat/thread-state.ts`): one call per thread switch, a no-op
+    // most of the time, so a fast switcher must not spend the `chat/update` budget that renames share.
+    "chat/markViewed:free": Ratelimit.tokenBucket(60, MINUTE, 120),
+    "chat/markViewed:premium": Ratelimit.tokenBucket(120, MINUTE, 240),
     // Chat/AI limits (tiered)
     "chat/message:free": Ratelimit.tokenBucket(30, MINUTE, 50),
 

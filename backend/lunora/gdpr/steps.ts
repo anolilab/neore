@@ -123,7 +123,10 @@ const projectMessage = (
  * to names — the ids alone mean nothing to the data subject.
  */
 const projectThread = (
-    thread: Pick<Doc<"threads">, "_creationTime" | "activeLeafMessageId" | "category" | "model" | "summary" | "tagIds" | "tags" | "title" | "updatedAt"> & {
+    thread: Pick<
+        Doc<"threads">,
+        "_creationTime" | "activeLeafMessageId" | "category" | "lastViewedAt" | "model" | "snoozedUntil" | "summary" | "tagIds" | "tags" | "title" | "updatedAt"
+    > & {
         _id: string;
     },
     tagNames: ReadonlyMap<string, string>,
@@ -135,7 +138,9 @@ const projectThread = (
         activeLeafMessageId: thread.activeLeafMessageId,
         category: thread.category,
         createdAt: thread._creationTime,
+        lastViewedAt: thread.lastViewedAt,
         model: thread.model,
+        snoozedUntil: thread.snoozedUntil,
         summary: thread.summary,
         tags: thread.tags,
         title: thread.title,

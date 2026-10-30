@@ -54,7 +54,7 @@ import {
     resolveThreadReadAccess,
     type ThreadPermission,
 } from "../agent/thread-read-access";
-import { publicThread } from "../agent/threads";
+import { publicThread, threadForViewer } from "../agent/threads";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
@@ -1196,7 +1196,7 @@ export const getThread = optionalAuthQuery
 
         // Anyone but the owner or a grantee sees a public thread only redacted —
         // no owner id, system prompt or org/team ids.
-        return access.kind === "full" ? publicThread(access.thread) : redactThreadForPublicViewer(publicThread(access.thread));
+        return access.kind === "full" ? threadForViewer(access.thread, context.user?.userId) : redactThreadForPublicViewer(publicThread(access.thread));
     });
 
 export const getThreadsWithTemporaryFilter = internalQuery
