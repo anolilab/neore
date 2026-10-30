@@ -33,7 +33,6 @@ import {
     Lock,
     Pin,
     PinOff,
-    Radio,
     Send,
     Square,
     Tag,
@@ -59,6 +58,7 @@ import { showError } from "@/lib/toast";
 import MessageSearchMatches from "./message-search-matches";
 import SortableThreadItem from "./sortable-thread-item";
 import { selectSetShowManageTagsDialog, useThreadListUIStore } from "./stores/thread-list-ui-store";
+import ThreadStatusIcon from "./thread-status-icon";
 import type { BranchNode, LoadingStates } from "./types";
 
 // Lazy: its project icons pull `lucide-react/dynamic`'s import map of every icon (~190KB).
@@ -499,8 +499,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 node.status === "archived" && "-mr-9",
                             )}
                         >
-                            {isStreaming && <Radio aria-label={t`Streaming`} className="text-primary h-3 w-3 shrink-0 animate-pulse" />}
-                            {isFailed && <Radio aria-label={t`Failed`} className="text-destructive h-3 w-3 shrink-0" />}
+                            {isStreaming && <ThreadStatusIcon status="running" />}
+                            {isFailed && <ThreadStatusIcon status="error" />}
                             {isComparisonParent && <GitCompareArrows aria-label={t`Model comparison`} className="text-muted-foreground h-3 w-3 shrink-0" />}
                             {isLocked && <Lock aria-hidden="true" className="text-muted-foreground h-3 w-3 shrink-0" />}
                             <span className="truncate">{displayTitle}</span>
