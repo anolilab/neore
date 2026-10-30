@@ -100,6 +100,7 @@ const vRollup = v.object({
     optionalFailing: v.number(),
     pending: v.number(),
     state: v.union(v.literal("failing"), v.literal("none"), v.literal("passing"), v.literal("pending")),
+    waiting: v.array(v.string().max(MAX_LENGTH.short)),
 });
 
 const vRef = {
@@ -212,7 +213,7 @@ export const getPullRequestChecks = authAction
         const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => {
             const summary = await DEVELOP_DRIVER.listChecks(request, args, args.headSha);
 
-            return { ...summary, rollup: rollupOf(summary.checks, summary.total) };
+            return { checks: summary.checks, rollup: rollupOf(summary.checks, summary.total, summary.required), total: summary.total };
         });
 
         ctx.log.event("source_control.get_checks", { status: outcome.status });

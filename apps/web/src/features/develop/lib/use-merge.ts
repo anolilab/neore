@@ -35,7 +35,8 @@ export const useChecksAndMergeActions = (address: PullRequestAddress) => {
 
     return {
         autoMerge: useMutation({
-            mutationFn: async (input: { enabled: boolean; method: "merge" | "rebase" | "squash" }) => await setAutoMerge({ ...address, ...input }),
+            mutationFn: async (input: { enabled: boolean; headSha: string; method: "merge" | "rebase" | "squash" }) =>
+                await setAutoMerge({ ...address, ...input }),
             onSettled: async () => await refresh("merge"),
         }),
         merge: useMutation({

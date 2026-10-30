@@ -66,7 +66,7 @@ const ChecksTab = ({
 
     const { checks: list, rollup, total } = checks.data;
 
-    if (list.length === 0 && total === 0) {
+    if (list.length === 0 && total === 0 && rollup.waiting.length === 0) {
         return <p className="text-muted-foreground text-sm">{t`No checks have run for this commit.`}</p>;
     }
 
@@ -80,19 +80,35 @@ const ChecksTab = ({
         skipped: t`Skipped`,
         success: t`Passed`,
     };
-    const summaries = knowsRequired
-        ? {
-              failing: plural(rollup.failing, { one: "# required check is failing", other: "# required checks are failing" }),
-              none: "",
-              passing: t`All required checks passed.`,
-              pending: plural(rollup.pending, { one: "# required check is still running", other: "# required checks are still running" }),
-          }
-        : {
-              failing: plural(rollup.failing, { one: "# check is failing", other: "# checks are failing" }),
-              none: "",
-              passing: t`All checks passed.`,
-              pending: plural(rollup.pending, { one: "# check is still running", other: "# checks are still running" }),
-          };
+    // A check whose requirement could not be read counts as required, so the wording must not claim it is.
+    const unsure = list.some((check) => check.required === null);
+    const waiting = rollup.waiting.length > 0 ? t`Waiting for ${rollup.waiting.join(", ")}.` : "";
+    const withWaiting = (running: string) => [rollup.pending > 0 ? running : "", waiting].filter(Boolean).join(" ");
+    const plainSummaries = {
+        failing: plural(rollup.failing, { one: "# check is failing", other: "# checks are failing" }),
+        none: "",
+        passing: t`All checks passed.`,
+        pending: withWaiting(plural(rollup.pending, { one: "# check is still running", other: "# checks are still running" })),
+    };
+    const requiredSummaries = {
+        failing: plural(rollup.failing, { one: "# required check is failing", other: "# required checks are failing" }),
+        none: "",
+        passing: t`All required checks passed.`,
+        pending: withWaiting(plural(rollup.pending, { one: "# required check is still running", other: "# required checks are still running" })),
+    };
+    const unsureSummaries = {
+        failing: plural(rollup.failing, { one: "# required or unknown check is failing", other: "# required or unknown checks are failing" }),
+        none: "",
+        passing: t`All required or unknown checks passed.`,
+        pending: withWaiting(
+            plural(rollup.pending, { one: "# required or unknown check is still running", other: "# required or unknown checks are still running" }),
+        ),
+    };
+    let summaries = plainSummaries;
+
+    if (knowsRequired) {
+        summaries = unsure ? unsureSummaries : requiredSummaries;
+    }
 
     const rerun = async () => {
         if (target === null) {

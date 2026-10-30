@@ -61,7 +61,10 @@ export const getMergeStatus = authAction
         ),
     )
     .action(async ({ args, ctx }) => {
-        requireCapability("merge.now");
+        // The panel is useful with either: a host may offer auto-merge alone.
+        if (!isHostCapabilityAvailable(DEVELOP_DRIVER.view.capabilities, "merge.now")) {
+            requireCapability("merge.auto");
+        }
 
         const token = await resolveGithubToken(ctx, ctx.user.userId);
         const outcome = await readFromHost(DEVELOP_DRIVER, token, (request) => DEVELOP_DRIVER.getMergeStatus(request, args));
@@ -111,17 +114,17 @@ export const mergePullRequest = authAction
         return outcome;
     });
 
-/** Turns auto-merge on (merge with `method` once the host's rules are met) or off. */
+/** Turns auto-merge on (merge `headSha` with `method` once the host's rules are met) or off. */
 export const setAutoMerge = authAction
     .use(rateLimit("sourceControl/write"))
-    .input({ ...vRef, enabled: v.boolean(), method: vMergeMethod })
+    .input({ ...vRef, enabled: v.boolean(), headSha: v.string().max(MAX_LENGTH.short), method: vMergeMethod })
     .output(v.union(vOk, vWriteFailed))
     .action(async ({ args, ctx }) => {
         requireCapability("merge.auto");
 
         const token = await resolveGithubToken(ctx, ctx.user.userId);
         const outcome = await writeToHost(DEVELOP_DRIVER, token, async (request) => {
-            await DEVELOP_DRIVER.setAutoMerge(request, args, args.enabled, args.method);
+            await DEVELOP_DRIVER.setAutoMerge(request, args, args.enabled, args.method, args.headSha);
 
             return {};
         });

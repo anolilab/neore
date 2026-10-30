@@ -51,8 +51,8 @@ export interface HostDriver {
     replyToThread: (request: HostRequest, ref: PullRequestRef, commentId: string, body: string) => Promise<{ id: string }>;
     /** Re-runs the narrowest scope the host offers for one check: a single job, not its whole workflow. */
     rerunCheck: (request: HostRequest, ref: PullRequestRef, checkId: string) => Promise<void>;
-    /** Turns auto-merge on (merging with `method` once the host's rules are met) or off. */
-    setAutoMerge: (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod) => Promise<void>;
+    /** Turns auto-merge on (merging `headSha` with `method` once the host's rules are met) or off. */
+    setAutoMerge: (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod, headSha: string) => Promise<void>;
     setThreadResolved: (request: HostRequest, threadId: string, resolved: boolean) => Promise<void>;
     setViewed: (request: HostRequest, ref: PullRequestRef, path: string, viewed: boolean) => Promise<void>;
     /** Posts the whole review in ONE host call, and returns it only when the host confirmed it. */
