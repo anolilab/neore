@@ -99,7 +99,8 @@ export const createBoundRequester = ({
 
             const location = response.headers.get("location");
 
-            await response.body?.cancel();
+            // A body that fails to cancel is already gone: the redirect is judged on its headers alone.
+            await response.body?.cancel().catch(() => undefined);
 
             if (location === null || hop >= maxRedirects) {
                 throw new HostApiError("The host redirected the request too many times", 0);
