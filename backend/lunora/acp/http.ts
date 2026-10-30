@@ -5,8 +5,8 @@
  *
  *   { v: 1, kind: "turn", deviceId, issuedAt, sessionId, threadId?, turnId?, firstSeq?, events: [...] }
  *
- * No `threadId` = a session-level post (`session_open`, which makes the host thread). Otherwise a turn post: the
- * event at index `i` takes `seq = firstSeq + i`.
+ * No `threadId` = a session-level post (`session_open`, which makes the host thread; or `close: true` with no events,
+ * which ends the session). Otherwise a turn post: the event at index `i` takes `seq = firstSeq + i`.
  *
  * The checks, in the order that keeps a forged post from costing anything:
  * 1. an in-isolate per-address counter and a body cap, before anything is parsed or any database is touched;
@@ -159,6 +159,7 @@ const optionalString = (value: unknown): string | undefined | null => {
 };
 
 interface Post {
+    close: boolean;
     events: Infer<typeof vHostEvent>[];
     firstSeq: number | undefined;
     sessionId: string;
@@ -180,6 +181,7 @@ const readPost = (payload: Record<string, unknown>): Post | null => {
         (threadId?.length ?? 0) > MAX_LENGTH.id ||
         (turnId?.length ?? 0) > MAX_LENGTH.id ||
         (firstSeq !== undefined && typeof firstSeq !== "number") ||
+        (payload.close !== undefined && typeof payload.close !== "boolean") ||
         !Array.isArray(payload.events) ||
         payload.events.length > MAX_EVENTS_PER_POST
     ) {
@@ -198,7 +200,7 @@ const readPost = (payload: Record<string, unknown>): Post | null => {
         events.push(parsed.value);
     }
 
-    return { events, firstSeq, sessionId: payload.sessionId, threadId, turnId };
+    return { close: payload.close === true, events, firstSeq, sessionId: payload.sessionId, threadId, turnId };
 };
 
 const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: string, payload: string, signature: string): Promise<Response> => {
@@ -224,6 +226,7 @@ const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: 
         deviceId,
         events: post.events,
         sessionId: post.sessionId,
+        ...(post.close && { close: true }),
         ...(post.firstSeq !== undefined && { firstSeq: post.firstSeq }),
         ...(post.threadId !== undefined && { threadId: post.threadId }),
         ...(post.turnId !== undefined && { turnId: post.turnId }),
@@ -232,6 +235,10 @@ const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: 
     switch (result.outcome) {
         case "applied": {
             return json({ ended: result.ended, next: result.next, ...(result.threadId !== undefined && { threadId: result.threadId }) }, 200);
+        }
+        case "busy": {
+            // A conflict with no `next`: the host reads it as "try again", not as a gap to fill.
+            return json({ error: "turn_in_progress" }, 409);
         }
         case "gap": {
             return json({ error: "gap", next: result.next }, 409);

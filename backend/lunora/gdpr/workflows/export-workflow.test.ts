@@ -21,7 +21,7 @@ interface Call {
 
 let calls: Call[];
 let generate: () => unknown;
-
+let stepNames: string[];
 const refOf = (reference: unknown): string => (reference as { __lunoraRef: string }).__lunoraRef;
 
 const execute = async (): Promise<void> => {
@@ -34,7 +34,13 @@ const execute = async (): Promise<void> => {
 
             return ref === "gdpr_steps:generateExportFile" ? generate() : [];
         },
-        step: { do: async (_name: string, callback: () => Promise<unknown>) => await callback() },
+        step: {
+            do: async (name: string, callback: () => Promise<unknown>) => {
+                stepNames.push(name);
+
+                return await callback();
+            },
+        },
     };
 
     await dataExportWorkflowConfig.handler(context as never);
@@ -46,6 +52,17 @@ const ran = (ref: string): Call[] => calls.filter((call) => call.ref === ref);
 beforeEach(() => {
     calls = [];
     generate = () => "storage-1";
+    stepNames = [];
+});
+
+describe("data export workflow: coding-agent history", () => {
+    it("leaves the coding-agent history to the export step, so no step result or call argument carries it", async () => {
+        await execute();
+
+        expect(ran("acp_gdpr:collectAcpSessionsForExport")).toHaveLength(0);
+        expect(stepNames.filter((name) => name.startsWith("collect-acp-sessions"))).toEqual([]);
+        expect(ran("gdpr_steps:generateExportFile")[0]?.args).not.toHaveProperty("acpSessions");
+    });
 });
 
 describe("data export workflow: failure", () => {
