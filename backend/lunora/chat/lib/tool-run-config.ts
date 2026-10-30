@@ -47,3 +47,9 @@ export const vToolRunConfig = v.object({
 });
 
 export type ToolRunConfig = Infer<typeof vToolRunConfig>;
+
+/**
+ * Who started a run, when that is not the person at the app (`outside_agent`: the public API's key). Such a run never gets more than
+ * `ask` for its tools and no device tools, whatever the user's own overrides say (`resolveToolPermission`).
+ */
+export type RunOrigin = NonNullable<ToolRunConfig["dispatchOrigin"]>;

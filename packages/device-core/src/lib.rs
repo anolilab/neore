@@ -27,6 +27,9 @@ pub mod hmac;
 pub mod host;
 #[cfg(feature = "keychain")]
 pub mod install;
+pub mod launch;
+#[cfg(feature = "keychain")]
+pub mod lifecycle;
 pub mod mcp;
 pub mod media;
 pub mod sandbox;

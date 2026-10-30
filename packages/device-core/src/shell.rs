@@ -294,6 +294,70 @@ impl Drop for Job {
     }
 }
 
+/// The runs in flight (their process groups), so a host that is told to stop can end them: only the thread that
+/// started a run enforces its timeout, and that thread dies with the host. Once stopping, a run that registers late
+/// is killed on the spot.
+#[cfg(unix)]
+static RUNNING: Mutex<Running> = Mutex::new(Running {
+    pids: Vec::new(),
+    stopping: false,
+});
+
+#[cfg(unix)]
+struct Running {
+    pids: Vec<u32>,
+    stopping: bool,
+}
+
+/// Notes a run's group while it lives and forgets it however the run ends.
+#[cfg(unix)]
+struct Tracked(u32);
+
+#[cfg(unix)]
+impl Tracked {
+    fn new(pid: u32) -> Self {
+        let mut running = RUNNING.lock().unwrap();
+
+        running.pids.push(pid);
+
+        if running.stopping {
+            kill_group(pid);
+        }
+
+        Tracked(pid)
+    }
+}
+
+#[cfg(unix)]
+impl Drop for Tracked {
+    fn drop(&mut self) {
+        RUNNING.lock().unwrap().pids.retain(|pid| *pid != self.0);
+    }
+}
+
+/// Kills the process group `process_group(0)` made for a run. The result is not checked: ESRCH means it ended.
+#[cfg(unix)]
+fn kill_group(pid: u32) {
+    // SAFETY: plain syscall with no memory arguments; the group is one this process made.
+    unsafe {
+        libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
+    }
+}
+
+/// Kills every run in flight, background children included, and every run that starts from now on. For a host that
+/// was told to stop. A descendant that left the run's process group (`setsid`) is out of reach: the group is the
+/// only handle there is without a cgroup.
+#[cfg(unix)]
+pub fn kill_running() {
+    let mut running = RUNNING.lock().unwrap();
+
+    running.stopping = true;
+
+    for pid in &running.pids {
+        kill_group(*pid);
+    }
+}
+
 fn kill_tree(child: &mut Child) {
     #[cfg(unix)]
     {
@@ -376,6 +440,8 @@ pub fn run(
     })?;
     #[cfg(windows)]
     let _job = Job::attach(&child);
+    #[cfg(unix)]
+    let tracked = Tracked::new(child.id());
 
     let buffer = Arc::new(Mutex::new((Vec::new(), false)));
     let stop = Arc::new(AtomicBool::new(false));
@@ -412,6 +478,10 @@ pub fn run(
     // Whatever the command started and left running dies with it; output it already
     // wrote stays readable in the pipe.
     kill_tree(&mut child);
+
+    // The group is gone, so a host that stops now must not signal its number: it may be someone else's by then.
+    #[cfg(unix)]
+    drop(tracked);
 
     // A background child can inherit stdout and hold the pipe open after the
     // shell exits, so wait for the readers only up to a deadline. Unfinished

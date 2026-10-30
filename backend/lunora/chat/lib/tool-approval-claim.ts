@@ -28,6 +28,7 @@ const LATEST_MESSAGE_WINDOW = 20;
 
 interface StoredPart {
     approvalId?: string;
+    input?: unknown;
     toolCallId?: string;
     toolName?: string;
     type?: string;
@@ -53,6 +54,17 @@ export const findPendingApprovalOnLatestTurn = async (
     threadId: Id<"threads">,
     approvalId: string,
 ): Promise<{ toolName: string | null } | undefined> => {
+    const request = await findPendingRequestOnLatestTurn(ctx, threadId, approvalId);
+
+    return request && { toolName: request.toolName };
+};
+
+/** The same lookup as `findPendingApprovalOnLatestTurn`, with the call's id and arguments too: what a pending request shows a reader. */
+export const findPendingRequestOnLatestTurn = async (
+    ctx: Pick<QueryCtx, "db">,
+    threadId: Id<"threads">,
+    approvalId: string,
+): Promise<{ input: unknown; toolCallId: string | null; toolName: string | null } | undefined> => {
     const thread = await ctx.db.get(threadId);
     // A branched thread's latest turn is the end of the path the user is on;
     // the newest rows in storage order may belong to a sibling branch.
@@ -88,7 +100,7 @@ export const findPendingApprovalOnLatestTurn = async (
 
         const call = parts.find((p) => p.type === "tool-call" && p.toolCallId === request.toolCallId);
 
-        return { toolName: call?.toolName ?? null };
+        return { input: call?.input, toolCallId: call?.toolCallId ?? null, toolName: call?.toolName ?? null };
     }
 
     return undefined;

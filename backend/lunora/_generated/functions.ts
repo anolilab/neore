@@ -4153,7 +4153,14 @@ __val1 = source["checkLock"];
 __has1 = true;
 }
 if (typeof source["streamId"] !== "string") return DEFER;
-return { "afterIndex": source["afterIndex"], ...(__has1 ? { "checkLock": __val1 } : {}), "streamId": source["streamId"] };
+let __has2 = false;
+let __val2;
+if (source["withPendingRequest"] !== undefined) {
+if (typeof source["withPendingRequest"] !== "boolean") return DEFER;
+__val2 = source["withPendingRequest"];
+__has2 = true;
+}
+return { "afterIndex": source["afterIndex"], ...(__has1 ? { "checkLock": __val1 } : {}), "streamId": source["streamId"], ...(__has2 ? { "withPendingRequest": __val2 } : {}) };
 });
 installCompiledValidatorMap(lunora_chat_streaming_persistent_library_71.getStreamStatus.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8472,7 +8479,7 @@ export interface Caller {
                     claimStreamRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<boolean>;
                     createStream: (args: { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }) => Promise<Id<"persistentStreams">>;
                     finishStoppedReply: (args: { agentName?: string; continuation: boolean; order: number; pendingReasoning: string; pendingText: string; promptMessageId: string; streamId: Id<"persistentStreams"> }) => Promise<{ messageId?: Id<"messages">; stopped: boolean }>;
-                    getChunksAfter: (args: { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams"> }) => Promise<{ chunks: Array<{ reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string }>; locked: boolean; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
+                    getChunksAfter: (args: { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams">; withPendingRequest?: boolean }) => Promise<{ chunks: Array<{ reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string }>; locked: boolean; pendingRequest?: { question?: string; toolCallId: string; toolName: string | null }; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
                     getStreamStatus: (args: { streamId: Id<"persistentStreams"> }) => Promise<"streaming" | "pending" | "error" | "timeout" | "done">;
                     getStreamText: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ hostState?: "accepted" | "received" | "running" | "ended"; messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
                     setStreamStatus: (args: { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }) => Promise<void>;
