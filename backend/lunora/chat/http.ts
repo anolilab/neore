@@ -610,8 +610,9 @@ const runChatStartOnShard = async (
     if (validThreadId && body.regenerate && body.parentId) {
         const ownThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> });
 
-        // The regenerate branch skips the access gate above, so the host-run refusal is repeated here.
-        if (isHostRunThread(ownThread)) {
+        // The regenerate branch skips the access gate above, so the host-run refusal is repeated here. Only for the
+        // owner (the only caller a regenerate admits): a stranger gets the answer any inaccessible thread gets.
+        if (ownThread?.userId === userId && isHostRunThread(ownThread)) {
             return hostRunThreadResponse();
         }
 

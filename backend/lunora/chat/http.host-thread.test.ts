@@ -29,6 +29,8 @@ const { runChatStart } = await import("./http");
 registerModule(registry, "agent_sharing", await import("../agent/sharing"));
 registerModule(registry, "agent_threads", await import("../agent/threads"));
 registerModule(registry, "chat_functions", await import("./functions"));
+registerModule(registry, "agent_messages", await import("../agent/messages"));
+registerModule(registry, "lib_rate_limiter_mutations", await import("../lib/rate-limiter-mutations"));
 registerModule(registry, "lib_shard_housekeeping", await import("../lib/shard-housekeeping"));
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -91,6 +93,34 @@ describe("runChatStart on a host-run thread", () => {
 
         expect(response.status).toBe(409);
         await expect(response.json()).resolves.toMatchObject({ error: "HOST_RUN_THREAD" });
+        expect(await streamCount()).toBe(0);
+    });
+
+    it("answers a stranger's regenerate like any thread they cannot reach, not as a host thread", async () => {
+        const regenerate = async (fields: Record<string, unknown>) => {
+            const threadId = await insertThread({ userId: "someone-else", ...fields });
+            const parentId = (await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("messages", {
+                        message: { content: "hi", role: "user" },
+                        order: 0,
+                        status: "success",
+                        stepOrder: 0,
+                        text: "hi",
+                        threadId,
+                        tool: false,
+                        userId: "someone-else",
+                    }),
+            )) as string;
+
+            return await runChatStart(httpContext(), { model: "gpt-4o", parentId, regenerate: true, threadId }, "secret");
+        };
+        const hostResponse = await regenerate({ runner: "host" });
+        const cloudResponse = await regenerate({});
+
+        expect(hostResponse.status).not.toBe(409);
+        expect(hostResponse.status).toBe(cloudResponse.status);
+        expect(await hostResponse.json()).toEqual(await cloudResponse.json());
         expect(await streamCount()).toBe(0);
     });
 

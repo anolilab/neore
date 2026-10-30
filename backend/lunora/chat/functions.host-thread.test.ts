@@ -9,7 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import schema from "../schema";
-import { generateSummary, getFollowupSuggestions } from "./functions";
+import { branchThread, generateSummary, getFollowupSuggestions } from "./functions";
 
 const OWNER = "user-owner";
 
@@ -80,6 +80,12 @@ describe("a host-run thread", () => {
     it("gets no follow-up suggestions, and no error for asking", async () => {
         await expect(harness.withIdentity({ userId: OWNER }).action(getFollowupSuggestions as never, { threadId } as never)).resolves.toEqual({
             suggestions: [],
+        });
+    });
+
+    it("cannot be forked into a cloud thread", async () => {
+        await expect(harness.withIdentity({ userId: OWNER }).action(branchThread as never, { threadId } as never)).rejects.toMatchObject({
+            code: "CONFLICT",
         });
     });
 });

@@ -10,7 +10,7 @@
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { decryptKey } from "../../lib/encryption";
-import { DEVICE_CALL_DEADLINE_MS, MAX_OPEN_ACP_CALLS_PER_DEVICE } from "./constants";
+import { ACP_CLAIM_WINDOW_MS, DEVICE_CALL_DEADLINE_MS, MAX_OPEN_ACP_CALLS_PER_DEVICE } from "./constants";
 import { signDevicePayload } from "./signing";
 import { isAcpTool, OPEN_CALL_STATUSES } from "./state";
 
@@ -33,7 +33,8 @@ export const createAcpCancelCall = async (
     for (const status of OPEN_CALL_STATUSES) {
         const { page } = await ctx.db.deviceCalls.findMany({ limit: 50, where: { deviceId, status } });
 
-        open += page.filter((call) => isAcpTool(call.toolName)).length;
+        // A pending call past its claim window can no longer be claimed (it expires on its own): it must not block a cancel.
+        open += page.filter((call) => isAcpTool(call.toolName) && !(call.status === "pending" && now - call.createdAt > ACP_CLAIM_WINDOW_MS)).length;
     }
 
     if (open >= MAX_OPEN_ACP_CALLS_PER_DEVICE) {

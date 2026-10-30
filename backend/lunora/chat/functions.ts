@@ -2858,6 +2858,11 @@ export const branchThread = authAction
 
         throwUnlessGranted(gateResult.outcome, "Admin access denied to this thread");
 
+        // A fork is an ordinary cloud thread: it would carry a coding agent's messages out of its paired computer.
+        if (gateResult.hostRun) {
+            throw new LunoraError("CONFLICT", "This thread runs on a paired computer, so it cannot be branched.");
+        }
+
         const { language, model, organizationId } = parentThread;
 
         if (!model) {
