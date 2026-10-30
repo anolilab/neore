@@ -131,7 +131,9 @@ const isPlainHost = (host: string): boolean => {
 
 const locate = (host: string, webOrigin: string | undefined, segments: string[], declared: DeclaredHost[]): Located => {
     let best: (DeclaredHost & { base: string }) | undefined;
-    // An SSH path never carries the web mount prefix: a declaration for the host still names its kind.
+    // An SSH remote names neither a port nor the web mount prefix: it can match a declaration by hostname only, and
+    // only when one declared server has that hostname, so the result never depends on the order of declarations.
+    const sshOrigins = new Set<string>();
     let sshFallback: (DeclaredHost & { origin: string }) | undefined;
 
     for (const candidate of declared) {
@@ -151,16 +153,19 @@ const locate = (host: string, webOrigin: string | undefined, segments: string[],
             best = { ...candidate, base, origin: candidateUrl.origin };
         }
 
-        if (matches && webOrigin === undefined && sshFallback === undefined) {
-            sshFallback = { ...candidate, origin: candidateUrl.origin };
+        if (matches && webOrigin === undefined) {
+            sshOrigins.add(candidateUrl.origin);
+            sshFallback ??= { ...candidate, origin: candidateUrl.origin };
         }
     }
 
-    if (best) {
+    const ambiguous = webOrigin === undefined && sshOrigins.size > 1;
+
+    if (best && !ambiguous) {
         return { basePath: best.base, hostKind: best.hostKind, origin: best.origin };
     }
 
-    if (sshFallback) {
+    if (sshFallback && !ambiguous) {
         return { basePath: "", hostKind: sshFallback.hostKind, origin: sshFallback.origin };
     }
 

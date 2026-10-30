@@ -144,6 +144,16 @@ describe("parseRepoRemote", () => {
             expect(parseRepoRemote("git@example.com:team/app.git", declared)).toEqual(identity("gitlab", "https://example.com", "team/app"));
         });
 
+        it("does not guess between two declared servers on one host for an SSH remote", () => {
+            const declared: DeclaredHost[] = [
+                { hostKind: "gitlab", origin: "https://example.com:8443" },
+                { hostKind: "forgejo", origin: "https://example.com" },
+            ];
+
+            expect(parseRepoRemote("git@example.com:team/app.git", declared)?.hostKind).toBe("unknown");
+            expect(parseRepoRemote("git@example.com:team/app.git", [...declared].reverse())?.hostKind).toBe("unknown");
+        });
+
         it("ignores a declaration whose origin is not a URL", () => {
             expect(parseRepoRemote("https://github.com/octo/hello", [{ hostKind: "gitlab", origin: "not a url" }])?.hostKind).toBe("github");
         });
