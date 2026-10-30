@@ -2961,11 +2961,6 @@
       "to": "function:coding_agents_functions:setPullRequestSandbox"
     },
     {
-      "from": "function:coding_agents_execute:createPullRequest",
-      "kind": "call",
-      "to": "function:connectors_store:listConnectorGrants"
-    },
-    {
       "from": "function:coding_agents_execute:finishRun",
       "kind": "call",
       "to": "function:coding_agents_functions:appendRunLog"
@@ -2999,11 +2994,6 @@
       "from": "function:coding_agents_execute:finishRun",
       "kind": "call",
       "to": "function:coding_agents_functions:setPullRequestSandbox"
-    },
-    {
-      "from": "function:coding_agents_execute:finishRun",
-      "kind": "call",
-      "to": "function:connectors_store:listConnectorGrants"
     },
     {
       "from": "function:coding_agents_execute:pollCodingAgentRun",
@@ -3066,11 +3056,6 @@
       "to": "function:coding_agents_functions:postRunResult"
     },
     {
-      "from": "function:coding_agents_execute:pollPullRequest",
-      "kind": "call",
-      "to": "function:connectors_store:listConnectorGrants"
-    },
-    {
       "from": "function:coding_agents_execute:reapPullRequest",
       "kind": "call",
       "to": "function:coding_agents_functions:expirePullRequest"
@@ -3119,11 +3104,6 @@
       "from": "function:coding_agents_execute:startCodingAgentRun",
       "kind": "call",
       "to": "function:coding_agents_functions:setRunSandbox"
-    },
-    {
-      "from": "function:coding_agents_execute:startCodingAgentRun",
-      "kind": "call",
-      "to": "function:connectors_store:listConnectorGrants"
     },
     {
       "from": "function:coding_agents_execute:startCodingAgentRun",
@@ -14227,6 +14207,48 @@
     },
     {
       "detail": "action",
+      "id": "function:source_control_functions:getDevelopHost",
+      "kind": "function",
+      "name": "source_control.functions.getDevelopHost",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_functions:getInbox",
+      "kind": "function",
+      "name": "source_control.functions.getInbox",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_functions:getPullRequest",
+      "kind": "function",
+      "name": "source_control.functions.getPullRequest",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_functions:getPullRequestChecks",
+      "kind": "function",
+      "name": "source_control.functions.getPullRequestChecks",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_functions:getPullRequestCommits",
+      "kind": "function",
+      "name": "source_control.functions.getPullRequestCommits",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_functions:getPullRequestFiles",
+      "kind": "function",
+      "name": "source_control.functions.getPullRequestFiles",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
       "id": "function:sub_agents_execute:runSubAgent",
       "kind": "function",
       "name": "sub_agents.execute.runSubAgent",
@@ -16279,6 +16301,11 @@
         "skills",
         "userSkills"
       ]
+    },
+    {
+      "description": "Develop mode: pull requests across Git hosts, read through one host adapter. Holds no table yet; the client caches what it reads.",
+      "name": "source-control",
+      "tables": []
     },
     {
       "description": "Sub-agent runs delegated from a chat: admission limits, the child thread run and the result post-back.",
@@ -18642,6 +18669,18 @@
       "reason": "\"beginOAuthFlow\" is not a registered function"
     },
     {
+      "file": "connectors/lib/github-token",
+      "kind": "call",
+      "line": 16,
+      "reason": "\"resolveGithubToken\" is not a registered function"
+    },
+    {
+      "file": "connectors/lib/github-token",
+      "kind": "call",
+      "line": 50,
+      "reason": "\"hasGithubGrant\" is not a registered function"
+    },
+    {
       "file": "connectors/lib/grant-runtime",
       "kind": "call",
       "line": 113,
@@ -19610,19 +19649,19 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 795,
+      "line": 799,
       "reason": "\"rateLimitGuard\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 891,
+      "line": 895,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 933,
+      "line": 937,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {
