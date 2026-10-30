@@ -17381,25 +17381,25 @@
     {
       "file": "auth/lib/preference-writes",
       "kind": "write",
-      "line": 32,
-      "reason": "\"saveAiUserPreferences\" is not a registered function"
-    },
-    {
-      "file": "auth/lib/preference-writes",
-      "kind": "write",
       "line": 34,
       "reason": "\"saveAiUserPreferences\" is not a registered function"
     },
     {
       "file": "auth/lib/preference-writes",
       "kind": "write",
-      "line": 46,
-      "reason": "\"saveUserSettings\" is not a registered function"
+      "line": 36,
+      "reason": "\"saveAiUserPreferences\" is not a registered function"
     },
     {
       "file": "auth/lib/preference-writes",
       "kind": "write",
       "line": 48,
+      "reason": "\"saveUserSettings\" is not a registered function"
+    },
+    {
+      "file": "auth/lib/preference-writes",
+      "kind": "write",
+      "line": 50,
       "reason": "\"saveUserSettings\" is not a registered function"
     },
     {
@@ -18311,19 +18311,19 @@
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 226,
+      "line": 227,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 265,
+      "line": 268,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 396,
+      "line": 412,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {

@@ -28,6 +28,7 @@
 import type { ToolSet } from "ai";
 
 import type { ToolPermissionGrants } from "./tool-permission-grants";
+import { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
 import { grantExpiryFor } from "./tool-permission-grants";
 
 export type ToolPermissionMode = "auto" | "ask" | "off";
@@ -83,13 +84,7 @@ export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set(["askUs
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
 
-/**
- * Built-ins that exist to wait for a person — `askUser` pauses the run until
- * the user answers, whatever its mode (the tool itself always needs approval).
- * A headless run has nobody to answer, so they are removed there even when the
- * user set them to `auto`.
- */
-export const BUILTIN_TOOLS_NEEDING_A_PERSON: ReadonlySet<string> = new Set(["askUser"]);
+export { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
 
 /**
  * Default mode when the user has not chosen one.

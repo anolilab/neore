@@ -9,6 +9,7 @@
  * sees it.
  */
 import { localParts, resolveTimeZone, zonedTimeToUtc } from "../../memory/reflection-logic";
+import { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
 
 export type ToolPermissionGrants = Record<string, number>;
 
@@ -22,7 +23,7 @@ export const MAX_TOOL_GRANTS = 100;
 /** Tools that never take a time-boxed allow: a question hard-codes a person, and a device call is approved again on the device. */
 const isDeviceKey = (key: string): boolean => key.startsWith("device:");
 
-const PERSON_KEYS: ReadonlySet<string> = new Set(["builtin:askUser"]);
+const PERSON_KEYS: ReadonlySet<string> = new Set([...BUILTIN_TOOLS_NEEDING_A_PERSON].map((name) => `builtin:${name}`));
 
 /** The longest key the revoke procedure accepts: a grant it could not name could never be ended early. */
 export const MAX_GRANT_KEY_LENGTH = 256;
