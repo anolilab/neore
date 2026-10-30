@@ -1131,7 +1131,7 @@ msgstr "{providerName} · sua própria conta Bedrock ({region})"
 msgid "{requestCount} req"
 msgstr "{requestCount} req."
 
-#: src/features/develop/components/pull-request-view.tsx:108
+#: src/features/develop/components/pull-request-view.tsx:112
 msgid "{requestNoun} views"
 msgstr ""
 
