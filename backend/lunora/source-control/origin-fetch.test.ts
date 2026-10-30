@@ -48,6 +48,7 @@ describe("createBoundRequester", () => {
     it("never sends the token to a plain-http origin", async () => {
         const { seen, via } = transport(() => Response.json({}));
 
+        // eslint-disable-next-line unicorn/prefer-https -- a plain-http origin is the case under test
         await expect(createBoundRequester({ origin: "http://git.example", token: "tkn", via })("/repos/o/r")).rejects.toMatchObject({
             name: "HostApiError",
             status: 0,
