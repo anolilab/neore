@@ -13,13 +13,15 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { endHostSessionsOfDevice } from "../acp/lib/revoke";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
+import { deleteShardRoute, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
 import { decryptKey, encryptKey } from "../lib/encryption";
-import { DEVICE_CLAIM_WINDOW_MS, DEVICE_SIGNATURE_WINDOW_MS, MAX_DEVICE_OUTPUT_BYTES, MAX_DEVICES_PER_USER, MAX_MANIFEST_BYTES } from "./lib/constants";
+import { DEVICE_SIGNATURE_WINDOW_MS, MAX_DEVICE_OUTPUT_BYTES, MAX_DEVICES_PER_USER, MAX_MANIFEST_BYTES } from "./lib/constants";
 import { parseManifestTools } from "./lib/manifest";
-import { expireOpenCalls, isForwardPhase } from "./lib/state";
+import { claimWindowMs, expireOpenCalls, isForwardPhase } from "./lib/state";
 import { capUtf8, generateDeviceSecret, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
 import { vDeviceCallView, vDevicePlatform, vDeviceView, vDeviceCallStatusView } from "./validators";
 
@@ -129,6 +131,9 @@ export const registerDevice = authMutation
             ...(args.viaDeviceId !== undefined && { transport: "ssh" as const, viaDeviceId: args.viaDeviceId }),
         });
 
+        // The host ingest has no session: it finds this device's owner, hence its shard, from this row.
+        await setShardRoute(ctx, "device", deviceId as string, userId);
+
         ctx.log.event("devices.register_device", { platform: args.platform, ssh: args.viaDeviceId !== undefined });
 
         return { deviceId: deviceId as string, secret };
@@ -198,6 +203,8 @@ export const revokeDevice = authMutation
 
         for (const revoked of [device, ...hosts]) {
             await expireOpenCalls(ctx, revoked._id, "The device was removed");
+            await endHostSessionsOfDevice(ctx, revoked._id, ctx.now);
+            await deleteShardRoute(ctx, "device", revoked._id as string);
             await ctx.db.delete(revoked._id);
         }
 
@@ -205,6 +212,31 @@ export const revokeDevice = authMutation
 
         return null;
     });
+
+/** When this isolate last confirmed a device's ingest route, so a heartbeat reads the route table once in a while, not every 30 s. */
+const routeCheckedAt = new Map<string, number>();
+const ROUTE_RECHECK_MS = 10 * 60_000;
+
+/**
+ * A device paired before the host ingest existed has no `shardRoutes` row. Its next heartbeat writes it, so it
+ * works without re-pairing.
+ */
+const ensureDeviceRoute = async (ctx: Pick<MutationCtx, "db">, deviceId: string, userId: string, now: number): Promise<void> => {
+    if (now - (routeCheckedAt.get(deviceId) ?? 0) < ROUTE_RECHECK_MS) {
+        return;
+    }
+
+    try {
+        if ((await shardRouteOwner(ctx, "device", deviceId)) === null) {
+            await setShardRoute(ctx, "device", deviceId, userId);
+        }
+
+        routeCheckedAt.set(deviceId, now);
+    } catch (error) {
+        // A heartbeat must not fail for a route hint; the next one tries again.
+        console.error("[devices] Failed to record the ingest route:", error);
+    }
+};
 
 /**
  * The shell's page beats every 30 s while open. `paired: false` tells it this
@@ -222,6 +254,7 @@ export const heartbeatDevice = authMutation
         }
 
         await ctx.db.patch(device._id, { lastSeenAt: ctx.now });
+        await ensureDeviceRoute(ctx, device._id as string, ctx.user.userId, ctx.now);
 
         ctx.log.event("devices.heartbeat_device", { paired: true });
 
@@ -323,7 +356,7 @@ export const claimDeviceCall = authMutation
         const call = await ctx.db.deviceCalls.findFirst({ where: { _id: args.callId, deviceId: args.deviceId, userId } });
         const { now } = ctx;
 
-        if (call?.status !== "pending" || now - call.createdAt > DEVICE_CLAIM_WINDOW_MS) {
+        if (call?.status !== "pending" || now - call.createdAt > claimWindowMs(call.toolName)) {
             return { claimed: false };
         }
 

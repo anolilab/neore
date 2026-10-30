@@ -6,7 +6,7 @@
  * Signing the exact string (rather than a re-serialised object) means neither
  * side needs canonical JSON: the verifier checks the bytes it received and only
  * then parses them. The domain prefix keeps a signed result from being replayed
- * as a call, a manifest or a progress report. The Rust half is `packages/device-core/src/envelope.rs`;
+ * as a call, a manifest, a progress report or a turn post (`acp/http.ts`). The Rust half is `packages/device-core/src/envelope.rs`;
  * `signing.test.ts` pins a vector both sides share.
  *
  * The secret is 32 random bytes as 64 hex characters, used as the HMAC key in
@@ -14,7 +14,7 @@
  */
 import { bytesToHex, hmacSha256Hex, timingSafeEqual } from "../../lib/crypto";
 
-export type DeviceSigningDomain = "call" | "manifest" | "progress" | "result";
+export type DeviceSigningDomain = "call" | "manifest" | "progress" | "result" | "turn";
 
 const HEX_64 = /^[0-9a-f]{64}$/u;
 
@@ -24,11 +24,14 @@ export const generateDeviceSecret = (): string => bytesToHex(crypto.getRandomVal
 
 export const isDeviceSecret = (value: string): boolean => HEX_64.test(value);
 
+/** The shape of every signature (`hex(HMAC-SHA256)`); a caller checks it before anything is looked up. */
+export const isDeviceSignature = (value: string): boolean => HEX_64.test(value);
+
 export const signDevicePayload = async (secret: string, domain: DeviceSigningDomain, payload: string): Promise<string> =>
     await hmacSha256Hex(secret, domainPrefix(domain) + payload);
 
 export const verifyDevicePayload = async (secret: string, domain: DeviceSigningDomain, payload: string, signature: string): Promise<boolean> => {
-    if (!HEX_64.test(signature)) {
+    if (!isDeviceSignature(signature)) {
         return false;
     }
 

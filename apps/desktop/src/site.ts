@@ -8,6 +8,7 @@
 
 /** `pnpm dev` compiles against the local Vite server; release builds must set the origin. */
 const DEFAULT_SITE_URL = "http://localhost:5173";
+const DEFAULT_BACKEND_URL = "http://localhost:8788";
 
 /**
  * Thread ids are Lunora document ids. Anything else in a deep link is refused
@@ -39,6 +40,28 @@ export const siteOrigin = (raw: string | undefined = process.env.NEORE_SITE_URL 
 
     if (!origin) {
         throw new Error("NEORE_SITE_URL must be an http(s) origin");
+    }
+
+    return origin;
+};
+
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "[::1]", "localhost"]);
+
+/**
+ * The backend the main process posts a coding agent's output to. Fixed at BUILD time like the site origin
+ * (`NEORE_BACKEND_URL`), and never taken from the page: a page that could pick where turn output goes would have
+ * a way to send it elsewhere. Prompts, output and tool data ride in those posts, so plain http is admitted for a
+ * loopback dev backend only.
+ */
+export const backendOrigin = (raw: string | undefined = process.env.NEORE_BACKEND_URL ?? DEFAULT_BACKEND_URL): URL => {
+    const origin = originOf(new URL(raw));
+
+    if (!origin) {
+        throw new Error("NEORE_BACKEND_URL must be an http(s) origin");
+    }
+
+    if (origin.protocol !== "https:" && !LOOPBACK_HOSTS.has(origin.hostname)) {
+        throw new Error("NEORE_BACKEND_URL must be https unless it points at this machine");
     }
 
     return origin;

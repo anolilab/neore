@@ -238,6 +238,7 @@ export const RATE_LIMIT_CONFIGS = {
     "devices/manifest:free": Ratelimit.fixedWindow(120, HOUR),
     "devices/manifest:premium": Ratelimit.fixedWindow(120, HOUR),
     "devices/register:free": Ratelimit.fixedWindow(5, HOUR),
+
     "devices/register:premium": Ratelimit.fixedWindow(5, HOUR),
     "devices/relay:free": Ratelimit.fixedWindow(120, MINUTE),
     "devices/relay:premium": Ratelimit.fixedWindow(120, MINUTE),
@@ -249,18 +250,22 @@ export const RATE_LIMIT_CONFIGS = {
     "evals/create:free": Ratelimit.fixedWindow(20, MINUTE),
     "evals/create:premium": Ratelimit.fixedWindow(60, MINUTE),
     "evals/delete:free": Ratelimit.fixedWindow(20, MINUTE),
-
     "evals/delete:premium": Ratelimit.fixedWindow(60, MINUTE),
     "evals/run:free": Ratelimit.fixedWindow(3, MINUTE),
 
     "evals/run:premium": Ratelimit.fixedWindow(10, MINUTE),
     "evals/update:free": Ratelimit.fixedWindow(30, MINUTE),
+
     "evals/update:premium": Ratelimit.fixedWindow(90, MINUTE),
     // General rate limits
     free: Ratelimit.tokenBucket(40, 10 * SECOND, 40),
     // GDPR limits
     "gdpr/request:free": Ratelimit.fixedWindow(3, HOUR),
     "gdpr/request:premium": Ratelimit.fixedWindow(5, HOUR),
+    // Host turn output (`acp/http.ts`), per verified device: a turn posts at most four batches a second,
+    // and a device runs a handful of sessions.
+    "hosts/ingest:free": Ratelimit.fixedWindow(3000, MINUTE),
+    "hosts/ingest:premium": Ratelimit.fixedWindow(3000, MINUTE),
     // Adding a file to the knowledge base schedules its ingestion.
     "knowledge/add:free": Ratelimit.fixedWindow(20, MINUTE),
     "knowledge/add:premium": Ratelimit.fixedWindow(60, MINUTE),

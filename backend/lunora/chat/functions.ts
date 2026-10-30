@@ -1,4 +1,5 @@
 import type { ImageModelV2, JSONValue, LanguageModelV3 } from "@ai-sdk/provider";
+import { isHostRunThread, refuseHostThread } from "../acp/lib/host-thread";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -727,18 +728,24 @@ export const createThreadWithInitialMessage = internalMutation
 export const gateThreadActionHandler = async (
     context: Pick<QueryContext, "db">,
     args: { level: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
-): Promise<{ botId?: Id<"bots">; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
+): Promise<{ botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
     const outcome = await threadGateOutcome(context, args);
 
     if (outcome !== "ok") {
         return { outcome };
     }
 
-    // A bot thread runs on its bot's model, so a granted caller also learns which bot, if any.
+    // A bot thread runs on its bot's model, so a granted caller also learns which bot, if any. A host-run thread
+    // runs on a paired device, never on a cloud model: `runChatStart` refuses it.
     const thread = await context.db.get(args.threadId);
 
     // A worker's thread takes a turn only through `dispatchToWorker`; the chat entry points refuse it.
-    return { botId: thread?.botId, ...(args.level === "write" && { isWorker: await isWorkerThread(context, args.threadId) }), outcome };
+    return {
+        botId: thread?.botId,
+        ...(args.level === "write" && { isWorker: await isWorkerThread(context, args.threadId) }),
+        outcome,
+        ...(isHostRunThread(thread) && { hostRun: true }),
+    };
 };
 
 export const gateThreadAction = internalQuery
@@ -751,6 +758,7 @@ export const gateThreadAction = internalQuery
     .output(
         v.object({
             botId: v.optional(v.id("bots")),
+            hostRun: v.optional(v.boolean()),
             isWorker: v.optional(v.boolean()),
             outcome: v.union(v.literal("denied"), v.literal("locked"), v.literal("ok")),
         }),
@@ -1034,6 +1042,11 @@ export const continueThread = authAction
 
         if (gateResult.isWorker) {
             throw new LunoraError("BAD_REQUEST", "This is a worker's thread. Message the worker from its thread instead.");
+        }
+
+        // A cloud model must never answer in a thread the desktop owns: `runChatStart` refuses it the same way.
+        if (gateResult.hostRun) {
+            throw new LunoraError("CONFLICT", "This thread runs on a paired computer. Send the message from the desktop app.");
         }
 
         const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
@@ -1731,6 +1744,11 @@ export const generateSummary = authAction
 
         throwUnlessGranted(gateResult.outcome);
 
+        // A host-run thread's messages stay on the paired computer: they must not reach a cloud summary model.
+        if (gateResult.hostRun) {
+            throw new LunoraError("CONFLICT", "This thread runs on a paired computer, so it has no summary.");
+        }
+
         // Get thread data to check the model
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, {
             threadId: threadId as Id<"threads">,
@@ -2312,6 +2330,11 @@ export const updateThreadVisibility = authMutation
             throwThreadLocked();
         }
 
+        // A coding-agent thread holds commands and targets only its owner reads (the twin of `chat_sharing.toggleThreadVisibility`).
+        if (isPublic === true) {
+            refuseHostThread(thread, "made public");
+        }
+
         // The share token is minted here, as `chat_sharing.toggleThreadVisibility`
         // does. It used to be caller-chosen: guessable, or equal to another
         // thread's token so `getPublicThread`'s `.first()` could shadow that share.
@@ -2834,6 +2857,11 @@ export const branchThread = authAction
         const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "admin", threadId, unlockProof, userId });
 
         throwUnlessGranted(gateResult.outcome, "Admin access denied to this thread");
+
+        // A fork is an ordinary cloud thread: it would carry a coding agent's messages out of its paired computer.
+        if (gateResult.hostRun) {
+            throw new LunoraError("CONFLICT", "This thread runs on a paired computer, so it cannot be branched.");
+        }
 
         const { language, model, organizationId } = parentThread;
 
@@ -3586,6 +3614,13 @@ export const getFollowupSuggestions = authAction
         const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "read", threadId, unlockProof, userId });
 
         throwUnlessGranted(gateResult.outcome, "Access denied to this thread");
+
+        // The suggestions come from a cloud model, which a host-run thread's messages must never reach. The
+        // client asks after every reply, so this answers with none instead of an error.
+        if (gateResult.hostRun) {
+            return { suggestions: [] };
+        }
+
         const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
         const threadLanguage = threadData?.language;

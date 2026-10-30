@@ -15,9 +15,10 @@ import { internalQuery } from "../_generated/server";
 /**
  * `thread-public` routes a share TOKEN (the anonymous share page);
  * `thread-share` routes the id of a PUBLIC thread, so `/chat/<id>` opened by a
- * signed-in stranger can still find its share page.
+ * signed-in stranger can still find its share page. `device` routes a paired
+ * device's id to its owner, for the host ingest (`acp/http.ts`).
  */
-export type ShardRouteKind = "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger";
+export type ShardRouteKind = "device" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger";
 
 /** The `shardRoutes.key` for `value` of `kind`. */
 export const shardRouteKey = (kind: ShardRouteKind, value: string): string => `${kind}:${value}`;
@@ -95,7 +96,14 @@ export const deleteShardRoutesOf = async (context: Pick<MutationCtx, "db">, owne
 /** The owner `value` of `kind` routes to — for HTTP actions, which resolve it before choosing a shard. */
 export const getRouteOwner = internalQuery
     .input({
-        kind: v.union(v.literal("messenger"), v.literal("page-public"), v.literal("thread-public"), v.literal("thread-share"), v.literal("trigger")),
+        kind: v.union(
+            v.literal("device"),
+            v.literal("messenger"),
+            v.literal("page-public"),
+            v.literal("thread-public"),
+            v.literal("thread-share"),
+            v.literal("trigger"),
+        ),
         value: v.string(),
     })
     .output(v.union(v.string(), v.null()))

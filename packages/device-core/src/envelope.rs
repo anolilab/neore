@@ -23,6 +23,8 @@ pub enum Domain {
     Manifest,
     /// Where a call is on this device (`prompting` / `running`), for the chat.
     Progress,
+    /// A batch of a coding agent's turn output, posted by the main process straight to the backend.
+    Turn,
 }
 
 impl Domain {
@@ -32,6 +34,7 @@ impl Domain {
             Domain::Result => "neore-device:result:v1\n",
             Domain::Manifest => "neore-device:manifest:v1\n",
             Domain::Progress => "neore-device:progress:v1\n",
+            Domain::Turn => "neore-device:turn:v1\n",
         }
     }
 }
@@ -193,6 +196,28 @@ mod tests {
             sign(SECRET, Domain::Progress, r#"{"v":1,"kind":"progress"}"#),
             "11754e18ca1e841537e220af075d8908a42cb8bca86d8f0f133068e3a5d479c0"
         );
+        assert_eq!(
+            sign(SECRET, Domain::Turn, r#"{"v":1,"kind":"turn"}"#),
+            "8b75ddba17829fcc48f06be01cd218becd5ebe06877e6b92800587cba4a946b4"
+        );
+    }
+
+    #[test]
+    fn a_turn_signature_is_not_a_call_or_result_signature() {
+        let payload = r#"{"v":1,"kind":"turn"}"#;
+
+        assert!(!verify(
+            SECRET,
+            Domain::Call,
+            payload,
+            &sign(SECRET, Domain::Turn, payload)
+        ));
+        assert!(!verify(
+            SECRET,
+            Domain::Turn,
+            payload,
+            &sign(SECRET, Domain::Result, payload)
+        ));
     }
 
     fn envelope(overrides: Value) -> Signed {

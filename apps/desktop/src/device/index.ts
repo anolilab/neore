@@ -15,10 +15,12 @@ import { pathToFileURL } from "node:url";
 import type { BrowserWindow as BrowserWindowInstance, IpcMainInvokeEvent, WebContents } from "electron";
 import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 
+import { HostPoster } from "../acp/ingest";
 import { AcpManager } from "../acp/manager";
 import { coreGate } from "../acp/permission";
 import { spawnAgent } from "../acp/process";
 import type { AcpView, PermissionView, SpawnPlan } from "../acp/types";
+import { backendOrigin } from "../site";
 import type { TerminalOpener } from "../terminal/index";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
 import type { HostTransport } from "./transport";
@@ -63,6 +65,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         acp?: AcpManager;
         core?: DeviceCore;
         coreError?: unknown;
+        host?: HostPoster;
         local?: BrowserWindowInstance;
         transport?: HostTransport;
     } = {};
@@ -211,6 +214,11 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     const onEvent = (event: CoreEvent): void => {
         switch (event.type) {
+            case "acpCancel": {
+                // A signed `acp_cancel` the core verified: the backend timed the turn out, or the user pressed Stop.
+                state.acp?.cancelTurn(event.sessionId, event.turnId);
+                break;
+            }
             case "acpPermission": {
                 showAgentRequest(event.agent, event.tool);
                 break;
@@ -240,11 +248,26 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         }
     };
 
+    /** Saves what the agents do on the backend, from here and not from the page. Without a pairing it posts nothing. */
+    const requireHost = (core: DeviceCore): HostPoster => {
+        state.host ??= new HostPoster({
+            deviceId: () => (JSON.parse(core.status()) as { deviceId: string | null }).deviceId ?? undefined,
+            endpoint: new URL("hosts/ingest", backendOrigin()),
+            log: (message) => console.error(message),
+            sign: (payload) => core.signTurn(payload),
+            stateFile: path.join(app.getPath("userData"), "acp-host-turns.json"),
+        });
+
+        return state.host;
+    };
+
     try {
         const created = createLocalTransport(app.getPath("userData"), onEvent, hostBundleDirectory());
 
         state.transport = created;
         state.core = created.core;
+        // A turn a previous run was cut off in ends as `interrupted`, whether or not an agent is started this time.
+        requireHost(state.core).recover();
     } catch (error) {
         // Register the handlers anyway: they reject with the reason, and the shell keeps running.
         state.coreError = error;
@@ -254,10 +277,18 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     const requireAcp = (): AcpManager => {
         const core = requireCore();
 
+        const host = requireHost(core);
+
         // The core decides what may start: it refuses an unregistered agent and a folder that is not allowed.
         state.acp ??= new AcpManager({
             appVersion: app.getVersion(),
             gate: coreGate(core),
+            hostInfo: (agentKey, folder) => {
+                const consent = (JSON.parse(core.acpView()) as AcpView).consents.find((candidate) => candidate.agentKey === agentKey && candidate.folderPath === folder);
+
+                return consent === undefined ? undefined : { folderId: consent.folderId, folderLabel: consent.folderLabel };
+            },
+            observer: host,
             onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
             plan: (agentKey, folder) => JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan,
             spawn: spawnAgent,
@@ -275,17 +306,30 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         clearInterval(reap);
         // Synchronous: `will-quit` cannot await, and an agent left behind would outlive the app.
         state.acp?.killAll();
+        state.host?.stop();
         state.transport?.stop();
     });
 
     // ─── Relay (site window) ───────────────────────────────────────────────
+
+    const pairAndOpenSessions = async (deviceId: string, secret: string, accountLabel: string): Promise<boolean> => {
+        const paired = await requireTransport().pair(deviceId, secret, accountLabel);
+
+        // Sessions opened before pairing stayed on this computer; they open on the backend now.
+        // A declined pairing keeps the existing one: nothing to open.
+        if (paired) {
+            state.host?.paired();
+        }
+
+        return paired;
+    };
 
     relay(DEVICE_CHANNEL.status, () => requireTransport().status());
 
     relay(DEVICE_CHANNEL.pair, (_event, pairing) => {
         const { accountLabel, deviceId, secret } = readPairing(pairing);
 
-        return requireTransport().pair(deviceId, secret, accountLabel);
+        return pairAndOpenSessions(deviceId, secret, accountLabel);
     });
 
     relay(DEVICE_CHANNEL.manifest, async (_event, deviceId) => requireTransport().manifest(readOptionalDeviceId(deviceId)));

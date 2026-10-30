@@ -32,6 +32,7 @@ const { default: schema } = await import("../schema");
 const functions = await import("./functions");
 const internals = await import("./internal");
 const { signDevicePayload, verifyDevicePayload } = await import("./lib/signing");
+const gdpr = await import("./gdpr");
 const { MAX_OPEN_CALLS_PER_DEVICE } = await import("./lib/constants");
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -130,6 +131,33 @@ describe("registerDevice", () => {
         const guest = await insertUser({ isAnonymous: true });
 
         await expect(register(guest)).rejects.toThrow(REQUIRES_AN_ACCOUNT_ERROR);
+    });
+});
+
+const routeOf = async (deviceId: string) => await harness.run(async (ctx: any) => await ctx.db.shardRoutes.findFirst({ where: { key: `device:${deviceId}` } }));
+
+describe("a device's ingest route", () => {
+    it("is written when the device is paired and gone once it is revoked", async () => {
+        const { deviceId } = await register(ownerId);
+
+        expect(await routeOf(deviceId)).toMatchObject({ ownerId });
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId } as never);
+
+        expect(await routeOf(deviceId)).toBeNull();
+    });
+
+    it("is erased with the account's devices", async () => {
+        const first = await register(ownerId);
+        const second = await register(ownerId);
+        const other = await register(await insertUser());
+
+        const result = await harness.run(async (ctx: any) => await ctx.runMutation(gdpr.deleteUserDevices, { userId: ownerId }));
+
+        expect(result).toEqual({ hasMore: false });
+        expect(await routeOf(first.deviceId)).toBeNull();
+        expect(await routeOf(second.deviceId)).toBeNull();
+        expect(await routeOf(other.deviceId)).not.toBeNull();
     });
 });
 

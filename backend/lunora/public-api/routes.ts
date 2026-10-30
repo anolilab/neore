@@ -20,6 +20,7 @@ import z from "zod/v4";
 import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
+import { isHostRunThread } from "../acp/lib/host-thread";
 import { runChatStart } from "../chat/http";
 import { verifyStreamToken } from "../chat/streaming/persistent/stream-token";
 import { isSelectableTextModel } from "../skills/builder-logic";
@@ -605,11 +606,18 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
             const threadId = idParameter(input, "threadId") as Id<"threads">;
 
             // `deleteThread` checks ownership only, and a key has no unlock path: a locked thread is not found.
-            await getUnlockedThread(input.ctx, threadId);
+            const thread = await getUnlockedThread(input.ctx, threadId);
+
+            // A coding-agent thread has a turn on the user's computer that this route cannot stop: that is the desktop's to end.
+            if (isHostRunThread(thread)) {
+                throw new PublicApiError("conflict", "This thread runs on a paired computer. Delete it from the app.");
+            }
+
             await input.ctx.runMutation(api.chat.functions.deleteThread, { threadId });
 
             return { data: { deleted: true, id: input.params["threadId"] } };
         },
+        mayConflict: true,
         method: "delete",
         operationId: "deleteThread",
         path: "/threads/{threadId}",

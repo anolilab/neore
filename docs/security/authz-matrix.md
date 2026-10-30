@@ -146,6 +146,8 @@ for a schema table that is neither policed nor listed:
 
 | procedure | kind | builder | resources | ownership check | status |
 | --- | --- | --- | --- | --- | --- |
+| `acp_functions.getHostSession` | query | authQuery | acpSessions | row.userId == caller AND row.threadId == arg | ok — new; a stranger's or non-host thread id answers null; no device id of anyone else, no path |
+| `acp_functions.listHostSessions` | query | authQuery | acpSessions | caller-scoped (ctx.user) | ok — new; labels, status and the capability report only; paths never reach the backend |
 | `admin_audit_log.getAuditLogEntry` | query | adminQuery | auditLog | admin role | ok |
 | `admin_audit_log.getAuditLogs` | query | adminQuery | auditLog | admin role | ok |
 | `admin_audit_log.getAuditLogStats` | query | adminQuery | — | admin role | ok |
@@ -274,7 +276,7 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.createExtensionPairing` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_functions.createThread` | mutation | authMutation + RL | projects, teamMember | org membership/role; row.userId == caller; botId must be a bot the caller owns | **fixed** (low) — organizationId must be the active org |
 | `chat_functions.createThreadRelationshipPublic` | mutation | authMutation + RL | threads | row.userId == caller (both ends) | **fixed** (critical) — both threads must be the caller's; a link to a stranger's thread was a read grant on it |
-| `chat_functions.deleteThread` | mutation | authMutation + RL | threads | row.userId == caller | ok |
+| `chat_functions.deleteThread` | mutation | authMutation + RL | threads | row.userId == caller; the public API route (`DELETE /api/v1/threads/{id}`) refuses a host-run thread with 409 before calling it | ok |
 | `chat_functions.deleteThreads` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `chat_functions.generateSummary` | action | authAction + RL | threads | thread access (owner/grant) | **fixed** (low) — write access (it overwrites the summary) |
 | `chat_functions.getAllThreadRelationships` | query | authQuery | — | caller-scoped (ctx.user) | ok |
@@ -321,7 +323,7 @@ for a schema table that is neither policed nor listed:
 | `chat_group_functions.getGroupChat` | query | authQuery | threads | thread access (owner/grant) | ok |
 | `chat_group_functions.listGroupCandidates` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_group_functions.stopGroupTurn` | mutation | authMutation + RL | threads | thread access (owner/grant) | ok |
-| `chat_group_functions.updateGroupChat` | mutation | authMutation + RL | threads | skill access; row.userId == caller | ok |
+| `chat_group_functions.updateGroupChat` | mutation | authMutation + RL | threads | skill access; row.userId == caller; adding participants to a host-run thread is refused | ok |
 | `chat_link_preview.getLinkPreview` | action | authAction + RL (on cache miss) | actionCache | no per-user data: public page metadata keyed by URL; SSRF guard (`validateDomain` per redirect hop, `fetchWithTimeout`), 5s deadline, 256 KB body cap | ok |
 | `chat_local_models.saveLocalTurn` | mutation | authMutation + RL | messages, threads | caller-scoped (ctx.user) | ok |
 | `chat_mcp_registry.listMcpRegistryServers` | action | authAction + RL | — | fixed public registry | ok |
@@ -332,7 +334,7 @@ for a schema table that is neither policed nor listed:
 | `chat_pins_functions.updatePinSelectedText` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `chat_prompt_outline.getThreadPromptOutline` | query | liteAuthQuery | messages, threads | thread read access (`resolveThreadReadAccess`: owner or live grantee); a locked chat is refused without its proof; a public viewer without a grant gets an empty outline; bounded scan, reads text only | ok |
 | `chat_sharing.acceptThreadInvite` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | accepted — the token is a bearer link; it is no longer visible to non-admins |
-| `chat_sharing.createThreadInvite` | mutation | authMutation + RL | threads | caller-scoped (ctx.user) | ok |
+| `chat_sharing.createThreadInvite` | mutation | authMutation + RL | threads | caller-scoped (ctx.user); a host-run thread (`runner == "host"`) is refused | ok |
 | `chat_sharing.getPublicThread` | action | publicAction | shardRoutes → threads (owner shard) | share token | accepted — public by design; share token + allow-list projection. An action: resolves the token's owner shard (`shardRoutes`) and reads there as the system; `readPublicThread` re-checks the token |
 | `chat_sharing.getThreadAccess` | query | authQuery | threads | thread access (owner/grant); row.userId == caller | **fixed** (low) — grantee e-mails only for admins |
 | `chat_sharing.getThreadInvites` | query | authQuery | threads | thread access, admin | **fixed** (high) — admin-only; read grantees / public-thread viewers could lift pending admin tokens |
@@ -340,7 +342,7 @@ for a schema table that is neither policed nor listed:
 | `chat_sharing.resolveThreadShard` | query | authQuery | threadAccess | caller's own grant (row.userId == caller) | ok — answers only the owner id of a grant the caller holds; nothing about other threads |
 | `chat_sharing.removeThreadAccess` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_sharing.revokeThreadInvite` | mutation | authMutation + RL | threadInvites | caller-scoped (ctx.user) | ok |
-| `chat_sharing.toggleThreadVisibility` | mutation | authMutation + RL | threads | caller-scoped (ctx.user) | ok |
+| `chat_sharing.toggleThreadVisibility` | mutation | authMutation + RL | threads | caller-scoped (ctx.user); making a host-run thread public is refused (making it private is not) | ok |
 | `chat_slides_functions.createPresentation` | mutation | authMutation + RL | presentations, threads | row.userId == caller | **fixed** (low) — thread must be the caller's; rate-limited |
 | `chat_slides_functions.createSlide` | mutation | authMutation + RL | presentationSlides, presentations | owner helper | **fixed** (high) — any deck was writable; owner-only + RL |
 | `chat_slides_functions.deletePresentation` | mutation | authMutation + RL | presentations | owner helper | **fixed** (high) — owner-only + RL |
@@ -668,6 +670,7 @@ else the better-auth cookie). No route takes identity from a header.
 | `POST /email/resend/webhook` | Svix HMAC, 5 min window | — | ok |
 | `POST /messenger/{telegram,slack,discord}/:id` | platform signature | pairing gate (`messenger/pairing.ts`); event dedupe | **fixed** (low) — the first sender to reach a bot claimed it. Now only the contact who sent `/pair <code>` (one-time, 15 min, SHA-256 at rest, 5 guesses / 15 min per connection) is answered; strangers get one "this bot is private" reply per hour. Discord's signed timestamp is now checked (±5 min) and all three dedupe by event id |
 | `/messenger/{whatsapp,line,feishu,teams,wechat}/:id` | platform signature / JWT | pairing gate via `acceptInbound`; dedupe | **fixed** (low) — same pairing gate, applied after the dedupe claim |
+| `POST /hosts/ingest` | per-device HMAC over the exact payload, `turn` domain (`devices/lib/signing.ts`), fresh `issuedAt`; device owner from the `.global()` `shardRoutes` row `device:<id>` | `thread.userId == device.userId`, `thread.runner == "host"`, the thread's `acpSessions` row names this device and desktop session; stream `userId`/`threadId` match; events claimed once by `(turnId, seq)` | ok — new; every auth failure is the same 401 and the per-device limit (`hosts/ingest`, after verification) never moves for one; body capped at 256 KiB while reading; per-address flood guard in the isolate; a post into another user's or a cloud thread is 403 |
 | `POST /triggers/webhook/:triggerId` | per-trigger HMAC over `<timestamp>.<body>`, constant-time | trigger → owner | **fixed** (low) — `X-Neore-Timestamp` must be within ±5 min and is signed with the body; each signature is accepted once (`triggerWebhookDeliveries`, 15 min); 60 deliveries/min per trigger; unsigned requests (legacy rows without a secret) are refused. Breaking for senders: documented in the trigger settings UI |
 | `/extension/auth/*` | JWT / PKCE code / session token | own user | ok |
 | `/api/v1/*` | API key (`verifyApiKey`) + scope | shared procedure checks; stream token userId must equal the key's | ok |

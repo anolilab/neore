@@ -151,6 +151,9 @@ jobs:
             # The deployment the shell wraps. A repository VARIABLE, not a secret:
             # it is the site's public URL.
             NEORE_SITE_URL: "${{ vars.DESKTOP_SITE_URL }}"
+            # The backend the main process posts coding-agent output to (`/hosts/ingest`). Public
+            # as well, and the same origin the web build calls (`VITE_LUNORA_URL`).
+            NEORE_BACKEND_URL: "${{ vars.DESKTOP_BACKEND_URL }}"
         permissions:
             contents: "read"
         steps:

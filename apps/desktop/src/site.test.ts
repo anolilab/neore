@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { clampText, isSameOrigin, originOf, parseDeepLink, remotePattern, siteOrigin, threadUrl } from "./site";
+import { backendOrigin, clampText, isSameOrigin, originOf, parseDeepLink, remotePattern, siteOrigin, threadUrl } from "./site";
 import { isTrustedUrl } from "./trust";
 
 const origin = new URL("https://app.example.com");
@@ -21,6 +21,21 @@ describe("origin", () => {
     it("refuses a build without an http(s) origin", () => {
         expect(() => siteOrigin("file:///etc/passwd")).toThrow();
         expect(siteOrigin("https://app.example.com/some/path").href).toBe("https://app.example.com/");
+    });
+
+    it("takes the backend origin from the build, and refuses a non-http(s) one", () => {
+        expect(backendOrigin("https://api.example.com/some/path").href).toBe("https://api.example.com/");
+        expect(() => backendOrigin("file:///etc/passwd")).toThrow();
+    });
+
+    it("sends agent data over plain http to this machine only", () => {
+        expect(backendOrigin("http://localhost:8788").href).toBe("http://localhost:8788/");
+        expect(backendOrigin("http://127.0.0.1:8788").href).toBe("http://127.0.0.1:8788/");
+        expect(backendOrigin("http://[::1]:8788").href).toBe("http://[::1]:8788/");
+        // eslint-disable-next-line unicorn/prefer-https -- the scheme is the thing this case checks
+        expect(() => backendOrigin("http://api.example.com")).toThrow("https");
+        // eslint-disable-next-line unicorn/prefer-https -- the scheme is the thing this case checks
+        expect(() => backendOrigin("http://localhost.evil.test")).toThrow("https");
     });
 
     it("compares scheme, host and port", () => {

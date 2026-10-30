@@ -11,6 +11,7 @@ import {
     extensionAccessTokenHttpAction,
     revokeExtensionSessionHttpAction,
 } from "./auth/extension-grant-http";
+import { hostIngestHttpAction } from "./acp/http";
 import { E2E_INVITATIONS_PATH, e2eSeedInvitationHttpAction } from "./auth/e2e-seed-http";
 import { seedInvitationsHttpAction } from "./auth/seed-invitations-http";
 import {
@@ -249,6 +250,10 @@ app.post(
             async (ctx) => await handleTriggerWebhook(ctx, c.req.raw, c.req.param("triggerId")),
         ),
 );
+
+// A paired computer's coding-agent turn output (no CORS/session — signed with the device secret). It finds the
+// owner's shard itself (`acp/http.ts`).
+app.post("/hosts/ingest", httpAction(hostIngestHttpAction));
 
 // Gateway-first entry point — HMAC-signed by gateway, user JWT forwarded for auth
 // Extension sign-in without cookies (the Firefox build) — PKCE code flow; see
