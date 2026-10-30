@@ -18,8 +18,8 @@ use device_core::acp_install::InstallRequest;
 use device_core::acp_permission::PermissionRequest;
 use device_core::engine::{HostSpec, SettingsUpdate};
 use device_core::envelope::Signed;
-use device_core::install::{Bundle, Root};
 use device_core::fs::MediaRead;
+use device_core::install::{Bundle, Root};
 use device_core::media::Kind;
 use device_core::{DeviceState, Event};
 use napi::bindgen_prelude::{
