@@ -9,8 +9,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import DeviceScope from "./device-scope";
 
-const { setDeviceProjectScope } = vi.hoisted(() => {
-    return { setDeviceProjectScope: vi.fn(async (_variables: unknown) => null) };
+const { projectList, setDeviceProjectScope } = vi.hoisted(() => {
+    return {
+        projectList: { current: { isAnswered: true, projects: [{ _id: "p-listed", projectType: "chat", title: "Listed" }] as unknown[] } },
+        setDeviceProjectScope: vi.fn(async (_variables: unknown) => null),
+    };
 });
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
@@ -31,9 +34,7 @@ vi.mock("sonner", () => {
 
 vi.mock("@/features/projects/hooks/use-projects", () => {
     return {
-        useProjectList: () => {
-            return { isAnswered: true, projects: [{ _id: "p-listed", projectType: "chat", title: "Listed" }] };
-        },
+        useProjectList: () => projectList.current,
     };
 });
 
@@ -72,5 +73,18 @@ describe("<DeviceScope>", () => {
         await waitFor(() => {
             expect(setDeviceProjectScope.mock.calls[0]?.[0]).toStrictEqual({ deviceId: "d1", scope: { kind: "projects", projectIds: ["p-listed"] } });
         });
+    });
+
+    it("does not claim there are no projects while the list has not been answered", () => {
+        projectList.current = { isAnswered: false, projects: [] };
+
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <DeviceScope deviceId="d1" projectIds={[]} />
+            </QueryClientProvider>,
+        );
+
+        expect(screen.queryByText("You have no projects yet.")).toBeNull();
+        expect(screen.getByText("Loading your projects…")).toBeTruthy();
     });
 });

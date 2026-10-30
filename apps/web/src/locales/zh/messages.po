@@ -2860,7 +2860,7 @@ msgstr "具有 bedrock:InvokeModel 权限的 IAM 用户的秘密访问密钥。�
 msgid "An image in the file is corrupt."
 msgstr "文件中的某张图片已损坏。"
 
-#: src/features/devices/components/device-scope.tsx:97
+#: src/features/devices/components/device-scope.tsx:98
 msgid "An older project not listed here"
 msgstr ""
 
@@ -3029,7 +3029,7 @@ msgstr "任意模型"
 msgid "Any name from ollama.com/library, e.g. llama3.2, qwen3:8b or gemma3:4b. Downloads run on your computer and can take a while."
 msgstr "ollama.com/library 中的任意名称，例如 llama3.2、qwen3:8b 或 gemma3:4b。下载在你的电脑上进行，可能需要一些时间。"
 
-#: src/features/devices/components/device-scope.tsx:52
+#: src/features/devices/components/device-scope.tsx:53
 msgid "Any of my chats"
 msgstr ""
 
@@ -7069,7 +7069,7 @@ msgstr "无法取消运行。"
 msgid "Could not change push notifications. Try again."
 msgstr "无法更改推送通知，请重试。"
 
-#: src/features/devices/components/device-scope.tsx:32
+#: src/features/devices/components/device-scope.tsx:33
 msgid "Could not change where this device is offered."
 msgstr ""
 
@@ -16749,6 +16749,10 @@ msgstr "正在加载工作流..."
 msgid "Loading your overview…"
 msgstr "正在加载概览…"
 
+#: src/features/devices/components/device-scope.tsx:104
+msgid "Loading your projects…"
+msgstr ""
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:178
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:62
 #: src/components/default-loading.tsx:8
@@ -19789,7 +19793,7 @@ msgstr ""
 msgid "not measured"
 msgstr "未测量"
 
-#: src/features/devices/components/device-scope.tsx:108
+#: src/features/devices/components/device-scope.tsx:109
 msgid "Not offered in any chat until you choose a project."
 msgstr ""
 
@@ -19962,7 +19966,7 @@ msgstr ""
 msgid "Off"
 msgstr "关闭"
 
-#: src/features/devices/components/device-scope.tsx:109
+#: src/features/devices/components/device-scope.tsx:110
 msgid "Offered only in chats that belong to the projects above. It applies from the next message."
 msgstr ""
 
@@ -20212,7 +20216,7 @@ msgstr "仅扫描了最新的运行记录，因此可能缺少较早的模型。
 msgid "Only the owner can change who sees this skill."
 msgstr "只有所有者可以更改谁能看到此技能。"
 
-#: src/features/devices/components/device-scope.tsx:56
+#: src/features/devices/components/device-scope.tsx:57
 msgid "Only these projects"
 msgstr ""
 
@@ -20228,7 +20232,7 @@ msgstr "只有你可以查看和使用。"
 msgid "Only you."
 msgstr "仅你自己。"
 
-#: src/features/devices/components/device-scope.tsx:105
+#: src/features/devices/components/device-scope.tsx:106
 msgid "Only your 100 most recent projects are listed."
 msgstr ""
 
@@ -22543,7 +22547,7 @@ msgstr "需要更长的 10 秒视频片段和高度创意控制的项目"
 msgid "Projects that require full 1080p video resolution from a frontier model"
 msgstr "需要前沿模型输出完整 1080p 视频分辨率的项目"
 
-#: src/features/devices/components/device-scope.tsx:62
+#: src/features/devices/components/device-scope.tsx:63
 msgid "Projects this device is offered in"
 msgstr ""
 
@@ -32224,7 +32228,7 @@ msgstr "设置后，只会使用这些提供商。留空则允许全部。"
 msgid "When should the assistant use this skill?"
 msgstr "助手应在什么时候使用此技能？"
 
-#: src/features/devices/components/device-scope.tsx:37
+#: src/features/devices/components/device-scope.tsx:38
 msgid "Where this device is offered"
 msgstr ""
 
@@ -32596,7 +32600,7 @@ msgstr "你还没有评测数据集。"
 msgid "You have no indexed knowledge files yet."
 msgstr "你还没有已索引的知识文件。"
 
-#: src/features/devices/components/device-scope.tsx:103
+#: src/features/devices/components/device-scope.tsx:104
 msgid "You have no projects yet."
 msgstr ""
 

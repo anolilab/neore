@@ -2859,7 +2859,7 @@ msgstr "An IAM user's secret access key with bedrock:InvokeModel. Encrypted at r
 msgid "An image in the file is corrupt."
 msgstr "An image in the file is corrupt."
 
-#: src/features/devices/components/device-scope.tsx:97
+#: src/features/devices/components/device-scope.tsx:98
 msgid "An older project not listed here"
 msgstr "An older project not listed here"
 
@@ -3028,7 +3028,7 @@ msgstr "Any model"
 msgid "Any name from ollama.com/library, e.g. llama3.2, qwen3:8b or gemma3:4b. Downloads run on your computer and can take a while."
 msgstr "Any name from ollama.com/library, e.g. llama3.2, qwen3:8b or gemma3:4b. Downloads run on your computer and can take a while."
 
-#: src/features/devices/components/device-scope.tsx:52
+#: src/features/devices/components/device-scope.tsx:53
 msgid "Any of my chats"
 msgstr "Any of my chats"
 
@@ -7068,7 +7068,7 @@ msgstr "Could not cancel the run."
 msgid "Could not change push notifications. Try again."
 msgstr "Could not change push notifications. Try again."
 
-#: src/features/devices/components/device-scope.tsx:32
+#: src/features/devices/components/device-scope.tsx:33
 msgid "Could not change where this device is offered."
 msgstr "Could not change where this device is offered."
 
@@ -16748,6 +16748,10 @@ msgstr "Loading workflow..."
 msgid "Loading your overview…"
 msgstr "Loading your overview…"
 
+#: src/features/devices/components/device-scope.tsx:104
+msgid "Loading your projects…"
+msgstr "Loading your projects…"
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:178
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:62
 #: src/components/default-loading.tsx:8
@@ -19788,7 +19792,7 @@ msgstr "Not loaded: the diffs on this page were already large."
 msgid "not measured"
 msgstr "not measured"
 
-#: src/features/devices/components/device-scope.tsx:108
+#: src/features/devices/components/device-scope.tsx:109
 msgid "Not offered in any chat until you choose a project."
 msgstr "Not offered in any chat until you choose a project."
 
@@ -19961,7 +19965,7 @@ msgstr "off"
 msgid "Off"
 msgstr "Off"
 
-#: src/features/devices/components/device-scope.tsx:109
+#: src/features/devices/components/device-scope.tsx:110
 msgid "Offered only in chats that belong to the projects above. It applies from the next message."
 msgstr "Offered only in chats that belong to the projects above. It applies from the next message."
 
@@ -20211,7 +20215,7 @@ msgstr "Only the newest runs were scanned, so an older model may be missing."
 msgid "Only the owner can change who sees this skill."
 msgstr "Only the owner can change who sees this skill."
 
-#: src/features/devices/components/device-scope.tsx:56
+#: src/features/devices/components/device-scope.tsx:57
 msgid "Only these projects"
 msgstr "Only these projects"
 
@@ -20227,7 +20231,7 @@ msgstr "Only you can see and use it."
 msgid "Only you."
 msgstr "Only you."
 
-#: src/features/devices/components/device-scope.tsx:105
+#: src/features/devices/components/device-scope.tsx:106
 msgid "Only your 100 most recent projects are listed."
 msgstr "Only your 100 most recent projects are listed."
 
@@ -22542,7 +22546,7 @@ msgstr "Projects that need longer 10-second video clips with a high degree of cr
 msgid "Projects that require full 1080p video resolution from a frontier model"
 msgstr "Projects that require full 1080p video resolution from a frontier model"
 
-#: src/features/devices/components/device-scope.tsx:62
+#: src/features/devices/components/device-scope.tsx:63
 msgid "Projects this device is offered in"
 msgstr "Projects this device is offered in"
 
@@ -32223,7 +32227,7 @@ msgstr "When set, only these providers will be used. Leave empty to allow all."
 msgid "When should the assistant use this skill?"
 msgstr "When should the assistant use this skill?"
 
-#: src/features/devices/components/device-scope.tsx:37
+#: src/features/devices/components/device-scope.tsx:38
 msgid "Where this device is offered"
 msgstr "Where this device is offered"
 
@@ -32595,7 +32599,7 @@ msgstr "You have no eval datasets yet."
 msgid "You have no indexed knowledge files yet."
 msgstr "You have no indexed knowledge files yet."
 
-#: src/features/devices/components/device-scope.tsx:103
+#: src/features/devices/components/device-scope.tsx:104
 msgid "You have no projects yet."
 msgstr "You have no projects yet."
 

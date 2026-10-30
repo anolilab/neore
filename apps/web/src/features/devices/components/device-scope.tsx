@@ -21,7 +21,7 @@ const DeviceScope: FC<{ deviceId: string; projectIds?: string[] }> = ({ deviceId
     const baseId = useId();
     const scoped = projectIds !== undefined;
     // The project list is only needed to draw the picker, so a device offered in any chat starts no query.
-    const { projects } = useProjectList(scoped);
+    const { isAnswered, projects } = useProjectList(scoped);
     const setScope = useMutation(crpc.devices.functions.setDeviceProjectScope.mutationOptions());
     const chat = projects.filter((project) => project.projectType !== "workflow");
     const chosen = new Set(projectIds);
@@ -101,7 +101,7 @@ const DeviceScope: FC<{ deviceId: string; projectIds?: string[] }> = ({ deviceId
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-muted-foreground text-xs">{t`You have no projects yet.`}</p>
+                        <p className="text-muted-foreground text-xs">{isAnswered ? t`You have no projects yet.` : t`Loading your projects…`}</p>
                     )}
                     {projects.length >= 100 && <p className="text-muted-foreground text-xs">{t`Only your 100 most recent projects are listed.`}</p>}
                     <p className="text-muted-foreground text-xs" role="status">

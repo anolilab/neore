@@ -2860,7 +2860,7 @@ msgstr "La clé d'accès secrète d'un utilisateur IAM disposant de bedrock:Invo
 msgid "An image in the file is corrupt."
 msgstr "Une image du fichier est corrompue."
 
-#: src/features/devices/components/device-scope.tsx:97
+#: src/features/devices/components/device-scope.tsx:98
 msgid "An older project not listed here"
 msgstr ""
 
@@ -3029,7 +3029,7 @@ msgstr "N’importe quel modèle"
 msgid "Any name from ollama.com/library, e.g. llama3.2, qwen3:8b or gemma3:4b. Downloads run on your computer and can take a while."
 msgstr "N’importe quel nom de ollama.com/library, par ex. llama3.2, qwen3:8b ou gemma3:4b. Les téléchargements s’exécutent sur votre ordinateur et peuvent prendre du temps."
 
-#: src/features/devices/components/device-scope.tsx:52
+#: src/features/devices/components/device-scope.tsx:53
 msgid "Any of my chats"
 msgstr ""
 
@@ -7069,7 +7069,7 @@ msgstr "Impossible d’annuler l’exécution."
 msgid "Could not change push notifications. Try again."
 msgstr "Impossible de modifier les notifications push. Réessayez."
 
-#: src/features/devices/components/device-scope.tsx:32
+#: src/features/devices/components/device-scope.tsx:33
 msgid "Could not change where this device is offered."
 msgstr ""
 
@@ -16749,6 +16749,10 @@ msgstr "Chargement du workflow..."
 msgid "Loading your overview…"
 msgstr "Chargement de votre aperçu…"
 
+#: src/features/devices/components/device-scope.tsx:104
+msgid "Loading your projects…"
+msgstr ""
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:178
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:62
 #: src/components/default-loading.tsx:8
@@ -19789,7 +19793,7 @@ msgstr ""
 msgid "not measured"
 msgstr "non mesuré"
 
-#: src/features/devices/components/device-scope.tsx:108
+#: src/features/devices/components/device-scope.tsx:109
 msgid "Not offered in any chat until you choose a project."
 msgstr ""
 
@@ -19962,7 +19966,7 @@ msgstr ""
 msgid "Off"
 msgstr "Désactivé"
 
-#: src/features/devices/components/device-scope.tsx:109
+#: src/features/devices/components/device-scope.tsx:110
 msgid "Offered only in chats that belong to the projects above. It applies from the next message."
 msgstr ""
 
@@ -20212,7 +20216,7 @@ msgstr "Seules les exécutions les plus récentes ont été analysées ; un mod�
 msgid "Only the owner can change who sees this skill."
 msgstr "Seul le propriétaire peut modifier qui voit cette compétence."
 
-#: src/features/devices/components/device-scope.tsx:56
+#: src/features/devices/components/device-scope.tsx:57
 msgid "Only these projects"
 msgstr ""
 
@@ -20228,7 +20232,7 @@ msgstr "Vous seul pouvez la voir et l’utiliser."
 msgid "Only you."
 msgstr "Vous seul."
 
-#: src/features/devices/components/device-scope.tsx:105
+#: src/features/devices/components/device-scope.tsx:106
 msgid "Only your 100 most recent projects are listed."
 msgstr ""
 
@@ -22543,7 +22547,7 @@ msgstr "Projets nécessitant des clips vidéo plus longs de 10 secondes avec un 
 msgid "Projects that require full 1080p video resolution from a frontier model"
 msgstr "Projets nécessitant une résolution vidéo Full HD 1080p d’un modèle de pointe"
 
-#: src/features/devices/components/device-scope.tsx:62
+#: src/features/devices/components/device-scope.tsx:63
 msgid "Projects this device is offered in"
 msgstr ""
 
@@ -32224,7 +32228,7 @@ msgstr "Si cette option est définie, seuls ces fournisseurs seront utilisés. L
 msgid "When should the assistant use this skill?"
 msgstr "Quand l’assistant doit-il utiliser cette compétence ?"
 
-#: src/features/devices/components/device-scope.tsx:37
+#: src/features/devices/components/device-scope.tsx:38
 msgid "Where this device is offered"
 msgstr ""
 
@@ -32596,7 +32600,7 @@ msgstr "Vous n’avez encore aucun jeu de données d’évaluation."
 msgid "You have no indexed knowledge files yet."
 msgstr "Vous n’avez encore aucun fichier de connaissances indexé."
 
-#: src/features/devices/components/device-scope.tsx:103
+#: src/features/devices/components/device-scope.tsx:104
 msgid "You have no projects yet."
 msgstr ""
 
