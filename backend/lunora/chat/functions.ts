@@ -1744,6 +1744,11 @@ export const generateSummary = authAction
 
         throwUnlessGranted(gateResult.outcome);
 
+        // A host-run thread's messages stay on the paired computer: they must not reach a cloud summary model.
+        if (gateResult.hostRun) {
+            throw new LunoraError("CONFLICT", "This thread runs on a paired computer, so it has no summary.");
+        }
+
         // Get thread data to check the model
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, {
             threadId: threadId as Id<"threads">,
@@ -3604,6 +3609,13 @@ export const getFollowupSuggestions = authAction
         const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "read", threadId, unlockProof, userId });
 
         throwUnlessGranted(gateResult.outcome, "Access denied to this thread");
+
+        // The suggestions come from a cloud model, which a host-run thread's messages must never reach. The
+        // client asks after every reply, so this answers with none instead of an error.
+        if (gateResult.hostRun) {
+            return { suggestions: [] };
+        }
+
         const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
         const threadLanguage = threadData?.language;
