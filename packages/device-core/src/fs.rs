@@ -341,7 +341,8 @@ mod confined {
                 (false, _) => ("unknown", 0),
                 (true, libc::S_IFLNK) => ("symlink", stat.st_size as u64),
                 (true, libc::S_IFDIR) => ("dir", stat.st_size as u64),
-                (true, _) => ("file", stat.st_size as u64),
+                (true, libc::S_IFREG) => ("file", stat.st_size as u64),
+                (true, _) => ("other", 0),
             }
         }
     }
@@ -1156,6 +1157,35 @@ mod tests {
         assert_eq!(names, ["a.txt", "sub"]);
         assert_eq!(read(&roots, &roots[0].join("a.txt")).unwrap(), "hello");
         assert!(read(&roots, &roots[0]).is_err());
+    }
+
+    /// A FIFO is listed as `other`, not `file`, so a page cannot ask to preview (and block on) it.
+    #[cfg(unix)]
+    #[test]
+    fn lists_a_fifo_as_other() {
+        let dir = scratch("fifo");
+        let fifo =
+            std::ffi::CString::new(dir.join("root/pipe").to_string_lossy().as_bytes()).unwrap();
+        // SAFETY: `fifo` is a NUL-terminated path inside the scratch folder.
+        assert_eq!(unsafe { libc::mkfifo(fifo.as_ptr(), 0o600) }, 0);
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+        let listing = list(&roots, &roots[0]).unwrap();
+        let kinds: Vec<(&str, &str)> = listing["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| {
+                (
+                    entry["name"].as_str().unwrap(),
+                    entry["type"].as_str().unwrap(),
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            kinds,
+            [("a.txt", "file"), ("pipe", "other"), ("sub", "dir")]
+        );
     }
 
     /// An ancestor of the root replaced by a link after the roots were read must not be followed.

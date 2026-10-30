@@ -741,7 +741,13 @@ const loadTerminalAvailability = async (): Promise<void> => {
 // ─── Files on a server ──────────────────────────────────────────────────────
 
 /** Where the file tree is: a server and one of its folders, or `null` for the list of its shared folders. */
-const files: { folder: string | null; next: string | null; request: number; roots: string } = { folder: null, next: null, request: 0, roots: "" };
+const files: { folder: string | null; next: string | null; preview: number; request: number; roots: string } = {
+    folder: null,
+    next: null,
+    preview: 0,
+    request: 0,
+    roots: "",
+};
 
 const filesHost = (): HostView | undefined => state.settings?.hosts.find((host) => host.deviceId === ($("files-host") as HTMLSelectElement).value);
 
@@ -810,11 +816,15 @@ const entryRow = (host: HostView, folder: string, entry: FileEntry): HTMLLIEleme
         return fileRow(`${entry.name} (${String(entry.size)} bytes)`, async () => {
             const preview = $("files-preview");
 
+            files.preview += 1;
+
+            const request = files.preview;
+
             try {
                 const read = await globalThis.neoreDevice.hostFileRead(host.deviceId, path);
 
                 // A slow read must not land in a folder or server the person has since moved to.
-                if (files.folder !== folder || filesHost()?.deviceId !== host.deviceId) {
+                if (request !== files.preview || files.folder !== folder || filesHost()?.deviceId !== host.deviceId) {
                     return;
                 }
 

@@ -71,7 +71,7 @@ export interface HostUpgrade {
 export interface FileEntry {
     name: string;
     size: number;
-    type: "dir" | "file" | "symlink" | "unknown";
+    type: "dir" | "file" | "other" | "symlink" | "unknown";
 }
 
 /** One page of a folder on a connected server (`host_files_list`). */
@@ -135,18 +135,18 @@ export interface Prompt {
         | { host: string; kind: "hostKeyChanged"; pinned: string[]; port: number; presented: string[] }
         | { host: string; kind: "passphrase"; prompt: string }
         | {
-              allowAlways: boolean;
-              detail: string;
-              /** The server the call runs on; absent for this computer. */
-              host?: string;
-              input: string;
-              kind: "call";
-              sandbox: { confined: boolean; note: string } | null;
-              taintedBy: string[];
-              threadTitle: string;
-              tool: string;
-              toolKind: string;
-          };
+            allowAlways: boolean;
+            detail: string;
+            /** The server the call runs on; absent for this computer. */
+            host?: string;
+            input: string;
+            kind: "call";
+            sandbox: { confined: boolean; note: string } | null;
+            taintedBy: string[];
+            threadTitle: string;
+            tool: string;
+            toolKind: string;
+        };
     expiresAt: number;
     id: number;
 }
@@ -165,12 +165,12 @@ export interface SettingsView {
 }
 
 /** What the engine emits, parsed from the addon's JSON event strings. */
-export type CoreEvent =
-    | { agent: string; tool: string; type: "acpPermission" }
-    | { callId: string; deviceId: string; payload: string; signature: string; type: "progress" }
-    | { prompt: Prompt; type: "prompt" }
-    | { type: "acpPermissionsChanged" }
-    | { type: "changed" };
+export type CoreEvent
+    = | { agent: string; tool: string; type: "acpPermission" }
+        | { callId: string; deviceId: string; payload: string; signature: string; type: "progress" }
+        | { prompt: Prompt; type: "prompt" }
+        | { type: "acpPermissionsChanged" }
+        | { type: "changed" };
 
 /** The surface of the native `DeviceCore` class. */
 export interface DeviceCore {
@@ -187,9 +187,9 @@ export interface DeviceCore {
     acpPermissions: () => string;
     /** A relayed coding-agent command, checked but not acted on (`acp/commands.ts`). */
     acpPrepare: (envelope: string, signature: string) => string;
-    acpSign: (envelope: string, signature: string, outcome: string) => string;
     /** Reads a file an agent's reply refers to, in Rust: only inside the folder the agent was approved for, only an allowed type. */
     acpReadMedia: (agentKey: string, folder: string, reference: string) => Promise<MediaRead>;
+    acpSign: (envelope: string, signature: string, outcome: string) => string;
     acpSpawnPlan: (agentKey: string, folder: string | null) => string;
     acpUpdate: (update: string) => string;
     acpView: () => string;
