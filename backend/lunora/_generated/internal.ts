@@ -340,6 +340,22 @@ export interface InternalApiTypes {
             streamAsync: FunctionReference<"action", { customSystemPrompt?: string; enabledFeatures?: Array<string>; jobId?: string; messageId: string; model: string; parentId?: string; prompt?: string; reasoningEffort?: number; statelessMode?: boolean; threadId: string }, null>;
             updateThreadModel: FunctionReference<"mutation", { customSystemPrompt?: string; dictationLanguage?: string; enabledFeatures?: Array<string>; model: string; order?: number; reasoningEffort?: number; statelessMode?: boolean; threadId: string; userId: string }, null>;
         };
+        goals: {
+            execute: {
+                reviewGoalRound: FunctionReference<"action", { goalId: Id<"threadGoals">; round: number }, null>;
+            };
+            internal: {
+                chargeGoalRound: FunctionReference<"mutation", { userId: string }, boolean>;
+                claimGoalRound: FunctionReference<"mutation", { goalId: Id<"threadGoals">; round: number }, { text: string; threadId: Id<"threads">; userId: string } | null>;
+                endGoalsForThread: FunctionReference<"mutation", { reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; threadId: Id<"threads"> }, boolean>;
+                failGoalReview: FunctionReference<"mutation", { goalId: Id<"threadGoals">; reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; round: number }, boolean>;
+                getActiveGoalForRun: FunctionReference<"query", { threadId: Id<"threads"> }, { goalId: Id<"threadGoals">; round: number } | null>;
+                reapStalledGoals: FunctionReference<"mutation", {}, number>;
+                recordGoalVerdict: FunctionReference<"mutation", { anchorOrder?: number; costMicrodollars: number; goalId: Id<"threadGoals">; met: boolean; reason: string; round: number }, { next?: { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean }; messageId: string; organizationId?: string; streamId: string }; outcome: "continue" | "ended" | "ignored" }>;
+                roundTranscript: FunctionReference<"query", { goalId: Id<"threadGoals"> }, { costMicrodollars: number; lastOrder?: number; transcript: string }>;
+                startGoal: FunctionReference<"mutation", { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean }; maxRounds?: number; organizationId?: string; promptMessageId: string; text: string; threadId: Id<"threads">; userId: string }, { goalId: Id<"threadGoals">; ok: true } | { error: string; ok: false }>;
+            };
+        };
         group: {
             functions: {
                 getGroupHistory: FunctionReference<"query", { threadId: string; userId: string }, Array<{ agentName?: string; id: string; role: "user" | "assistant"; speakerSkillId?: string; text: string }>>;
@@ -380,7 +396,7 @@ export interface InternalApiTypes {
             deliverSteers: FunctionReference<"mutation", { pendingMessageId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads">; userId: string }, null | { messageId: string; text: string }>;
         };
         streaming: {
-            createStreamWithMessage: FunctionReference<"mutation", { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, string>;
+            createStreamWithMessage: FunctionReference<"mutation", { goalId?: Id<"threadGoals">; messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, string>;
             streamRunThread: FunctionReference<"query", { streamId: Id<"persistentStreams">; userId: string }, ({ activeLeafMessageId?: string | undefined; botId?: string | undefined; createdAt?: number | undefined; groupChat?: ({ debateRounds?: number | undefined; stopRequestedAt?: number | undefined; synthesizerSkillId?: string | undefined; } & { mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: ({} & { addedAt: number; skillId: string; })[]; }) | undefined; lastUserMessageAt?: number | undefined; lockedAt?: number | undefined; order?: number | undefined; runner?: "host" | undefined; tagIds?: string[] | undefined; workerPolicy?: ({ maxDispatchesPerHour?: number | undefined; } & { allowedSources: ("user" | "lead" | "trigger" | "messenger" | "outside_agent")[]; hostDispatch: "ask"; }) | undefined; category?: string | undefined; createdBy?: string | undefined; customSystemPrompt?: string | undefined; deleted?: boolean | undefined; deletedAt?: number | undefined; dictationLanguage?: string | undefined; enabledFeatures?: string[] | undefined; externalThreadId?: string | undefined; isPublic?: boolean | undefined; isTemporary?: boolean | undefined; language?: string | undefined; lastCompressionStartedAt?: number | undefined; messengerConnectionId?: string | undefined; mode?: "text" | "image" | "video" | undefined; model?: string | undefined; multiChat?: boolean | undefined; organizationId?: string | undefined; parentThreadIds?: string[] | undefined; pinnedAt?: number | undefined; projectId?: string | undefined; publicAccessToken?: string | undefined; reasoningEffort?: number | undefined; source?: string | undefined; statelessMode?: boolean | undefined; summary?: string | undefined; tags?: string[] | undefined; teamId?: string | undefined; title?: string | undefined; updatedAt?: number | undefined; userId?: string | undefined; } & { _creationTime: number; _id: string; status: "error" | "running" | "active" | "archived" | "abort" | "finish"; }) | null>;
             persistent: {
                 crons: {
@@ -1382,6 +1398,22 @@ export const internal: InternalApiTypes = {
             optimizeSystemPrompt: { __lunoraRef: "chat_functions:optimizeSystemPrompt" },
             streamAsync: { __lunoraRef: "chat_functions:streamAsync" },
             updateThreadModel: { __lunoraRef: "chat_functions:updateThreadModel" },
+        },
+        goals: {
+            execute: {
+                reviewGoalRound: { __lunoraRef: "chat_goals_execute:reviewGoalRound" },
+            },
+            internal: {
+                chargeGoalRound: { __lunoraRef: "chat_goals_internal:chargeGoalRound" },
+                claimGoalRound: { __lunoraRef: "chat_goals_internal:claimGoalRound" },
+                endGoalsForThread: { __lunoraRef: "chat_goals_internal:endGoalsForThread" },
+                failGoalReview: { __lunoraRef: "chat_goals_internal:failGoalReview" },
+                getActiveGoalForRun: { __lunoraRef: "chat_goals_internal:getActiveGoalForRun" },
+                reapStalledGoals: { __lunoraRef: "chat_goals_internal:reapStalledGoals" },
+                recordGoalVerdict: { __lunoraRef: "chat_goals_internal:recordGoalVerdict" },
+                roundTranscript: { __lunoraRef: "chat_goals_internal:roundTranscript" },
+                startGoal: { __lunoraRef: "chat_goals_internal:startGoal" },
+            },
         },
         group: {
             functions: {

@@ -18119,6 +18119,198 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#chat_goals_functions:getThreadGoal": {
+      "post": {
+        "description": "Invoke the `query` `chat_goals_functions:getThreadGoal` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_goals_functions:getThreadGoal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_goals_functions:getThreadGoal",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "costMicrodollars": {
+                          "type": "number"
+                        },
+                        "createdAt": {
+                          "type": "number"
+                        },
+                        "goalId": {
+                          "type": "string"
+                        },
+                        "maxCostMicrodollars": {
+                          "type": "number"
+                        },
+                        "maxRounds": {
+                          "type": "number"
+                        },
+                        "round": {
+                          "type": "number"
+                        },
+                        "startMessageId": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "active",
+                              "type": "string"
+                            },
+                            {
+                              "const": "met",
+                              "type": "string"
+                            },
+                            {
+                              "const": "stopped",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "stopReason": {
+                          "anyOf": [
+                            {
+                              "const": "cost_limit",
+                              "type": "string"
+                            },
+                            {
+                              "const": "daily_limit",
+                              "type": "string"
+                            },
+                            {
+                              "const": "error",
+                              "type": "string"
+                            },
+                            {
+                              "const": "review_failed",
+                              "type": "string"
+                            },
+                            {
+                              "const": "round_limit",
+                              "type": "string"
+                            },
+                            {
+                              "const": "superseded",
+                              "type": "string"
+                            },
+                            {
+                              "const": "unsupported",
+                              "type": "string"
+                            },
+                            {
+                              "const": "user",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "verdicts": {
+                          "items": {
+                            "properties": {
+                              "at": {
+                                "type": "number"
+                              },
+                              "met": {
+                                "type": "boolean"
+                              },
+                              "order": {
+                                "type": "number"
+                              },
+                              "reason": {
+                                "type": "string"
+                              },
+                              "round": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "at",
+                              "met",
+                              "reason",
+                              "round"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "costMicrodollars",
+                        "createdAt",
+                        "goalId",
+                        "maxCostMicrodollars",
+                        "maxRounds",
+                        "round",
+                        "startMessageId",
+                        "status",
+                        "text",
+                        "verdicts"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: chat_goals_functions:getThreadGoal",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#chat_group_functions:createGroupChat": {
       "post": {
         "description": "Invoke the `mutation` `chat_group_functions:createGroupChat` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -49684,7 +49876,7 @@
       "name": "changelog"
     },
     {
-      "description": "Chat threads end to end: start/stream/execute, tools, sharing, tags, pins, group chats, slides, local models and persistent streams.",
+      "description": "Chat threads end to end: start/stream/execute, tools, sharing, tags, pins, group chats, slides, local models and persistent streams, goals (run until a reviewer confirms).",
       "name": "chat"
     },
     {

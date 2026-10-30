@@ -8,11 +8,11 @@ import type { MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batch";
 
 /**
- * The user's pins, tags and thread passcodes (relationships and grants are `agent/gdpr.ts`).
+ * The user's pins, tags, goals and thread passcodes (relationships and grants are `agent/gdpr.ts`).
  * A passcode row is the hash of a lock on one of their threads: it goes with them.
  */
 export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
-    const [pins, threadTags, passcodes] = await Promise.all([
+    const [pins, threadTags, passcodes, goals] = await Promise.all([
         ctx.db
             .query("threadPins")
             .withIndex("by_user_and_thread", (q) => q.eq("userId", userId))
@@ -25,12 +25,17 @@ export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: st
             .query("threadPasscodes")
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .collect(),
+        ctx.db
+            .query("threadGoals")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect(),
     ]);
 
     await Promise.all([
         ...pins.map((p) => ctx.db.delete(p._id)),
         ...threadTags.map((tag) => ctx.db.delete(tag._id)),
         ...passcodes.map((row) => ctx.db.delete(row._id)),
+        ...goals.map((goal) => ctx.db.delete(goal._id)),
     ]);
 };
 

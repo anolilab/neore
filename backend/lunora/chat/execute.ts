@@ -23,6 +23,7 @@ import { internalAction } from "../_generated/server";
 import { streamLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
 import { findSkillCommand, parseSkillCommand, resolveReasoningEffort, resolveSkillModel } from "../skills/slash-command";
+import { handOffToGoalReview } from "./goals/execute";
 import { continueGroupAfterToolApproval, runGroupTurn } from "./group/run";
 import {
     afterRun,
@@ -137,6 +138,8 @@ export const runStreamingAgent = internalAction
             }
 
             if (groupConfig) {
+                // A goal reviews one agent's turns; a group turn has several speakers.
+                await ctx.runMutation(internal.chat.goals.internal.endGoalsForThread, { reason: "unsupported", threadId: threadId as Id<"threads"> });
                 await runGroupTurn(
                     ctx,
                     { isAnonymous: isAnonymous === true, messageId, organizationId, origin, streamId, streamingConfig, threadId, userId, userPrompt },
@@ -416,8 +419,10 @@ export const runStreamingAgent = internalAction
             // A locked chat's content is never mined into memory.
             const extractMemory = runContext.memoryEnabled && !isThreadLocked(thread);
 
+            let paused: boolean;
+
             try {
-                await finishRun(ctx, {
+                ({ paused } = await finishRun(ctx, {
                     mcpLabels: toolResult.mcpLabels,
                     pending,
                     savedMessages: result.savedMessages,
@@ -440,7 +445,7 @@ export const runStreamingAgent = internalAction
                     threadId,
                     unsaved,
                     userId,
-                });
+                }));
             } catch (error) {
                 // A stop landed after the pipe ended: the final write is refused, the owed text is saved.
                 await stoppedAt(error);
@@ -455,6 +460,12 @@ export const runStreamingAgent = internalAction
                 firstTokenTime,
                 prompt,
             });
+
+            // A run that belongs to a goal is reviewed before the chat settles: the goal keeps the thread running
+            // and holds the follow-ups back until it ends. A run paused on an approval is not finished yet.
+            if (!paused && (await handOffToGoalReview(ctx, threadId))) {
+                return;
+            }
 
             void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, {
                 threadId,
@@ -550,11 +561,16 @@ export const continueAfterToolApproval = internalAction
             }
 
             // The gate above admitted this continuation, so its knowledge search may read the chat's own files.
-            await resumeApprovedRun(
+            const resumed = await resumeApprovedRun(
                 ctx,
                 { answer, approvalId, approved, config, denyReason, streamId, threadId, userId },
                 { admittedRun: true, steerable: true },
             );
+
+            // The run a goal was waiting on ended here, once nothing more is pending (see `runStreamingAgent`).
+            if (!resumed.paused && !resumed.stopped && (await handOffToGoalReview(ctx, threadId))) {
+                return;
+            }
 
             await setThreadStatus(ctx, threadId, "active");
         } catch (error) {

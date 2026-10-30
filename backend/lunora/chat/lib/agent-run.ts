@@ -1179,4 +1179,11 @@ export const failRun = async (
     } catch {
         // Ignore cleanup errors
     }
+
+    // A failed run ends the goal it belonged to: no review follows a run that never finished.
+    try {
+        await ctx.runMutation(internal.chat.goals.internal.endGoalsForThread, { reason: "error", threadId: threadId as Id<"threads"> });
+    } catch {
+        // The goal's own stall sweep ends it (`reapStalledGoals`).
+    }
 };

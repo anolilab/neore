@@ -245,6 +245,11 @@ export interface ApiTypes {
             updateThreadVisibility: FunctionReference<"mutation", { isPublic?: boolean; threadId: Id<"threads"> }, { success: boolean }>;
             validateThreadExists: FunctionReference<"query", { threadId: Id<"threads"> }, boolean>;
         };
+        goals: {
+            functions: {
+                getThreadGoal: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { costMicrodollars: number; createdAt: number; goalId: string; maxCostMicrodollars: number; maxRounds: number; round: number; startMessageId: string; status: "active" | "met" | "stopped"; stopReason?: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; text: string; verdicts: Array<{ at: number; met: boolean; order?: number; reason: string; round: number }> } | null>;
+            };
+        };
         group: {
             functions: {
                 createGroupChat: FunctionReference<"mutation", { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; model: string; skillIds: Array<string>; synthesizerSkillId?: string; title?: string }, { threadId: string }>;
@@ -1017,6 +1022,11 @@ export const api: ApiTypes = {
             updateThreadOrder: { __lunoraRef: "chat_functions:updateThreadOrder" },
             updateThreadVisibility: { __lunoraRef: "chat_functions:updateThreadVisibility" },
             validateThreadExists: { __lunoraRef: "chat_functions:validateThreadExists" },
+        },
+        goals: {
+            functions: {
+                getThreadGoal: { __lunoraRef: "chat_goals_functions:getThreadGoal" },
+            },
         },
         group: {
             functions: {

@@ -36,6 +36,9 @@ import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { createRequestChannel } from "@/features/chat/core/stores/request-channel-store";
+import { GoalBanner, GoalVerdictNote } from "@/features/chat/goal/goal-notes";
+import { anchorVerdicts, withoutGoalInstructions } from "@/features/chat/goal/goal-view";
+import { useThreadGoal } from "@/features/chat/goal/use-thread-goal";
 import type { UIMessage } from "@/lib/agent";
 import { showInfo } from "@/lib/toast";
 
@@ -226,8 +229,12 @@ interface MessageListProps {
 const MessageList: FC<MessageListProps> = memo(({ className, editComposerComponent: EditComposer, emptyComponent, maxWidth: maxWidthProp }) => {
     const maxWidth = maxWidthProp ?? "65ch";
     const { t } = useLingui();
-    const { loadMore, messages, messagesReady, messagesStatus } = useChatMessages();
+    const { loadMore, messages: threadMessages, messagesReady, messagesStatus } = useChatMessages();
     const { threadId } = useChatThread();
+    // A goal's own instructions are not the user's messages; its verdicts sit under the replies they judged.
+    const goal = useThreadGoal(threadId);
+    const messages = withoutGoalInstructions(threadMessages);
+    const verdictAnchors = goal ? anchorVerdicts(messages, goal.verdicts) : null;
     const { activeStreamId, gatewayUrl, isStreaming, pendingStreamId, streamToken } = useChatIsStreaming();
     const editingMessageId = useChatUIStore((state) => state.editingMessageId);
 
@@ -427,16 +434,29 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             initialIds !== null && shouldAnimateEntrance({ index, initialIds, messageId: message.id, role: message.role, total: messages.length });
 
         return (
-            <div
-                aria-posinset={index + 1}
-                aria-setsize={setSize}
-                className={cn("outline-none", isEntering && "animate-in fade-in slide-in-from-bottom-2 duration-200")}
-                data-list-message-id={message.id}
-                role="listitem"
-                tabIndex={-1}
-            >
-                {renderMessage(message, index)}
-            </div>
+            <>
+                {goal && threadId && goal.startMessageId === message.id && (
+                    <div role="listitem">
+                        <GoalBanner goal={goal} maxWidth={maxWidth} threadId={threadId} />
+                    </div>
+                )}
+                <div
+                    aria-posinset={index + 1}
+                    aria-setsize={setSize}
+                    className={cn("outline-none", isEntering && "animate-in fade-in slide-in-from-bottom-2 duration-200")}
+                    data-list-message-id={message.id}
+                    role="listitem"
+                    tabIndex={-1}
+                >
+                    {renderMessage(message, index)}
+                </div>
+                {goal &&
+                    verdictAnchors?.get(message.id)?.map((verdict) => (
+                        <div key={verdict.round} role="listitem">
+                            <GoalVerdictNote goal={goal} maxWidth={maxWidth} verdict={verdict} />
+                        </div>
+                    ))}
+            </>
         );
     };
 

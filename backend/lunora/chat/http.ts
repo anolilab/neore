@@ -20,6 +20,7 @@ import { getUserTier } from "../lib/rate-limiter";
 import { SERVICE_REQUEST_WINDOW_MS } from "../lib/sign-request";
 import { threadShardFor } from "../lib/thread-shard";
 import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
+import { GOAL_TEXT_MAX } from "./goals/shared";
 import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
@@ -354,6 +355,8 @@ export interface ChatStartBody {
     duration?: number;
     enabledFeatures?: string[];
     fileIds?: string[];
+    /** Run until a reviewer confirms this goal is met (`chat/goals/`). Text turns in the caller's own chat only. */
+    goal?: { maxRounds?: number; text: string };
     imageSize?: string;
     language?: string;
     mcpServerNames?: string[];
@@ -477,6 +480,19 @@ const runChatStartOnShard = async (
         contentType = "image";
     } else if (modelDefinition?.mode === "video") {
         contentType = "video";
+    }
+
+    if (body.goal !== undefined) {
+        // The gateway forwards the body unread, so the goal's shape and size are checked here.
+        const goalText = typeof body.goal?.text === "string" ? body.goal.text.trim() : "";
+
+        if (contentType !== "text" || isAnonymous || body.regenerate) {
+            return Response.json({ error: "A goal needs a signed-in account and a new text message." }, { status: 400 });
+        }
+
+        if (goalText.length === 0 || goalText.length > GOAL_TEXT_MAX) {
+            return Response.json({ error: `A goal must be between 1 and ${GOAL_TEXT_MAX} characters.` }, { status: 400 });
+        }
     }
 
     // Scopes organization-shared skills. `user.activeOrganization` is always
@@ -658,7 +674,8 @@ const runChatStartOnShard = async (
         researchDepth: body.researchDepth,
         searchMode: body.searchMode,
         seed: body.seed,
-        shouldAutoContinue: body.shouldAutoContinue === true,
+        // A goal runs Deep Work.
+        shouldAutoContinue: body.shouldAutoContinue === true || body.goal !== undefined,
         statelessMode: body.statelessMode,
         style: body.style,
     };
@@ -798,7 +815,38 @@ const runChatStartOnShard = async (
     let streamToken: string | undefined;
 
     if (contentType === "text") {
+        const activeOrganizationId = await activeOrganizationPromise;
+        let goalId: Id<"threadGoals"> | undefined;
+
+        if (body.goal !== undefined) {
+            const started = await context.runMutation(internal.chat.goals.internal.startGoal, {
+                config: {
+                    ...(streamingConfig.customSystemPrompt !== undefined && { customSystemPrompt: streamingConfig.customSystemPrompt }),
+                    ...(streamingConfig.enabledFeatures !== undefined && { enabledFeatures: streamingConfig.enabledFeatures }),
+                    ...(streamingConfig.mcpServerNames !== undefined && { mcpServerNames: streamingConfig.mcpServerNames }),
+                    model: streamingConfig.model,
+                    ...(streamingConfig.reasoningEffort !== undefined && { reasoningEffort: streamingConfig.reasoningEffort }),
+                    ...(streamingConfig.researchDepth !== undefined && { researchDepth: streamingConfig.researchDepth }),
+                    ...(streamingConfig.searchMode !== undefined && { searchMode: streamingConfig.searchMode }),
+                    ...(streamingConfig.statelessMode !== undefined && { statelessMode: streamingConfig.statelessMode }),
+                },
+                ...(typeof body.goal.maxRounds === "number" && { maxRounds: body.goal.maxRounds }),
+                ...(activeOrganizationId && { organizationId: activeOrganizationId }),
+                promptMessageId: messageId,
+                text: body.goal.text,
+                threadId: threadId as Id<"threads">,
+                userId,
+            });
+
+            if (!started.ok) {
+                return Response.json({ error: started.error }, { status: 400 });
+            }
+
+            goalId = started.goalId;
+        }
+
         streamId = await context.runMutation(internal.chat.streaming.createStreamWithMessage, {
+            ...(goalId && { goalId }),
             messageId,
             streamingConfig,
             threadId,
@@ -806,8 +854,6 @@ const runChatStartOnShard = async (
         });
 
         streamToken = await createStreamToken(streamId!, userId, threadId, signingSecret);
-
-        const activeOrganizationId = await activeOrganizationPromise;
 
         // On the jobs queue, not the scheduler: the SchedulerDO runs jobs one at a
         // time, so a scheduled run waited behind every other user's run and

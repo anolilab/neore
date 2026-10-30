@@ -18,6 +18,7 @@ const harness = vi.hoisted(() => {
         actions: {} as Record<string, unknown>,
         ActionsContext: undefined as Context<Record<string, unknown>> | undefined,
         contentRenders: new Map<string, number>(),
+        goal: null as unknown,
         messages: [] as unknown[],
         MessagesContext: undefined as Context<unknown[]> | undefined,
         publish: undefined as (() => void) | undefined,
@@ -98,6 +99,10 @@ vi.mock("@/lib/lunora/crpc", () => {
     const namespace: object = new Proxy({}, { get: (_target, key) => (Object.hasOwn(leaf, key) ? leaf[key as keyof typeof leaf] : namespace) });
 
     return { useCRPC: () => namespace };
+});
+
+vi.mock("@/features/chat/goal/use-thread-goal", () => {
+    return { useThreadGoal: () => harness.goal };
 });
 
 vi.mock("@/features/evals/components/save-eval-case-action", () => {
@@ -287,5 +292,49 @@ describe("message list text size hook", () => {
         mountInto();
 
         expect(screen.getByText("system note").closest(".message-text")).not.toBeNull();
+    });
+});
+
+describe("message list goal", () => {
+    beforeEach(() => {
+        harness.actions = {};
+        harness.contentRenders.clear();
+        harness.messages = [
+            makeMessage(0, "Make the report"),
+            makeMessage(1, "Here is a draft."),
+            { ...makeMessage(2, "Goal: Ship the report. Keep going."), agentName: "neore:goal", order: 1 },
+            { ...makeMessage(3, "Charts added."), order: 1 },
+        ];
+        harness.goal = {
+            costMicrodollars: 0,
+            createdAt: 1,
+            goalId: "g1",
+            maxCostMicrodollars: 2_000_000,
+            maxRounds: 5,
+            round: 2,
+            startMessageId: "m0",
+            status: "met",
+            text: "Ship the report",
+            verdicts: [
+                { met: false, order: 0, reason: "Add the charts.", round: 1 },
+                { met: true, order: 1, reason: "Charts added.", round: 2 },
+            ],
+        };
+    });
+
+    it("shows the goal at the top of the run and a verdict under each reply it judged", () => {
+        mount();
+
+        expect(screen.getByRole("region", { name: "Goal" }).textContent).toContain("Ship the report");
+        expect(screen.getByText("Round 1: not yet. Add the charts.")).toBeTruthy();
+        expect(screen.getByText("Goal met: Charts added.")).toBeTruthy();
+    });
+
+    it("does not show the instruction the goal saved to open its second round", () => {
+        mount();
+
+        expect(harness.contentRenders.has("m2")).toBe(false);
+        expect(harness.contentRenders.has("m1")).toBe(true);
+        expect(harness.contentRenders.has("m3")).toBe(true);
     });
 });

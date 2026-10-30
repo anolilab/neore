@@ -1349,6 +1349,34 @@ export const temporaryThreads = sqliteTable("temporaryThreads", {
     by_thread: index("by_thread").on(t.threadId),
 }));
 
+export const threadGoals = sqliteTable("threadGoals", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    claimedRound: real("claimedRound"),
+    config: text("config", { mode: "json" }).$type<{ customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean }>().notNull(),
+    costMicrodollars: real("costMicrodollars").notNull(),
+    createdAt: real("createdAt").notNull(),
+    endedAt: real("endedAt"),
+    maxCostMicrodollars: real("maxCostMicrodollars").notNull(),
+    maxRounds: real("maxRounds").notNull(),
+    organizationId: text("organizationId"),
+    promptMessageId: text("promptMessageId").notNull(),
+    round: real("round").notNull(),
+    startMessageId: text("startMessageId").notNull(),
+    status: text("status", { mode: "json" }).$type<"active" | "met" | "stopped">().notNull(),
+    stopReason: text("stopReason", { mode: "json" }).$type<"cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user">(),
+    text: text("text").notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    updatedAt: real("updatedAt").notNull(),
+    userId: text("userId").notNull(),
+    verdicts: text("verdicts", { mode: "json" }).$type<Array<{ at: number; met: boolean; order?: number; reason: string; round: number }>>().notNull(),
+}, (t) => ({
+    by_status_and_updatedAt: index("by_status_and_updatedAt").on(t.status, t.updatedAt),
+    by_user: index("by_user").on(t.userId),
+    by_thread_and_status: index("by_thread_and_status").on(t.threadId, t.status),
+    by_thread: index("by_thread").on(t.threadId),
+}));
+
 export const threadKnowledge = sqliteTable("threadKnowledge", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

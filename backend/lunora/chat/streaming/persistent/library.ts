@@ -13,6 +13,7 @@ import { internal } from "../../../_generated/internal";
 import type { Doc, Id } from "../../../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../../../_generated/server";
 import { stopHostTurn } from "../../../acp/lib/finish";
+import { endActiveGoals } from "../../goals/rows";
 import { patchRow } from "../../../lib/patch";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { findPendingRequestOnLatestTurn } from "../../lib/tool-approval-claim";
@@ -24,6 +25,30 @@ import { streamStatusValidator } from "./schema";
 
 const STREAM_TTL_MS = 20 * 60 * 1000; // 20 minutes
 const LIVE_STREAM_PAGE = 50;
+
+/** The pending row a run writes into; `createStream` and a goal's next round (`chat/goals/internal.ts`) both start one. */
+export const insertPersistentStream = async (
+    ctx: Pick<MutationCtx, "db" | "now">,
+    {
+        messageId,
+        streamingConfig,
+        threadId,
+        userId,
+    }: {
+        messageId: string;
+        streamingConfig: Omit<Doc<"persistentStreams">["streamingConfig"], "researchDepth"> & { researchDepth?: string };
+        threadId: string;
+        userId: string;
+    },
+): Promise<Id<"persistentStreams">> =>
+    (await ctx.db.insert("persistentStreams", {
+        expiresAt: ctx.now + STREAM_TTL_MS,
+        messageId,
+        status: "pending",
+        streamingConfig,
+        threadId,
+        userId,
+    })) as Id<"persistentStreams">;
 
 export const createStream = internalMutation
     .input({
@@ -42,19 +67,7 @@ export const createStream = internalMutation
         threadId: v.string(),
         userId: v.string(),
     })
-    .mutation(async ({ args, ctx }) => {
-        const { now } = ctx;
-        const insertedId = await ctx.db.insert("persistentStreams", {
-            expiresAt: now + STREAM_TTL_MS,
-            messageId: args.messageId,
-            status: "pending",
-            streamingConfig: args.streamingConfig,
-            threadId: args.threadId,
-            userId: args.userId,
-        });
-
-        return insertedId as Id<"persistentStreams">;
-    });
+    .mutation(async ({ args, ctx }) => await insertPersistentStream(ctx, args));
 
 /**
  * Whether a run may start writing `stream`: only once, and only while nothing
@@ -223,15 +236,18 @@ export const stopActiveForThread = internalMutation
             await ctx.db.patch(stream._id, { status: "done", ...(steers && { steers }) });
         }
 
+        // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop.
+        const goalEnded = await endActiveGoals(ctx, args.threadId as Id<"threads">, "user");
+
         // The thread leaves `running` only when no live reply is left to keep running.
-        if (streams.length > 0 && streams.length === live.length) {
+        if ((streams.length > 0 && streams.length === live.length) || (goalEnded && live.length === 0)) {
             const threadId = args.threadId as Id<"threads">;
 
             await patchThread(ctx.db, threadId, { status: "abort", updatedAt: ctx.now });
             await ctx.scheduler.runAfter(1000, internal.agent.streams.resetThreadStatusToActive, { threadId });
         }
 
-        return streams.length > 0;
+        return streams.length > 0 || goalEnded;
     });
 
 /**
