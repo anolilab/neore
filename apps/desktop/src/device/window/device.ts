@@ -695,7 +695,7 @@ const loadTerminalAvailability = async (): Promise<void> => {
 // ─── Files on a server ──────────────────────────────────────────────────────
 
 /** Where the file tree is: a server and one of its folders, or `null` for the list of its shared folders. */
-const files: { folder: string | null; next: string | null; request: number } = { folder: null, next: null, request: 0 };
+const files: { folder: string | null; next: string | null; request: number; roots: string } = { folder: null, next: null, request: 0, roots: "" };
 
 const filesHost = (): HostView | undefined => state.settings?.hosts.find((host) => host.deviceId === ($("files-host") as HTMLSelectElement).value);
 
@@ -719,11 +719,19 @@ const renderFilesHosts = (): void => {
         }),
     );
 
-    if (hosts.some((host) => host.deviceId === kept)) {
+    const current = hosts.find((host) => host.deviceId === kept);
+    const roots = JSON.stringify(current?.roots ?? []);
+
+    if (current !== undefined) {
         select.value = kept;
-    } else {
+    }
+
+    // A folder opened under shared folders that have since changed may no longer be shared: back to the list.
+    if (current === undefined || roots !== files.roots) {
         showFolder(null);
     }
+
+    files.roots = roots;
 
     select.disabled = hosts.length === 0;
     setText("files-path", hosts.length === 0 ? "Connect a server to browse it." : files.folder ?? "Shared folders");

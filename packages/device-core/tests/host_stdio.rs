@@ -620,7 +620,7 @@ mod tar {
         assert_eq!(response["id"], 3);
         assert_eq!(
             response["result"],
-            json!({ "bytes": 6, "files": 2, "folders": 1, "skipped": 0 })
+            json!({ "bytes": 6, "files": 2, "folders": 1, "skipped": 0, "unreadable": 0 })
         );
         assert_eq!(names.len(), 3, "{names:?}");
         assert!(names[0].ends_with("root/") && names[1].ends_with("/one"));

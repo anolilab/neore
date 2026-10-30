@@ -159,6 +159,28 @@ mod confined {
     use std::os::unix::ffi::OsStrExt;
     use std::path::{Component, Path, PathBuf};
 
+    /// The thread's `errno`, which `readdir` leaves alone at the end of a folder and sets on an error.
+    pub(crate) fn errno() -> *mut libc::c_int {
+        // SAFETY: each of these returns the address of the calling thread's `errno`.
+        #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
+        unsafe {
+            libc::__errno_location()
+        }
+        #[cfg(any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "freebsd",
+            target_os = "dragonfly"
+        ))]
+        unsafe {
+            libc::__error()
+        }
+        #[cfg(any(target_os = "netbsd", target_os = "openbsd"))]
+        unsafe {
+            libc::__errno()
+        }
+    }
+
     fn openat(dir: libc::c_int, name: &OsStr, flags: libc::c_int) -> io::Result<OwnedFd> {
         let name = CString::new(name.as_bytes())
             .map_err(|_| io::Error::from(io::ErrorKind::InvalidInput))?;
@@ -273,21 +295,33 @@ mod confined {
             Ok(Stream { fd, stream })
         }
 
-        /// Calls `visit` with each name but `.` and `..` until it answers `false`.
-        fn names(&mut self, mut visit: impl FnMut(&std::ffi::CStr) -> bool) {
+        /// Calls `visit` with each name but `.` and `..` until it answers `false`. A read that fails partway is an
+        /// error, not the end of the folder: a short listing would pass for a complete one.
+        fn names(&mut self, mut visit: impl FnMut(&std::ffi::CStr) -> bool) -> io::Result<()> {
             loop {
-                // SAFETY: `stream` is a live DIR* until `closedir`; the entry is only read before the next call.
-                let entry = unsafe { libc::readdir(self.stream) };
+                // SAFETY: `errno` is the calling thread's own; `stream` is a live DIR* until `closedir`, and the
+                // entry is only read before the next call.
+                let entry = unsafe {
+                    *errno() = 0;
+
+                    libc::readdir(self.stream)
+                };
 
                 if entry.is_null() {
-                    return;
+                    // The end of the folder leaves `errno` alone; a failed read sets it.
+                    let error = io::Error::last_os_error();
+
+                    return match error.raw_os_error() {
+                        Some(0) | None => Ok(()),
+                        Some(_) => Err(error),
+                    };
                 }
 
                 // SAFETY: `d_name` is a NUL-terminated string inside the entry returned above.
                 let name = unsafe { std::ffi::CStr::from_ptr((*entry).d_name.as_ptr()) };
 
                 if !matches!(name.to_bytes(), b"." | b"..") && !visit(name) {
-                    return;
+                    return Ok(());
                 }
             }
         }
@@ -337,7 +371,7 @@ mod confined {
             listed.push((name.to_string_lossy().into_owned(), kind, size));
 
             true
-        });
+        })?;
 
         Ok((listed, truncated))
     }
@@ -384,7 +418,7 @@ mod confined {
             }
 
             true
-        });
+        })?;
 
         let fd = stream.fd;
         let mut names = kept.into_sorted_vec();
@@ -747,6 +781,9 @@ mod confined {
         })
     }
 }
+
+#[cfg(unix)]
+pub(crate) use confined::errno;
 
 /// A folder opened for reading through the same walk as [`list`], for a caller that goes on by descriptor.
 #[cfg(unix)]

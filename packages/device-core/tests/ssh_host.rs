@@ -1946,7 +1946,7 @@ fn a_ten_thousand_file_folder_lists_and_downloads_within_the_budget() {
     // What came down is a complete archive of the folder without the link, and nothing of what the link names.
     assert_eq!(
         summary,
-        json!({ "bytes": bytes, "files": BIG_FOLDER_FILES, "folders": 1, "skipped": 1 })
+        json!({ "bytes": bytes, "files": BIG_FOLDER_FILES, "folders": 1, "skipped": 1, "unreadable": 0 })
     );
 
     let entries = Command::new("tar")
