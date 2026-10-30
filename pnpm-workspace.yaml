@@ -27,6 +27,9 @@ auditConfig:
     # eslint-plugin-react-compiler calls through its zod 3 API (it breaks on zod 4),
     # and it runs at lint time only. The MCP packages and the product use zod 4.6.7.
     - GHSA-mrhx-c7xc-m3w5
+    # deepmerge >=4.2.0 <=4.3.1, via @lunora/mail > @react-email/render > html-to-text.
+    # No patched release exists; it merges the renderer's own option objects, not input.
+    - GHSA-gcqx-w48m-w2h4
 
 # OFF: auto-installing peers materialised Next.js — which nothing here uses — as
 # the peer of fumadocs, geist, better-auth, @visulima/pail and friends, and its
@@ -757,9 +760,10 @@ overrides:
   # 0.33.5 is the lowest patched release, so the jump stays as small as possible.
   satori@<0.33.5: 0.33.5
   semver@>=7.0.0 <7.5.2: ">=7.7.3"
-  serialize-javascript@<=7.0.2: ">=7.0.3"
-  serialize-javascript@>=5.0.0 <7.0.5: ">=7.0.5"
-  seroval@<1.4.1: ">=1.4.1"
+  # GHSA-9wx9-5pv9-3349 and the typed-array constructor advisory: 1.6.11 is the lowest patched
+  # release, pinned with its plugins so the pair stays matched (1.7.x is not a day old yet).
+  seroval-plugins@<1.6.11: 1.6.11
+  seroval@<1.6.11: 1.6.11
   sharp@<0.35.5: ">=0.35.5"
   shell-quote@<=1.8.4: ">=1.9.0"
   shell-quote@>=1.1.0 <=1.8.3: ">=1.8.4"
@@ -767,6 +771,8 @@ overrides:
   smol-toml@<=1.8.0: ">=1.9.0 <2.0.0"
   svelte@<=5.55.6: 5.55.10
   svgo@>=4.0.0 <4.0.2: ">=4.0.2"
+  # Windows command injection in services(); only reached through dev tooling.
+  systeminformation@<5.33.16: ">=5.33.16"
   tar-fs@>=2.0.0 <2.1.4: ">=3.1.1"
   tar@<=7.5.20: ">=7.5.21"
   tar@<=7.5.3: ">=7.5.4"
