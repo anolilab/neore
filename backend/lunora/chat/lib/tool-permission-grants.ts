@@ -24,7 +24,10 @@ const isDeviceKey = (key: string): boolean => key.startsWith("device:");
 
 const PERSON_KEYS: ReadonlySet<string> = new Set(["builtin:askUser"]);
 
-export const isGrantableKey = (key: string): boolean => !isDeviceKey(key) && !PERSON_KEYS.has(key);
+/** The longest key the revoke procedure accepts: a grant it could not name could never be ended early. */
+export const MAX_GRANT_KEY_LENGTH = 256;
+
+export const isGrantableKey = (key: string): boolean => key.length <= MAX_GRANT_KEY_LENGTH && !isDeviceKey(key) && !PERSON_KEYS.has(key);
 
 /**
  * When a grant of `kind` made at `now` lapses. `today` ends at the user's next
@@ -37,7 +40,13 @@ export const grantExpiry = (kind: TimedGrantKind, now: number, timezone: string 
 
     const zone = resolveTimeZone(timezone);
     const { day, month, year } = localParts(now, zone);
-    const midnight = zonedTimeToUtc(year, month, day + 1, 0, 0, zone);
+    let midnight = zonedTimeToUtc(year, month, day + 1, 0, 0, zone);
+
+    // Where a DST change skips midnight, the conversion lands before it, still on today's date: step to the first
+    // instant of tomorrow. A clock change moves at most an hour or two, so this ends within a few steps.
+    for (let step = 0; step < 8 && localParts(midnight, zone).day === day; step += 1) {
+        midnight += GRANT_HOUR_MS / 2;
+    }
 
     return midnight > now ? midnight : now + GRANT_HOUR_MS;
 };

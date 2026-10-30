@@ -33,6 +33,22 @@ describe("grantExpiry", () => {
     });
 });
 
+describe("a 'today' allow where midnight does not exist", () => {
+    it("lasts until the first instant of the next local day when a DST change skips midnight", () => {
+        // Santiago springs forward at midnight on 6 Sep 2026: 00:00 -04 becomes 01:00 -03 (04:00Z).
+        const noon = Date.UTC(2026, 8, 5, 16, 0); // 12:00 local on the 5th
+
+        expect(grantExpiry("today", noon, "America/Santiago")).toBe(Date.UTC(2026, 8, 6, 4, 0));
+    });
+});
+
+describe("grantable keys", () => {
+    it("refuses a key longer than the revoke procedure accepts", () => {
+        expect(isGrantableKey(`mcp:${"x".repeat(300)}:t`)).toBe(false);
+        expect(isGrantableKey("mcp:Files:delete")).toBe(true);
+    });
+});
+
 describe("grants in force", () => {
     it("keeps only unexpired entries", () => {
         expect(activeGrants({ a: 10, b: 20 }, 15)).toStrictEqual({ b: 20 });
