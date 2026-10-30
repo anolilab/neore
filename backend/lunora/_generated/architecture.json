@@ -16347,13 +16347,13 @@
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 206,
+      "line": 208,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 223,
+      "line": 225,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
@@ -16367,6 +16367,12 @@
       "kind": "write",
       "line": 21,
       "reason": "\"touchSession\" is not a registered function"
+    },
+    {
+      "file": "acp/lib/thread-removed",
+      "kind": "write",
+      "line": 48,
+      "reason": "\"endHostThread\" is not a registered function"
     },
     {
       "file": "admin/audit-log",
@@ -17103,13 +17109,13 @@
     {
       "file": "agent/threads",
       "kind": "write",
-      "line": 289,
+      "line": 290,
       "reason": "\"markThreadArchived\" is not a registered function"
     },
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1449,
+      "line": 1462,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
@@ -18699,19 +18705,19 @@
     {
       "file": "devices/lib/acp-call",
       "kind": "write",
-      "line": 47,
+      "line": 46,
       "reason": "\"createAcpCancelCall\" is not a registered function"
     },
     {
       "file": "devices/lib/acp-call",
       "kind": "write",
-      "line": 77,
+      "line": 76,
       "reason": "\"createAcpCancelCall\" is not a registered function"
     },
     {
       "file": "devices/lib/state",
       "kind": "write",
-      "line": 35,
+      "line": 72,
       "reason": "\"expireOpenCalls\" is not a registered function"
     },
     {
@@ -19215,43 +19221,43 @@
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 91,
+      "line": 97,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 93,
+      "line": 110,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 106,
+      "line": 123,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 124,
+      "line": 141,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 165,
+      "line": 182,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 174,
+      "line": 191,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 179,
+      "line": 196,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {

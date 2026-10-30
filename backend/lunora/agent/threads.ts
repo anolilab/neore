@@ -17,6 +17,7 @@ import { omit, pick } from "../lib/collections";
 import { assert } from "../lib/error-helpers";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { paginationOptionsValidator, partial, MAX_LENGTH } from "../lib/validators";
+import { endHostThread } from "../acp/lib/thread-removed";
 import { deleteMessage } from "./messages";
 import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
@@ -434,6 +435,16 @@ export const deleteAllForThreadIdAsync = internalMutation
     });
 
 async function deletePageForThreadIdHandler(context: MutationContext, args: DeleteThreadArgs): Promise<DeleteThreadReturns> {
+    // A coding agent's live turn and session end before the first page of messages goes: the ingest keeps taking
+    // posts into the thread until the session is ended, and a paged delete leaves it standing for several calls.
+    if (args.cursor === undefined) {
+        const host = await context.db.get(args.threadId);
+
+        if (host) {
+            await endHostThread(context, host, context.now);
+        }
+    }
+
     const messages = await context.db
         .query("messages")
         .withIndex("threadId_status_tool_order_stepOrder", (q) => q.eq("threadId", args.threadId))
@@ -683,6 +694,8 @@ export const softDeleteThread = internalMutation
             deletedAt: ctx.now,
             updatedAt: ctx.now,
         });
+        // A coding agent's turn does not outlive the thread it writes into.
+        await endHostThread(ctx, oldThread, ctx.now);
         const newThread = (await ctx.db.get(args.threadId))!;
 
         // Remove from aggregates when soft deleted
