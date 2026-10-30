@@ -101,11 +101,6 @@
       "to": "function:agent_auto_archive:autoArchiveContinue"
     },
     {
-      "from": "function:agent_branches:setActiveLeaf",
-      "kind": "write",
-      "to": "table:threads"
-    },
-    {
       "from": "function:agent_branches:switchBranch",
       "kind": "write",
       "to": "table:threads"
@@ -10440,6 +10435,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:chat_streaming_persistent_library:settleStoppedRun",
+      "kind": "function",
+      "name": "chat.streaming.persistent.library.settleStoppedRun",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
       "id": "function:chat_streaming_persistent_library:stopActiveForThread",
       "kind": "function",
       "name": "chat.streaming.persistent.library.stopActiveForThread",
@@ -16433,12 +16435,18 @@
       "file": "agent/branches",
       "kind": "write",
       "line": 282,
+      "reason": "\"setActiveLeafHandler\" is not a registered function"
+    },
+    {
+      "file": "agent/branches",
+      "kind": "write",
+      "line": 328,
       "reason": "\"saveEditedSiblingHandler\" is not a registered function"
     },
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 377,
+      "line": 423,
       "reason": "\"editAssistantReplyHandler\" is not a registered function"
     },
     {
@@ -16930,62 +16938,62 @@
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 57,
+      "line": 58,
       "reason": "\"deleteMessage\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 60,
+      "line": 61,
       "reason": "\"deleteMessage\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 220,
+      "line": 223,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 232,
+      "line": 235,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 371,
+      "line": 374,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 388,
+      "line": 391,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 405,
-      "reason": "\"addMessagesHandler\" is not a registered function"
-    },
-    {
-      "file": "agent/messages",
-      "kind": "read",
-      "line": 447,
+      "line": 408,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
       "line": 457,
-      "reason": "\"addMessagesHandler\" is not a registered function"
+      "reason": "\"pinFollowingRowParent\" is not a registered function"
+    },
+    {
+      "file": "agent/messages",
+      "kind": "read",
+      "line": 467,
+      "reason": "\"pinFollowingRowParent\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 463,
-      "reason": "\"addMessagesHandler\" is not a registered function"
+      "line": 473,
+      "reason": "\"pinFollowingRowParent\" is not a registered function"
     },
     {
       "file": "agent/streams",
@@ -17782,61 +17790,61 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 792,
+      "line": 793,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 821,
+      "line": 822,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 935,
+      "line": 936,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 950,
+      "line": 951,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 959,
+      "line": 960,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 983,
+      "line": 984,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1106,
+      "line": 1107,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1114,
+      "line": 1115,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1255,
+      "line": 1256,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1281,
+      "line": 1282,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
@@ -17999,6 +18007,12 @@
       "file": "chat/lib/agent-run",
       "kind": "call",
       "line": 1168,
+      "reason": "\"failRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 1178,
       "reason": "\"failRun\" is not a registered function"
     },
     {

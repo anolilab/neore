@@ -352,6 +352,23 @@ export const finishStoppedReply = internalMutation
         return { stopped: true, ...(messageId !== undefined && { messageId }) };
     });
 
+/**
+ * A stopped run that ended without saving its owed text (`failRun`: setup or the finish threw) will never
+ * save it, so the stop is as settled as it will get and a model switch need not wait for it (`hasUnsettledStop`).
+ */
+export const settleStoppedRun = internalMutation
+    .input({ streamId: v.id("persistentStreams") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
+
+        if (stream?.stoppedAt !== undefined) {
+            await patchRow(ctx.db, stream, { stoppedAt: undefined });
+        }
+
+        return null;
+    });
+
 export const getStreamStatus = internalQuery
     .input({
         streamId: v.id("persistentStreams"),

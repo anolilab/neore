@@ -9,11 +9,12 @@ import { adoptForkAgentOf, pathExceedsColdStart, runAgentModelOf, syncActiveAgen
 import { agentSwitchOf } from "../agent/agent-switch-logic";
 import { buildBranchTree, resolveActivePath } from "../agent/branch-tree";
 import { descendFrom, getThreadRow } from "../agent/branch-rows";
+import { listActivePathPage, setActiveLeafHandler } from "../agent/branches";
 import { docsToModelMessages } from "../agent/mapping";
 import { addMessagesHandler } from "../agent/messages";
 import { omit } from "../lib/collections";
 import schema from "../schema";
-import { finishStoppedReply, stopActiveForThread } from "./streaming/persistent/library";
+import { finishStoppedReply, settleStoppedRun, stopActiveForThread } from "./streaming/persistent/library";
 import { AGENT_SWITCH_STREAMING, AGENT_SWITCH_UNSUPPORTED, switchThreadAgentHandler } from "./agent-switch";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -351,10 +352,24 @@ describe("a switch in a thread that never branched", () => {
             expect(await switchTo(B, "click-2")).toMatchObject({ switched: true });
         });
 
-        it("stops blocking when the run died without saving, at the stream's expiry", async () => {
-            await startStoppedRun({ expiresAt: Date.now() - 1 });
+        it("stops blocking once the run that failed has settled its stop", async () => {
+            const streamId = await startStoppedRun();
 
-            expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
+            await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_STREAMING } });
+
+            await run(async (ctx) => await ctx.runMutation(settleStoppedRun, { streamId }));
+
+            expect(await switchTo(B, "click-2")).toMatchObject({ switched: true });
+        });
+
+        it("stops blocking when the run died without a trace, a couple of minutes after the stop", async () => {
+            const streamId = await startStoppedRun({ expiresAt: Date.now() + 20 * 60_000 });
+
+            await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_STREAMING } });
+
+            await run(async (ctx) => await ctx.db.patch(streamId, { stoppedAt: Date.now() - 3 * 60_000 }));
+
+            expect(await switchTo(B, "click-2")).toMatchObject({ switched: true });
         });
 
         it("works at once when the run had not started, since nothing will ever save a reply", async () => {
@@ -490,6 +505,116 @@ describe("the agent of each branch", () => {
         const { activeAgent } = await thread();
 
         expect(activeAgent).toStrictEqual({ kind: "model", model: A });
+    });
+});
+
+describe("a regenerate of the newest turn after a switch", () => {
+    beforeEach(async () => {
+        await insertRow("u1", 0, 0, text("user", "hello"));
+        await insertRow("a1", 0, 1, text("assistant", "hi"));
+        await switchTo(B, "click-1");
+    });
+
+    // What `/chat/start` does for a regenerate: point the thread at the prompt, then the run saves its pending reply.
+    const regenerate = async (promptId: string, runModelId: string) => {
+        await run(async (ctx) => await setActiveLeafHandler(ctx, { messageId: promptId as never, runModel: runModelId, threadId: threadId as never }));
+        await run(async (ctx) => {
+            await addMessagesHandler(ctx, {
+                failPendingSteps: true,
+                messages: [{ message: { content: [], role: "assistant" }, status: "pending" }],
+                promptMessageId: promptId as never,
+                threadId: threadId as never,
+                userId: OWNER,
+            });
+        });
+    };
+    const pathNames = async (): Promise<string[]> => {
+        const { activeLeafMessageId } = await thread();
+        const all = await rows();
+        const names = new Map(Object.entries(ids).map(([name, id]) => [id, name]));
+
+        return resolveActivePath(buildBranchTree(all), activeLeafMessageId).map(
+            (id) => names.get(id) ?? (agentSwitchOf(all.find((row) => row._id === id)) ? "divider" : "reply"),
+        );
+    };
+
+    it("keeps the switched agent on the regenerated branch, so the next send runs on it", async () => {
+        await regenerate(ids.u1!, B);
+
+        expect(await pathNames()).toStrictEqual(["u1", "divider", "reply"]);
+        expect(await activeAgentOf()).toStrictEqual({ kind: "model", model: B });
+        expect(await runModel()).toBe(B);
+
+        // The divider is under the prompt and names the switch the redo ran on; the earlier one is untouched.
+        const dividers = await switchRows();
+        const [first, second] = dividers.toSorted((x, y) => x.order - y.order || x.stepOrder - y.stepOrder);
+
+        expect(agentSwitchOf(first)).toMatchObject({ from: { model: A }, startMessageId: ids.u1, to: { model: B } });
+        expect(first).toMatchObject({ order: 0, parentMessageId: ids.u1 });
+        expect(agentSwitchOf(second)).toMatchObject({ startMessageId: ids.a1, to: { model: B } });
+
+        // The original reply keeps its own place: the first divider still follows it.
+        const tree = buildBranchTree(await rows());
+
+        expect(tree.parentOf(second._id)).toBe(ids.a1);
+
+        // A prompt sent next runs on B and the thread stays there.
+        await run(async (ctx) => {
+            await addMessagesHandler(ctx, {
+                fromUser: true,
+                messages: [{ message: text("user", "next"), status: "success" }],
+                threadId: threadId as never,
+                userId: OWNER,
+            });
+        });
+        expect(await runModel()).toBe(B);
+        expect(await activeAgentOf()).toStrictEqual({ kind: "model", model: B });
+    });
+
+    it("reuses the divider when the same turn is regenerated again", async () => {
+        await regenerate(ids.u1!, B);
+        await regenerate(ids.u1!, B);
+
+        expect(await switchRows()).toHaveLength(2);
+        expect(await pathNames()).toStrictEqual(["u1", "divider", "reply"]);
+        expect(await runModel()).toBe(B);
+    });
+
+    it("stays on the switched agent when the run is stopped or fails before it saved a reply", async () => {
+        await run(async (ctx) => await setActiveLeafHandler(ctx, { messageId: ids.u1 as never, runModel: B, threadId: threadId as never }));
+
+        expect(await pathNames()).toStrictEqual(["u1", "divider"]);
+        expect(await activeAgentOf()).toStrictEqual({ kind: "model", model: B });
+        expect(await runModel()).toBe(B);
+    });
+
+    it("writes no divider when the run does not use the path's agent", async () => {
+        // A bot or a model outside the registry keeps what it brought; the path is left as it was.
+        await regenerate(ids.u1!, A);
+
+        expect(await switchRows()).toHaveLength(1);
+        expect(await pathNames()).toStrictEqual(["u1", "reply"]);
+    });
+
+    it("writes no divider for an older turn, which runs on its own path", async () => {
+        await insertRow("u2", 2, 0, text("user", "more"));
+        await insertRow("a2", 2, 1, text("assistant", "sure"));
+        await regenerate(ids.u1!, A);
+
+        expect(await switchRows()).toHaveLength(1);
+        expect(await activeAgentOf()).toStrictEqual({ kind: "model", model: A });
+    });
+
+    it("offers the original reply and the regenerated one as siblings in the switcher", async () => {
+        await regenerate(ids.u1!, B);
+
+        const stored = await thread();
+        const page: any = await run(async (ctx) => await listActivePathPage(ctx, stored, { cursor: null, numItems: 100 }));
+        const reply = page.page.find((row: any) => row.status === "pending");
+        const divider = page.page.find((row: any) => agentSwitchOf(row));
+
+        expect(page.branches.get(reply._id)).toMatchObject({ count: 2, index: 1, siblingIds: [ids.a1, reply._id] });
+        expect(page.branches.has(divider._id)).toBe(false);
     });
 });
 

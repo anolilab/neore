@@ -38,12 +38,19 @@ export const hasStreamFor = async (ctx: Pick<MutationCtx, "db">, threadId: strin
 };
 
 /**
+ * How long after a sidebar stop its run is expected to have saved the text it owed. The run learns of the stop at its
+ * next chunk write or its stop poll (`STOP_POLL_MS`, 2 s), then saves in one mutation; a tool that ignores the abort
+ * signal can hold it longer. Past this a run that died is not waited for, whatever its stream's `expiresAt` says.
+ */
+const STOPPED_RUN_SETTLE_MS = 2 * 60 * 1000;
+
+/**
  * Whether a sidebar stop has ended a run whose owed text is not saved yet: the stream is `done` (`stopActiveForThread`)
- * but `finishStoppedReply` has not cleared `stoppedAt`, so the reply would still land under its prompt. A run that dies
- * without ever saving it stops counting at the stream's `expiresAt`, which the timeout cron does not touch for a `done` stream.
+ * but `finishStoppedReply` has not cleared `stoppedAt`, so the reply would still land under its prompt. A run that fails
+ * clears it (`settleStoppedRun`); one that dies without a trace stops counting after {@link STOPPED_RUN_SETTLE_MS}.
  */
 export const hasUnsettledStop = async (ctx: Pick<MutationCtx, "db">, threadId: string, now: number): Promise<boolean> => {
     const streams = await recentStreams(ctx, threadId);
 
-    return streams.some((stream) => stream.stoppedAt !== undefined && stream.expiresAt > now);
+    return streams.some((stream) => stream.stoppedAt !== undefined && stream.stoppedAt > now - STOPPED_RUN_SETTLE_MS);
 };

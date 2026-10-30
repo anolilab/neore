@@ -739,6 +739,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_streaming_persistent_library:getStreamStatus": lunora_chat_streaming_persistent_library_72.getStreamStatus as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:getStreamText": lunora_chat_streaming_persistent_library_72.getStreamText as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:setStreamStatus": lunora_chat_streaming_persistent_library_72.setStreamStatus as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_library:settleStoppedRun": lunora_chat_streaming_persistent_library_72.settleStoppedRun as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:stopActiveForThread": lunora_chat_streaming_persistent_library_72.stopActiveForThread as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_purge:purgeFinishedStreams": lunora_chat_streaming_persistent_purge_73.purgeFinishedStreams as unknown as RegisteredLunoraFunction,
     "chat_tags_functions:createThreadTag": lunora_chat_tags_functions_74.createThreadTag as unknown as RegisteredLunoraFunction,
@@ -1583,13 +1584,6 @@ __has2 = true;
 }
 if (typeof source["threadId"] !== "string") return DEFER;
 return { ...(__has1 ? { "index": __val1 } : {}), ...(__has2 ? { "messageId": __val2 } : {}), "threadId": source["threadId"] };
-});
-installCompiledValidatorMap(lunora_agent_branches_8.setActiveLeaf.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["messageId"] !== "string") return DEFER;
-if (typeof source["threadId"] !== "string") return DEFER;
-return { "messageId": source["messageId"], "threadId": source["threadId"] };
 });
 installCompiledValidatorMap(lunora_agent_document_history_9.getVersion.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -4181,6 +4175,12 @@ if (typeof source["streamId"] !== "string") return DEFER;
 return { "streamId": source["streamId"] };
 });
 installCompiledValidatorMap(lunora_chat_streaming_persistent_library_72.getStreamText.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["streamId"] !== "string") return DEFER;
+return { "streamId": source["streamId"] };
+});
+installCompiledValidatorMap(lunora_chat_streaming_persistent_library_72.settleStoppedRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["streamId"] !== "string") return DEFER;
@@ -7914,7 +7914,7 @@ export interface Caller {
             getMaxOrder: (args: { threadId: Id<"threads"> }) => Promise<number>;
             resolveForkEnd: (args: { index?: number; messageId?: string; threadId: Id<"threads"> }) => Promise<null | { endId: Id<"messages">; index: number }>;
             saveEditedSibling: (args: { fileIds?: Array<Id<"chatFiles">>; message: { content: string | Array<{ providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { image: string | ArrayBuffer; mediaType?: string; providerOptions?: Record<string, Record<string, unknown>>; type: "image" } | { data: string | ArrayBuffer; filename?: string; mediaType?: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; type: "file" }>; providerOptions?: Record<string, Record<string, unknown>>; role: "user" } | { content: string | Array<{ providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { data: string | ArrayBuffer; filename?: string; mediaType?: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; type: "file" } | { providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; signature?: string; text: string; type: "reasoning" } | { data: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; type: "redacted-reasoning" } | { input?: unknown; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; toolName: string; type: "tool-call" } | { dynamic?: boolean; input?: unknown; output?: { providerOptions?: Record<string, Record<string, unknown>>; type: "text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; reason?: string; type: "execution-denied" } | { type: "content"; value: Array<{ providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { data: string; filename?: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "file-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "file-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "file-id" } | { data: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "image-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "image-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "image-file-id" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "custom" }> }; preliminary?: boolean; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; toolName: string; type: "tool-result" } | { id: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "url"; title?: string; type: "source"; url: string } | { filename?: string; id: string; mediaType: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "document"; title: string; type: "source" } | { approvalId: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; type: "tool-approval-request" }>; providerOptions?: Record<string, Record<string, unknown>>; role: "assistant" } | { content: Array<{ dynamic?: boolean; input?: unknown; output?: { providerOptions?: Record<string, Record<string, unknown>>; type: "text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; reason?: string; type: "execution-denied" } | { type: "content"; value: Array<{ providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { data: string; filename?: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "file-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "file-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "file-id" } | { data: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "image-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "image-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "image-file-id" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "custom" }> }; preliminary?: boolean; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; toolName: string; type: "tool-result" } | { approvalId: string; approved: boolean; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; reason?: string; type: "tool-approval-response" }>; providerOptions?: Record<string, Record<string, unknown>>; role: "tool" } | { content: string; providerOptions?: Record<string, Record<string, unknown>>; role: "system" }; originalMessageId: Id<"messages">; userId: string }) => Promise<Id<"messages">>;
-            setActiveLeaf: (args: { messageId: Id<"messages">; threadId: Id<"threads"> }) => Promise<null>;
+            setActiveLeaf: (args: { messageId: Id<"messages">; runModel?: string; threadId: Id<"threads"> }) => Promise<null>;
             switchBranch: (args: { messageId: string; threadId: Id<"threads">; unlockProof?: string }) => Promise<null>;
         };
         document_history: {
@@ -8496,6 +8496,7 @@ export interface Caller {
                     getStreamStatus: (args: { streamId: Id<"persistentStreams"> }) => Promise<"streaming" | "pending" | "error" | "timeout" | "done">;
                     getStreamText: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ hostState?: "accepted" | "received" | "running" | "ended"; messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
                     setStreamStatus: (args: { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }) => Promise<void>;
+                    settleStoppedRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<null>;
                     stopActiveForThread: (args: { messageId?: string; threadId: string }) => Promise<boolean>;
                 };
                 purge: {
@@ -10170,6 +10171,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
                     getStreamStatus: (args) => callRegistered(context, "chat_streaming_persistent_library:getStreamStatus", args),
                     getStreamText: (args) => callRegistered(context, "chat_streaming_persistent_library:getStreamText", args),
                     setStreamStatus: (args) => callRegistered(context, "chat_streaming_persistent_library:setStreamStatus", args),
+                    settleStoppedRun: (args) => callRegistered(context, "chat_streaming_persistent_library:settleStoppedRun", args),
                     stopActiveForThread: (args) => callRegistered(context, "chat_streaming_persistent_library:stopActiveForThread", args),
                 },
                 purge: {
