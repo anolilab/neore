@@ -705,6 +705,41 @@ describe("a regenerate of the newest turn after a switch", () => {
     });
 });
 
+describe("a regenerate of a prompt that was stopped before its reply, after a switch and a later send", () => {
+    it("offers no later prompt as a version of the regenerated reply", async () => {
+        await insertRow("u1", 0, 0, text("user", "hello"));
+        await insertStream("aborted", ids.u1!);
+        await switchTo(B, "click-1");
+        await run(async (ctx) => {
+            await addMessagesHandler(ctx, {
+                fromUser: true,
+                messages: [{ message: text("user", "next"), status: "success" }],
+                threadId: threadId as never,
+                userId: OWNER,
+            });
+        });
+        await run(async (ctx) => await setActiveLeafHandler(ctx, { messageId: ids.u1 as never, runModel: B, threadId: threadId as never }));
+        await run(async (ctx) => {
+            await addMessagesHandler(ctx, {
+                failPendingSteps: true,
+                messages: [{ message: { content: [], role: "assistant" }, status: "pending" }],
+                promptMessageId: ids.u1 as never,
+                threadId: threadId as never,
+                userId: OWNER,
+            });
+        });
+
+        const stored = await thread();
+        const page: any = await run(async (ctx) => await listActivePathPage(ctx, stored, { cursor: null, numItems: 100 }));
+        const reply = page.page.find((row: any) => row.status === "pending");
+        const all = await rows();
+        const prompts = new Set(all.filter((row) => row.message?.role === "user").map((row) => row._id));
+
+        expect(reply).toBeDefined();
+        expect(page.branches.get(reply._id)?.siblingIds.some((id: string) => prompts.has(id)) ?? false).toBe(false);
+    });
+});
+
 describe("a fork of a switched thread", () => {
     const forkWith = async (rowsToCopy: any[]): Promise<string> =>
         await run(async (ctx) => {
