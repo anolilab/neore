@@ -67,7 +67,9 @@ const PullRequestView = ({
         <article aria-labelledby="develop-pr-title" className="space-y-4">
             <header className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={detail.state === "open" ? "default" : "secondary"}>{detail.draft ? t`Draft` : stateLabels[detail.state]}</Badge>
+                    <Badge variant={detail.state === "open" ? "default" : "secondary"}>
+                        {detail.draft && detail.state === "open" ? t`Draft` : stateLabels[detail.state]}
+                    </Badge>
                     <span className="text-muted-foreground text-xs">
                         {detail.repository}#{detail.number}
                     </span>

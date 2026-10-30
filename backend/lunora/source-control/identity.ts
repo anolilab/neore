@@ -34,6 +34,9 @@ const MAX_REMOTE_LENGTH = 2048;
 const URL_SCHEMES = new Set(["git+ssh:", "git:", "http:", "https:", "ssh+git:", "ssh:"]);
 const SSH_SCHEMES = new Set(["git+ssh:", "ssh+git:", "ssh:"]);
 const SCP_FORM = /^(?:[^\s/:@]+@)?([^\s/:@]+):(?!\/\/)(.+)$/u;
+const URL_PATH = /^[^/]*\/\/[^/]*(\/.*)?$/u;
+const LEADING_SLASH = /^\//u;
+const TRAILING_SLASH = /\/$/u;
 const WHITESPACE = /\s/u;
 const AZURE_LEGACY_HOST = /^(?!vs-ssh\.)([a-z0-9-]+)\.visualstudio\.com$/u;
 const AZURE_LEGACY_SSH_HOST = /^vs-ssh\.visualstudio\.com$/u;
@@ -64,13 +67,15 @@ const hasControlCharacter = (text: string): boolean =>
 
 const hasControlOrSpace = (text: string): boolean => WHITESPACE.test(text) || hasControlCharacter(text);
 
-/** Decoded, non-empty segments; `undefined` for a path with an unsafe one. */
+/** Decoded segments of a path as written; `undefined` for an empty, `.`, `..` or otherwise unsafe one. One leading and one trailing slash are allowed. */
 const readSegments = (rawPath: string): string[] | undefined => {
     const segments: string[] = [];
+    const trimmed = rawPath.replace(LEADING_SLASH, "").replace(TRAILING_SLASH, "");
+    const raws = trimmed === "" ? [] : trimmed.split("/");
 
-    for (const raw of rawPath.split("/")) {
+    for (const raw of raws) {
         if (raw === "") {
-            continue;
+            return undefined;
         }
 
         let decoded: string;
@@ -225,14 +230,15 @@ export const parseRepoRemote = (remote: string, declared: DeclaredHost[] = []): 
             return null;
         }
 
-        if (!URL_SCHEMES.has(url.protocol) || url.hostname === "" || url.search !== "" || url.hash !== "") {
+        if (!URL_SCHEMES.has(url.protocol) || url.hostname === "" || input.includes("?") || input.includes("#")) {
             return null;
         }
 
         viaSsh = SSH_SCHEMES.has(url.protocol) || url.protocol === "git:";
         host = url.hostname.toLowerCase();
         webOrigin = viaSsh ? undefined : url.origin;
-        rawPath = url.pathname;
+        // As written: `url.pathname` has already folded `//` and `..` away.
+        rawPath = URL_PATH.exec(input)?.[1] ?? "";
     } else {
         const scp = SCP_FORM.exec(input);
 

@@ -39,7 +39,7 @@ const ChecksTab = ({ address, headSha, hostLabel }: { address: PullRequestAddres
 
     const { checks: list, total } = checks.data;
 
-    if (list.length === 0) {
+    if (list.length === 0 && total === 0) {
         return <p className="text-muted-foreground text-sm">{t`No checks have run for this commit.`}</p>;
     }
 

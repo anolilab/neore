@@ -35,25 +35,36 @@ export const failureOf = (error: HostApiError): ReadFailure => {
     }
 };
 
+const PROBLEM_STATUS = { expired: "needs_reconnect", not_connected: "not_connected", unavailable: "host_error" } as const;
+
 export const readFromHost = async <T extends object>(
     driver: HostDriver,
     token: GithubTokenOutcome,
     read: (request: HostRequest) => Promise<T>,
     via?: BoundRequesterConfig["via"],
 ): Promise<ReadOutcome<T>> => {
-    if ("problem" in token) {
-        return { status: token.problem === "expired" ? "needs_reconnect" : "not_connected" };
-    }
+    let current = token;
 
-    const request = createBoundRequester({ headers: driver.headers, origin: driver.apiOrigin, token: token.accessToken, via });
-
-    try {
-        return { ...(await read(request)), status: "ok" };
-    } catch (error) {
-        if (error instanceof HostApiError) {
-            return { status: failureOf(error) };
+    // A 401 gets one forced refresh before it is called a sign-in problem.
+    for (let attempt = 0; ; attempt += 1) {
+        if ("problem" in current) {
+            return { status: PROBLEM_STATUS[current.problem] };
         }
 
-        throw error;
+        const request = createBoundRequester({ headers: driver.headers, origin: driver.apiOrigin, token: current.accessToken, via });
+
+        try {
+            return { ...(await read(request)), status: "ok" };
+        } catch (error) {
+            if (!(error instanceof HostApiError)) {
+                throw error;
+            }
+
+            if (error.status !== 401 || attempt > 0) {
+                return { status: failureOf(error) };
+            }
+
+            current = await current.renew();
+        }
     }
 };

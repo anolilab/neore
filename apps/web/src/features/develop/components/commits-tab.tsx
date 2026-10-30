@@ -18,18 +18,15 @@ const CommitsTab = ({ address, commitLimit, hostLabel, leftOut }: { address: Pul
         return <Skeleton aria-label={t`Loading commits`} className="h-24 w-full" role="status" />;
     }
 
-    if (commits.isError) {
-        return <FailureNotice label={hostLabel} status="host_error" />;
-    }
-
-    const { pages } = commits.data;
-    const failure = pages.find((page) => page.status !== "ok");
-
-    if (failure) {
-        return <FailureNotice label={hostLabel} status={failure.status} />;
-    }
-
+    const pages = commits.data?.pages ?? [];
     const listed = pages.flatMap((page) => (page.status === "ok" ? page.commits : []));
+    const failed = pages.find((page) => page.status !== "ok");
+    const failure = failed?.status ?? (commits.isError ? "host_error" : undefined);
+
+    // A later page that fails leaves the earlier ones on screen, with the failure below them.
+    if (failure && listed.length === 0) {
+        return <FailureNotice label={hostLabel} status={failure} />;
+    }
 
     return (
         <div className="space-y-3">
@@ -47,7 +44,8 @@ const CommitsTab = ({ address, commitLimit, hostLabel, leftOut }: { address: Pul
                     </li>
                 ))}
             </ol>
-            {commits.hasNextPage && (
+            {failure && <FailureNotice label={hostLabel} status={failure} />}
+            {commits.hasNextPage && !failure && (
                 <Button disabled={commits.isFetchingNextPage} onClick={() => commits.fetchNextPage()} variant="outline">
                     {t`Load more commits`}
                 </Button>

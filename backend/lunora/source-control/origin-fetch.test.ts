@@ -37,7 +37,7 @@ describe("createBoundRequester", () => {
     });
 
     it("never sends the token to another host that a redirect names", async () => {
-        const { seen, via } = transport((url) => (url.startsWith(ORIGIN) ? redirect("https://evil.example/steal") : Response.json({})));
+        const { seen, via } = transport((url) => (new URL(url).origin === ORIGIN ? redirect("https://evil.example/steal") : Response.json({})));
 
         await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/repos/o/r")).rejects.toMatchObject({ name: "HostApiError", status: 0 });
 
@@ -51,7 +51,7 @@ describe("createBoundRequester", () => {
         ["a look-alike host", "https://api.github.com.evil.example/x"],
         ["a userinfo trick", "https://api.github.com@evil.example/x"],
     ])("refuses a redirect to %s", async (_name, location) => {
-        const { seen, via } = transport((url) => (url.startsWith(ORIGIN) && url.length < 40 ? redirect(location) : Response.json({})));
+        const { seen, via } = transport((url) => (new URL(url).origin === ORIGIN && url.length < 40 ? redirect(location) : Response.json({})));
 
         await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/repos/o/r")).rejects.toBeInstanceOf(HostApiError);
         expect(seen).toHaveLength(1);
