@@ -18,6 +18,7 @@ export type DictationState = "idle" | "preparing" | "recording" | "transcribing"
 
 export type DictationOutcome
     = | "cancelled"
+        | "disabled"
         | "download-declined"
         | "download-started"
         | "downloading"
@@ -38,6 +39,8 @@ export interface CaptureWindow {
 export interface ControllerDependencies {
     /** Asks before a large download. Resolves with the answer. */
     confirmDownload: (spec: ModelSpec) => Promise<boolean>;
+    /** The opt-in switch, read at every press: off means nothing happens, not even a model download. */
+    enabled: () => boolean;
     /** Whether the helper binary exists in this build: dictation refuses cleanly where it was not built. */
     hasHelper: () => boolean;
     insert: (text: string) => void;
@@ -48,7 +51,8 @@ export interface ControllerDependencies {
      * the person: the key may be up by now and nothing could see it, so this press ends and the next one records.
      */
     microphoneAllowed: () => Promise<boolean | "prompted">;
-    model: ModelSpec;
+    /** The model the user chose (or this machine's default), read at every press. */
+    model: () => ModelSpec;
     models: Pick<ModelStore, "download" | "ensureVerified" | "isDownloading" | "status">;
     notify: (title: string, body: string) => void;
     now: () => number;
@@ -150,13 +154,56 @@ export const createDictationController = (dependencies: ControllerDependencies):
             await dependencies.models.download(spec);
             dependencies.notify(TITLE, "The speech model is ready. Hold the shortcut to dictate.");
         } catch (error) {
+            // The user turned dictation off or deleted the model: they know, and a notice would only be noise.
+            if (error instanceof ModelError && error.code === "cancelled") {
+                return;
+            }
+
             dependencies.log(`model download failed: ${String(error)}`);
             dependencies.notify(TITLE, error instanceof ModelError ? error.message : "The speech model could not be downloaded.");
         }
     };
 
+    /** No model on disk: tell the person it is downloading, or ask before starting the download. */
+    const handleMissingModel = async (mine: number, model: ModelSpec): Promise<void> => {
+        if (dependencies.models.isDownloading(model)) {
+            settle("downloading");
+            dependencies.notify(TITLE, "The speech model is still downloading. You will be told when it is ready.");
+
+            return;
+        }
+
+        const accepted = mine === generation && await dependencies.confirmDownload(model);
+
+        if (mine !== generation) {
+            return;
+        }
+
+        // Switched off while the question was open: nothing is fetched.
+        if (accepted && !dependencies.enabled()) {
+            settle("disabled");
+
+            return;
+        }
+
+        if (!accepted) {
+            settle("download-declined");
+
+            return;
+        }
+
+        settle("download-started");
+        download(model);
+    };
+
     /** Whether a window should open now. Every step that waits checks that this dictation is still the current one. */
-    const prepare = async (mine: number): Promise<boolean> => {
+    const prepare = async (mine: number, model: ModelSpec): Promise<boolean> => {
+        if (!dependencies.enabled()) {
+            settle("disabled");
+
+            return false;
+        }
+
         if (!dependencies.hasHelper()) {
             settle("no-helper");
             dependencies.notify(TITLE, "On-device dictation is not available on this computer yet.");
@@ -164,30 +211,16 @@ export const createDictationController = (dependencies: ControllerDependencies):
             return false;
         }
 
-        const { state: modelState } = await dependencies.models.status(dependencies.model);
+        const { state: modelState } = await dependencies.models.status(model);
+
+        // Turned off, or pressed again, while the status was read: neither a download notice nor the system's
+        // microphone prompt belongs to this attempt any more.
+        if (mine !== generation || !dependencies.enabled()) {
+            return false;
+        }
 
         if (modelState === "missing") {
-            if (dependencies.models.isDownloading(dependencies.model)) {
-                settle("downloading");
-                dependencies.notify(TITLE, "The speech model is still downloading. You will be told when it is ready.");
-
-                return false;
-            }
-
-            const accepted = mine === generation && await dependencies.confirmDownload(dependencies.model);
-
-            if (mine !== generation) {
-                return false;
-            }
-
-            if (!accepted) {
-                settle("download-declined");
-
-                return false;
-            }
-
-            settle("download-started");
-            download(dependencies.model);
+            await handleMissingModel(mine, model);
 
             return false;
         }
@@ -215,8 +248,8 @@ export const createDictationController = (dependencies: ControllerDependencies):
         return true;
     };
 
-    const startHelper = async (mine: number): Promise<Recognizer> => {
-        const modelPath = await dependencies.models.ensureVerified(dependencies.model);
+    const startHelper = async (mine: number, model: ModelSpec): Promise<Recognizer> => {
+        const modelPath = await dependencies.models.ensureVerified(model);
         const started = dependencies.startRecognizer(modelPath);
 
         started.onEarlyExit((error) => {
@@ -243,9 +276,11 @@ export const createDictationController = (dependencies: ControllerDependencies):
         state = "preparing";
 
         const mine = generation;
+        // One model for this whole dictation: a change in settings applies to the next one.
+        const model = dependencies.model();
 
         try {
-            if (!await prepare(mine)) {
+            if (!await prepare(mine, model)) {
                 return;
             }
         } catch (error) {
@@ -266,7 +301,7 @@ export const createDictationController = (dependencies: ControllerDependencies):
         timer = setTimeout(finish, MAX_RECORDING_MS);
 
         // The model is checked while the user speaks; the helper starts as soon as it passes, so it is loading by the time the key is up.
-        recognizer = startHelper(mine);
+        recognizer = startHelper(mine, model);
         watchStart(recognizer, mine);
     };
 

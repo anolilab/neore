@@ -28,7 +28,7 @@ const isAllowedRedirect = (target: string, pinnedHost: string): boolean => {
 };
 
 export class ModelError extends Error {
-    public readonly code: "checksum" | "download" | "missing" | "size";
+    public readonly code: "cancelled" | "checksum" | "delete" | "download" | "missing" | "size";
 
     public constructor(code: ModelError["code"], message: string) {
         super(message);
@@ -67,6 +67,8 @@ export interface DownloadOptions {
 }
 
 export interface ModelStore {
+    /** Stops every running download and waits until each has removed its partial file. Nothing is left on disk. */
+    cancelDownloads: () => Promise<void>;
     /** Downloads over HTTPS, verifies the size and SHA-256, then moves the file into place. A mismatch leaves nothing. */
     download: (spec: ModelSpec, options?: DownloadOptions) => Promise<string>;
     /** The path of a model whose bytes hash to the pinned checksum; checked once per file state per run. A mismatch deletes the file. */
@@ -74,6 +76,8 @@ export interface ModelStore {
     /** Whether a download of this model is running now. */
     isDownloading: (spec: ModelSpec) => boolean;
     pathOf: (spec: ModelSpec) => string;
+    /** Deletes the model file, after stopping a download of it that is still running. Succeeds when there is no file. */
+    remove: (spec: ModelSpec) => Promise<void>;
     status: (spec: ModelSpec) => Promise<ModelStatus>;
     /** Removes the leftovers of a download that was interrupted (the process died, the machine slept). */
     sweepPartials: () => Promise<void>;
@@ -87,6 +91,17 @@ const hashFile = async (file: string): Promise<string> => {
     }
 
     return hash.digest("hex");
+};
+
+/** Deletes a file that should be there. Only "already gone" is quiet: a file that is still in use must not read as deleted. */
+const removeFile = async (file: string): Promise<void> => {
+    try {
+        await unlink(file);
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+            throw new ModelError("delete", "The model file could not be deleted. It may still be in use.");
+        }
+    }
 };
 
 const removeQuietly = async (file: string): Promise<void> => {
@@ -104,7 +119,7 @@ const removeQuietly = async (file: string): Promise<void> => {
 export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stallTimeoutMs = STALL_TIMEOUT_MS }: ModelStoreOptions): ModelStore => {
     const pathOf = (spec: ModelSpec): string => path.join(directory, spec.file);
     const verified = new Map<string, string>();
-    const inFlight = new Map<string, Promise<string>>();
+    const inFlight = new Map<string, { abort: () => void; done: Promise<string> }>();
     // Partial files a download is writing now: a sweep that starts late must not unlink one.
     const activePartials = new Set<string>();
 
@@ -186,8 +201,7 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
         throw new ModelError("download", "The model server redirected too many times");
     };
 
-    const fetchToPartial = async (spec: ModelSpec, partial: string, options: DownloadOptions): Promise<void> => {
-        const controller = new AbortController();
+    const fetchToPartial = async (spec: ModelSpec, partial: string, options: DownloadOptions, controller: AbortController): Promise<void> => {
         let timer: ReturnType<typeof setTimeout> | undefined;
         const arm = (): void => {
             clearTimeout(timer);
@@ -233,7 +247,7 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
             }
         } catch (error) {
             if (controller.signal.aborted) {
-                throw new ModelError("download", "The model download stalled");
+                throw controller.signal.reason instanceof ModelError ? controller.signal.reason : new ModelError("download", "The model download stalled");
             }
 
             throw error;
@@ -243,7 +257,7 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
         }
     };
 
-    const downloadOnce = async (spec: ModelSpec, options: DownloadOptions): Promise<string> => {
+    const downloadOnce = async (spec: ModelSpec, options: DownloadOptions, controller: AbortController): Promise<string> => {
         const target = pathOf(spec);
 
         await mkdir(directory, { mode: 0o700, recursive: true });
@@ -254,7 +268,13 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
         activePartials.add(path.basename(partial));
 
         try {
-            await fetchToPartial(spec, partial, options);
+            await fetchToPartial(spec, partial, options, controller);
+
+            // Cancelled after the last byte: the model must not appear once dictation was switched off or the model deleted.
+            if (controller.signal.aborted) {
+                throw controller.signal.reason;
+            }
+
             await rename(partial, target);
         } catch (error) {
             await removeQuietly(partial);
@@ -271,20 +291,44 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
         const running = inFlight.get(spec.id);
 
         if (running !== undefined) {
-            return running;
+            return running.done;
         }
 
-        const started = (async () => {
+        const controller = new AbortController();
+        const done = (async () => {
             try {
-                return await downloadOnce(spec, options);
+                return await downloadOnce(spec, options, controller);
             } finally {
                 inFlight.delete(spec.id);
             }
         })();
 
-        inFlight.set(spec.id, started);
+        inFlight.set(spec.id, { abort: () => controller.abort(new ModelError("cancelled", "The model download was cancelled")), done });
 
-        return started;
+        return done;
+    };
+
+    /** Aborts the download of one model and waits for it to clean up; its failure is the cancellation itself. */
+    const cancel = async (id: string): Promise<void> => {
+        const running = inFlight.get(id);
+
+        if (running === undefined) {
+            return;
+        }
+
+        running.abort();
+
+        try {
+            await running.done;
+        } catch {
+            // Cancelled, or it had already failed: either way it left no file.
+        }
+    };
+
+    const remove = async (spec: ModelSpec): Promise<void> => {
+        await cancel(spec.id);
+        verified.delete(pathOf(spec));
+        await removeFile(pathOf(spec));
     };
 
     const sweepPartials = async (): Promise<void> => {
@@ -299,5 +343,16 @@ export const createModelStore = ({ directory, fetch: fetchFunction = fetch, stal
         await Promise.all(names.filter((name) => name.endsWith(PARTIAL_SUFFIX) && !activePartials.has(name)).map((name) => removeQuietly(path.join(directory, name))));
     };
 
-    return { download, ensureVerified, isDownloading: (spec) => inFlight.has(spec.id), pathOf, status, sweepPartials };
+    return {
+        cancelDownloads: async () => {
+            await Promise.all(Array.from(inFlight.keys(), async (id) => cancel(id)));
+        },
+        download,
+        ensureVerified,
+        isDownloading: (spec) => inFlight.has(spec.id),
+        pathOf,
+        remove,
+        status,
+        sweepPartials,
+    };
 };

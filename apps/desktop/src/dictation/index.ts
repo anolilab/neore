@@ -1,6 +1,7 @@
 /**
  * On-device dictation in the Electron main process: the shortcut, the capture window, the model store and the helper.
- * The logic is in `controller.ts`; this file is the Electron side of it.
+ * The logic is in `controller.ts`; this file is the Electron side of it. It is opt-in (`settings.ts`, changed in the local
+ * settings window): with the switch off the shortcut is not held and no window, download or helper ever starts.
  *
  * The capture window is a LOCAL page with its own sandboxed preload and its own in-memory session, which loads
  * nothing but its own files. Its audio goes to the main process in memory, to a helper process on stdin. Nothing is written to disk and
@@ -14,18 +15,22 @@ import { pathToFileURL } from "node:url";
 import type { BrowserWindow as BrowserWindowInstance, IpcMainEvent, Session } from "electron";
 import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, net, Notification, session, systemPreferences } from "electron";
 
-import { modelFor } from "./catalog.js";
+import type { ModelSpec } from "./catalog.js";
+import { offeredModels, resolveModel } from "./catalog.js";
 import type { CaptureFailure } from "./channels.js";
 import { CAPTURE_FAILURES, DICTATION_CHANNEL, DICTATION_EVENT } from "./channels.js";
 import type { CaptureWindow, DictationController } from "./controller.js";
 import { createDictationController } from "./controller.js";
-import { DICTATION_SHORTCUT, isCancel, isChordRelease } from "./hold.js";
+import { DICTATION_SHORTCUT, DICTATION_SHORTCUT_LABEL, isCancel, isChordRelease } from "./hold.js";
 import { insertDictation } from "./insert.js";
 import { createModelStore } from "./model-store.js";
 import type { PermissionPolicy } from "./permissions.js";
 import { createPermissionPolicy, isDictationAsset } from "./permissions.js";
 import type { HelperCommand, Recognizer } from "./recognizer.js";
 import { startRecognizer } from "./recognizer.js";
+import { createSettingsStore } from "./settings.js";
+import { createSettingsApi } from "./settings-api.js";
+import { createSettingsWindow } from "./settings-window.js";
 
 const WINDOW_DIR = path.join(__dirname, "dictation-window");
 const PAGE = path.join(WINDOW_DIR, "dictation.html");
@@ -35,6 +40,8 @@ const PARTITION = "dictation";
 /** How long to wait for the page to hand over its last chunk after a stop. */
 const STOP_TIMEOUT_MS = 1500;
 const MAX_CHUNK_BYTES = 65_536;
+/** After a cancel, how long a delete waits for the helper to let go of its model file. */
+const HELPER_EXIT_WAIT_MS = 3000;
 
 /** What the e2e suite drives and reads through `app.evaluate`. Test hooks exist only in an unpackaged build. */
 export interface DictationProbe {
@@ -43,6 +50,7 @@ export interface DictationProbe {
     cancel?: () => void;
     end?: () => void;
     helperPid: () => number | undefined;
+    openSettings?: () => void;
     outcome: () => string | undefined;
     state: () => string;
     /** Replaces the recogniser and its model with these, skipping the model store. */
@@ -52,7 +60,6 @@ export interface DictationProbe {
 export interface DictationOptions {
     /** Can the main window put text in its composer right now? */
     canTakeDraft: () => boolean;
-    enabled: boolean;
     handOffDraft: (text: string) => void;
     /** Is this a page of the site, on its trusted origin? */
     isSiteUrl: (url: string | undefined) => boolean;
@@ -64,10 +71,12 @@ export interface DictationOptions {
 export interface Dictation {
     /** Is this the live capture window's own contents, asking from its own page? Feeds the permission policy. */
     isWindow: (webContents: unknown, url: string | undefined) => boolean;
+    /** Opens the local settings window (the tray's item): the only way in, the site has none. */
+    openSettings: () => void;
     /** The one permission policy, for the default session and the capture window's own. */
     policy: PermissionPolicy;
     probe: DictationProbe | undefined;
-    /** Registers the shortcut and the channels. Does nothing when dictation is off or the helper was not built. */
+    /** Registers the channels, and the shortcut while the switch is on and the helper was built. */
     register: () => void;
 }
 
@@ -106,7 +115,14 @@ const notify = (title: string, body: string): void => {
 export const createDictation = (options: DictationOptions): Dictation => {
     const pageUrl = pathToFileURL(PAGE).href;
     const assetFolder = `${pathToFileURL(WINDOW_DIR).href}/`;
-    const model = modelFor(process.platform, process.arch);
+    const offered = offeredModels(process.platform, process.arch);
+    const dictationFolder = path.join(app.getPath("userData"), "dictation");
+    const settings = createSettingsStore(path.join(dictationFolder, "settings.json"), new Set(offered.map(({ spec }) => spec.id)));
+    const models = createModelStore({ directory: path.join(dictationFolder, "models"), fetch: (url, init) => net.fetch(String(url), init) });
+    const chosenModel = () => resolveModel(settings.get().model, process.platform, process.arch);
+    let shortcutHeld = false;
+    /** The OS refused the shortcut (another app holds it): settings says so instead of leaving the switch looking healthy. */
+    let shortcutRefused = false;
     let capture: BrowserWindowInstance | undefined;
     let ended: (() => void) | undefined;
     let recognizer: Recognizer | undefined;
@@ -260,7 +276,7 @@ export const createDictation = (options: DictationOptions): Dictation => {
         return status === "granted";
     };
 
-    const confirmDownload = async (spec: typeof model): Promise<boolean> => {
+    const confirmDownload = async (spec: ModelSpec): Promise<boolean> => {
         const megabytes = Math.round(spec.bytes / 1_000_000);
         const { response } = await dialog.showMessageBox({
             buttons: ["Download", "Cancel"],
@@ -274,16 +290,66 @@ export const createDictation = (options: DictationOptions): Dictation => {
         return response === 0;
     };
 
-    const register = (): void => {
-        if (!options.enabled) {
-            return;
+    const hasHelper = (): boolean => testEngine !== undefined || existsSync(helperPath());
+
+    /** The shortcut is held only while the switch is on and the helper exists: off, other apps keep the key. */
+    const syncShortcut = (): void => {
+        const wanted = settings.get().enabled && hasHelper();
+
+        if (wanted && !shortcutHeld) {
+            shortcutHeld = globalShortcut.register(DICTATION_SHORTCUT, () => controller?.press());
+            shortcutRefused = !shortcutHeld;
+
+            if (shortcutRefused) {
+                options.log(`dictation: could not register ${DICTATION_SHORTCUT}`);
+            }
+        } else if (!wanted) {
+            if (shortcutHeld) {
+                globalShortcut.unregister(DICTATION_SHORTCUT);
+            }
+
+            shortcutHeld = false;
+            shortcutRefused = false;
         }
+    };
 
-        const models = createModelStore({ directory: path.join(app.getPath("userData"), "dictation", "models"), fetch: (url, init) => net.fetch(String(url), init) });
+    /** Cancels a dictation and waits (briefly) for its helper to exit: Windows will not delete a model file the helper still has open. */
+    const cancelDictation = async (): Promise<void> => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise((resolve) => {
+            timer = setTimeout(resolve, HELPER_EXIT_WAIT_MS);
+        });
 
+        controller?.cancel();
+
+        try {
+            await Promise.race([recognizer?.exited(), timeout]);
+        } finally {
+            clearTimeout(timer);
+        }
+    };
+
+    const settingsWindow = createSettingsWindow({
+        api: createSettingsApi({
+            cancelDictation,
+            hasHelper,
+            models,
+            offered,
+            onEnabledChange: syncShortcut,
+            onNotice: (message) => settingsWindow.changed(message),
+            resolveModel: () => chosenModel().id,
+            settings,
+            shortcut: DICTATION_SHORTCUT_LABEL,
+            shortcutRefused: () => shortcutRefused,
+        }),
+        log: options.log,
+    });
+
+    const register = (): void => {
         controller = createDictationController({
             confirmDownload,
-            hasHelper: () => testEngine !== undefined || existsSync(helperPath()),
+            enabled: () => settings.get().enabled,
+            hasHelper,
             insert: (text) =>
                 insertDictation(
                     {
@@ -296,9 +362,20 @@ export const createDictation = (options: DictationOptions): Dictation => {
                 ),
             log: options.log,
             microphoneAllowed,
-            model,
+            model: chosenModel,
             models: {
-                download: (spec) => models.download(spec),
+                // A download the shortcut started shows in an open settings window too.
+                download: async (spec) => {
+                    const running = models.download(spec);
+
+                    settingsWindow.changed();
+
+                    try {
+                        return await running;
+                    } finally {
+                        settingsWindow.changed();
+                    }
+                },
                 ensureVerified: async (spec) => testEngine?.modelPath ?? models.ensureVerified(spec),
                 isDownloading: (spec) => models.isDownloading(spec),
                 status: async (spec) => testEngine === undefined ? models.status(spec) : { bytes: 0, file: spec.file, state: "present", version: spec.version },
@@ -308,7 +385,7 @@ export const createDictation = (options: DictationOptions): Dictation => {
             openWindow,
             startRecognizer: (modelPath) => {
                 // The folder is ours and empty: if the helper ever wrote a file, this is where it would land.
-                const started = startRecognizer({ cwd: path.join(app.getPath("userData"), "dictation"), helper: helper(), modelPath });
+                const started = startRecognizer({ cwd: dictationFolder, helper: helper(), language: settings.get().language, modelPath });
 
                 recognizer = started;
 
@@ -349,7 +426,7 @@ export const createDictation = (options: DictationOptions): Dictation => {
 
         (async () => {
             try {
-                await mkdir(path.join(app.getPath("userData"), "dictation"), { mode: 0o700, recursive: true });
+                await mkdir(dictationFolder, { mode: 0o700, recursive: true });
                 await models.sweepPartials();
             } catch (error) {
                 options.log(`dictation: could not prepare its folder: ${String(error)}`);
@@ -361,21 +438,20 @@ export const createDictation = (options: DictationOptions): Dictation => {
                 begin: () => controller?.press(),
                 cancel: () => controller?.cancel(),
                 end: () => controller?.release(),
+                openSettings: settingsWindow.open,
                 useTestEngine: (replacement: { args: string[]; command: string; modelPath: string }) => {
                     testEngine = replacement;
                 },
             });
         }
 
+        settingsWindow.register();
+
         if (!existsSync(helperPath())) {
             options.log("dictation: the speech helper is not part of this build, so the shortcut is not registered");
-
-            return;
         }
 
-        if (!globalShortcut.register(DICTATION_SHORTCUT, () => controller?.press())) {
-            options.log(`dictation: could not register ${DICTATION_SHORTCUT}`);
-        }
+        syncShortcut();
 
         app.on("will-quit", () => {
             controller?.cancel();
@@ -384,5 +460,5 @@ export const createDictation = (options: DictationOptions): Dictation => {
         });
     };
 
-    return { isWindow, policy, probe: options.enabled ? probe : undefined, register };
+    return { isWindow, openSettings: settingsWindow.open, policy, probe: app.isPackaged ? undefined : probe, register };
 };

@@ -2,6 +2,8 @@ import type { ChildProcess, SpawnOptions } from "node:child_process";
 import { spawn as nodeSpawn } from "node:child_process";
 
 import { SAMPLE_RATE } from "./channels.js";
+import type { Language } from "./settings.js";
+import { isLanguage } from "./settings.js";
 import { wavBytes } from "./wav.js";
 
 /** Waiting for text after the audio is in: model load is mostly done by then, so this covers only the decode. */
@@ -39,6 +41,8 @@ export interface Transcript {
 }
 
 export interface Recognizer {
+    /** Resolves once the helper process has ended (killed, crashed or done), so its model file is no longer open. */
+    exited: () => Promise<void>;
     /** Stops the helper. Safe to call after it has exited. */
     kill: () => void;
     /** Called once if the helper exits or fails to start before `transcribe` was called. */
@@ -52,6 +56,8 @@ export interface RecognizerOptions {
     /** Where the helper runs: a folder we control, so any file it might write lands there. */
     cwd: string;
     helper: HelperCommand;
+    /** What the user is dictating in; `auto` lets the model detect it. Checked here too, since it ends up in the helper's arguments. */
+    language: Language;
     modelPath: string;
     spawn?: (command: string, args: ReadonlyArray<string>, options: SpawnOptions) => ChildProcess;
     timeoutMs?: number;
@@ -89,11 +95,15 @@ const helperEnvironment = (): NodeJS.ProcessEnv => {
  * `RecognizerError`.
  */
 export const startRecognizer = (options: RecognizerOptions): Recognizer => {
+    if (!isLanguage(options.language)) {
+        throw new RecognizerError("unavailable", "The dictation language is not supported");
+    }
+
     const spawn = options.spawn ?? nodeSpawn;
     const timeoutMs = options.timeoutMs ?? TRANSCRIBE_TIMEOUT_MS;
-    // `-l auto`: the default is English, which would turn other languages into English. With `-f -` the recogniser has no file
+    // `-l`: the default is English, which would turn other languages into English, so it is always given (`auto` detects). With `-f -` the recogniser has no file
     // name to derive an output from, so `-otxt` writes the text to stdout (upstream's stdin mode; Windows uses the console there, S4).
-    const args = [...options.helper.args, "-m", options.modelPath, "-f", "-", "-otxt", "-nt", "-np", "-l", "auto"];
+    const args = [...options.helper.args, "-m", options.modelPath, "-f", "-", "-otxt", "-nt", "-np", "-l", options.language];
     const child = spawn(options.helper.command, args, {
         cwd: options.cwd,
         env: helperEnvironment(),
@@ -217,6 +227,15 @@ export const startRecognizer = (options: RecognizerOptions): Recognizer => {
     };
 
     return {
+        exited: async () => {
+            await new Promise<void>((resolve) => {
+                if (ended === undefined) {
+                    endedListeners.push(resolve);
+                } else {
+                    resolve();
+                }
+            });
+        },
         kill,
         onEarlyExit: (listener) => {
             const earlier = failure();

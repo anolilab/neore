@@ -66,6 +66,17 @@ export const isLocalPage = (page: URL, raw: string | undefined): boolean => {
     }
 };
 
+/**
+ * The caller of an IPC handler is the TOP frame of one specific local window (`contents`) and that frame is on the page's own
+ * URL: not another window's page, and not an iframe inside it.
+ */
+export const isOwnFrame = (
+    event: { sender: unknown; senderFrame?: { url: string } | null },
+    contents: { mainFrame: unknown } | undefined,
+    pageUrl: string,
+): boolean =>
+    contents !== undefined && event.sender === contents && event.senderFrame != null && event.senderFrame === contents.mainFrame && event.senderFrame.url === pageUrl;
+
 export type UrlClass = "artifact" | "external" | "oauth" | "site";
 
 /**

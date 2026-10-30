@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { ModelSpec } from "./catalog.js";
-import { LARGE_V3_TURBO_Q5, modelFor, SMALL } from "./catalog.js";
+import { LARGE_V3_TURBO_Q5, offeredModels, resolveModel, SMALL } from "./catalog.js";
 import { createModelStore, ModelError } from "./model-store.js";
 
 const PAYLOAD = Buffer.from("a stand-in for model weights, long enough to arrive in three chunks".repeat(3));
@@ -70,11 +70,27 @@ describe("catalog", () => {
         }
     });
 
-    it("gives Apple Silicon the large model and every other machine the small one", () => {
-        expect(modelFor("darwin", "arm64")).toBe(LARGE_V3_TURBO_Q5);
-        expect(modelFor("darwin", "x64")).toBe(SMALL);
-        expect(modelFor("win32", "x64")).toBe(SMALL);
-        expect(modelFor("linux", "arm64")).toBe(SMALL);
+    it("defaults Apple Silicon to the large model and every other machine to the small one", () => {
+        expect(resolveModel(undefined, "darwin", "arm64")).toBe(LARGE_V3_TURBO_Q5);
+        expect(resolveModel(undefined, "darwin", "x64")).toBe(SMALL);
+        expect(resolveModel(undefined, "win32", "x64")).toBe(SMALL);
+        expect(resolveModel(undefined, "linux", "arm64")).toBe(SMALL);
+    });
+
+    it("offers both models everywhere, with exactly one default, and says the small one is weaker on Chinese and Italian", () => {
+        for (const [platform, arch] of [["darwin", "arm64"], ["darwin", "x64"], ["win32", "x64"], ["linux", "arm64"]] as const) {
+            const offered = offeredModels(platform, arch);
+
+            expect(new Set(offered.map((model) => model.spec.id))).toStrictEqual(new Set(["large-v3-turbo-q5_0", "small"]));
+            expect(offered.filter(({ isDefault }) => isDefault)).toHaveLength(1);
+            expect(offered.find((model) => model.spec === SMALL)?.note).toContain("Chinese and Italian");
+        }
+    });
+
+    it("uses the chosen model when it is offered and falls back to the default for anything else", () => {
+        expect(resolveModel("small", "darwin", "arm64")).toBe(SMALL);
+        expect(resolveModel("large-v3-turbo-q5_0", "linux", "x64")).toBe(LARGE_V3_TURBO_Q5);
+        expect(resolveModel("../../etc/passwd", "linux", "x64")).toBe(SMALL);
     });
 });
 
@@ -299,5 +315,99 @@ describe("ensureVerified", () => {
         await utimes(file, pinned, pinned);
 
         await expect(store.ensureVerified(spec)).rejects.toMatchObject({ code: "checksum" });
+    });
+});
+
+describe("remove", () => {
+    it("deletes the model file and nothing else", async () => {
+        await writeFile(path.join(directory, spec.file), PAYLOAD);
+        await writeFile(path.join(directory, "ggml-other.bin"), "other");
+
+        const store = createModelStore({ directory });
+
+        await store.remove(spec);
+
+        expect(await readdir(directory)).toStrictEqual(["ggml-other.bin"]);
+        expect(await store.status(spec)).toStrictEqual({ state: "missing" });
+    });
+
+    it("succeeds when there is no file, and forgets that a file was verified", async () => {
+        const store = createModelStore({ directory });
+
+        await writeFile(path.join(directory, spec.file), PAYLOAD);
+        await store.ensureVerified(spec);
+        await store.remove(spec);
+        await store.remove(spec);
+
+        await expect(store.ensureVerified(spec)).rejects.toMatchObject({ code: "missing" });
+    });
+
+    it("stops a download of that model and leaves no file behind", async () => {
+        const store = createModelStore({
+            directory,
+            fetch: async (_url, init) => responseOf([PAYLOAD.subarray(0, 30)], { signal: init?.signal as AbortSignal, stall: true }),
+        });
+        const running = store.download(spec);
+        const rejection = expect(running).rejects.toMatchObject({ code: "cancelled" });
+
+        await new Promise((resolve) => {
+            setTimeout(resolve, 20);
+        });
+        await store.remove(spec);
+        await rejection;
+        expect(store.isDownloading(spec)).toBe(false);
+        expect(await readdir(directory)).toStrictEqual([]);
+    });
+});
+
+describe("remove, when the file cannot be deleted", () => {
+    it("fails instead of reporting a deletion, and leaves the file", async () => {
+        // A directory where the file should be: the unlink fails with something other than "not found".
+        await mkdir(path.join(directory, spec.file));
+
+        await expect(createModelStore({ directory }).remove(spec)).rejects.toMatchObject({ code: "delete" });
+        expect(await readdir(directory)).toStrictEqual([spec.file]);
+    });
+});
+
+describe("a download cancelled after its last byte", () => {
+    it("does not move the model into place and leaves the folder empty", async () => {
+        let cancelling: Promise<void> | undefined;
+        const store = createModelStore({ directory, fetch: async () => responseOf(split(PAYLOAD)) });
+        const running = store.download(spec, {
+            onProgress: (received) => {
+                // The bytes are all in and verified a moment later: the switch goes off right now.
+                if (received === PAYLOAD.length) {
+                    cancelling = store.cancelDownloads();
+                }
+            },
+        });
+
+        await expect(running).rejects.toMatchObject({ code: "cancelled" });
+        await cancelling;
+        expect(await readdir(directory)).toStrictEqual([]);
+        expect(await store.status(spec)).toStrictEqual({ state: "missing" });
+    });
+});
+
+describe("cancelDownloads", () => {
+    it("stops every download and leaves the folder empty", async () => {
+        const store = createModelStore({
+            directory,
+            fetch: async (_url, init) => responseOf([PAYLOAD.subarray(0, 30)], { signal: init?.signal as AbortSignal, stall: true }),
+        });
+        const running = store.download(spec);
+        const rejection = expect(running).rejects.toMatchObject({ code: "cancelled" });
+
+        await new Promise((resolve) => {
+            setTimeout(resolve, 20);
+        });
+        await store.cancelDownloads();
+        await rejection;
+        expect(await readdir(directory)).toStrictEqual([]);
+    });
+
+    it("does nothing when nothing is downloading", async () => {
+        await expect(createModelStore({ directory }).cancelDownloads()).resolves.toBeUndefined();
     });
 });
