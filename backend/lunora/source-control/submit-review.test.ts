@@ -15,14 +15,20 @@ const comment = (id: string): DraftComment => {
 const claimed = (overrides: Partial<ClaimedDraft> = {}): Claim => {
     return {
         draft: { body: "Looks fine", comments: [comment("c1"), comment("c2")], commitId: COMMIT, revision: 5, verdict: "approve", ...overrides },
+        lease: 1234,
         status: "claimed",
     };
 };
 
 /** Ports that record the order of effects. */
-const ports = (claim: Claim, post: (submission: ReviewSubmission) => Promise<WriteOutcome<{ review: SubmittedReview }>>) => {
+const ports = (
+    claim: Claim,
+    post: (submission: ReviewSubmission) => Promise<WriteOutcome<{ review: SubmittedReview }>>,
+    finish: () => Promise<void> = async () => {},
+) => {
     const calls: string[] = [];
-    const finished: { revision: number; sentIds: string[] }[] = [];
+    const finished: { lease: number; revision: number; sentIds: string[] }[] = [];
+    const released: number[] = [];
     const posted: ReviewSubmission[] = [];
     const value: SubmitPorts = {
         claim: async () => {
@@ -30,9 +36,10 @@ const ports = (claim: Claim, post: (submission: ReviewSubmission) => Promise<Wri
 
             return claim;
         },
-        finish: async (revision, sentIds) => {
+        finish: async (revision, sentIds, lease) => {
             calls.push("finish");
-            finished.push({ revision, sentIds });
+            finished.push({ lease, revision, sentIds });
+            await finish();
         },
         post: async (submission) => {
             calls.push("post");
@@ -40,12 +47,13 @@ const ports = (claim: Claim, post: (submission: ReviewSubmission) => Promise<Wri
 
             return await post(submission);
         },
-        release: async () => {
+        release: async (lease) => {
             calls.push("release");
+            released.push(lease);
         },
     };
 
-    return { calls, finished, posted, value };
+    return { calls, finished, posted, released, value };
 };
 
 const accepted = async (): Promise<WriteOutcome<{ review: SubmittedReview }>> => {
@@ -61,7 +69,7 @@ describe("submitDraft", () => {
         expect(posted).toHaveLength(1);
         expect(posted[0]).toMatchObject({ body: "Looks fine", commitId: COMMIT, verdict: "approve" });
         expect(posted[0]?.comments).toHaveLength(2);
-        expect(finished).toEqual([{ revision: 5, sentIds: ["c1", "c2"] }]);
+        expect(finished).toEqual([{ lease: 1234, revision: 5, sentIds: ["c1", "c2"] }]);
     });
 
     it.each([
@@ -76,6 +84,25 @@ describe("submitDraft", () => {
         expect(await submitDraft(value)).toEqual(failure);
         expect(calls).toEqual(["claim", "post", "release"]);
         expect(finished).toEqual([]);
+    });
+
+    it("hands the claim's lease back to release, so only that claim is given up", async () => {
+        const { released, value } = ports(claimed(), async () => {
+            return { status: "host_error" };
+        });
+
+        await submitDraft(value);
+        expect(released).toEqual([1234]);
+    });
+
+    it("still reports the review as submitted when clearing the draft fails afterwards, so nobody posts it twice", async () => {
+        const { calls, value } = ports(claimed(), accepted, async () => {
+            throw new Error("database unavailable");
+        });
+
+        expect(await submitDraft(value)).toEqual({ reviewUrl: "https://github.com/o/r/pull/1#pullrequestreview-9", status: "ok" });
+        // The claim is not released: the lease keeps the draft locked instead of inviting a resubmit at once.
+        expect(calls).toEqual(["claim", "post", "finish"]);
     });
 
     it("releases the claim and rethrows when the post fails unexpectedly", async () => {

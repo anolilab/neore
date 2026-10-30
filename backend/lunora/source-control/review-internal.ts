@@ -26,6 +26,7 @@ export const claimDraftForSubmit = internalMutation
                     revision: v.number(),
                     verdict: v.union(vReviewVerdict, v.null()),
                 }),
+                lease: v.number(),
                 status: v.literal("claimed"),
             }),
             v.object({ status: v.union(v.literal("in_progress"), v.literal("no_draft")) }),
@@ -48,6 +49,7 @@ export const claimDraftForSubmit = internalMutation
 
         return {
             draft: { body: draft.body, comments: draft.comments, commitId: draft.commitId, revision: draft.revision, verdict: draft.verdict },
+            lease: now,
             status: "claimed" as const,
         };
     });
@@ -55,14 +57,15 @@ export const claimDraftForSubmit = internalMutation
 /**
  * The host confirmed the review. A draft nobody touched since the claim goes; one that
  * was edited anyway (a lease that ran out) keeps only the comments the host did not receive.
+ * A row another submit has claimed since (`lease` no longer matches) is that submit's: untouched.
  */
 export const finishDraftSubmit = internalMutation
-    .input({ ...address, revision: v.number(), sentIds: v.array(v.string().max(MAX_LENGTH.id)) })
+    .input({ ...address, lease: v.number(), revision: v.number(), sentIds: v.array(v.string().max(MAX_LENGTH.id)) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const draft = await draftFor(ctx, args.userId, args.repository, args.number);
 
-        if (draft === null) {
+        if (draft === null || draft.submittingAt !== args.lease) {
             return null;
         }
 
@@ -78,14 +81,14 @@ export const finishDraftSubmit = internalMutation
         return null;
     });
 
-/** The host did not take the review: the draft stays exactly as it was and can be submitted again. */
+/** The host did not take the review: the draft stays exactly as it was and can be submitted again. Only this claim's own lease is given back. */
 export const releaseDraftSubmit = internalMutation
-    .input(address)
+    .input({ ...address, lease: v.number() })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const draft = await draftFor(ctx, args.userId, args.repository, args.number);
 
-        if (draft !== null) {
+        if (draft !== null && draft.submittingAt === args.lease) {
             await ctx.db.patch(draft._id, { submittingAt: 0 });
         }
 

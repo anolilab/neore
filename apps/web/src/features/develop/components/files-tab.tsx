@@ -18,6 +18,7 @@ import { usePullRequestFiles } from "../lib/use-develop";
 import { useReviewActions, useReviewDraft, useReviewThreads, useViewedFiles } from "../lib/use-review";
 import { useReviewMessages } from "../lib/use-review-messages";
 import DiffView from "./diff-view";
+import type { ReadFailureStatus } from "./failure-notice";
 import FailureNotice from "./failure-notice";
 import type { DraftCommentEntry } from "./review-diff";
 import ReviewDiff from "./review-diff";
@@ -48,6 +49,10 @@ interface FileReview {
     viewed: ViewedState | undefined;
     viewedPending: boolean;
 }
+
+/** The first failure among a query's pages, if any; a thrown page counts as the host failing. */
+const failureOf = (pages: ReadonlyArray<{ status: string }>, isError: boolean): ReadFailureStatus | undefined =>
+    (pages.find((page) => page.status !== "ok")?.status as ReadFailureStatus | undefined) ?? (isError ? "host_error" : undefined);
 
 const FileRow = ({ context, file, review, showDiff }: { context: ReviewContext; file: FileEntry; review: FileReview; showDiff: boolean }) => {
     const { t } = useLingui();
@@ -195,7 +200,8 @@ const FilesTab = ({
     const listed = [
         ...new Map(pages.flatMap((page) => (page.status === "ok" ? page.files : [])).map((file) => [`${file.previousPath ?? ""}→${file.path}`, file])).values(),
     ];
-    const failure = pages.find((page) => page.status !== "ok")?.status ?? (files.isError ? "host_error" : undefined);
+    const failure = failureOf(pages, files.isError);
+    const reviewFailure = failureOf(threads.data?.pages ?? [], threads.isError) ?? failureOf(viewed.data?.pages ?? [], viewed.isError);
 
     // Keep loading until the host has nothing more to list: the pages are bounded by the host's own ceiling.
     useEffect(() => {
@@ -272,6 +278,7 @@ const FilesTab = ({
                 ))}
             </ul>
             {failure && <FailureNotice label={hostLabel} status={failure} />}
+            {reviewFailure && reviewFailure !== failure && <FailureNotice label={hostLabel} status={reviewFailure} />}
             {hasNextPage && !isFetchingNextPage && !failure && (
                 <Button onClick={() => fetchNextPage()} variant="outline">
                     {t`Load more files`}

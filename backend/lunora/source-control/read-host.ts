@@ -35,7 +35,7 @@ export const failureOf = (error: HostApiError): ReadFailure => {
     }
 };
 
-const PROBLEM_STATUS = { expired: "needs_reconnect", not_connected: "not_connected", unavailable: "host_error" } as const;
+export const PROBLEM_STATUS = { expired: "needs_reconnect", not_connected: "not_connected", unavailable: "host_error" } as const;
 
 export const readFromHost = async <T extends object>(
     driver: HostDriver,

@@ -13,7 +13,7 @@ export const useReviewMessages = (label: string) => {
         head_moved: t`The change has new commits since you started this review. Submit or discard the review first, then comment on the new version.`,
         not_found: t`That comment is already gone.`,
         submitting: t`Your review is being submitted. Wait for it to finish.`,
-        too_many: t`A review holds at most 100 comments. Submit this one first.`,
+        too_many: t`This review is too long to keep: it holds at most 100 comments and about 1 MB of text. Submit it first, or shorten it.`,
     };
     const writes: Record<string, string> = {
         forbidden: t`${label} refused this. Your account may lack access.`,

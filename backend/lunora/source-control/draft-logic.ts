@@ -5,8 +5,11 @@
  */
 import type { DiffSide, ReviewVerdict } from "./types";
 
-/** Comments one draft holds; with `MAX_LENGTH.long` each, a row stays far under a Durable Object's 2 MB row. */
+/** Comments one draft holds. The length caps count characters, so `MAX_DRAFT_BYTES` is what keeps the row small. */
 export const MAX_DRAFT_COMMENTS = 100;
+
+/** UTF-8 bytes of a draft's text and comments, half a Durable Object's 2 MB row: CJK text is 3 bytes a character. */
+export const MAX_DRAFT_BYTES = 1_000_000;
 
 /** How long a submit holds its draft. A host call has a 15 s deadline, so a lease this long means the submitter died. */
 export const SUBMIT_LEASE_MS = 60_000;
@@ -46,6 +49,10 @@ export const commitFor = (draft: Pick<DraftState, "comments" | "commitId"> | nul
 
     return "head_moved";
 };
+
+/** The bytes a draft's body and comments take in the row. */
+export const draftBytes = (draft: Pick<DraftState, "body" | "comments">): number =>
+    new TextEncoder().encode(JSON.stringify({ body: draft.body, comments: draft.comments })).byteLength;
 
 export type SubmitBlocker = "needs_text" | "needs_verdict";
 

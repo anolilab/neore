@@ -402,7 +402,10 @@ written here is what is not.
 - **Develop review** (`backend/lunora/source-control/`, plans/develop-mode.md) — the draft is the
   `reviewDrafts` row, server-side so a reload or second device sees it. `submitReview` claims it
   first (`submittingAt`, a 60 s lease; edits are refused meanwhile), posts ONE host call, and
-  clears the draft only on a confirmed review (`submit-review.ts` fixes the order). A refusal
+  clears the draft only on a confirmed review (`submit-review.ts` fixes the order). The claim
+  returns its `submittingAt` as a lease token: finish and release act only while the row still
+  holds it, and a finish that fails after the host accepted is still `ok`. A 401 on a write gets
+  one token renewal and one retry (the host did nothing); no other write is repeated. A refusal
   keeps it (`rejected`, the host's reason is untrusted text); an answer that never came is
   `unconfirmed` — the host may hold the review, so the UI says to look there before resubmitting.
   Comment lines mean something only on the commit the reviewer saw, so a draft with comments

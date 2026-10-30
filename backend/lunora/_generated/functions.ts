@@ -9478,9 +9478,9 @@ export interface Caller {
             submitReview: (args: { number: number; repository: string }) => Promise<{ reviewUrl: string | null; status: "ok" } | { status: "in_progress" | "needs_text" | "needs_verdict" | "no_draft" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
         };
         review_internal: {
-            claimDraftForSubmit: (args: { number: number; repository: string; userId: string }) => Promise<{ draft: { body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; revision: number; verdict: "approve" | "comment" | "request_changes" | null }; status: "claimed" } | { status: "in_progress" | "no_draft" }>;
-            finishDraftSubmit: (args: { number: number; repository: string; userId: string; revision: number; sentIds: Array<string> }) => Promise<null>;
-            releaseDraftSubmit: (args: { number: number; repository: string; userId: string }) => Promise<null>;
+            claimDraftForSubmit: (args: { number: number; repository: string; userId: string }) => Promise<{ draft: { body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; revision: number; verdict: "approve" | "comment" | "request_changes" | null }; lease: number; status: "claimed" } | { status: "in_progress" | "no_draft" }>;
+            finishDraftSubmit: (args: { number: number; repository: string; userId: string; lease: number; revision: number; sentIds: Array<string> }) => Promise<null>;
+            releaseDraftSubmit: (args: { number: number; repository: string; userId: string; lease: number }) => Promise<null>;
         };
     };
     sub_agents: {

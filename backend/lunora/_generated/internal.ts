@@ -944,9 +944,9 @@ export interface InternalApiTypes {
             deleteUserReviewDrafts: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
         };
         review_internal: {
-            claimDraftForSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string }, { draft: { body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; revision: number; verdict: "approve" | "comment" | "request_changes" | null }; status: "claimed" } | { status: "in_progress" | "no_draft" }>;
-            finishDraftSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string; revision: number; sentIds: Array<string> }, null>;
-            releaseDraftSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string }, null>;
+            claimDraftForSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string }, { draft: { body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; revision: number; verdict: "approve" | "comment" | "request_changes" | null }; lease: number; status: "claimed" } | { status: "in_progress" | "no_draft" }>;
+            finishDraftSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string; lease: number; revision: number; sentIds: Array<string> }, null>;
+            releaseDraftSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string; lease: number }, null>;
         };
     };
     sub_agents: {

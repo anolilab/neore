@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { githubDriver } from "./drivers/github";
+import type { HostRequest } from "./origin-fetch";
 import { HostApiError } from "./origin-fetch";
 import { writeToHost } from "./write-host";
 
-const token = { accessToken: "tkn" } as const;
+const token = {
+    accessToken: "tkn",
+    renew: async () => {
+        return { problem: "expired" as const };
+    },
+};
 
 const failing = (error: unknown) => async () => {
     throw error;
@@ -16,6 +22,89 @@ describe("writeToHost", () => {
 
         expect(await writeToHost(githubDriver, { problem: "not_connected" }, write)).toEqual({ status: "not_connected" });
         expect(await writeToHost(githubDriver, { problem: "expired" }, write)).toEqual({ status: "needs_reconnect" });
+        expect(await writeToHost(githubDriver, { problem: "unavailable" }, write)).toEqual({ status: "host_error" });
+    });
+
+    describe("a 401", () => {
+        const renewing = (next: Parameters<typeof writeToHost>[1]) => {
+            let renewals = 0;
+            const first = {
+                accessToken: "stale",
+                renew: async () => {
+                    renewals += 1;
+
+                    return next;
+                },
+            };
+
+            return { first, renewals: () => renewals };
+        };
+
+        it("renews the token once and writes again with the new one, since a 401 means the host did nothing", async () => {
+            const { first, renewals } = renewing({ accessToken: "fresh", renew: token.renew });
+            const used: string[] = [];
+            const via = async (_input: Request | string | URL, init?: RequestInit): Promise<Response> => {
+                used.push(new Headers(init?.headers).get("authorization") ?? "");
+
+                return used.length === 1 ? new Response("{}", { status: 401 }) : Response.json({ ok: true });
+            };
+            const outcome = await writeToHost(
+                githubDriver,
+                first,
+                async (request: HostRequest) => {
+                    await request("/user", { json: { a: 1 }, method: "POST" });
+
+                    return {};
+                },
+                via,
+            );
+
+            expect(outcome).toEqual({ status: "ok" });
+            expect(renewals()).toBe(1);
+            expect(used).toEqual(["Bearer stale", "Bearer fresh"]);
+        });
+
+        it("asks to reconnect when the renewal yields no token, and does not write again", async () => {
+            const { first, renewals } = renewing({ problem: "expired" });
+            let writes = 0;
+            const outcome = await writeToHost(githubDriver, first, async () => {
+                writes += 1;
+
+                throw new HostApiError("x", 401);
+            });
+
+            expect(outcome).toEqual({ status: "needs_reconnect" });
+            expect(renewals()).toBe(1);
+            expect(writes).toBe(1);
+        });
+
+        it("gives up after one renewal when the host still answers 401", async () => {
+            const { first, renewals } = renewing({ accessToken: "fresh", renew: token.renew });
+            let writes = 0;
+            const outcome = await writeToHost(githubDriver, first, async () => {
+                writes += 1;
+
+                throw new HostApiError("x", 401);
+            });
+
+            expect(outcome).toEqual({ status: "needs_reconnect" });
+            expect(renewals()).toBe(1);
+            expect(writes).toBe(2);
+        });
+
+        it("never repeats a write that failed any other way", async () => {
+            const { first, renewals } = renewing({ accessToken: "fresh", renew: token.renew });
+            let writes = 0;
+
+            await writeToHost(githubDriver, first, async () => {
+                writes += 1;
+
+                throw new HostApiError("x", 500);
+            });
+
+            expect(writes).toBe(1);
+            expect(renewals()).toBe(0);
+        });
     });
 
     it("returns what the write returned with an ok status", async () => {

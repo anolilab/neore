@@ -88,16 +88,16 @@ const portsFor = (userId: string, host: (submission: ReviewSubmission) => Promis
     const posted: ReviewSubmission[] = [];
     const value: SubmitPorts = {
         claim: async () => (await harness.run(async (ctx: any) => await ctx.runMutation(claimDraftForSubmit, address))) as never,
-        finish: async (revision, sentIds) => {
-            await harness.run(async (ctx: any) => await ctx.runMutation(finishDraftSubmit, { ...address, revision, sentIds }));
+        finish: async (revision, sentIds, lease) => {
+            await harness.run(async (ctx: any) => await ctx.runMutation(finishDraftSubmit, { ...address, lease, revision, sentIds }));
         },
         post: async (submission) => {
             posted.push(submission);
 
             return await host(submission);
         },
-        release: async () => {
-            await harness.run(async (ctx: any) => await ctx.runMutation(releaseDraftSubmit, address));
+        release: async (lease) => {
+            await harness.run(async (ctx: any) => await ctx.runMutation(releaseDraftSubmit, { ...address, lease }));
         },
     };
 
@@ -173,6 +173,29 @@ describe("a draft lives on the server", () => {
         }
 
         expect(await save(A, { line: 500 })).toEqual({ status: "too_many" });
+    });
+
+    it("counts bytes, not characters: CJK text past the row budget is refused as too long", async () => {
+        // 10,000 characters (the cap on one comment) is 30,000 bytes in UTF-8: 100 of them would be 3 MB.
+        const wide = "字".repeat(10_000);
+        let saved = 0;
+
+        for (; saved < MAX_DRAFT_COMMENTS; saved += 1) {
+            const outcome = await save(A, { body: wide, line: saved + 1 });
+
+            if (outcome.status !== "ok") {
+                expect(outcome).toEqual({ status: "too_many" });
+
+                break;
+            }
+        }
+
+        expect(saved).toBeGreaterThan(0);
+        expect(saved).toBeLessThan(MAX_DRAFT_COMMENTS);
+        expect(await as(A).mutation(setDraftReview as never, { ...PULL, body: wide, commitId: HEAD, verdict: "comment" } as never)).toEqual({
+            status: "too_many",
+        });
+        expect(await commentsOf(A)).toHaveLength(saved);
     });
 
     it("refuses lines, commits and text that are not any", async () => {
@@ -286,7 +309,6 @@ describe("submitting", () => {
             await ctx.db.patch(row._id, {
                 comments: [...row.comments, { body: "late", createdAt: 1, id: "late", line: 3, path: "z.ts", side: "new", startLine: null }],
                 revision: row.revision + 1,
-                submittingAt: 0,
             });
         });
 
@@ -294,12 +316,47 @@ describe("submitting", () => {
             await value.finish(
                 claim.draft.revision,
                 claim.draft.comments.map((entry) => entry.id),
+                claim.lease,
             );
         }
 
         expect(await idsOf(A)).toEqual(["late"]);
         // What went out with the review (the summary and the verdict) is not left to go out a second time.
         expect(await read(A)).toMatchObject({ body: "", verdict: null });
+    });
+
+    it("leaves a draft another submit has claimed since alone when a late finish or release arrives", async () => {
+        await seedReady();
+
+        const { value } = portsFor(A, confirmed);
+        const stale = await value.claim();
+
+        expect(stale.status).toBe("claimed");
+
+        // The first submitter's lease ran out and a second device took the draft over.
+        await harness.run(async (ctx: any) => {
+            const [row] = await ctx.db.query("reviewDrafts").collect();
+
+            await ctx.db.patch(row._id, { submittingAt: Date.now() - SUBMIT_LEASE_MS - 1000 });
+        });
+
+        const fresh = await value.claim();
+
+        expect(fresh.status).toBe("claimed");
+
+        if (stale.status === "claimed" && fresh.status === "claimed") {
+            expect(fresh.lease).not.toBe(stale.lease);
+
+            await value.release(stale.lease);
+            expect(await read(A)).toMatchObject({ submitting: true });
+
+            await value.finish(stale.draft.revision, [], stale.lease);
+            expect(await read(A)).toMatchObject({ body: "Two nits", submitting: true });
+            expect(await commentsOf(A)).toHaveLength(2);
+
+            await value.finish(fresh.draft.revision, [], fresh.lease);
+            expect(await read(A)).toBeNull();
+        }
     });
 
     it("has nothing to submit without a draft", async () => {

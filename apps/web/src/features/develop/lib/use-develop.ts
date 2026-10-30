@@ -27,7 +27,7 @@ export interface PullRequestAddress {
  * cache key and nothing is fetched before it is known: another account on the same browser
  * can never be handed the previous one's results.
  */
-const useDevelopUser = (): string | undefined => {
+export const useDevelopUser = (): string | undefined => {
     const { hooks } = useAuth();
 
     return hooks.useSession().data?.user.id;

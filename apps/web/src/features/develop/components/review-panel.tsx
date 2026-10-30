@@ -44,6 +44,8 @@ const ReviewPanel = ({
     const [typed, setTyped] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
     const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+    // Set before the summary is saved, so a second click cannot start another submit while the first is still saving.
+    const [submitting, setSubmitting] = useState(false);
     const stored = draft.data;
     const verdicts = (Object.keys(VERDICT_CAPABILITIES) as ReviewVerdict[]).filter((verdict) =>
         isHostCapabilityAvailable(capabilities, VERDICT_CAPABILITIES[verdict]),
@@ -53,7 +55,7 @@ const ReviewPanel = ({
         return null;
     }
 
-    const locked = stored?.submitting === true || actions.submit.isPending;
+    const locked = stored?.submitting === true || submitting || actions.submit.isPending;
     const batched = hostCapabilityOf(capabilities, "review.batchedSubmit");
     const emulated = !batched.supported || batched.degradation !== "none";
     const verdictLabels: Record<ReviewVerdict, string> = { approve: t`Approve`, comment: t`Comment`, request_changes: t`Request changes` };
@@ -61,25 +63,23 @@ const ReviewPanel = ({
     const dirty = typed !== null;
     const summary = typed ?? stored?.body ?? "";
 
-    const saveReview = async (next: { body: string; verdict: ReviewVerdict | null }) => {
+    /** Whether the summary and verdict are stored now. */
+    const saveReview = async (next: { body: string; verdict: ReviewVerdict | null }): Promise<boolean> => {
         const outcome = await mutations.setReview.mutateAsync({ ...address, ...next, commitId: headSha });
 
         if (outcome.status === "ok") {
             setTyped(null);
             setFeedback(null);
-        } else {
-            setFeedback({ kind: "error", text: messages.edit(outcome.status) });
+
+            return true;
         }
+
+        setFeedback({ kind: "error", text: messages.edit(outcome.status) });
+
+        return false;
     };
 
-    const submit = async () => {
-        setFeedback(null);
-
-        // The summary typed last goes with the review even if the box never lost focus.
-        if (dirty) {
-            await saveReview({ body: summary, verdict: stored?.verdict ?? null });
-        }
-
+    const post = async () => {
         try {
             const outcome = await actions.submit.mutateAsync();
 
@@ -109,12 +109,40 @@ const ReviewPanel = ({
 
                     break;
                 }
+                case "unconfirmed": {
+                    // A review the host kept as pending blocks another one until it is submitted or deleted there.
+                    setFeedback({
+                        kind: "error",
+                        text: `${messages.write(outcome)} ${t`If it kept the review as pending, submit or delete it there first.`} ${t`Your review is kept.`}`,
+                    });
+
+                    break;
+                }
                 default: {
                     setFeedback({ kind: "error", text: `${messages.write(outcome)} ${t`Your review is kept.`}` });
                 }
             }
         } catch {
-            setFeedback({ kind: "error", text: t`Could not submit the review. Your review is kept.` });
+            // The action may have run to the host before the answer was lost: say so rather than invite a second review.
+            setFeedback({ kind: "error", text: t`Could not confirm that the review was submitted. Check on ${hostLabel} before you try again. Your review is kept here.` });
+        }
+    };
+
+    const submit = async () => {
+        setSubmitting(true);
+        setFeedback(null);
+
+        try {
+            // The summary typed last goes with the review even if the box never lost focus; if it is not stored, nothing is posted.
+            if (dirty && !(await saveReview({ body: summary, verdict: stored?.verdict ?? null }))) {
+                return;
+            }
+
+            await post();
+        } catch {
+            setFeedback({ kind: "error", text: t`Could not save the summary, so nothing was submitted. Try again.` });
+        } finally {
+            setSubmitting(false);
         }
     };
 

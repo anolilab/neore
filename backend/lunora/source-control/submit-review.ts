@@ -24,15 +24,16 @@ export interface ClaimedDraft {
     verdict: ReviewSubmission["verdict"] | null;
 }
 
-export type Claim = { draft: ClaimedDraft; status: "claimed" } | { status: "in_progress" } | { status: "no_draft" };
+/** `lease` is what the claim wrote to the row: finish and release act only while the row still holds it. */
+export type Claim = { draft: ClaimedDraft; lease: number; status: "claimed" } | { status: "in_progress" } | { status: "no_draft" };
 
 export interface SubmitPorts {
     claim: () => Promise<Claim>;
     /** The draft was posted: take off it what the host received. */
-    finish: (revision: number, sentIds: string[]) => Promise<void>;
+    finish: (revision: number, sentIds: string[], lease: number) => Promise<void>;
     post: (submission: ReviewSubmission) => Promise<WriteOutcome<{ review: SubmittedReview }>>;
     /** Gives the claim back and keeps the draft. */
-    release: () => Promise<void>;
+    release: (lease: number) => Promise<void>;
 }
 
 export type SubmitOutcome =
@@ -47,11 +48,11 @@ export const submitDraft = async (ports: SubmitPorts): Promise<SubmitOutcome> =>
         return { status: claim.status };
     }
 
-    const { draft } = claim;
+    const { draft, lease } = claim;
     const blocker = submitBlocker(draft);
 
     if (blocker !== null || draft.verdict === null) {
-        await ports.release();
+        await ports.release(lease);
 
         return { status: blocker ?? "needs_verdict" };
     }
@@ -61,21 +62,26 @@ export const submitDraft = async (ports: SubmitPorts): Promise<SubmitOutcome> =>
     try {
         outcome = await ports.post({ body: draft.body, comments: draft.comments, commitId: draft.commitId, verdict: draft.verdict });
     } catch (error) {
-        await ports.release();
+        await ports.release(lease);
 
         throw error;
     }
 
     if (outcome.status !== "ok") {
-        await ports.release();
+        await ports.release(lease);
 
         return outcome;
     }
 
-    await ports.finish(
-        draft.revision,
-        draft.comments.map((comment) => comment.id),
-    );
+    // The host has the review. If clearing the draft fails, that is not a failed submit: telling the
+    // person so would have them post the review a second time. The lease keeps the draft locked meanwhile.
+    await ports
+        .finish(
+            draft.revision,
+            draft.comments.map((comment) => comment.id),
+            lease,
+        )
+        .catch(() => undefined);
 
     return { reviewUrl: outcome.review.url, status: "ok" };
 };
