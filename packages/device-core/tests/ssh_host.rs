@@ -15,7 +15,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -125,6 +125,36 @@ fn keygen_fingerprint(public_key: &Path) -> String {
         .to_owned()
 }
 
+/// Whether this sshd knows `PerSourcePenalties` (OpenSSH 9.8+). Left on, it refuses connections from 127.0.0.1 for
+/// a while after sessions end abruptly, which these tests do on purpose; an older sshd would refuse to start with
+/// the keyword in its config, so it is probed once per process with the first server's host key.
+fn disables_source_penalties(sshd: &Path, dir: &Path) -> bool {
+    static SUPPORTED: OnceLock<bool> = OnceLock::new();
+
+    *SUPPORTED.get_or_init(|| {
+        let probe = dir.join("sshd_probe_config");
+
+        fs::write(
+            &probe,
+            format!(
+                "HostKey {}/host_key\nPerSourcePenalties no\n",
+                dir.display()
+            ),
+        )
+        .unwrap();
+
+        let output = Command::new(sshd)
+            .arg("-t")
+            .arg("-f")
+            .arg(&probe)
+            .output()
+            .unwrap();
+        let complaint = String::from_utf8_lossy(&output.stderr);
+
+        output.status.success() || !complaint.contains("PerSourcePenalties")
+    })
+}
+
 /// A running throwaway sshd and the files around it. A short path under `/tmp` keeps the control socket inside
 /// the Unix socket limit; the product itself never uses `/tmp`.
 struct Server {
@@ -175,8 +205,13 @@ impl Server {
         fs::write(
             dir.join("sshd_config"),
             format!(
-                "Port {port}\nListenAddress 127.0.0.1\nHostKey {dir}/host_key\nAuthorizedKeysFile {dir}/authorized_keys\nPidFile {dir}/sshd.pid\nUsePAM no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nPubkeyAuthentication yes\nStrictModes no\nAllowUsers {user}\nLogLevel INFO\n",
-                dir = dir.display()
+                "Port {port}\nListenAddress 127.0.0.1\nHostKey {dir}/host_key\nAuthorizedKeysFile {dir}/authorized_keys\nPidFile {dir}/sshd.pid\nUsePAM no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nPubkeyAuthentication yes\nStrictModes no\nAllowUsers {user}\nLogLevel INFO\nMaxStartups 100\n{penalties}",
+                dir = dir.display(),
+                penalties = if disables_source_penalties(sshd, &dir) {
+                    "PerSourcePenalties no\n"
+                } else {
+                    ""
+                }
             ),
         )
         .unwrap();
@@ -236,6 +271,16 @@ impl Drop for Server {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+
+        // The log goes with the directory: a failing test prints it first, so a refused connection explains itself.
+        if thread::panicking() {
+            eprintln!(
+                "--- sshd log ({}) ---\n{}",
+                self.dir.display(),
+                fs::read_to_string(self.dir.join("sshd.log")).unwrap_or_default()
+            );
+        }
+
         let _ = fs::remove_dir_all(&self.dir);
     }
 }
@@ -254,10 +299,25 @@ fn connect(
     HostConnection::connect(target, paths, &server.binary(), &interact)
 }
 
-/// Ends the session and the master it rode, so no ssh outlives the test.
-fn finish(connection: &HostConnection) {
+/// Ends the session and the master it rode, so no ssh outlives the test. `ssh -O exit` only asks the master to
+/// stop, so this waits until it is gone: a later ssh to the same target would otherwise hit the dying control
+/// socket and fail with 255.
+fn finish(connection: &HostConnection, target: &Target, paths: &SshPaths) {
     connection.close();
     connection.exit_master();
+    wait_for_master_exit(target, paths);
+}
+
+fn wait_for_master_exit(target: &Target, paths: &SshPaths) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+
+    while master_is_running(target, paths) {
+        assert!(
+            Instant::now() < deadline,
+            "the ssh master was still running 5s after `-O exit`"
+        );
+        thread::sleep(Duration::from_millis(50));
+    }
 }
 
 /// Whether the ssh control master for `target` is up, asked of ssh itself.
@@ -330,7 +390,7 @@ fn it_connects_pins_the_key_and_runs_an_action_on_the_server() {
         );
     }
 
-    finish(&connection);
+    finish(&connection, &target, &paths);
 }
 
 #[test]
@@ -455,7 +515,7 @@ fn a_passphrase_goes_through_the_helper_and_is_written_nowhere() {
         0o700
     );
 
-    finish(&connection);
+    finish(&connection, &target, &paths);
 }
 
 #[test]
@@ -515,7 +575,7 @@ fn closing_one_session_leaves_the_others_and_the_master_alone() {
         "closing a session ended the master"
     );
 
-    finish(&second);
+    finish(&second, &target, &paths);
     assert!(
         !master_is_running(&target, &paths),
         "ending the master left it running"
@@ -587,7 +647,7 @@ fn a_terminal_rides_the_open_connection_and_ends_with_it() {
     let mut shell = terminal_ssh(&args, "sleep 60").spawn().unwrap();
 
     thread::sleep(Duration::from_millis(500));
-    finish(&connection);
+    finish(&connection, &target, &paths);
 
     let deadline = Instant::now() + Duration::from_secs(20);
     let status = loop {
@@ -658,7 +718,7 @@ fn a_data_folder_with_a_space_that_is_too_deep_for_a_socket_still_connects_over_
 
     assert_eq!(outcome.status, "completed");
 
-    finish(&connection);
+    finish(&connection, &target, &paths);
     assert!(!master_is_running(&target, &paths));
 }
 
@@ -776,7 +836,7 @@ fn the_bundled_host_installs_once_starts_and_a_second_install_uploads_nothing() 
         HostConnection::connect(&target, &paths, &root.binary(HOST_VERSION), &interact).unwrap();
 
     assert_eq!(connection.hello().version, HOST_VERSION);
-    finish(&connection);
+    finish(&connection, &target, &paths);
 
     assert_eq!(
         install::install(&remote, &bundle, &root).unwrap(),
