@@ -35,7 +35,8 @@ export const consentText = ({ agent, format, sha256, target }: ResolvedInstall):
             agent.repository === "" ? undefined : `Repository: ${agent.repository}`,
             `Download: ${target.archive} (${format === "raw" ? "a single file" : format})`,
             `SHA-256 the registry published: ${sha256}`,
-            `Runs: ${[target.cmd, ...target.args].join(" ")}`,
+            // Each part quoted, so an argument with a space is one argument on screen as it is to the core.
+            `Runs: ${[target.cmd, ...target.args].map((part) => JSON.stringify(part)).join(" ")}`,
             Object.keys(target.env).length === 0 ? undefined : `Sets: ${Object.keys(target.env).join(", ")}`,
             "",
             "Neore downloads this file, checks it against that checksum and installs it under its own app data. If the checksum does not match, nothing is installed.",

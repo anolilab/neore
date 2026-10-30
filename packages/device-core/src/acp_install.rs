@@ -273,6 +273,12 @@ impl DeviceState {
         let aside = key_dir.join(format!(".{}.old", request.version));
         let replaced = final_dir.exists();
 
+        // The agent's folder must be a real folder under app data: through a symlink the cleanup below would
+        // delete, and the rename would place files, somewhere else.
+        if fs::symlink_metadata(&key_dir).is_ok_and(|meta| !meta.is_dir()) {
+            return Err("the agent's install folder is not a plain folder".into());
+        }
+
         fs::create_dir_all(&key_dir).map_err(|error| error.to_string())?;
         let _ = fs::remove_dir_all(&aside);
 
@@ -1183,6 +1189,30 @@ mod tests {
             .acp_update(AcpUpdate::RemoveAgent { key: "demo".into() })
             .unwrap();
         assert!(!dir.join("acp-agents/demo").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_install_refuses_an_agent_folder_that_is_a_symlink_and_touches_nothing_behind_it() {
+        let (state, dir) = state("symlink-key");
+        let outside = dir.join("outside");
+        let old = outside.join(".1.2.3.old");
+
+        fs::create_dir_all(&old).unwrap();
+        fs::write(old.join("keep"), b"x").unwrap();
+        fs::create_dir_all(dir.join("acp-agents")).unwrap();
+        std::os::unix::fs::symlink(&outside, dir.join("acp-agents/demo")).unwrap();
+
+        let archive = tar_gz(&[("agent", b"x", 0o755)], &[]);
+        let stage = state.acp_install_stage().unwrap();
+        let result = state.acp_install(request(&stage, &archive, ArchiveFormat::TarGz, "agent"));
+
+        assert!(result.is_err(), "a symlinked agent folder is refused");
+        assert!(
+            old.join("keep").exists(),
+            "what the link points at is untouched"
+        );
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]
