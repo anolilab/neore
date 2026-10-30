@@ -186,6 +186,11 @@ msgid "{0, plural, one {# char} other {# chars}}"
 msgstr "{0, plural, one {# char} other {# chars}}"
 
 #. placeholder {0}: files.length
+#: src/features/chat/thread/host-changes.tsx:44
+msgid "{0, plural, one {# file changed} other {# files changed}}"
+msgstr "{0, plural, one {# file changed} other {# files changed}}"
+
+#. placeholder {0}: files.length
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:707
 msgid "{0, plural, one {# file} other {# files}}"
 msgstr "{0, plural, one {# file} other {# files}}"
@@ -414,7 +419,7 @@ msgid "{0} deleted"
 msgstr "{0} deleted"
 
 #. placeholder {0}: formatDuration(elapsedMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:555
+#: src/features/chat/thread/streaming-placeholder.tsx:557
 msgid "{0} elapsed"
 msgstr "{0} elapsed"
 
@@ -574,7 +579,7 @@ msgid "{0} tok/s"
 msgstr "{0} tok/s"
 
 #. placeholder {0}: tokPerSec.toFixed(1)
-#: src/features/chat/thread/streaming-placeholder.tsx:545
+#: src/features/chat/thread/streaming-placeholder.tsx:547
 msgid "{0} tokens/s"
 msgstr "{0} tokens/s"
 
@@ -944,7 +949,7 @@ msgid "{name} is installed"
 msgstr "{name} is installed"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:241
-#: src/features/chat/thread/streaming-placeholder.tsx:473
+#: src/features/chat/thread/streaming-placeholder.tsx:475
 msgid "{name} is responding"
 msgstr "{name} is responding"
 
@@ -1168,7 +1173,7 @@ msgstr "<0>Schedule</0> — Run on a cron schedule (e.g., daily at 8 AM). Uses s
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 
-#: src/features/chat/thread/streaming-placeholder.tsx:546
+#: src/features/chat/thread/streaming-placeholder.tsx:548
 msgid "~{approxTokenCount} tokens"
 msgstr "~{approxTokenCount} tokens"
 
@@ -3464,9 +3469,9 @@ msgstr "Assistant (no skill)"
 msgid "Assistant replied:"
 msgstr "Assistant replied:"
 
-#: src/features/chat/thread/message-item.tsx:203
-#: src/features/chat/thread/streaming-placeholder.tsx:687
+#: src/features/chat/thread/message-item.tsx:204
 #: src/features/chat/thread/streaming-placeholder.tsx:723
+#: src/features/chat/thread/streaming-placeholder.tsx:760
 msgid "Assistant Reply:"
 msgstr "Assistant Reply:"
 
@@ -5044,6 +5049,10 @@ msgstr "Change your organization's unique identifier"
 #: src/features/skills/components/skill-builder-diff.tsx:44
 msgid "Changes from the last refinement"
 msgstr "Changes from the last refinement"
+
+#: src/features/chat/thread/host-changes.tsx:74
+msgid "Changes in this turn"
+msgstr "Changes in this turn"
 
 #: src/features/workflow/components/version-history.tsx:129
 msgid "Changes will appear here"
@@ -6896,7 +6905,7 @@ msgstr "Copied to clipboard"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:351
+#: src/features/chat/thread/message-item.tsx:352
 #: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copied!"
 msgstr "Copied!"
@@ -6906,7 +6915,7 @@ msgstr "Copied!"
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
-#: src/features/chat/thread/message-item.tsx:351
+#: src/features/chat/thread/message-item.tsx:352
 #: src/features/chat/thread/text-selection-menu.tsx:385
 #: src/features/settings/components/chat/trigger-settings.tsx:739
 msgid "Copy"
@@ -6930,7 +6939,7 @@ msgstr "Copy {0} to clipboard"
 msgid "Copy as Markdown"
 msgstr "Copy as Markdown"
 
-#: src/features/chat/thread/message-item.tsx:368
+#: src/features/chat/thread/message-item.tsx:369
 msgid "Copy as plain text"
 msgstr "Copy as plain text"
 
@@ -9336,7 +9345,7 @@ msgstr "Download a model"
 msgid "Download as CSV"
 msgstr "Download as CSV"
 
-#: src/features/chat/thread/message-item.tsx:372
+#: src/features/chat/thread/message-item.tsx:373
 msgid "Download as Markdown"
 msgstr "Download as Markdown"
 
@@ -9708,7 +9717,7 @@ msgstr "Edge-guided generation"
 #: src/features/canvas/canvas-panel.tsx:767
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:391
+#: src/features/chat/thread/message-item.tsx:392
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:218
@@ -12568,6 +12577,10 @@ msgstr "Filename cannot be empty"
 #~ msgid "files"
 #~ msgstr "files"
 
+#: src/features/chat/thread/host-changes.tsx:41
+msgid "Files changed by this turn"
+msgstr "Files changed by this turn"
+
 #: src/features/settings/components/privacy/data-access.tsx:52
 msgid "Files:"
 msgstr "Files:"
@@ -12758,7 +12771,7 @@ msgid "First slide"
 msgstr "First slide"
 
 #. placeholder {0}: formatDuration(ttftMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:547
+#: src/features/chat/thread/streaming-placeholder.tsx:549
 msgid "First token {0}"
 msgstr "First token {0}"
 
@@ -12957,7 +12970,7 @@ msgstr "Fork"
 msgid "Fork {0} to edit a copy"
 msgstr "Fork {0} to edit a copy"
 
-#: src/features/chat/thread/message-item.tsx:401
+#: src/features/chat/thread/message-item.tsx:402
 msgid "Fork conversation"
 msgstr "Fork conversation"
 
@@ -13477,7 +13490,7 @@ msgstr "Generate from a description"
 msgid "Generate ideas for a creative writing story"
 msgstr "Generate ideas for a creative writing story"
 
-#: src/features/chat/thread/message-item.tsx:420
+#: src/features/chat/thread/message-item.tsx:421
 msgid "Generate image"
 msgstr "Generate image"
 
@@ -13503,7 +13516,7 @@ msgstr "Generate random seed"
 msgid "Generate unique business ideas for 2025"
 msgstr "Generate unique business ideas for 2025"
 
-#: src/features/chat/thread/message-item.tsx:430
+#: src/features/chat/thread/message-item.tsx:431
 msgid "Generate video"
 msgstr "Generate video"
 
@@ -13516,7 +13529,7 @@ msgstr "Generate Video"
 msgid "Generate videos from text or images"
 msgstr "Generate videos from text or images"
 
-#: src/features/chat/thread/message-item.tsx:440
+#: src/features/chat/thread/message-item.tsx:441
 msgid "Generate voice"
 msgstr "Generate voice"
 
@@ -18304,7 +18317,7 @@ msgstr "More About You"
 msgid "More actions for {0}"
 msgstr "More actions for {0}"
 
-#: src/features/chat/thread/message-item.tsx:360
+#: src/features/chat/thread/message-item.tsx:361
 msgid "More copy options"
 msgstr "More copy options"
 
@@ -18822,7 +18835,7 @@ msgstr "Neore - AI Text & Video & Audio & Image & Documents Generation Platform"
 msgid "Neore (timestamped)"
 msgstr "Neore (timestamped)"
 
-#: src/features/chat/thread/composer.tsx:643
+#: src/features/chat/thread/composer.tsx:655
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore can make mistakes. Check important information."
 
@@ -20411,6 +20424,10 @@ msgstr "Open as page"
 msgid "Open current URL"
 msgstr "Open current URL"
 
+#: src/features/chat/thread/host-changes.tsx:50
+msgid "Open diff"
+msgstr "Open diff"
+
 #: src/features/layout/components/sidebar-shortcut.tsx:100
 msgid "Open Evals"
 msgstr "Open Evals"
@@ -21790,7 +21807,7 @@ msgstr "Pin memory"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:144
 #: ../../packages/chat-ui/src/chat/message-item.tsx:193
-#: src/features/chat/thread/message-item.tsx:379
+#: src/features/chat/thread/message-item.tsx:380
 msgid "Pin message"
 msgstr "Pin message"
 
@@ -23435,7 +23452,7 @@ msgstr "Reconnect {0}"
 msgid "Reconnecting to the server…"
 msgstr "Reconnecting to the server…"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:537
+#: src/features/chat/thread/streaming-placeholder.tsx:539
 msgid "Reconnecting…"
 msgstr "Reconnecting…"
 
@@ -23619,7 +23636,7 @@ msgid "Refresh installed models"
 msgstr "Refresh installed models"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:198
-#: src/features/chat/thread/message-item.tsx:385
+#: src/features/chat/thread/message-item.tsx:386
 msgid "Regenerate"
 msgstr "Regenerate"
 
@@ -25731,6 +25748,10 @@ msgstr "Send Verification Code"
 #: src/features/chat/voice-mode/voice-mode-button.tsx:88
 msgid "Sending your message and waiting for the reply"
 msgstr "Sending your message and waiting for the reply"
+
+#: src/features/chat/thread/streaming-placeholder.tsx:587
+msgid "Sending…"
+msgstr "Sending…"
 
 #: src/features/devices/components/devices-settings.tsx:173
 msgid "Sent"
@@ -28045,7 +28066,7 @@ msgstr "Synthesizer (weighs both sides)"
 msgid "System default"
 msgstr "System default"
 
-#: src/features/chat/thread/message-item.tsx:230
+#: src/features/chat/thread/message-item.tsx:231
 msgid "System message:"
 msgstr "System message:"
 
@@ -28756,6 +28777,14 @@ msgstr "The dataset, its cases and every run of it are removed."
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 
+#: src/features/chat/thread/host-changes.tsx:77
+msgid "The diff as it was when the turn ended. Later edits to these files are not part of it."
+msgstr "The diff as it was when the turn ended. Later edits to these files are not part of it."
+
+#: src/features/chat/thread/host-changes.tsx:66
+msgid "The diff is too large to keep. The files and their line counts are shown."
+msgstr "The diff is too large to keep. The files and their line counts are shown."
+
 #: src/features/evals/components/case-fields.tsx:115
 msgid "The documents the answer should be retrieved from. Used for hit rate, MRR, precision and recall."
 msgstr "The documents the answer should be retrieved from. Used for hit rate, MRR, precision and recall."
@@ -29177,7 +29206,7 @@ msgstr "Thinking-enabled vision-language model"
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1036
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
-#: src/features/chat/thread/streaming-placeholder.tsx:727
+#: src/features/chat/thread/streaming-placeholder.tsx:764
 msgid "Thinking..."
 msgstr "Thinking..."
 
@@ -29202,6 +29231,10 @@ msgstr "This browser cannot receive push notifications here."
 #: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
 msgstr "This chat is locked"
+
+#: src/features/chat/thread/composer.tsx:584
+msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
+msgstr "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:294
 msgid "This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files."
@@ -32051,6 +32084,10 @@ msgstr "Waiting for approval on {device}"
 msgid "Waiting for output…"
 msgstr "Waiting for output…"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:594
+msgid "Waiting for the agent…"
+msgstr "Waiting for the agent…"
+
 #: src/features/chat/thread/ask-user-prompt.tsx:124
 msgid "Waiting for the owner to answer"
 msgstr "Waiting for the owner to answer"
@@ -32510,6 +32547,7 @@ msgstr "Workflows"
 msgid "Working"
 msgstr "Working"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:601
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"
@@ -32971,7 +33009,7 @@ msgstr "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Your message contains inappropriate content that cannot be sent."
 
-#: src/features/chat/thread/message-item.tsx:175
+#: src/features/chat/thread/message-item.tsx:176
 msgid "Your message:"
 msgstr "Your message:"
 
