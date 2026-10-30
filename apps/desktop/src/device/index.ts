@@ -290,9 +290,13 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
                 // The folder's path stays here: the session knows its agent and its folder's id, and the core
                 // checks that pair against the approvals before it opens anything.
                 read: async (agentKey, folderId, reference) => {
-                    const consent = (JSON.parse(core.acpView()) as AcpView).consents.find((candidate) => candidate.agentKey === agentKey && candidate.folderId === folderId);
+                    const consent = (JSON.parse(core.acpView()) as AcpView).consents.find(
+                        (candidate) => candidate.agentKey === agentKey && candidate.folderId === folderId,
+                    );
 
-                    return consent === undefined ? { kind: "", mime: "", name: "", size: 0, status: "refused" } : await core.acpReadMedia(agentKey, consent.folderPath, reference);
+                    return consent === undefined
+                        ? { kind: "", mime: "", name: "", size: 0, status: "refused" }
+                        : await core.acpReadMedia(agentKey, consent.folderPath, reference);
                 },
                 sign: (payload) => core.signUpload(payload),
             },
@@ -436,7 +440,10 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             log: (message) => console.error(message),
             receiptFile: path.join(app.getPath("userData"), "acp-host-receipts.json"),
             refused: (held, reason) =>
-                requireHost(requireCore()).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { error: `the message was not sent: ${reason}`.slice(0, 1000), reason: "failed" }),
+                requireHost(requireCore()).endLapsedTurn(held.sessionId, held.turnId, held.threadId, {
+                    error: `the message was not sent: ${reason}`.slice(0, 1000),
+                    reason: "failed",
+                }),
         });
 
         return state.commands;
@@ -460,9 +467,15 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
                 }
             })(),
         );
-        const leftovers = await read;
+        let leftovers: Awaited<typeof read>;
 
-        await recovered;
+        try {
+            leftovers = await read;
+        } finally {
+            // Recovery settles whether or not the read worked.
+            await recovered;
+        }
+
         await host.recover(leftovers);
     };
 

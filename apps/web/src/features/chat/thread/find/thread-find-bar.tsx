@@ -11,7 +11,8 @@ import { useChatMessages, useChatThread } from "@/features/chat/core/context/cha
 import { FIND_IN_THREAD_EVENT } from "@/features/keyboard/lib/find-in-thread-target";
 
 import { scrollToMessage } from "../message-list";
-import { clampIndex, findMatches, MAX_FIND_QUERY_LENGTH, stepIndex } from "./match";
+import type { FindPaging } from "./match";
+import { clampIndex, findMatches, MAX_FIND_QUERY_LENGTH, nextFindPaging, stepIndex } from "./match";
 import useFindHighlights from "./use-find-highlights";
 
 /**
@@ -44,11 +45,35 @@ const ThreadFindBar: FC = () => {
     useFindHighlights(isOpen, deferredQuery, current, revealKey);
 
     // Matches come from loaded messages only, so a search reads the older pages in until the thread is exhausted.
+    // It stops after an errored page (no progress twice) or past a page cap, and says so.
+    const pagingRef = useRef<FindPaging>({ lastCount: 0, pages: 0, stalls: 0 });
+    const [gaveUp, setGaveUp] = useState(false);
+    const messageCount = messages.length;
+
     useEffect(() => {
-        if (isOpen && deferredQuery.trim() !== "" && messagesStatus === "CanLoadMore") {
-            loadMore(FIND_PAGE_SIZE);
+        pagingRef.current = { lastCount: messageCount, pages: 0, stalls: 0 };
+        setGaveUp(false);
+        // Restart only when the search itself changes, not when messages arrive.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, deferredQuery]);
+
+    useEffect(() => {
+        if (!isOpen || deferredQuery.trim() === "" || messagesStatus !== "CanLoadMore" || gaveUp) {
+            return;
         }
-    }, [isOpen, deferredQuery, messagesStatus, loadMore]);
+
+        const { paging, stop } = nextFindPaging(pagingRef.current, messageCount);
+
+        pagingRef.current = paging;
+
+        if (stop) {
+            setGaveUp(true);
+
+            return;
+        }
+
+        loadMore(FIND_PAGE_SIZE);
+    }, [isOpen, deferredQuery, messagesStatus, messageCount, gaveUp, loadMore]);
 
     useEffect(() => {
         const open = () => {
@@ -150,10 +175,13 @@ const ThreadFindBar: FC = () => {
     let status = "";
 
     if (hasQuery) {
-        const isReadingOlder = messagesStatus === "CanLoadMore" || messagesStatus === "LoadingMore";
+        const isReadingOlder = !gaveUp && (messagesStatus === "CanLoadMore" || messagesStatus === "LoadingMore");
+        const limited = gaveUp && messagesStatus !== "Exhausted";
 
         if (matches.length > 0) {
-            status = t`${activeIndex + 1} of ${matches.length}`;
+            status = limited ? t`${activeIndex + 1} of ${matches.length} (latest messages only)` : t`${activeIndex + 1} of ${matches.length}`;
+        } else if (limited) {
+            status = t`Searched the latest messages only`;
         } else {
             status = isReadingOlder ? t`Searching…` : t`No matches`;
         }
@@ -182,7 +210,7 @@ const ThreadFindBar: FC = () => {
                 type="text"
                 value={query}
             />
-            <span aria-live="polite" className="text-muted-foreground min-w-16 px-1 text-center text-xs whitespace-nowrap tabular-nums" role="status">
+            <span aria-live="polite" className="text-muted-foreground min-w-16 px-1 text-center text-xs tabular-nums" role="status">
                 {status}
             </span>
             <TooltipIconButton disabled={matches.length === 0} onClick={() => step(-1)} tooltip={t`Previous match`} type="button">

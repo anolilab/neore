@@ -548,9 +548,15 @@ msgstr "{0} new, {1} merged, {2} promoted, {3} contradictions resolved, {4} fade
 
 #. placeholder {0}: activeIndex + 1
 #. placeholder {1}: matches.length
-#: src/features/chat/thread/find/thread-find-bar.tsx:156
+#: src/features/chat/thread/find/thread-find-bar.tsx:182
 msgid "{0} of {1}"
 msgstr "{0} of {1}"
+
+#. placeholder {0}: activeIndex + 1
+#. placeholder {1}: matches.length
+#: src/features/chat/thread/find/thread-find-bar.tsx:182
+msgid "{0} of {1} (latest messages only)"
+msgstr "{0} of {1} (latest messages only)"
 
 #. placeholder {0}: String(run.nextIndex)
 #. placeholder {1}: String(run.caseCount)
@@ -5833,7 +5839,7 @@ msgstr "Close dialogs and menus"
 msgid "Close execution history"
 msgstr "Close execution history"
 
-#: src/features/chat/thread/find/thread-find-bar.tsx:194
+#: src/features/chat/thread/find/thread-find-bar.tsx:222
 msgid "Close find"
 msgstr "Close find"
 
@@ -12972,9 +12978,9 @@ msgstr "Financial data and bank connection APIs"
 msgid "Find in table..."
 msgstr "Find in table..."
 
-#: src/features/chat/thread/find/thread-find-bar.tsx:164
-#: src/features/chat/thread/find/thread-find-bar.tsx:172
-#: src/features/chat/thread/find/thread-find-bar.tsx:178
+#: src/features/chat/thread/find/thread-find-bar.tsx:192
+#: src/features/chat/thread/find/thread-find-bar.tsx:200
+#: src/features/chat/thread/find/thread-find-bar.tsx:206
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:76
 msgid "Find in thread"
 msgstr "Find in thread"
@@ -19500,7 +19506,7 @@ msgstr "Next item"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:229
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:200
-#: src/features/chat/thread/find/thread-find-bar.tsx:191
+#: src/features/chat/thread/find/thread-find-bar.tsx:219
 msgid "Next match"
 msgstr "Next match"
 
@@ -19838,7 +19844,7 @@ msgstr "No languages found"
 msgid "No lens selected"
 msgstr "No lens selected"
 
-#: src/features/chat/thread/find/thread-find-bar.tsx:158
+#: src/features/chat/thread/find/thread-find-bar.tsx:186
 msgid "No matches"
 msgstr "No matches"
 
@@ -22868,7 +22874,7 @@ msgstr "Previous item"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:233
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:189
-#: src/features/chat/thread/find/thread-find-bar.tsx:188
+#: src/features/chat/thread/find/thread-find-bar.tsx:216
 msgid "Previous match"
 msgstr "Previous match"
 
@@ -25936,11 +25942,15 @@ msgstr "Search, filter, and manage user roles and access"
 msgid "Search..."
 msgstr "Search..."
 
+#: src/features/chat/thread/find/thread-find-bar.tsx:184
+msgid "Searched the latest messages only"
+msgstr "Searched the latest messages only"
+
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1081
 msgid "Searching..."
 msgstr "Searching..."
 
-#: src/features/chat/thread/find/thread-find-bar.tsx:158
+#: src/features/chat/thread/find/thread-find-bar.tsx:186
 #: src/features/pages/components/pages-sidebar.tsx:77
 msgid "Searching…"
 msgstr "Searching…"

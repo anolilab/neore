@@ -443,10 +443,20 @@ export class HostCommands {
 
         this.handling.set(callId, running);
 
+        let outcome: string;
+
         try {
-            await running;
+            outcome = await running;
         } finally {
             this.handling.delete(callId);
+        }
+
+        // `apply` threw: `act` recorded a refusal, and a send's turn must end with it like any other refusal.
+        if (outcome !== ACCEPTED) {
+            this.options.log?.(`[acp-host] a command left from the last run could not be carried out and was dropped: ${outcome}`);
+            this.refuse(envelope, outcome);
+
+            return outcome;
         }
 
         return undefined;

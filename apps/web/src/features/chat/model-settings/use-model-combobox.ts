@@ -125,6 +125,13 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
 
     // Past the cold-start threshold the user sees the cost first; the divider is written only after they agree.
     const startSwitch = async (newModel: string, id: string, row: ThreadRow) => {
+        // The user picked again, or opened another thread, while the preview was in flight.
+        const isStale = () => {
+            const { selectedModel, selectedModelThreadId } = useModelStore.getState();
+
+            return selectedModel !== newModel || selectedModelThreadId !== id;
+        };
+
         try {
             // Read fresh: the conversation grows between picks.
             const preview = await queryClient.fetchQuery({
@@ -133,7 +140,7 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
             });
 
             // The user picked again while this was in flight: that pick owns the thread now.
-            if (useModelStore.getState().selectedModel !== newModel) {
+            if (isStale()) {
                 return true;
             }
 
@@ -143,6 +150,10 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
                 return true;
             }
         } catch {
+            if (isStale()) {
+                return true;
+            }
+
             // No estimate is no reason to refuse, but the server must not pick a summary (and charge for it)
             // unasked: keep the whole history, which costs nothing extra.
             return await runSwitch(newModel, id, row, "full");

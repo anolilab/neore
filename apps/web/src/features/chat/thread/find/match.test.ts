@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { FindableMessage } from "./match";
-import { clampIndex, findMatches, messageTexts, occurrenceOffsets, stepIndex, visibleText } from "./match";
+import { clampIndex, findMatches, MAX_FIND_PAGES, messageTexts, nextFindPaging, occurrenceOffsets, stepIndex, visibleText } from "./match";
 
 const message = (id: string, role: string, ...texts: string[]): FindableMessage => {
     return {
@@ -93,6 +93,11 @@ describe("findMatches", () => {
         expect(findMatches([message("a", "user", "cat"), streaming], "cat")).toEqual([{ messageId: "a", occurrence: 0 }]);
         expect(findMatches([streaming, message("c", "user", "cat")], "cat")).toHaveLength(2);
         expect(findMatches([message("a", "user", "cat"), { ...streaming, status: "success" }], "cat")).toHaveLength(2);
+        expect(findMatches([message("a", "user", "cat"), { ...streaming, status: "pending" }], "cat")).toHaveLength(1);
+    });
+
+    it("keeps a failed last reply, which still shows its text", () => {
+        expect(findMatches([message("a", "user", "cat"), { ...message("b", "assistant", "cat"), status: "failed" }], "cat")).toHaveLength(2);
     });
 });
 
@@ -113,5 +118,32 @@ describe("clampIndex", () => {
         expect(clampIndex(5, 3)).toBe(2);
         expect(clampIndex(1, 3)).toBe(1);
         expect(clampIndex(4, 0)).toBe(0);
+    });
+});
+
+describe("nextFindPaging", () => {
+    it("stops after consecutive requests that added no message", () => {
+        let paging = { lastCount: 10, pages: 0, stalls: 0 };
+        const first = nextFindPaging(paging, 10);
+
+        expect(first.stop).toBe(false);
+        paging = first.paging;
+        expect(nextFindPaging(paging, 10).stop).toBe(true);
+    });
+
+    it("keeps going while pages add messages, up to the page cap", () => {
+        let paging = { lastCount: 0, pages: 0, stalls: 0 };
+        let count = 0;
+
+        for (let page = 0; page < MAX_FIND_PAGES; page += 1) {
+            count += 50;
+
+            const step = nextFindPaging(paging, count);
+
+            expect(step.stop).toBe(false);
+            paging = step.paging;
+        }
+
+        expect(nextFindPaging(paging, count + 50).stop).toBe(true);
     });
 });

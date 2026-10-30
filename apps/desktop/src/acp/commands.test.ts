@@ -21,12 +21,15 @@ let receiptFile: string;
 /** A core that prepares what the envelope says, and signs by writing the outcome into the payload. */
 const fakeCore = (prepared: Record<string, unknown>) => {
     return {
-        acpPrepare: (envelope: string): string => JSON.stringify({ expiresAt: Date.now() + 60_000, refusal: null, ...JSON.parse(envelope) as object, ...prepared }),
-        acpSign: (envelope: string, _signature: string, outcome: string): string => JSON.stringify({ payload: JSON.stringify({ callId: (JSON.parse(envelope) as { callId: string }).callId, outcome }), signature: "signed" }),
+        acpPrepare: (envelope: string): string =>
+            JSON.stringify({ expiresAt: Date.now() + 60_000, refusal: null, ...(JSON.parse(envelope) as object), ...prepared }),
+        acpSign: (envelope: string, _signature: string, outcome: string): string =>
+            JSON.stringify({ payload: JSON.stringify({ callId: (JSON.parse(envelope) as { callId: string }).callId, outcome }), signature: "signed" }),
     };
 };
 
-const envelopeFor = (callId: string, command: AcpCommand | null = SEND, refusal: string | null = null): string => JSON.stringify({ callId, command, refusal, tool: "acp_send" });
+const envelopeFor = (callId: string, command: AcpCommand | null = SEND, refusal: string | null = null): string =>
+    JSON.stringify({ callId, command, refusal, tool: "acp_send" });
 
 const outcomeOf = (signed: { payload: string }): string => (JSON.parse(signed.payload) as { outcome: string }).outcome;
 
@@ -35,7 +38,13 @@ const deliver = async (target: HostCommands, callId: string): Promise<string> =>
 
 const make = (
     applied: AcpCommand[],
-    overrides: { apply?: (command: AcpCommand, call: AppliedCall) => Held | Promise<Held | string> | string; file?: string; interrupted?: (send: { sessionId: string; threadId: string; turnId: string }) => void; lapsed?: (send: { sessionId: string; threadId: string; turnId: string }) => void; now?: () => number } = {},
+    overrides: {
+        apply?: (command: AcpCommand, call: AppliedCall) => Held | Promise<Held | string> | string;
+        file?: string;
+        interrupted?: (send: { sessionId: string; threadId: string; turnId: string }) => void;
+        lapsed?: (send: { sessionId: string; threadId: string; turnId: string }) => void;
+        now?: () => number;
+    } = {},
 ) =>
     new HostCommands({
         apply:
@@ -185,7 +194,16 @@ describe("a coding-agent command", () => {
     });
 });
 
-const START: AcpCommand = { agentKey: "claude", agentLabel: "Claude", folderId: "f1", folderLabel: "neore", folderPath: "/work/neore", kind: "start", sessionId: "s1", threadId: "t1" };
+const START: AcpCommand = {
+    agentKey: "claude",
+    agentLabel: "Claude",
+    folderId: "f1",
+    folderLabel: "neore",
+    folderPath: "/work/neore",
+    kind: "start",
+    sessionId: "s1",
+    threadId: "t1",
+};
 
 /** An envelope as the backend signs it: the tool, the thread and the ids a held send needs. */
 const heldEnvelope = (callId: string, command: AcpCommand, expiresAt?: number): string =>
@@ -438,6 +456,33 @@ describe("a command held until its session opens", () => {
         expect(open()).not.toContain("fix it");
     });
 
+    it("ends a replayed send's turn when apply throws during the replay", async () => {
+        const first = make([], { apply: () => HELD });
+
+        await first.execute(heldEnvelope("start", START), "sig");
+        await first.execute(heldEnvelope("send", SEND), "sig");
+
+        const refused: { reason: string; send: unknown }[] = [];
+        const failing = new HostCommands({
+            apply: (command) => {
+                if (command.kind === "send") {
+                    throw new Error("session gone");
+                }
+
+                return "accepted";
+            },
+            core: fakeCore({}),
+            log: () => undefined,
+            receiptFile,
+            refused: (send, reason) => {
+                refused.push({ reason, send });
+            },
+        });
+
+        await failing.recover();
+        expect(refused).toEqual([{ reason: "session gone", send: { sessionId: "s1", threadId: "t1", turnId: "u1" } }]);
+    });
+
     it("does not act on a held command whose envelope has expired, and says so for a message", async () => {
         const clock = { now: 1_000_000 };
         const first = make([], { apply: () => HELD, now: () => clock.now });
@@ -448,9 +493,12 @@ describe("a command held until its session opens", () => {
         const applied: AcpCommand[] = [];
         const lapsed: unknown[] = [];
 
-        await make(applied, { lapsed: (held) => {
-            lapsed.push(held);
-        }, now: () => clock.now }).recover();
+        await make(applied, {
+            lapsed: (held) => {
+                lapsed.push(held);
+            },
+            now: () => clock.now,
+        }).recover();
         expect(applied).toEqual([]);
         expect(lapsed).toEqual([{ sessionId: "s1", threadId: "t1", turnId: "u1" }]);
         expect(open()).not.toContain("fix it");

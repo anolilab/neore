@@ -74,7 +74,7 @@ export const findMatches = (messages: ReadonlyArray<FindableMessage>, query: str
         }
 
         // The list shows the streaming placeholder instead of the unfinished reply, so it has no row to find.
-        if (message === last && message.role === "assistant" && message.status !== undefined && message.status !== "success") {
+        if (message === last && message.role === "assistant" && (message.status === "pending" || message.status === "streaming")) {
             continue;
         }
 
@@ -104,3 +104,25 @@ export const stepIndex = (current: number, total: number, direction: -1 | 1): nu
 
 /** The index kept in range when the match list shrinks under it. */
 export const clampIndex = (index: number, total: number): number => (total <= 0 ? 0 : Math.min(Math.max(index, 0), total - 1));
+
+/** Most older pages one search pulls in; each page is a live subscription and a socket holds 32. */
+export const MAX_FIND_PAGES = 20;
+/** Consecutive page requests that added no message before the search gives up (a failing page returns to "can load more"). */
+export const MAX_FIND_STALLS = 2;
+
+export interface FindPaging {
+    lastCount: number;
+    pages: number;
+    stalls: number;
+}
+
+/** Books one more page request; `stop` is true when this request must not be made. */
+export const nextFindPaging = (paging: FindPaging, count: number): { paging: FindPaging; stop: boolean } => {
+    const stalls = count > paging.lastCount ? 0 : paging.stalls + 1;
+
+    if (stalls >= MAX_FIND_STALLS || paging.pages >= MAX_FIND_PAGES) {
+        return { paging: { ...paging, stalls }, stop: true };
+    }
+
+    return { paging: { lastCount: count, pages: paging.pages + 1, stalls }, stop: false };
+};

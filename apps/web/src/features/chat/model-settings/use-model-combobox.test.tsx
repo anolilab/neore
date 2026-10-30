@@ -237,4 +237,60 @@ describe("useModelCombobox: the confirmation step", () => {
         expect(result.current.pendingSwitch).toBeNull();
         expect(hoisted.switchAgent).not.toHaveBeenCalled();
     });
+
+    it("drops a preview that lands after the user opened another thread on the same model", async () => {
+        let controls = { resolve: (_value: unknown) => {} };
+
+        hoisted.preview.mockReturnValue(
+            new Promise((resolve) => {
+                controls = { resolve };
+            }),
+        );
+
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+        let pick: Promise<void> = Promise.resolve();
+
+        act(() => {
+            pick = result.current.changeModel(B);
+        });
+
+        act(() => {
+            useModelStore.getState().setSelectedModel(B, "t2");
+        });
+
+        await act(async () => {
+            controls.resolve({ coldStartCostly: false });
+            await pick;
+        });
+
+        expect(hoisted.switchAgent).not.toHaveBeenCalled();
+    });
+
+    it("does not run the fallback switch when the estimate fails after the user picked again", async () => {
+        let controls = { reject: (_reason: unknown) => {} };
+
+        hoisted.preview.mockReturnValue(
+            new Promise((_resolve, reject) => {
+                controls = { reject };
+            }),
+        );
+
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+        let pick: Promise<void> = Promise.resolve();
+
+        act(() => {
+            pick = result.current.changeModel(B);
+        });
+
+        act(() => {
+            useModelStore.getState().setSelectedModel("openai/gpt-4.1-nano", "t1");
+        });
+
+        await act(async () => {
+            controls.reject(new Error("offline"));
+            await pick;
+        });
+
+        expect(hoisted.switchAgent).not.toHaveBeenCalled();
+    });
 });
