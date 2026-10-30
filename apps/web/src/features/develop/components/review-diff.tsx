@@ -43,6 +43,54 @@ const targetOf = (line: NumberedDiffLine): { line: number; side: DiffSide } | nu
     return line.newLine === null ? null : { line: line.newLine, side: "new" };
 };
 
+/** One pending comment, editable until the review is submitted; used on its line and wherever its file shows no diff. */
+export const DraftComment = ({
+    address,
+    comment,
+    headSha,
+    hostLabel,
+    locked,
+}: {
+    address: PullRequestAddress;
+    comment: DraftCommentEntry;
+    headSha: string;
+    hostLabel: string;
+    locked: boolean;
+}) => {
+    const messages = useReviewMessages(hostLabel);
+    const mutations = useDraftMutations();
+
+    return (
+        <DraftCommentCard
+            body={comment.body}
+            locked={locked}
+            onDelete={async () => {
+                try {
+                    const outcome = await mutations.deleteComment.mutateAsync({ ...address, commentId: comment.id });
+
+                    return outcome.status === "ok" ? null : messages.edit(outcome.status);
+                } catch {
+                    return messages.edit("failed");
+                }
+            }}
+            onEdit={async (body) => {
+                const outcome = await mutations.saveComment.mutateAsync({
+                    ...address,
+                    body,
+                    commentId: comment.id,
+                    commitId: headSha,
+                    line: comment.line,
+                    path: comment.path,
+                    side: comment.side,
+                    startLine: null,
+                });
+
+                return outcome.status === "ok" ? null : messages.edit(outcome.status);
+            }}
+        />
+    );
+};
+
 /**
  * A unified patch, line by line, with the review on it: the conversations already there, the
  * comments in the draft, and a button on each line to add one. The patch and every comment are text
@@ -73,6 +121,11 @@ const ReviewDiff = ({
     const { t } = useLingui();
     const messages = useReviewMessages(hostLabel);
     const mutations = useDraftMutations();
+    const save = async (input: { body: string; line: number; side: DiffSide }): Promise<string | null> => {
+        const outcome = await mutations.saveComment.mutateAsync({ ...address, ...input, commitId: headSha, path, startLine: null });
+
+        return outcome.status === "ok" ? null : messages.edit(outcome.status);
+    };
     const [composing, setComposing] = useState<string | null>(null);
     const lines = useMemo(() => numberDiffLines(patch), [patch]);
     const canComment = isHostCapabilityAvailable(capabilities, "review.lineComments") && !locked;
@@ -93,28 +146,8 @@ const ReviewDiff = ({
     // A draft comment on a line this patch does not show (it was cut short) must not vanish from sight.
     const looseDrafts = useMemo(() => draftComments.filter((comment) => !placed.has(lineKey(comment.side, comment.line))), [draftComments, placed]);
 
-    const save = async (input: { body: string; commentId?: string; line: number; side: DiffSide }): Promise<string | null> => {
-        const outcome = await mutations.saveComment.mutateAsync({ ...address, ...input, commitId: headSha, path, startLine: null });
-
-        return outcome.status === "ok" ? null : messages.edit(outcome.status);
-    };
-
     const draftCard = (comment: DraftCommentEntry) => (
-        <DraftCommentCard
-            body={comment.body}
-            key={comment.id}
-            locked={locked}
-            onDelete={async () => {
-                try {
-                    const outcome = await mutations.deleteComment.mutateAsync({ ...address, commentId: comment.id });
-
-                    return outcome.status === "ok" ? null : messages.edit(outcome.status);
-                } catch {
-                    return messages.edit("failed");
-                }
-            }}
-            onEdit={async (body) => await save({ body, commentId: comment.id, line: comment.line, side: comment.side })}
-        />
+        <DraftComment address={address} comment={comment} headSha={headSha} hostLabel={hostLabel} key={comment.id} locked={locked} />
     );
 
     return (

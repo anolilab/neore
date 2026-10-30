@@ -16,7 +16,7 @@ import type { PullRequestAddress } from "../lib/use-develop";
 import { useDraftMutations, useReviewActions, useReviewDraft } from "../lib/use-review";
 import { useReviewMessages } from "../lib/use-review-messages";
 
-type Feedback = { kind: "error"; text: string } | { kind: "success"; url: string | undefined } | { kind: "info"; text: string };
+type Feedback = { kind: "error"; text: string; unconfirmed?: boolean } | { kind: "success"; url: string | undefined } | { kind: "info"; text: string };
 
 /**
  * The review being written: the verdict, a summary and the comments added on the diff. It lives on
@@ -144,6 +144,7 @@ const ReviewPanel = ({
                     // A review the host kept as pending blocks another one until it is submitted or deleted there.
                     setFeedback({
                         kind: "error",
+                        unconfirmed: true,
                         text: `${messages.write(outcome)} ${t`If it kept the review as pending, submit or delete it there first.`} ${t`Your review is kept.`}`,
                     });
 
@@ -157,6 +158,7 @@ const ReviewPanel = ({
             // The action may have run to the host before the answer was lost: say so rather than invite a second review.
             setFeedback({
                 kind: "error",
+                unconfirmed: true,
                 text: t`Could not confirm that the review was submitted. Check on ${hostLabel} before you try again. Your review is kept here.`,
             });
         }
@@ -296,7 +298,7 @@ const ReviewPanel = ({
             </div>
             {feedback?.kind === "error" && (
                 <Alert role="alert" variant="destructive">
-                    <AlertTitle>{t`Not submitted`}</AlertTitle>
+                    <AlertTitle>{feedback.unconfirmed ? t`Not confirmed` : t`Not submitted`}</AlertTitle>
                     <AlertDescription>{feedback.text}</AlertDescription>
                 </Alert>
             )}

@@ -32,12 +32,24 @@ export class HostApiError extends Error {
     }
 }
 
-/** The `message` of a host's JSON error body, or `undefined` when there is none. */
+/** The host's words in a JSON error body: `message`, else the first of GraphQL's `errors`; `undefined` when there are none. */
 const messageOf = (body: string | undefined): string | undefined => {
     try {
-        const parsed = JSON.parse(body ?? "") as { message?: unknown };
+        const parsed = JSON.parse(body ?? "") as { errors?: unknown; message?: unknown };
 
-        return typeof parsed.message === "string" ? parsed.message : undefined;
+        if (typeof parsed.message === "string") {
+            return parsed.message;
+        }
+
+        const [first] = Array.isArray(parsed.errors) ? (parsed.errors as unknown[]) : [];
+
+        if (typeof first === "string") {
+            return first;
+        }
+
+        const nested = (first as { message?: unknown } | null | undefined)?.message;
+
+        return typeof nested === "string" ? nested : undefined;
     } catch {
         return undefined;
     }

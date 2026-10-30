@@ -372,15 +372,27 @@ describe("mergePullRequest", () => {
             expect(await githubDriver.mergePullRequest(request, REF, merge)).toEqual({ sha: "c".repeat(40) });
         });
 
-        it("still refuses when it merged a different head, is not merged, or cannot be read", async () => {
+        it("is unconfirmed when the read that would tell cannot be read", async () => {
             const refusal = new HostApiError("no", 409, false, { detail: "Head branch was modified" });
 
             for (const routes of [
-                { [`${REPO}/pulls/7`]: pull("d".repeat(40), true) },
-                { [`${REPO}/pulls/7`]: pull(SHA, false) },
                 { [`${REPO}/pulls/7`]: { nonsense: true } },
-                {},
+                { [`${REPO}/pulls/7`]: new HostApiError("slow down", 403, true) },
+                { [`${REPO}/pulls/7`]: new HostApiError("down", 502) },
             ]) {
+                const { request } = host({ ...routes, [`${REPO}/pulls/7/merge`]: refusal });
+
+                await expect(githubDriver.mergePullRequest(request, REF, { headSha: SHA, method: "merge" })).rejects.toMatchObject({
+                    status: 0,
+                    unconfirmed: true,
+                });
+            }
+        });
+
+        it("still refuses when it merged a different head, is not merged, or the host answers the read with a refusal", async () => {
+            const refusal = new HostApiError("no", 409, false, { detail: "Head branch was modified" });
+
+            for (const routes of [{ [`${REPO}/pulls/7`]: pull("d".repeat(40), true) }, { [`${REPO}/pulls/7`]: pull(SHA, false) }, {}]) {
                 const { request } = host({ ...routes, [`${REPO}/pulls/7/merge`]: refusal });
 
                 await expect(githubDriver.mergePullRequest(request, REF, { headSha: SHA, method: "merge" })).rejects.toBe(refusal);

@@ -8,8 +8,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import FilesTab from "./files-tab";
 
-const { files } = vi.hoisted(() => {
+const { drafts, files } = vi.hoisted(() => {
     return {
+        drafts: {
+            current: undefined as unknown,
+        },
         files: {
             current: {} as Record<string, unknown>,
         },
@@ -44,8 +47,11 @@ vi.mock("../lib/use-review", () => {
         useReviewActions: () => {
             return { setViewed: { isPending: false, mutateAsync: vi.fn(), variables: undefined } };
         },
+        useDraftMutations: () => {
+            return { deleteComment: { mutateAsync: vi.fn() }, saveComment: { mutateAsync: vi.fn() } };
+        },
         useReviewDraft: () => {
-            return { data: undefined };
+            return { data: drafts.current };
         },
         useReviewThreads: () => idle,
         useViewedFiles: () => idle,
@@ -126,5 +132,48 @@ describe("FilesTab: a page that failed", () => {
         renderTab();
 
         expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    });
+});
+
+const RENAMED_ROW = /src\/old\.ts → src\/new\.ts/;
+
+describe("FilesTab: pending comments with no row of their own", () => {
+    const capabilities = { "review.lineComments": { available: true } };
+    const comment = (id: string, path: string) => {
+        return { body: `note ${id}`, id, line: 1, path, side: "new" };
+    };
+
+    beforeEach(() => {
+        drafts.current = undefined;
+    });
+
+    it("lists a comment on a file the list does not show, and shows one under a renamed file's old path with its row", () => {
+        files.current = {
+            ...idle,
+            data: { pages: [{ files: [{ ...file, path: "src/new.ts", previousPath: "src/old.ts" }], hasMore: false, page: 1, status: "ok" }] },
+            isFetching: false,
+            retry,
+        };
+        drafts.current = { comments: [comment("a", "src/old.ts"), comment("b", "src/elsewhere.ts")], submitting: false };
+
+        render(
+            <FilesTab
+                address={{ number: 7, repository: "octo/hello" }}
+                capabilities={capabilities as never}
+                fileCount={1}
+                fileLimit={3000}
+                headSha={"a".repeat(40)}
+                hostLabel="GitHub"
+                leftOut={0}
+                showDiff={false}
+            />,
+        );
+
+        expect(screen.getByText("note b")).toBeTruthy();
+        expect(screen.queryByText("note a")).toBeNull();
+
+        fireEvent.click(screen.getByRole("button", { name: RENAMED_ROW }));
+
+        expect(screen.getByText("note a")).toBeTruthy();
     });
 });

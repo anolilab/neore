@@ -313,4 +313,12 @@ describe("viewed marks", () => {
 
         await expect(githubDriver.setViewed(failing.request, REF, "a.ts", true)).rejects.toMatchObject({ status: 403 });
     });
+
+    it("does not take a null or empty answer to the mutation for success", async () => {
+        for (const data of [null, {}]) {
+            const odd = host((call) => (call.json.query.includes("mutation") ? { data } : { data: { repository: { pullRequest: { id: "PR_node" } } } }));
+
+            await expect(githubDriver.setViewed(odd.request, REF, "a.ts", true)).rejects.toBeDefined();
+        }
+    });
 });

@@ -21,7 +21,7 @@ import DiffView from "./diff-view";
 import type { ReadFailureStatus } from "./failure-notice";
 import FailureNotice from "./failure-notice";
 import type { DraftCommentEntry } from "./review-diff";
-import ReviewDiff from "./review-diff";
+import ReviewDiff, { DraftComment } from "./review-diff";
 import ReviewThreadCard from "./review-thread";
 
 interface FileEntry {
@@ -50,6 +50,9 @@ interface FileReview {
     viewed: ViewedState | undefined;
     viewedPending: boolean;
 }
+
+/** Whether review data recorded under `path` belongs on this file's row: its path now, or the one it had before a rename. */
+const ownsPath = (file: FileEntry, path: string): boolean => path === file.path || path === file.previousPath;
 
 /** The first failure among a query's pages, if any; a thrown page counts as the host failing. */
 const failureOf = (pages: ReadonlyArray<{ status: string }>, isError: boolean): ReadFailureStatus | undefined =>
@@ -145,6 +148,18 @@ const FileRow = ({ context, file, review, showDiff }: { context: ReviewContext; 
                             thread={thread}
                         />
                     ))}
+                {open &&
+                    !(showDiff && file.patch !== null && reviewable) &&
+                    review.draftComments.map((comment) => (
+                        <DraftComment
+                            address={context.address}
+                            comment={comment}
+                            headSha={context.headSha}
+                            hostLabel={context.hostLabel}
+                            key={comment.id}
+                            locked={review.locked}
+                        />
+                    ))}
                 {open && notes[file.patchState] && <p className="text-muted-foreground px-3 py-2 text-xs">{notes[file.patchState]}</p>}
                 {open && !showDiff && <p className="text-muted-foreground px-3 py-2 text-xs">{t`Diffs are not available from this host.`}</p>}
             </div>
@@ -182,19 +197,11 @@ const FilesTab = ({
     const viewed = useViewedFiles(address, viewedEnabled);
     const actions = useReviewActions(address);
     const [viewedError, setViewedError] = useState<string | null>(null);
+    // Several files can be toggled at once: each keeps its checkbox disabled until its own call ends.
+    const [viewedPending, setViewedPending] = useState<ReadonlySet<string>>(new Set());
     const viewedStates = useMemo(() => viewedStatesOf(viewed.data?.pages ?? []), [viewed.data]);
-    const threadsByPath = useMemo(() => {
-        const byPath = new Map<string, ReviewThread[]>();
-
-        const pages = threads.data?.pages ?? [];
-        const loaded = pages.flatMap((page) => (page.status === "ok" ? page.threads : []));
-
-        for (const thread of loaded) {
-            byPath.set(thread.path, [...(byPath.get(thread.path) ?? []), thread]);
-        }
-
-        return byPath;
-    }, [threads.data]);
+    const loadedThreads = useMemo(() => (threads.data?.pages ?? []).flatMap((page) => (page.status === "ok" ? page.threads : [])), [threads.data]);
+    const draftComments = draft.data?.comments ?? [];
 
     // The host's pages are bounded by its own ceilings, so reading them to the end is bounded too.
     // A page that failed stays failed: asking again at once would only spend the read budget.
@@ -244,6 +251,8 @@ const FilesTab = ({
     }
 
     const loading = !failure && (hasNextPage || isFetchingNextPage);
+    const strayThreads = loadedThreads.filter((thread) => listed.every((file) => !ownsPath(file, thread.path)));
+    const strayDrafts = draftComments.filter((comment) => listed.every((file) => !ownsPath(file, comment.path)));
     const viewedCount = countViewed(
         listed.map((file) => file.path),
         viewedStates,
@@ -282,10 +291,11 @@ const FilesTab = ({
                         file={file}
                         key={`${file.previousPath ?? ""}→${file.path}`}
                         review={{
-                            draftComments: draft.data?.comments.filter((comment) => comment.path === file.path) ?? [],
+                            draftComments: draftComments.filter((comment) => ownsPath(file, comment.path)),
                             locked: draft.data?.submitting === true,
                             onToggleViewed: async (next) => {
                                 setViewedError(null);
+                                setViewedPending((current) => new Set(current).add(file.path));
 
                                 try {
                                     const outcome = await actions.setViewed.mutateAsync({ path: file.path, viewed: next });
@@ -295,16 +305,42 @@ const FilesTab = ({
                                     }
                                 } catch {
                                     setViewedError(messages.write({ status: "failed" }));
+                                } finally {
+                                    setViewedPending((current) => {
+                                        const rest = new Set(current);
+
+                                        rest.delete(file.path);
+
+                                        return rest;
+                                    });
                                 }
                             },
-                            threads: threadsByPath.get(file.path) ?? [],
+                            threads: loadedThreads.filter((thread) => ownsPath(file, thread.path)),
                             viewed: viewedStates.get(file.path),
-                            viewedPending: actions.setViewed.isPending && actions.setViewed.variables?.path === file.path,
+                            viewedPending: viewedPending.has(file.path),
                         }}
                         showDiff={showDiff}
                     />
                 ))}
             </ul>
+            {!loading && (strayThreads.length > 0 || strayDrafts.length > 0) && (
+                <section aria-label={t`Other conversations`} className="space-y-2">
+                    <p className="text-muted-foreground text-xs">{t`Conversations and pending comments on files this list does not show`}</p>
+                    {strayThreads.map((thread) => (
+                        <ReviewThreadCard address={address} capabilities={capabilities} hostLabel={hostLabel} key={thread.id} thread={thread} />
+                    ))}
+                    {strayDrafts.map((comment) => (
+                        <DraftComment
+                            address={address}
+                            comment={comment}
+                            headSha={headSha}
+                            hostLabel={hostLabel}
+                            key={comment.id}
+                            locked={draft.data?.submitting === true}
+                        />
+                    ))}
+                </section>
+            )}
             {failure && (
                 <>
                     <FailureNotice label={hostLabel} status={failure} />

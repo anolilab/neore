@@ -212,6 +212,15 @@ describe("createBoundRequester", () => {
             await expect(requester("/x")).rejects.toMatchObject({ detail: undefined, status: 422 });
         });
 
+        it("reads the host's reason from GraphQL-style errors, and from a truncated body gives none", async () => {
+            const via = (body: string) => async () => new Response(body, { status: 422 });
+            const ask = (body: string) => createBoundRequester({ origin: ORIGIN, token: "tkn", via: via(body) })("/x", { json: {}, method: "POST" });
+
+            await expect(ask(JSON.stringify({ errors: [{ message: "Could not resolve" }] }))).rejects.toMatchObject({ detail: "Could not resolve" });
+            await expect(ask(JSON.stringify({ errors: ["plain"] }))).rejects.toMatchObject({ detail: "plain" });
+            await expect(ask('{"errors":[{"message":"cut')).rejects.toMatchObject({ detail: undefined, status: 422 });
+        });
+
         it("marks a write whose answer never came as unconfirmed, and a read as not", async () => {
             const via = async (): Promise<Response> => {
                 throw new DOMException("timed out", "TimeoutError");

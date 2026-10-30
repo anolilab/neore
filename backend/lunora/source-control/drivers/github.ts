@@ -623,7 +623,13 @@ const pullNodeId = async (request: HostRequest, ref: PullRequestRef): Promise<st
 const setViewed = async (request: HostRequest, ref: PullRequestRef, path: string, viewed: boolean): Promise<void> => {
     const pullRequestId = await pullNodeId(request, ref);
 
-    await graphqlRequest(request, viewed ? MARK_VIEWED_MUTATION : UNMARK_VIEWED_MUTATION, { path, pullRequestId }, z.object({}).passthrough());
+    // The mutation's own field must come back: a null or empty `data` is a call the host did not act on.
+    await graphqlRequest(
+        request,
+        viewed ? MARK_VIEWED_MUTATION : UNMARK_VIEWED_MUTATION,
+        { path, pullRequestId },
+        z.object({ [viewed ? "markFileAsViewed" : "unmarkFileAsViewed"]: z.object({}).passthrough() }),
+    );
 };
 
 const reviewSchema = z.object({ html_url: z.string().optional(), id: z.number(), state: z.string() });
@@ -983,7 +989,8 @@ const mergedPullSchema = z.object({ head: z.object({ sha: z.string() }), merge_c
 
 /**
  * Whether the pull request is already merged at `headSha`: a second tab's merge, or a retry, is then the same merge done,
- * not a refusal. `undefined` when it is not, or when the host could not say.
+ * not a refusal. `undefined` when the host answered that it is not; a read that could not be answered (rate limited, down, unreadable) is
+ * unconfirmed, because the merge may have happened.
  */
 const alreadyMerged = async (request: HostRequest, ref: PullRequestRef, headSha: string): Promise<MergedPullRequest | undefined> => {
     try {
@@ -991,6 +998,11 @@ const alreadyMerged = async (request: HostRequest, ref: PullRequestRef, headSha:
 
         return pull.merged === true && pull.head.sha === headSha ? { sha: pull.merge_commit_sha ?? null } : undefined;
     } catch (error) {
+        // A read the host answered with a refusal says nothing about the merge; one it could not answer (throttled, down, unreadable) may hide it.
+        if (error instanceof HostApiError && (error.rateLimited || error.status === 0 || error.status >= 500)) {
+            throw new HostApiError("The host could not say whether the pull request was merged", 0, false, { unconfirmed: true });
+        }
+
         if (error instanceof HostApiError) {
             return undefined;
         }
