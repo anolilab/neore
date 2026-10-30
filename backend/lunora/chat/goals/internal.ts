@@ -41,7 +41,7 @@ import { vGoalRunConfig, vGoalStopReason } from "./validators";
 /** How far back from the thread's end a round's rows are looked for. A round is at most a few dozen steps. */
 const ROUND_ROWS_SCAN = 200;
 
-export const ANONYMOUS_GOALS_MESSAGE = "Goals need an account. Sign up to run until a goal is met.";
+const ANONYMOUS_GOALS_MESSAGE = "Goals need an account. Sign up to run until a goal is met.";
 
 export const endGoalsForThread = internalMutation
     .input({ reason: vGoalStopReason, threadId: v.id("threads") })
