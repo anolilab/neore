@@ -17,7 +17,8 @@ import { claimOnce } from "../lib/claim-once";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { createAcpCall } from "../devices/lib/acp-call";
-import { isDeviceOnline } from "../devices/lib/state";
+import { ACP_CLAIM_WINDOW_MS } from "../devices/lib/constants";
+import { countOpenCalls, isDeviceOnline } from "../devices/lib/state";
 import { withdrawSend } from "./lib/withdraw";
 import { isHostRunThread } from "./lib/host-thread";
 import { sessionOfThread } from "./lib/sessions";
@@ -220,6 +221,17 @@ export const getHostPendingPermissions = authQuery
         return stream ? await waitingRequests(ctx, stream) : [];
     });
 
+/** The request an `acp_permission_answer` call answers, from its stored input (cleared once the call ends). */
+const requestOf = (input: string): string | undefined => {
+    try {
+        const { requestId } = JSON.parse(input) as { requestId?: unknown };
+
+        return typeof requestId === "string" ? requestId : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
 /**
  * Answers a permission request from the web or the phone: allow once or decline, with an option the agent offered.
  * Queues `acp_permission_answer`; the computer's first answer, here or in its own window, wins, and the later one
@@ -248,6 +260,23 @@ export const answerHostPermission = authMutation
         // Only an option the agent offered, and only allow-once or reject-once: `waitingRequests` lists no other.
         if (request.options.every((option) => option.optionId !== args.optionId)) {
             throw new LunoraError("BAD_REQUEST", "The agent did not offer that option.");
+        }
+
+        // One answer per request: a second tap, or the phone and the web at once, finds the first still on its way.
+        // A pending call past its claim window can no longer be claimed, so it does not count.
+        const queued = await countOpenCalls(
+            ctx,
+            session.deviceId,
+            (open) =>
+                open.toolName === "acp_permission_answer" &&
+                open.threadId === args.threadId &&
+                !(open.status === "pending" && ctx.now - open.createdAt > ACP_CLAIM_WINDOW_MS) &&
+                requestOf(open.input) === args.requestId,
+            1,
+        );
+
+        if (queued > 0) {
+            return { sent: true };
         }
 
         const call = await createAcpCall(

@@ -167,6 +167,13 @@ export const hasClaim = async (ctx: Pick<QueryCtx, "db">, scope: string, key: st
     return existing !== null && existing.expiresAt > Date.now();
 };
 
+/** When the unexpired claim for `(scope, key)` was taken, or `null` when there is none: lets a retry find what the first try made. */
+export const claimedAtOf = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string): Promise<number | null> => {
+    const existing = await findClaim(ctx, scope, key);
+
+    return existing !== null && existing.expiresAt > Date.now() ? existing.claimedAt : null;
+};
+
 /** `true` for the first claim of `(scope, key)` within `ttlMs`, `false` for every later one. */
 export const claimOnce = async (ctx: ClaimCtx, scope: string, key: string, ttlMs: number, userId?: string): Promise<boolean> =>
     await claim(ctx, scope, key, { ttlMs, userId });

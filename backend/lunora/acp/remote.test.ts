@@ -220,6 +220,15 @@ const addRequest = async (
         await ctx.db.patch(streamId, { hostPendingPermissions: [requestId] });
     });
 
+/** Several requests waiting at once on one stream. */
+const addRequests = async (streamId: string, ids: string[]) => {
+    for (const [seq, id] of ids.entries()) {
+        await addRequest(streamId, seq, id);
+    }
+
+    await run(async (ctx) => await ctx.db.patch(streamId as never, { hostPendingPermissions: ids }));
+};
+
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
     ownerId = await insertUser();
@@ -534,6 +543,26 @@ describe("sendToHost", () => {
         expect(await rows("deviceCalls", { toolName: "acp_send" })).toHaveLength(1);
     });
 
+    it("answers a retry with the turn it started, not a later one on the same thread", async () => {
+        const { threadId } = await readyThread();
+        const first = await sendText(threadId, "one", "req-1");
+
+        await run(async (ctx) => {
+            const stream = await ctx.db.persistentStreams.findFirst({ where: { threadId: threadId as never } });
+
+            await ctx.db.patch(stream?._id as never, { status: "done" });
+        });
+        await new Promise((resolve) => {
+            setTimeout(resolve, 5);
+        });
+
+        const second = await sendText(threadId, "two", "req-2");
+        const again = await sendText(threadId, "one", "req-1");
+
+        expect(second.outcome).toBe("sent");
+        expect(again).toMatchObject({ messageId: first.messageId, outcome: "duplicate", streamId: first.streamId });
+    });
+
     it("sends only into the owner's own host thread, and one turn at a time", async () => {
         const { threadId } = await readyThread();
         const stranger = await insertUser();
@@ -803,11 +832,11 @@ describe("cancelHostTurn", () => {
         await sendText(threadId);
         const live = await streamOf(threadId);
 
-        await addRequest(live._id, 0, "r1");
+        await addRequests(live._id, ["r1", "r3"]);
 
         // The open-call budget is full: the send and two answers.
-        for (let index = 0; index < 2; index += 1) {
-            await as(ownerId).mutation(remote.answerHostPermission as never, { optionId: "r1-allow_once", requestId: "r1", threadId } as never);
+        for (const id of ["r1", "r3"]) {
+            await as(ownerId).mutation(remote.answerHostPermission as never, { optionId: `${id}-allow_once`, requestId: id, threadId } as never);
         }
 
         const full = await run(
@@ -845,10 +874,10 @@ describe("cancelHostTurn", () => {
 
         const stream = await streamOf(threadId);
 
-        await addRequest(stream._id, 0, "r1");
+        await addRequests(stream._id, ["r1", "r3"]);
 
-        for (let index = 0; index < 2; index += 1) {
-            await as(ownerId).mutation(remote.answerHostPermission as never, { optionId: "r1-allow_once", requestId: "r1", threadId } as never);
+        for (const id of ["r1", "r3"]) {
+            await as(ownerId).mutation(remote.answerHostPermission as never, { optionId: `${id}-allow_once`, requestId: id, threadId } as never);
         }
 
         const cancelCall = await run(
@@ -951,15 +980,30 @@ describe("answerHostPermission", () => {
     });
 
     it("reports a busy computer instead of queuing past the open-call budget", async () => {
-        const { threadId } = await waiting();
+        const { stream, threadId } = await waiting();
+
+        await addRequests(stream._id, ["r1", "r2", "r3"]);
 
         // Three open commands is the budget (`MAX_OPEN_ACP_CALLS_PER_DEVICE`) and the send holds one; nothing is claimed
         // here, so the answers stay open.
-        for (let index = 0; index < 2; index += 1) {
-            await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ sent: true });
+        for (const id of ["r1", "r2"]) {
+            await expect(answer(threadId, id, `${id}-allow_once`)).resolves.toEqual({ sent: true });
         }
 
-        await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ reason: "busy", sent: false });
+        await expect(answer(threadId, "r3", "r3-allow_once")).resolves.toEqual({ reason: "busy", sent: false });
+    });
+
+    it("queues one answer per request: a second tap, or the other device, finds the first on its way", async () => {
+        const { threadId } = await waiting();
+
+        await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ sent: true });
+        await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ sent: true });
+        await expect(answer(threadId, "r1", "r1-reject_once")).resolves.toEqual({ sent: true });
+
+        const queued = await rows("deviceCalls", { toolName: "acp_permission_answer" });
+
+        expect(queued).toHaveLength(1);
+        expect(JSON.parse(queued[0]?.input as string)).toMatchObject({ optionId: "r1-allow_once" });
     });
 });
 

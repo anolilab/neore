@@ -20,7 +20,7 @@ import { getCurrentUserInternal } from "../auth/lib/helper";
 import { createStreamToken } from "../chat/streaming/persistent/stream-token";
 import { createHostStream } from "../chat/streaming/persistent/host";
 import { createAcpCall } from "../devices/lib/acp-call";
-import { claimOnce, hasClaim } from "../lib/claim-once";
+import { claimedAtOf, claimOnce } from "../lib/claim-once";
 import { checkRateLimit, getUserTier } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
 import { readCappedBody } from "./http";
@@ -28,6 +28,8 @@ import { liveHostStream } from "./remote";
 import { isHostRunThread } from "./lib/host-thread";
 import { sessionOfThread, touchSession } from "./lib/sessions";
 
+/** How many of a thread's latest streams a retry looks through for its own; a turn is one stream, and a day holds few. */
+const DUPLICATE_SCAN_STREAMS = 50;
 const SEND_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 /** The prompt on the wire. The signed call carries it whole and caps its input at 32 KiB, which is what refuses a longer one. */
 const MAX_SEND_CHARS = 30_000;
@@ -72,8 +74,17 @@ export const sendToHost = internalMutation
             return { outcome: "not_found" as const };
         }
 
-        if (await hasClaim(ctx, "host-send", key)) {
-            const first = await ctx.db.persistentStreams.findFirst({ orderBy: [{ _creationTime: "desc" }], where: { producer: "host", threadId } });
+        const claimedAt = await claimedAtOf(ctx, "host-send", key);
+
+        if (claimedAt !== null) {
+            // The claim is taken last, in the transaction that made the stream: the newest stream at or before it is
+            // this request's, however many turns the thread has had since.
+            const { page } = await ctx.db.persistentStreams.findMany({
+                limit: DUPLICATE_SCAN_STREAMS,
+                orderBy: [{ _creationTime: "desc" }],
+                where: { producer: "host", threadId },
+            });
+            const first = page.find((stream) => stream._creationTime <= claimedAt);
 
             return { outcome: "duplicate" as const, ...(first && { messageId: first.messageId, streamId: first._id as string }) };
         }
@@ -207,7 +218,10 @@ export const hostSendHttpAction = async (context: HttpActionCtx, request: Reques
             {
                 duplicate: true,
                 ...(result.messageId !== undefined && { messageId: result.messageId }),
-                ...(result.streamId !== undefined && { streamId: result.streamId }),
+                ...(result.streamId !== undefined && {
+                    streamId: result.streamId,
+                    streamToken: await createStreamToken(result.streamId, userId, threadId, signingSecret),
+                }),
             },
             200,
         );
