@@ -17,6 +17,10 @@ describe("parseDiffLines", () => {
         expect(parseDiffLines("--- a/file")[0]?.kind).toBe("remove");
     });
 
+    it("does not turn the patch's final newline into a line", () => {
+        expect(parseDiffLines("+a\n")).toEqual([{ kind: "add", text: "+a" }]);
+    });
+
     it("answers one empty line for an empty patch", () => {
         expect(parseDiffLines("")).toEqual([{ kind: "context", text: "" }]);
     });

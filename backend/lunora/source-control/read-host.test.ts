@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { githubDriver } from "./drivers/github";
+import type { HostRequest } from "./origin-fetch";
 import { HostApiError } from "./origin-fetch";
 import { failureOf, readFromHost } from "./read-host";
 
-const token = { accessToken: "tkn" } as const;
+const token = {
+    accessToken: "tkn",
+    renew: async () => {
+        return { problem: "expired" as const };
+    },
+};
 
 describe("readFromHost", () => {
     it("answers not_connected without calling the host", async () => {
@@ -65,6 +71,43 @@ describe("readFromHost", () => {
                 throw new RangeError("bug");
             }),
         ).rejects.toBeInstanceOf(RangeError);
+    });
+
+    it("retries a 401 once with the renewed token, and asks to reconnect when none comes", async () => {
+        const used: string[] = [];
+        const via = async (_input: Request | string | URL, init?: RequestInit): Promise<Response> => {
+            const authorization = new Headers(init?.headers).get("authorization") ?? "";
+
+            used.push(authorization);
+
+            return authorization === "Bearer fresh" ? Response.json({ ok: true }) : new Response(null, { status: 401 });
+        };
+        const read = async (request: HostRequest) => {
+            const response = await request("/user");
+
+            return (await response.json()) as Record<string, unknown>;
+        };
+        const expired = async () => {
+            return { problem: "expired" as const };
+        };
+        const unavailable = async () => {
+            return { problem: "unavailable" as const };
+        };
+        const renewed = {
+            accessToken: "stale",
+            renew: async () => {
+                return { accessToken: "fresh", renew: expired };
+            },
+        };
+
+        expect(await readFromHost(githubDriver, renewed, read, via)).toEqual({ ok: true, status: "ok" });
+        expect(used).toEqual(["Bearer stale", "Bearer fresh"]);
+        expect(await readFromHost(githubDriver, { accessToken: "stale", renew: expired }, read, via)).toEqual({
+            status: "needs_reconnect",
+        });
+        expect(await readFromHost(githubDriver, { accessToken: "stale", renew: unavailable }, read, via)).toEqual({
+            status: "host_error",
+        });
     });
 
     it.each([

@@ -47,7 +47,7 @@ const DevelopPage = ({ onSearchChange, search }: { onSearchChange: (next: Develo
                     <section aria-label={t`Inbox`} className="lg:w-96 lg:shrink-0">
                         <InboxList
                             host={info}
-                            onSectionChange={(next) => onSearchChange({ section: next })}
+                            onSectionChange={(next) => onSearchChange({ ...search, section: next })}
                             onSelect={(repo, number) => onSearchChange({ number, repository: repo, section })}
                             section={section}
                             selected={selected}

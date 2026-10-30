@@ -36,8 +36,11 @@ export const GITHUB_COMMIT_LIMIT = 250;
 export const GITHUB_PAGE_SIZE = 100;
 const INBOX_PAGE_SIZE = 30;
 
-/** GitHub search stops at 1000 results; ten pages of 30 stay inside that. */
-export const GITHUB_INBOX_MAX_PAGE = 10;
+const SEARCH_RESULT_LIMIT = 1000;
+
+/** GitHub search stops at 1000 results: the last page of 30 holds the final 10. */
+export const GITHUB_INBOX_MAX_PAGE = Math.ceil(SEARCH_RESULT_LIMIT / INBOX_PAGE_SIZE);
+
 const MAX_FILE_PAGE = Math.ceil(GITHUB_FILE_LIMIT / GITHUB_PAGE_SIZE);
 const MAX_COMMIT_PAGE = Math.ceil(GITHUB_COMMIT_LIMIT / GITHUB_PAGE_SIZE);
 
@@ -65,7 +68,8 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
     version: 1,
 };
 
-const OWNER = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/u;
+// Enterprise Managed User logins are `handle_shortcode`.
+const OWNER = /^[A-Za-z0-9][\w-]{0,99}$/u;
 const REPO = /^(?!\.{1,2}$)[\w.-]{1,100}$/u;
 const SHA = /^[0-9a-f]{40,64}$/u;
 
@@ -107,7 +111,10 @@ const readText = async (response: Response): Promise<string> => {
     let received = 0;
 
     while (reader) {
-        const { done, value } = await reader.read();
+        // The request's deadline also covers the body: a slow or cut-off read is a host failure.
+        const { done, value } = await reader.read().catch(() => {
+            throw new HostApiError("The host's response could not be read", 0);
+        });
 
         if (done) {
             break;
@@ -258,7 +265,7 @@ const listInbox = async (request: HostRequest, section: InboxSection, page: numb
             }),
         ),
     );
-    const reachable = Math.min(search.total_count, 1000);
+    const reachable = Math.min(search.total_count, SEARCH_RESULT_LIMIT);
 
     return {
         hasMore: current < GITHUB_INBOX_MAX_PAGE && current * INBOX_PAGE_SIZE < reachable,

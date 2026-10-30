@@ -12,7 +12,7 @@ export interface DiffLine {
  * `+`, `-` or space.
  */
 export const parseDiffLines = (patch: string): DiffLine[] =>
-    patch.split("\n").map((text) => {
+    (patch.endsWith("\n") ? patch.slice(0, -1) : patch).split("\n").map((text) => {
         if (text.startsWith("@@")) {
             return { kind: "hunk", text };
         }

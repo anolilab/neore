@@ -254,6 +254,7 @@ describe("github driver: a pull request", () => {
     it("splits a repository into owner and name", () => {
         expect(splitGithubRepo("octo-org/hello.world_js")).toEqual({ name: "hello.world_js", owner: "octo-org" });
         expect(splitGithubRepo("-octo/hello")).toBeUndefined();
+        expect(splitGithubRepo("octo_acme/hello")).toEqual({ name: "hello", owner: "octo_acme" });
     });
 });
 
@@ -395,12 +396,14 @@ describe("github driver: inbox", () => {
         });
 
         const first = await githubDriver.listInbox(request, "mine", 1);
-        const last = await githubDriver.listInbox(request, "mine", 10);
+        const penultimate = await githubDriver.listInbox(request, "mine", 33);
+        const last = await githubDriver.listInbox(request, "mine", 34);
         const beyond = await githubDriver.listInbox(request, "mine", 999);
 
         expect(first.hasMore).toBe(true);
+        expect(penultimate.hasMore).toBe(true);
         expect(last.hasMore).toBe(false);
-        expect(beyond.page).toBe(10);
+        expect(beyond.page).toBe(34);
     });
 
     it("drops an entry whose repository or link is not GitHub's", async () => {
@@ -510,6 +513,19 @@ describe("github driver: responses that are never read", () => {
 
         await expect(githubDriver.getPullRequest(request, REF)).rejects.toMatchObject({ status: 0 });
         expect(big.cancelled()).toBe(true);
+    });
+
+    it("answers with a host error when the body read is cut off", async () => {
+        const broken = new Response(
+            new ReadableStream({
+                pull: () => {
+                    throw new TypeError("The operation was aborted");
+                },
+            }),
+        );
+        const request = answering({ "/repos/octo/hello/pulls/7": () => broken });
+
+        await expect(githubDriver.getPullRequest(request, REF)).rejects.toBeInstanceOf(HostApiError);
     });
 
     it("stops reading a body that grows past the cap with no length declared", async () => {

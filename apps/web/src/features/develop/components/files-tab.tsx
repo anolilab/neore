@@ -87,8 +87,8 @@ const FilesTab = ({
     const files = usePullRequestFiles(address, true);
     const { fetchNextPage, hasNextPage, isFetchingNextPage } = files;
     const pages = files.data?.pages ?? [];
-    const failure = pages.find((page) => page.status !== "ok");
     const listed = pages.flatMap((page) => (page.status === "ok" ? page.files : []));
+    const failure = pages.find((page) => page.status !== "ok")?.status ?? (files.isError ? "host_error" : undefined);
 
     // Keep loading until the host has nothing more to list: the pages are bounded by the host's own ceiling.
     useEffect(() => {
@@ -101,15 +101,12 @@ const FilesTab = ({
         return <Skeleton aria-label={t`Loading files`} className="h-24 w-full" role="status" />;
     }
 
-    if (files.isError) {
-        return <FailureNotice label={hostLabel} status="host_error" />;
+    // A later page that fails leaves the earlier ones on screen, with the failure below them.
+    if (failure && listed.length === 0) {
+        return <FailureNotice label={hostLabel} status={failure} />;
     }
 
-    if (failure) {
-        return <FailureNotice label={hostLabel} status={failure.status} />;
-    }
-
-    const loading = hasNextPage || isFetchingNextPage;
+    const loading = !failure && (hasNextPage || isFetchingNextPage);
 
     return (
         <div className="space-y-3">
@@ -118,7 +115,7 @@ const FilesTab = ({
                 {loading ? t`Loading files…` : <Plural one="# file" other="# files" value={listed.length} />}
             </p>
             <p aria-hidden className="text-muted-foreground text-sm">
-                {loading ? (
+                {loading || failure ? (
                     <Trans>
                         Loaded {listed.length} of <Plural one="# file" other="# files" value={Math.min(fileCount, fileLimit)} />…
                     </Trans>
@@ -136,7 +133,8 @@ const FilesTab = ({
                     <FileRow file={file} key={`${file.previousPath ?? ""}→${file.path}`} showDiff={showDiff} />
                 ))}
             </ul>
-            {hasNextPage && !isFetchingNextPage && (
+            {failure && <FailureNotice label={hostLabel} status={failure} />}
+            {hasNextPage && !isFetchingNextPage && !failure && (
                 <Button onClick={() => fetchNextPage()} variant="outline">
                     {t`Load more files`}
                 </Button>
