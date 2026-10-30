@@ -17602,7 +17602,8 @@
                   "kind": "number",
                   "nullable": false,
                   "optional": false,
-                  "unique": false
+                  "unique": false,
+                  "refined": true
                 },
                 "storageKey": {
                   "kind": "string",
