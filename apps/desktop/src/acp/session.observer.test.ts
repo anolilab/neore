@@ -115,6 +115,32 @@ describe("a session's observer", () => {
         expect(calls.at(-1)).toEqual(["turnEnded", expect.any(String), "cancelled", undefined]);
     });
 
+    it("closes a request still open when the agent ends the turn, before the turn's end", async () => {
+        const { calls, observer } = recorder();
+        let release: (() => void) | undefined;
+        const held: PermissionGate = {
+            ask: async () =>
+                await new Promise((resolve) => {
+                    release = () => resolve({ outcome: "cancelled" });
+                }),
+            cancelSession: () => release?.(),
+        };
+        const { agent, player, session } = await start(held, observer);
+        const steps = readTranscript("cancel-with-permission");
+
+        session.send("run it");
+        await player.play(steps.slice(0, 3));
+        await expect.poll(() => release !== undefined).toBe(true);
+        // The agent finishes its prompt without the user ever answering.
+        agent.say({ id: agent.written.find((frame) => frame.method === "session/prompt")?.id as number, result: { stopReason: "end_turn" } });
+        await expect.poll(() => session.snapshot().status).toBe("idle");
+
+        const names = calls.map(([name]) => name);
+
+        expect(names.filter((name) => name === "permissionResolved")).toHaveLength(1);
+        expect(names.indexOf("permissionResolved")).toBeLessThan(names.indexOf("turnEnded"));
+    });
+
     it("holds back a value the user masked until it can be recognised, so it is never posted", async () => {
         const { calls, observer } = recorder();
         const secret = "hunter22";

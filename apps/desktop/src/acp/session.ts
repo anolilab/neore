@@ -106,6 +106,9 @@ export class AgentSession {
     /** How much of each turn's text has been handed to the observer, in characters of the scrubbed text. */
     private readonly sent = new WeakMap<Turn, { text: number; thought: number }>();
 
+    /** Requests the host was told about and has not yet heard the end of, by id. */
+    private readonly pendingPermissions = new Map<string, Turn>();
+
     private readonly toolOwner = new Map<string, Turn>();
 
     private readonly tools = new Map<string, ToolState>();
@@ -329,6 +332,7 @@ export class AgentSession {
         }
 
         turn.end(this.cancelRequested ? "cancelled" : reason);
+        this.observeUnanswered(turn);
         this.observeEnd(turn);
         // A request the agent made during this turn and left unanswered must not stay answerable: an Allow now
         // would authorize something for a turn that is over. A queued turn asks for its own once it starts.
@@ -381,6 +385,7 @@ export class AgentSession {
         wasRunning?.end(this.cancelRequested ? "cancelled" : "failed");
 
         if (wasRunning !== undefined) {
+            this.observeUnanswered(wasRunning);
             this.observeEnd(wasRunning, said);
         }
 
@@ -464,6 +469,21 @@ export class AgentSession {
             const { scrub } = this.options.process;
 
             this.observe((observer) => observer.tool(this.id, turn.id, { id: scrub(tool.id), kind: scrub(tool.kind), status: tool.status, title: tool.title }));
+        }
+    }
+
+    /**
+     * Cancelling a request releases its waiter a tick later, after the turn is sealed on the host, so the ones
+     * still open when a turn ends are closed here, in order, before its end.
+     */
+    private observeUnanswered(turn: Turn): void {
+        for (const [requestId, owner] of this.pendingPermissions) {
+            if (owner !== turn) {
+                continue;
+            }
+
+            this.pendingPermissions.delete(requestId);
+            this.observe((observer) => observer.permissionResolved(this.id, turn.id, requestId, "cancelled"));
         }
     }
 
@@ -593,8 +613,14 @@ export class AgentSession {
         const turn = this.current;
 
         this.observePermission(turn, requestId, request);
+        this.pendingPermissions.set(requestId, turn);
 
         const outcome = await this.options.gate.ask(request);
+
+        // The turn ended while it waited and the host was told so already.
+        if (!this.pendingPermissions.delete(requestId)) {
+            return { outcome: { outcome: "cancelled" } };
+        }
 
         // The request reaches the core's queue a moment after it is sent, so a turn's end can slip between the two:
         // an answer for a turn that is no longer the running one authorizes nothing.
