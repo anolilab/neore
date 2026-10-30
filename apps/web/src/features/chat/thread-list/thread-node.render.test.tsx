@@ -61,7 +61,10 @@ vi.mock("@/lib/lunora/crpc", () => {
         useCRPC: () => {
             return {
                 agent: { thread_lock: { lockThread: entry } },
-                chat: { functions: { abortThreadStream: entry, convertTemporaryToPermanent: entry, getThread: entry } },
+                chat: {
+                    functions: { abortThreadStream: entry, convertTemporaryToPermanent: entry, getThread: entry },
+                    thread_state: { snoozeThread: entry, unsnoozeThread: entry },
+                },
             };
         },
         useLunora: () => {
@@ -79,7 +82,7 @@ vi.mock("@neore/client-runtime", async (importOriginal) => {
 });
 
 vi.mock("@/lib/toast", () => {
-    return { showError: () => {} };
+    return { showError: () => {}, showSuccess: () => {} };
 });
 
 vi.mock("@/hooks/use-has-opened", () => {
