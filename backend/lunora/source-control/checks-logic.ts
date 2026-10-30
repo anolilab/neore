@@ -7,14 +7,7 @@
  * a host that withholds its rules can make a pull request look worse, never better.
  */
 import { matchesGlob } from "./glob";
-import type { CheckRun, CheckState } from "./types";
-
-/** The patterns a branch's rules require, and whether every source of those rules could be read. */
-export interface RequiredChecks {
-    /** `false` when a source was unreadable: a check no pattern names is then unknown, not optional. */
-    complete: boolean;
-    patterns: string[];
-}
+import type { CheckRun, CheckState, RequiredChecks } from "./types";
 
 /** `true`/`false` as the rules say; `null` when they cannot say. */
 export const requirementOf = (name: string, required: RequiredChecks): boolean | null => {
@@ -34,6 +27,23 @@ export const requirementOf = (name: string, required: RequiredChecks): boolean |
     return undecided ? null : false;
 };
 
+/** Longest list of waiting names (and each name) a rollup carries: patterns come from the host. */
+const WAITING_MAX = 10;
+const WAITING_NAME_MAX_CHARS = 200;
+
+const WILDCARD = /[*?]/u;
+
+/**
+ * The checks the rules require by name that have not reported yet. A required check the host is still waiting on is
+ * absent from the listing, so counting only what was listed would call that pull request ready. A pattern with a
+ * wildcard names no one check and cannot be missing; each plain one with no listed check of that name is.
+ */
+export const waitingFor = (checks: CheckRun[], required: RequiredChecks): string[] => {
+    const listed = new Set(checks.map((check) => check.name));
+
+    return [...new Set(required.patterns)].filter((pattern) => !WILDCARD.test(pattern) && !listed.has(pattern));
+};
+
 export interface ChecksRollup {
     /** `false` when the host holds more checks than were listed: a pass here is not a pass overall. */
     complete: boolean;
@@ -44,12 +54,14 @@ export interface ChecksRollup {
     /** Required (or unknown) checks still running. */
     pending: number;
     state: "failing" | "none" | "passing" | "pending";
+    /** Required checks that have not reported at all yet (the first {@link WAITING_MAX}); each one holds the verdict at pending. */
+    waiting: string[];
 }
 
 const NOT_PASSING = new Set<CheckState>(["cancelled", "failure"]);
 
-const stateOf = (listed: number, failing: number, pending: number): ChecksRollup["state"] => {
-    if (listed === 0) {
+const stateOf = (known: number, failing: number, pending: number): ChecksRollup["state"] => {
+    if (known === 0) {
         return "none";
     }
 
@@ -60,7 +72,7 @@ const stateOf = (listed: number, failing: number, pending: number): ChecksRollup
     return pending > 0 ? "pending" : "passing";
 };
 
-export const rollupOf = (checks: CheckRun[], total: number): ChecksRollup => {
+export const rollupOf = (checks: CheckRun[], total: number, required: RequiredChecks): ChecksRollup => {
     let failing = 0;
     let optionalFailing = 0;
     let pending = 0;
@@ -79,5 +91,14 @@ export const rollupOf = (checks: CheckRun[], total: number): ChecksRollup => {
         }
     }
 
-    return { complete: total <= checks.length, failing, optionalFailing, pending, state: stateOf(checks.length, failing, pending) };
+    const waiting = waitingFor(checks, required);
+
+    return {
+        complete: total <= checks.length,
+        failing,
+        optionalFailing,
+        pending,
+        state: stateOf(checks.length + waiting.length, failing, pending + waiting.length),
+        waiting: waiting.slice(0, WAITING_MAX).map((name) => name.slice(0, WAITING_NAME_MAX_CHARS)),
+    };
 };

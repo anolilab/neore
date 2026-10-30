@@ -182,12 +182,12 @@ msgid "{0, plural, one {# char} other {# chars}}"
 msgstr "{0, plural, one {# Zeichen} other {# Zeichen}}"
 
 #. placeholder {0}: rollup.failing
-#: src/features/develop/components/checks-tab.tsx:91
+#: src/features/develop/components/checks-tab.tsx:88
 msgid "{0, plural, one {# check is failing} other {# checks are failing}}"
 msgstr ""
 
 #. placeholder {0}: rollup.pending
-#: src/features/develop/components/checks-tab.tsx:94
+#: src/features/develop/components/checks-tab.tsx:91
 msgid "{0, plural, one {# check is still running} other {# checks are still running}}"
 msgstr ""
 
@@ -250,7 +250,7 @@ msgid "{0, plural, one {# node} other {# nodes}}"
 msgstr "{0, plural, one {# Node} other {# Nodes}}"
 
 #. placeholder {0}: rollup.optionalFailing
-#: src/features/develop/components/checks-tab.tsx:126
+#: src/features/develop/components/checks-tab.tsx:142
 msgid "{0, plural, one {# optional check failed.} other {# optional checks failed.}}"
 msgstr ""
 
@@ -277,13 +277,23 @@ msgid "{0, plural, one {# reply} other {# replies}}"
 msgstr "{0, plural, one {# Antwort} other {# Antworten}}"
 
 #. placeholder {0}: rollup.failing
-#: src/features/develop/components/checks-tab.tsx:85
+#: src/features/develop/components/checks-tab.tsx:94
 msgid "{0, plural, one {# required check is failing} other {# required checks are failing}}"
 msgstr ""
 
 #. placeholder {0}: rollup.pending
-#: src/features/develop/components/checks-tab.tsx:88
+#: src/features/develop/components/checks-tab.tsx:97
 msgid "{0, plural, one {# required check is still running} other {# required checks are still running}}"
+msgstr ""
+
+#. placeholder {0}: rollup.failing
+#: src/features/develop/components/checks-tab.tsx:100
+msgid "{0, plural, one {# required or unknown check is failing} other {# required or unknown checks are failing}}"
+msgstr ""
+
+#. placeholder {0}: rollup.pending
+#: src/features/develop/components/checks-tab.tsx:104
+msgid "{0, plural, one {# required or unknown check is still running} other {# required or unknown checks are still running}}"
 msgstr ""
 
 #. placeholder {0}: executions.length
@@ -642,7 +652,7 @@ msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2}
 msgstr ""
 
 #. placeholder {0}: target.name
-#: src/features/develop/components/checks-tab.tsx:110
+#: src/features/develop/components/checks-tab.tsx:126
 msgid "{0} was started again."
 msgstr ""
 
@@ -867,10 +877,22 @@ msgstr ""
 msgid "{hostLabel} says this is ready to merge."
 msgstr ""
 
+#. placeholder {0}: headSha.slice(0, 7)
+#. placeholder {1}: methodLabels[method]
+#: src/features/develop/components/merge-panel.tsx:119
+#~ msgid "{hostLabel} will merge the commit {0} with “{1}” once its rules are met. If the branch has changed by then, {hostLabel} will not merge it. You can turn this off until then."
+#~ msgstr ""
+
+#. placeholder {0}: methodLabels[method]
+#. placeholder {1}: headSha.slice(0, 7)
+#: src/features/develop/components/merge-panel.tsx:119
+msgid "{hostLabel} will merge this {requestNoun} with “{0}” once its rules are met. It is turned on for the commit {1}: if the branch has changed since you opened this page, {hostLabel} refuses. You can turn this off until then."
+msgstr ""
+
 #. placeholder {0}: methodLabels[method]
 #: src/features/develop/components/merge-panel.tsx:119
-msgid "{hostLabel} will merge this {requestNoun} with “{0}” once its rules are met. You can turn this off until then."
-msgstr ""
+#~ msgid "{hostLabel} will merge this {requestNoun} with “{0}” once its rules are met. You can turn this off until then."
+#~ msgstr ""
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:84
 msgid "{hours} hours"
@@ -2719,7 +2741,7 @@ msgstr "Alle Änderungen gespeichert"
 msgid "All chats"
 msgstr "Alle Chats"
 
-#: src/features/develop/components/checks-tab.tsx:93
+#: src/features/develop/components/checks-tab.tsx:90
 msgid "All checks passed."
 msgstr ""
 
@@ -2804,8 +2826,12 @@ msgstr "Alle Anbieter"
 msgid "All providers + BYOK"
 msgstr "Alle Anbieter + BYOK"
 
-#: src/features/develop/components/checks-tab.tsx:87
+#: src/features/develop/components/checks-tab.tsx:96
 msgid "All required checks passed."
+msgstr ""
+
+#: src/features/develop/components/checks-tab.tsx:102
+msgid "All required or unknown checks passed."
 msgstr ""
 
 #: src/features/marketing/components/gateway-footer.tsx:135
@@ -3679,7 +3705,7 @@ msgstr "Auto-Layout (L)"
 msgid "Auto-merge is off."
 msgstr ""
 
-#: src/features/develop/components/merge-panel.tsx:172
+#: src/features/develop/components/merge-panel.tsx:175
 msgid "Auto-merge is on: it merges once {hostLabel}'s rules are met."
 msgstr ""
 
@@ -7182,7 +7208,7 @@ msgid "Could not change push notifications. Try again."
 msgstr "Push-Benachrichtigungen konnten nicht geändert werden. Versuch es erneut."
 
 #. placeholder {0}: target.name
-#: src/features/develop/components/checks-tab.tsx:108
+#: src/features/develop/components/checks-tab.tsx:124
 msgid "Could not confirm that {0} was started again. Check on {hostLabel} before you try again."
 msgstr ""
 
@@ -17756,7 +17782,7 @@ msgid "Merge this {requestNoun}?"
 msgstr ""
 
 #: src/features/develop/components/merge-panel.tsx:118
-#: src/features/develop/components/merge-panel.tsx:163
+#: src/features/develop/components/merge-panel.tsx:165
 msgid "Merge when ready"
 msgstr ""
 
@@ -17773,7 +17799,7 @@ msgstr "Zusammengeführt"
 msgid "Merged on {hostLabel}."
 msgstr ""
 
-#: src/features/develop/components/merge-panel.tsx:159
+#: src/features/develop/components/merge-panel.tsx:160
 msgid "Merging…"
 msgstr ""
 
@@ -19981,7 +20007,7 @@ msgstr ""
 msgid "not measured"
 msgstr "nicht gemessen"
 
-#: src/features/develop/components/merge-panel.tsx:178
+#: src/features/develop/components/merge-panel.tsx:182
 msgid "Not merged"
 msgstr ""
 
@@ -19993,7 +20019,7 @@ msgstr "Nicht gekoppelt – der Bot antwortet noch niemandem"
 msgid "Not rated"
 msgstr "Nicht bewertet"
 
-#: src/features/develop/components/checks-tab.tsx:175
+#: src/features/develop/components/checks-tab.tsx:191
 msgid "Not re-run"
 msgstr ""
 
@@ -20408,7 +20434,7 @@ msgstr "Es wurden nur die neuesten Läufe geprüft, daher fehlt möglicherweise 
 msgid "Only the owner can change who sees this skill."
 msgstr "Nur der Eigentümer kann ändern, wer diesen Skill sieht."
 
-#: src/features/develop/components/checks-tab.tsx:181
+#: src/features/develop/components/checks-tab.tsx:197
 msgid "Only this check is started again on {hostLabel}, not the rest of its workflow."
 msgstr ""
 
@@ -21017,7 +21043,7 @@ msgstr "Wird optimiert..."
 msgid "optional"
 msgstr "optional"
 
-#: src/features/develop/components/checks-tab.tsx:154
+#: src/features/develop/components/checks-tab.tsx:170
 msgid "Optional"
 msgstr ""
 
@@ -23235,18 +23261,18 @@ msgstr "Erneut optimieren"
 msgid "Re-pair with a new code"
 msgstr "Mit einem neuen Code neu koppeln"
 
-#: src/features/develop/components/checks-tab.tsx:163
-#: src/features/develop/components/checks-tab.tsx:180
+#: src/features/develop/components/checks-tab.tsx:179
+#: src/features/develop/components/checks-tab.tsx:196
 msgid "Re-run"
 msgstr ""
 
 #. placeholder {0}: check.name
-#: src/features/develop/components/checks-tab.tsx:157
+#: src/features/develop/components/checks-tab.tsx:173
 msgid "Re-run {0}"
 msgstr ""
 
 #. placeholder {0}: target?.name ?? ""
-#: src/features/develop/components/checks-tab.tsx:189
+#: src/features/develop/components/checks-tab.tsx:205
 msgid "Re-run {0}?"
 msgstr ""
 
@@ -24254,7 +24280,7 @@ msgstr "Anfragen"
 msgid "required"
 msgstr "erforderlich"
 
-#: src/features/develop/components/checks-tab.tsx:153
+#: src/features/develop/components/checks-tab.tsx:169
 #: src/features/prompts/components/variable-definitions.tsx:94
 #: src/features/prompts/components/variable-fill-dialog.tsx:154
 msgid "Required"
@@ -26218,7 +26244,7 @@ msgid "Show/hide help"
 msgstr "Hilfe anzeigen/ausblenden"
 
 #. placeholder {0}: list.length
-#: src/features/develop/components/checks-tab.tsx:132
+#: src/features/develop/components/checks-tab.tsx:148
 msgid "Showing {0} of {total, plural, one {# check} other {# checks}}."
 msgstr ""
 
@@ -30402,7 +30428,7 @@ msgstr "Verwandle jedes GitHub-Repository in einen Remote-MCP-Endpunkt"
 msgid "Turn off"
 msgstr ""
 
-#: src/features/develop/components/merge-panel.tsx:168
+#: src/features/develop/components/merge-panel.tsx:170
 msgid "Turn off auto-merge"
 msgstr ""
 
@@ -32160,6 +32186,11 @@ msgstr "Volumen (24 Std.)"
 msgctxt "width abbreviation"
 msgid "W"
 msgstr "B"
+
+#. placeholder {0}: rollup.waiting.join(", ")
+#: src/features/develop/components/checks-tab.tsx:85
+msgid "Waiting for {0}."
+msgstr ""
 
 #: src/features/devices/components/device-tool-call.tsx:53
 msgid "Waiting for {device} to pick this up…"

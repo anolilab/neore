@@ -43,13 +43,13 @@ const MergePanel = ({
     const messages = useReviewMessages(hostLabel);
     const canMerge = isHostCapabilityAvailable(capabilities, "merge.now");
     const canAutoMerge = isHostCapabilityAvailable(capabilities, "merge.auto");
-    const status = useMergeStatus(address, canMerge);
+    const status = useMergeStatus(address, canMerge || canAutoMerge);
     const actions = useChecksAndMergeActions(address);
     const [chosen, setChosen] = useState<MergeMethod | null>(null);
     const [pending, setPending] = useState<Pending | null>(null);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
 
-    if (!canMerge || status.isPending) {
+    if ((!canMerge && !canAutoMerge) || status.isPending) {
         return null;
     }
 
@@ -102,7 +102,7 @@ const MergePanel = ({
         }
 
         const enabled = action === "auto";
-        const outcome = await actions.autoMerge.mutateAsync({ enabled, method }).catch(() => undefined);
+        const outcome = await actions.autoMerge.mutateAsync({ enabled, headSha, method }).catch(() => undefined);
 
         if (outcome === undefined) {
             setFeedback({ kind: "error", text: t`Could not confirm the change to auto-merge. Check on ${hostLabel} before you try again.` });
@@ -116,7 +116,7 @@ const MergePanel = ({
     const dialogs: Record<Pending, { confirm: string; description: string; title: string }> = {
         auto: {
             confirm: t`Merge when ready`,
-            description: t`${hostLabel} will merge this ${requestNoun} with “${methodLabels[method]}” once its rules are met. You can turn this off until then.`,
+            description: t`${hostLabel} will merge this ${requestNoun} with “${methodLabels[method]}” once its rules are met. It is turned on for the commit ${headSha.slice(0, 7)}: if the branch has changed since you opened this page, ${hostLabel} refuses. You can turn this off until then.`,
             title: t`Merge when ready?`,
         },
         autoOff: {
@@ -155,9 +155,11 @@ const MergePanel = ({
                 </RadioGroup>
             )}
             <div className="flex flex-wrap items-center gap-2">
-                <Button disabled={busy} onClick={() => setPending("merge")}>
-                    {actions.merge.isPending ? t`Merging…` : methodLabels[method]}
-                </Button>
+                {canMerge && (
+                    <Button disabled={busy} onClick={() => setPending("merge")}>
+                        {actions.merge.isPending ? t`Merging…` : methodLabels[method]}
+                    </Button>
+                )}
                 {canAutoMerge && autoMergeAllowed && !autoMergeEnabled && (
                     <Button disabled={busy} onClick={() => setPending("auto")} variant="outline">
                         {t`Merge when ready`}
@@ -169,7 +171,9 @@ const MergePanel = ({
                     </Button>
                 )}
             </div>
-            {canAutoMerge && autoMergeEnabled && <p className="text-muted-foreground text-xs">{t`Auto-merge is on: it merges once ${hostLabel}'s rules are met.`}</p>}
+            {canAutoMerge && autoMergeEnabled && (
+                <p className="text-muted-foreground text-xs">{t`Auto-merge is on: it merges once ${hostLabel}'s rules are met.`}</p>
+            )}
             <div aria-live="polite" role="status">
                 {feedback?.kind === "success" && <p className="text-sm">{feedback.text}</p>}
             </div>

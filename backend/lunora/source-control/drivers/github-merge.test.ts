@@ -135,11 +135,73 @@ describe("required checks", () => {
         ).rejects.toMatchObject({ rateLimited: true });
     });
 
-    it("refuses a base branch that is not a branch name before it reaches a path", async () => {
+    it("reads every check as unknown, without a request, when the base branch cannot be a path", async () => {
         const { request, sent } = host({ ...checksRoutes([run(1, "build")]), [`${REPO}/pulls/7`]: { base: { ref: "main/../../admin" } } });
 
-        await expect(githubDriver.listChecks(request, REF, SHA)).rejects.toMatchObject({ status: 404 });
+        const { checks, required } = await githubDriver.listChecks(request, REF, SHA);
+
+        expect(checks.map((check) => check.required)).toEqual([null]);
+        expect(required).toEqual({ complete: false, patterns: [] });
         expect(sent.some((call) => call.path.includes("admin"))).toBe(false);
+    });
+
+    it.each(["feature/über", "fix#12", "release,v2", "what?", "100%", "a b"])("reads the rules of a base branch named %j", async (branch) => {
+        const encoded = branch
+            .split("/")
+            .map((segment) => encodeURIComponent(segment))
+            .join("/");
+        const { request, sent } = host({
+            ...checksRoutes([run(1, "build")]),
+            [`${REPO}/branches/${encoded}`]: { protected: false },
+            [`${REPO}/pulls/7`]: { base: { ref: branch } },
+            [`${REPO}/rules/branches/${encoded}`]: [{ parameters: { required_status_checks: [{ context: "build" }] }, type: "required_status_checks" }],
+        });
+
+        const { checks } = await githubDriver.listChecks(request, REF, SHA);
+
+        expect(checks.map((check) => check.required)).toEqual([true]);
+        expect(sent.map((call) => call.path)).toContain(`${REPO}/rules/branches/${encoded}`);
+    });
+
+    it.each(["", "a//b", "./x", "x/.", "x/../y", "x".repeat(251), "\u{D800}"])("leaves checks unknown for the unusable base branch %j", async (branch) => {
+        const { request } = host({ ...checksRoutes([run(1, "build")]), [`${REPO}/pulls/7`]: { base: { ref: branch } } });
+
+        const { checks, required } = await githubDriver.listChecks(request, REF, SHA);
+
+        expect(checks.map((check) => check.required)).toEqual([null]);
+        expect(required.complete).toBe(false);
+    });
+
+    it("returns the patterns so a required check that has not reported can be waited on", async () => {
+        const { required } = await githubDriver.listChecks(
+            host({
+                ...checksRoutes([run(1, "lint")]),
+                [`${REPO}/branches/main`]: { protected: false },
+                [`${REPO}/rules/branches/main`]: [
+                    { parameters: { required_status_checks: [{ context: "lint" }, { context: "build" }] }, type: "required_status_checks" },
+                ],
+            }).request,
+            REF,
+            SHA,
+        );
+
+        expect(required).toEqual({ complete: true, patterns: ["lint", "build"] });
+    });
+
+    it("does not call the rules complete when the rules page is full", async () => {
+        const { required } = await githubDriver.listChecks(
+            host({
+                ...checksRoutes([run(1, "lint")]),
+                [`${REPO}/branches/main`]: { protected: false },
+                [`${REPO}/rules/branches/main`]: Array.from({ length: 100 }, () => {
+                    return { type: "pull_request" };
+                }),
+            }).request,
+            REF,
+            SHA,
+        );
+
+        expect(required.complete).toBe(false);
     });
 
     it("encodes each segment of a branch name that has slashes", async () => {
@@ -178,6 +240,31 @@ describe("rerunCheck", () => {
         await githubDriver.rerunCheck(request, REF, "56");
 
         expect(sent.filter((call) => call.method !== "GET").map((call) => call.path)).toEqual([`${REPO}/check-runs/56/rerequest`]);
+    });
+
+    it("keeps the host's reason for a re-run it refuses with a 403", async () => {
+        const { request } = host({
+            [`${REPO}/actions/jobs/55/rerun`]: new HostApiError("Forbidden", 403, false, {
+                detail: "Cannot re-run a job while others in the run are in progress",
+            }),
+            [`${REPO}/check-runs/55`]: run(55, "build"),
+        });
+
+        await expect(githubDriver.rerunCheck(request, REF, "55")).rejects.toMatchObject({
+            detail: "Cannot re-run a job while others in the run are in progress",
+            status: 422,
+        });
+    });
+
+    it("leaves a bare 403, and a rate-limited one, as they are", async () => {
+        const bare = host({ [`${REPO}/actions/jobs/55/rerun`]: new HostApiError("Forbidden", 403), [`${REPO}/check-runs/55`]: run(55, "build") });
+        const limited = host({
+            [`${REPO}/actions/jobs/55/rerun`]: new HostApiError("Forbidden", 403, true, { detail: "You have exceeded a secondary rate limit." }),
+            [`${REPO}/check-runs/55`]: run(55, "build"),
+        });
+
+        await expect(githubDriver.rerunCheck(bare.request, REF, "55")).rejects.toMatchObject({ status: 403 });
+        await expect(githubDriver.rerunCheck(limited.request, REF, "55")).rejects.toMatchObject({ rateLimited: true, status: 403 });
     });
 
     it.each(["", "abc", "1/../2", "12345678901234567890123"])("refuses %j as a check id before any request", async (id) => {
@@ -250,6 +337,66 @@ describe("mergePullRequest", () => {
         await expect(githubDriver.mergePullRequest(request, REF, { headSha: SHA, method: "merge" })).rejects.toMatchObject({ unconfirmed: true });
     });
 
+    describe("when the merge was already done", () => {
+        const pull = (head: string, merged: boolean) => {
+            return { head: { sha: head }, merge_commit_sha: "c".repeat(40), merged };
+        };
+
+        it.each([405, 409])("answers a %i with the merge that already happened at the same head", async (status) => {
+            const { request, sent } = host({
+                [`${REPO}/pulls/7/merge`]: new HostApiError("Head branch was modified", status, false, { detail: "Pull Request is not mergeable" }),
+                [`${REPO}/pulls/7`]: pull(SHA, true),
+            });
+
+            expect(await githubDriver.mergePullRequest(request, REF, { headSha: SHA, method: "merge" })).toEqual({ sha: "c".repeat(40) });
+            expect(sent.filter((call) => call.method !== "GET")).toHaveLength(1);
+        });
+
+        it("is the same answer when it is asked twice", async () => {
+            let merged = false;
+            const { request } = host({
+                [`${REPO}/pulls/7/merge`]: () => {
+                    if (merged) {
+                        return new HostApiError("Pull Request is not mergeable", 405, false, { detail: "Pull Request is not mergeable" });
+                    }
+
+                    merged = true;
+
+                    return { merged: true, sha: "c".repeat(40) };
+                },
+                [`${REPO}/pulls/7`]: () => pull(SHA, merged),
+            });
+            const merge = { headSha: SHA, method: "merge" } as const;
+
+            expect(await githubDriver.mergePullRequest(request, REF, merge)).toEqual({ sha: "c".repeat(40) });
+            expect(await githubDriver.mergePullRequest(request, REF, merge)).toEqual({ sha: "c".repeat(40) });
+        });
+
+        it("still refuses when it merged a different head, is not merged, or cannot be read", async () => {
+            const refusal = new HostApiError("no", 409, false, { detail: "Head branch was modified" });
+
+            for (const routes of [
+                { [`${REPO}/pulls/7`]: pull("d".repeat(40), true) },
+                { [`${REPO}/pulls/7`]: pull(SHA, false) },
+                { [`${REPO}/pulls/7`]: { nonsense: true } },
+                {},
+            ]) {
+                const { request } = host({ ...routes, [`${REPO}/pulls/7/merge`]: refusal });
+
+                await expect(githubDriver.mergePullRequest(request, REF, { headSha: SHA, method: "merge" })).rejects.toBe(refusal);
+            }
+        });
+
+        it("does not look for a merge after a 422, a 403 or a rate limit", async () => {
+            for (const error of [new HostApiError("x", 422), new HostApiError("x", 403), new HostApiError("x", 405, true)]) {
+                const { request, sent } = host({ [`${REPO}/pulls/7/merge`]: error, [`${REPO}/pulls/7`]: pull(SHA, true) });
+
+                await expect(githubDriver.mergePullRequest(request, REF, { headSha: SHA, method: "merge" })).rejects.toBe(error);
+                expect(sent.some((call) => call.method === "GET")).toBe(false);
+            }
+        });
+    });
+
     it.each(["main", "../x", ""])("refuses %j as a commit id before any request", async (headSha) => {
         const { request, sent } = host({});
 
@@ -275,10 +422,19 @@ describe("setAutoMerge", () => {
             };
         });
 
-        await githubDriver.setAutoMerge(request, REF, true, "rebase");
+        await githubDriver.setAutoMerge(request, REF, true, "rebase", SHA);
 
-        expect(sent.at(-1)?.json.variables).toEqual({ method: "REBASE", pullRequestId: "PR_node" });
+        expect(sent.at(-1)?.json.variables).toEqual({ expectedHeadOid: SHA, method: "REBASE", pullRequestId: "PR_node" });
         expect(String(sent.at(-1)?.json.query)).toContain("enablePullRequestAutoMerge");
+    });
+
+    it("refuses a head that is not a commit id before any request when turning it on", async () => {
+        const { request, sent } = graphql(() => {
+            return {};
+        });
+
+        await expect(githubDriver.setAutoMerge(request, REF, true, "merge", "main")).rejects.toMatchObject({ status: 404 });
+        expect(sent).toEqual([]);
     });
 
     it("turns it off", async () => {
@@ -286,7 +442,7 @@ describe("setAutoMerge", () => {
             return { data: { disablePullRequestAutoMerge: { pullRequest: { autoMergeRequest: null } } } };
         });
 
-        await githubDriver.setAutoMerge(request, REF, false, "merge");
+        await githubDriver.setAutoMerge(request, REF, false, "merge", SHA);
 
         expect(sent.at(-1)?.json.variables).toEqual({ pullRequestId: "PR_node" });
     });
@@ -296,7 +452,7 @@ describe("setAutoMerge", () => {
             return { data: { enablePullRequestAutoMerge: { pullRequest: { autoMergeRequest: null } } } };
         });
 
-        await expect(githubDriver.setAutoMerge(request, REF, true, "merge")).rejects.toBeInstanceOf(HostApiError);
+        await expect(githubDriver.setAutoMerge(request, REF, true, "merge", SHA)).rejects.toBeInstanceOf(HostApiError);
     });
 
     it("carries the host's reason when it refuses", async () => {
@@ -304,7 +460,10 @@ describe("setAutoMerge", () => {
             return { errors: [{ message: "Pull request is in clean status", type: "UNPROCESSABLE" }] };
         });
 
-        await expect(githubDriver.setAutoMerge(request, REF, true, "merge")).rejects.toMatchObject({ detail: "Pull request is in clean status", status: 422 });
+        await expect(githubDriver.setAutoMerge(request, REF, true, "merge", SHA)).rejects.toMatchObject({
+            detail: "Pull request is in clean status",
+            status: 422,
+        });
     });
 });
 
@@ -348,6 +507,26 @@ describe("what a person is told when the host's rules refuse", () => {
         );
 
         expect(outcome).toEqual({ reason: "Pull Request is not mergeable", status: "rejected" });
+    });
+
+    it("keeps the reason of a re-run the host refuses with a 403, and says forbidden for a bare one", async () => {
+        const rerun = async (response: Response) =>
+            await writeToHost(
+                githubDriver,
+                token,
+                async (request) => {
+                    await githubDriver.rerunCheck(request, REF, "55");
+
+                    return {};
+                },
+                async (url) => (String(url).includes("/rerun") ? response : Response.json(run(55, "build"))),
+            );
+
+        expect(await rerun(Response.json({ message: "Cannot re-run a job while others in the run are in progress" }, { status: 403 }))).toEqual({
+            reason: "Cannot re-run a job while others in the run are in progress",
+            status: "rejected",
+        });
+        expect(await rerun(new Response(null, { status: 403 }))).toEqual({ status: "forbidden" });
     });
 
     it("says rate_limited, not no access, when the merge is throttled", async () => {

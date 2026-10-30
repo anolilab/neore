@@ -107,8 +107,17 @@ export interface CheckRun {
     url: string | null;
 }
 
+/** The patterns a branch's rules require, and whether every source of those rules could be read. */
+export interface RequiredChecks {
+    /** `false` when a source was unreadable: a check no pattern names is then unknown, not optional. */
+    complete: boolean;
+    patterns: string[];
+}
+
 export interface CheckSummary {
     checks: CheckRun[];
+    /** The rules' required-check patterns: a required check that has not reported is not in `checks`. */
+    required: RequiredChecks;
     /** How many the host reports; `checks` holds at most one bounded page of them. */
     total: number;
 }

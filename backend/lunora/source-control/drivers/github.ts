@@ -8,7 +8,6 @@
 import z from "zod/v4";
 
 import type { HostCapabilityReport } from "../capabilities";
-import type { RequiredChecks } from "../checks-logic";
 import { requirementOf } from "../checks-logic";
 import type { HostDriver } from "../driver";
 import { graphqlRequest } from "../graphql";
@@ -35,6 +34,7 @@ import type {
     PullRequestFile,
     PullRequestRef,
     PullRequestSummary,
+    RequiredChecks,
     ReviewSubmission,
     ReviewThread,
     SubmittedReview,
@@ -710,18 +710,27 @@ const STATUS_STATES: Record<string, CheckState> = { error: "failure", failure: "
 
 const statusState = (state: string): CheckState => STATUS_STATES[state] ?? "pending";
 
-/** A branch name that is safe to put in a URL path, one encoded segment at a time. */
-const BRANCH = /^(?!.*\.\.)[\w./@+-]{1,250}$/u;
+/** Longest branch name that is read; a longer one is treated as unreadable rather than sent. */
+const BRANCH_MAX_CHARS = 250;
 
-const branchPath = (branch: string): string => {
-    if (!BRANCH.test(branch)) {
-        throw new HostApiError("Not a branch name", 404);
+/**
+ * A branch name as a URL path, one encoded segment at a time, or `undefined` when it cannot be one safely. Git allows
+ * almost any character in a name, so the characters are not limited, only the segments that would walk the path
+ * (`.`, `..`) or vanish (empty).
+ */
+const branchPath = (branch: string): string | undefined => {
+    const segments = branch.split("/");
+
+    if (branch.length > BRANCH_MAX_CHARS || segments.some((segment) => ["", ".", ".."].includes(segment))) {
+        return undefined;
     }
 
-    return branch
-        .split("/")
-        .map((segment) => encodeURIComponent(segment))
-        .join("/");
+    try {
+        return segments.map((segment) => encodeURIComponent(segment)).join("/");
+    } catch {
+        // A lone surrogate cannot be encoded.
+        return undefined;
+    }
 };
 
 /** Reads a source of required-check rules, which may be withheld: only a sign-in or rate-limit problem is the caller's. */
@@ -743,13 +752,19 @@ const rulesSchema = z.array(
 
 const protectionSchema = z.object({ checks: z.array(z.object({ context: z.string() })).optional(), contexts: z.array(z.string()) });
 
-/** The required-check patterns of the rulesets that apply to `branch`; anyone who can read the repository can read these. */
-const rulesetPatterns = async (request: HostRequest, ref: PullRequestRef, branch: string): Promise<string[]> => {
+/**
+ * The required-check patterns of the rulesets that apply to `branch`; anyone who can read the repository can read these.
+ * `complete` is false when the rules fill a whole page: the host may hold more.
+ */
+const rulesetPatterns = async (request: HostRequest, ref: PullRequestRef, branch: string): Promise<{ complete: boolean; patterns: string[] }> => {
     const rules = parse(rulesSchema, await readJson(await request(`${repoPath(ref)}/rules/branches/${branch}`, { query: { per_page: GITHUB_PAGE_SIZE } })));
 
-    return rules.flatMap((rule) =>
-        rule.type === "required_status_checks" ? (rule.parameters?.required_status_checks ?? []).map((check) => check.context) : [],
-    );
+    return {
+        complete: rules.length < GITHUB_PAGE_SIZE,
+        patterns: rules.flatMap((rule) =>
+            rule.type === "required_status_checks" ? (rule.parameters?.required_status_checks ?? []).map((check) => check.context) : [],
+        ),
+    };
 };
 
 const branchSchema = z.object({
@@ -799,12 +814,20 @@ const requiredChecksOf = async (request: HostRequest, ref: PullRequestRef): Prom
     }
 
     const branch = branchPath(pull.base.ref);
-    const [rulesets, protection] = [
-        await readable(async () => await rulesetPatterns(request, ref, branch)),
-        await readable(async () => await protectionPatterns(request, ref, branch)),
-    ];
 
-    return { complete: rulesets !== undefined && protection !== undefined, patterns: [...(rulesets ?? []), ...(protection ?? [])] };
+    if (branch === undefined) {
+        return { complete: false, patterns: [] };
+    }
+
+    const [rulesets, protection] = await Promise.all([
+        readable(async () => await rulesetPatterns(request, ref, branch)),
+        readable(async () => await protectionPatterns(request, ref, branch)),
+    ]);
+
+    return {
+        complete: rulesets?.complete === true && protection !== undefined,
+        patterns: [...(rulesets?.patterns ?? []), ...(protection ?? [])],
+    };
 };
 
 const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: string): Promise<CheckSummary> => {
@@ -878,7 +901,7 @@ const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: st
         }),
     ];
 
-    return { checks, total: runs.total_count + (statuses.total_count ?? statuses.statuses.length) };
+    return { checks, required, total: runs.total_count + (statuses.total_count ?? statuses.statuses.length) };
 };
 
 const runAppSchema = z.object({ app: z.object({ slug: z.string() }).nullable().optional() });
@@ -895,7 +918,17 @@ const rerunCheck = async (request: HostRequest, ref: PullRequestRef, checkId: st
     const run = parse(runAppSchema, await readJson(await request(`${repo}/check-runs/${checkId}`)));
     const path = run.app?.slug === ACTIONS_APP ? `${repo}/actions/jobs/${checkId}/rerun` : `${repo}/check-runs/${checkId}/rerequest`;
 
-    await discard(await request(path, { json: {}, method: "POST" }));
+    try {
+        await discard(await request(path, { json: {}, method: "POST" }));
+    } catch (error) {
+        // A 403 that is not a rate limit and says why ("cannot re-run a job while other jobs in the run are in progress") is a
+        // refusal of this call, not a lack of access: the reason is what the person needs.
+        if (error instanceof HostApiError && error.status === 403 && !error.rateLimited && error.detail !== undefined) {
+            throw new HostApiError(error.message, 422, false, { detail: error.detail });
+        }
+
+        throw error;
+    }
 };
 
 // ─── Merge ──────────────────────────────────────────────────────────────────
@@ -942,13 +975,49 @@ const getMergeStatus = async (request: HostRequest, ref: PullRequestRef): Promis
 
 const mergedSchema = z.object({ merged: z.boolean(), message: z.string().optional(), sha: z.string().optional() });
 
+const mergedPullSchema = z.object({ head: z.object({ sha: z.string() }), merge_commit_sha: z.string().nullable().optional(), merged: z.boolean().optional() });
+
+/**
+ * Whether the pull request is already merged at `headSha`: a second tab's merge, or a retry, is then the same merge done,
+ * not a refusal. `undefined` when it is not, or when the host could not say.
+ */
+const alreadyMerged = async (request: HostRequest, ref: PullRequestRef, headSha: string): Promise<MergedPullRequest | undefined> => {
+    try {
+        const pull = parse(mergedPullSchema, await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}`)));
+
+        return pull.merged === true && pull.head.sha === headSha ? { sha: pull.merge_commit_sha ?? null } : undefined;
+    } catch (error) {
+        if (error instanceof HostApiError) {
+            return undefined;
+        }
+
+        throw error;
+    }
+};
+
 /** One `PUT .../merge` naming the head the person saw: the host merges that commit or refuses, with its reason. */
 const mergePullRequest = async (request: HostRequest, ref: PullRequestRef, merge: MergeRequest): Promise<MergedPullRequest> => {
     if (!SHA.test(merge.headSha)) {
         throw new HostApiError("Not a commit id", 404);
     }
 
-    const response = await request(`${repoPath(ref)}/pulls/${ref.number}/merge`, { json: { merge_method: merge.method, sha: merge.headSha }, method: "PUT" });
+    let response: Response;
+
+    try {
+        response = await request(`${repoPath(ref)}/pulls/${ref.number}/merge`, { json: { merge_method: merge.method, sha: merge.headSha }, method: "PUT" });
+    } catch (error) {
+        // 405 ("not mergeable") and 409 ("head modified") are also what a merge that already happened answers.
+        if (error instanceof HostApiError && !error.rateLimited && [405, 409].includes(error.status)) {
+            const done = await alreadyMerged(request, ref, merge.headSha);
+
+            if (done) {
+                return done;
+            }
+        }
+
+        throw error;
+    }
+
     let result: z.infer<typeof mergedSchema>;
 
     try {
@@ -967,8 +1036,8 @@ const mergePullRequest = async (request: HostRequest, ref: PullRequestRef, merge
 
 const AUTO_MERGE_METHODS = { merge: "MERGE", rebase: "REBASE", squash: "SQUASH" } as const satisfies Record<MergeMethod, string>;
 
-const ENABLE_AUTO_MERGE = `mutation ($pullRequestId: ID!, $method: PullRequestMergeMethod!) {
-  enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: $method }) { pullRequest { autoMergeRequest { enabledAt } } }
+const ENABLE_AUTO_MERGE = `mutation ($pullRequestId: ID!, $method: PullRequestMergeMethod!, $expectedHeadOid: GitObjectID!) {
+  enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: $method, expectedHeadOid: $expectedHeadOid }) { pullRequest { autoMergeRequest { enabledAt } } }
 }`;
 const DISABLE_AUTO_MERGE = `mutation ($pullRequestId: ID!) {
   disablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId }) { pullRequest { autoMergeRequest { enabledAt } } }
@@ -976,12 +1045,17 @@ const DISABLE_AUTO_MERGE = `mutation ($pullRequestId: ID!) {
 
 const autoMergeResultSchema = z.object({ pullRequest: z.object({ autoMergeRequest: z.unknown().nullable() }) });
 
-const setAutoMerge = async (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod): Promise<void> => {
+const setAutoMerge = async (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod, headSha: string): Promise<void> => {
+    // Turning it on names the head the person looked at, so a branch that moved since is not merged unseen.
+    if (enabled && !SHA.test(headSha)) {
+        throw new HostApiError("Not a commit id", 404);
+    }
+
     const pullRequestId = await pullNodeId(request, ref);
     const data = await graphqlRequest(
         request,
         enabled ? ENABLE_AUTO_MERGE : DISABLE_AUTO_MERGE,
-        enabled ? { method: AUTO_MERGE_METHODS[method], pullRequestId } : { pullRequestId },
+        enabled ? { expectedHeadOid: headSha, method: AUTO_MERGE_METHODS[method], pullRequestId } : { pullRequestId },
         z.object({ disablePullRequestAutoMerge: autoMergeResultSchema.optional(), enablePullRequestAutoMerge: autoMergeResultSchema.optional() }),
     );
     const result = enabled ? data.enablePullRequestAutoMerge : data.disablePullRequestAutoMerge;

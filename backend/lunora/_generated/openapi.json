@@ -44403,6 +44403,12 @@
                                   "type": "string"
                                 }
                               ]
+                            },
+                            "waiting": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
                             }
                           },
                           "required": [
@@ -44410,7 +44416,8 @@
                             "failing",
                             "optionalFailing",
                             "pending",
-                            "state"
+                            "state",
+                            "waiting"
                           ],
                           "type": "object"
                         },
@@ -45397,6 +45404,9 @@
                       "enabled": {
                         "type": "boolean"
                       },
+                      "headSha": {
+                        "type": "string"
+                      },
                       "method": {
                         "anyOf": [
                           {
@@ -45418,6 +45428,7 @@
                       "number",
                       "repository",
                       "enabled",
+                      "headSha",
                       "method"
                     ],
                     "type": "object"
