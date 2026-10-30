@@ -2961,11 +2961,6 @@
       "to": "function:coding_agents_functions:setPullRequestSandbox"
     },
     {
-      "from": "function:coding_agents_execute:createPullRequest",
-      "kind": "call",
-      "to": "function:connectors_store:listConnectorGrants"
-    },
-    {
       "from": "function:coding_agents_execute:finishRun",
       "kind": "call",
       "to": "function:coding_agents_functions:appendRunLog"
@@ -2999,11 +2994,6 @@
       "from": "function:coding_agents_execute:finishRun",
       "kind": "call",
       "to": "function:coding_agents_functions:setPullRequestSandbox"
-    },
-    {
-      "from": "function:coding_agents_execute:finishRun",
-      "kind": "call",
-      "to": "function:connectors_store:listConnectorGrants"
     },
     {
       "from": "function:coding_agents_execute:pollCodingAgentRun",
@@ -3066,11 +3056,6 @@
       "to": "function:coding_agents_functions:postRunResult"
     },
     {
-      "from": "function:coding_agents_execute:pollPullRequest",
-      "kind": "call",
-      "to": "function:connectors_store:listConnectorGrants"
-    },
-    {
       "from": "function:coding_agents_execute:reapPullRequest",
       "kind": "call",
       "to": "function:coding_agents_functions:expirePullRequest"
@@ -3119,11 +3104,6 @@
       "from": "function:coding_agents_execute:startCodingAgentRun",
       "kind": "call",
       "to": "function:coding_agents_functions:setRunSandbox"
-    },
-    {
-      "from": "function:coding_agents_execute:startCodingAgentRun",
-      "kind": "call",
-      "to": "function:connectors_store:listConnectorGrants"
     },
     {
       "from": "function:coding_agents_execute:startCodingAgentRun",
@@ -14255,6 +14235,48 @@
     },
     {
       "detail": "action",
+      "id": "function:source_control_functions:getDevelopHost",
+      "kind": "function",
+      "name": "source_control.functions.getDevelopHost",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_functions:getInbox",
+      "kind": "function",
+      "name": "source_control.functions.getInbox",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_functions:getPullRequest",
+      "kind": "function",
+      "name": "source_control.functions.getPullRequest",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_functions:getPullRequestChecks",
+      "kind": "function",
+      "name": "source_control.functions.getPullRequestChecks",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_functions:getPullRequestCommits",
+      "kind": "function",
+      "name": "source_control.functions.getPullRequestCommits",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_functions:getPullRequestFiles",
+      "kind": "function",
+      "name": "source_control.functions.getPullRequestFiles",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
       "id": "function:sub_agents_execute:runSubAgent",
       "kind": "function",
       "name": "sub_agents.execute.runSubAgent",
@@ -16309,6 +16331,11 @@
       ]
     },
     {
+      "description": "Develop mode: pull requests across Git hosts, read through one host adapter. Holds no table yet; the client caches what it reads.",
+      "name": "source-control",
+      "tables": []
+    },
+    {
       "description": "Sub-agent runs delegated from a chat: admission limits, the child thread run and the result post-back.",
       "name": "sub-agents",
       "tables": [
@@ -16434,19 +16461,19 @@
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 281,
+      "line": 289,
       "reason": "\"setActiveLeafHandler\" is not a registered function"
     },
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 327,
+      "line": 335,
       "reason": "\"saveEditedSiblingHandler\" is not a registered function"
     },
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 422,
+      "line": 430,
       "reason": "\"editAssistantReplyHandler\" is not a registered function"
     },
     {
@@ -18724,6 +18751,18 @@
       "reason": "\"beginOAuthFlow\" is not a registered function"
     },
     {
+      "file": "connectors/lib/github-token",
+      "kind": "call",
+      "line": 16,
+      "reason": "\"resolveGithubToken\" is not a registered function"
+    },
+    {
+      "file": "connectors/lib/github-token",
+      "kind": "call",
+      "line": 50,
+      "reason": "\"hasGithubGrant\" is not a registered function"
+    },
+    {
       "file": "connectors/lib/grant-runtime",
       "kind": "call",
       "line": 113,
@@ -19692,19 +19731,19 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 795,
+      "line": 799,
       "reason": "\"rateLimitGuard\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 891,
+      "line": 895,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 933,
+      "line": 937,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {
@@ -20172,97 +20211,97 @@
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 719,
+      "line": 721,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 743,
+      "line": 745,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 765,
+      "line": 767,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 766,
+      "line": 768,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 803,
+      "line": 805,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 822,
+      "line": 824,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 826,
+      "line": 828,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 836,
+      "line": 838,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 858,
+      "line": 860,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 902,
+      "line": 904,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 924,
+      "line": 926,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 951,
+      "line": 953,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 985,
+      "line": 987,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 1004,
+      "line": 1006,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 1048,
+      "line": 1050,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 1068,
+      "line": 1070,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
