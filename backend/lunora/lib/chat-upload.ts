@@ -177,11 +177,7 @@ export interface FinalizedChatFile {
  * Turn `userId`'s staged `uploadId` into a chat file: stored content-addressed
  * with a grant for `userId`, and queued for text extraction.
  */
-export const finalizeStagedUploadFile = async (
-    ctx: ActionCtx,
-    userId: string,
-    args: { filename: string; uploadId: string },
-): Promise<FinalizedChatFile> =>
+export const finalizeStagedUploadFile = async (ctx: ActionCtx, userId: string, args: { filename: string; uploadId: string }): Promise<FinalizedChatFile> =>
     await takeStagedUpload(ctx, userId, args.uploadId, uploadLimitFor, async ({ bytes, contentType }) => {
         const maxBytes = uploadLimitFor(contentType);
         const {
