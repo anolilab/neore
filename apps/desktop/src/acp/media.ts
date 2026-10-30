@@ -107,6 +107,8 @@ const request = async (options: MediaOptions, deviceId: string, url: URL, init: 
         ...init.body !== undefined && { body: init.body },
         headers: { ...init.headers, [PAYLOAD_HEADER]: base64url(payload), [SIGNATURE_HEADER]: options.sign(payload), "Tus-Resumable": "1.0.0" },
         method: init.method,
+        // A redirect would resend the signed body and headers to wherever it points.
+        redirect: "error",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
 };
