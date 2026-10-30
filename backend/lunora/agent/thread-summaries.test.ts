@@ -212,7 +212,7 @@ describe("making a summary", () => {
         expect(stored).toHaveLength(1);
         expect(stored[0]?.summary).toBe("Updated summary.");
         expect(stored[0]?.coveredUpToMessageId).toBe(rowIds[79]);
-        // The previous summary and only the rows after its cover go to the model.
+        // The previous summary goes to the model with the rows after its cover.
         const { prompt } = generateText.mock.calls[1]![0];
 
         expect(prompt).toContain("The user is planning a trip.");
