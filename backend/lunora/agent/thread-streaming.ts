@@ -36,3 +36,14 @@ export const hasStreamFor = async (ctx: Pick<MutationCtx, "db">, threadId: strin
 
     return streams.some((stream) => stream.messageId === messageId);
 };
+
+/**
+ * Whether a sidebar stop has ended a run whose owed text is not saved yet: the stream is `done` (`stopActiveForThread`)
+ * but `finishStoppedReply` has not cleared `stoppedAt`, so the reply would still land under its prompt. A run that dies
+ * without ever saving it stops counting at the stream's `expiresAt`, which the timeout cron does not touch for a `done` stream.
+ */
+export const hasUnsettledStop = async (ctx: Pick<MutationCtx, "db">, threadId: string, now: number): Promise<boolean> => {
+    const streams = await recentStreams(ctx, threadId);
+
+    return streams.some((stream) => stream.stoppedAt !== undefined && stream.expiresAt > now);
+};

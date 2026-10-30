@@ -1166,6 +1166,7 @@ export interface Doc_persistentStreams {
     runClaimedAt?: number;
     status: string;
     steers?: Array<{ id: string; messageId?: string; pendingMessageId?: string; status: "queued" | "delivered" | "withdrawn"; text?: string }>;
+    stoppedAt?: number;
     streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean };
     threadId: string;
     userId: string;
@@ -3946,6 +3947,7 @@ export interface Insert_persistentStreams {
     runClaimedAt?: number;
     status: string;
     steers?: Array<{ id: string; messageId?: string; pendingMessageId?: string; status: "queued" | "delivered" | "withdrawn"; text?: string }>;
+    stoppedAt?: number;
     streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean };
     threadId: string;
     userId: string;

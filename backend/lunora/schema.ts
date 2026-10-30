@@ -1765,6 +1765,9 @@ export const schema = defineSchema({
                 }),
             ),
         ),
+        // Set by the sidebar's stop, cleared once the run has saved the text it still owed (`finishStoppedReply`).
+        // While set the stream is `done` but its reply is not in the thread yet, so an agent switch waits (`hasUnsettledStop`).
+        stoppedAt: v.optional(v.number()),
         streamingConfig: v.object({
             contentType: v.string(),
             customSystemPrompt: v.optional(v.string()),

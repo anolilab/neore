@@ -219,7 +219,9 @@ export const stopActiveForThread = internalMutation
 
             const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
 
-            await ctx.db.patch(stream._id, { status: "done", ...(steers && { steers }) });
+            // Only a claimed run is still to settle the stop (`finishStoppedReply`); a queued one that has not started
+            // never will (`claimStreamRun` refuses a `done` stream), so it leaves nothing for a switch to wait on.
+            await ctx.db.patch(stream._id, { status: "done", ...(stream.runClaimedAt !== undefined && { stoppedAt: ctx.now }), ...(steers && { steers }) });
         }
 
         // The thread leaves `running` only when no live reply is left to keep running.
@@ -285,6 +287,11 @@ export const finishStoppedReply = internalMutation
 
         const threadId = stream.threadId as Id<"threads">;
         let messageId: Id<"messages"> | undefined;
+
+        // The owed text is saved below, in this transaction, so the stop is settled when it commits.
+        if (stream.stoppedAt !== undefined) {
+            await patchRow(ctx.db, stream, { stoppedAt: undefined });
+        }
 
         // A steered run carries on below its latest steered message (`chat/steering.ts`): its pending
         // row and the text it owes belong in that message's order, with that message as their prompt.
