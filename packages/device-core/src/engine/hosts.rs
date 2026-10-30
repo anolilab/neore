@@ -503,7 +503,7 @@ impl DeviceState {
                     && other.target() == Some(target)
             });
 
-        if !shared && !self.upgrade_running(&target) {
+        if !shared && !self.upgrade_running(target) {
             link.exit_master();
         }
     }
