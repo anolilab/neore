@@ -1,7 +1,9 @@
+/* eslint-disable sonarjs/no-hardcoded-ip -- the addresses are the cases */
 import { describe, expect, it, vi } from "vitest";
 
 import { REGISTRY_FIXTURE, SHA } from "./fixtures/registry";
-import { AgentRegistry, archiveFormat, parseRegistry, platformKey, REGISTRY_URL, resolveInstall } from "./registry";
+import { isPrivateHost } from "./private-host";
+import { AgentRegistry, archiveFormat, fetchHttps, parseRegistry, platformKey, REGISTRY_URL, resolveInstall } from "./registry";
 
 const jsonResponse = (body: unknown, init: ResponseInit = {}): Response => Response.json(body, { headers: { "content-type": "application/json" }, ...init });
 
@@ -192,5 +194,40 @@ describe("AgentRegistry", () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+});
+
+describe("a download that points inward", () => {
+    it("knows the private and loopback hosts", () => {
+        for (const host of [
+            "localhost",
+            "app.localhost",
+            "printer.local",
+            "127.0.0.1",
+            "10.1.2.3",
+            "172.16.0.1",
+            "192.168.1.1",
+            "169.254.169.254",
+            "100.64.0.1",
+            "[::1]",
+            "[fd00::1]",
+            "[fe80::1]",
+            new URL("https://[::ffff:127.0.0.1]/").hostname,
+        ]) {
+            expect(isPrivateHost(host), host).toBe(true);
+        }
+
+        for (const host of ["cdn.agentclientprotocol.com", "github.com", "8.8.8.8", "172.32.0.1", "100.128.0.1", "[2606:4700::1]"]) {
+            expect(isPrivateHost(host), host).toBe(false);
+        }
+    });
+
+    it("is refused before it is requested, as the first address and as a redirect", async () => {
+        const fetchImpl = vi.fn(async () => new Response(null, { headers: { location: "https://169.254.169.254/latest" }, status: 302 }));
+
+        await expect(fetchHttps(fetchImpl, "https://127.0.0.1/agent.zip", {})).rejects.toThrow("private network");
+        expect(fetchImpl).not.toHaveBeenCalled();
+        await expect(fetchHttps(fetchImpl, "https://downloads.example.com/agent.zip", {})).rejects.toThrow("private network");
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
     });
 });

@@ -9,6 +9,8 @@
  * fetch whatever the package manager resolves at launch. Those are listed, with the reason, and not installable.
  */
 
+import { isPrivateHost } from "./private-host";
+
 export const REGISTRY_URL = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";
 
 const REGISTRY_TIMEOUT_MS = 15_000;
@@ -327,7 +329,7 @@ const readCapped = async (response: Response, max: number): Promise<string> => {
 const MAX_REDIRECTS = 5;
 
 /**
- * Fetches `url`, following redirects by hand: every hop must be https BEFORE it is requested, so an http
+ * Fetches `url`, following redirects by hand: every hop must be https and not a private host BEFORE it is requested, so an http
  * detour is never contacted (a check on the final URL alone would have sent the request and read the answer first).
  */
 export const fetchHttps = async (fetchImpl: Fetch, url: string, init: RequestInit): Promise<Response> => {
@@ -336,6 +338,10 @@ export const fetchHttps = async (fetchImpl: Fetch, url: string, init: RequestIni
     for (let hops = 0; hops <= MAX_REDIRECTS; hops += 1) {
         if (new URL(current).protocol !== "https:") {
             throw new Error("A download was redirected away from https.");
+        }
+
+        if (isPrivateHost(new URL(current).hostname)) {
+            throw new Error("A download points at this computer or a private network.");
         }
 
         // eslint-disable-next-line no-await-in-loop -- each hop depends on the previous answer
