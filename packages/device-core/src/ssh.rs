@@ -39,6 +39,9 @@ pub const HOST_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// How long a connection may take once nobody is being asked anything.
 pub const CONNECT_PATIENCE: Duration = Duration::from_secs(6 * 60);
 
+/// How long ending a master may take before its `ssh -O exit` is killed.
+const EXIT_MASTER_PATIENCE: Duration = Duration::from_secs(5);
+
 /// A Unix socket path holds 104 bytes on macOS. ssh appends a dot and 16 random characters to the control path
 /// while it binds, and `%C` is 40 hex characters.
 const CONTROL_PATH_MARGIN: usize = 1 + IDENTITY_TAG_LEN + 40 + 1 + 16 + 1;
@@ -1293,13 +1296,32 @@ impl HostLink for HostConnection {
     }
 
     fn exit_master(&self) {
-        if MULTIPLEXING {
-            let _ = Command::new("ssh")
-                .args(&self.exit_master)
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
+        if !MULTIPLEXING {
+            return;
+        }
+
+        let Ok(mut exit) = Command::new("ssh")
+            .args(&self.exit_master)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        else {
+            return;
+        };
+
+        // A wedged master never answers `-O exit`, and the thread supervising every kept server waits here.
+        let deadline = Instant::now() + EXIT_MASTER_PATIENCE;
+
+        while matches!(exit.try_wait(), Ok(None)) {
+            if Instant::now() >= deadline {
+                let _ = exit.kill();
+                let _ = exit.wait();
+
+                return;
+            }
+
+            thread::sleep(Duration::from_millis(25));
         }
     }
 }

@@ -71,7 +71,7 @@ const DeviceRow: FC<{
     const revoke = useMutation(crpc.devices.functions.revokeDevice.mutationOptions());
     const online = isDeviceOnline(device.lastSeenAt, now);
     const nameId = `device-name-${device._id}`;
-    // A server being reconnected is stopped by "Disconnect"; one that gave up is tried again by "Retry".
+    // A server being reconnected is stopped by "Disconnect"; one that gave up is tried again by "Retry" or let go by "Dismiss".
     const stoppable = connected || reconnect?.phase === "waiting" || reconnect?.phase === "connecting";
     let buttonLabel = t`Connect`;
 
@@ -80,6 +80,18 @@ const DeviceRow: FC<{
     } else if (reconnect?.phase === "gaveUp") {
         buttonLabel = t`Retry`;
     }
+
+    const connection = (action: () => Promise<unknown>) => {
+        void (async () => {
+            try {
+                await action();
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : t`Could not connect to the server.`);
+            } finally {
+                onConnectionChange();
+            }
+        })();
+    };
 
     return (
         <li className="flex flex-wrap items-center gap-3 border-b py-3 last:border-b-0">
@@ -114,21 +126,16 @@ const DeviceRow: FC<{
                 {(reconnect?.phase === "waiting" || reconnect?.phase === "connecting") && <Badge variant="secondary">{t`Reconnecting`}</Badge>}
                 {connected !== undefined && (
                     <Button
-                        onClick={() => {
-                            void (async () => {
-                                try {
-                                    await (stoppable ? disconnectNativeHost(device._id) : connectNativeHost(device._id));
-                                } catch (error) {
-                                    toast.error(error instanceof Error ? error.message : t`Could not connect to the server.`);
-                                } finally {
-                                    onConnectionChange();
-                                }
-                            })();
-                        }}
+                        onClick={() => connection(() => (stoppable ? disconnectNativeHost(device._id) : connectNativeHost(device._id)))}
                         size="sm"
                         variant="outline"
                     >
                         {buttonLabel}
+                    </Button>
+                )}
+                {reconnect?.phase === "gaveUp" && (
+                    <Button onClick={() => connection(() => disconnectNativeHost(device._id))} size="sm" variant="outline">
+                        {t`Dismiss`}
                     </Button>
                 )}
                 <Button onClick={() => setConfirming(true)} size="sm" variant="outline">
