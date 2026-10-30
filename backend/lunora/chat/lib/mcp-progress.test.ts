@@ -235,6 +235,14 @@ describe(createLatestThrottle, () => {
     });
 });
 
+describe(sanitizeProgressMessage, () => {
+    it("cuts a huge message down before cleaning it, and still returns at most the cap", () => {
+        const huge = "a\u{202E}".repeat(1_000_000);
+
+        expect([...sanitizeProgressMessage(huge)]).toHaveLength(200);
+    });
+});
+
 describe(createToolProgressWriter, () => {
     const tool = { serverName: "Docs", toolCallId: "call_1", toolName: "index" };
 

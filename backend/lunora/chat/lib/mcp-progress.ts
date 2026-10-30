@@ -58,7 +58,10 @@ export interface ToolProgressChunk {
  */
 export const sanitizeProgressMessage = (message: string, maxLength = MAX_PROGRESS_MESSAGE_LENGTH): string =>
     [
+        // Cut first, so a huge message from the server costs no more than a short one: what survives the
+        // cleaning is at most `maxLength` code points of at most two units, plus what the cleaning removes.
         ...message
+            .slice(0, maxLength * 8)
             .replaceAll(/[\t\n\r]+/gu, " ")
             .replaceAll(/[\p{Cc}\u{202A}-\u{202E}\u{2066}-\u{2069}]/gu, "")
             .trim(),

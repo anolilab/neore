@@ -59,7 +59,9 @@ const MAX_MESSAGE_LENGTH = 200;
  */
 const sanitizeMessage = (message: string): string =>
     [
+        // Cut first, so a huge message costs no more to clean than a short one.
         ...message
+            .slice(0, MAX_MESSAGE_LENGTH * 8)
             .replaceAll(/[\t\n\r]+/gu, " ")
             .replaceAll(/[\p{Cc}\u{202A}-\u{202E}\u{2066}-\u{2069}]/gu, "")
             .trim(),
