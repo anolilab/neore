@@ -16789,31 +16789,31 @@
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 265,
+      "line": 270,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 288,
+      "line": 293,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 324,
+      "line": 329,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 328,
+      "line": 333,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 405,
+      "line": 410,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
@@ -16885,13 +16885,13 @@
     {
       "file": "acp/upload-http",
       "kind": "call",
-      "line": 226,
+      "line": 230,
       "reason": "\"hostUploadHttpAction\" is not a registered function"
     },
     {
       "file": "acp/upload-http",
       "kind": "call",
-      "line": 253,
+      "line": 257,
       "reason": "\"hostUploadHttpAction\" is not a registered function"
     },
     {
@@ -16915,19 +16915,19 @@
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 281,
+      "line": 289,
       "reason": "\"setActiveLeafHandler\" is not a registered function"
     },
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 327,
+      "line": 335,
       "reason": "\"saveEditedSiblingHandler\" is not a registered function"
     },
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 422,
+      "line": 430,
       "reason": "\"editAssistantReplyHandler\" is not a registered function"
     },
     {
@@ -20161,7 +20161,7 @@
     {
       "file": "lib/chat-upload",
       "kind": "schedule",
-      "line": 203,
+      "line": 199,
       "reason": "\"finalizeStagedUploadFile\" is not a registered function"
     },
     {
@@ -20371,13 +20371,13 @@
     {
       "file": "lib/upload-route",
       "kind": "call",
-      "line": 211,
+      "line": 221,
       "reason": "\"serveUserUpload\" is not a registered function"
     },
     {
       "file": "lib/upload-route",
       "kind": "schedule",
-      "line": 222,
+      "line": 232,
       "reason": "\"serveUserUpload\" is not a registered function"
     },
     {
@@ -20755,97 +20755,97 @@
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 783,
+      "line": 785,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 807,
+      "line": 809,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 829,
+      "line": 831,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 830,
+      "line": 832,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 867,
+      "line": 869,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 886,
+      "line": 888,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 890,
+      "line": 892,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 900,
+      "line": 902,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 922,
+      "line": 924,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 966,
+      "line": 968,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 988,
+      "line": 990,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 1015,
+      "line": 1017,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 1049,
+      "line": 1051,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 1068,
+      "line": 1070,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 1112,
+      "line": 1114,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 1132,
+      "line": 1134,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
