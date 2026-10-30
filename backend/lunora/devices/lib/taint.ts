@@ -12,6 +12,7 @@
  */
 import type { Infer } from "lunorash/server";
 
+import { parseGoalReviewNote } from "../../chat/goals/shared";
 import type { vDeviceTaintSource } from "../validators";
 
 export type DeviceTaintSource = Infer<typeof vDeviceTaintSource>;
@@ -63,8 +64,25 @@ interface MessageLike {
 }
 
 /**
+ * The taint a goal's instruction row carries: the reviewer's note was written from the round's tool results,
+ * so the round that follows is as untrusted as they were. A user message is read, never an assistant one.
+ */
+const goalNoteTaint = (content: unknown): DeviceTaintSource[] => {
+    const texts = Array.isArray(content)
+        ? (content as ReadonlyArray<{ text?: unknown; type?: unknown }>).flatMap((part) =>
+              part.type === "text" && typeof part.text === "string" ? [part.text] : [],
+          )
+        : [content];
+
+    return texts
+        .flatMap((text) => (typeof text === "string" ? (parseGoalReviewNote(text)?.taintedBy ?? []) : []))
+        .filter((source): source is DeviceTaintSource => TAINT_ORDER.includes(source as DeviceTaintSource));
+};
+
+/**
  * The sorted, de-duplicated taint of a message list. Reads only `role`,
- * `content[].type` and `content[].toolName`, so it takes any model-message shape.
+ * `content[].type` and `content[].toolName` (and a goal's review note in a
+ * user message), so it takes any model-message shape.
  */
 export const computeTaint = (messages: ReadonlyArray<MessageLike> | undefined): DeviceTaintSource[] => {
     const found = new Set<DeviceTaintSource>();
@@ -72,6 +90,12 @@ export const computeTaint = (messages: ReadonlyArray<MessageLike> | undefined): 
     const list = messages ?? [];
 
     for (const message of list) {
+        if (message.role === "user") {
+            for (const source of goalNoteTaint(message.content)) {
+                found.add(source);
+            }
+        }
+
         if (!Array.isArray(message.content)) {
             continue;
         }

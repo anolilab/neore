@@ -241,6 +241,39 @@ describe("regenerate and edit on the local path", () => {
         ]);
     });
 
+    it.each([
+        ["a new turn", undefined],
+        ["a regenerate", "regenerate"],
+        ["an edit", "edit"],
+    ] as const)("ends the goal the thread was working toward on %s", async (_name, kind) => {
+        await seedEndpoint(OWNER, "local-browser");
+
+        const first = await save(OWNER, { prompt: "hi", reply: "first answer" });
+        const goalId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadGoals", {
+                    config: { model: "m" },
+                    costMicrodollars: 0,
+                    createdAt: 1,
+                    maxCostMicrodollars: 1,
+                    maxRounds: 5,
+                    promptMessageId: first.userMessageId,
+                    round: 1,
+                    startMessageId: first.userMessageId,
+                    status: "active",
+                    text: "Ship it",
+                    threadId: first.threadId,
+                    updatedAt: 1,
+                    userId: OWNER,
+                    verdicts: [],
+                }),
+        );
+
+        await save(OWNER, { ...(kind && { branch: { kind, messageId: first.userMessageId } }), prompt: "hi again", threadId: first.threadId });
+
+        expect(await harness.run(async (ctx: any) => await ctx.db.get(goalId))).toMatchObject({ status: "stopped", stopReason: "superseded" });
+    });
+
     it("refuses a branch whose target is not a prompt of the thread", async () => {
         await seedEndpoint(OWNER, "local-browser");
 

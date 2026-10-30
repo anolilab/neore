@@ -118,3 +118,20 @@ export const GoalVerdictNote: FC<{ goal: ThreadGoalView; maxWidth?: string; verd
         </div>
     );
 };
+
+/** What a goal's reviewer found missing, shown where the instruction that carried it to the agent sits. */
+export const GoalReviewNote: FC<{ maxWidth?: string; reason: string }> = ({ maxWidth, reason }) => {
+    const { t } = useLingui();
+
+    return (
+        <div
+            className="text-muted-foreground mx-auto my-2 flex w-full items-start gap-2 text-xs"
+            data-goal-review="true"
+            role="status"
+            style={{ maxWidth: maxWidth ?? "65ch" }}
+        >
+            <CircleDashed aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+            <p className="min-w-0 break-words">{t`Review: ${reason}`}</p>
+        </div>
+    );
+};

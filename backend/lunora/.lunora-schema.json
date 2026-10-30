@@ -19457,7 +19457,8 @@
               "kind": "string",
               "nullable": false,
               "optional": true,
-              "unique": false
+              "unique": false,
+              "refined": true
             },
             "enabledFeatures": {
               "kind": "array",
@@ -19468,8 +19469,10 @@
                 "kind": "string",
                 "nullable": false,
                 "optional": false,
-                "unique": false
-              }
+                "unique": false,
+                "refined": true
+              },
+              "refined": true
             },
             "mcpServerNames": {
               "kind": "array",
@@ -19480,20 +19483,31 @@
                 "kind": "string",
                 "nullable": false,
                 "optional": false,
-                "unique": false
-              }
+                "unique": false,
+                "refined": true
+              },
+              "refined": true
             },
             "model": {
               "kind": "string",
               "nullable": false,
               "optional": false,
-              "unique": false
+              "unique": false,
+              "refined": true
+            },
+            "origin": {
+              "kind": "literal",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "literal": "\"outside_agent\""
             },
             "reasoningEffort": {
               "kind": "number",
               "nullable": false,
               "optional": true,
-              "unique": false
+              "unique": false,
+              "refined": true
             },
             "researchDepth": {
               "kind": "union",
@@ -19528,7 +19542,30 @@
               "kind": "string",
               "nullable": false,
               "optional": true,
-              "unique": false
+              "unique": false,
+              "refined": true
+            },
+            "skill": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "rawArgs": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "slug": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                }
+              }
             },
             "statelessMode": {
               "kind": "boolean",

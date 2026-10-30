@@ -50,11 +50,13 @@ export const runHeadlessGoalRounds = async (input: {
     review: (args: { round: number; transcript: string }) => Promise<GoalVerdict & { costMicrodollars: number }>;
     /** Runs another round in the same thread with `prompt` as the next instruction. */
     runRound: (prompt: string) => Promise<GoalRoundResult>;
+    /** When the run began (before its first generation), which is where the time budget starts. Default: now. */
+    startedAt?: number;
     /** Asked before each further round: `true` ends the goal there (a sub-agent run that was cancelled). */
     stopped?: () => Promise<boolean>;
 }): Promise<HeadlessGoalOutcome> => {
     const now = input.now ?? Date.now;
-    const deadline = now() + (input.budgetMs ?? HEADLESS_GOAL_BUDGET_MS);
+    const deadline = (input.startedAt ?? now()) + (input.budgetMs ?? HEADLESS_GOAL_BUDGET_MS);
     const maxRounds = clampGoalRounds(input.goal.maxRounds);
     const maxCostMicrodollars = input.goal.maxCostMicrodollars ?? GOAL_MAX_COST_MICRODOLLARS;
     let result = input.first;

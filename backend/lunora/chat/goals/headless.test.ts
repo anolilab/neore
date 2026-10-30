@@ -87,6 +87,24 @@ describe("runHeadlessGoalRounds", () => {
     });
 });
 
+describe("the time budget", () => {
+    it("counts from when the run began, so a long first generation leaves less for further rounds", async () => {
+        const { run, runRound } = setup([{ met: false }]);
+        // The first generation took 7 of the 8 minutes; the loop itself starts at minute 7 with only one minute left to spend... and none after it.
+        const outcome = await run({ budgetMs: 8 * 60_000, now: () => 9 * 60_000, startedAt: 0 });
+
+        expect(outcome.ended).toBe("time_limit");
+        expect(runRound).not.toHaveBeenCalled();
+    });
+
+    it("still runs a further round while the budget lasts", async () => {
+        const { run, runRound } = setup([{ met: false }, { met: true }]);
+
+        expect((await run({ budgetMs: 8 * 60_000, now: () => 60_000, startedAt: 0 })).ended).toBe("met");
+        expect(runRound).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe("stopped and stepsTranscript", () => {
     it("ends the goal when the caller says the run was stopped", async () => {
         const { run, runRound } = setup([{ met: false }]);

@@ -23,7 +23,9 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 vi.mock("./lib/agent-run", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("./lib/agent-run")>()),
-        resumeApprovedRun: vi.fn(async () => {return { lastMessageId: undefined, paused: false, stopped: false }}),
+        resumeApprovedRun: vi.fn(async () => {
+            return { lastMessageId: undefined, paused: false, stopped: false };
+        }),
     };
 });
 

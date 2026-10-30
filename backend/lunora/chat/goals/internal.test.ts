@@ -10,9 +10,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../../schema";
 import { chargeRound } from "../../tasks/account";
-import { claimGoalRound, endGoalsForThread, failGoalReview, GOAL_STALL_MS, reapStalledGoals, recordGoalVerdict, roundTranscript, startGoal } from "./internal";
+import { deleteAllForThreadIdAsync, softDeleteThread } from "../../agent/threads";
+import {
+    claimGoalRound,
+    endGoalsForThread,
+    failGoalReview,
+    GOAL_STALL_MS,
+    reapStalledGoals,
+    recordGoalVerdict,
+    roundTranscript,
+    startGoal,
+    touchGoal,
+} from "./internal";
 import { GOAL_MAX_COST_MICRODOLLARS } from "./logic";
-import { GOAL_CONTINUATION_AGENT } from "./shared";
+import { GOAL_CONTINUATION_AGENT, parseGoalReviewNote } from "./shared";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the account behind each goal is looked up here.
 const { users } = vi.hoisted(() => {
@@ -40,6 +51,15 @@ type Harness = ReturnType<typeof lunoraTest>;
 
 const OWNER = "owner-1";
 const CONFIG = { model: "test-model", searchMode: "chat" };
+const RUN_CONFIG = {
+    autoMediaEnrichment: false,
+    mcpServerNames: [],
+    model: "m",
+    researchDepth: "balanced",
+    searchMode: "chat",
+    shouldAutoContinue: true,
+    toolNames: [],
+};
 
 let harness: Harness;
 let threadId: string;
@@ -59,12 +79,29 @@ const start = async (overrides: Record<string, unknown> = {}): Promise<string> =
 };
 
 /** Claims and records one round, the way the review job does. */
-const review = async (goalId: string, round: number, verdict: { cost?: number; met: boolean; reason?: string }): Promise<any> => {
+const review = async (
+    goalId: string,
+    round: number,
+    verdict: { cost?: number; lastMessage?: { id: string; order: number }; met: boolean; reason?: string; taintedBy?: string[] },
+): Promise<any> => {
     const claimed = await run(claimGoalRound, { goalId, round });
 
     expect(claimed).not.toBeNull();
 
-    return await run(recordGoalVerdict, { costMicrodollars: verdict.cost ?? 0, goalId, met: verdict.met, reason: verdict.reason ?? "Not yet.", round });
+    return await run(recordGoalVerdict, {
+        costMicrodollars: verdict.cost ?? 0,
+        goalId,
+        ...(verdict.lastMessage && { lastMessage: verdict.lastMessage }),
+        met: verdict.met,
+        reason: verdict.reason ?? "Not yet.",
+        round,
+        ...(verdict.taintedBy && { taintedBy: verdict.taintedBy }),
+    });
+};
+
+/** Pushes a goal past the stall window, as an hour of silence would. */
+const stall = async (goalId: string): Promise<void> => {
+    await harness.run(async (ctx: any) => await ctx.db.patch(goalId, { updatedAt: Date.now() - GOAL_STALL_MS - 1000 }));
 };
 
 beforeEach(async () => {
@@ -146,8 +183,10 @@ describe("recordGoalVerdict", () => {
         expect(goal).toMatchObject({ promptMessageId: outcome.next.messageId, round: 1, startMessageId: promptId, status: "active" });
         expect(instruction.agentName).toBe(GOAL_CONTINUATION_AGENT);
         expect(instruction.message.role).toBe("user");
-        // The run takes its prompt from the row's text.
+        // The run takes its prompt from the row's text; the reviewer's reason sits in a fenced note, not in the user's voice.
         expect(instruction.text).toContain("The charts are missing.");
+        expect(instruction.text).not.toContain("Do that next");
+        expect(parseGoalReviewNote(instruction.text)).toEqual({ reason: "The charts are missing.", taintedBy: [] });
         expect(JSON.stringify(instruction.message.content)).toContain("The charts are missing.");
         expect(JSON.stringify(instruction.message.content)).toContain("Ship the report");
         expect(stream).toMatchObject({ messageId: outcome.next.messageId, status: "pending", threadId, userId: OWNER });
@@ -266,6 +305,267 @@ describe("ending a goal from outside", () => {
         expect(await run(reapStalledGoals, {})).toBe(1);
         expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "error" });
         expect((await read(threadId)).status).toBe("active");
+    });
+});
+
+describe("the instruction that opens the next round", () => {
+    it("carries the taint of the tool results the round read", async () => {
+        const goalId = await start();
+        const outcome = await review(goalId, 1, { met: false, reason: "Check the page again.", taintedBy: ["web", "mcp"] });
+
+        expect(parseGoalReviewNote((await read(outcome.next.messageId)).text)).toEqual({ reason: "Check the page again.", taintedBy: ["web", "mcp"] });
+    });
+
+    it("roundTranscript reports the taint of the round's tool results and its last row", async () => {
+        const goalId = await start();
+        const lastId = await harness.run(async (ctx: any) => {
+            const base = { order: 0, status: "success", threadId, userId: OWNER };
+
+            await ctx.db.insert("messages", {
+                ...base,
+                message: {
+                    content: [{ output: { type: "text", value: "page text" }, toolCallId: "1", toolName: "webSearch", type: "tool-result" }],
+                    role: "tool",
+                },
+                stepOrder: 1,
+                tool: true,
+            });
+
+            return String(await ctx.db.insert("messages", { ...base, message: { content: "Done.", role: "assistant" }, stepOrder: 2, tool: false }));
+        });
+        const result = await harness.run(async (ctx: any) => await ctx.runQuery(roundTranscript, { goalId }));
+
+        expect(result.taintedBy).toEqual(["web"]);
+        expect(result.lastMessage).toEqual({ id: lastId, order: 0 });
+    });
+});
+
+describe("a round whose branch was left", () => {
+    /** The round's reply, then a sibling reply the user switched to. Returns both ids. */
+    const branch = async (): Promise<{ other: string; reply: string }> =>
+        await harness.run(async (ctx: any) => {
+            const base = { order: 0, status: "success", threadId, tool: false, userId: OWNER };
+            const reply = String(await ctx.db.insert("messages", { ...base, message: { content: "Draft.", role: "assistant" }, stepOrder: 1 }));
+            const other = String(
+                await ctx.db.insert("messages", { ...base, message: { content: "Other.", role: "assistant" }, parentMessageId: promptId, stepOrder: 2 }),
+            );
+
+            return { other, reply };
+        });
+    const setLeaf = async (leaf: string): Promise<void> => {
+        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: leaf }));
+    };
+
+    it("continues while the displayed branch still ends at the round's last row", async () => {
+        const { reply } = await branch();
+
+        await setLeaf(reply);
+
+        const goalId = await start();
+        const outcome = await review(goalId, 1, { lastMessage: { id: reply, order: 0 }, met: false });
+
+        expect(outcome.outcome).toBe("continue");
+    });
+
+    it("ends the goal, charges nothing and opens no stream once the thread shows another branch", async () => {
+        const { other, reply } = await branch();
+        const goalId = await start();
+
+        await setLeaf(other);
+
+        const outcome = await review(goalId, 1, { lastMessage: { id: reply, order: 0 }, met: false });
+
+        expect(outcome).toEqual({ outcome: "ended" });
+        expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "superseded" });
+        expect(chargeRound).not.toHaveBeenCalled();
+        expect(await count("persistentStreams")).toBe(0);
+        expect((await read(threadId)).status).toBe("active");
+    });
+});
+
+describe("a goal whose thread is gone", () => {
+    const deleteThread = async (): Promise<void> => {
+        await harness.run(async (ctx: any) => await ctx.db.delete(threadId));
+    };
+
+    it("ends on a verdict without throwing", async () => {
+        const goalId = await start();
+
+        await deleteThread();
+
+        expect(await review(goalId, 1, { met: true })).toEqual({ outcome: "ended" });
+        expect(await read(goalId)).toMatchObject({ status: "met" });
+    });
+
+    it("ends instead of opening a round when the verdict says to go on", async () => {
+        const goalId = await start();
+
+        await deleteThread();
+
+        expect(await review(goalId, 1, { met: false })).toEqual({ outcome: "ended" });
+        expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "error" });
+    });
+
+    it("failGoalReview ends it without throwing", async () => {
+        const goalId = await start();
+
+        await run(claimGoalRound, { goalId, round: 1 });
+        await deleteThread();
+
+        expect(await run(failGoalReview, { goalId, reason: "review_failed", round: 1 })).toBe(true);
+        expect(await read(goalId)).toMatchObject({ status: "stopped" });
+    });
+
+    it("does not stop the sweep from reaping the goals of other threads", async () => {
+        const gone = await start();
+        const otherThread = await harness.run(async (ctx: any) => String(await ctx.db.insert("threads", { status: "running", title: "Other", userId: OWNER })));
+        const kept = await start({ threadId: otherThread });
+
+        await stall(gone);
+        await stall(kept);
+        await deleteThread();
+
+        expect(await run(reapStalledGoals, {})).toBe(2);
+        expect(await read(gone)).toMatchObject({ status: "stopped", stopReason: "error" });
+        expect(await read(kept)).toMatchObject({ status: "stopped", stopReason: "error" });
+        expect((await read(otherThread)).status).toBe("active");
+    });
+
+    it("ends when the chat is moved to the trash, and a verdict that arrives after opens no round", async () => {
+        const goalId = await start();
+
+        await run(claimGoalRound, { goalId, round: 1 });
+        await run(softDeleteThread, { threadId });
+
+        expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "user" });
+        expect(await run(recordGoalVerdict, { costMicrodollars: 0, goalId, met: false, reason: "More.", round: 1 })).toEqual({ outcome: "ignored" });
+        expect(await count("persistentStreams")).toBe(0);
+    });
+
+    it("treats a trashed chat as gone when a goal somehow outlives it", async () => {
+        const goalId = await start();
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true, deletedAt: Date.now() }));
+
+        expect(await review(goalId, 1, { met: false })).toEqual({ outcome: "ended" });
+        expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "error" });
+        expect(chargeRound).not.toHaveBeenCalled();
+        expect(await count("persistentStreams")).toBe(0);
+    });
+
+    it("is removed with the thread, whatever its status", async () => {
+        const active = await start();
+        const ended = await start({ threadId });
+
+        await run(endGoalsForThread, { reason: "user", threadId });
+        await harness.run(async (ctx: any) => await ctx.runMutation(deleteAllForThreadIdAsync, { threadId }));
+
+        expect(await read(active)).toBeNull();
+        expect(await read(ended)).toBeNull();
+        expect(await count("threadGoals")).toBe(0);
+    });
+});
+
+describe("the sweep leaves a goal that is waiting", () => {
+    const insertStream = async (status: string): Promise<void> => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: promptId,
+                    status,
+                    streamingConfig: { contentType: "text", model: "m" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+    };
+
+    it.each(["pending", "streaming"])("on a %s stream", async (status) => {
+        const goalId = await start();
+
+        await stall(goalId);
+        await insertStream(status);
+
+        expect(await run(reapStalledGoals, {})).toBe(0);
+        expect(await read(goalId)).toMatchObject({ status: "active" });
+    });
+
+    it("on a tool approval nobody has answered yet", async () => {
+        const goalId = await start();
+
+        await stall(goalId);
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("toolApprovalRuns", {
+                    approvalId: "a1",
+                    config: RUN_CONFIG,
+                    createdAt: Date.now(),
+                    status: "pending",
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await run(reapStalledGoals, {})).toBe(0);
+        expect(await read(goalId)).toMatchObject({ status: "active" });
+    });
+
+    it("on a pending approval that is newer than twenty answered ones", async () => {
+        const goalId = await start();
+
+        await stall(goalId);
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 21; index += 1) {
+                // Distinct creation times: the pending one is the newest of the thread's approvals.
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 2);
+                });
+                await ctx.db.insert("toolApprovalRuns", {
+                    approvalId: `old-${String(index)}`,
+                    config: RUN_CONFIG,
+                    createdAt: 1000 + index,
+                    status: index === 20 ? "pending" : "approved",
+                    threadId,
+                    userId: OWNER,
+                });
+            }
+        });
+
+        expect(await run(reapStalledGoals, {})).toBe(0);
+        expect(await read(goalId)).toMatchObject({ status: "active" });
+    });
+
+    it("but still ends one whose approval was answered and whose run never came back", async () => {
+        const goalId = await start();
+
+        await stall(goalId);
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("toolApprovalRuns", {
+                    approvalId: "a1",
+                    config: RUN_CONFIG,
+                    createdAt: Date.now(),
+                    status: "approved",
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+        await insertStream("done");
+
+        expect(await run(reapStalledGoals, {})).toBe(1);
+    });
+
+    it("touchGoal restarts a goal's stall clock", async () => {
+        const goalId = await start();
+
+        await stall(goalId);
+        expect(await run(touchGoal, { threadId })).toBe(true);
+        expect(await run(reapStalledGoals, {})).toBe(0);
+
+        const quiet = await harness.run(async (ctx: any) => String(await ctx.db.insert("threads", { status: "active", title: "Quiet", userId: OWNER })));
+
+        expect(await run(touchGoal, { threadId: quiet })).toBe(false);
     });
 });
 

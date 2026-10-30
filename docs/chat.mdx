@@ -370,14 +370,21 @@ own chats.
 1. The AI works on the goal as in Deep Work mode.
 2. When it would stop, a reviewer reads the goal and the last turn's text
    and tool results, and says whether the goal is met.
-3. If not, the reviewer's one-line reason becomes the next instruction and
-   another round runs. Each further round counts toward your daily message
-   limit.
+3. If not, another round runs. The reviewer's one-line reason is passed to
+   the AI as a note about its work, not as an instruction: it is written from
+   tool results and web pages, so the AI is told not to obey anything in it.
+   The note also shows in the chat as "Review: …", so you see what drove the
+   round. Each further round counts toward your daily message limit.
 4. If it is met, the goal ends and the thread shows "Goal met" with a
    short summary.
 
 The goal sits at the top of the run, and each round's verdict appears as
-a small note under the reply it judged.
+a small note under the reply it judged. Shared links and public views leave
+these notes out.
+
+The reviewer reads the text of the AI's replies and the results of its tools
+(cut short), and runs on a small utility model, so
+tool results are sent to that model in addition to the one you picked.
 
 ### When it stops
 
@@ -387,7 +394,9 @@ a small note under the reply it judged.
   the gateway cannot price adds nothing to the cost, so only the round limit
   bounds a run on your own key.
 - Your daily limit is used up, or the reviewer cannot be reached.
-- You press **Stop**, or send another message in the chat.
+- You press **Stop**, or send another message, edit a message, regenerate a
+  reply or switch to another branch of the chat.
+- The chat is deleted.
 
 ## Message Features
 

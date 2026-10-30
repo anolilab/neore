@@ -257,6 +257,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
 
         await options.onGenerationStart?.();
 
+        // The goal's time budget is the invocation's, so it starts before the first generation.
+        const startedAt = Date.now();
         const result = await thread.generateText(generateArgs as never);
         const text = result.text ?? "";
 
@@ -265,16 +267,6 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
             patch: { ...(!options.keepThreadStatus && { status: "active" as const }), updatedAt: Date.now() },
             threadId: threadId as Id<"threads">,
         });
-
-        if (extractMemory && text && prompt && servesUser(userId)) {
-            void ctx.scheduler.runAfter(0, internal.memory.extract.extractMemories, {
-                assistantResponse: text.slice(0, 4000),
-                ...(options.botId && { botId: options.botId }),
-                threadId: threadId as Id<"threads">,
-                userId,
-                userMessage: prompt,
-            });
-        }
 
         // Usage heatmap + per-skill breakdown, keyed on the reply's first row so a
         // redelivered record counts once. Every round of a goal is a reply of its own.
@@ -300,8 +292,22 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
             };
         };
         const first = settle(result);
+        // Memory learns from the answer the run ends on: a goal's interim rounds are not what the user was given.
+        const extract = (answer: string): void => {
+            if (extractMemory && answer && prompt && servesUser(userId)) {
+                void ctx.scheduler.runAfter(0, internal.memory.extract.extractMemories, {
+                    assistantResponse: answer.slice(0, 4000),
+                    ...(options.botId && { botId: options.botId }),
+                    threadId: threadId as Id<"threads">,
+                    userId,
+                    userMessage: prompt,
+                });
+            }
+        };
 
         if (!options.goal) {
+            extract(text);
+
             return { costMicrodollars: first.priced, text, threadId, totalTokens: result.totalUsage?.totalTokens };
         }
 
@@ -312,8 +318,11 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
             goal: { ...options.goal },
             review: async ({ round, transcript }) => await reviewRound({ gateway: gatewayFetch(ctx), goal: goalText, round, threadId, transcript, userId }),
             runRound: async (instruction) => settle(await thread.generateText({ ...generateArgs, prompt: instruction } as never)),
+            startedAt,
             stopped: options.shouldStop,
         });
+
+        extract(outcome.result.text);
 
         return {
             costMicrodollars: outcome.costMicrodollars || undefined,

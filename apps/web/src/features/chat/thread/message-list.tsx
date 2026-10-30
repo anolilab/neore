@@ -36,8 +36,8 @@ import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { createRequestChannel } from "@/features/chat/core/stores/request-channel-store";
-import { GoalBanner, GoalVerdictNote } from "@/features/chat/goal/goal-notes";
-import { anchorVerdicts, withoutGoalInstructions } from "@/features/chat/goal/goal-view";
+import { GoalBanner, GoalReviewNote, GoalVerdictNote } from "@/features/chat/goal/goal-notes";
+import { anchorVerdicts, goalReviewNotes, withoutGoalInstructions, withoutNotedVerdicts } from "@/features/chat/goal/goal-view";
 import { useThreadGoal } from "@/features/chat/goal/use-thread-goal";
 import type { UIMessage } from "@/lib/agent";
 import { showInfo } from "@/lib/toast";
@@ -231,10 +231,12 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     const { t } = useLingui();
     const { loadMore, messages: threadMessages, messagesReady, messagesStatus } = useChatMessages();
     const { threadId } = useChatThread();
-    // A goal's own instructions are not the user's messages; its verdicts sit under the replies they judged.
+    // A goal's own instructions are not the user's messages: each shows as a "Review: …" note after the reply it
+    // followed, and the verdicts that note already says sit under the replies they judged.
     const goal = useThreadGoal(threadId);
     const messages = withoutGoalInstructions(threadMessages);
-    const verdictAnchors = goal ? anchorVerdicts(messages, goal.verdicts) : null;
+    const reviewNotes = goalReviewNotes(threadMessages);
+    const verdictAnchors = goal ? anchorVerdicts(messages, withoutNotedVerdicts(goal.verdicts, reviewNotes)) : null;
     const { activeStreamId, gatewayUrl, isStreaming, pendingStreamId, streamToken } = useChatIsStreaming();
     const editingMessageId = useChatUIStore((state) => state.editingMessageId);
 
@@ -450,6 +452,11 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                 >
                     {renderMessage(message, index)}
                 </div>
+                {reviewNotes.get(message.id)?.map((reason, noteIndex) => (
+                    <div key={`${message.id}-review-${String(noteIndex)}`} role="listitem">
+                        <GoalReviewNote maxWidth={maxWidth} reason={reason} />
+                    </div>
+                ))}
                 {goal &&
                     verdictAnchors?.get(message.id)?.map((verdict) => (
                         <div key={verdict.round} role="listitem">

@@ -39,8 +39,13 @@ export const getThreadGoal = authQuery
         const { userId } = context.user;
         const thread = await context.db.get(threadId as Id<"threads">);
 
+        // A goal belongs to its chat: with the chat gone nothing of it is shown.
+        if (!thread || thread.deleted) {
+            return null;
+        }
+
         // A goal quotes the chat's work: a locked chat's goal needs its proof.
-        if (thread && isThreadLocked(thread) && (await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId })) !== "ok") {
+        if (isThreadLocked(thread) && (await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId })) !== "ok") {
             return null;
         }
 

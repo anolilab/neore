@@ -4,6 +4,7 @@
  * stub `MessageContent`, which every `MessageItem` render renders once.
  */
 
+import { formatGoalReviewNote } from "@neore/backend/chat/goals";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen } from "@testing-library/react";
 import type { Context, ReactNode } from "react";
@@ -302,7 +303,7 @@ describe("message list goal", () => {
         harness.messages = [
             makeMessage(0, "Make the report"),
             makeMessage(1, "Here is a draft."),
-            { ...makeMessage(2, "Goal: Ship the report. Keep going."), agentName: "neore:goal", order: 1 },
+            { ...makeMessage(2, `Goal: Ship the report.\n\n${formatGoalReviewNote("Add the charts.")}`), agentName: "neore:goal", order: 1 },
             { ...makeMessage(3, "Charts added."), order: 1 },
         ];
         harness.goal = {
@@ -326,11 +327,17 @@ describe("message list goal", () => {
         mount();
 
         expect(screen.getByRole("region", { name: "Goal" }).textContent).toContain("Ship the report");
-        expect(screen.getByText("Round 1: not yet. Add the charts.")).toBeTruthy();
         expect(screen.getByText("Goal met: Charts added.")).toBeTruthy();
     });
 
-    it("does not show the instruction the goal saved to open its second round", () => {
+    it("shows what the instruction that opened the second round carried as a review note, once", () => {
+        mount();
+
+        expect(screen.getAllByText("Review: Add the charts.")).toHaveLength(1);
+        expect(screen.queryByText("Round 1: not yet. Add the charts.")).toBeNull();
+    });
+
+    it("does not show the instruction the goal saved to open its second round as a message", () => {
         mount();
 
         expect(harness.contentRenders.has("m2")).toBe(false);

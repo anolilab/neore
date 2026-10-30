@@ -2406,6 +2406,16 @@
       "to": "table:threadGoals"
     },
     {
+      "from": "function:chat_goals_internal:reapStalledGoals",
+      "kind": "read",
+      "to": "table:toolApprovalRuns"
+    },
+    {
+      "from": "function:chat_goals_internal:reapStalledGoals",
+      "kind": "write",
+      "to": "table:threadGoals"
+    },
+    {
       "from": "function:chat_goals_internal:recordGoalVerdict",
       "kind": "write",
       "to": "table:threadGoals"
@@ -2417,6 +2427,11 @@
     },
     {
       "from": "function:chat_goals_internal:startGoal",
+      "kind": "write",
+      "to": "table:threadGoals"
+    },
+    {
+      "from": "function:chat_goals_internal:touchGoal",
       "kind": "write",
       "to": "table:threadGoals"
     },
@@ -9974,6 +9989,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:chat_goals_internal:touchGoal",
+      "kind": "function",
+      "name": "chat.goals.internal.touchGoal",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
       "id": "function:chat_group_functions:createGroupChat",
       "kind": "function",
       "name": "chat.group.functions.createGroupChat",
@@ -16587,13 +16609,13 @@
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 280,
+      "line": 285,
       "reason": "\"saveEditedSiblingHandler\" is not a registered function"
     },
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 374,
+      "line": 379,
       "reason": "\"editAssistantReplyHandler\" is not a registered function"
     },
     {
@@ -17301,13 +17323,13 @@
     {
       "file": "agent/threads",
       "kind": "write",
-      "line": 290,
+      "line": 291,
       "reason": "\"markThreadArchived\" is not a registered function"
     },
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1468,
+      "line": 1473,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
@@ -17719,16 +17741,34 @@
       "reason": "\"handOffToGoalReview\" is not a registered function"
     },
     {
+      "file": "chat/goals/execute",
+      "kind": "call",
+      "line": 44,
+      "reason": "\"noteGoalPaused\" is not a registered function"
+    },
+    {
       "file": "chat/goals/rows",
       "kind": "read",
-      "line": 13,
+      "line": 14,
       "reason": "\"activeGoalsOf\" is not a registered function"
     },
     {
       "file": "chat/goals/rows",
       "kind": "write",
-      "line": 19,
+      "line": 20,
       "reason": "\"stopGoalRow\" is not a registered function"
+    },
+    {
+      "file": "chat/goals/rows",
+      "kind": "read",
+      "line": 53,
+      "reason": "\"deleteGoalsForThread\" is not a registered function"
+    },
+    {
+      "file": "chat/goals/rows",
+      "kind": "write",
+      "line": 59,
+      "reason": "\"deleteGoalsForThread\" is not a registered function"
     },
     {
       "file": "chat/group/run",
@@ -17865,133 +17905,133 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 135,
+      "line": 136,
       "reason": "\"improvePromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 238,
+      "line": 239,
       "reason": "\"optimizeSystemPromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 286,
+      "line": 287,
       "reason": "\"iteratePromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 512,
+      "line": 513,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 547,
+      "line": 548,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 616,
+      "line": 617,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 636,
+      "line": 637,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 648,
+      "line": 649,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 734,
+      "line": 735,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 746,
+      "line": 747,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 751,
+      "line": 752,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 760,
+      "line": 761,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 798,
+      "line": 799,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 831,
+      "line": 835,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 857,
+      "line": 864,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 978,
+      "line": 985,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 993,
+      "line": 1000,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1002,
+      "line": 1009,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1123,
+      "line": 1130,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1131,
+      "line": 1138,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1272,
+      "line": 1279,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1298,
+      "line": 1305,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
@@ -18231,19 +18271,19 @@
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 263,
+      "line": 265,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "schedule",
-      "line": 270,
+      "line": 298,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 310,
+      "line": 316,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
@@ -18381,19 +18421,19 @@
     {
       "file": "chat/local-models",
       "kind": "read",
-      "line": 75,
+      "line": 76,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {
       "file": "chat/local-models",
       "kind": "read",
-      "line": 138,
+      "line": 141,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {
       "file": "chat/local-models",
       "kind": "call",
-      "line": 144,
+      "line": 147,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {

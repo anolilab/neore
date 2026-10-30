@@ -16,9 +16,13 @@
  */
 import { v } from "lunorash/server";
 
+import type { Doc } from "../../_generated/dataModel";
+import type { MutationCtx } from "../../_generated/server";
 import { internalMutation, internalQuery } from "../../_generated/server";
+import { candidatesOnActivePath } from "../../agent/branch-rows";
 import { addMessagesHandler } from "../../agent/messages";
 import { patchThread } from "../../agent/table-writes";
+import { computeTaint } from "../../devices/lib/taint";
 import { sumMessageCosts } from "../../agent/message-cost";
 import { isAccountDeletionUnderway } from "../../gdpr/deletion-guard";
 import { withoutUndefined } from "../../lib/patch";
@@ -34,7 +38,7 @@ import {
     GOAL_TEXT_MAX,
     type GoalStopReason,
 } from "./logic";
-import { activeGoalsOf, endActiveGoals, stopGoalRow } from "./rows";
+import { activeGoalsOf, endActiveGoals, giveThreadBack, stopGoalRow } from "./rows";
 import { GOAL_CONTINUATION_AGENT } from "./shared";
 import { vGoalRunConfig, vGoalStopReason } from "./validators";
 
@@ -139,12 +143,22 @@ export const claimGoalRound = internalMutation
 
 /**
  * What the reviewer reads of the round that just ended: the rows after the
- * round's prompt, as a bounded transcript, plus what those rows cost and the
- * turn of the last reply (where the verdict note sits).
+ * round's prompt, as a bounded transcript, plus what those rows cost, the
+ * turn of the last reply (where the verdict note sits), the round's last row
+ * (to tell whether the displayed branch still ends there) and the untrusted
+ * sources its tool results came from (`devices/lib/taint.ts`).
  */
 export const roundTranscript = internalQuery
     .input({ goalId: v.id("threadGoals") })
-    .output(v.object({ costMicrodollars: v.number(), lastOrder: v.optional(v.number()), transcript: v.string() }))
+    .output(
+        v.object({
+            costMicrodollars: v.number(),
+            lastMessage: v.optional(v.object({ id: v.string(), order: v.number() })),
+            lastOrder: v.optional(v.number()),
+            taintedBy: v.optional(v.array(v.string())),
+            transcript: v.string(),
+        }),
+    )
     .query(async ({ args, ctx }) => {
         const goal = await ctx.db.get(args.goalId);
 
@@ -159,15 +173,17 @@ export const roundTranscript = internalQuery
             .take(ROUND_ROWS_SCAN);
         const prompt = recent.findIndex((row) => row._id === goal.promptMessageId);
         // Newest first; the round is everything newer than its prompt (all of it, if the scan did not reach the prompt).
-        const rows = (prompt === -1 ? recent : recent.slice(0, prompt))
-            .toReversed()
-            .filter((row) => (row.message as { role?: string } | undefined)?.role !== "user");
+        const round = prompt === -1 ? recent : recent.slice(0, prompt);
+        const rows = round.toReversed().filter((row) => (row.message as { role?: string } | undefined)?.role !== "user");
+        const last = round[0];
         const cost = sumMessageCosts(rows.map((row) => row.providerMetadata));
         const lastReply = rows.findLast((row) => !row.tool);
 
         return {
             costMicrodollars: Math.round(cost?.microdollars ?? 0),
+            ...(last && { lastMessage: { id: last._id as string, order: last.order } }),
             ...(lastReply && { lastOrder: lastReply.order }),
+            taintedBy: computeTaint(rows.map((row) => row.message as { content?: unknown; role?: unknown })),
             transcript: buildGoalTranscript(rows),
         };
     });
@@ -192,9 +208,13 @@ export const recordGoalVerdict = internalMutation
         anchorOrder: v.optional(v.number()),
         costMicrodollars: v.number(),
         goalId: v.id("threadGoals"),
+        /** The round's last row: the goal goes on only while the thread's displayed branch still ends at or below it. */
+        lastMessage: v.optional(v.object({ id: v.string().max(MAX_LENGTH.id), order: v.number() })),
         met: v.boolean(),
         reason: v.string().max(MAX_LENGTH.long),
         round: v.number(),
+        /** Untrusted sources the round's tool results came from; carried onto the next round's instruction. */
+        taintedBy: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
     })
     .output(v.object({ next: v.optional(vNext), outcome: v.union(v.literal("continue"), v.literal("ended"), v.literal("ignored")) }))
     .mutation(async ({ args, ctx }) => {
@@ -227,7 +247,7 @@ export const recordGoalVerdict = internalMutation
         // The run that just ended left the thread `running` for this hand-off; ending the goal gives it back.
         const end = async (status: "met" | "stopped", stopReason?: GoalStopReason) => {
             await ctx.db.patch(goal._id, withoutUndefined({ ...progress, endedAt: now, status, stopReason }));
-            await patchThread(ctx.db, goal.threadId, { status: "active", updatedAt: now });
+            await giveThreadBack(ctx, goal.threadId);
 
             return { outcome: "ended" as const };
         };
@@ -240,6 +260,23 @@ export const recordGoalVerdict = internalMutation
             return await end("stopped", decision);
         }
 
+        const thread = await ctx.db.get(goal.threadId);
+
+        // A chat in the trash is as good as gone: nothing is run into it.
+        if (!thread || thread.deleted) {
+            return await end("stopped", "error");
+        }
+
+        // The user switched branch, or edited, while the review ran: the next round would answer a branch nobody is looking at.
+        if (thread.activeLeafMessageId && args.lastMessage) {
+            const { id, order } = args.lastMessage;
+            const onPath = await candidatesOnActivePath(ctx, goal.threadId, thread.activeLeafMessageId, [{ _id: id, order }]);
+
+            if (!onPath.has(id)) {
+                return await end("stopped", "superseded");
+            }
+        }
+
         const account = await loadTaskAccount(ctx, goal.userId);
 
         if (taskAccessProblem(account) || !account || (await isAccountDeletionUnderway(ctx, goal.userId))) {
@@ -250,17 +287,17 @@ export const recordGoalVerdict = internalMutation
             return await end("stopped", "daily_limit");
         }
 
-        const thread = await ctx.db.get(goal.threadId);
-
-        if (!thread) {
-            return await end("stopped", "error");
-        }
-
         const saved = await addMessagesHandler(ctx, {
             agentName: GOAL_CONTINUATION_AGENT,
             // Not `fromUser`: nobody typed it, so it must not count as the user's reply to their chat.
             messages: [
-                { message: { content: [{ text: buildGoalContinuationPrompt({ goal: goal.text, reason }), type: "text" }], role: "user" }, status: "success" },
+                {
+                    message: {
+                        content: [{ text: buildGoalContinuationPrompt({ goal: goal.text, reason, taintedBy: args.taintedBy }), type: "text" }],
+                        role: "user",
+                    },
+                    status: "success",
+                },
             ],
             threadId: goal.threadId,
             userId: goal.userId,
@@ -304,7 +341,7 @@ export const failGoalReview = internalMutation
         }
 
         await stopGoalRow(ctx, goal, args.reason);
-        await patchThread(ctx.db, goal.threadId, { status: "active", updatedAt: ctx.now });
+        await giveThreadBack(ctx, goal.threadId);
 
         return true;
     });
@@ -313,9 +350,54 @@ export const failGoalReview = internalMutation
 export const GOAL_STALL_MS = 60 * 60 * 1000;
 
 /**
+ * Whether the goal is waiting on something that will still move it: a run queued or running (`pending` is
+ * a round whose job has not started yet), or a tool approval nobody has answered. Only a goal with neither
+ * has lost its hand-off.
+ */
+const isGoalWaiting = async (ctx: Pick<MutationCtx, "db">, goal: Doc<"threadGoals">): Promise<boolean> => {
+    for (const status of ["pending", "streaming"] as const) {
+        const live = await ctx.db
+            .query("persistentStreams")
+            .withIndex("by_threadId_status", (q) => q.eq("threadId", goal.threadId).eq("status", status))
+            .first();
+
+        if (live) {
+            return true;
+        }
+    }
+
+    // The user's unanswered approvals are few; the thread's answered ones are not, and would hide a new pending one.
+    const pending = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_userId_status_createdAt", (q) => q.eq("userId", goal.userId).eq("status", "pending"))
+        .take(100);
+
+    return pending.some((approval) => approval.threadId === goal.threadId);
+};
+
+/**
+ * Restarts the stall clock of the thread's active goal: a round that paused on an approval is waiting on a
+ * person, not lost. Returns whether a goal was touched.
+ */
+export const touchGoal = internalMutation
+    .input({ threadId: v.id("threads") })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const goals = await activeGoalsOf(ctx, args.threadId);
+
+        for (const goal of goals) {
+            await ctx.db.patch(goal._id, { updatedAt: ctx.now });
+        }
+
+        return goals.length > 0;
+    });
+
+/**
  * Ends a goal whose round neither reviewed nor continued (an isolate evicted
  * mid-review, a queue send that failed) and gives its thread back. Housekeeping
- * calls it. Returns how many it ended.
+ * calls it. Returns how many it ended. A goal that is still waiting is touched
+ * instead, so the oldest rows of the batch are not the same waiting ones every
+ * hour; a goal whose thread is gone is ended without the thread.
  */
 export const reapStalledGoals = internalMutation
     .input({})
@@ -328,17 +410,13 @@ export const reapStalledGoals = internalMutation
         let ended = 0;
 
         for (const goal of stalled) {
-            const live = await ctx.db
-                .query("persistentStreams")
-                .withIndex("by_threadId_status", (q) => q.eq("threadId", goal.threadId).eq("status", "streaming"))
-                .first();
-
-            if (live) {
+            if (await isGoalWaiting(ctx, goal)) {
+                await ctx.db.patch(goal._id, { updatedAt: ctx.now });
                 continue;
             }
 
             await stopGoalRow(ctx, goal, "error");
-            await patchThread(ctx.db, goal.threadId, { status: "active", updatedAt: ctx.now });
+            await giveThreadBack(ctx, goal.threadId);
             ended += 1;
         }
 

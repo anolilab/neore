@@ -21,9 +21,10 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
 import { streamLogger } from "../lib/logger";
+import { MAX_LENGTH } from "../lib/validators";
 import { isThreadLocked } from "../lib/thread-lock";
 import { findSkillCommand, parseSkillCommand, resolveReasoningEffort, resolveSkillModel } from "../skills/slash-command";
-import { handOffToGoalReview } from "./goals/execute";
+import { handOffToGoalReview, noteGoalPaused } from "./goals/execute";
 import { continueGroupAfterToolApproval, runGroupTurn } from "./group/run";
 import {
     afterRun,
@@ -64,6 +65,8 @@ export const runStreamingAgent = internalAction
         organizationId: v.optional(v.string()),
         /** What started the turn: the user's own chat, or the public API's key (an outside agent). Unset reads as the user's. */
         origin: v.optional(v.union(v.literal("lead"), v.literal("outside_agent"))),
+        /** The skill a goal's first round invoked, so every later round runs it too (the round's own text no longer starts with `/<slug>`). */
+        skill: v.optional(v.object({ rawArgs: v.string().max(MAX_LENGTH.text), slug: v.string().max(MAX_LENGTH.short) })),
         streamId: v.string(),
         streamingConfig: v.object({
             contentType: v.string(),
@@ -83,12 +86,12 @@ export const runStreamingAgent = internalAction
         /** The raw composer text, when the start payload had it — where a `/<slug>` command is detected. */
         userPrompt: v.optional(v.string()),
     })
-    .action(async ({ args: { isAnonymous, messageId, organizationId, origin, streamId, streamingConfig, threadId, userId, userPrompt }, ctx }) => {
+    .action(async ({ args: { isAnonymous, messageId, organizationId, origin, skill, streamId, streamingConfig, threadId, userId, userPrompt }, ctx }) => {
         // Everything before the first token is on the user's wait, so the reads
         // that need nothing but the job's own arguments start together, WITH
         // the claim. They are queries: a redelivery that loses the claim reads
         // and discards, and generates nothing.
-        const isSkillCommand = userPrompt !== undefined && Boolean(parseSkillCommand(userPrompt));
+        const isSkillCommand = skill !== undefined || (userPrompt !== undefined && Boolean(parseSkillCommand(userPrompt)));
         const reads = Promise.all([
             // Full access, or a locked chat the stream was started under (`streamRunThread`).
             ctx.runQuery(internal.chat.streaming.streamRunThread, { streamId: streamId as Id<"persistentStreams">, userId }),
@@ -178,7 +181,7 @@ export const runStreamingAgent = internalAction
 
             runContextPromise.catch(() => undefined);
 
-            const skillCommand = findSkillCommand(userPrompt, message?.message?.content, prompt);
+            const skillCommand = skill ?? findSkillCommand(userPrompt, message?.message?.content, prompt);
             const skillRun = await ctx.runQuery(internal.skills.executor.resolveSkillsForRun, {
                 organizationId,
                 rawArgs: skillCommand?.rawArgs,
@@ -463,7 +466,9 @@ export const runStreamingAgent = internalAction
 
             // A run that belongs to a goal is reviewed before the chat settles: the goal keeps the thread running
             // and holds the follow-ups back until it ends. A run paused on an approval is not finished yet.
-            if (!paused && (await handOffToGoalReview(ctx, threadId))) {
+            if (paused) {
+                await noteGoalPaused(ctx, threadId);
+            } else if (await handOffToGoalReview(ctx, threadId)) {
                 return;
             }
 
@@ -568,7 +573,9 @@ export const continueAfterToolApproval = internalAction
             );
 
             // The run a goal was waiting on ended here, once nothing more is pending (see `runStreamingAgent`).
-            if (!resumed.paused && !resumed.stopped && (await handOffToGoalReview(ctx, threadId))) {
+            if (resumed.paused) {
+                await noteGoalPaused(ctx, threadId);
+            } else if (!resumed.stopped && (await handOffToGoalReview(ctx, threadId))) {
                 return;
             }
 

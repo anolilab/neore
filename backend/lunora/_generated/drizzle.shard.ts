@@ -1353,7 +1353,7 @@ export const threadGoals = sqliteTable("threadGoals", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     claimedRound: real("claimedRound"),
-    config: text("config", { mode: "json" }).$type<{ customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean }>().notNull(),
+    config: text("config", { mode: "json" }).$type<{ customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }>().notNull(),
     costMicrodollars: real("costMicrodollars").notNull(),
     createdAt: real("createdAt").notNull(),
     endedAt: real("endedAt"),

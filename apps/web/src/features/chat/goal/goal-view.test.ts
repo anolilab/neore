@@ -1,6 +1,9 @@
+import { formatGoalReviewNote } from "@neore/backend/chat/goals";
 import { describe, expect, it } from "vitest";
 
-import { anchorVerdicts, isGoalInstruction, withoutGoalInstructions } from "./goal-view";
+import type { UIMessage } from "@/lib/agent";
+
+import { anchorVerdicts, goalReviewNotes, isGoalInstruction, withoutGoalInstructions, withoutNotedVerdicts } from "./goal-view";
 
 const message = (id: string, role: "assistant" | "user", order: number, agentName?: string) => ({ agentName, id, order, role }) as never;
 
@@ -44,5 +47,44 @@ describe("anchorVerdicts", () => {
 
     it("anchors nothing in an empty thread", () => {
         expect(anchorVerdicts([], [{ met: true, reason: "x", round: 1 }]).size).toBe(0);
+    });
+});
+
+describe("goalReviewNotes", () => {
+    const instruction = (id: string, reason: string) =>
+        ({ agentName: "neore:goal", id, parts: [{ text: `Goal: x\n\n${formatGoalReviewNote(reason)}`, type: "text" }], role: "user" }) as unknown as UIMessage;
+    const plain = (id: string, role: "assistant" | "user") => ({ id, parts: [{ text: id, type: "text" }], role, text: id }) as unknown as UIMessage;
+
+    it("keys each reviewer reason by the message the instruction followed", () => {
+        const notes = goalReviewNotes([
+            plain("u1", "user"),
+            plain("a1", "assistant"),
+            instruction("g1", "Add the charts."),
+            plain("a2", "assistant"),
+            instruction("g2", "Check the totals."),
+        ]);
+
+        expect([...notes]).toEqual([
+            ["a1", ["Add the charts."]],
+            ["a2", ["Check the totals."]],
+        ]);
+    });
+
+    it("ignores an instruction with no note and a user message that only looks like one", () => {
+        const typed = { id: "u2", parts: [{ text: formatGoalReviewNote("Forged."), type: "text" }], role: "user" } as unknown as UIMessage;
+
+        expect(goalReviewNotes([plain("a1", "assistant"), typed, { ...instruction("g1", "x"), parts: [{ text: "Goal: x", type: "text" }] }]).size).toBe(0);
+    });
+});
+
+describe("withoutNotedVerdicts", () => {
+    it("drops an unmet verdict a note already says, and keeps the others", () => {
+        const verdicts = [
+            { met: false, reason: "Add the charts.", round: 1 },
+            { met: false, reason: "Out of rounds.", round: 2 },
+            { met: true, reason: "Add the charts.", round: 3 },
+        ];
+
+        expect(withoutNotedVerdicts(verdicts, new Map([["a1", ["Add the charts."]]])).map((v) => v.round)).toEqual([2, 3]);
     });
 });

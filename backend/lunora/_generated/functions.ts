@@ -680,6 +680,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_goals_internal:recordGoalVerdict": lunora_chat_goals_internal_56.recordGoalVerdict as unknown as RegisteredLunoraFunction,
     "chat_goals_internal:roundTranscript": lunora_chat_goals_internal_56.roundTranscript as unknown as RegisteredLunoraFunction,
     "chat_goals_internal:startGoal": lunora_chat_goals_internal_56.startGoal as unknown as RegisteredLunoraFunction,
+    "chat_goals_internal:touchGoal": lunora_chat_goals_internal_56.touchGoal as unknown as RegisteredLunoraFunction,
     "chat_group_functions:createGroupChat": lunora_chat_group_functions_57.createGroupChat as unknown as RegisteredLunoraFunction,
     "chat_group_functions:createGroupChatFromTemplate": lunora_chat_group_functions_57.createGroupChatFromTemplate as unknown as RegisteredLunoraFunction,
     "chat_group_functions:getGroupChat": lunora_chat_group_functions_57.getGroupChat as unknown as RegisteredLunoraFunction,
@@ -3792,6 +3793,12 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["goalId"] !== "string") return DEFER;
 return { "goalId": source["goalId"] };
+});
+installCompiledValidatorMap(lunora_chat_goals_internal_56.touchGoal.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+return { "threadId": source["threadId"] };
 });
 installCompiledValidatorMap(lunora_chat_group_functions_57.getGroupHistory.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8323,7 +8330,7 @@ export interface Caller {
         };
         execute: {
             continueAfterToolApproval: (args: { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }) => Promise<void>;
-            runStreamingAgent: (args: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }) => Promise<void>;
+            runStreamingAgent: (args: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }) => Promise<void>;
         };
         functions: {
             abortStreamByMessageId: (args: { messageId: string; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ aborted: boolean }>;
@@ -8425,9 +8432,10 @@ export interface Caller {
                 failGoalReview: (args: { goalId: Id<"threadGoals">; reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; round: number }) => Promise<boolean>;
                 getActiveGoalForRun: (args: { threadId: Id<"threads"> }) => Promise<{ goalId: Id<"threadGoals">; round: number } | null>;
                 reapStalledGoals: (args?: {}) => Promise<number>;
-                recordGoalVerdict: (args: { anchorOrder?: number; costMicrodollars: number; goalId: Id<"threadGoals">; met: boolean; reason: string; round: number }) => Promise<{ next?: { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean }; messageId: string; organizationId?: string; streamId: string }; outcome: "continue" | "ended" | "ignored" }>;
-                roundTranscript: (args: { goalId: Id<"threadGoals"> }) => Promise<{ costMicrodollars: number; lastOrder?: number; transcript: string }>;
-                startGoal: (args: { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean }; maxRounds?: number; organizationId?: string; promptMessageId: string; text: string; threadId: Id<"threads">; userId: string }) => Promise<{ goalId: Id<"threadGoals">; ok: true } | { error: string; ok: false }>;
+                recordGoalVerdict: (args: { anchorOrder?: number; costMicrodollars: number; goalId: Id<"threadGoals">; lastMessage?: { id: string; order: number }; met: boolean; reason: string; round: number; taintedBy?: Array<string> }) => Promise<{ next?: { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }; messageId: string; organizationId?: string; streamId: string }; outcome: "continue" | "ended" | "ignored" }>;
+                roundTranscript: (args: { goalId: Id<"threadGoals"> }) => Promise<{ costMicrodollars: number; lastMessage?: { id: string; order: number }; lastOrder?: number; taintedBy?: Array<string>; transcript: string }>;
+                startGoal: (args: { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }; maxRounds?: number; organizationId?: string; promptMessageId: string; text: string; threadId: Id<"threads">; userId: string }) => Promise<{ goalId: Id<"threadGoals">; ok: true } | { error: string; ok: false }>;
+                touchGoal: (args: { threadId: Id<"threads"> }) => Promise<boolean>;
             };
         };
         group: {
@@ -10124,6 +10132,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
                 recordGoalVerdict: (args) => callRegistered(context, "chat_goals_internal:recordGoalVerdict", args),
                 roundTranscript: (args) => callRegistered(context, "chat_goals_internal:roundTranscript", args),
                 startGoal: (args) => callRegistered(context, "chat_goals_internal:startGoal", args),
+                touchGoal: (args) => callRegistered(context, "chat_goals_internal:touchGoal", args),
             },
         },
         group: {

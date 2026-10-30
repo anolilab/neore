@@ -202,7 +202,7 @@ afterEach(() => {
     harness.close();
 });
 
-const run = async (extra: { userPrompt?: string } = {}) =>
+const run = async (extra: { skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {}) =>
     await harness.action(
         async (ctx: any) =>
             await ctx.runAction(runStreamingAgent, {
@@ -351,6 +351,12 @@ describe("runStreamingAgent: group chats and skill commands", () => {
         expect(skillState.calls).toStrictEqual([{ skillSlug: "summarise" }]);
         // The single agent answered, not the group.
         expect(modelState.builtAgents).toBe(1);
+    });
+
+    it("runs the skill a goal carried into a later round, whose own text starts with no slash", async () => {
+        await run({ skill: { rawArgs: "the thread", slug: "summarise" }, userPrompt: "Goal: summarise the thread" });
+
+        expect(skillState.calls).toStrictEqual([{ skillSlug: "summarise" }]);
     });
 
     it("records the invoked skill on the reply's usage", async () => {

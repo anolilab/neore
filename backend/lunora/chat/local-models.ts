@@ -27,6 +27,7 @@ import { authMutation, rateLimit } from "../lib/crpc";
 import { isWorkerThread } from "../sub-agents/functions";
 import { storedRetentionHours } from "../lib/temporary-retention";
 import { MAX_LENGTH } from "../lib/validators";
+import { endActiveGoals } from "./goals/rows";
 import type { StoredCustomProvider } from "./lib/custom-providers";
 import {
     buildLocalPromptMessage,
@@ -120,6 +121,8 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
         }
 
         threadId = args.threadId;
+        // A turn the browser ran ends a goal like a sent message does: no review follows a local reply.
+        await endActiveGoals(ctx, threadId, "superseded");
         await patchThread(ctx.db, threadId, { model: args.model, updatedAt: now });
     } else {
         threadId = (await insertThread(ctx.db, {

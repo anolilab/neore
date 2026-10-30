@@ -36,17 +36,34 @@ export const handOffToGoalReview = async (ctx: Pick<ActionCtx, "runQuery">, thre
     return true;
 };
 
+/**
+ * Called when a run that may belong to a goal pauses on a tool approval: the goal is waiting on a person,
+ * so its stall clock restarts (the sweep would otherwise end it an hour later).
+ */
+export const noteGoalPaused = async (ctx: Pick<ActionCtx, "runMutation">, threadId: string): Promise<void> => {
+    await ctx.runMutation(internal.chat.goals.internal.touchGoal, { threadId: threadId as never }).catch(() => undefined);
+};
+
 /** The run the goal opens next, queued after the mutation that wrote it committed. */
 const startNextRound = async (
-    next: { config: Record<string, unknown> & { model: string }; messageId: string; organizationId?: string; streamId: string },
+    next: {
+        config: Record<string, unknown> & { model: string; origin?: "outside_agent"; skill?: { rawArgs: string; slug: string } };
+        messageId: string;
+        organizationId?: string;
+        streamId: string;
+    },
     goal: { threadId: string; userId: string },
 ): Promise<void> => {
-    const { config } = next;
+    // `origin` and `skill` are the run's own arguments; the rest is its stream's config.
+    const { origin, skill, ...config } = next.config;
 
     await enqueueJob(internal.chat.execute.runStreamingAgent, {
         isAnonymous: false,
         messageId: next.messageId,
         ...(next.organizationId !== undefined && { organizationId: next.organizationId }),
+        // The round keeps what the first run was: an API key's run still has its tool limits.
+        ...(origin !== undefined && { origin }),
+        ...(skill !== undefined && { skill }),
         streamId: next.streamId,
         streamingConfig: {
             contentType: "text",
@@ -71,7 +88,7 @@ export const reviewGoalRound = internalAction
 
         const { goalId, round } = args;
         let verdict: GoalVerdict & { costMicrodollars: number };
-        let read: { costMicrodollars: number; lastOrder?: number; transcript: string };
+        let read: { costMicrodollars: number; lastMessage?: { id: string; order: number }; lastOrder?: number; taintedBy?: string[]; transcript: string };
 
         try {
             read = await ctx.runQuery(internal.chat.goals.internal.roundTranscript, { goalId });
@@ -85,20 +102,40 @@ export const reviewGoalRound = internalAction
             });
         } catch (error) {
             streamLogger.error(`[Goal] Review of round ${String(round)} failed:`, error);
-            await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "review_failed", round });
-            await setThreadStatus(ctx, goal.threadId, "active").catch(() => undefined);
+
+            // Only a goal this call ended gives the thread back: one the user stopped, or that a new message superseded, is no longer ours to settle.
+            if (await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "review_failed", round })) {
+                await setThreadStatus(ctx, goal.threadId, "active").catch(() => undefined);
+            }
 
             return null;
         }
 
-        const outcome = await ctx.runMutation(internal.chat.goals.internal.recordGoalVerdict, {
-            ...(read.lastOrder !== undefined && { anchorOrder: read.lastOrder }),
-            costMicrodollars: read.costMicrodollars + verdict.costMicrodollars,
-            goalId,
-            met: verdict.met,
-            reason: verdict.reason,
-            round,
-        });
+        const recordVerdict = async () =>
+            await ctx.runMutation(internal.chat.goals.internal.recordGoalVerdict, {
+                ...(read.lastOrder !== undefined && { anchorOrder: read.lastOrder }),
+                costMicrodollars: read.costMicrodollars + verdict.costMicrodollars,
+                goalId,
+                ...(read.lastMessage && { lastMessage: read.lastMessage }),
+                met: verdict.met,
+                reason: verdict.reason,
+                round,
+                ...(read.taintedBy && { taintedBy: read.taintedBy }),
+            });
+        let outcome: Awaited<ReturnType<typeof recordVerdict>>;
+
+        try {
+            outcome = await recordVerdict();
+        } catch (error) {
+            // The round is claimed, so a redelivery would do nothing: end the goal here instead of leaving the chat running.
+            streamLogger.error(`[Goal] The verdict on round ${String(round)} could not be recorded:`, error);
+
+            if (await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "error", round })) {
+                await setThreadStatus(ctx, goal.threadId, "active").catch(() => undefined);
+            }
+
+            return null;
+        }
 
         if (outcome.outcome === "ended") {
             // The goal held the follow-ups back while it ran (`handOffToGoalReview`).
@@ -113,12 +150,16 @@ export const reviewGoalRound = internalAction
             } catch (error) {
                 // The next round's rows exist but nothing will run them: end the goal and close the stream.
                 streamLogger.error(`[Goal] Round ${String(round + 1)} could not be queued:`, error);
-                await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "error", round });
+                const failed = await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "error", round });
+
                 await ctx.runMutation(internal.chat.streaming.persistent.library.setStreamStatus, {
                     status: "error",
                     streamId: outcome.next.streamId as never,
                 });
-                await setThreadStatus(ctx, goal.threadId, "active").catch(() => undefined);
+
+                if (failed) {
+                    await setThreadStatus(ctx, goal.threadId, "active").catch(() => undefined);
+                }
             }
         }
 

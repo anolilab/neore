@@ -1,4 +1,4 @@
-import { GOAL_CONTINUATION_AGENT } from "@neore/backend/chat/goals";
+import { GOAL_CONTINUATION_AGENT, parseGoalReviewNote } from "@neore/backend/chat/goals";
 
 import type { UIMessage } from "@/lib/agent";
 
@@ -38,4 +38,38 @@ export const anchorVerdicts = (
     }
 
     return anchors;
+};
+
+const messageText = (message: Pick<UIMessage, "parts" | "text">): string =>
+    message.text ?? message.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
+
+/**
+ * The reviewer's reasons the goal's instruction rows carry, each keyed by the message it follows (the last
+ * one that is not itself an instruction): they are shown there as "Review: …" notes, not as messages.
+ */
+export const goalReviewNotes = (messages: ReadonlyArray<Pick<UIMessage, "agentName" | "id" | "parts" | "role" | "text">>): Map<string, string[]> => {
+    const notes = new Map<string, string[]>();
+    let previousId: string | undefined;
+
+    for (const message of messages) {
+        if (!isGoalInstruction(message)) {
+            previousId = message.id;
+            continue;
+        }
+
+        const reason = previousId === undefined ? undefined : parseGoalReviewNote(messageText(message))?.reason;
+
+        if (previousId !== undefined && reason) {
+            notes.set(previousId, [...(notes.get(previousId) ?? []), reason]);
+        }
+    }
+
+    return notes;
+};
+
+/** The verdicts that no instruction row already shows: an unmet verdict whose reason is a "Review: …" note is not said twice. */
+export const withoutNotedVerdicts = (verdicts: ReadonlyArray<GoalVerdictView>, notes: ReadonlyMap<string, string[]>): GoalVerdictView[] => {
+    const shown = new Set([...notes.values()].flat());
+
+    return verdicts.filter((verdict) => verdict.met || !shown.has(verdict.reason));
 };

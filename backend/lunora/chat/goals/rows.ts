@@ -5,6 +5,7 @@
  */
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
+import { patchThread } from "../../agent/table-writes";
 import type { GoalStopReason } from "./shared";
 
 export type GoalCtx = Pick<MutationCtx, "db" | "now">;
@@ -34,4 +35,27 @@ export const endActiveGoals = async (ctx: GoalCtx, threadId: Id<"threads">, reas
     }
 
     return goals.length > 0;
+};
+
+/**
+ * Gives a thread back to the user after a goal's run: `active` again. A thread that is gone (deleted
+ * while a round was queued) is skipped, so one goal of a vanished thread never fails the write that
+ * ends it, or the sweep that reaps many.
+ */
+export const giveThreadBack = async (ctx: GoalCtx, threadId: Id<"threads">): Promise<void> => {
+    if (await ctx.db.get(threadId)) {
+        await patchThread(ctx.db, threadId, { status: "active", updatedAt: ctx.now });
+    }
+};
+
+/** Removes every goal of a thread being deleted. Idempotent: the delete chain re-runs it per batch. */
+export const deleteGoalsForThread = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<void> => {
+    const goals = await ctx.db
+        .query("threadGoals")
+        .withIndex("by_thread_and_status", (q) => q.eq("threadId", threadId))
+        .collect();
+
+    for (const goal of goals) {
+        await ctx.db.delete(goal._id);
+    }
 };

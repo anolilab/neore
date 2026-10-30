@@ -11,7 +11,7 @@ import { findPendingApprovalOnLatestTurn } from "../chat/lib/tool-approval-claim
 import schema from "../schema";
 import type { BranchTree } from "./branch-tree";
 import { buildBranchTree, continuationOrder, resolveActivePath } from "./branch-tree";
-import { editAssistantReplyHandler, getForkContextIds, listActivePathPage, resolveForkEnd } from "./branches";
+import { editAssistantReplyHandler, getForkContextIds, listActivePathPage, resolveForkEnd, saveEditedSiblingHandler } from "./branches";
 import { addMessagesHandler, cloneMessageBatch, getMaxMessage } from "./messages";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -453,5 +453,40 @@ describe("editing an assistant reply in place", () => {
 
     it("refuses a sibling reply that is not on the displayed path", async () => {
         await expect(edit(ids.rB0 as string, "Off path.")).rejects.toThrow();
+    });
+});
+
+describe("saving an edited prompt", () => {
+    it("ends the goal the thread was working toward", async () => {
+        const goalId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadGoals", {
+                    config: { model: "m" },
+                    costMicrodollars: 0,
+                    createdAt: 1,
+                    maxCostMicrodollars: 1,
+                    maxRounds: 5,
+                    promptMessageId: ids.u1,
+                    round: 1,
+                    startMessageId: ids.u1,
+                    status: "active",
+                    text: "Ship it",
+                    threadId,
+                    updatedAt: 1,
+                    userId: OWNER,
+                    verdicts: [],
+                }),
+        );
+
+        await harness.run(
+            async (ctx: any) =>
+                await saveEditedSiblingHandler(ctx, {
+                    message: { content: [{ text: "edited", type: "text" }], role: "user" },
+                    originalMessageId: ids.u1 as never,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await harness.run(async (ctx: any) => await ctx.db.get(goalId))).toMatchObject({ status: "stopped", stopReason: "superseded" });
     });
 });

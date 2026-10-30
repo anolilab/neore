@@ -19,7 +19,12 @@ import schema from "../../schema";
 
 const { modelState, registry, users } = vi.hoisted(() => {
     return {
-        modelState: { calls: [] as { prompt: string }[], failWith: undefined as Error | undefined, reply: '{"met": false, "reason": "x"}' },
+        modelState: {
+            calls: [] as { prompt: string }[],
+            during: undefined as (() => Promise<void>) | undefined,
+            failWith: undefined as Error | undefined,
+            reply: '{"met": false, "reason": "x"}',
+        },
         registry: new Map<string, unknown>(),
         users: new Map<string, { isAnonymous?: boolean; role?: string }>(),
     };
@@ -56,6 +61,7 @@ vi.mock("ai", async (importOriginal) => {
         ...(await importOriginal<typeof import("ai")>()),
         generateText: vi.fn(async (options: { prompt: string }) => {
             modelState.calls.push({ prompt: options.prompt });
+            await modelState.during?.();
 
             if (modelState.failWith) {
                 throw modelState.failWith;
@@ -90,6 +96,7 @@ beforeAll(async () => {
 beforeEach(async () => {
     jobsQueueMessages.length = 0;
     modelState.calls = [];
+    modelState.during = undefined;
     modelState.failWith = undefined;
     modelState.reply = '{"met": false, "reason": "The charts are missing."}';
     users.clear();
@@ -181,6 +188,54 @@ describe("reviewGoalRound", () => {
         expect(state.promptMessageId).toBe(next!.args.messageId);
     });
 
+    it("carries the originating run's origin and skill into every further round", async () => {
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.get(goalId);
+
+            await ctx.db.patch(goalId, { config: { ...row.config, origin: "outside_agent", skill: { rawArgs: "the report", slug: "summarize" } } });
+        });
+
+        await review();
+
+        const [next] = runs();
+
+        expect(next!.args).toMatchObject({ origin: "outside_agent", skill: { rawArgs: "the report", slug: "summarize" } });
+        // They are the run's own arguments, not part of the stream's saved config.
+        expect(next!.args.streamingConfig).not.toHaveProperty("origin");
+        expect(next!.args.streamingConfig).not.toHaveProperty("skill");
+    });
+
+    it("runs an ordinary goal as the user's own chat", async () => {
+        await review();
+
+        expect(runs()[0]!.args.origin).toBeUndefined();
+        expect(runs()[0]!.args.skill).toBeUndefined();
+    });
+
+    it("ends the goal and gives the thread back when the verdict cannot be written", async () => {
+        const key = "chat_goals_internal:recordGoalVerdict";
+        const original = registry.get(key);
+
+        registry.set(
+            key,
+            internalMutation
+                .input({ costMicrodollars: v.number(), goalId: v.string(), met: v.boolean(), reason: v.string(), round: v.number() })
+                .mutation(async () => {
+                    throw new Error("write failed");
+                }),
+        );
+
+        try {
+            await review();
+        } finally {
+            registry.set(key, original);
+        }
+
+        expect(await goal()).toMatchObject({ status: "stopped", stopReason: "error" });
+        expect(runs()).toHaveLength(0);
+        expect((await harness.run(async (ctx: any) => await ctx.db.get(threadId))).status).toBe("active");
+    });
+
     it("treats an unreadable verdict as not met and goes on", async () => {
         modelState.reply = "I think so?";
 
@@ -198,6 +253,24 @@ describe("reviewGoalRound", () => {
         expect(await goal()).toMatchObject({ status: "stopped", stopReason: "review_failed" });
         expect(runs()).toHaveLength(0);
         expect((await harness.run(async (ctx: any) => await ctx.db.get(threadId))).status).toBe("active");
+    });
+
+    it("leaves the thread alone when the goal was ended while the reviewer failed", async () => {
+        const { internal } = await import("../../_generated/internal");
+
+        modelState.failWith = new Error("gateway down");
+        // The user presses Stop mid-review: the thread is `abort`, which is not the goal's to settle.
+        modelState.during = async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.runMutation(internal.chat.goals.internal.endGoalsForThread, { reason: "user", threadId });
+                await ctx.db.patch(threadId, { status: "abort" });
+            });
+        };
+
+        await review();
+
+        expect(await goal()).toMatchObject({ status: "stopped", stopReason: "user" });
+        expect((await harness.run(async (ctx: any) => await ctx.db.get(threadId))).status).toBe("abort");
     });
 
     it("spends one reviewer call and queues one round however often the job is delivered", async () => {

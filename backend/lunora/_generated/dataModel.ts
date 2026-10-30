@@ -1619,7 +1619,7 @@ export interface Doc_threadGoals {
     _id: Id<"threadGoals">;
     _creationTime: number;
     claimedRound?: number;
-    config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean };
+    config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean };
     costMicrodollars: number;
     createdAt: number;
     endedAt?: number;
@@ -4426,7 +4426,7 @@ export interface Insert_threadGoals {
     _id?: Id<"threadGoals">;
     _creationTime?: number;
     claimedRound?: number;
-    config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean };
+    config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean };
     costMicrodollars: number;
     createdAt: number;
     endedAt?: number;

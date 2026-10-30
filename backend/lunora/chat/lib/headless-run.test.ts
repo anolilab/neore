@@ -22,7 +22,9 @@ const seen = vi.hoisted(() => {
         failAt: undefined as "generate" | "keys" | "thread" | undefined,
         filterRules: undefined as Record<string, string[]> | undefined,
         filters: [] as unknown[],
+        met: [] as boolean[],
         prepareSteps: [] as unknown[],
+        replies: [] as string[],
         system: [] as string[],
         tools: [] as string[][],
     };
@@ -57,7 +59,7 @@ vi.mock("./get-agent", () => {
 
                     seen.system.push(args.system ?? instructions);
 
-                    return { text: "reply" };
+                    return { text: seen.replies.shift() ?? "reply" };
                 },
             };
 
@@ -77,6 +79,14 @@ vi.mock("./get-agent", () => {
                 options: { instructions },
             };
         },
+    };
+});
+
+vi.mock("../goals/review", () => {
+    return {
+        reviewRound: vi.fn(async () => {
+            return { costMicrodollars: 0, met: seen.met.shift() ?? true, reason: "Add more." };
+        }),
     };
 });
 
@@ -106,13 +116,13 @@ const PREFS = {
     profession: "SECRET-PROFESSION",
 };
 
-const fakeCtx = () =>
+const fakeCtx = (prefs: typeof PREFS = PREFS) =>
     ({
         runAction: vi.fn(),
-        runMutation: vi.fn(async () => null),
+        runMutation: vi.fn(async (reference: string) => (reference === "chat_goals_internal:chargeGoalRound" ? true : null)),
         runQuery: vi.fn(async (reference: string) => {
             if (reference === "auth_functions:getUserPreferencesQuery") {
-                return PREFS;
+                return prefs;
             }
 
             if (reference === "auth_functions:getAgentModulePreferencesQuery") {
@@ -433,5 +443,58 @@ describe("runHeadlessAgent onGenerationStart", () => {
         seen.failAt = "generate";
         await expect(run(started)).rejects.toThrow("model call failed");
         expect(started).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("runHeadlessAgent with a goal and memory", () => {
+    beforeEach(() => {
+        seen.failAt = undefined;
+        seen.replies = [];
+        seen.met = [];
+    });
+
+    const extractions = (ctx: { scheduler: { runAfter: ReturnType<typeof vi.fn> } }): string[] =>
+        ctx.scheduler.runAfter.mock.calls.flatMap((call) =>
+            (call[2] as { assistantResponse?: string } | undefined)?.assistantResponse ? [(call[2] as { assistantResponse: string }).assistantResponse] : [],
+        );
+
+    it("remembers only the answer the goal ended on, not an interim round", async () => {
+        seen.replies = ["interim answer", "final answer"];
+        seen.met = [false, true];
+
+        const ctx = fakeCtx({ ...PREFS, memoryEnabled: true });
+        const result = await runHeadlessAgent(ctx, {
+            goal: { text: "Ship it" },
+            memory: true,
+            model: "test-model",
+            origin: "lead",
+            personalization: "none",
+            prompt: "Do the thing",
+            thread: { title: "Trigger: x" },
+            tools: "none",
+            userId: "owner",
+        });
+
+        expect(result.text).toBe("final answer");
+        expect(extractions(ctx as never)).toEqual(["final answer"]);
+    });
+
+    it("still remembers the answer of a run without a goal", async () => {
+        seen.replies = ["only answer"];
+
+        const ctx = fakeCtx({ ...PREFS, memoryEnabled: true });
+
+        await runHeadlessAgent(ctx, {
+            memory: true,
+            model: "test-model",
+            origin: "lead",
+            personalization: "none",
+            prompt: "Do the thing",
+            thread: { title: "t" },
+            tools: "none",
+            userId: "owner",
+        });
+
+        expect(extractions(ctx as never)).toEqual(["only answer"]);
     });
 });
