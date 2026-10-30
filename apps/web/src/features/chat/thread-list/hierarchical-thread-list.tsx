@@ -1102,12 +1102,53 @@ const HierarchicalThreadList: FC<
         if (!shouldUseVirtualScrolling) {
             // Non-virtualized rendering for small lists
             // Separate project groups from other groups for sorting
+            const topGroups = threadGroups.filter((g) => g.groupType === "needsYou" || g.groupType === "working");
             const projectGroups = threadGroups.filter((g) => g.projectId);
-            const otherGroups = threadGroups.filter((g) => !g.projectId);
+            const otherGroups = threadGroups.filter((g) => !g.projectId && !topGroups.includes(g));
             const projectGroupIds = projectGroups.map((g) => `project-group-${g.projectId}`);
+
+            const renderPlainGroup = (group: ThreadGroup) => {
+                const project = group.projectId ? projectsMap.get(group.projectId) : null;
+                const isProjectGroup = getGroupType(group) === "project" && Boolean(group.projectId);
+
+                return (
+                    <ProjectGroupContainer isProjectGroup={isProjectGroup} key={group.title} projectId={group.projectId}>
+                        <ThreadGroupRenderer
+                            currentThreadId={currentThreadId}
+                            expandedThreads={expandedThreads}
+                            flattenedThreads={flattenedThreads}
+                            getGroupThreadIds={getGroupThreadIds}
+                            group={group}
+                            handleCreateBranch={handleCreateBranch}
+                            handleDeleteProject={handleDeleteProject}
+                            handleDeleteThread={handleDeleteThread}
+                            handleDownloadThread={handleDownloadThread}
+                            handleEditProject={handleEditProject}
+                            handleGroupToggle={handleGroupToggle}
+                            handleMouseEnter={handleMouseEnter}
+                            handlePinProject={handlePinProject}
+                            handlePinThread={handlePinThread}
+                            handleThreadToggle={handleThreadToggle}
+                            handleUnpinThread={handleUnpinThread}
+                            isKeyboardNavigating={isKeyboardNavigating}
+                            isSelectionMode={isSelectionMode}
+                            loadingStates={loadingStates}
+                            projectPinnedAt={project?.pinnedAt}
+                            searchQuery={searchQuery}
+                            selectedThreadIds={selectedThreadIds}
+                            selectedThreadIndex={selectedThreadIndex}
+                            toggleExpanded={toggleExpanded}
+                            toggleGroupCollapsed={toggleGroupCollapsed}
+                            updateThread={updateThread}
+                        />
+                    </ProjectGroupContainer>
+                );
+            };
 
             return (
                 <>
+                    {/* Derived sections sit above everything, Snoozed sits with the others; none of them is a drop target. */}
+                    {topGroups.map((group) => renderPlainGroup(group))}
                     {projectGroups.length > 0 && (
                         <SortableContext items={projectGroupIds} strategy={verticalListSortingStrategy}>
                             {projectGroups.map((group) => {
@@ -1156,44 +1197,7 @@ const HierarchicalThreadList: FC<
                         </SortableContext>
                     )}
 
-                    {/* Other groups (non-project) - uses extracted ThreadGroupRenderer */}
-                    {otherGroups.map((group) => {
-                        const project = group.projectId ? projectsMap.get(group.projectId) : null;
-                        const isProjectGroup = getGroupType(group) === "project" && Boolean(group.projectId);
-
-                        return (
-                            <ProjectGroupContainer isProjectGroup={isProjectGroup} key={group.title} projectId={group.projectId}>
-                                <ThreadGroupRenderer
-                                    currentThreadId={currentThreadId}
-                                    expandedThreads={expandedThreads}
-                                    flattenedThreads={flattenedThreads}
-                                    getGroupThreadIds={getGroupThreadIds}
-                                    group={group}
-                                    handleCreateBranch={handleCreateBranch}
-                                    handleDeleteProject={handleDeleteProject}
-                                    handleDeleteThread={handleDeleteThread}
-                                    handleDownloadThread={handleDownloadThread}
-                                    handleEditProject={handleEditProject}
-                                    handleGroupToggle={handleGroupToggle}
-                                    handleMouseEnter={handleMouseEnter}
-                                    handlePinProject={handlePinProject}
-                                    handlePinThread={handlePinThread}
-                                    handleThreadToggle={handleThreadToggle}
-                                    handleUnpinThread={handleUnpinThread}
-                                    isKeyboardNavigating={isKeyboardNavigating}
-                                    isSelectionMode={isSelectionMode}
-                                    loadingStates={loadingStates}
-                                    projectPinnedAt={project?.pinnedAt}
-                                    searchQuery={searchQuery}
-                                    selectedThreadIds={selectedThreadIds}
-                                    selectedThreadIndex={selectedThreadIndex}
-                                    toggleExpanded={toggleExpanded}
-                                    toggleGroupCollapsed={toggleGroupCollapsed}
-                                    updateThread={updateThread}
-                                />
-                            </ProjectGroupContainer>
-                        );
-                    })}
+                    {otherGroups.map((group) => renderPlainGroup(group))}
                 </>
             );
         }

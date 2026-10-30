@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import { useOptimisticDeletions, useOptimisticPins, useOptimisticStatuses } from "@/features/chat/core/stores/thread-store-hooks";
@@ -9,6 +9,7 @@ import { useProjectList } from "@/features/projects/hooks/use-projects";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import { useDateBoundaries } from "../contexts/date-boundaries-context";
+import { nextSnoozeWake, partitionDerivedSections } from "../lib/derived-sections";
 import { selectSelectedTagIds, useThreadListUIStore } from "../stores/thread-list-ui-store";
 import type { BranchNode, GroupType, MinimalThreadRelationship, ThreadGroup } from "../types";
 import { usePersistThreadList, useThreadListPlaceholder } from "./use-thread-list-cache";
@@ -43,6 +44,9 @@ const sortThreadsInGroup = (threads: BranchNode[]): BranchNode[] => {
         return b.createdAt - a.createdAt;
     });
 };
+
+/** The longest delay setTimeout accepts; a snooze further out simply re-arms when this one fires. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 const useThreadGroups = (
     collapsedGroups: Set<GroupType>,
@@ -209,6 +213,7 @@ const useThreadGroups = (
             const optimisticStatus = optimisticStatuses.get(threadId);
 
             return {
+                awaitingInput: thread.awaitingInput,
                 branchPoint: 0,
                 branchType: "branch",
                 category: thread.category,
@@ -218,10 +223,13 @@ const useThreadGroups = (
                 depth,
                 expiresAt: thread.expiresAt,
                 isPinned: optimisticPin === undefined ? pinnedThreadsSet.has(threadId) : optimisticPin,
+                lastReplyAt: thread.lastReplyAt,
+                lastViewedAt: thread.lastViewedAt,
                 model: thread.model,
                 order: threadOrderMap.get(threadId),
                 projectId: thread.projectId,
                 relevantMessages: thread.relevantMessages,
+                snoozedUntil: thread.snoozedUntil,
                 source: thread.source,
                 statelessMode: thread.statelessMode,
                 status: optimisticStatus === undefined ? thread.status || "active" : optimisticStatus,
@@ -350,6 +358,17 @@ const useThreadGroups = (
         return { heldProjectThreads, map, threadsWithoutProject };
     }, [hierarchyData, holdProjectThreads, projects, searchQuery]);
 
+    // Snoozes end on their own: one timer to the next wake, none while nothing is snoozed.
+    const [now, setNow] = useState(() => Date.now());
+    const nextWake = useMemo(() => (hierarchyData ? nextSnoozeWake(hierarchyData.regularThreads, now) : undefined), [hierarchyData, now]);
+
+    useEffect(() => {
+        const delay = nextWake === undefined ? 0 : Math.min(Math.max(nextWake - Date.now(), 0) + 25, MAX_TIMEOUT_MS);
+        const timer = nextWake === undefined ? undefined : setTimeout(() => setNow(Date.now()), delay);
+
+        return () => clearTimeout(timer);
+    }, [nextWake, now]);
+
     // Memoize search results separately - this is a common hot path
     const searchResultsGroup = useMemo(() => {
         if (!searchQuery.trim() || !hierarchyData) {
@@ -408,8 +427,20 @@ const useThreadGroups = (
             }
         }
 
+        // Needs you / Working / Snoozed are derived over every active regular chat, project chats included, and take them out of the groups below.
+        // The stored placeholder copy has none of these fields, so its held project chats stay where they are.
+        const projectRoots = [...threadsByProject.map.values()].flat();
+        const activeRoots = [...threadsWithoutProject, ...projectRoots].filter((thread) => thread.status !== "archived");
+        const derived = partitionDerivedSections(activeRoots, now);
+        const derivedThreads = [...derived.needsYou, ...derived.working, ...derived.snoozed];
+        const derivedIds = new Set(derivedThreads.map((thread) => thread.threadId));
+
         // Single pass grouping for regular threads without projects
         for (const thread of threadsWithoutProject) {
+            if (derivedIds.has(thread.threadId)) {
+                continue;
+            }
+
             if (thread.status === "archived") {
                 archivedThreads.push(thread);
             } else if (thread.isPinned) {
@@ -426,6 +457,14 @@ const useThreadGroups = (
         }
 
         const groups: ThreadGroup[] = [];
+
+        const derivedGroup = (groupType: GroupType, threads: BranchNode[], title: string, isCollapsed: boolean): ThreadGroup[] =>
+            threads.length > 0 ? [{ groupType, isCollapsed, isPlaceholder: true, threads, title }] : [];
+
+        groups.push(
+            ...derivedGroup("needsYou", derived.needsYou, t`Needs you`, collapsedGroups.has("needsYou")),
+            ...derivedGroup("working", derived.working, t`Working`, collapsedGroups.has("working")),
+        );
 
         // Add project groups first (before time-based groups)
         // Include all projects, even if they have no threads
@@ -488,7 +527,7 @@ const useThreadGroups = (
             const projectThreads = threadsByProject.map.get(projectId) || [];
 
             // Filter out archived threads from project groups
-            const activeProjectThreads = projectThreads.filter((candidate) => candidate.status !== "archived");
+            const activeProjectThreads = projectThreads.filter((candidate) => candidate.status !== "archived" && !derivedIds.has(candidate.threadId));
 
             // Check if this specific project group is collapsed
             const isCollapsed = collapsedProjects.has(projectId);
@@ -521,6 +560,11 @@ const useThreadGroups = (
         ];
 
         for (const config of groupConfigs) {
+            // Snoozed sits just above Archived. Its stored flag means "expanded", so a stored list that never heard of it opens it shut.
+            if (config.groupType === "archived") {
+                groups.push(...derivedGroup("snoozed", derived.snoozed, t`Snoozed`, !collapsedGroups.has("snoozed")));
+            }
+
             if (config.threads.length > 0) {
                 groups.push({
                     groupType: config.groupType,
@@ -532,7 +576,7 @@ const useThreadGroups = (
         }
 
         return groups;
-    }, [searchResultsGroup, hierarchyData, threadsByProject, projects, collapsedGroups, collapsedProjects, dateBoundaries, t]);
+    }, [searchResultsGroup, hierarchyData, threadsByProject, projects, collapsedGroups, collapsedProjects, dateBoundaries, now, t]);
 
     return { isPlaceholderData, threadGroups, threadsData };
 };
