@@ -8,6 +8,7 @@ import { hasFindInThreadTarget } from "../lib/find-in-thread-target";
 import { convertRecordedShortcutToHotkeysHook, effortCommandsToRegister } from "../lib/recorded-shortcut-converter";
 import convertShortcutToHotkeysHook from "../lib/shortcut-converter";
 import { hasThreadSearchTarget } from "../lib/thread-search-target";
+import KeyboardShortcutsSheet from "./keyboard-shortcuts-sheet";
 
 // Context for keyboard shortcuts
 interface KeyboardShortcutsContextType {
@@ -555,6 +556,7 @@ export const KeyboardShortcutsManager: React.FC<{
         <HotkeysProvider>
             <KeyboardShortcutsContext value={contextValue}>
                 <KeyboardShortcutsHandler onShortcut={onShortcut} shortcuts={effectiveShortcuts} />
+                <KeyboardShortcutsSheet shortcuts={effectiveShortcuts} />
                 {children}
             </KeyboardShortcutsContext>
         </HotkeysProvider>
