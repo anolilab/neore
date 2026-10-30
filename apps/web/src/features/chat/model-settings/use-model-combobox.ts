@@ -91,10 +91,13 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
                     }),
             );
 
+            // The answer can land after the user opened another thread: the store belongs to that one by now.
+            const isOnThread = () => useModelStore.getState().selectedModelThreadId === threadId;
+
             try {
                 const result = await request;
 
-                if (!isLatestPick()) {
+                if (!isLatestPick() || !isOnThread()) {
                     return;
                 }
 
@@ -109,7 +112,7 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
             } catch (error) {
                 // A thread with nothing to switch from yet (no messages) has no transcript to put a divider in: the
                 // pick is an edit of the thread's model, below.
-                if (!isLatestPick()) {
+                if (!isLatestPick() || !isOnThread()) {
                     return;
                 }
 

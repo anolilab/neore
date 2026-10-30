@@ -10,11 +10,23 @@ const recentStreams = async (ctx: Pick<MutationCtx, "db">, threadId: string) =>
         .order("desc")
         .take(RECENT_STREAMS_CHECKED);
 
-/** Whether the thread has a run still writing to it (`persistentStreams`, pending or streaming). */
+/**
+ * Whether the thread has a run still writing to it (`persistentStreams`, pending or streaming). Read by status, not
+ * from the newest streams: a send does not wait for a live run, so newer runs can finish while an older one streams.
+ */
 export const isThreadStreaming = async (ctx: Pick<MutationCtx, "db">, threadId: string): Promise<boolean> => {
-    const streams = await recentStreams(ctx, threadId);
+    for (const status of ["pending", "streaming"]) {
+        const live = await ctx.db
+            .query("persistentStreams")
+            .withIndex("by_threadId_status", (q) => q.eq("threadId", threadId).eq("status", status))
+            .take(1);
 
-    return streams.some((stream) => stream.status === "pending" || stream.status === "streaming");
+        if (live.length > 0) {
+            return true;
+        }
+    }
+
+    return false;
 };
 
 /**
@@ -32,7 +44,12 @@ export const hasLiveDeltaStream = async (ctx: Pick<MutationCtx, "db">, threadId:
 
 /** Whether a run was ever started for `messageId` (a prompt), in any state — a run stopped before its first token counts. */
 export const hasStreamFor = async (ctx: Pick<MutationCtx, "db">, threadId: string, messageId: string): Promise<boolean> => {
-    const streams = await recentStreams(ctx, threadId);
+    // The whole thread, not its newest streams: an older prompt can become the displayed leaf (a branch switch)
+    // after any number of later runs. Streams are purged after their retention, so this stays small.
+    const streams = await ctx.db
+        .query("persistentStreams")
+        .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
+        .collect();
 
     return streams.some((stream) => stream.messageId === messageId);
 };

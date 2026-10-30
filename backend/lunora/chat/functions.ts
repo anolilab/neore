@@ -1476,7 +1476,7 @@ export const updateThread = authAction
             }
 
             context.log.event("chat.update_thread", {
-                modelChanged: model !== undefined,
+                modelChanged: model !== undefined && !threadData?.activeAgent,
                 statusChanged: status ?? null,
                 summaryChanged: summary !== undefined,
                 titleChanged: title !== undefined,
