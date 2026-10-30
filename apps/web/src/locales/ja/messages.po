@@ -1033,6 +1033,10 @@ msgstr "{providerName} · ご自身の Bedrock アカウント（{region}）"
 msgid "{requestCount} req"
 msgstr "{requestCount} 件"
 
+#: src/features/develop/components/pull-request-view.tsx:106
+msgid "{requestNoun} views"
+msgstr ""
+
 #: src/components/settings/settings-search.tsx:93
 msgid "{resultCount, plural, one {# result} other {# results}}"
 msgstr ""

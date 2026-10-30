@@ -103,7 +103,7 @@ const PullRequestView = ({
                 <p className="text-muted-foreground text-sm">{t`This host does not offer any view of a ${requestNoun} yet.`}</p>
             ) : (
                 <Tabs onValueChange={(value) => onTabChange(value as DevelopTab)} value={current}>
-                    <TabsList>
+                    <TabsList aria-label={t`${requestNoun} views`}>
                         {tabs.map((candidate) => (
                             <TabsTrigger key={candidate} value={candidate}>
                                 {tabLabels[candidate]}
