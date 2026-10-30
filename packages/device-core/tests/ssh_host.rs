@@ -1673,7 +1673,7 @@ fn a_forwarded_agent_is_linked_from_a_stable_path_in_the_run_folder() {
     );
     assert!(!plain.remote_env().contains("SSH_AUTH_SOCK"));
 
-    finish(&connection, &target, &paths);
+    finish(&connection, &plain.target("client"), &plain.paths("a"));
 
     let _ = agent.kill();
     let _ = agent.wait();
