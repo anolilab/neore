@@ -90,7 +90,7 @@ const renderPrompt = (prompt: Prompt | null): void => {
             setText("prompt-heading", `Connect to ${body.user}@${body.address}?`);
             const installs = body.installVersion === null
                 ? ""
-                : ` If the server does not have it yet, Neore also copies its host program (neore-host ${body.installVersion}) into ~/.neore/host there.`;
+                : ` Unless the server already has this exact build, Neore also copies its host program (neore-host ${body.installVersion}) into ~/.neore/host there, replacing a different build of that version.`;
 
             setText(
                 "prompt-context",
