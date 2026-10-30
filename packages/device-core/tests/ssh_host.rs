@@ -1973,7 +1973,7 @@ fn a_ten_thousand_file_folder_lists_and_downloads_within_the_budget() {
         .unwrap_err()
         .contains("outside the shared folders"));
 
-    finish(&connection);
+    finish(&connection, &target, &paths);
 }
 
 /// A writer that takes its time, like a slow disk.
@@ -2044,5 +2044,5 @@ fn another_request_is_answered_while_a_download_waits_on_a_slow_disk() {
     );
 
     let _ = fs::remove_dir_all(&dir);
-    finish(&connection);
+    finish(&connection, &target, &paths);
 }
