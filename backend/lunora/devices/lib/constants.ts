@@ -30,6 +30,9 @@ export const ACP_CLAIM_LEASE_MS = 30_000;
 /** Offers a manifest may carry; the desktop sends at most the same number. */
 export const MAX_MANIFEST_OFFERS = 50;
 
+/** The coding-agent call kinds, and the only names `isAcpTool` takes for one. A device cannot advertise any of them as a tool. */
+export const ACP_TOOLS: ReadonlyArray<string> = ["acp_start", "acp_send", "acp_cancel", "acp_permission_answer"];
+
 /** Approval wait + run, from creation. Also the envelope's `expiresAt`. */
 export const DEVICE_CALL_DEADLINE_MS = 5 * 60_000;
 

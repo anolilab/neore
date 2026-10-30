@@ -55,6 +55,8 @@ const agentThreads = await import("../agent/threads");
 const composite = await import("../chat/composite");
 const { measureDb } = await import("../../test/db-cost");
 const { HOST_STREAM_IDLE_MS, HOST_TURN_MAX_MS, INGEST_FLOOD_LIMIT_PER_MINUTE } = await import("./lib/constants");
+const { streamLogger } = await import("../lib/logger");
+const { MAX_OPEN_ACP_CANCELS_PER_DEVICE } = await import("../devices/lib/constants");
 
 registerModule(registry, "lib_shard_routes", await import("../lib/shard-routes"));
 registerModule(registry, "lib_shard_housekeeping", await import("../lib/shard-housekeeping"));
@@ -114,6 +116,7 @@ const pair = async (userId: string): Promise<Paired> => {
 };
 
 interface Body {
+    close?: boolean;
     events: unknown[];
     firstSeq?: number;
     issuedAt?: number;
@@ -624,16 +627,16 @@ describe("ingest refusals", () => {
     });
 });
 
+const expire = async (turnId: string, at: number) =>
+    await harness.run(async (ctx: any) => {
+        const stream = await ctx.db.persistentStreams.findFirst({ where: { hostTurnId: turnId } });
+
+        await ctx.db.patch(stream._id, { expiresAt: at });
+    });
+
+const reap = async () => await harness.run(async (ctx: any) => await ctx.runMutation(reapHostStreams, {}));
+
 describe("the reaper", () => {
-    const expire = async (turnId: string, at: number) =>
-        await harness.run(async (ctx: any) => {
-            const stream = await ctx.db.persistentStreams.findFirst({ where: { hostTurnId: turnId } });
-
-            await ctx.db.patch(stream._id, { expiresAt: at });
-        });
-
-    const reap = async () => await harness.run(async (ctx: any) => await ctx.runMutation(reapHostStreams, {}));
-
     it("times out a silent stream, sends the host a signed cancel, and drops what arrives later", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
@@ -913,6 +916,262 @@ describe("acp calls", () => {
         )) as { error?: string };
 
         expect(result.error).not.toBe("busy");
+    });
+});
+
+/** A signed session-level close, as the desktop posts it when a local session ends. */
+const close = async (device: Paired, sessionId = "host-s1", extra: Partial<Body> = {}) =>
+    await ingest(device, { close: true, events: [], sessionId, ...extra } as Body);
+
+describe("a turn that begins while the session's previous turn is live", () => {
+    it("is told to wait, and starts once the earlier turn's end has landed", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("first"), TEXT("working")]);
+
+        const waiting = await turn(device, threadId, "t2", 0, [START("second")]);
+
+        // 409 without `next`: the host reads it as "try again", not as a gap to fill.
+        expect(waiting).toMatchObject({ json: { error: "turn_in_progress" }, status: 409 });
+        expect(waiting.json.next).toBeUndefined();
+        expect(await streamFor("t2")).toBeNull();
+        const saved = await messagesOf(threadId);
+
+        expect(saved.filter((message) => message.message.role === "user")).toHaveLength(1);
+
+        await turn(device, threadId, "t1", 2, [{ kind: "turn_end", reason: "finished" }]);
+
+        await expect(turn(device, threadId, "t2", 0, [START("second")])).resolves.toMatchObject({ json: { ended: false }, status: 200 });
+
+        const second = await streamFor("t2");
+
+        await expect(as(ownerId).query(streaming.getActiveStreamForThread as never, { threadId } as never)).resolves.toMatchObject({ streamId: second?._id });
+    });
+
+    it("keeps answering a redelivery of the live turn itself, not as busy", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("first")]);
+
+        await expect(turn(device, threadId, "t1", 0, [START("first"), TEXT("more")])).resolves.toMatchObject({ json: { next: 2 }, status: 200 });
+    });
+
+    it("lets the reaper unblock the next turn when the earlier one's host never returned", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("first")]);
+        await expect(turn(device, threadId, "t2", 0, [START("second")])).resolves.toMatchObject({ status: 409 });
+        await expire("t1", Date.now() - 1000);
+        await reap();
+
+        await expect(turn(device, threadId, "t2", 0, [START("second")])).resolves.toMatchObject({ status: 200 });
+    });
+});
+
+describe("a long turn read live", () => {
+    it("shows every chunk to a second client, however many pages the turn has", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const texts = Array.from({ length: 300 }, (_, index) => TEXT(String(index % 10)));
+
+        await turn(device, threadId, "t1", 0, [START(), ...texts.slice(0, 150)]);
+        await turn(device, threadId, "t1", 151, texts.slice(150));
+
+        const stream = await streamFor("t1");
+        const body = (await harness.run(async (ctx: any) => await ctx.runQuery(library.getStreamText, { streamId: stream?._id }))) as {
+            status: string;
+            text: string;
+        };
+
+        expect(body.status).toBe("streaming");
+        expect(body.text).toBe(texts.map((event) => event.text).join(""));
+        expect(body.text).toHaveLength(300);
+    });
+});
+
+describe("a session the desktop closed", () => {
+    it("ends the session at once, and refuses turn posts into it", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("done"), { kind: "turn_end", reason: "finished" }]);
+
+        const closed = await close(device);
+
+        expect(closed).toMatchObject({ json: { ended: true }, status: 200 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "ended" });
+        await expect(turn(device, threadId, "t2", 0, [START("again")])).resolves.toMatchObject({ status: 403 });
+        // The thread and its saved reply are untouched.
+        expect(await row(threadId)).toMatchObject({ runner: "host", status: "active" });
+        expect(await assistantRepliesOf(threadId)).toHaveLength(1);
+    });
+
+    it("is idempotent, and a session it does not know is not an error", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+
+        await expect(close(device)).resolves.toMatchObject({ json: { ended: true }, status: 200 });
+        await expect(close(device)).resolves.toMatchObject({ json: { ended: true }, status: 200 });
+        await expect(close(device, "never-opened")).resolves.toMatchObject({ json: { ended: true }, status: 200 });
+    });
+
+    it("ends a turn the host never finished as interrupted, so no stream stays live", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("half")]);
+        await close(device);
+
+        expect(await streamFor("t1")).toMatchObject({ hostEndReason: "interrupted", hostState: "ended", status: "error" });
+        await expect(as(ownerId).query(streaming.getActiveStreamForThread as never, { threadId } as never)).resolves.toBeNull();
+        expect(await assistantRepliesOf(threadId)).toHaveLength(1);
+    });
+
+    it("ends only the sessions of the device that signed it", async () => {
+        const device = await pair(ownerId);
+        const other = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await close(other);
+
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "idle" });
+    });
+
+    it("refuses a close that carries events or a thread", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await expect(close(device, "host-s1", { events: [SESSION_OPEN] })).resolves.toMatchObject({ status: 403 });
+        await expect(close(device, "host-s1", { threadId })).resolves.toMatchObject({ status: 403 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "idle" });
+    });
+
+    it("answers 400 to a close flag that is not a boolean", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+
+        await expect(ingest(device, { close: "yes", events: [] } as never)).resolves.toMatchObject({ status: 400 });
+    });
+});
+
+describe("deleting a host thread", () => {
+    const hardDelete = async (threadId: string) =>
+        await harness.run(async (ctx: any) => await ctx.runMutation(agentThreads.deleteAllForThreadIdAsync, { threadId }));
+    const softDelete = async (threadId: string) => await harness.run(async (ctx: any) => await ctx.runMutation(agentThreads.softDeleteThread, { threadId }));
+
+    it.each([
+        ["soft", softDelete],
+        ["hard", hardDelete],
+    ])("a %s delete during a live turn ends the turn without a reply, asks the host to cancel, and ends the session", async (_kind, remove) => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("half")]);
+        await remove(threadId);
+
+        expect(await streamFor("t1")).toMatchObject({ hostEndReason: "stopped", hostState: "ended", status: "done" });
+        expect(await assistantRepliesOf(threadId)).toHaveLength(0);
+        expect(await cancelCalls()).toHaveLength(1);
+
+        const sessions = await pageOf(async (ctx) => await ctx.db.acpSessions.findMany({ where: { userId: ownerId } }));
+
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0]).toMatchObject({ status: "ended", threadId });
+        // The desktop's next post is refused, and a reopen is told the session is over (not given a new thread).
+        await expect(turn(device, threadId, "t1", 2, [TEXT("more")])).resolves.toMatchObject({ status: 403 });
+        await expect(ingest(device, { events: [SESSION_OPEN] })).resolves.toMatchObject({ json: { ended: true, threadId } });
+    });
+
+    it("undoing a soft delete lets the desktop that still holds the session post into the thread again", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("half")]);
+        await softDelete(threadId);
+        await expect(turn(device, threadId, "t2", 0, [START("again")])).resolves.toMatchObject({ status: 403 });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(agentThreads.restoreThread, { threadId }));
+
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "offline" });
+        // A redelivered open is no longer told the session is over, and the next turn is taken.
+        await expect(ingest(device, { events: [SESSION_OPEN] })).resolves.toMatchObject({ json: { ended: false, threadId } });
+        await expect(turn(device, threadId, "t2", 0, [START("again")])).resolves.toMatchObject({ json: { ended: false }, status: 200 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "busy" });
+        // The turn the delete cut short stays ended.
+        expect(await streamFor("t1")).toMatchObject({ hostEndReason: "stopped", hostState: "ended" });
+    });
+
+    it("undoing a soft delete leaves the session ended when its device was removed meanwhile", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await softDelete(threadId);
+        await as(ownerId).mutation(devices.revokeDevice as never, { deviceId: device.deviceId } as never);
+        await harness.run(async (ctx: any) => await ctx.runMutation(agentThreads.restoreThread, { threadId }));
+
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "ended" });
+    });
+
+    it("a hard delete removes the thread and leaves no live stream behind", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("half")]);
+        await hardDelete(threadId);
+
+        expect(await row(threadId)).toBeNull();
+        expect(await pageOf(async (ctx) => await ctx.db.persistentStreams.findMany({ where: { status: { in: ["pending", "streaming"] } } }))).toHaveLength(0);
+    });
+
+    it("leaves an ordinary thread and a host thread without a live turn alone", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const cloud = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "Chat", userId: ownerId }))) as string;
+
+        await softDelete(cloud);
+        await softDelete(threadId);
+
+        expect(await cancelCalls()).toHaveLength(0);
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "ended" });
+    });
+});
+
+describe("the cancel a stop or a delete sends", () => {
+    it("is logged, not lost silently, when the device's call budget is spent", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const warn = vi.spyOn(streamLogger, "warn").mockImplementation(() => {});
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("x")]);
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < MAX_OPEN_ACP_CANCELS_PER_DEVICE; index += 1) {
+                await ctx.db.insert("deviceCalls", {
+                    createdAt: Date.now(),
+                    deadline: Date.now() + 600_000,
+                    deviceId: device.deviceId,
+                    deviceName: "Laptop",
+                    envelope: "",
+                    input: "{}",
+                    signature: "",
+                    status: "claimed",
+                    taintedBy: [],
+                    threadId,
+                    toolName: "acp_cancel",
+                    userId: ownerId,
+                });
+            }
+        });
+        await harness.run(async (ctx: any) => await ctx.runMutation(library.stopActiveForThread, { threadId }));
+
+        expect(await streamFor("t1")).toMatchObject({ hostEndReason: "stopped", status: "done" });
+        expect(await cancelCalls()).toHaveLength(MAX_OPEN_ACP_CANCELS_PER_DEVICE);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("busy"));
+        warn.mockRestore();
     });
 });
 

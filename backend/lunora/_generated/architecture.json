@@ -4161,6 +4161,11 @@
       "to": "table:threadTags"
     },
     {
+      "from": "function:gdpr_steps:generateExportFile",
+      "kind": "call",
+      "to": "function:acp_gdpr:collectAcpSessionsForExport"
+    },
+    {
       "from": "function:gdpr_steps:sendExportReadyEmail",
       "kind": "call",
       "to": "function:gdpr_functions:getRequestById"
@@ -16411,13 +16416,13 @@
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 206,
+      "line": 208,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 223,
+      "line": 225,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
@@ -16445,9 +16450,21 @@
       "reason": "\"touchSession\" is not a registered function"
     },
     {
+      "file": "acp/lib/thread-removed",
+      "kind": "write",
+      "line": 50,
+      "reason": "\"endHostThread\" is not a registered function"
+    },
+    {
+      "file": "acp/lib/thread-removed",
+      "kind": "write",
+      "line": 71,
+      "reason": "\"restoreHostThread\" is not a registered function"
+    },
+    {
       "file": "acp/send",
       "kind": "call",
-      "line": 192,
+      "line": 202,
       "reason": "\"hostSendHttpAction\" is not a registered function"
     },
     {
@@ -17185,13 +17202,13 @@
     {
       "file": "agent/threads",
       "kind": "write",
-      "line": 289,
+      "line": 290,
       "reason": "\"markThreadArchived\" is not a registered function"
     },
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1449,
+      "line": 1468,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
@@ -18781,19 +18798,19 @@
     {
       "file": "devices/lib/acp-call",
       "kind": "write",
-      "line": 76,
+      "line": 74,
       "reason": "\"createAcpCall\" is not a registered function"
     },
     {
       "file": "devices/lib/acp-call",
       "kind": "write",
-      "line": 106,
+      "line": 104,
       "reason": "\"createAcpCall\" is not a registered function"
     },
     {
       "file": "devices/lib/acp-call",
       "kind": "schedule",
-      "line": 108,
+      "line": 106,
       "reason": "\"createAcpCall\" is not a registered function"
     },
     {
@@ -18805,7 +18822,7 @@
     {
       "file": "devices/lib/state",
       "kind": "write",
-      "line": 38,
+      "line": 75,
       "reason": "\"expireOpenCalls\" is not a registered function"
     },
     {
@@ -19309,43 +19326,37 @@
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 91,
+      "line": 89,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 93,
+      "line": 102,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 106,
+      "line": 120,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 124,
+      "line": 160,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 165,
+      "line": 169,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
       "line": 174,
-      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
-    },
-    {
-      "file": "gdpr/workflows/export-workflow",
-      "kind": "call",
-      "line": 179,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {

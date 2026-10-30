@@ -20,7 +20,7 @@ import {
     MAX_OPEN_ACP_CANCELS_PER_DEVICE,
 } from "./constants";
 import { signDevicePayload, utf8Length } from "./signing";
-import { isAcpTool, isDeviceOnline, OPEN_CALL_STATUSES } from "./state";
+import { countOpenCalls, isAcpTool, isDeviceOnline } from "./state";
 
 export type AcpCallKind = "acp_cancel" | "acp_permission_answer" | "acp_send" | "acp_start";
 
@@ -53,21 +53,19 @@ export const createAcpCall = async (
     }
 
     // Stop has a budget of its own: three answers waiting to be delivered must not be able to swallow it.
-    let open = 0;
+    // A pending call past its claim window can no longer be claimed (it expires on its own): it must not block a cancel.
+    const limit = kind === "acp_cancel" ? MAX_OPEN_ACP_CANCELS_PER_DEVICE : MAX_OPEN_ACP_CALLS_PER_DEVICE;
+    const open = await countOpenCalls(
+        ctx,
+        deviceId,
+        (call) =>
+            isAcpTool(call.toolName) &&
+            !(call.status === "pending" && now - call.createdAt > ACP_CLAIM_WINDOW_MS) &&
+            (call.toolName === "acp_cancel") === (kind === "acp_cancel"),
+        limit,
+    );
 
-    for (const status of OPEN_CALL_STATUSES) {
-        const { page } = await ctx.db.deviceCalls.findMany({ limit: 50, where: { deviceId, status } });
-
-        // A pending call past its claim window can no longer be claimed (it expires on its own): it must not block a cancel.
-        open += page.filter(
-            (call) =>
-                isAcpTool(call.toolName) &&
-                !(call.status === "pending" && now - call.createdAt > ACP_CLAIM_WINDOW_MS) &&
-                (call.toolName === "acp_cancel") === (kind === "acp_cancel"),
-        ).length;
-    }
-
-    if (open >= (kind === "acp_cancel" ? MAX_OPEN_ACP_CANCELS_PER_DEVICE : MAX_OPEN_ACP_CALLS_PER_DEVICE)) {
+    if (open >= limit) {
         return { error: "busy" };
     }
 

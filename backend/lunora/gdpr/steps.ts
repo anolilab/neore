@@ -1,5 +1,6 @@
 import { LunoraError, v } from "lunorash/server";
 
+import { collectAcpSessionPages } from "../acp/gdpr";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -451,8 +452,8 @@ export const collectPrompts = internalQuery.input({ userId: v.string() }).query(
 
 export const generateExportFile = internalAction
     .input({
-        // Coding-agent sessions on paired devices (`acp/gdpr.ts`). Optional for
-        // the same in-flight-replay reason as `threadTags`.
+        // Coding-agent sessions on paired devices (`acp/gdpr.ts`). Read here, a page at a
+        // time, unless a workflow already in flight passes them.
         acpSessions: v.optional(v.any()),
         // Usage history, sub-agent runs and knowledge collections
         // (`collectActivityForExport`). Optional for the same in-flight-replay
@@ -501,7 +502,13 @@ export const generateExportFile = internalAction
     .action(async ({ args, ctx: context }) => {
         const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
         const exportData = {
-            acpSessions: args.acpSessions ?? { sessions: [] },
+            // Read here, a page per query, so no workflow step result or action argument carries the history.
+            acpSessions:
+                args.acpSessions ??
+                (await collectAcpSessionPages(
+                    async (cursor) => await context.runQuery(internal.acp.gdpr.collectAcpSessionsForExport, { cursor, userId: args.userId }),
+                    MAX_EXPORT_BYTES,
+                )),
             bots: args.bots ?? { bots: [] },
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
