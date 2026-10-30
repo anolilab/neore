@@ -282,6 +282,20 @@ done
 }
 
 fn nonce() -> String {
+    unique_hex(8)
+}
+
+/// The name of this installation (`SshPaths::desktop_tag`): 16 hex characters.
+pub(crate) fn desktop_tag() -> String {
+    unique_hex(8)
+}
+
+/// The id of one `neore-host` launch (`launch.rs`): 32 hex characters.
+pub(crate) fn launch_id() -> String {
+    unique_hex(16)
+}
+
+fn unique_hex(bytes: usize) -> String {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
 
     let now = SystemTime::now()
@@ -293,7 +307,7 @@ fn nonce() -> String {
     digest.update(std::process::id().to_le_bytes());
     digest.update(COUNTER.fetch_add(1, Ordering::Relaxed).to_le_bytes());
 
-    hex(&digest.finalize()[..8])
+    hex(&digest.finalize()[..bytes])
 }
 
 /// Where a run goes and who answers its questions.
