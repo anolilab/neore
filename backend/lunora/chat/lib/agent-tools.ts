@@ -24,6 +24,7 @@ import { ToolName } from "../tools";
 import { admittedKnowledgeSearchTool } from "../tools/knowledge-search";
 import { getToolsForModelAndMode, listBuiltInTools } from "./tool-builder";
 import type { ToolDescriptor, ToolPermissionOverrides } from "./tool-permissions";
+import type { RunOrigin } from "./tool-run-config";
 import { applyToolPermissions, toolPermissionKey } from "./tool-permissions";
 
 /**
@@ -55,6 +56,8 @@ export interface BuildAgentToolsOptions {
     /** Restrict MCP servers to these names; empty/undefined means every enabled server. */
     mcpServerNames?: string[];
     model: LanguageModel | string;
+    /** Who started the run, when not the person at the app: an API key's run gets no device tools and no `auto` tool. */
+    origin?: RunOrigin;
     searchMode: SearchMode;
     /**
      * An invoked skill's tool config. It only changes the CANDIDATES: extra
@@ -89,8 +92,20 @@ export interface BuildAgentToolsResult {
 }
 
 export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOptions): Promise<BuildAgentToolsResult> => {
-    const { admittedRun, autoMediaEnrichment, deviceThreadId, headless, headlessApproved, mcpServerNames, model, searchMode, skillTools, snapshot, userId } =
-        options;
+    const {
+        admittedRun,
+        autoMediaEnrichment,
+        deviceThreadId,
+        headless,
+        headlessApproved,
+        mcpServerNames,
+        model,
+        origin,
+        searchMode,
+        skillTools,
+        snapshot,
+        userId,
+    } = options;
 
     // Built-ins beyond the search mode's set: a skill's extra tools on a fresh
     // run, or — on a snapshot rebuild — every built-in the paused run had (a
@@ -139,7 +154,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     const [mcpResult, deviceResult] = await Promise.all([
         getMCPTools(selectedServers),
         // A device problem must never take the run down with it.
-        deviceThreadId === undefined || headless
+        deviceThreadId === undefined || headless || origin === "outside_agent"
             ? noDevices
             : buildDeviceTools(ctx, { threadId: deviceThreadId, userId }).catch((error: unknown) => {
                   toolsLogger.warn("[TOOLS] Device tools unavailable:", error);
@@ -181,6 +196,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     };
 
     const { removed, requiresApproval, tools } = applyToolPermissions(candidates, describe, overrides as ToolPermissionOverrides, {
+        ...(origin === "outside_agent" && { apiKeyOrigin: true }),
         headless,
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
     });
