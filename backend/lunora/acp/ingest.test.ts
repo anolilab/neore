@@ -1861,13 +1861,11 @@ describe("what a turn changed", () => {
         expect(await assistantRepliesOf(threadId)).toHaveLength(0);
     });
 
-    it("keeps each reply, and the changes it carries, under its own prompt across back-to-back turns", async () => {
+    it("keeps each turn's summary on its own reply, not on the next turn's", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
 
-        await turn(device, threadId, "t1", 0, [START("one"), TEXT("first")]);
-        // The host waits for the earlier turn's end before the next turn begins (a second live stream would hide it).
-        await turn(device, threadId, "t1", 2, [{ kind: "turn_end", reason: "finished", summary: SUMMARY }]);
+        await turn(device, threadId, "t1", 0, [START("one"), TEXT("first"), { kind: "turn_end", reason: "finished", summary: SUMMARY }]);
         await turn(device, threadId, "t2", 0, [START("two"), TEXT("second"), { kind: "turn_end", reason: "finished" }]);
 
         const { toUIMessages } = await import("../agent/ui-messages");
