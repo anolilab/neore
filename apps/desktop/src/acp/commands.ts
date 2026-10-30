@@ -36,6 +36,13 @@ const KEEP_AFTER_EXPIRY_MS = 10 * 60_000;
 /** The backend allows three open commands per device and each lives five minutes, so this is far more than can be live. */
 const MAX_RECEIPTS = 1000;
 
+/**
+ * The longest a signed command stays valid (the backend's `DEVICE_CALL_DEADLINE_MS`), plus the same skew margin.
+ * A receipt log that cannot be read is set aside and commands wait this long: by then every command it could have
+ * held a receipt for has expired, so starting empty cannot run one again.
+ */
+const UNREADABLE_LOG_WAIT_MS = 5 * 60_000 + KEEP_AFTER_EXPIRY_MS;
+
 export type AcpCommand
     = | { kind: "cancel"; sessionId: string; turnId: string }
         | { kind: "permissionAnswer"; optionId: string; requestId: string; sessionId: string }
@@ -192,6 +199,9 @@ export class HostCommands {
     private readonly handling = new Map<string, Promise<string>>();
 
     private loaded: Promise<void> | undefined;
+
+    /** Set when the receipt log on disk could not be read: no command runs before this time. */
+    private unreadableUntil = 0;
 
     /** Set while `recover` runs: a delivery waits for it, so a redelivered call cannot be acted on twice. */
     private replaying: Promise<void> | undefined;
@@ -475,29 +485,68 @@ export class HostCommands {
         return (this.options.now ?? Date.now)();
     }
 
-    private load(): Promise<void> {
-        this.loaded ??= this.read();
+    private async load(): Promise<void> {
+        // A failed read is not remembered: the next delivery reads again, rather than the app running without its log.
+        this.loaded ??= this.readOnce();
 
-        return this.loaded;
+        await this.loaded;
+
+        if (this.now() < this.unreadableUntil) {
+            throw new Error("The command receipt log could not be read; coding-agent commands resume once its commands have expired.");
+        }
+    }
+
+    private async readOnce(): Promise<void> {
+        try {
+            await this.read();
+        } catch (error) {
+            this.loaded = undefined;
+
+            throw error;
+        }
     }
 
     private async read(): Promise<void> {
-        try {
-            const parsed: unknown = JSON.parse(await readFile(this.options.receiptFile, "utf8"));
-            const entries = isRecord(parsed) && Array.isArray(parsed.receipts) ? parsed.receipts : [];
+        let text: string;
 
-            for (const entry of entries) {
-                if (Array.isArray(entry) && typeof entry[0] === "string" && typeof entry[1] === "number") {
-                    this.receipts.set(entry[0], {
-                        expiresAt: entry[1],
-                        ...typeof entry[2] === "string" && { refusal: entry[2] },
-                        ...typeof entry[3] === "string" && typeof entry[4] === "string" && { held: { envelope: entry[3], signature: entry[4] } },
-                    });
-                }
+        try {
+            text = await readFile(this.options.receiptFile, "utf8");
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+                return;
             }
+
+            throw error;
+        }
+
+        let parsed: unknown;
+
+        try {
+            parsed = JSON.parse(text);
         } catch {
-            // No file yet, or one that cannot be read: the log starts empty. A call it forgot can run again only
-            // while its envelope is valid, and the backend's own claim keeps a second window from taking it.
+            parsed = undefined;
+        }
+
+        // A file that is there but cannot be trusted is set aside, and commands wait until any it held a receipt for
+        // has expired: starting empty at once could run one of them again.
+        if (!isRecord(parsed) || !Array.isArray(parsed.receipts)) {
+            const aside = `${this.options.receiptFile}.unreadable-${String(this.now())}`;
+
+            await rename(this.options.receiptFile, aside);
+            this.unreadableUntil = this.now() + UNREADABLE_LOG_WAIT_MS;
+            this.options.log?.(`[acp-host] the command receipt log could not be read; it was moved to ${aside}`);
+
+            return;
+        }
+
+        for (const entry of parsed.receipts) {
+            if (Array.isArray(entry) && typeof entry[0] === "string" && typeof entry[1] === "number") {
+                this.receipts.set(entry[0], {
+                    expiresAt: entry[1],
+                    ...typeof entry[2] === "string" && { refusal: entry[2] },
+                    ...typeof entry[3] === "string" && typeof entry[4] === "string" && { held: { envelope: entry[3], signature: entry[4] } },
+                });
+            }
         }
     }
 

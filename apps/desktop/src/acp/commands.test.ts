@@ -4,7 +4,7 @@
  * and one killed after the receipt acknowledges it without running it again. "Killed" is a fresh `HostCommands` over the same
  * file, which is all a restart leaves behind.
  */
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -228,6 +228,45 @@ const killedInside = (): Promise<string> =>
     new Promise<string>(() => {
         // Settles never.
     });
+
+describe("a receipt log that cannot be read", () => {
+    it.each(["{not json", "{}"])("stops a delivery instead of starting empty for %s", async (content) => {
+        writeFileSync(receiptFile, content);
+
+        const applied: AcpCommand[] = [];
+        const commands = make(applied);
+
+        await expect(deliver(commands, "c1")).rejects.toThrow();
+        expect(applied).toEqual([]);
+    });
+
+    it("sets the unreadable log aside and runs commands again, from an empty log, once its commands have expired", async () => {
+        writeFileSync(receiptFile, "{not json");
+
+        let clock = 1_000_000;
+        const applied: AcpCommand[] = [];
+        const commands = make(applied, { now: () => clock });
+
+        await expect(deliver(commands, "c1")).rejects.toThrow();
+        expect(existsSync(receiptFile)).toBe(false);
+        expect(readdirSync(directory).some((name) => name.includes(".unreadable-"))).toBe(true);
+
+        clock += 14 * 60_000;
+        await expect(deliver(commands, "c1")).rejects.toThrow();
+
+        clock += 2 * 60_000;
+        expect(await deliver(commands, "c1")).toBe("accepted");
+        expect(applied).toEqual([SEND]);
+    });
+
+    it("starts empty at once when there is no log yet", async () => {
+        const applied: AcpCommand[] = [];
+        const fresh = make(applied, { file: path.join(directory, "missing.json") });
+
+        expect(await deliver(fresh, "c2")).toBe("accepted");
+        expect(applied).toEqual([SEND]);
+    });
+});
 
 describe("a command held until its session opens", () => {
     it("is acknowledged with its envelope in the log, and the envelope leaves the log once it has been acted on", async () => {
