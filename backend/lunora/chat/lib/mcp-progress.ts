@@ -194,6 +194,8 @@ export const createLatestThrottle = <T>(
             .then(() => {
                 writing = undefined;
                 schedule();
+
+                return undefined;
             });
     };
 

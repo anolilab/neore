@@ -107,9 +107,9 @@ describe("toolProgress", () => {
     });
 
     it("strips control characters and bidi overrides and isolates from the message", () => {
-        expect(readToolProgress({ ...tool, message: "a\u0007b\u202Ec\u2066d\u2069e", progress: 1 })?.message).toBe("abcde");
+        expect(readToolProgress({ ...tool, message: "a\u{7}b\u{202E}c\u{2066}d\u{2069}e", progress: 1 })?.message).toBe("abcde");
         expect(readToolProgress({ ...tool, message: "page 1\r\npage 2", progress: 1 })?.message).toBe("page 1 page 2");
-        expect(readToolProgress({ ...tool, message: "\u202E\u2066", progress: 1 })).toStrictEqual({ ...tool, progress: 1 });
+        expect(readToolProgress({ ...tool, message: "\u{202E}\u{2066}", progress: 1 })).toStrictEqual({ ...tool, progress: 1 });
     });
 
     it("cuts the message by code point, so a surrogate pair is never split", () => {

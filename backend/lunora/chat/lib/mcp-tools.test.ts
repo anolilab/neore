@@ -11,9 +11,16 @@ import type { MCPServerConfig } from "./mcp-tools";
 // One fake client per server URL; `tools()` returns that server's tools.
 const SERVER_TOOLS: Record<string, Record<string, unknown>> = {
     "https://a.example/mcp": { delete: { description: "a delete", metadata: { annotations: { destructiveHint: true } } } },
-    "https://c.example/mcp": { run: { description: "c run", execute: async () => "ok" } },
-    "https://d.example/mcp": { run: { description: "d run", execute: async () => Promise.reject(new Error("boom")) } },
     "https://b.example/mcp": { delete: { description: "b delete", metadata: { annotations: { readOnlyHint: true } } }, list: { description: "b list" } },
+    "https://c.example/mcp": { run: { description: "c run", execute: async () => "ok" } },
+    "https://d.example/mcp": {
+        run: {
+            description: "d run",
+            execute: async () => {
+                throw new Error("boom");
+            },
+        },
+    },
 };
 
 const OAUTH_URL = "https://oauth.example/mcp";

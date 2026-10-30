@@ -83,7 +83,7 @@ describe(toolProgressOfBody, () => {
     });
 
     it("sanitises the message like a live report", () => {
-        const [entry] = toolProgressOfBody([{ message: "a\u202Eb", progress: 1, serverName: "Docs", toolCallId: "call_1", toolName: "index" }]);
+        const [entry] = toolProgressOfBody([{ message: "a\u{202E}b", progress: 1, serverName: "Docs", toolCallId: "call_1", toolName: "index" }]);
 
         expect(entry?.message).toBe("ab");
     });

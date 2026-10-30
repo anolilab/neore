@@ -100,5 +100,7 @@ export const attachProgressTokens = (client: MCPClient): void => {
         original?.(message);
     };
 
+    // An MCP transport is not an EventTarget: `onmessage` is its only message hook.
+    // eslint-disable-next-line unicorn/prefer-add-event-listener -- MCP transports expose a callback property, not addEventListener
     transport.onmessage = route;
 };

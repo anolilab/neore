@@ -28,7 +28,7 @@ const fakeClock = () => {
             const end = time + ms;
 
             for (;;) {
-                const due = [...timers].filter(([, timer]) => timer.at <= end).sort(([, a], [, b]) => a.at - b.at)[0];
+                const due = [...timers].filter(([, timer]) => timer.at <= end).toSorted(([, a], [, b]) => a.at - b.at)[0];
 
                 if (!due) {
                     break;
@@ -137,7 +137,9 @@ describe(createLatestThrottle, () => {
         await Promise.resolve();
         await clock.advance(100);
         throttle.push(2);
+        // eslint-disable-next-line unicorn/prefer-single-call -- the throttle's own push, one value per call, not Array#push
         throttle.push(3);
+        // eslint-disable-next-line unicorn/prefer-single-call -- the throttle's own push, one value per call, not Array#push
         throttle.push(4);
         await clock.advance(399);
 
@@ -195,6 +197,7 @@ describe(createLatestThrottle, () => {
         const throttle = createLatestThrottle<number>(emit, clock);
 
         throttle.push(1);
+        // eslint-disable-next-line unicorn/prefer-single-call -- the throttle's own push, one value per call, not Array#push
         throttle.push(2);
         await clock.advance(2000);
 
@@ -203,6 +206,8 @@ describe(createLatestThrottle, () => {
         let closed = false;
         const closing = throttle.close().then(() => {
             closed = true;
+
+            return undefined;
         });
 
         await Promise.resolve();
@@ -250,6 +255,7 @@ describe(createToolProgressWriter, () => {
         call.push({ message: "start", progress: 0, total: 4 });
         await clock.advance(1);
         call.push({ progress: 1, total: 4 });
+        // eslint-disable-next-line unicorn/prefer-single-call -- the progress call's own push, one value per call, not Array#push
         call.push({ progress: 2, total: 4 });
         await call.finish();
         await clock.advance(5000);
@@ -401,7 +407,12 @@ describe(attachProgressTokens, () => {
     const call = async (script: Parameters<typeof fakeServer>[0], progressCall?: { onProgress: (progress: McpProgress) => void; token: string }) => {
         const server = fakeServer(script);
         const errors: unknown[] = [];
-        const client = await createMCPClient({ onUncaughtError: (error) => errors.push(error), transport: server.transport });
+        const client = await createMCPClient({
+            onUncaughtError: (error) => {
+                errors.push(error);
+            },
+            transport: server.transport,
+        });
 
         attachProgressTokens(client);
 
