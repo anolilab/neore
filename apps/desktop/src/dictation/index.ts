@@ -262,7 +262,7 @@ export const createDictation = (options: DictationOptions): Dictation => {
     const helper = (): HelperCommand => testEngine === undefined ? { args: [], command: helperPath() } : { args: testEngine.args, command: testEngine.command };
 
     // `getMediaAccessStatus` exists on macOS and Windows only; Linux has no OS gate and is never asked.
-    const microphoneAllowed = (): Promise<boolean> => {
+    const microphoneAllowed = (): Promise<boolean | "prompted"> => {
         if (testEngine !== undefined) {
             return Promise.resolve(true);
         }
