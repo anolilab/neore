@@ -47,6 +47,8 @@ const errorOf = async (response: Response): Promise<HostSendError> => {
     }
 };
 
+const SEND_DEADLINE_MS = 30_000;
+
 export const sendHostMessage = async (
     input: { requestId: string; text: string; threadId: string },
     options: { fetch?: typeof fetch; token?: () => Promise<string | null | undefined> } = {},
@@ -57,6 +59,8 @@ export const sendHostMessage = async (
             body: JSON.stringify(input),
             headers: { "content-type": "application/json", ...(token && { authorization: `Bearer ${token}` }) },
             method: "POST",
+            // A stalled connection must not leave the composer in its sending state for good.
+            signal: AbortSignal.timeout(SEND_DEADLINE_MS),
         });
 
         return response.ok ? { ok: true } : { error: await errorOf(response), ok: false };
