@@ -486,6 +486,32 @@ describe("with the switch off", () => {
         expect(h.deps.openWindow).toHaveBeenCalledTimes(1);
     });
 
+    it("asks for no microphone access when the switch went off while the model status was read", async () => {
+        let on = true;
+        const microphoneAllowed = vi.fn(async () => true);
+        const h = harness({
+            enabled: () => on,
+            microphoneAllowed,
+            models: {
+                download: vi.fn(),
+                ensureVerified: vi.fn(),
+                isDownloading: vi.fn(() => false),
+                status: vi.fn(async () => {
+                    on = false;
+
+                    return { bytes: 1, file: "m.bin", state: "present" as const, version: "v1" };
+                }),
+            },
+        });
+
+        h.controller.press();
+        await settled();
+
+        expect(microphoneAllowed).not.toHaveBeenCalled();
+        expect(h.deps.openWindow).not.toHaveBeenCalled();
+        expect(h.notices).toStrictEqual([]);
+    });
+
     it("downloads nothing when the switch went off while the download question was open", async () => {
         let on = true;
         let answer: (accepted: boolean) => void = () => {};

@@ -213,6 +213,12 @@ export const createDictationController = (dependencies: ControllerDependencies):
 
         const { state: modelState } = await dependencies.models.status(model);
 
+        // Turned off, or pressed again, while the status was read: neither a download notice nor the system's
+        // microphone prompt belongs to this attempt any more.
+        if (mine !== generation || !dependencies.enabled()) {
+            return false;
+        }
+
         if (modelState === "missing") {
             await handleMissingModel(mine, model);
 
