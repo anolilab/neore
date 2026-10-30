@@ -619,6 +619,15 @@ written here is what is not.
   `~/.neore/cm` when that overflows a Unix socket path (macOS's default userData does), never `/tmp`.
   Tests start a real `sshd` as the current user (`tests/ssh_host.rs`; `NEORE_REQUIRE_SSHD=1` makes a missing one
   fail). Windows desktops have no passphrase helper or multiplexing yet.
+  **A terminal on a server** (`hostTerminal` → `ssh.rs#terminal_args`) is the local `ssh` on the terminal module's PTY,
+  riding the connection's master: `host_connect` first (the trust prompt and passphrase come BEFORE any window), then
+  `-O check`, then the same hardened options with `-t`, `ControlMaster=no`, `BatchMode=yes` (all asking stays in the
+  device window), `ForwardAgent=no` whatever the server's flag (the terminal requests no forwarding, but a server the user opted
+  into forwarding for exposes the agent socket to that account on the server anyway), and `-e none` — without it `~C` opens ssh's command
+  line and a person can add a `-L` listener. `ProxyCommand=false` is deliberate: ssh tries the control socket before
+  it connects, so with the master gone it fails instead of opening a connection of its own. No remote command; the
+  server starts the user's login shell. Ending the master (Disconnect, forgetting the key) ends the terminal; ssh
+  exits 255 and the page words it as the connection ending.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay

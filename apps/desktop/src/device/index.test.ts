@@ -9,6 +9,7 @@ import { pathToFileURL } from "node:url";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { SshTerminal } from "../terminal/index";
 import { isTrustedUrl } from "../trust.js";
 import type { DeviceIpcOptions } from "./index";
 
@@ -209,6 +210,8 @@ const makeCore = () => {
         hostPair: vi.fn(async (_spec: string, _deviceId: string, _secret: string) => true),
         hostProbe: vi.fn(async (_spec: string) => JSON.stringify({ platform: "linux", sandboxAvailable: true, sandboxDetail: "Landlock", version: "0.1.0" })),
         hostRemove: vi.fn(),
+        hostTerminal: vi.fn(async (_deviceId: string) => JSON.stringify(["-t", "--", "build.example.com"])),
+        hostTerminalAttach: vi.fn(async (_deviceId: string) => JSON.stringify(["-t", "--", "build.example.com"])),
         manifest: vi.fn(async (_deviceId?: string) => JSON.stringify({ payload: "{}", signature: "m" })),
         pair: vi.fn(async () => true),
         promptAnswer: vi.fn(),
@@ -524,10 +527,16 @@ describe("coding-agent channels", () => {
 });
 
 describe("opening a terminal", () => {
-    const terminal = { availability: { available: true } as const, open: vi.fn(async (_folder: string | null) => {}) };
+    const terminal = {
+        availability: { available: true } as const,
+        open: vi.fn(async (_folder: string | null) => {}),
+        openSsh: vi.fn(async (_server: SshTerminal) => {}),
+        sshAvailability: { available: true } as const,
+    };
 
     beforeEach(() => {
         terminal.open.mockClear();
+        terminal.openSsh.mockClear();
         fake.handlers.clear();
         registerDeviceIpc({ ...options, terminal });
         invoke(DEVICE_CHANNEL.openSettings, siteEvent());
@@ -546,11 +555,63 @@ describe("opening a terminal", () => {
         expect(terminal.open).toHaveBeenNthCalledWith(1, "/work");
         expect(terminal.open).toHaveBeenNthCalledWith(2, null);
         expect(invoke(LOCAL_CHANNEL.terminalAvailability, localEvent())).toEqual({ available: true });
+        expect(invoke(LOCAL_CHANNEL.terminalSshAvailability, localEvent())).toEqual({ available: true });
     });
 
     it("rejects a folder that is not text", async () => {
         await expect(invoke(LOCAL_CHANNEL.openTerminal, localEvent(), { path: "/work" })).rejects.toThrow("device: folder is invalid");
         expect(terminal.open).not.toHaveBeenCalled();
+    });
+
+    describe("on a server", () => {
+        const paired = { address: "build.example.com", deviceId: "host-1", user: "deploy" };
+
+        beforeEach(() => {
+            core.settingsGet.mockReturnValue(JSON.stringify({ hosts: [paired], paired: true, roots: [] }));
+        });
+
+        it("is refused from the site, which has no way to open one", async () => {
+            expect(() => invoke(LOCAL_CHANNEL.openHostTerminal, siteEvent(), "host-1")).toThrow("device: not the device window");
+            expect(core.hostTerminal).not.toHaveBeenCalled();
+            expect(terminal.openSsh).not.toHaveBeenCalled();
+        });
+
+        it("hands the terminal the server's label and a way to get ssh's arguments, which connects only when called", async () => {
+            await invoke(LOCAL_CHANNEL.openHostTerminal, localEvent(), "host-1");
+
+            const [server] = terminal.openSsh.mock.calls[0] as [SshTerminal];
+
+            expect(server).toMatchObject({ deviceId: "host-1", label: "deploy@build.example.com" });
+            expect(core.hostTerminal).not.toHaveBeenCalled();
+            await expect(server.args()).resolves.toEqual(["-t", "--", "build.example.com"]);
+            expect(core.hostTerminal).toHaveBeenCalledWith("host-1");
+        });
+
+        it("gives a restart a way to attach that never connects", async () => {
+            await invoke(LOCAL_CHANNEL.openHostTerminal, localEvent(), "host-1");
+
+            const [server] = terminal.openSsh.mock.calls[0] as [SshTerminal];
+
+            await expect(server.attach()).resolves.toEqual(["-t", "--", "build.example.com"]);
+            expect(core.hostTerminalAttach).toHaveBeenCalledWith("host-1");
+            expect(core.hostTerminal).not.toHaveBeenCalled();
+        });
+
+        it("refuses a server that is not paired, and an id that is not text, before connecting anything", async () => {
+            await expect(invoke(LOCAL_CHANNEL.openHostTerminal, localEvent(), "host-2")).rejects.toThrow("not paired");
+            await expect(invoke(LOCAL_CHANNEL.openHostTerminal, localEvent(), { id: 1 })).rejects.toThrow("device: deviceId is invalid");
+            expect(terminal.openSsh).not.toHaveBeenCalled();
+            expect(core.hostTerminal).not.toHaveBeenCalled();
+        });
+
+        it("passes on the refusal of a server whose key was not trusted", async () => {
+            terminal.openSsh.mockImplementationOnce(async (server) => {
+                await server.args();
+            });
+            core.hostTerminal.mockRejectedValueOnce(new Error("the server's host key was not trusted"));
+
+            await expect(invoke(LOCAL_CHANNEL.openHostTerminal, localEvent(), "host-1")).rejects.toThrow("not trusted");
+        });
     });
 
     it("says it is unavailable when the shell offers none", async () => {

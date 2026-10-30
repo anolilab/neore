@@ -19,6 +19,10 @@ export const terminalAvailability = (platform: NodeJS.Platform = process.platfor
     return platform === "darwin" || platform === "linux" ? { available: true } : { available: false, reason: "The terminal is not available on this platform." };
 };
 
+/** A shell on a server rides ssh connection sharing, which the Windows desktop does not have yet (plans/ssh-environments.md). */
+export const sshTerminalAvailability = (platform: NodeJS.Platform = process.platform): Availability =>
+    platform === "win32" ? { available: false, reason: "A terminal on a server is not available on Windows yet." } : terminalAvailability(platform);
+
 const isExecutable = (file: string): boolean => {
     try {
         accessSync(file, constants.X_OK);
@@ -106,6 +110,36 @@ export const shellEnvironment = (env: NodeJS.ProcessEnv = process.env): Record<s
 
     result.TERM = "xterm-256color";
     result.COLORTERM = "truecolor";
+
+    return result;
+};
+
+/** The `ssh` the terminal runs: the first one on the path, as an absolute path, so the pseudo-terminal does no lookup of its own. */
+export const resolveSsh = (env: NodeJS.ProcessEnv = process.env, executable: (file: string) => boolean = isExecutable): string => {
+    const directories = [...(env.PATH ?? "").split(path.delimiter), "/usr/bin", "/bin"];
+    const found = directories.map((directory) => path.join(directory, "ssh")).find((candidate) => path.isAbsolute(candidate) && executable(candidate));
+
+    if (found === undefined) {
+        throw new Error("terminal: ssh was not found on this computer");
+    }
+
+    return found;
+};
+
+/** What ssh needs of the local environment: where things are, who is asking and the locale. Nothing else is handed on. */
+const SSH_ENVIRONMENT = /^(?:HOME|LANG|LC_.*|LOGNAME|PATH|TMPDIR|USER)$/u;
+
+/** The environment of the local `ssh` of a terminal on a server. `TERM` is the one thing ssh passes on, in its request for a terminal. */
+export const sshEnvironment = (env: NodeJS.ProcessEnv = process.env): Record<string, string> => {
+    const result: Record<string, string> = {};
+
+    for (const [key, value] of Object.entries(env)) {
+        if (value !== undefined && SSH_ENVIRONMENT.test(key)) {
+            result[key] = value;
+        }
+    }
+
+    result.TERM = "xterm-256color";
 
     return result;
 };

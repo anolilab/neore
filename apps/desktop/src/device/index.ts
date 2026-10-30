@@ -428,6 +428,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     // The terminal is the user's own shell, opened by a click in this window. The folder is checked by the terminal module.
     local(LOCAL_CHANNEL.terminalAvailability, () => options.terminal?.availability ?? { available: false, reason: "The terminal is not available." });
+    local(LOCAL_CHANNEL.terminalSshAvailability, () => options.terminal?.sshAvailability ?? { available: false, reason: "The terminal is not available." });
 
     local(LOCAL_CHANNEL.openTerminal, async (folder) => {
         if (options.terminal === undefined) {
@@ -439,6 +440,23 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         }
 
         await options.terminal.open(folder);
+    });
+
+    // A shell on a paired server: connecting it first is what asks to trust its key, so a server that is not trusted
+    // gets no window. The shell itself is the terminal module's, and rides the connection this opens.
+    local(LOCAL_CHANNEL.openHostTerminal, async (deviceId) => {
+        if (options.terminal === undefined) {
+            throw new Error("The terminal is not available.");
+        }
+
+        const id = readDeviceId(deviceId);
+        const host = requireTransport().settingsGet().hosts.find((candidate) => candidate.deviceId === id);
+
+        if (host === undefined) {
+            throw new Error("device: that server is not paired with this computer");
+        }
+
+        await options.terminal.openSsh({ args: () => requireTransport().hostTerminal(id), attach: () => requireTransport().hostTerminalAttach(id), deviceId: id, label: `${host.user}@${host.address}` });
     });
 
     return state.transport !== undefined;

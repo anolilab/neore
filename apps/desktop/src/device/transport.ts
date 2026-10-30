@@ -24,6 +24,10 @@ export interface HostTransport {
     /** Connects a server that is not paired yet, asking to trust its key and for a key passphrase. */
     hostProbe: (spec: HostSpec) => Promise<HostProbe>;
     hostRemove: (deviceId: string) => void;
+    /** The `ssh` arguments of a shell on a paired server, after connecting it (which asks to trust its key). */
+    hostTerminal: (deviceId: string) => Promise<string[]>;
+    /** The same arguments for a new shell on a connection that is still up; never connects. */
+    hostTerminalAttach: (deviceId: string) => Promise<string[]>;
     readonly kind: "local";
     /** This computer's signed tool list, or a server's (signed with that server's own secret). */
     manifest: (deviceId?: string) => Promise<Signed>;
@@ -56,6 +60,8 @@ export const createLocalTransport = (dataDirectory: string, onEvent: (event: Cor
         hostPair: (spec, deviceId, secret) => core.hostPair(JSON.stringify(spec), deviceId, secret),
         hostProbe: async (spec) => JSON.parse(await core.hostProbe(JSON.stringify(spec))) as HostProbe,
         hostRemove: (deviceId) => core.hostRemove(deviceId),
+        hostTerminal: async (deviceId) => JSON.parse(await core.hostTerminal(deviceId)) as string[],
+        hostTerminalAttach: async (deviceId) => JSON.parse(await core.hostTerminalAttach(deviceId)) as string[],
         kind: "local",
         manifest: async (deviceId) => JSON.parse(await core.manifest(deviceId)) as Signed,
         pair: (deviceId, secret, accountLabel) => core.pair(deviceId, secret, accountLabel),

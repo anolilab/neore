@@ -32,6 +32,8 @@ export interface DeviceWindowApi {
     hostRemove: (deviceId: string) => Promise<void>;
     onAcpChanged: (handler: () => void) => () => void;
     onPromptQueued: (handler: () => void) => () => void;
+    /** Opens a terminal on a paired server, connecting it first (which asks to trust its key). */
+    openHostTerminal: (deviceId: string) => Promise<void>;
     /** Opens a terminal for the folder; `null` asks for one. */
     openTerminal: (folder: string | null) => Promise<void>;
     pickFolder: () => Promise<string | null>;
@@ -42,4 +44,6 @@ export interface DeviceWindowApi {
     settingsGet: () => Promise<SettingsView>;
     settingsUpdate: (update: Record<string, unknown>) => Promise<SettingsView>;
     terminalAvailability: () => Promise<Availability>;
+    /** Whether a terminal on a server is offered (not on Windows yet). */
+    terminalSshAvailability: () => Promise<Availability>;
 }
