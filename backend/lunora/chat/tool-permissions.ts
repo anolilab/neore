@@ -254,6 +254,8 @@ export const setToolPermission = authMutation
     .output(v.null())
     .mutation(async ({ args: { key, mode }, ctx }) => {
         await writeToolPermission(ctx, key, mode);
+        // An explicit choice replaces a time-boxed allow: picking "Ask" must ask, not wait out the allow.
+        await writeToolGrant(ctx, key, null);
 
         ctx.log.event("chat.set_tool_permission", { cleared: mode === null });
 
@@ -276,14 +278,21 @@ const writeToolGrant = async (ctx: PreferenceCtx, key: string, expiresAt: number
         next[key] = expiresAt;
     }
 
-    if (Object.keys(next).length > MAX_TOOL_GRANTS) {
-        throw new LunoraError("BAD_REQUEST", "Too many time-boxed tool allows");
+    // At the cap the allow that ends soonest makes room, so the approval the user just gave never fails on it.
+    const byExpiry = Object.entries(next)
+        .filter(([grantKey]) => grantKey !== key)
+        .toSorted(([, left], [, right]) => left - right);
+
+    while (Object.keys(next).length > MAX_TOOL_GRANTS && byExpiry.length > 0) {
+        const [soonest] = byExpiry.shift()!;
+
+        delete next[soonest];
     }
 
     await saveAiUserPreferences(ctx.db, prefs, userId, { toolPermissionGrants: next });
 };
 
-/** End a time-boxed allow early: the tool asks again from the next call. */
+/** End a time-boxed allow early: the tool asks again from the next message (a run already going keeps the allow it started with). */
 export const revokeToolPermissionGrant = authMutation
     .use(rateLimit("chat/update"))
     .input({
@@ -377,11 +386,17 @@ export const recordPendingToolApprovals = internalMutation
 
 /**
  * What an answer leaves behind for next time: `always` stores `auto` for the tool, `hour` / `today` a time-boxed
- * allow. `key` is the permission key recorded when the tool was built; a snapshot without one approves this call
- * and stores nothing, rather than guessing.
+ * allow. `key` is the permission key recorded when the tool was built; a snapshot without one approves a plain or
+ * "always" answer once and stores nothing rather than guessing, and refuses `hour` / `today`, which it could not keep.
  */
 export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: ToolApprovalDecision, key: string | undefined): Promise<void> => {
     if (!key) {
+        // Approving once and storing nothing would leave the user believing the tool is allowed for the period.
+        // The throw rolls the claim back.
+        if (decision === "hour" || decision === "today") {
+            throw new LunoraError("BAD_REQUEST", "This call can only be approved once");
+        }
+
         return;
     }
 

@@ -23,7 +23,7 @@ describe("grantExpiry", () => {
         expect(grantExpiry("today", now, "Not/AZone")).toBe(Date.UTC(2026, 9, 31, 0, 0));
     });
 
-    it("follows a DST change: the day of the fall-back lasts 25 hours", () => {
+    it("follows a DST change: midnight after the fall-back is counted in local time", () => {
         // Berlin falls back on 25 Oct 2026 03:00 -> 02:00. Local midnight at the end of that day is 23:00Z (CET).
         const start = Date.UTC(2026, 9, 25, 0, 30); // 02:30 CEST on the 25th
         const midnight = grantExpiry("today", start, "Europe/Berlin");

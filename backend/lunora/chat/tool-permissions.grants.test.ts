@@ -6,7 +6,14 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { getToolPermissionSettings, pruneExpiredToolPermissionGrants, recordApprovalPreference, revokeToolPermissionGrant } from "./tool-permissions";
+import { MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
+import {
+    getToolPermissionSettings,
+    pruneExpiredToolPermissionGrants,
+    recordApprovalPreference,
+    revokeToolPermissionGrant,
+    setToolPermission,
+} from "./tool-permissions";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -91,12 +98,32 @@ describe("recordApprovalPreference", () => {
         expect(await grantsOf()).toStrictEqual({ [KEY]: Date.UTC(2026, 9, 31, 4, 0) });
     });
 
-    it("stores nothing for a plain approval, a denial or a snapshot without a key", async () => {
+    it("stores nothing for a plain approval or a denial", async () => {
         await record("approve", KEY);
         await record("deny", KEY);
-        await record("hour", undefined);
 
         expect(await stored()).toBeNull();
+    });
+
+    it("refuses a time-boxed allow for a snapshot without a key, rather than approving once in silence", async () => {
+        await expect(record("hour", undefined)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        await expect(record("today", undefined)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(await stored()).toBeNull();
+    });
+
+    it("makes room at the cap by dropping the allow that ends soonest, instead of failing the approval", async () => {
+        const full = Object.fromEntries(Array.from({ length: MAX_TOOL_GRANTS }, (_, index) => [`mcp:S${index}:t`, NOW + 60_000 + index]));
+
+        await harness.run(async (ctx: any) => await ctx.db.insert("aiUserPreferences", { toolPermissionGrants: full, userId: USER }));
+        await record("hour", KEY);
+
+        const grants = await grantsOf();
+
+        expect(Object.keys(grants ?? {})).toHaveLength(MAX_TOOL_GRANTS);
+        expect(grants?.[KEY]).toBe(NOW + 3_600_000);
+        expect(grants?.["mcp:S0:t"]).toBeUndefined();
+        expect(grants?.["mcp:S1:t"]).toBe(NOW + 60_001);
     });
 
     it("refuses a device tool, shell_run and the question tool", async () => {
@@ -140,6 +167,22 @@ describe("revokeToolPermissionGrant", () => {
         await as().mutation(revokeToolPermissionGrant as never, { key: KEY } as never);
 
         expect(await grantsOf()).toStrictEqual({ "mcp:Other:t": later });
+    });
+});
+
+describe("setToolPermission", () => {
+    it("ends the tool's time-boxed allow, so picking Ask in settings asks again", async () => {
+        const later = Date.now() + 3_600_000;
+
+        await harness.run(
+            async (ctx: any) => await ctx.db.insert("aiUserPreferences", { toolPermissionGrants: { [KEY]: later, "mcp:Other:t": later }, userId: USER }),
+        );
+        await as().mutation(setToolPermission as never, { key: KEY, mode: "ask" } as never);
+
+        const row = await stored();
+
+        expect(row?.toolPermissionGrants).toStrictEqual({ "mcp:Other:t": later });
+        expect(row?.toolPermissions).toStrictEqual({ [KEY]: "ask" });
     });
 });
 

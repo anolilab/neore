@@ -179,7 +179,7 @@ const TimedAllows: FC<TimedAllowsProps> = ({ grants, isRevoking, onRevoke }) => 
     return (
         <section aria-label={t`Allowed for a limited time`} className="space-y-2">
             <Heading className="text-lg font-semibold" fallbackLevel={3}>{t`Allowed for a limited time`}</Heading>
-            <p className="text-muted-foreground text-sm">{t`These tools run without asking until the time shown. Revoke one to be asked again right away.`}</p>
+            <p className="text-muted-foreground text-sm">{t`These tools run without asking until the time shown. Revoke one to be asked again from your next message.`}</p>
             <ul className="divide-y rounded-lg border px-4">
                 {active.map(([key, expiresAt]) => {
                     const { server, tool } = describeGrantKey(key);
