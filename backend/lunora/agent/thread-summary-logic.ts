@@ -46,6 +46,14 @@ export const SUMMARY_OVERLAP_ROWS = SUMMARY_MIN_NEW_ROWS;
 /** One run folds in at most this many rows, so a path far behind catches up over several runs. */
 export const SUMMARY_MAX_ROWS_PER_RUN = 60;
 
+/**
+ * The reader uses a summary only if its cover is within this many rows of the
+ * prompt: the window plus one run's catch-up plus the margin. Further back, a
+ * long gap of uncovered rows would sit between the summary and the window, and
+ * the walk to find the cover would cost most of the path on every agent run.
+ */
+export const SUMMARY_READ_REACH_ROWS = SUMMARY_RECENT_ROWS + SUMMARY_MAX_ROWS_PER_RUN + SUMMARY_MARGIN_ROWS;
+
 /** A path longer than this is not read from the top; such a thread keeps today's behaviour. */
 export const SUMMARY_MAX_PATH_ROWS = 5000;
 

@@ -437,6 +437,24 @@ describe("editing an assistant reply in place", () => {
         expect(after.get(idOf("rA2"))?.parentMessageId).toBe(before.get(idOf("rA2"))?.parentMessageId);
     });
 
+    it("drops the thread's context summaries, which may quote the old reply", async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadContextSummaries", {
+                    coveredCount: 1,
+                    coveredUpToMessageId: ids.u1,
+                    createdAt: 1,
+                    summary: "The old answer said A.",
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        await edit(ids.rA0 as string, "Revised answer.");
+
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("threadContextSummaries").collect())).toHaveLength(0);
+    });
+
     it("writes nothing when the same text is saved again", async () => {
         await edit(ids.rA0 as string, "Revised answer.");
 

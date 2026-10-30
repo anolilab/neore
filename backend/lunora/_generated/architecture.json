@@ -16518,13 +16518,13 @@
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 280,
+      "line": 281,
       "reason": "\"saveEditedSiblingHandler\" is not a registered function"
     },
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 374,
+      "line": 375,
       "reason": "\"editAssistantReplyHandler\" is not a registered function"
     },
     {
@@ -17244,13 +17244,13 @@
     {
       "file": "agent/thread-summaries",
       "kind": "read",
-      "line": 394,
+      "line": 397,
       "reason": "\"deleteThreadSummaries\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "write",
-      "line": 400,
+      "line": 403,
       "reason": "\"deleteThreadSummaries\" is not a registered function"
     },
     {

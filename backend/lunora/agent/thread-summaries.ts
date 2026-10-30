@@ -48,6 +48,7 @@ import {
     SUMMARIES_KEPT_PER_THREAD,
     SUMMARY_MAX_OUTPUT_TOKENS,
     SUMMARY_MAX_PATH_ROWS,
+    SUMMARY_READ_REACH_ROWS,
     SUMMARY_SYSTEM_PROMPT,
     THREAD_SUMMARY_CLAIM_SCOPE,
     THREAD_SUMMARY_CLAIM_TTL_MS,
@@ -96,14 +97,14 @@ const blockerOf = async (ctx: Reader, thread: OwnedThread): Promise<string | nul
     return settings?.threadSummariesEnabled === false ? "disabled" : null;
 };
 
-/** Of `candidates` (rows of a thread), the ids that are ancestors of `tip` or `tip` itself. */
-const ancestorIds = async (ctx: Reader, threadId: Id<"threads">, tip: Row, candidates: ReadonlyArray<Row>): Promise<Set<string>> => {
+/** Of `candidates` (rows of a thread), the ids that are `tip` or among its `reach` nearest ancestors. */
+const ancestorIds = async (ctx: Reader, threadId: Id<"threads">, tip: Row, candidates: ReadonlyArray<Row>, reach: number): Promise<Set<string>> => {
     if (candidates.length === 0) {
         return new Set();
     }
 
     const wanted = new Set(candidates.map((row) => row._id as string));
-    const { rows } = await walkPath(ctx, threadId, tip, { limit: Infinity, stopBelowOrder: Math.min(...candidates.map((row) => row.order)) });
+    const { rows } = await walkPath(ctx, threadId, tip, { limit: reach, stopBelowOrder: Math.min(...candidates.map((row) => row.order)) });
 
     return new Set(rows.map((row) => row._id as string).filter((id) => wanted.has(id)));
 };
@@ -116,14 +117,15 @@ const summariesOf = async (ctx: Reader, threadId: Id<"threads">): Promise<Doc<"t
 
 /**
  * The summaries of `threadId` whose last covered row is an ancestor of `tip`
- * (`tip` itself does not count), each with that row, the one covering the most
- * first. A covered row that is gone (deleted) disqualifies its summary.
+ * within `reach` rows (`tip` itself does not count), each with that row, the one
+ * covering the most first. A covered row that is gone (deleted) disqualifies its summary.
  */
 const summariesOnPath = async (
     ctx: Reader,
     threadId: Id<"threads">,
     tip: Row,
     summaries: ReadonlyArray<Doc<"threadContextSummaries">>,
+    reach: number,
 ): Promise<{ covered: Row; summary: Doc<"threadContextSummaries"> }[]> => {
     const loaded = await Promise.all(
         summaries.map(async (summary) => {
@@ -136,6 +138,7 @@ const summariesOnPath = async (
         threadId,
         tip,
         present.map((entry) => entry.covered),
+        reach,
     );
 
     return present
@@ -187,7 +190,7 @@ export const prepareThreadSummary = internalMutation
             return null;
         }
 
-        const [base] = await summariesOnPath(ctx, thread._id, leaf, await summariesOf(ctx, thread._id));
+        const [base] = await summariesOnPath(ctx, thread._id, leaf, await summariesOf(ctx, thread._id), SUMMARY_MAX_PATH_ROWS);
         const { next, rows } = await walkPath(ctx, thread._id, leaf, {
             limit: SUMMARY_MAX_PATH_ROWS,
             ...(base && { stopAtId: base.covered._id as string }),
@@ -384,7 +387,7 @@ export const getThreadSummaryForContext = internalQuery
             return null;
         }
 
-        const [best] = await summariesOnPath(ctx, args.threadId, tip, summaries);
+        const [best] = await summariesOnPath(ctx, args.threadId, tip, summaries, SUMMARY_READ_REACH_ROWS);
 
         return best && best.summary.summary !== "" ? best.summary.summary : null;
     });

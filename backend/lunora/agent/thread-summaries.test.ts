@@ -371,6 +371,19 @@ describe("what the agent reads", () => {
         expect(await contextSummary(late)).toBe("Early turns: trip planning.");
     });
 
+    it("ignores a summary whose cover is too far back to sit next to the window", async () => {
+        expect.assertions(2);
+
+        await seedThread(400);
+        await storeSummary(10, "Rows 0 to 10.");
+
+        expect(await contextSummary(rowIds.at(-1))).toBeNull();
+
+        await storeSummary(250, "Rows 0 to 250.");
+
+        expect(await contextSummary(rowIds.at(-1))).toBe("Rows 0 to 250.");
+    });
+
     it("prefers the summary covering more of the path, and ignores one whose covered row is gone", async () => {
         expect.assertions(2);
 

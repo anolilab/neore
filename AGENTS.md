@@ -462,8 +462,9 @@ written here is what is not.
   not a mid-array `system` message. Billed by the gateway against the thread OWNER
   like title/category (no `chargeRound`). **Opt-OUT**, `userSettings.threadSummariesEnabled`
   (absent = on). Never made for temporary, locked, deleted, stateless or host-run
-  threads; locking a chat and deleting a thread erase the rows, and the reader
-  re-applies the same rules. Not `threads.summary` — that is the user-triggered,
+  threads; locking a chat, deleting a thread and editing a reply in place erase
+  the rows (a future single-message delete must too), and the reader re-applies
+  the same rules and ignores a cover further than `SUMMARY_READ_REACH_ROWS` back. Not `threads.summary` — that is the user-triggered,
   thread-wide `createSummarizeChat` output.
 
 - **Auto-continue ("Deep Work")** — raises the agent loop from 5 to 25
