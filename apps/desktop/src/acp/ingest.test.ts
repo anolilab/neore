@@ -222,6 +222,8 @@ describe("a turn's files", () => {
 
         expect(withFiles).toHaveLength(2);
         expect(withFiles.map(({ post }) => post.events.filter((event) => event.kind === "media").length)).toEqual([1, 1]);
+        expect(new Set(withFiles.map(({ post }) => post.firstSeq)).size).toBe(2);
+        expect((backend.chunks.get("t1") ?? []).filter((event) => event.kind === "media")).toHaveLength(2);
         expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished" });
     });
 

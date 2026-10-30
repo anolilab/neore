@@ -195,7 +195,7 @@ export class HostPoster implements SessionObserver {
         this.texts.delete(turnId);
 
         // A turn that failed leaves no reply to show files in; one without an image reference has nothing to read.
-        if (reason === "failed" || this.stopped || info === undefined || this.options.media === undefined || imageReferences(text).length === 0) {
+        if (endReasonOf(reason) === "failed" || this.stopped || info === undefined || this.options.media === undefined || imageReferences(text).length === 0) {
             channel.end(endReasonOf(reason), error);
 
             return;
