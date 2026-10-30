@@ -20,8 +20,7 @@ const CommitsTab = ({ address, commitLimit, hostLabel, leftOut }: { address: Pul
 
     const pages = commits.data?.pages ?? [];
     const listed = pages.flatMap((page) => (page.status === "ok" ? page.commits : []));
-    const failed = pages.find((page) => page.status !== "ok");
-    const failure = failed?.status ?? (commits.isError ? "host_error" : undefined);
+    const failure = pages.find((page) => page.status !== "ok")?.status ?? (commits.isError ? "host_error" : undefined);
 
     // A later page that fails leaves the earlier ones on screen, with the failure below them.
     if (failure && listed.length === 0) {
