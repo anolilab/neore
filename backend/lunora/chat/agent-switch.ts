@@ -15,7 +15,7 @@ import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { getMaxMessage } from "../agent/messages";
 import { insertAgentSwitchRow, patchThread } from "../agent/table-writes";
 import { requireThreadPermission } from "../agent/thread-read-access";
-import { hasLiveDeltaStream, hasStreamFor, isThreadStreaming } from "../agent/thread-streaming";
+import { hasLiveDeltaStream, hasStreamFor, hasUnsettledStop, isThreadStreaming } from "../agent/thread-streaming";
 import { getUser } from "../auth/lib/better-auth-queries";
 import { claimOnce } from "../lib/claim-once";
 import { authMutation, rateLimit } from "../lib/crpc";
@@ -108,7 +108,7 @@ export const switchThreadAgentHandler = async (ctx: MutationCtx, args: SwitchArg
     await assertPaidModel(ctx, args.userId, definition);
 
     // A hard rule, so a transcript never has two agents writing at once.
-    if ((await isThreadStreaming(ctx, thread._id)) || (await hasLiveDeltaStream(ctx, thread._id))) {
+    if ((await isThreadStreaming(ctx, thread._id)) || (await hasLiveDeltaStream(ctx, thread._id)) || (await hasUnsettledStop(ctx, thread._id, Date.now()))) {
         throw new LunoraError("CONFLICT", "Wait for the reply to finish, or stop it, before switching", { data: { code: AGENT_SWITCH_STREAMING } });
     }
 

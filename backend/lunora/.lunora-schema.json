@@ -15486,6 +15486,12 @@
             }
           }
         },
+        "stoppedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "streamingConfig": {
           "kind": "object",
           "nullable": false,

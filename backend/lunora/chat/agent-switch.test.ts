@@ -13,6 +13,7 @@ import { docsToModelMessages } from "../agent/mapping";
 import { addMessagesHandler } from "../agent/messages";
 import { omit } from "../lib/collections";
 import schema from "../schema";
+import { finishStoppedReply, stopActiveForThread } from "./streaming/persistent/library";
 import { AGENT_SWITCH_STREAMING, AGENT_SWITCH_UNSUPPORTED, switchThreadAgentHandler } from "./agent-switch";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -304,6 +305,63 @@ describe("a switch in a thread that never branched", () => {
         );
 
         expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
+    });
+
+    describe("after a sidebar stop", () => {
+        const startStoppedRun = async ({ claimed = true, expiresAt = Date.now() + 60_000 } = {}) => {
+            await insertRow("u2", 1, 0, text("user", "and now?"));
+            const streamId = await run(
+                async (ctx) =>
+                    await ctx.db.insert("persistentStreams", {
+                        expiresAt,
+                        messageId: ids.u2,
+                        ...(claimed && { runClaimedAt: Date.now() }),
+                        status: claimed ? "streaming" : "pending",
+                        streamingConfig: { contentType: "text", model: A },
+                        threadId,
+                        userId: OWNER,
+                    }),
+            );
+
+            await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { threadId }));
+
+            return streamId;
+        };
+
+        it("is refused until the run has saved the text it owed, then works", async () => {
+            // The stop ended the stream (`done`) but the reply is not in the thread yet: a divider now would sit under the prompt the reply then hangs off.
+            const streamId = await startStoppedRun();
+
+            await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_STREAMING } });
+            expect(await switchRows()).toHaveLength(0);
+
+            const { stopped } = await run(
+                async (ctx) =>
+                    await ctx.runMutation(finishStoppedReply, {
+                        continuation: false,
+                        order: 1,
+                        pendingReasoning: "",
+                        pendingText: "partial",
+                        promptMessageId: ids.u2,
+                        streamId,
+                    }),
+            );
+
+            expect(stopped).toBe(true);
+            expect(await switchTo(B, "click-2")).toMatchObject({ switched: true });
+        });
+
+        it("stops blocking when the run died without saving, at the stream's expiry", async () => {
+            await startStoppedRun({ expiresAt: Date.now() - 1 });
+
+            expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
+        });
+
+        it("works at once when the run had not started, since nothing will ever save a reply", async () => {
+            await startStoppedRun({ claimed: false });
+
+            expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
+        });
     });
 
     it("needs a write grant: a reader is refused, a writer switches, and the row carries the writer", async () => {
