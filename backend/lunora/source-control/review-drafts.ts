@@ -15,7 +15,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import type { DraftComment } from "./draft-logic";
-import { commitFor, isSubmitting, MAX_DRAFT_COMMENTS } from "./draft-logic";
+import { commitFor, draftBytes, isSubmitting, MAX_DRAFT_BYTES, MAX_DRAFT_COMMENTS } from "./draft-logic";
 import { vDraftComment, vReviewVerdict } from "./validators";
 
 const COMMIT_ID = /^[0-9a-f]{40,64}$/u;
@@ -143,11 +143,19 @@ export const saveDraftComment = authMutation
             side: args.side,
             startLine: args.startLine,
         };
+        const comments =
+            existing === undefined
+                ? [...(draft?.comments ?? []), comment]
+                : (draft?.comments ?? []).map((candidate) => (candidate.id === comment.id ? comment : candidate));
+
+        if (draftBytes({ body: draft?.body ?? "", comments }) > MAX_DRAFT_BYTES) {
+            return { status: "too_many" as const };
+        }
 
         if (draft === null) {
             await ctx.db.insert("reviewDrafts", {
                 body: "",
-                comments: [comment],
+                comments,
                 commitId,
                 createdAt: now,
                 hostOrigin: DEVELOP_DRIVER.webOrigin,
@@ -166,8 +174,7 @@ export const saveDraftComment = authMutation
         const revision = draft.revision + 1;
 
         await ctx.db.patch(draft._id, {
-            comments:
-                existing === undefined ? [...draft.comments, comment] : draft.comments.map((candidate) => (candidate.id === comment.id ? comment : candidate)),
+            comments,
             commitId,
             revision,
             updatedAt: now,
@@ -230,6 +237,10 @@ export const setDraftReview = authMutation
 
         if (draft !== null && isSubmitting(draft, now)) {
             return { status: "submitting" as const };
+        }
+
+        if (draftBytes({ body: args.body, comments: draft?.comments ?? [] }) > MAX_DRAFT_BYTES) {
+            return { status: "too_many" as const };
         }
 
         if (draft === null) {

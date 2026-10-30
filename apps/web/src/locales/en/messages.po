@@ -33114,3 +33114,19 @@ msgstr "Your review is being submitted. Wait for it to finish."
 #: src/features/develop/components/review-panel.tsx:113
 msgid "Your review is kept."
 msgstr "Your review is kept."
+
+#: src/features/develop/components/review-panel.tsx:127
+msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
+msgstr "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
+
+#: src/features/develop/components/review-panel.tsx:143
+msgid "Could not save the summary, so nothing was submitted. Try again."
+msgstr "Could not save the summary, so nothing was submitted. Try again."
+
+#: src/features/develop/components/review-panel.tsx:116
+msgid "If it kept the review as pending, submit or delete it there first."
+msgstr "If it kept the review as pending, submit or delete it there first."
+
+#: src/features/develop/lib/use-review-messages.ts:16
+msgid "This review is too long to keep: it holds at most 100 comments and about 1 MB of text. Submit it first, or shorten it."
+msgstr "This review is too long to keep: it holds at most 100 comments and about 1 MB of text. Submit it first, or shorten it."

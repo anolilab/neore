@@ -56,9 +56,14 @@ describe("numberDiffLines", () => {
         ]);
     });
 
-    it("numbers nothing before a first hunk header, and not the patch's empty trailing line", () => {
+    it("numbers nothing before a first hunk header, and not an empty line (a blank context line is a single space)", () => {
         expect(numberDiffLines("+stray").map((line) => [line.oldLine, line.newLine])).toEqual([[null, null]]);
+        // The patch's own trailing newline is no line at all.
         expect(numberDiffLines("@@ -1 +1 @@\n+a\n").map((line) => [line.oldLine, line.newLine])).toEqual([
+            [null, null],
+            [null, 1],
+        ]);
+        expect(numberDiffLines("@@ -1 +1,2 @@\n+a\n\n").map((line) => [line.oldLine, line.newLine])).toEqual([
             [null, null],
             [null, 1],
             [null, null],

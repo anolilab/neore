@@ -170,15 +170,20 @@ export const submitReview = authAction
         const token = await resolveGithubToken(ctx, userId);
         const outcome = await submitDraft({
             claim: async () => await ctx.runMutation(internal.source_control.review_internal.claimDraftForSubmit, address),
-            finish: async (revision, sentIds) => {
-                await ctx.runMutation(internal.source_control.review_internal.finishDraftSubmit, { ...address, revision, sentIds });
+            finish: async (revision, sentIds, lease) => {
+                // The host has the review; a draft left behind is for the lease to hold, but ops should see it.
+                await ctx.runMutation(internal.source_control.review_internal.finishDraftSubmit, { ...address, lease, revision, sentIds }).catch((error: unknown) => {
+                    ctx.log.event("source_control.submit_review_finish_failed", { message: error instanceof Error ? error.message : "unknown" });
+
+                    throw error;
+                });
             },
             post: async (submission) =>
                 await writeToHost(DEVELOP_DRIVER, token, async (request) => {
                     return { review: await DEVELOP_DRIVER.submitReview(request, args, submission) };
                 }),
-            release: async () => {
-                await ctx.runMutation(internal.source_control.review_internal.releaseDraftSubmit, address);
+            release: async (lease) => {
+                await ctx.runMutation(internal.source_control.review_internal.releaseDraftSubmit, { ...address, lease });
             },
         });
 

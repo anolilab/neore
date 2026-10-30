@@ -631,9 +631,10 @@ const submitReview = async (request: HostRequest, ref: PullRequestRef, submissio
         throw new HostApiError("The host's answer to the review could not be read", 0, false, { unconfirmed: true });
     }
 
-    // With an event the review is submitted; a pending one is not a review anybody can see yet.
+    // With an event the review is submitted; a pending one is not a review anybody can see yet, and
+    // while it exists GitHub refuses the reviewer another, so a retry would fail: the wording says so.
     if (review.state === "PENDING") {
-        throw new HostApiError("The host kept the review as a draft", 0, false, { unconfirmed: true });
+        throw new HostApiError("The host kept the review as a pending draft, which blocks another review", 0, false, { unconfirmed: true });
     }
 
     return { id: String(review.id), url: webUrl(review.html_url) };

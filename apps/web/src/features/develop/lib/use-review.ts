@@ -5,6 +5,7 @@ import { skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } fr
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import type { PullRequestAddress } from "./use-develop";
+import { useDevelopUser } from "./use-develop";
 
 const MINUTE_MS = 60_000;
 
@@ -31,14 +32,15 @@ export const useDraftMutations = () => {
 
 export const useReviewThreads = (address: PullRequestAddress | undefined, enabled: boolean) => {
     const getThreads = useAction(api.source_control.review_functions.getReviewThreads);
+    const userId = useDevelopUser();
 
     return useInfiniteQuery({
         ...READ,
-        enabled: enabled && address !== undefined,
+        enabled: enabled && address !== undefined && userId !== undefined,
         queryFn: async ({ pageParam }) => await getThreads({ ...(address as PullRequestAddress), ...(pageParam !== null && { after: pageParam }) }),
         initialPageParam: null as string | null,
         getNextPageParam: (last: Awaited<ReturnType<typeof getThreads>>) => (last.status === "ok" && last.hasMore ? last.endCursor : undefined),
-        queryKey: ["develop", "threads", address],
+        queryKey: ["develop", userId, "threads", address],
         staleTime: MINUTE_MS,
     });
 };
@@ -46,26 +48,28 @@ export const useReviewThreads = (address: PullRequestAddress | undefined, enable
 /** Which files the user marked viewed on the host, read page by page until the host has no more. */
 export const useViewedFiles = (address: PullRequestAddress | undefined, enabled: boolean) => {
     const getViewed = useAction(api.source_control.review_functions.getViewedFiles);
+    const userId = useDevelopUser();
 
     return useInfiniteQuery({
         ...READ,
-        enabled: enabled && address !== undefined,
+        enabled: enabled && address !== undefined && userId !== undefined,
         queryFn: async ({ pageParam }) => await getViewed({ ...(address as PullRequestAddress), ...(pageParam !== null && { after: pageParam }) }),
         initialPageParam: null as string | null,
         getNextPageParam: (last: Awaited<ReturnType<typeof getViewed>>) => (last.status === "ok" && last.hasMore ? last.endCursor : undefined),
-        queryKey: ["develop", "viewed", address],
+        queryKey: ["develop", userId, "viewed", address],
         staleTime: MINUTE_MS,
     });
 };
 
 export const useReviewActions = (address: PullRequestAddress) => {
     const queryClient = useQueryClient();
+    const userId = useDevelopUser();
     const reply = useAction(api.source_control.review_functions.replyToReviewThread);
     const resolve = useAction(api.source_control.review_functions.setReviewThreadResolved);
     const setViewed = useAction(api.source_control.review_functions.setFileViewed);
     const submit = useAction(api.source_control.review_functions.submitReview);
-    const refreshThreads = async () => await queryClient.invalidateQueries({ queryKey: ["develop", "threads", address] });
-    const refreshViewed = async () => await queryClient.invalidateQueries({ queryKey: ["develop", "viewed", address] });
+    const refreshThreads = async () => await queryClient.invalidateQueries({ queryKey: ["develop", userId, "threads", address] });
+    const refreshViewed = async () => await queryClient.invalidateQueries({ queryKey: ["develop", userId, "viewed", address] });
 
     return {
         reply: useMutation({
