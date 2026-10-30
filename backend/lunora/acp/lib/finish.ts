@@ -18,30 +18,76 @@ type Stream = Doc<"persistentStreams">;
 const CHUNK_PAGE = 200;
 
 /**
- * The most chunk pages one finish reads. Reasoning and tool events do not fill the text cap, so without a bound a
- * long turn would page through its whole history inside the mutation that must save the reply and end the stream.
+ * The most chunk pages one finish reads from the front of a stream, and again from its end. Reasoning and tool
+ * events do not fill the text cap, so without a bound a long turn would page through its whole history inside the
+ * mutation that must save the reply and end the stream.
  */
 export const MAX_TRANSCRIPT_PAGES = 25;
 
-/** What the host wrote to a stream, in order, up to the reply cap. Pages through the chunks and stops once the text is full (reasoning after that point is not kept) or the page budget is spent. */
+/** Pages read back from the end of a stream once the front budget is spent: a final answer after a long run of tool events lives there. */
+export const MAX_TAIL_PAGES = 5;
+
+/** Joins the front of a long turn to its end, so the reply says that the middle was left out. */
+export const OMITTED_MARKER = "\n\n[… output omitted …]\n\n";
+
+type ChunkRead = Pick<Doc<"persistentChunks">, "reasoning" | "seq" | "text">;
+
+const appendChunks = (transcript: ReturnType<typeof emptyTranscript>, chunks: ChunkRead[]): void => {
+    for (const chunk of chunks) {
+        // Tool and permission events ride as `event` with no text of their own.
+        if (chunk.text.length > 0 || chunk.reasoning) {
+            appendToTranscript(transcript, chunk);
+        }
+    }
+};
+
+/**
+ * What the host wrote to a stream, in order, up to the reply cap. Pages through the chunks and stops once the text
+ * is full (reasoning after that point is not kept). When the page budget is spent first, the last pages are read
+ * too and joined on after a marker, so the answer that follows a long run of tool events is not lost.
+ */
 export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId: Id<"persistentStreams">) => {
     const transcript = emptyTranscript();
     let cursor: string | undefined;
     let pages = 0;
+    let lastSeq = -1;
+    let exhausted: boolean;
 
     do {
         pages += 1;
         const page = await ctx.db.persistentChunks.findMany({ cursor, limit: CHUNK_PAGE, orderBy: [{ seq: "asc" }], where: { streamId } });
 
-        for (const chunk of page.page) {
-            // Tool and permission events ride as `event` with no text of their own.
-            if (chunk.text.length > 0 || chunk.reasoning) {
-                appendToTranscript(transcript, chunk);
-            }
+        appendChunks(transcript, page.page);
+        lastSeq = page.page.at(-1)?.seq ?? lastSeq;
+        exhausted = page.isDone;
+        cursor = exhausted || isTranscriptFull(transcript) || pages >= MAX_TRANSCRIPT_PAGES ? undefined : (page.continueCursor ?? undefined);
+    } while (cursor);
+
+    if (exhausted || isTranscriptFull(transcript)) {
+        return transcript;
+    }
+
+    const tail: ChunkRead[] = [];
+    let tailCursor: string | undefined;
+    let reachedFront = false;
+
+    for (let read = 0; read < MAX_TAIL_PAGES && !reachedFront; read += 1) {
+        const page = await ctx.db.persistentChunks.findMany({ cursor: tailCursor, limit: CHUNK_PAGE, orderBy: [{ seq: "desc" }], where: { streamId } });
+
+        tail.push(...page.page.filter((chunk) => chunk.seq > lastSeq));
+        reachedFront = page.isDone || page.page.some((chunk) => chunk.seq <= lastSeq + 1);
+        tailCursor = page.continueCursor ?? undefined;
+    }
+
+    if (tail.length > 0) {
+        tail.reverse();
+
+        if (!reachedFront && transcript.text.length > 0) {
+            appendToTranscript(transcript, { text: OMITTED_MARKER });
         }
 
-        cursor = page.isDone || isTranscriptFull(transcript) || pages >= MAX_TRANSCRIPT_PAGES ? undefined : (page.continueCursor ?? undefined);
-    } while (cursor);
+        appendChunks(transcript, tail);
+    }
 
     return transcript;
 };
