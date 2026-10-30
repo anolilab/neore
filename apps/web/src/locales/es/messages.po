@@ -184,8 +184,8 @@ msgstr "{0, plural, one {# carácter} other {# caracteres}}"
 #. placeholder {0}: files.length
 #. placeholder {0}: listed.length
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:707
-#: src/features/develop/components/files-tab.tsx:118
-#: src/features/develop/components/files-tab.tsx:126
+#: src/features/develop/components/files-tab.tsx:245
+#: src/features/develop/components/files-tab.tsx:253
 msgid "{0, plural, one {# file} other {# files}}"
 msgstr "{0, plural, one {# archivo} other {# archivos}}"
 
@@ -239,6 +239,11 @@ msgstr "{0, plural, one {# destino más no se muestra.} other {# destinos más n
 msgid "{0, plural, one {# node} other {# nodes}}"
 msgstr "{0, plural, one {# nodo} other {# nodos}}"
 
+#. placeholder {0}: review.draftComments.length
+#: src/features/develop/components/files-tab.tsx:101
+msgid "{0, plural, one {# pending comment} other {# pending comments}}"
+msgstr ""
+
 #. placeholder {0}: selectedPromptIds.size
 #: src/features/prompts/components/prompt-list.tsx:627
 msgid "{0, plural, one {# prompt selected} other {# prompts selected}}"
@@ -275,6 +280,11 @@ msgstr "{0, plural, one {# habilidad} other {# habilidades}}"
 #: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:266
 msgid "{0, plural, one {# slide} other {# slides}}"
 msgstr "{0, plural, one {# diapositiva} other {# diapositivas}}"
+
+#. placeholder {0}: review.threads.length
+#: src/features/develop/components/files-tab.tsx:96
+msgid "{0, plural, one {# thread} other {# threads}}"
+msgstr ""
 
 #. placeholder {0}: stats.estimatedTokens
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:765
@@ -432,10 +442,6 @@ msgstr "{0} aptos · {1} eliminados · {2} ms"
 #: src/features/tasks/components/goal-list.tsx:47
 msgid "{0} failed"
 msgstr "{0} fallidas"
-
-#: src/routes/admin/gateway/keys.tsx:421
-#~ msgid "Virtual API Keys"
-#~ msgstr "Claves de API virtuales"
 
 #. placeholder {0}: modeLabels[mode]
 #. placeholder {1}: tool.name
@@ -606,7 +612,7 @@ msgstr "{0} usos"
 #. placeholder {1}: detail.commitCount
 #. placeholder {2}: detail.baseBranch
 #. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:94
+#: src/features/develop/components/pull-request-view.tsx:95
 msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
 msgstr ""
 
@@ -671,6 +677,10 @@ msgstr "{characterCount}/{maxLength} caracteres"
 #: src/features/workflow/components/nodes/group-node.tsx:320
 msgid "{childCount, plural, one {# node} other {# nodes}}"
 msgstr "{childCount, plural, one {# nodo} other {# nodos}}"
+
+#: src/features/develop/components/review-panel.tsx:192
+msgid "{commentCount, plural, one {# comment is waiting to be submitted} other {# comments are waiting to be submitted}}"
+msgstr ""
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:138
 msgid "{comparisonCount, plural, one {# model} other {# models}}"
@@ -811,6 +821,10 @@ msgstr "{fps} fps"
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr ""
 
+#: src/features/develop/components/review-panel.tsx:235
+msgid "{hostLabel} has no batched review: your comments are posted one after another when you submit."
+msgstr ""
+
 #: src/features/chat/header/temporary-chat-dropdown.tsx:84
 msgid "{hours} hours"
 msgstr "{hours} horas"
@@ -845,15 +859,34 @@ msgid "{itemCount, plural, one {# item} other {# items}}"
 msgstr "{itemCount, plural, one {# elemento} other {# elementos}}"
 
 #: src/features/develop/components/failure-notice.tsx:17
+#: src/features/develop/lib/use-review-messages.ts:20
 msgid "{label} could not be reached or answered unexpectedly. Try again in a moment."
 msgstr ""
 
+#. placeholder {0}: result.reason
+#: src/features/develop/lib/use-review-messages.ts:37
+msgid "{label} did not accept this: {0}"
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:37
+msgid "{label} did not accept this."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:25
+msgid "{label} did not answer, so it may have taken this. Check on {label} before trying again."
+msgstr ""
+
 #: src/features/develop/components/failure-notice.tsx:21
+#: src/features/develop/lib/use-review-messages.ts:24
 msgid "{label} is limiting requests for this account. Try again in a few minutes."
 msgstr ""
 
 #: src/features/develop/components/failure-notice.tsx:19
 msgid "{label} is not connected"
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:22
+msgid "{label} is not connected."
 msgstr ""
 
 #. placeholder {0}: ids.length
@@ -863,6 +896,10 @@ msgstr "{label} movido a la posición {position} de {0} en destacados"
 
 #: src/features/develop/components/failure-notice.tsx:14
 msgid "{label} refused this request. Your account may lack access, or an organization may require you to authorize the app."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:19
+msgid "{label} refused this. Your account may lack access."
 msgstr ""
 
 #: src/features/settings/components/chat/usage-settings.tsx:606
@@ -1024,7 +1061,7 @@ msgstr "{providerName} · tu propia cuenta de Bedrock ({region})"
 msgid "{requestCount} req"
 msgstr "{requestCount} sol."
 
-#: src/features/develop/components/pull-request-view.tsx:106
+#: src/features/develop/components/pull-request-view.tsx:108
 msgid "{requestNoun} views"
 msgstr ""
 
@@ -1493,6 +1530,14 @@ msgstr "Un vídeo de referencia puede durar como máximo {0} segundos."
 msgid "A regular expression the answer must match"
 msgstr "Una expresión regular que la respuesta debe cumplir"
 
+#: src/features/develop/components/review-thread.tsx:76
+msgid "A reply is posted straight away, not with the rest of your review."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:16
+#~ msgid "A review holds at most 100 comments. Submit this one first."
+#~ msgstr ""
+
 #: src/features/settings/components/chat/bots-settings.tsx:141
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr ""
@@ -1851,6 +1896,10 @@ msgstr "Añadir círculo"
 msgid "Add comments"
 msgstr "Añadir comentarios"
 
+#: src/features/develop/components/review-panel.tsx:194
+msgid "Add comments on a line of the diff, then submit."
+msgstr ""
+
 #: src/features/settings/components/chat/custom-providers-settings.tsx:329
 #: src/features/settings/components/chat/custom-providers-settings.tsx:439
 msgid "Add Endpoint"
@@ -2010,6 +2059,10 @@ msgstr "Añadir a favoritos"
 msgid "Add to Favorites"
 msgstr "Añadir a favoritos"
 
+#: src/features/develop/components/review-diff.tsx:166
+msgid "Add to review"
+msgstr ""
+
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
 #: src/components/model-picker/model-picker.tsx:340
 msgid "Add to starred"
@@ -2023,7 +2076,7 @@ msgstr ""
 msgid "Add/Replace Object"
 msgstr "Añadir/reemplazar objeto"
 
-#: src/features/develop/components/files-tab.tsx:31
+#: src/features/develop/components/files-tab.tsx:63
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:99
 msgid "Added"
 msgstr "Añadido"
@@ -3158,6 +3211,7 @@ msgid "approval"
 msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:116
+#: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:102
 msgid "Approve"
 msgstr "Aprobar"
@@ -4684,6 +4738,7 @@ msgstr "Canadá"
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:162
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
+#: src/features/develop/components/comment-composer.tsx:62
 #: src/features/evals/components/case-form-dialog.tsx:68
 #: src/features/evals/components/dataset-form-dialog.tsx:168
 #: src/features/evals/components/import-cases-dialog.tsx:113
@@ -4958,8 +5013,8 @@ msgstr "Cambia el nombre visible de tu organización"
 msgid "Change your organization's unique identifier"
 msgstr "Cambia el identificador único de tu organización"
 
-#: src/features/develop/components/files-tab.tsx:32
-#: src/features/develop/components/files-tab.tsx:57
+#: src/features/develop/components/files-tab.tsx:64
+#: src/features/develop/components/files-tab.tsx:104
 msgid "Changed"
 msgstr ""
 
@@ -5165,7 +5220,7 @@ msgstr "Comprobando..."
 msgid "Checking…"
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:64
+#: src/features/develop/components/pull-request-view.tsx:65
 #: src/features/evals/components/case-fields.tsx:150
 #: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
@@ -5241,6 +5296,10 @@ msgstr "Elige cómo te avisa Neore del trabajo terminado y de lo que te necesita
 #: src/features/settings/components/account/account-settings.tsx:183
 msgid "Choose how to send messages in the chat."
 msgstr "Elige cómo enviar mensajes en el chat."
+
+#: src/features/develop/components/review-panel.tsx:129
+msgid "Choose how you review this before you submit it."
+msgstr ""
 
 #: src/features/chat/prompt-improvement/components/composer-prompt-improvement-button.tsx:107
 msgid "Choose prompt improvement style"
@@ -5617,7 +5676,7 @@ msgstr "Cerrar traducción"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread/widgets/places-widget.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 msgid "Closed"
 msgstr "Cerrado"
 
@@ -5884,6 +5943,7 @@ msgstr ""
 msgid "Commands"
 msgstr "Comandos"
 
+#: src/features/develop/components/review-panel.tsx:64
 #: src/features/pages/components/page-comments-panel.tsx:146
 #: src/features/pages/components/page-view.tsx:429
 #: src/features/workflow/components/nodes/comment-node.tsx:95
@@ -5895,6 +5955,12 @@ msgstr "Comentar"
 #: src/features/workflow/components/nodes/comment-node.tsx:74
 msgid "Comment color"
 msgstr "Color del comentario"
+
+#. placeholder {0}: target.line
+#: src/features/develop/components/review-diff.tsx:134
+#: src/features/develop/components/review-diff.tsx:155
+msgid "Comment on line {0}"
+msgstr ""
 
 #: src/features/pages/components/page-comments-panel.tsx:135
 #: src/features/pages/components/page-comments-panel.tsx:137
@@ -5920,7 +5986,7 @@ msgstr "diseño comercial"
 msgid "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 msgstr "Proyectos comerciales que exigen la mejor calidad de imagen de Black Forest Labs"
 
-#: src/features/develop/components/pull-request-view.tsx:64
+#: src/features/develop/components/pull-request-view.tsx:65
 msgid "Commits"
 msgstr ""
 
@@ -6749,6 +6815,10 @@ msgstr "Historial de la conversación"
 msgid "Conversation not available"
 msgstr "Conversación no disponible"
 
+#: src/features/develop/components/review-diff.tsx:183
+msgid "Conversations on lines this diff no longer shows"
+msgstr ""
+
 #: src/features/chat/thread/composer-input.tsx:714
 #: src/features/chat/thread/composer-input.tsx:1070
 msgid "Conversion failed"
@@ -6804,7 +6874,7 @@ msgstr ""
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:211
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:34
-#: src/features/develop/components/files-tab.tsx:33
+#: src/features/develop/components/files-tab.tsx:65
 #: src/features/local-models/components/local-setup-guide.tsx:44
 #: src/features/pages/components/page-kept-draft.tsx:30
 msgid "Copied"
@@ -7044,6 +7114,10 @@ msgstr "No se pudo cancelar la ejecución."
 msgid "Could not change push notifications. Try again."
 msgstr "No se pudieron cambiar las notificaciones push. Inténtalo de nuevo."
 
+#: src/features/develop/components/review-panel.tsx:160
+msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
+msgstr ""
+
 #: src/features/devices/components/devices-settings.tsx:109
 msgid "Could not connect to the server."
 msgstr ""
@@ -7100,6 +7174,10 @@ msgstr "No se pudo eliminar la página"
 
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:119
 msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, Claude, or a Neore data export."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:34
+msgid "Could not do this. Try again."
 msgstr ""
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:58
@@ -7234,6 +7312,15 @@ msgstr "No se pudo guardar el nuevo orden de {label}"
 msgid "Could not save the page"
 msgstr "No se pudo guardar la página"
 
+#: src/features/develop/components/review-panel.tsx:177
+msgid "Could not save the summary, so nothing was submitted. Try again."
+msgstr ""
+
+#: src/features/develop/components/comment-composer.tsx:42
+#: src/features/develop/lib/use-review-messages.ts:30
+msgid "Could not save this. Try again."
+msgstr ""
+
 #: src/features/sub-agents/components/worker-composer.tsx:59
 msgid "Could not send the message."
 msgstr ""
@@ -7280,6 +7367,10 @@ msgstr ""
 #: src/features/sub-agents/components/worker-stop-bar.tsx:40
 msgid "Could not stop the worker."
 msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:117
+#~ msgid "Could not submit the review. Your review is kept."
+#~ msgstr ""
 
 #: src/features/home/components/home-page.tsx:228
 msgid "Could not turn on the Daily Brief."
@@ -8277,6 +8368,7 @@ msgstr "Delega tareas en Devin, el ingeniero de software con IA"
 #: src/features/auth/components/settings/passkey/passkey-cell.tsx:98
 #: src/features/chat/thread-list/group-header.tsx:150
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:166
+#: src/features/develop/components/draft-comment-card.tsx:60
 #: src/features/evals/components/dataset-panel.tsx:322
 #: src/features/evals/components/evals-page.tsx:163
 #: src/features/local-models/components/ollama-model-manager.tsx:336
@@ -8737,7 +8829,7 @@ msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it,
 msgstr "Describe tu flujo de trabajo... p. ej., \"Genera una imagen a partir de texto, amplíala y luego quita el fondo\""
 
 #: src/components/model-picker/model-picker.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:64
+#: src/features/develop/components/pull-request-view.tsx:65
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:213
@@ -8921,7 +9013,7 @@ msgstr "No superada"
 msgid "Did you mean: {suggestion}?"
 msgstr "¿Quisiste decir: {suggestion}?"
 
-#: src/features/develop/components/files-tab.tsx:64
+#: src/features/develop/components/files-tab.tsx:149
 msgid "Diffs are not available from this host."
 msgstr ""
 
@@ -8981,10 +9073,15 @@ msgid "Disabling..."
 msgstr "Desactivando..."
 
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:808
+#: src/features/develop/components/review-panel.tsx:276
 #: src/features/pages/components/page-agent-dialog.tsx:139
 #: src/features/pages/components/page-kept-draft.tsx:42
 msgid "Discard"
 msgstr "Descartar"
+
+#: src/features/develop/components/review-panel.tsx:267
+msgid "Discard the review"
+msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:118
 #: src/features/settings/connectors/connector-card.tsx:186
@@ -9321,7 +9418,7 @@ msgstr "Las descargas abren la página de versiones de GitHub. Si aún no aparec
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/inbox-list.tsx:118
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
 msgstr "Borrador"
@@ -9614,6 +9711,7 @@ msgstr "Generación guiada por bordes"
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
 #: src/features/chat/thread/message-item.tsx:391
+#: src/features/develop/components/draft-comment-card.tsx:51
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:218
@@ -9650,6 +9748,10 @@ msgstr "Editar caso {0}"
 #: src/features/knowledge/components/collection-picker.tsx:97
 msgid "Edit collection"
 msgstr "Editar colección"
+
+#: src/features/develop/components/draft-comment-card.tsx:32
+msgid "Edit comment"
+msgstr ""
 
 #: src/features/chat/thread/composer-input.tsx:295
 msgid "Edit content"
@@ -12426,7 +12528,7 @@ msgstr "Subida de archivo rechazada."
 msgid "Filename cannot be empty"
 msgstr "El nombre del archivo no puede estar vacío"
 
-#: src/features/develop/components/pull-request-view.tsx:64
+#: src/features/develop/components/pull-request-view.tsx:65
 msgid "Files"
 msgstr ""
 
@@ -14495,6 +14597,10 @@ msgstr "Cómo funcionan los disparadores"
 msgid "How would you like the AI to respond?"
 msgstr "¿Cómo quieres que responda la IA?"
 
+#: src/features/develop/components/review-panel.tsx:203
+msgid "How you review this"
+msgstr ""
+
 #: src/features/slides/components/slide-editor-dialog.tsx:97
 msgid "HTML Content"
 msgstr "Contenido HTML"
@@ -14591,6 +14697,10 @@ msgstr "Identidad"
 #: src/features/sub-agents/components/worker-list.tsx:80
 msgid "Idle"
 msgstr "Inactivo"
+
+#: src/features/develop/components/review-panel.tsx:147
+msgid "If it kept the review as pending, submit or delete it there first."
+msgstr ""
 
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:271
 #: src/components/error-boundaries/route-error-boundary.tsx:139
@@ -14989,7 +15099,7 @@ msgid "Improving..."
 msgstr "Mejorando..."
 
 #. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:99
+#: src/features/develop/components/pull-request-view.tsx:100
 msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
@@ -15493,7 +15603,12 @@ msgid "Issue tracking and project management"
 msgstr "Seguimiento de incidencias y gestión de proyectos"
 
 #: src/features/develop/components/failure-notice.tsx:20
+#: src/features/develop/lib/use-review-messages.ts:23
 msgid "It does not exist, or your {label} account cannot see it."
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:286
+msgid "It is on {hostLabel} now."
 msgstr ""
 
 #: src/features/pages/components/page-view.tsx:190
@@ -15659,6 +15774,10 @@ msgstr "Mantener las filas actuales"
 #: src/features/knowledge/components/collection-picker.tsx:114
 msgid "Keep files"
 msgstr "Conservar archivos"
+
+#: src/features/develop/components/review-panel.tsx:270
+msgid "Keep it"
+msgstr ""
 
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:146
 msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
@@ -16502,7 +16621,7 @@ msgstr "Cargar más"
 msgid "Load more commits"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:142
+#: src/features/develop/components/files-tab.tsx:301
 msgid "Load more files"
 msgstr ""
 
@@ -16516,14 +16635,14 @@ msgstr "Cargar preajuste"
 
 #. placeholder {0}: listed.length
 #. placeholder {1}: Math.min(fileCount, fileLimit)
-#: src/features/develop/components/files-tab.tsx:122
+#: src/features/develop/components/files-tab.tsx:249
 msgid "Loaded {0} of {1, plural, one {# file} other {# files}}…"
 msgstr ""
 
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:26
 #: src/features/develop/components/inbox-list.tsx:86
-#: src/features/develop/components/pull-request-view.tsx:49
+#: src/features/develop/components/pull-request-view.tsx:50
 msgid "Loading"
 msgstr "Cargando"
 
@@ -16585,11 +16704,11 @@ msgstr "Cargando editor…"
 msgid "Loading file…"
 msgstr "Cargando archivo…"
 
-#: src/features/develop/components/files-tab.tsx:104
+#: src/features/develop/components/files-tab.tsx:227
 msgid "Loading files"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:118
+#: src/features/develop/components/files-tab.tsx:245
 msgid "Loading files…"
 msgstr ""
 
@@ -17540,7 +17659,7 @@ msgid "Merge request opened"
 msgstr ""
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 msgid "Merged"
 msgstr "Fusionado"
 
@@ -18007,7 +18126,7 @@ msgid "Modern gradient background"
 msgstr "Fondo degradado moderno"
 
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:771
-#: src/features/develop/components/files-tab.tsx:34
+#: src/features/develop/components/files-tab.tsx:66
 msgid "Modified"
 msgstr "Modificado"
 
@@ -19169,7 +19288,7 @@ msgstr "Aún no hay conjuntos de datos"
 msgid "No description"
 msgstr "Sin descripción"
 
-#: src/features/develop/components/pull-request-view.tsx:116
+#: src/features/develop/components/pull-request-view.tsx:118
 msgid "No description provided."
 msgstr ""
 
@@ -19740,7 +19859,7 @@ msgstr ""
 msgid "Not found"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:42
+#: src/features/develop/components/files-tab.tsx:74
 msgid "Not loaded: the diffs on this page were already large."
 msgstr ""
 
@@ -19765,6 +19884,10 @@ msgstr "Sin asignar"
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:75
 msgid "Not started"
 msgstr "No iniciado"
+
+#: src/features/develop/components/review-panel.tsx:299
+msgid "Not submitted"
+msgstr ""
 
 #: src/features/workflow/components/nodes/comment-node.tsx:70
 msgid "Note"
@@ -20191,7 +20314,7 @@ msgstr "Opacidad"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:669
 #: src/components/command-palette.tsx:618
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
 msgstr "Abrir"
@@ -20298,7 +20421,7 @@ msgid "Open new chat"
 msgstr "Abrir chat nuevo"
 
 #. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-view.tsx:85
+#: src/features/develop/components/pull-request-view.tsx:86
 msgid "Open on {0}"
 msgstr ""
 
@@ -20962,6 +21085,10 @@ msgstr "Nuestra política de privacidad explica cómo recopilamos, usamos y prot
 msgid "Outcome of every case per model"
 msgstr "Resultado de cada caso por modelo"
 
+#: src/features/develop/components/review-thread.tsx:44
+msgid "Outdated"
+msgstr ""
+
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
 #: src/features/workflow/types/index.ts:574
 #: src/features/workflow/types/index.ts:578
@@ -21411,6 +21538,10 @@ msgstr "Invitaciones pendientes"
 #: src/features/chat/sharing/thread-share-button.tsx:319
 msgid "Pending Invites"
 msgstr "Invitaciones pendientes"
+
+#: src/features/develop/components/draft-comment-card.tsx:28
+msgid "Pending: posted when you submit the review"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:210
 msgid "people"
@@ -23005,8 +23136,8 @@ msgid "Read the docs"
 msgstr "Lee la documentación"
 
 #: src/features/develop/components/develop-page.tsx:43
-msgid "Read what needs you: the description, commits, files, diff and checks of each change."
-msgstr ""
+#~ msgid "Read what needs you: the description, commits, files, diff and checks of each change."
+#~ msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:65
 msgid "read-only"
@@ -23807,7 +23938,7 @@ msgstr "Quitar usuario"
 msgid "Remove variable {0}"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:35
+#: src/features/develop/components/files-tab.tsx:67
 msgid "Removed"
 msgstr ""
 
@@ -23819,10 +23950,11 @@ msgstr "Quitado de favoritos"
 msgid "Removed:"
 msgstr "Quitado:"
 
-#: src/features/develop/components/files-tab.tsx:36
+#: src/features/develop/components/files-tab.tsx:68
 msgid "Renamed"
 msgstr ""
 
+#: src/features/develop/components/review-thread.tsx:104
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Reopen"
 msgstr "Reabrir"
@@ -23905,6 +24037,9 @@ msgstr "Las respuestas ya no se leerán en voz alta"
 msgid "Replies, tokens and spend per skill or agent for the selected period"
 msgstr "Respuestas, tokens y gasto por habilidad o agente en el período seleccionado"
 
+#: src/features/develop/components/review-thread.tsx:61
+#: src/features/develop/components/review-thread.tsx:74
+#: src/features/develop/components/review-thread.tsx:82
 #: src/features/pages/components/page-comments-panel.tsx:204
 #: src/features/pages/components/page-comments-panel.tsx:208
 msgid "Reply"
@@ -23925,6 +24060,10 @@ msgstr "Repositorios, issues, PR y búsqueda de código"
 #: src/features/tasks/components/task-form-dialog.tsx:263
 msgid "Repository"
 msgstr "Repositorio"
+
+#: src/features/develop/components/review-panel.tsx:64
+msgid "Request changes"
+msgstr ""
 
 #: src/features/settings/components/chat/usage-settings.tsx:92
 msgid "Request count"
@@ -24085,9 +24224,14 @@ msgstr "Cambiar el tamaño de la columna {label}"
 msgid "Resolution"
 msgstr "Resolución"
 
+#: src/features/develop/components/review-thread.tsx:104
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Resolve"
 msgstr "Resolver"
+
+#: src/features/develop/components/review-thread.tsx:43
+msgid "Resolved"
+msgstr ""
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:85
 msgid "Resource"
@@ -24271,6 +24415,10 @@ msgstr "Consulta nuestra política de privacidad y nuestras prácticas de tratam
 msgid "Review requested on a pull request"
 msgstr ""
 
+#: src/features/develop/components/review-panel.tsx:284
+msgid "Review submitted"
+msgstr ""
+
 #. placeholder {0}: task.title
 #: src/features/home/components/home-page.tsx:163
 msgid "Review task: {0}"
@@ -24279,6 +24427,10 @@ msgstr "Revisar tarea: {0}"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:134
 msgid "Review the optimized prompt below. You can apply it to update your prompt or reject it to try again."
 msgstr "Revisa el prompt optimizado de abajo. Puedes aplicarlo para actualizar tu prompt o rechazarlo para volver a intentarlo."
+
+#: src/features/develop/components/develop-page.tsx:43
+msgid "Review what needs you: the description, commits, files, diff and checks of each change, and your own review of it."
+msgstr ""
 
 #: src/features/skills/components/skill-form-dialog.tsx:354
 msgid "review, security"
@@ -24657,6 +24809,7 @@ msgstr "Arabia Saudí"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:154
+#: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:640
@@ -25471,6 +25624,10 @@ msgstr "Envía mensajes al bot de IA por Telegram. Las conversaciones aparecen e
 #: src/features/chat/thread/composer-prompt-queue.tsx:438
 msgid "Send next"
 msgstr "Enviar siguiente"
+
+#: src/features/develop/components/review-thread.tsx:74
+msgid "Send reply now"
+msgstr ""
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:180
 msgid "Send the secret as <0>X-Gitlab-Token</0>, in plain text, as GitLab's secret token works. GitLab does not sign the body and sends no timestamp, so the secret is a bearer token: whoever holds it can send any request. Every delivery must also carry <1>X-Gitlab-Event-UUID</1>, which GitLab sends itself. Each accepted delivery is remembered by that UUID and its body, and a resend of it is answered as a duplicate. Requests carrying other signature headers are rejected."
@@ -27542,6 +27699,14 @@ msgstr "Subtítulo"
 msgid "submit"
 msgstr ""
 
+#: src/features/develop/components/review-panel.tsx:239
+msgid "Submit review"
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:239
+msgid "Submitting…"
+msgstr ""
+
 #: src/components/model-picker/model-picker.tsx:983
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "Suscríbete por 8 $/mes para desbloquear todos los modelos."
@@ -27629,6 +27794,10 @@ msgstr "Resume mi bandeja de entrada y destaca los elementos urgentes. Usa {PAYL
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:86
 msgid "Summarize the history of the internet"
 msgstr "Resume la historia de internet"
+
+#: src/features/develop/components/review-panel.tsx:218
+msgid "Summary"
+msgstr ""
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:151
 msgid "Summary is only available for text models."
@@ -28381,6 +28550,10 @@ msgstr "Tailandia"
 msgid "Thanks for rating"
 msgstr "Gracias por tu valoración"
 
+#: src/features/develop/lib/use-review-messages.ts:14
+msgid "That comment is already gone."
+msgstr ""
+
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:168
 msgid "That key combination cannot be used as a shortcut"
 msgstr ""
@@ -28450,6 +28623,10 @@ msgstr "El navegador no puede leer este vídeo para capturar un fotograma"
 msgid "The builder could not answer. Try again."
 msgstr "El creador no pudo responder. Inténtalo de nuevo."
 
+#: src/features/develop/lib/use-review-messages.ts:13
+msgid "The change has new commits since you started this review. Submit or discard the review first, then comment on the new version."
+msgstr ""
+
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:215
 msgid "The change is too large to show in full."
 msgstr "El cambio es demasiado grande para mostrarlo completo."
@@ -28490,7 +28667,7 @@ msgstr "El límite de coste debe ser una cantidad positiva de dólares."
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "Se eliminan el conjunto de datos, sus casos y todas sus ejecuciones."
 
-#: src/features/develop/components/pull-request-view.tsx:118
+#: src/features/develop/components/pull-request-view.tsx:120
 msgid "The description is cut short."
 msgstr ""
 
@@ -28588,11 +28765,11 @@ msgstr ""
 msgid "The host lists at most {commitLimit, plural, one {# commit} other {# commits}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:131
+#: src/features/develop/components/files-tab.tsx:258
 msgid "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:41
+#: src/features/develop/components/files-tab.tsx:73
 msgid "The host sent no diff for this file (binary, or too large for it)."
 msgstr ""
 
@@ -28854,6 +29031,10 @@ msgstr "Después descarga un modelo y usa esta URL base:"
 msgid "There are no items to display."
 msgstr "No hay elementos que mostrar."
 
+#: src/features/develop/components/review-panel.tsx:134
+msgid "There is nothing to submit."
+msgstr ""
+
 #: src/components/error-boundaries/route-error-boundary.tsx:64
 msgid "There's a problem with your internet connection or our servers."
 msgstr "Hay un problema con tu conexión a internet o con nuestros servidores."
@@ -29023,7 +29204,7 @@ msgstr "Esta conversación no está disponible"
 msgid "This CSV file appears to be empty or invalid."
 msgstr "Este archivo CSV parece estar vacío o no es válido."
 
-#: src/features/develop/components/files-tab.tsx:43
+#: src/features/develop/components/files-tab.tsx:75
 msgid "This diff is cut short."
 msgstr ""
 
@@ -29067,7 +29248,7 @@ msgstr "Este archivo es demasiado grande (~{0} tokens) y supera la ventana de co
 msgid "This host does not offer an inbox yet."
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:103
+#: src/features/develop/components/pull-request-view.tsx:105
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
@@ -29177,6 +29358,14 @@ msgstr "Este prompt configurará:"
 #: src/features/local-models/components/ollama-model-manager.tsx:337
 msgid "This removes the model files from your computer. You can pull it again later."
 msgstr "Esto elimina los archivos del modelo de tu ordenador. Puedes volver a descargarlo más tarde."
+
+#: src/features/develop/components/review-panel.tsx:119
+msgid "This review is already being submitted, maybe from another device."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:16
+msgid "This review is too long to keep: it holds at most 100 comments and about 1 MB of text. Submit it first, or shorten it."
+msgstr ""
 
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:43
 msgid "This run is no longer available."
@@ -30266,7 +30455,7 @@ msgstr "Sin categoría ({0})"
 msgid "Uncategorized"
 msgstr "Sin categoría"
 
-#: src/features/develop/components/files-tab.tsx:37
+#: src/features/develop/components/files-tab.tsx:69
 #: src/features/evals/components/run-comparison.tsx:56
 msgid "Unchanged"
 msgstr "Sin cambios"
@@ -31531,6 +31720,10 @@ msgstr "Ver la documentación completa"
 msgid "View History"
 msgstr "Ver historial"
 
+#: src/features/develop/components/review-panel.tsx:289
+msgid "View it"
+msgstr ""
+
 #. placeholder {0}: latestUnread.title
 #: src/features/changelog/components/changelog-card.tsx:51
 msgid "View latest update: {0}"
@@ -31551,6 +31744,19 @@ msgstr "Ver pull request"
 #: src/features/admin/components/user-cell.tsx:122
 msgid "View Sessions"
 msgstr "Ver sesiones"
+
+#: src/features/develop/components/files-tab.tsx:117
+msgid "Viewed"
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:117
+msgid "Viewed (changed since)"
+msgstr ""
+
+#. placeholder {0}: listed.length
+#: src/features/develop/components/files-tab.tsx:261
+msgid "Viewed {viewedCount} of {0} files"
+msgstr ""
 
 #: src/features/workflow/components/collab/collaborator-facepile.tsx:73
 msgid "Viewing: {selectedNodeId}"
@@ -31576,6 +31782,10 @@ msgstr "Indie vintage, grano grueso"
 #: src/features/chat/tags/thread-tag-color-picker.tsx:23
 msgid "Violet"
 msgstr "Violeta"
+
+#: src/routes/admin/gateway/keys.tsx:421
+#~ msgid "Virtual API Keys"
+#~ msgstr "Claves de API virtuales"
 
 #: src/features/skills/components/skill-form-dialog.tsx:459
 msgid "Visibility"
@@ -32267,6 +32477,10 @@ msgstr "Escritura"
 msgid "Write a compelling product description for an e-commerce site"
 msgstr "Escribe una descripción de producto atractiva para una tienda online"
 
+#: src/features/develop/components/review-panel.tsx:124
+msgid "Write a summary, or add a comment, before you submit this review."
+msgstr ""
+
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:106
 msgid "Write a video description for a product launch"
 msgstr "Escribe la descripción de un video para el lanzamiento de un producto"
@@ -32592,6 +32806,10 @@ msgstr "Te has unido a la conversación. Redirigiendo..."
 msgid "Your {label} sign-in has expired. Connect it again to keep reading."
 msgstr ""
 
+#: src/features/develop/lib/use-review-messages.ts:21
+msgid "Your {label} sign-in has expired. Connect it again."
+msgstr ""
+
 #: src/features/auth/components/settings/account/delete-account-card.tsx:56
 msgid "Your account and all associated data are being deleted. This cannot be cancelled."
 msgstr "Tu cuenta y todos los datos asociados se están eliminando. No se puede cancelar."
@@ -32639,6 +32857,14 @@ msgstr "Tu navegador no indica qué procesador tienes, así que elige el instala
 #: src/features/local-models/components/local-setup-guide.tsx:85
 msgid "Your browser talks to the server on this computer directly — the prompt and reply never pass through our AI servers, and nothing is billed."
 msgstr "Tu navegador se comunica directamente con el servidor de este ordenador: el prompt y la respuesta nunca pasan por nuestros servidores de IA y no se cobra nada."
+
+#: src/features/develop/components/review-diff.tsx:177
+msgid "Your comments on lines this diff does not show"
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:199
+msgid "Your comments were written on an earlier version of this change. They are posted against that version, and the lines shown below may have moved."
+msgstr ""
 
 #: src/features/devices/components/device-tool-call.tsx:40
 msgid "your computer"
@@ -32755,9 +32981,19 @@ msgstr "Tu plan y tu asignación de créditos dependen de tu suscripción."
 msgid "Your rating"
 msgstr "Tu valoración"
 
+#: src/features/develop/components/review-panel.tsx:188
 #: src/features/tasks/components/task-detail-dialog.tsx:88
 msgid "Your review"
 msgstr "Tu revisión"
+
+#: src/features/develop/lib/use-review-messages.ts:15
+msgid "Your review is being submitted. Wait for it to finish."
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:147
+#: src/features/develop/components/review-panel.tsx:153
+msgid "Your review is kept."
+msgstr ""
 
 #: src/lib/toast.ts:248
 msgid "Your session has expired"
@@ -32916,222 +33152,3 @@ msgstr "Zúrich"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ puntos"
-
-#. placeholder {0}: review.draftComments.length
-#: src/features/develop/components/files-tab.tsx:95
-msgid "{0, plural, one {# pending comment} other {# pending comments}}"
-msgstr ""
-
-#. placeholder {0}: review.threads.length
-#: src/features/develop/components/files-tab.tsx:90
-msgid "{0, plural, one {# thread} other {# threads}}"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:130
-msgid "{commentCount, plural, one {# comment is waiting to be submitted} other {# comments are waiting to be submitted}}"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:168
-msgid "{hostLabel} has no batched review: your comments are posted one after another when you submit."
-msgstr ""
-
-#. placeholder {0}: result.reason
-#: src/features/develop/lib/use-review-messages.ts:37
-msgid "{label} did not accept this: {0}"
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:37
-msgid "{label} did not accept this."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:25
-msgid "{label} did not answer, so it may have taken this. Check on {label} before trying again."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:22
-msgid "{label} is not connected."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:19
-msgid "{label} refused this. Your account may lack access."
-msgstr ""
-
-#: src/features/develop/components/review-thread.tsx:76
-msgid "A reply is posted straight away, not with the rest of your review."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:16
-msgid "A review holds at most 100 comments. Submit this one first."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:132
-msgid "Add comments on a line of the diff, then submit."
-msgstr ""
-
-#: src/features/develop/components/review-diff.tsx:162
-msgid "Add to review"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:98
-msgid "Choose how you review this before you submit it."
-msgstr ""
-
-#. placeholder {0}: target.line
-#: src/features/develop/components/review-diff.tsx:130
-#: src/features/develop/components/review-diff.tsx:151
-msgid "Comment on line {0}"
-msgstr ""
-
-#: src/features/develop/components/review-diff.tsx:179
-msgid "Conversations on lines this diff no longer shows"
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:34
-msgid "Could not do this. Try again."
-msgstr ""
-
-#: src/features/develop/components/comment-composer.tsx:42
-#: src/features/develop/lib/use-review-messages.ts:30
-msgid "Could not save this. Try again."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:117
-msgid "Could not submit the review. Your review is kept."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:186
-msgid "Discard the review"
-msgstr ""
-
-#: src/features/develop/components/draft-comment-card.tsx:32
-msgid "Edit comment"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:136
-msgid "How you review this"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:205
-msgid "It is on {hostLabel} now."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:189
-msgid "Keep it"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:218
-msgid "Not submitted"
-msgstr ""
-
-#: src/features/develop/components/review-thread.tsx:44
-msgid "Outdated"
-msgstr ""
-
-#: src/features/develop/components/draft-comment-card.tsx:28
-msgid "Pending: posted when you submit the review"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:59
-msgid "Request changes"
-msgstr ""
-
-#: src/features/develop/components/review-thread.tsx:43
-msgid "Resolved"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:203
-msgid "Review submitted"
-msgstr ""
-
-#: src/features/develop/components/develop-page.tsx:43
-msgid "Review what needs you: the description, commits, files, diff and checks of each change, and your own review of it."
-msgstr ""
-
-#: src/features/develop/components/review-thread.tsx:74
-msgid "Send reply now"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:172
-msgid "Submit review"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:172
-msgid "Submitting…"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:151
-msgid "Summary"
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:14
-msgid "That comment is already gone."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:13
-msgid "The change has new commits since you started this review. Submit or discard the review first, then comment on the new version."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:103
-msgid "There is nothing to submit."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:88
-msgid "This review is already being submitted, maybe from another device."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:208
-msgid "View it"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:111
-msgid "Viewed"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:111
-msgid "Viewed (changed since)"
-msgstr ""
-
-#. placeholder {0}: listed.length
-#: src/features/develop/components/files-tab.tsx:242
-msgid "Viewed {viewedCount} of {0} files"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:93
-msgid "Write a summary, or add a comment, before you submit this review."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:21
-msgid "Your {label} sign-in has expired. Connect it again."
-msgstr ""
-
-#: src/features/develop/components/review-diff.tsx:173
-msgid "Your comments on lines this diff does not show"
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:15
-msgid "Your review is being submitted. Wait for it to finish."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:113
-msgid "Your review is kept."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:127
-msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:143
-msgid "Could not save the summary, so nothing was submitted. Try again."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:116
-msgid "If it kept the review as pending, submit or delete it there first."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:16
-msgid "This review is too long to keep: it holds at most 100 comments and about 1 MB of text. Submit it first, or shorten it."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:196
-msgid "Your comments were written on an earlier version of this change. They are posted against that version, and the lines shown below may have moved."
-msgstr ""

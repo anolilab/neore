@@ -584,7 +584,7 @@ export interface InternalApiTypes {
             collectPrompts: FunctionReference<"query", { userId: string }, { promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
             collectSettings: FunctionReference<"query", { userId: string }, { aiUserPreferences?: unknown | null; userSettings?: unknown | null }>;
             collectThreadTags: FunctionReference<"query", { userId: string }, Array<{ _id: string; color: string; createdAt: number; name: string; order: number; updatedAt: number }>>;
-            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; requestId: Id<"gdprRequests">; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string }, string>;
+            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string }, string>;
             sendExportReadyEmail: FunctionReference<"action", { requestId: Id<"gdprRequests">; userEmail: string }, null>;
             deletion_steps: {
                 deleteAuthRecords: FunctionReference<"mutation", { userId: string }, null>;
@@ -947,6 +947,17 @@ export interface InternalApiTypes {
         };
         jit_tool_loader: {
             getSkillToolConfig: FunctionReference<"query", { skillId: Id<"skills"> }, null | { preferredModel?: string; searchMode?: string; tools: Array<string> }>;
+        };
+    };
+    source_control: {
+        gdpr: {
+            collectReviewDraftsForExport: FunctionReference<"query", { userId: string }, { drafts: Array<{ body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; createdAt: number; hostOrigin: string; number: number; repository: string; updatedAt: number; verdict: "approve" | "comment" | "request_changes" | null }> }>;
+            deleteUserReviewDrafts: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
+        };
+        review_internal: {
+            claimDraftForSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string }, { draft: { body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; revision: number; verdict: "approve" | "comment" | "request_changes" | null }; lease: number; status: "claimed" } | { status: "in_progress" | "no_draft" }>;
+            finishDraftSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string; lease: number; revision: number; sentIds: Array<string> }, null>;
+            releaseDraftSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string; lease: number }, null>;
         };
     };
     sub_agents: {
@@ -1990,6 +2001,17 @@ export const internal: InternalApiTypes = {
         },
         jit_tool_loader: {
             getSkillToolConfig: { __lunoraRef: "skills_jit_tool_loader:getSkillToolConfig" },
+        },
+    },
+    source_control: {
+        gdpr: {
+            collectReviewDraftsForExport: { __lunoraRef: "source_control_gdpr:collectReviewDraftsForExport" },
+            deleteUserReviewDrafts: { __lunoraRef: "source_control_gdpr:deleteUserReviewDrafts" },
+        },
+        review_internal: {
+            claimDraftForSubmit: { __lunoraRef: "source_control_review_internal:claimDraftForSubmit" },
+            finishDraftSubmit: { __lunoraRef: "source_control_review_internal:finishDraftSubmit" },
+            releaseDraftSubmit: { __lunoraRef: "source_control_review_internal:releaseDraftSubmit" },
         },
     },
     sub_agents: {
