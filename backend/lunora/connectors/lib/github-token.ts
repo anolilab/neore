@@ -12,10 +12,15 @@ export type GithubTokenOutcome = { accessToken: string; renew: () => Promise<Git
 
 type TokenResult = Awaited<ReturnType<typeof obtainAccessToken>>;
 
+const readGithubGrant = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<ConnectorGrant | undefined> => {
+    const grants = (await ctx.runQuery(internal.connectors.store.listConnectorGrants, { userId })) as ConnectorGrant[];
+
+    return grants.find((candidate) => candidate.slug === "github");
+};
+
 /** Tells "never connected" from "connected, but the grant no longer yields a token". */
 export const resolveGithubToken = async (ctx: Pick<ActionCtx, "runMutation" | "runQuery">, userId: string): Promise<GithubTokenOutcome> => {
-    const grants = (await ctx.runQuery(internal.connectors.store.listConnectorGrants, { userId })) as ConnectorGrant[];
-    const grant = grants.find((candidate) => candidate.slug === "github");
+    const grant = await readGithubGrant(ctx, userId);
 
     if (!grant) {
         return { problem: "not_connected" };
@@ -26,8 +31,15 @@ export const resolveGithubToken = async (ctx: Pick<ActionCtx, "runMutation" | "r
             return { problem: result.expired ? "expired" : "unavailable" };
         }
 
-        // `renew` forces a refresh, for a token the host refused before its stored expiry.
-        return { accessToken: result.accessToken, renew: async () => outcomeOf(await obtainAccessToken(ctx, grant, undefined, { force: true })) };
+        return { accessToken: result.accessToken, renew };
+    };
+
+    // Forces a refresh, for a token the host refused before its stored expiry. The grant is read again: a refresh
+    // earlier in this request stored new tokens, and refreshing from the old ones would hand back the refused token.
+    const renew = async (): Promise<GithubTokenOutcome> => {
+        const current = await readGithubGrant(ctx, userId);
+
+        return current ? outcomeOf(await obtainAccessToken(ctx, current, undefined, { force: true })) : { problem: "not_connected" };
     };
 
     return outcomeOf(await obtainAccessToken(ctx, grant));

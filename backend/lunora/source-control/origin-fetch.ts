@@ -53,9 +53,15 @@ export const createBoundRequester = ({
     token,
     via,
 }: BoundRequesterConfig): HostRequest => {
-    const boundOrigin = new URL(origin).origin;
+    const bound = new URL(origin);
+    const boundOrigin = bound.origin;
 
     return async (path, options = {}) => {
+        // A token never travels in cleartext, whatever origin a caller derived.
+        if (bound.protocol !== "https:") {
+            throw new HostApiError("A host token is only sent over https", 0);
+        }
+
         if (!path.startsWith("/") || path.startsWith("//")) {
             throw new HostApiError("A host path must start with a single slash", 0);
         }
