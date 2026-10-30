@@ -88,6 +88,8 @@ export class ReplayCollector {
         private readonly nativeSessionId: string,
         private readonly scrub: (text: string) => string = (text) => text,
         private readonly maxTotalChars = MAX_IMPORT_TOTAL_CHARS,
+        /** The longest hidden value: a cut may fall inside one whose rest was never collected, so its prefix is dropped. */
+        private readonly secretLength = 0,
     ) {}
 
     /** The `params` of one `session/update`. Anything but the loading session's history is ignored. */
@@ -183,7 +185,7 @@ export class ReplayCollector {
 
         const next = turn[field] + chunk;
         // Masked before it is cut: a value that straddles the cut would otherwise leave its first half readable.
-        const kept = next.length <= limit ? next : this.scrub(next).slice(0, limit);
+        const kept = next.length <= limit ? next : this.scrub(next).slice(0, Math.max(0, limit - Math.max(0, this.secretLength - 1)));
         const added = kept.length - turn[field].length;
 
         if (this.total + added > this.maxTotalChars) {

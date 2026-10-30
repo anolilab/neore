@@ -397,6 +397,47 @@ describe("a command held until its session opens", () => {
         expect(await deliverHeld(revoking, "c1", START)).toBe("not approved on this computer");
     });
 
+    it("fails the messages held for a start the core refuses now, and one it refuses itself, with the reason", async () => {
+        const first = make([], { apply: () => HELD });
+
+        await first.execute(heldEnvelope("start", START), "sig");
+        await first.execute(heldEnvelope("send", SEND), "sig");
+        await first.execute(heldEnvelope("start2", { ...START, sessionId: "s2" }), "sig");
+        await first.execute(heldEnvelope("other", { ...SEND, sessionId: "s2", turnId: "u2" }), "sig");
+
+        const applied: AcpCommand[] = [];
+        const refused: { reason: string; send: unknown }[] = [];
+        const revoking = new HostCommands({
+            apply: (command) => {
+                applied.push(command);
+
+                return "accepted";
+            },
+            core: {
+                acpPrepare: (envelope: string): string => {
+                    const { callId } = JSON.parse(envelope) as { callId: string };
+
+                    const refusals: Record<string, string> = { other: "consent revoked", start: "not approved" };
+                    const refusal = refusals[callId];
+
+                    return refusal === undefined ? fakeCore({}).acpPrepare(envelope) : fakeCore({ command: null, refusal }).acpPrepare(envelope);
+                },
+                acpSign: fakeCore({}).acpSign,
+            },
+            log: () => undefined,
+            receiptFile,
+            refused: (send, reason) => {
+                refused.push({ reason, send });
+            },
+        });
+
+        await revoking.recover();
+        expect(applied.map((command) => command.kind)).toEqual(["start"]);
+        expect(refused).toContainEqual({ reason: "not approved", send: { sessionId: "s1", threadId: "t1", turnId: "u1" } });
+        expect(refused).toContainEqual({ reason: "consent revoked", send: { sessionId: "s2", threadId: "t1", turnId: "u2" } });
+        expect(open()).not.toContain("fix it");
+    });
+
     it("does not act on a held command whose envelope has expired, and says so for a message", async () => {
         const clock = { now: 1_000_000 };
         const first = make([], { apply: () => HELD, now: () => clock.now });
@@ -441,6 +482,31 @@ describe("a command held until its session opens", () => {
         release.go?.();
         await replay;
         expect(outcomeOf(await delivery)).toBe("accepted");
+        expect(applied).toHaveLength(1);
+    });
+
+    it("holds a delivery while the replay still waits for what it was told to wait for", async () => {
+        const first = make([], { apply: () => HELD });
+
+        await first.execute(heldEnvelope("c1", START), "sig");
+
+        const gate: { open?: () => void } = {};
+        const applied: AcpCommand[] = [];
+        const restarted = make(applied);
+        const replay = restarted.recover(
+            new Promise<void>((resolve) => {
+                gate.open = resolve;
+            }),
+        );
+        const delivery = restarted.execute(heldEnvelope("c1", START), "sig");
+
+        await new Promise<void>((resolve) => {
+            setTimeout(resolve, 20);
+        });
+        expect(applied).toEqual([]);
+        gate.open?.();
+        await replay;
+        await delivery;
         expect(applied).toHaveLength(1);
     });
 

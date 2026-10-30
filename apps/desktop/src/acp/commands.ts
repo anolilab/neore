@@ -36,11 +36,11 @@ const KEEP_AFTER_EXPIRY_MS = 10 * 60_000;
 /** The backend allows three open commands per device and each lives five minutes, so this is far more than can be live. */
 const MAX_RECEIPTS = 1000;
 
-export type AcpCommand =
-    | { kind: "cancel"; sessionId: string; turnId: string }
-    | { kind: "permissionAnswer"; optionId: string; requestId: string; sessionId: string }
-    | { kind: "send"; sessionId: string; text: string; turnId: string }
-    | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; folderPath: string; kind: "start"; sessionId: string; threadId: string };
+export type AcpCommand
+    = | { kind: "cancel"; sessionId: string; turnId: string }
+        | { kind: "permissionAnswer"; optionId: string; requestId: string; sessionId: string }
+        | { kind: "send"; sessionId: string; text: string; turnId: string }
+        | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; folderPath: string; kind: "start"; sessionId: string; threadId: string };
 
 interface Prepared {
     callId: string;
@@ -87,6 +87,8 @@ export interface CommandOptions {
     now?: () => number;
     /** Under the app's data folder. */
     receiptFile: string;
+    /** Told of a held `send` that will not run: the core would not allow it any more, or the start it waited for was refused. */
+    refused?: (send: LapsedSend, reason: string) => void;
 }
 
 export const ACCEPTED = "accepted";
@@ -229,12 +231,18 @@ export class HostCommands {
 
     /**
      * Acts on the commands a previous run left unfinished, once, starts before sends. Call at app start, before the
-     * relay delivers anything: a delivery waits for this.
+     * relay delivers anything: a delivery waits for this. `before` is something the replay must wait for; the gate is
+     * up while it is pending, so a delivery arriving in that gap is not acted on ahead of the replay and again by it.
      */
-    public async recover(): Promise<void> {
-        this.replaying = this.replayAll();
+    public async recover(before?: Promise<unknown>): Promise<void> {
+        this.replaying = this.replayAfter(before);
 
         await this.replaying;
+    }
+
+    private async replayAfter(before: Promise<unknown> | undefined): Promise<void> {
+        await before;
+        await this.replayAll();
     }
 
     private async outcomeOf(prepared: Prepared, envelope: string, signature: string): Promise<string> {
@@ -275,7 +283,7 @@ export class HostCommands {
      */
     private async receive(command: AcpCommand, call: AppliedCall, signed: { envelope: string; signature: string }): Promise<string> {
         const { callId } = call;
-        const receipt: Receipt = { expiresAt: call.expiresAt, ...(isReplayable(command) && { held: signed }) };
+        const receipt: Receipt = { expiresAt: call.expiresAt, ...isReplayable(command) && { held: signed } };
 
         this.receipts.set(callId, receipt);
 
@@ -334,68 +342,88 @@ export class HostCommands {
     private async replay(): Promise<void> {
         await this.load();
 
-        const open = [...this.receipts].filter(([, receipt]) => receipt.held !== undefined);
+        const pending = [...this.receipts].filter(([, receipt]) => receipt.held !== undefined);
 
         // A session must exist before the message waiting for it is held against it.
-        open.sort(
+        pending.sort(
             ([, first], [, second]) =>
-                Number(parsedEnvelope(second.held?.envelope ?? "").tool === "acp_start") -
-                Number(parsedEnvelope(first.held?.envelope ?? "").tool === "acp_start"),
+                Number(parsedEnvelope(second.held?.envelope ?? "").tool === "acp_start")
+                - Number(parsedEnvelope(first.held?.envelope ?? "").tool === "acp_start"),
         );
 
         // The sessions a replayed start will open. A held message for any other session is for one that died with the
         // process or whose start has not come back yet: it may already have run, so its turn is interrupted.
-        const opening = new Set(open.flatMap(([, receipt]) => receipt.expiresAt > this.now() ? [startedSessionOf(receipt.held?.envelope ?? "")] : []));
+        const opening = new Set(pending.flatMap(([, receipt]) => receipt.expiresAt > this.now() ? [startedSessionOf(receipt.held?.envelope ?? "")] : []));
+        // A start the core refuses on this run opens nothing: the messages held for it fail with its reason.
+        const refusedStarts = new Map<string, string>();
 
-        for (const [callId, receipt] of open) {
-            const { envelope, signature } = receipt.held as { envelope: string; signature: string };
-
-            if (receipt.expiresAt <= this.now()) {
-                const send = sendOf(envelope);
-
-                if (send !== undefined) {
-                    this.options.lapsed?.(send);
-                }
-
-                // eslint-disable-next-line no-await-in-loop -- one command at a time, starts first
-                await this.finished(callId);
-
-                continue;
-            }
-
-            const send = sendOf(envelope);
-
-            if (send !== undefined && !opening.has(send.sessionId)) {
-                this.options.interrupted?.(send);
-
-                // eslint-disable-next-line no-await-in-loop -- one command at a time, starts first
-                await this.finished(callId);
-
-                continue;
-            }
-
+        for (const [callId, receipt] of pending) {
             // eslint-disable-next-line no-await-in-loop -- one command at a time, starts first
-            await this.replayOne(callId, envelope, signature);
+            await this.replayHeld(callId, receipt, opening, refusedStarts);
         }
     }
 
-    private async replayOne(callId: string, envelope: string, signature: string): Promise<void> {
+    private async replayHeld(callId: string, receipt: Receipt, opening: Set<string>, refusedStarts: Map<string, string>): Promise<void> {
+        const { envelope, signature } = receipt.held as { envelope: string; signature: string };
+        const send = sendOf(envelope);
+
+        if (receipt.expiresAt <= this.now()) {
+            if (send !== undefined) {
+                this.options.lapsed?.(send);
+            }
+
+            await this.finished(callId);
+
+            return;
+        }
+
+        const refusal = send === undefined ? undefined : refusedStarts.get(send.sessionId);
+
+        if (send !== undefined && refusal !== undefined) {
+            this.options.refused?.(send, refusal);
+            await this.finished(callId);
+
+            return;
+        }
+
+        if (send !== undefined && !opening.has(send.sessionId)) {
+            this.options.interrupted?.(send);
+            await this.finished(callId);
+
+            return;
+        }
+
+        const refused = await this.replayOne(callId, envelope, signature);
+        const started = startedSessionOf(envelope);
+
+        if (refused !== undefined && started !== "") {
+            opening.delete(started);
+            refusedStarts.set(started, refused);
+        }
+    }
+
+    /** Answers why the command was dropped, or `undefined` when it was acted on. */
+    private async replayOne(callId: string, envelope: string, signature: string): Promise<string | undefined> {
         let prepared: Prepared;
 
         try {
             // The core checks again what it checked the first time, and consent too: the user may have revoked it since.
             prepared = JSON.parse(this.options.core.acpPrepare(envelope, signature)) as Prepared;
         } catch (error) {
-            this.options.log?.(`[acp-host] a command left from the last run was not valid any more and was dropped: ${(error as Error).message}`);
+            const reason = (error as Error).message;
+
+            this.options.log?.(`[acp-host] a command left from the last run was not valid any more and was dropped: ${reason}`);
+            this.refuse(envelope, reason);
             await this.finished(callId);
 
-            return;
+            return reason;
         }
 
         if (prepared.command === null) {
             const reason = prepared.refusal ?? "refused";
 
             this.options.log?.(`[acp-host] a command left from the last run is not allowed any more and was dropped: ${reason}`);
+            this.refuse(envelope, reason);
 
             const receipt = this.receipts.get(callId) as Receipt;
 
@@ -408,7 +436,7 @@ export class HostCommands {
                 // The next write carries it.
             }
 
-            return;
+            return reason;
         }
 
         const running = this.act(prepared.command, { callId, expiresAt: prepared.expiresAt, threadId: threadOf(envelope) });
@@ -419,6 +447,17 @@ export class HostCommands {
             await running;
         } finally {
             this.handling.delete(callId);
+        }
+
+        return undefined;
+    }
+
+    /** A replayed `send` that was dropped ends its turn with the reason, instead of leaving it to the backend's timeouts. */
+    private refuse(envelope: string, reason: string): void {
+        const send = sendOf(envelope);
+
+        if (send !== undefined) {
+            this.options.refused?.(send, reason);
         }
     }
 
@@ -441,8 +480,8 @@ export class HostCommands {
                 if (Array.isArray(entry) && typeof entry[0] === "string" && typeof entry[1] === "number") {
                     this.receipts.set(entry[0], {
                         expiresAt: entry[1],
-                        ...(typeof entry[2] === "string" && { refusal: entry[2] }),
-                        ...(typeof entry[3] === "string" && typeof entry[4] === "string" && { held: { envelope: entry[3], signature: entry[4] } }),
+                        ...typeof entry[2] === "string" && { refusal: entry[2] },
+                        ...typeof entry[3] === "string" && typeof entry[4] === "string" && { held: { envelope: entry[3], signature: entry[4] } },
                     });
                 }
             }

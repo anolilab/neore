@@ -286,6 +286,14 @@ describe("a version probe", () => {
         await expect(start(target)).rejects.toThrow("sign in");
         target.killAll();
     });
+
+    it("keeps the capability report of an agent whose start failed after the handshake", async () => {
+        const target = make({ FAKE_AGENT_AUTH: "1" });
+
+        await expect(start(target)).rejects.toThrow("sign in");
+        expect(Object.keys(target.allReports())).toEqual(["fake"]);
+        target.killAll();
+    });
 });
 
 describe("quitting", () => {

@@ -39,6 +39,20 @@ export type ChildEvent
         | { kind: "reasoning"; text: string }
         | { kind: "text"; text: string };
 
+/** A tool call of a child as the agent sent it: an update may carry only the fields that changed. The ledger fills the rest from what it knows. */
+export interface ChildToolInput {
+    id: string;
+    kind: "tool";
+    status?: string;
+    title?: string;
+    toolKind?: string;
+}
+
+export type ChildInput = ChildToolInput | Exclude<ChildEvent, { kind: "tool" }>;
+
+/** A child keeps at most this many tools (the backend keeps the same), so what the ledger remembers of them is bounded too. */
+const MAX_CHILD_TOOLS = 50;
+
 export type ChildEnd = "cancelled" | "completed" | "failed";
 
 export interface ChildStats {
@@ -65,12 +79,14 @@ interface Card {
     hasChildren: boolean;
     reasoning?: MaskedStream;
     text?: MaskedStream;
+    /** The last full state of each tool, so a partial update does not reset what it leaves out. */
+    tools?: Map<string, Extract<ChildEvent, { kind: "tool" }>>;
 }
 
-const bytesOf = (event: ChildEvent): number => Buffer.byteLength(JSON.stringify(event));
+const bytesOf = (event: ChildInput): number => Buffer.byteLength(JSON.stringify(event));
 
 export class ChildLedger {
-    private readonly buffer = new Map<string, ChildEvent[]>();
+    private readonly buffer = new Map<string, ChildInput[]>();
 
     private bufferedBytes = 0;
 
@@ -105,7 +121,7 @@ export class ChildLedger {
     }
 
     /** A child's event, by the spawn call that owns it. Held when the card is not there yet. */
-    public receive(spawnId: string, event: ChildEvent): void {
+    public receive(spawnId: string, event: ChildInput): void {
         if (this.cards.has(spawnId)) {
             this.deliver(spawnId, event);
 
@@ -173,7 +189,7 @@ export class ChildLedger {
         }
     }
 
-    private deliver(spawnId: string, event: ChildEvent): void {
+    private deliver(spawnId: string, event: ChildInput): void {
         const card = this.cards.get(spawnId);
 
         if (card === undefined || card.ended) {
@@ -196,7 +212,22 @@ export class ChildLedger {
         }
 
         if (event.kind === "tool") {
-            this.options.emit(spawnId, { ...event, title: this.options.scrub(event.title) });
+            const known = card.tools?.get(event.id);
+            const merged = {
+                id: event.id,
+                kind: "tool" as const,
+                status: event.status ?? known?.status ?? "pending",
+                title: this.options.scrub(event.title ?? known?.title ?? event.id),
+                toolKind: event.toolKind ?? known?.toolKind ?? "other",
+            };
+
+            card.tools ??= new Map();
+
+            if (known !== undefined || card.tools.size < MAX_CHILD_TOOLS) {
+                card.tools.set(event.id, merged);
+            }
+
+            this.options.emit(spawnId, merged);
 
             return;
         }
@@ -212,6 +243,7 @@ export class ChildLedger {
         card.ended = true;
         delete card.reasoning;
         delete card.text;
+        delete card.tools;
 
         for (const kind of ["text", "reasoning"] as const) {
             const rest = streamed[kind]?.take("", true) ?? "";

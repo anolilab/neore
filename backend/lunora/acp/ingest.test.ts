@@ -407,6 +407,17 @@ describe("capability reports", () => {
         await expect(reportOf(threadId)).resolves.toMatchObject({ groups: REPORT.groups });
     });
 
+    it("clamps a future-dated report on the first open too, so the next real one still replaces it", async () => {
+        const device = await pair(ownerId);
+        const before = Date.now();
+        const threadId = await openWith(device, { ...REPORT, reportedAt: before + 10 * 365 * 24 * 60 * 60 * 1000 });
+        const first = (await reportOf(threadId)) as { reportedAt: number };
+
+        expect(first.reportedAt).toBeLessThanOrEqual(Date.now());
+        await openWith(device, { ...CHANGED, reportedAt: Date.now() + 1000 });
+        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: CHANGED.groups });
+    });
+
     it("keeps a valid stored report when a later open's report is invalid, and lets the next valid one replace the fallback", async () => {
         const device = await pair(ownerId);
         const threadId = await openWith(device, REPORT);
@@ -690,30 +701,36 @@ describe("importing an agent's saved session", () => {
         await expect(turn(device, threadId, "t9", 0, [START()])).resolves.toMatchObject({ status: 403 });
     });
 
-    it("imports a session again once its thread was deleted, soft or hard", async () => {
+    it("keeps the session of a soft-deleted thread, and imports again only once the thread is gone for good", async () => {
         const device = await pair(ownerId);
         const first = await importSession(device, TURNS);
 
         await harness.run(async (ctx: any) => await ctx.db.patch(first.threadId, { deleted: true }));
 
+        // Undo must still find the session: nothing is deleted and no second thread is made.
         const second = await importSession(device, TURNS);
 
-        expect(second.threadId).not.toBe(first.threadId);
-        expect(second.opened.json).toMatchObject({ existing: false });
-        await expect(transcriptOf(second.threadId)).resolves.toHaveLength(4);
+        expect(second.threadId).toBe(first.threadId);
+        expect(second.opened.json).toMatchObject({ ended: true, existing: true });
         expect(await sessionRows()).toHaveLength(1);
 
-        // The hard delete removes the session with the thread; a session left behind by anything else is replaced all the same.
         await harness.run(async (ctx: any) => {
-            await ctx.runMutation(deleteSessionsOfThread, { threadId: second.threadId });
-            await ctx.db.delete(second.threadId);
+            await ctx.runMutation(deleteSessionsOfThread, { threadId: first.threadId });
+            await ctx.db.delete(first.threadId);
         });
         expect(await sessionRows()).toHaveLength(0);
 
         const third = await importSession(device, TURNS);
 
-        expect(third.threadId).not.toBe(second.threadId);
+        expect(third.threadId).not.toBe(first.threadId);
         await expect(transcriptOf(third.threadId)).resolves.toHaveLength(4);
+
+        // A session left behind by anything else than a delete is replaced all the same.
+        await harness.run(async (ctx: any) => await ctx.db.delete(third.threadId));
+
+        const fourth = await importSession(device, TURNS);
+
+        expect(fourth.threadId).not.toBe(third.threadId);
     });
 
     it("replaces the session of a thread that vanished without it", async () => {
@@ -728,7 +745,7 @@ describe("importing an agent's saved session", () => {
         expect(await sessionRows()).toHaveLength(1);
     });
 
-    it("lets a thread deleted mid-import be imported again in full", async () => {
+    it("does not restart an import whose thread was soft-deleted mid-way", async () => {
         const device = await pair(ownerId);
         const sessionId = "import-1";
         const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId });
@@ -743,9 +760,9 @@ describe("importing an agent's saved session", () => {
 
         const again = await importSession(device, TURNS);
 
-        expect(again.threadId).not.toBe(json.threadId);
-        expect(again.opened.json).toMatchObject({ next: 0 });
-        await expect(transcriptOf(again.threadId)).resolves.toHaveLength(4);
+        expect(again.threadId).toBe(json.threadId);
+        expect(again.opened.json).toMatchObject({ ended: true, existing: true });
+        expect(await sessionRows()).toHaveLength(1);
     });
 
     it("lets another computer of the same user finish an unfinished import", async () => {

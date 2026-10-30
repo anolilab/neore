@@ -87,6 +87,19 @@ describe("ReplayCollector", () => {
         expect(shortenedTurns).toBe(1);
     });
 
+    it("drops the tail a hidden value could start in when a field is cut", () => {
+        const collector = new ReplayCollector(ID, (value) => value.replaceAll("sekrit", "••••"), undefined, 6);
+
+        say(collector, "user_message_chunk", text("hi"));
+        say(collector, "agent_message_chunk", text(`${"a".repeat(MAX_IMPORT_TEXT_CHARS - 2)}sek`));
+        say(collector, "agent_message_chunk", text("rit"));
+
+        const kept = collector.result().turns[0]?.text ?? "";
+
+        expect(kept.endsWith("se")).toBe(false);
+        expect(kept).toBe("a".repeat(MAX_IMPORT_TEXT_CHARS - 5));
+    });
+
     it("keeps the first turns past the cap and counts the rest", () => {
         const collector = new ReplayCollector(ID);
 

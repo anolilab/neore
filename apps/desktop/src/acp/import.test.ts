@@ -27,7 +27,9 @@ let posted: Payload[];
 let deviceId: string | undefined;
 let backend: (payload: Payload) => PostResult;
 
-const make = (env: Record<string, string>): AcpImporter => {
+const APPROVED = { folderId: "f1", folderLabel: "neore" };
+
+const make = (env: Record<string, string>, approved: () => { folderId: string; folderLabel: string } | undefined = () => APPROVED): AcpImporter => {
     manager = new AcpManager({
         appVersion: "9.9.9",
         onChange: () => {},
@@ -53,9 +55,7 @@ const make = (env: Record<string, string>): AcpImporter => {
     return new AcpImporter({
         agentLabel: (key) => key === "fake" ? "Fake Agent" : undefined,
         agents: manager,
-        hostInfo: () => {
-            return { folderId: "f1", folderLabel: "neore" };
-        },
+        hostInfo: approved,
         io,
     });
 };
@@ -155,6 +155,16 @@ describe("importing", () => {
 
         await expect(importer.import("fake", scratch.work, "s-new")).resolves.toEqual({ status: "already" });
         expect(posted).toHaveLength(1);
+    });
+
+    it("posts nothing when the folder's approval was withdrawn while the history loaded", async () => {
+        const answers = [APPROVED];
+        const importer = make({ FAKE_AGENT_SESSIONS: "list,load" }, () => answers.shift());
+
+        backend = freshBackend();
+
+        await expect(importer.import("fake", scratch.work, "s-new")).rejects.toThrow("approve this folder");
+        expect(posted).toEqual([]);
     });
 
     it("resumes an import the backend holds part of", async () => {

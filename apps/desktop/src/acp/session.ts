@@ -16,10 +16,10 @@ import type { CapabilityReport } from "@neore/ai/capabilities";
 import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
 
 import { reportFromHandshake } from "./capabilities";
-import { childEventOf, childParentOf, completionText, contentText, isRecord, text } from "./child-updates";
+import { TurnChanges } from "./changes";
+import { childEventOf, childParentOf, completionText, contentText, isRecord, text, toolIdOf } from "./child-updates";
 import type { ChildEvent } from "./children";
 import { ChildLedger } from "./children";
-import { TurnChanges } from "./changes";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate, PermissionOutcome } from "./permission";
@@ -194,7 +194,7 @@ export class AgentSession {
             const opened = {
                 ...hostInfo,
                 nativeSessionId: this.agentSessionId,
-                ...(this.report !== undefined && { capabilities: this.report }),
+                ...this.report !== undefined && { capabilities: this.report },
             };
 
             this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
@@ -514,7 +514,7 @@ export class AgentSession {
     /** The call the user said no to ends as declined here, whether or not the agent reports it afterwards. */
     private markDeclined(params: Record<string, unknown>): void {
         const toolCall = isRecord(params.toolCall) ? params.toolCall : {};
-        const id = text(toolCall.toolCallId);
+        const id = toolIdOf(toolCall.toolCallId);
         const tool = this.tools.get(id);
 
         if (tool === undefined || tool.status === "completed" || tool.status === "failed") {
@@ -567,7 +567,7 @@ export class AgentSession {
         const delta = scrubbed.slice(sent[field], end);
 
         sent[field] = end;
-        this.observe((observer) => (field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta)));
+        this.observe((observer) => field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta));
     }
 
     private observeTool(tool: ToolState): void {
@@ -649,9 +649,9 @@ export class AgentSession {
                 requestId,
                 tool: described.tool,
                 // The label the user chose for the folder, never its path.
-                ...(this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel }),
-                ...(described.command !== undefined && { command: described.command }),
-                ...(described.target !== undefined && { target: described.target }),
+                ...this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel },
+                ...described.command !== undefined && { command: described.command },
+                ...described.target !== undefined && { target: described.target },
             }),
         );
     }
@@ -720,7 +720,7 @@ export class AgentSession {
     }
 
     private upsertTool(turn: Turn | undefined, update: Record<string, unknown>): void {
-        const id = text(update.toolCallId);
+        const id = toolIdOf(update.toolCallId);
 
         if (id === "") {
             return;
@@ -803,7 +803,7 @@ export class AgentSession {
 
         // A request that names the file to be written is the last moment its earlier text can be read.
         if (isRecord(params.toolCall)) {
-            this.changes.get(turn)?.note({ id: text(params.toolCall.toolCallId), kind: text(params.toolCall.kind), status: "pending" }, params.toolCall);
+            this.changes.get(turn)?.note({ id: toolIdOf(params.toolCall.toolCallId), kind: text(params.toolCall.kind), status: "pending" }, params.toolCall);
         }
 
         this.observePermission(turn, requestId, request);

@@ -34,8 +34,8 @@ import { createLocalTransport } from "./transport";
 import type { CoreEvent, DeviceCore, Prompt } from "./types";
 import {
     readAcpUpdate,
-    readAgentKey,
     readAfter,
+    readAgentKey,
     readAgentVersion,
     readDeviceId,
     readFolder,
@@ -51,8 +51,8 @@ import {
     readRequestIds,
     readSearchQuery,
     readSecretAnswer,
-    readSessionId,
     readServerPath,
+    readSessionId,
     readSessionTitle,
     readSettingsUpdate,
     readSigned,
@@ -73,7 +73,7 @@ const LOCAL_PAGE = path.join(WINDOW_DIR, "device.html");
 const LOCAL_PRELOAD = path.join(WINDOW_DIR, "preload.cjs");
 
 /** The folder with the `neore-host` binaries and checksums this build ships: in the app's resources once packaged. */
-const hostBundleDirectory = (): string | undefined => (app.isPackaged ? path.join(process.resourcesPath, "neore-host") : process.env.NEORE_HOST_BUNDLE);
+const hostBundleDirectory = (): string | undefined => app.isPackaged ? path.join(process.resourcesPath, "neore-host") : process.env.NEORE_HOST_BUNDLE;
 
 /**
  * Registers the device handlers. Returns whether the core loaded: the shell advertises `device` only then
@@ -182,12 +182,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const win = state.local;
 
         return (
-            win !== undefined &&
-            !win.isDestroyed() &&
-            event.sender === win.webContents &&
-            event.senderFrame !== null &&
-            event.senderFrame === win.webContents.mainFrame &&
-            event.senderFrame.url === localUrl
+            win !== undefined
+            && !win.isDestroyed()
+            && event.sender === win.webContents
+            && event.senderFrame !== null
+            && event.senderFrame === win.webContents.mainFrame
+            && event.senderFrame.url === localUrl
         );
     };
 
@@ -435,6 +435,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             lapsed: (held) => requireHost(requireCore()).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { error: NEVER_OPENED, reason: "failed" }),
             log: (message) => console.error(message),
             receiptFile: path.join(app.getPath("userData"), "acp-host-receipts.json"),
+            refused: (held, reason) =>
+                requireHost(requireCore()).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { error: `the message was not sent: ${reason}`.slice(0, 1000), reason: "failed" }),
         });
 
         return state.commands;
@@ -447,9 +449,20 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     const recoverFromRestart = async (core: DeviceCore): Promise<void> => {
         const host = requireHost(core);
         // Read first: the replay opens channels, and the first of them rewrites the file of running turns.
-        const leftovers = await host.readLeftovers();
+        const read = host.readLeftovers();
+        // The gate goes up now, not once the read is done: a start delivered meanwhile would be replayed as well.
+        const recovered = requireCommands().recover(
+            (async () => {
+                try {
+                    await read;
+                } catch {
+                    // The restart recovery below reports it.
+                }
+            })(),
+        );
+        const leftovers = await read;
 
-        await requireCommands().recover();
+        await recovered;
         await host.recover(leftovers);
     };
 
@@ -585,15 +598,14 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     local(LOCAL_CHANNEL.settingsUpdate, (update) =>
         // The core emits `changed` itself, so the site resends its manifest.
-        requireTransport().settingsUpdate(readSettingsUpdate(update)),
-    );
+        requireTransport().settingsUpdate(readSettingsUpdate(update)));
 
     local(LOCAL_CHANNEL.pickFolder, async () => {
         const dialogOptions = { properties: ["openDirectory" as const] };
         const parent = liveLocal();
         const result = parent === undefined ? await dialog.showOpenDialog(dialogOptions) : await dialog.showOpenDialog(parent, dialogOptions);
 
-        return result.canceled ? null : (result.filePaths[0] ?? null);
+        return result.canceled ? null : result.filePaths[0] ?? null;
     });
 
     // A native dialog, so the page cannot draw a confirmation that looks like one.
@@ -679,8 +691,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     local(LOCAL_CHANNEL.acpImportList, (agentKey, folder) => requireImporter().list(readAgentKey(agentKey), readFolder(folder)));
 
     local(LOCAL_CHANNEL.acpImport, (agentKey, folder, nativeSessionId, title) =>
-        requireImporter().import(readAgentKey(agentKey), readFolder(folder), readNativeSessionId(nativeSessionId), readSessionTitle(title)),
-    );
+        requireImporter().import(readAgentKey(agentKey), readFolder(folder), readNativeSessionId(nativeSessionId), readSessionTitle(title)));
 
     local(LOCAL_CHANNEL.acpStart, async (agentKey, folder) => {
         const key = readAgentKey(agentKey);
@@ -741,7 +752,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const id = readDeviceId(deviceId);
         const host = requireTransport()
             .settingsGet()
-            .hosts.find((candidate) => candidate.deviceId === id);
+            .hosts
+            .find((candidate) => candidate.deviceId === id);
 
         if (host === undefined) {
             throw new Error("device: that server is not paired with this computer");

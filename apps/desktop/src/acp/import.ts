@@ -80,7 +80,7 @@ export class AcpImporter {
             agentKey,
             folder,
             { notification: (method, params) => method === METHOD.sessionUpdate && collector?.update(params) },
-            async ({ connection, plan, report, scrub }) => {
+            async ({ connection, plan, report, scrub, secretLength }) => {
                 requireAdvertised(report, "sessions.load", "load its saved sessions");
                 requireAdvertised(report, "sessions.listNative", "list its saved sessions");
 
@@ -97,7 +97,7 @@ export class AcpImporter {
                     throw new Error("that session is not one of this folder's saved sessions");
                 }
 
-                collector = new ReplayCollector(nativeSessionId, scrub);
+                collector = new ReplayCollector(nativeSessionId, scrub, undefined, secretLength);
 
                 await loadSession(connection, nativeSessionId, plan.cwd);
 
@@ -108,7 +108,14 @@ export class AcpImporter {
                 }
 
                 const name = title?.trim() ? title : firstWords(replay.turns[0]?.user ?? "");
-                const target = { ...capSessionInfo({ agentKey, agentLabel: label, capabilities: report, ...approved, nativeSessionId }), nativeSessionId, title: scrub(name).slice(0, MAX_TITLE_CHARS) };
+                // The replay took a while: the folder may have been withdrawn since it was checked.
+                const stillApproved = this.options.hostInfo(agentKey, plan.cwd);
+
+                if (stillApproved === undefined) {
+                    throw new Error("approve this folder for the agent first");
+                }
+
+                const target = { ...capSessionInfo({ agentKey, agentLabel: label, capabilities: report, ...stillApproved, nativeSessionId }), nativeSessionId, title: scrub(name).slice(0, MAX_TITLE_CHARS) };
                 const outcome = await postImport(this.options.io, hostSessionIdOf(agentKey, nativeSessionId), target, replay.turns);
 
                 return outcome.status === "already"

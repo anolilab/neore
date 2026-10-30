@@ -258,10 +258,19 @@ export class TurnChanges {
             }
 
             const relative = this.files.relative(item.path);
+
+            if (relative === undefined) {
+                continue;
+            }
+
             const oldText = typeof item.oldText === "string" ? item.oldText : null;
 
+            // A newer diff of the file replaces the earlier one even when this one is too big to keep: the old text is stale.
+            this.held -= call.diffs.get(relative)?.size ?? 0;
+            call.diffs.delete(relative);
+
             // Characters are never more than bytes, so a text with too many of them is too big without measuring it.
-            if (relative === undefined || item.newText.length > MAX_FILE_BYTES || (oldText?.length ?? 0) > MAX_FILE_BYTES) {
+            if (item.newText.length > MAX_FILE_BYTES || (oldText?.length ?? 0) > MAX_FILE_BYTES) {
                 continue;
             }
 
@@ -270,9 +279,6 @@ export class TurnChanges {
             if (size > 2 * MAX_FILE_BYTES || !this.admit(call, relative)) {
                 continue;
             }
-
-            this.held -= call.diffs.get(relative)?.size ?? 0;
-            call.diffs.delete(relative);
 
             if (this.reserve(size)) {
                 call.diffs.set(relative, { newText: item.newText, oldText, size });

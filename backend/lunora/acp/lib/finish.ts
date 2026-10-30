@@ -47,7 +47,10 @@ const appendChunks = (transcript: ReturnType<typeof emptyTranscript>, chunks: Ch
     for (const chunk of chunks) {
         // Tool and permission events ride as `event` with no text of their own.
         if (chunk.text.length > 0 || chunk.reasoning) {
-            appendToTranscript(transcript, chunk);
+            // Past the cap the words are not kept; the paging goes on for the children and files that come after.
+            if (!isTranscriptFull(transcript)) {
+                appendToTranscript(transcript, chunk);
+            }
         } else if (isChildEvent(chunk.event)) {
             appendChildEvent(transcript, chunk.event);
         }
@@ -68,8 +71,8 @@ const appendChunks = (transcript: ReturnType<typeof emptyTranscript>, chunks: Ch
 };
 
 /**
- * What the host wrote to a stream, in order, up to the reply cap. Pages through the chunks and stops once the text
- * is full (reasoning after that point is not kept). When the page budget is spent first, the last pages are read
+ * What the host wrote to a stream, in order, up to the reply cap. Pages through the chunks; once the text is full
+ * only children and files are still collected (reasoning after that point is not kept), within the same page budget. When the page budget is spent first, the last pages are read
  * too and joined on after a marker, so the answer that follows a long run of tool events is not lost.
  */
 export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId: Id<"persistentStreams">) => {
@@ -86,7 +89,7 @@ export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId:
         appendChunks(transcript, page.page);
         lastSeq = page.page.at(-1)?.seq ?? lastSeq;
         exhausted = page.isDone;
-        cursor = exhausted || isTranscriptFull(transcript) || pages >= MAX_TRANSCRIPT_PAGES ? undefined : (page.continueCursor ?? undefined);
+        cursor = exhausted || pages >= MAX_TRANSCRIPT_PAGES ? undefined : (page.continueCursor ?? undefined);
     } while (cursor);
 
     if (exhausted || isTranscriptFull(transcript)) {

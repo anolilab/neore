@@ -110,6 +110,17 @@ describe("the files a turn wrote", () => {
         expect(summary?.files).toEqual([{ added: 1, path: "a.ts", removed: 1 }]);
     });
 
+    it("lets go of the earlier diff of a file when a later one in the same call is too big to keep", () => {
+        const changes = recorder();
+        const held = () => (changes as unknown as { held: number }).held;
+        const huge = "x".repeat(1024 * 1024 + 1);
+
+        changes.note({ id: "1", kind: "edit", status: "pending" }, diffCall("1", "a.ts", "one\n", "two\n", "pending"));
+        expect(held()).toBeGreaterThan(0);
+        changes.note({ id: "1", kind: "edit", status: "pending" }, diffCall("1", "a.ts", "one\n", huge, "pending"));
+        expect(held()).toBe(0);
+    });
+
     it("lists a file named by location from its earlier and later text, and not one edited beside it", async () => {
         await writeFile(path.join(work, "named.txt"), "old\n");
         await writeFile(path.join(work, "other.txt"), "untouched\n");

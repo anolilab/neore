@@ -89,7 +89,7 @@ export class AcpManager {
         agentKey: string,
         folder: string | null,
         handlers: { notification?: (method: string, params: unknown) => void },
-        use: (agent: { connection: JsonRpcConnection; handshake: Handshake; plan: SpawnPlan; report: CapabilityReport; scrub: (text: string) => string }) => Promise<Result>,
+        use: (agent: { connection: JsonRpcConnection; handshake: Handshake; plan: SpawnPlan; report: CapabilityReport; scrub: (text: string) => string; secretLength: number }) => Promise<Result>,
     ): Promise<Result> {
         requireSupported();
 
@@ -130,7 +130,7 @@ export class AcpManager {
 
             this.reports.set(agentKey, report);
 
-            return await use({ connection, handshake, plan, report, scrub: child.scrub });
+            return await use({ connection, handshake, plan, report, scrub: child.scrub, secretLength: child.secretLength });
         } catch (error) {
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
             throw new Error(child.scrub((error as Error).message));
@@ -186,10 +186,14 @@ export class AcpManager {
         });
 
         this.sessions.set(session.id, session);
-        await session.start();
 
-        if (session.handshake !== undefined) {
-            this.reports.set(agentKey, reportFromHandshake(session.handshake.capabilities, Date.now()));
+        try {
+            await session.start();
+        } finally {
+            // A start that failed after the handshake still told what the agent can do.
+            if (session.handshake !== undefined) {
+                this.reports.set(agentKey, reportFromHandshake(session.handshake.capabilities, Date.now()));
+            }
         }
 
         return session.id;

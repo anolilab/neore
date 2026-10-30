@@ -21,6 +21,13 @@ import type { SessionObserver } from "./host-events";
 import type { SessionStatus } from "./types";
 
 export const NEVER_OPENED = "the agent did not open its session in time, so the message was not sent";
+export const NOT_OPEN_HERE = "this session is not open on this computer, so the message was not sent";
+
+/** How long a message waits for a session this computer has not heard of: the start it follows is claimed within moments, or never comes. */
+export const UNKNOWN_SESSION_WAIT_MS = 30_000;
+/** How long a failed start is remembered for the messages that follow it (a command lives five minutes), and how many are. */
+const FAILURE_KEEP_MS = 5 * 60_000;
+const MAX_FAILURES = 64;
 
 interface HeldSend {
     callId: string;
@@ -46,6 +53,9 @@ export interface EarlySendsOptions {
 export class EarlySends {
     private readonly held = new Map<string, HeldSend[]>();
 
+    /** sessionId → why its start failed, for the messages that arrive after it. */
+    private readonly failures = new Map<string, { reason: string; until: number }>();
+
     public constructor(private readonly options: EarlySendsOptions) {}
 
     /** Sends the message now, or holds it. Throws to refuse one for a session that has ended. */
@@ -67,13 +77,20 @@ export class EarlySends {
             throw new Error("this session is not open yet");
         }
 
+        const failure = status === undefined ? this.failureOf(sessionId) : undefined;
+
+        if (failure !== undefined) {
+            throw new Error(`the agent did not start: ${failure}`);
+        }
+
         const wait = Math.max(0, call.expiresAt - this.now());
         const entry: HeldSend = {
             callId: call.callId,
             expiresAt: call.expiresAt,
             sessionId,
             text,
-            timer: setTimeout(() => this.fail(entry, NEVER_OPENED), wait),
+            // A session nobody has heard of is waited for briefly; one that is starting, until the envelope expires.
+            timer: setTimeout(() => this.timedOut(entry), status === undefined ? Math.min(wait, UNKNOWN_SESSION_WAIT_MS) : wait),
             turnId,
         };
 
@@ -89,6 +106,7 @@ export class EarlySends {
         const waiting = this.held.get(sessionId) ?? [];
 
         this.held.delete(sessionId);
+        this.failures.delete(sessionId);
 
         for (const entry of waiting) {
             clearTimeout(entry.timer);
@@ -113,6 +131,7 @@ export class EarlySends {
         const waiting = this.held.get(sessionId) ?? [];
 
         this.held.delete(sessionId);
+        this.remember(sessionId, reason);
 
         for (const entry of waiting) {
             clearTimeout(entry.timer);
@@ -143,6 +162,45 @@ export class EarlySends {
         this.options.log?.(`[acp-host] a held message was not sent: ${reason}`);
         this.options.observer.turnEnded(entry.sessionId, entry.turnId, "failed", reason.slice(0, 1000));
         this.options.finished(entry.callId);
+    }
+
+    private remember(sessionId: string, reason: string): void {
+        const now = this.now();
+
+        for (const [id, { until }] of this.failures) {
+            if (until <= now) {
+                this.failures.delete(id);
+            }
+        }
+
+        this.failures.delete(sessionId);
+        this.failures.set(sessionId, { reason, until: now + FAILURE_KEEP_MS });
+
+        while (this.failures.size > MAX_FAILURES) {
+            this.failures.delete(this.failures.keys().next().value as string);
+        }
+    }
+
+    private failureOf(sessionId: string): string | undefined {
+        const known = this.failures.get(sessionId);
+
+        return known !== undefined && known.until > this.now() ? known.reason : undefined;
+    }
+
+    /** The wait is over: a session that appeared meanwhile is waited for until the envelope expires, any other is not open here. */
+    private timedOut(entry: HeldSend): void {
+        const status = this.options.statusOf(entry.sessionId);
+        const remaining = entry.expiresAt - this.now();
+
+        if (status !== undefined && status !== "ended" && remaining > 0) {
+            // eslint-disable-next-line no-param-reassign -- the held entry owns its timer, which `opened` and `cancel` clear
+            entry.timer = setTimeout(() => this.fail(entry, NEVER_OPENED), remaining);
+            entry.timer.unref();
+
+            return;
+        }
+
+        this.fail(entry, status === undefined && remaining > 0 ? NOT_OPEN_HERE : NEVER_OPENED);
     }
 
     private fail(entry: HeldSend, reason: string): void {

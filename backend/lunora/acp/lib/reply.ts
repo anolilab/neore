@@ -52,6 +52,12 @@ export interface HostTranscript {
 const MAX_CHILDREN = 16;
 const MAX_CHILD_CHARS = 64_000;
 const MAX_CHILD_TOOLS = 50;
+/**
+ * All children together: the reply's own text and reasoning may take 2 x 256 000 characters of the same message row, so
+ * the children add at most this much text (half of one of those) and this many tool cards, not 16 times their own caps.
+ */
+const MAX_CHILDREN_TOTAL_CHARS = 128_000;
+const MAX_CHILDREN_TOTAL_TOOLS = 200;
 
 export const emptyTranscript = (): HostTranscript => {
     return { children: [], media: [], reasoning: "", text: "" };
@@ -65,6 +71,10 @@ export const addMediaToTranscript = (transcript: HostTranscript, media: HostMedi
 };
 
 type ChildEvent = Extract<Doc<"persistentChunks">["event"], { spawnId: string }>;
+
+const charsOf = (children: ChildTranscript[]): number => children.reduce((sum, child) => sum + child.text.length + child.reasoning.length, 0);
+
+const toolsOf = (children: ChildTranscript[]): number => children.reduce((sum, child) => sum + child.tools.length, 0);
 
 /**
  * Adds one child event to its child's transcript. The first event for a spawn call makes the child; once it has
@@ -90,21 +100,21 @@ export const appendChildEvent = (transcript: HostTranscript, event: ChildEvent):
     if (event.kind === "child_text") {
         const field = event.field === "text" ? "text" : "reasoning";
 
-        child[field] += event.text.slice(0, MAX_CHILD_CHARS - child[field].length);
+        child[field] += event.text.slice(0, Math.max(0, Math.min(MAX_CHILD_CHARS - child[field].length, MAX_CHILDREN_TOTAL_CHARS - charsOf(transcript.children))));
     } else if (event.kind === "child_tool") {
         const known = child.tools.find((tool) => tool.id === event.id);
         const next = { id: event.id, status: event.status, title: event.title, toolKind: event.toolKind };
 
         if (known) {
             Object.assign(known, next);
-        } else if (child.tools.length < MAX_CHILD_TOOLS) {
+        } else if (child.tools.length < MAX_CHILD_TOOLS && toolsOf(transcript.children) < MAX_CHILDREN_TOTAL_TOOLS) {
             child.tools.push(next);
         }
     } else {
         child.status = event.status;
 
         if (child.text === "" && event.text !== undefined) {
-            child.text = event.text.slice(0, MAX_CHILD_CHARS);
+            child.text = event.text.slice(0, Math.max(0, Math.min(MAX_CHILD_CHARS, MAX_CHILDREN_TOTAL_CHARS - charsOf(transcript.children))));
         }
     }
 };

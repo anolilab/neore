@@ -58,13 +58,18 @@ export const openImport = async (ctx: MutationCtx, device: Doc<"devices">, hostS
         where: { agentKey: open.agentKey, nativeSessionId: open.nativeSessionId, userId: device.userId },
     });
 
-    // Deleting a thread does not take its session with it at once (a soft delete keeps both until the hard delete), so a
-    // session whose thread is gone or deleted is stale: it is dropped here and the import starts again.
+    // A hard-deleted thread leaves its session behind (the delete does not take it at once): that one is stale and is
+    // dropped, and the import starts again. A soft-deleted thread can still be restored (undo), so its session stays
+    // and the import is told it is over; it can be imported again once the thread is gone for good.
     const thread = found ? await ctx.db.threads.findFirst({ where: { _id: found.threadId } }) : null;
 
-    if (found && (!thread || thread.deleted === true)) {
+    if (found && !thread) {
         await ctx.db.delete(found._id);
     } else if (found) {
+        if (thread?.deleted === true) {
+            return { ended: true, existing: true, next: found.importedTurns ?? 0, outcome: "applied", threadId: found.threadId as string };
+        }
+
         // An import begun on one of the user's computers can be finished from another: the hand-over is the open.
         if (found.importState === "importing" && found.deviceId !== device._id) {
             await ctx.db.patch(found._id, { deviceId: device._id, hostSessionId, updatedAt: now });

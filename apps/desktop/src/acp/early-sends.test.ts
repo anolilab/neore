@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HELD } from "./commands";
-import { EarlySends, NEVER_OPENED } from "./early-sends";
+import { EarlySends, NEVER_OPENED, NOT_OPEN_HERE, UNKNOWN_SESSION_WAIT_MS } from "./early-sends";
 import type { SessionStatus } from "./types";
 
 interface Rig {
@@ -135,6 +135,53 @@ describe("a message for a session that is not open", () => {
         subject.early.opened("s1");
         expect(subject.sent).toEqual([]);
         expect(subject.finished).toEqual(["c1"]);
+    });
+
+    it("gives up on a session this computer never heard of after a short wait, not at the envelope's expiry", () => {
+        const subject = rig();
+
+        subject.early.submit(message(), call("c1", Date.now() + 5 * 60_000));
+        vi.advanceTimersByTime(UNKNOWN_SESSION_WAIT_MS + 1);
+
+        expect(subject.ended).toEqual([{ error: NOT_OPEN_HERE, reason: "failed", turnId: "u1" }]);
+        expect(subject.finished).toEqual(["c1"]);
+    });
+
+    it("keeps waiting to the envelope's expiry for a session that became known meanwhile", () => {
+        const subject = rig();
+
+        subject.early.submit(message(), call("c1", Date.now() + 5 * 60_000));
+        subject.setStatus("s1", "starting");
+        vi.advanceTimersByTime(UNKNOWN_SESSION_WAIT_MS + 1);
+        expect(subject.ended).toEqual([]);
+
+        vi.advanceTimersByTime(5 * 60_000);
+        expect(subject.ended).toEqual([{ error: NEVER_OPENED, reason: "failed", turnId: "u1" }]);
+    });
+
+    it("refuses at once, with the real reason, a message that follows a start that failed before the session existed", () => {
+        const subject = rig();
+
+        subject.early.failed("s1", "that folder is not approved");
+
+        expect(() => subject.early.submit(message(), call("c1"))).toThrow("that folder is not approved");
+        expect(subject.held).toEqual([]);
+
+        // A later start of the same session clears it.
+        subject.early.opened("s1");
+        subject.setStatus("s1", "idle");
+        expect(subject.early.submit(message(), call("c2"))).not.toBe(HELD);
+    });
+
+    it("forgets a failed start once its envelope lifetime has passed", () => {
+        const subject = rig();
+
+        subject.early.failed("s1", "no agent");
+        vi.advanceTimersByTime(5 * 60_000 + 1);
+
+        const second = call("c1", Date.now() + 60_000);
+
+        expect(subject.early.submit(message(), second)).toBe(HELD);
     });
 
     it("ends its stream, not runs, when the session opens after the envelope's expiry", () => {

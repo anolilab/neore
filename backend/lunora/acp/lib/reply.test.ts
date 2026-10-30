@@ -249,6 +249,30 @@ describe("an agent's own children", () => {
         expect(body.children).toHaveLength(16);
     });
 
+    it("share one budget across all of them, so a child-heavy turn cannot outgrow the reply's row", () => {
+        const body = emptyTranscript();
+
+        for (let index = 0; index < 20; index += 1) {
+            const spawnId = `spawn${String(index)}`;
+
+            appendChildEvent(body, text(spawnId, "t".repeat(64_000)));
+            appendChildEvent(body, text(spawnId, "r".repeat(64_000), "reasoning"));
+
+            for (let tool = 0; tool < 60; tool += 1) {
+                appendChildEvent(body, { id: `c${String(tool)}`, kind: "child_tool", spawnId, status: "completed", title: "T".repeat(500), toolKind: "read" });
+            }
+
+            appendChildEvent(body, { kind: "child_end", spawnId, status: "completed", text: "e".repeat(64_000) });
+        }
+
+        const chars = body.children.reduce((sum, child) => sum + child.text.length + child.reasoning.length, 0);
+        const reply = buildHostReply({ agentKey: "claude", reason: "finished", transcript: body });
+
+        expect(chars).toBeLessThanOrEqual(128_000);
+        expect(body.children.reduce((sum, child) => sum + child.tools.length, 0)).toBeLessThanOrEqual(200);
+        expect(JSON.stringify(reply?.providerMetadata).length).toBeLessThan(400_000);
+    });
+
     it("ride with the reply, and a turn that only had children still saves one", () => {
         const body = emptyTranscript();
 

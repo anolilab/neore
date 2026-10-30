@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { childEventOf, childParentOf, toolIdOf } from "./child-updates";
 import type { ChildEvent } from "./children";
 import { ChildLedger } from "./children";
 
@@ -234,5 +235,41 @@ describe("a child's text and the user's masked values", () => {
         ledger.settle("t", "completed", "used hunter22");
 
         expect(JSON.stringify(emitted)).not.toContain(secret);
+    });
+});
+
+describe("a child's tool call", () => {
+    it("keeps its status, title and kind when a later update carries only some of them", () => {
+        const { emitted, ledger } = rig();
+        const update = (fields: Record<string, unknown>) => childEventOf({ sessionUpdate: "tool_call_update", toolCallId: "tool-1", ...fields }, (value) => value) as ChildEvent;
+
+        ledger.spawn("task1");
+        ledger.receive("task1", update({ kind: "read", status: "in_progress", title: "Read a.ts" }));
+        ledger.receive("task1", update({ content: [] }));
+        ledger.receive("task1", update({ status: "completed" }));
+
+        expect(emitted.map(([, event]) => event)).toEqual([
+            { id: "tool-1", kind: "tool", status: "in_progress", title: "Read a.ts", toolKind: "read" },
+            { id: "tool-1", kind: "tool", status: "in_progress", title: "Read a.ts", toolKind: "read" },
+            { id: "tool-1", kind: "tool", status: "completed", title: "Read a.ts", toolKind: "read" },
+        ]);
+    });
+
+    it("starts as pending, titled by its id, when the first thing heard of it says nothing more", () => {
+        const { emitted, ledger } = rig();
+
+        ledger.spawn("task1");
+        ledger.receive("task1", { id: "tool-2", kind: "tool" });
+
+        expect(emitted[0]?.[1]).toEqual({ id: "tool-2", kind: "tool", status: "pending", title: "tool-2", toolKind: "other" });
+    });
+});
+
+describe("a long tool call id", () => {
+    it("is cut the same way for the spawn call and for the parent stamp of its children", () => {
+        const id = "toolu_".repeat(60);
+
+        expect(childParentOf({ _meta: { claudeCode: { parentToolUseId: id } } })).toBe(toolIdOf(id));
+        expect(toolIdOf(id)).toHaveLength(128);
     });
 });
