@@ -182,6 +182,25 @@ const connectToMCPServer = async (config: MCPServerConfig, timeoutMs = 10_000): 
 
 type Tool = ToolSet[string];
 
+/** How long a finished call waits for its progress rows to be written before it hands its result back anyway. */
+export const PROGRESS_FINISH_DEADLINE_MS = 2000;
+
+/** `promise`, or nothing once `ms` has passed: progress is display only, so a stalled write never holds a tool's result. */
+const settleWithin = async (promise: Promise<void>, ms: number): Promise<void> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        await Promise.race([
+            promise,
+            new Promise<void>((resolve) => {
+                timer = setTimeout(resolve, ms);
+            }),
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+};
+
 /**
  * `tool` reporting the server's progress to `sink` while it runs. The call's id
  * is its `progressToken`; the reports stop, and the row's progress with them,
@@ -208,7 +227,7 @@ const withProgress = (tool: Tool, label: { serverName: string; toolName: string 
             return await runWithProgressCall(call, async () => await run(input, options));
         } finally {
             call.release();
-            await progress.finish();
+            await settleWithin(progress.finish(), PROGRESS_FINISH_DEADLINE_MS);
         }
     };
 

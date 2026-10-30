@@ -87,7 +87,8 @@ export const readToolProgress = (value: unknown): ToolProgressEvent | undefined 
         return undefined;
     }
 
-    const event = { serverName, toolCallId, toolName };
+    // The names come from the MCP server: cleaned like its message, so they cannot reorder or hide text in the row.
+    const event = { serverName: sanitizeMessage(serverName), toolCallId, toolName: sanitizeMessage(toolName) };
 
     if (ended === true) {
         return { ...event, ended: true };

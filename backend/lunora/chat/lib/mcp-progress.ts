@@ -56,14 +56,14 @@ export interface ToolProgressChunk {
  * characters and the bidi overrides and isolates (which can reorder the text around them) are removed,
  * and it is cut to {@link MAX_PROGRESS_MESSAGE_LENGTH} code points, so a surrogate pair is never split.
  */
-export const sanitizeProgressMessage = (message: string): string =>
+export const sanitizeProgressMessage = (message: string, maxLength = MAX_PROGRESS_MESSAGE_LENGTH): string =>
     [
         ...message
             .replaceAll(/[\t\n\r]+/gu, " ")
             .replaceAll(/[\p{Cc}\u{202A}-\u{202E}\u{2066}-\u{2069}]/gu, "")
             .trim(),
     ]
-        .slice(0, MAX_PROGRESS_MESSAGE_LENGTH)
+        .slice(0, maxLength)
         .join("");
 
 /**
@@ -244,8 +244,12 @@ export const createToolProgressWriter = (write: (chunk: ToolProgressChunk) => Pr
     const now = clock?.now ?? Date.now;
 
     return (called) => {
-        // The column caps names; a longer one would be refused on every write.
-        const tool = { ...called, serverName: called.serverName.slice(0, MAX_TOOL_LABEL_LENGTH), toolName: called.toolName.slice(0, MAX_TOOL_LABEL_LENGTH) };
+        // The names come from the MCP server too: cleaned like the message, and capped as the column is.
+        const tool = {
+            ...called,
+            serverName: sanitizeProgressMessage(called.serverName, MAX_TOOL_LABEL_LENGTH),
+            toolName: sanitizeProgressMessage(called.toolName, MAX_TOOL_LABEL_LENGTH),
+        };
         const startedAt = now();
         let reported = false;
         let written = 0;

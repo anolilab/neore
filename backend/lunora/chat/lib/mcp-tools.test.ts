@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { getMCPTools, mcpRuntimeToolName } from "./mcp-tools";
+import { getMCPTools, mcpRuntimeToolName, PROGRESS_FINISH_DEADLINE_MS } from "./mcp-tools";
 import type { MCPServerConfig } from "./mcp-tools";
 
 // One fake client per server URL; `tools()` returns that server's tools.
@@ -143,6 +143,20 @@ describe("getMCPTools progress", () => {
         await expect((result.tools["mcp_d__run"]!.execute as any)({}, { messages: [], toolCallId: "call_1" })).rejects.toThrow("boom");
 
         expect(events).toStrictEqual(["start d/run#call_1", "finish"]);
+    });
+
+    it("hands the result back when the progress rows do not finish writing in time", async () => {
+        const progress = vi.fn(() => {
+            return {
+                finish: async () => await new Promise<void>(() => {}),
+                push: () => {},
+            };
+        });
+        const result = await getMCPTools([server("c", "https://c.example/mcp")], { progress });
+        const started = Date.now();
+
+        await expect((result.tools["mcp_c__run"]!.execute as any)({}, { messages: [], toolCallId: "call_1" })).resolves.toBe("ok");
+        expect(Date.now() - started).toBeLessThan(PROGRESS_FINISH_DEADLINE_MS + 1000);
     });
 
     it("leaves the tools untouched without a sink", async () => {

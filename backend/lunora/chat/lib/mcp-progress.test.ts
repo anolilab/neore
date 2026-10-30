@@ -238,6 +238,17 @@ describe(createLatestThrottle, () => {
 describe(createToolProgressWriter, () => {
     const tool = { serverName: "Docs", toolCallId: "call_1", toolName: "index" };
 
+    it("cleans the server and tool names it writes, which come from the MCP server", async () => {
+        const clock = fakeClock();
+        const write = vi.fn(async (_chunk: ToolProgressChunk) => {});
+        const call = createToolProgressWriter(write, clock)({ serverName: "Do\u{202E}cs", toolCallId: "call_1", toolName: "in\u{7}dex" });
+
+        call.push({ progress: 1 });
+        await call.finish();
+
+        expect(write.mock.calls[0]?.[0]).toMatchObject({ serverName: "Docs", toolName: "index" });
+    });
+
     it("writes nothing for a call that never reported progress", async () => {
         const write = vi.fn(async (_chunk: ToolProgressChunk) => {});
         const call = createToolProgressWriter(write, fakeClock())(tool);

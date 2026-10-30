@@ -110,6 +110,10 @@ describe("toolProgress", () => {
         expect(readToolProgress({ ...tool, message: "a\u{7}b\u{202E}c\u{2066}d\u{2069}e", progress: 1 })?.message).toBe("abcde");
         expect(readToolProgress({ ...tool, message: "page 1\r\npage 2", progress: 1 })?.message).toBe("page 1 page 2");
         expect(readToolProgress({ ...tool, message: "\u{202E}\u{2066}", progress: 1 })).toStrictEqual({ ...tool, progress: 1 });
+        expect(readToolProgress({ ...tool, progress: 1, serverName: "Do\u{202E}cs", toolName: "in\u{2066}dex" })).toMatchObject({
+            serverName: "Docs",
+            toolName: "index",
+        });
     });
 
     it("cuts the message by code point, so a surrogate pair is never split", () => {
