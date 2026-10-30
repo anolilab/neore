@@ -36,7 +36,9 @@ describe("which references are looked at", () => {
     });
 });
 
-const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+const NONCE = /^[\w-]{16,64}$/u;
+
+const pngBytes = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 1, 2, 3]);
 const PNG: MediaRead = { bytes: pngBytes, kind: "image", mime: "image/png", name: "chart.png", size: 7, status: "read" };
 
 /** An upload route that checks what the real one checks of a request before the handler: the signed fields against the request. */
@@ -54,7 +56,7 @@ const route = () => {
 
         if (init?.method === "POST") {
             expect(signed).toMatchObject({ size: Number(headers.get("upload-length")), type: "image/png" });
-            expect(signed.nonce).toMatch(/^[\w-]{16,64}$/u);
+            expect(signed.nonce).toMatch(NONCE);
 
             return new Response(null, { headers: { Location: "https://backend.test/hosts/uploads/abcdefghijklmnopqrstu" }, status: 201 });
         }

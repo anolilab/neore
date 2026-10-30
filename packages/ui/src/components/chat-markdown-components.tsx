@@ -47,6 +47,7 @@ type ImageProps = ComponentProps<"img"> & ExtraProps;
  * names no image the page can load. The files an agent shows are separate attachments the backend saved
  * (`backend/lunora/acp/`), so nothing is lost by not loading these.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- private to this module, which exports renderer maps rather than components
 const LiteralImage: FC<ImageProps> = ({ alt, src }) => (
     <span className="text-muted-foreground break-all">{`![${alt ?? ""}](${typeof src === "string" ? src : ""})`}</span>
 );
