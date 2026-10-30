@@ -39,8 +39,8 @@ describe("parseManifestTools", () => {
         expect(parseManifestTools([tool({ name })])).toBeNull();
     });
 
-    it("accepts other names that merely start with acp_", () => {
-        expect(parseManifestTools([tool({ name: "acp_backup" })])).toHaveLength(1);
+    it("refuses any other name in the reserved acp_ namespace, so a later command name can never collide", () => {
+        expect(parseManifestTools([tool({ name: "acp_backup" })])).toBeNull();
     });
 
     it("truncates long descriptions", () => {

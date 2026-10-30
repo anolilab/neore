@@ -36,8 +36,9 @@ export const parseManifestTools = (value: unknown): DeviceManifestTool[] | null 
         const { description, inputSchema, kind, name, readOnly } = entry;
 
         // The coding-agent call names are the backend's own (`acp-call.ts`), which it sends and the computer never offers: a device
-        // tool by one of them would be given an `acp_*` call's budget and claim window and reach the model as a device tool.
-        if (typeof name !== "string" || !DEVICE_TOOL_NAME.test(name) || seen.has(name) || ACP_TOOLS.includes(name)) {
+        // tool by one of them would be given an `acp_*` call's budget and claim window and reach the model as a device tool. The whole
+        // `acp_` prefix is reserved, so a command added later can never already be a device tool's name.
+        if (typeof name !== "string" || !DEVICE_TOOL_NAME.test(name) || seen.has(name) || ACP_TOOLS.includes(name) || name.startsWith("acp_")) {
             return null;
         }
 
