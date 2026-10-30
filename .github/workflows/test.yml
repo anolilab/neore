@@ -355,7 +355,9 @@ jobs:
                   ) &
                   sampler=$!
                   # The sampler's own `sleep` child holds stdout too: end it with the loop, or the step waits on it.
-                  trap 'pkill -P "$sampler" 2>/dev/null; kill "$sampler" 2>/dev/null' EXIT
+                  # `|| true`: the step runs under `-e`, and a pkill that finds no child (or a sampler already gone)
+                  # would otherwise turn a passing run into exit 1.
+                  trap 'pkill -P "$sampler" 2>/dev/null || true; kill "$sampler" 2>/dev/null || true' EXIT
                   pnpm --filter @neore/web run test:e2e --shard=${{ matrix.shard }}/3
 
             - name: "Upload the Playwright report"
