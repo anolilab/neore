@@ -298,6 +298,11 @@ impl Interact for AskUser {
     }
 
     fn key_changed(&self, target: &Target, pinned: &[String], presented: &[String]) {
+        // A background attempt gives up on a changed key and waits for a manual retry, which asks.
+        if !self.interactive {
+            return;
+        }
+
         let spec = target.host_spec();
 
         // One notice per server: a page that keeps retrying a refused connection must not stack them.
@@ -1173,12 +1178,16 @@ impl DeviceState {
 
     pub fn host_disconnect(&self, device_id: &str) {
         self.note_disconnect(device_id);
-        self.keep_forget(device_id);
 
+        let kept = self.keep_forget(device_id);
         let link = self.ssh.connections.lock().unwrap().remove(device_id);
 
-        if let Some(link) = link {
-            self.retire(&link);
+        if let Some(link) = &link {
+            self.retire(link);
+        }
+
+        // Another window shows the server as reconnecting (or gave up) until it hears the keeping is gone.
+        if kept || link.is_some() {
             self.emit(Event::Changed);
         }
     }
@@ -2965,6 +2974,35 @@ mod tests {
     }
 
     #[test]
+    fn stopping_a_server_that_gave_up_tells_the_other_windows() {
+        let link = FakeLink::new(true);
+        let (state, dir, events) = engine("stopped", &link);
+        let id = host_id("stopped");
+        let changed = || {
+            events
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|event| matches!(event, Event::Changed))
+                .count()
+        };
+
+        state.note_connected(&id, &(Arc::clone(&link) as Arc<dyn HostLink>), true);
+        state.ssh.connections.lock().unwrap().remove(&id);
+        state.keep_manual(&id, true).unwrap();
+        state.keep_failed(&id, &"the passphrase was not given".into());
+
+        let before = changed();
+
+        state.host_disconnect(&id);
+
+        assert_eq!(changed(), before + 1);
+        assert!(phase_of(&state, "stopped").is_none());
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn a_background_attempt_asks_nobody_and_one_server_has_one_attempt_at_a_time() {
         let first = FakeLink::new(true);
         let (state, dir, _) = engine("silent", &first);
@@ -2977,7 +3015,9 @@ mod tests {
 
         assert!(!ask.trust_key(&target, &key));
         assert_eq!(ask.passphrase(&target, "Enter passphrase"), None);
+        ask.key_changed(&target, &["a".into()], &["b".into()]);
         assert!(state.prompt_current().is_none(), "a prompt was queued");
+        assert!(state.ssh.changed_prompts.lock().unwrap().is_empty());
 
         let id = host_id("silent");
         let slot = state.begin_attempt(&id).unwrap();

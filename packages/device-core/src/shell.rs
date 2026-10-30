@@ -345,7 +345,8 @@ fn kill_group(pid: u32) {
 }
 
 /// Kills every run in flight, background children included, and every run that starts from now on. For a host that
-/// was told to stop.
+/// was told to stop. A descendant that left the run's process group (`setsid`) is out of reach: the group is the
+/// only handle there is without a cgroup.
 #[cfg(unix)]
 pub fn kill_running() {
     let mut running = RUNNING.lock().unwrap();
@@ -440,7 +441,7 @@ pub fn run(
     #[cfg(windows)]
     let _job = Job::attach(&child);
     #[cfg(unix)]
-    let _tracked = Tracked::new(child.id());
+    let tracked = Tracked::new(child.id());
 
     let buffer = Arc::new(Mutex::new((Vec::new(), false)));
     let stop = Arc::new(AtomicBool::new(false));
@@ -477,6 +478,10 @@ pub fn run(
     // Whatever the command started and left running dies with it; output it already
     // wrote stays readable in the pipe.
     kill_tree(&mut child);
+
+    // The group is gone, so a host that stops now must not signal its number: it may be someone else's by then.
+    #[cfg(unix)]
+    drop(tracked);
 
     // A background child can inherit stdout and hold the pipe open after the
     // shell exits, so wait for the readers only up to a deadline. Unfinished
