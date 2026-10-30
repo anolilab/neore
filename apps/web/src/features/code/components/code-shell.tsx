@@ -7,9 +7,18 @@ import { ArrowLeftIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
+import CodeWorkspace from "@/features/code/components/code-workspace";
 import { useCodeModeEnabled } from "@/features/code/hooks/use-code-mode-enabled";
+import { hostTabId } from "@/features/code/lib/layout";
+import { useCodeLayoutStore } from "@/features/code/stores/code-layout-store";
 import { isDeviceOnline } from "@/features/devices/lib/device-relay";
 import { useCRPC } from "@/lib/lunora/crpc";
+
+const useDevices = (enabled: boolean) => {
+    const crpc = useCRPC();
+
+    return useQuery({ ...crpc.devices.functions.listDevices.queryOptions({}), enabled });
+};
 
 const ROW =
     "flex min-h-11 w-full items-center gap-2 rounded-md px-2 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 md:min-h-9";
@@ -35,11 +44,15 @@ const Section: FC<{ children: ReactNode; id: string; title: string }> = ({ child
     </section>
 );
 
-const HostsSection: FC<{ onSelect: (id: string) => void; selected: string | undefined }> = ({ onSelect, selected }) => {
+type Devices = NonNullable<ReturnType<typeof useDevices>["data"]>;
+
+const HostsSection: FC<{ devices: Devices | undefined; now: number; onSelect: (id: string) => void; selected: string | undefined }> = ({
+    devices,
+    now,
+    onSelect,
+    selected,
+}) => {
     const { t } = useLingui();
-    const crpc = useCRPC();
-    const now = useNow();
-    const { data: devices } = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
 
     return (
         <Section id="code-hosts" title={t`Hosts`}>
@@ -57,7 +70,12 @@ const HostsSection: FC<{ onSelect: (id: string) => void; selected: string | unde
 
                     return (
                         <li key={device._id}>
-                            <button aria-pressed={selected === device._id} className={cn(ROW, selected === device._id && "bg-muted")} onClick={() => onSelect(device._id)} type="button">
+                            <button
+                                aria-pressed={selected === device._id}
+                                className={cn(ROW, selected === device._id && "bg-muted")}
+                                onClick={() => onSelect(device._id)}
+                                type="button"
+                            >
                                 <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", online ? "bg-green-500" : "bg-muted-foreground/40")} />
                                 <span className="min-w-0 flex-1 truncate">{device.name}</span>
                                 <span className="text-muted-foreground text-xs">{online ? t`Online` : t`Offline`}</span>
@@ -101,9 +119,15 @@ const RunsSection: FC = () => {
 const CodeShell: FC = () => {
     const { t } = useLingui();
     const enabled = useCodeModeEnabled();
-    const crpc = useCRPC();
-    const [selectedId, setSelectedId] = useState<string | undefined>();
-    const { data: devices } = useQuery({ ...crpc.devices.functions.listDevices.queryOptions({}), enabled });
+    const [listOpen, setListOpen] = useState(true);
+    const now = useNow();
+    const dispatch = useCodeLayoutStore((state) => state.dispatch);
+    const activeTab = useCodeLayoutStore((state) => state.layout.panes[state.layout.activePane]?.active);
+    const { data: devices } = useDevices(enabled === true);
+
+    if (enabled === undefined) {
+        return null;
+    }
 
     if (!enabled) {
         return (
@@ -115,41 +139,30 @@ const CodeShell: FC = () => {
         );
     }
 
-    const selected = devices?.find((device) => device._id === selectedId);
+    const selectedId = activeTab?.startsWith("host:") ? activeTab.slice("host:".length) : undefined;
+    const openHost = (id: string) => {
+        dispatch({ tabId: hostTabId(id), type: "open" });
+        setListOpen(false);
+    };
 
     return (
         <>
             <aside
                 aria-label={t`Code navigation`}
-                className={cn("border-border w-full shrink-0 overflow-y-auto md:block md:w-72 md:border-r", selected ? "hidden" : "block")}
+                className={cn("border-border w-full shrink-0 overflow-y-auto md:block md:w-72 md:border-r", listOpen ? "block" : "hidden")}
             >
-                <HostsSection onSelect={setSelectedId} selected={selectedId} />
+                <HostsSection devices={devices} now={now} onSelect={openHost} selected={selectedId} />
                 <PullRequestsSection />
                 <RunsSection />
             </aside>
-            <main className={cn("min-w-0 flex-1 flex-col overflow-y-auto md:flex", selected ? "flex" : "hidden")}>
-                {selected && (
-                    <div className="p-2 md:hidden">
-                        <Button className="min-h-11" onClick={() => setSelectedId(undefined)} variant="ghost">
-                            <ArrowLeftIcon aria-hidden="true" className="size-4" />
-                            <Trans>Back</Trans>
-                        </Button>
-                    </div>
-                )}
-                <div className="flex flex-1 flex-col items-center justify-center gap-1 p-6 text-center">
-                    {selected ? (
-                        <h1 className="text-lg font-semibold">{selected.name}</h1>
-                    ) : (
-                        <>
-                            <h1 className="text-lg font-semibold">
-                                <Trans>Pick a host or a pull request</Trans>
-                            </h1>
-                            <p className="text-muted-foreground text-sm">
-                                <Trans>Choose one on the left to start.</Trans>
-                            </p>
-                        </>
-                    )}
+            <main className={cn("min-w-0 flex-1 flex-col md:flex", listOpen ? "hidden" : "flex")}>
+                <div className="p-2 md:hidden">
+                    <Button className="min-h-11" onClick={() => setListOpen(true)} variant="ghost">
+                        <ArrowLeftIcon aria-hidden="true" className="size-4" />
+                        <Trans>Back</Trans>
+                    </Button>
                 </div>
+                <CodeWorkspace devices={devices} now={now} />
             </main>
         </>
     );
