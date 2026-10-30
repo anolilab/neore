@@ -9,6 +9,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { isHostRunThread } from "../acp/lib/host-thread";
 import { leafRowOf, pathExceedsColdStart, resolvePathAgent } from "../agent/agent-switch";
 import { sameAgent } from "../agent/agent-switch-logic";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
@@ -97,8 +98,15 @@ export const switchThreadAgentHandler = async (ctx: MutationCtx, args: SwitchArg
     }
 
     // A bot runs on its bot's model, a group chat on its participants, a messenger thread on the connection's,
-    // and a media thread has no model to swap.
-    if (thread.botId || thread.groupChat || thread.multiChat || thread.messengerConnectionId || (thread.mode !== undefined && thread.mode !== "text")) {
+    // a coding-agent thread on its host, and a media thread has no model to swap.
+    if (
+        thread.botId ||
+        thread.groupChat ||
+        thread.multiChat ||
+        thread.messengerConnectionId ||
+        isHostRunThread(thread) ||
+        (thread.mode !== undefined && thread.mode !== "text")
+    ) {
         return refuse(AGENT_SWITCH_UNSUPPORTED, "This chat runs on a fixed agent");
     }
 
@@ -106,6 +114,12 @@ export const switchThreadAgentHandler = async (ctx: MutationCtx, args: SwitchArg
     const definition = requireEnabledModel(args.target.model, { mode: "text" }, "chat");
 
     await assertPaidModel(ctx, args.userId, definition);
+
+    // Every later send runs on the switched model under its own sender's plan, the owner's included: a model the
+    // owner cannot run would leave their next send refused (`plan-required`) with no fallback.
+    if (thread.userId !== undefined && thread.userId !== args.userId) {
+        await assertPaidModel(ctx, thread.userId, definition);
+    }
 
     // A hard rule, so a transcript never has two agents writing at once.
     if ((await isThreadStreaming(ctx, thread._id)) || (await hasLiveDeltaStream(ctx, thread._id)) || (await hasUnsettledStop(ctx, thread._id, Date.now()))) {
@@ -124,8 +138,13 @@ export const switchThreadAgentHandler = async (ctx: MutationCtx, args: SwitchArg
     }
 
     const to: AgentRef = { kind: "model", model: definition.id };
+    // The caller's, not the thread's: the claims table is shared and a `clientId` is client-chosen.
+    const claim = async () => await claimOnce(ctx, "switch", `${args.userId}:${thread._id}:${args.clientId}`, AGENT_SWITCH_CLAIM_TTL_MS, args.userId);
 
     if (sameAgent(from, to)) {
+        // Claimed too, so a stale replay of this pick cannot revert a switch made after it.
+        await claim();
+
         return { agent: from, coldStartCostly: false, messageId: null, switched: false };
     }
 
@@ -137,8 +156,7 @@ export const switchThreadAgentHandler = async (ctx: MutationCtx, args: SwitchArg
         throw new LunoraError("CONFLICT", "Wait for the reply to start before switching", { data: { code: AGENT_SWITCH_STREAMING } });
     }
 
-    // The caller's, not the thread's: the claims table is shared and a `clientId` is client-chosen.
-    const claimed = await claimOnce(ctx, "switch", `${args.userId}:${thread._id}:${args.clientId}`, AGENT_SWITCH_CLAIM_TTL_MS, args.userId);
+    const claimed = await claim();
 
     if (!claimed) {
         return { agent: from, coldStartCostly: false, messageId: null, switched: false };

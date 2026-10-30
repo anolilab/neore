@@ -47,6 +47,26 @@ const text = (role: "assistant" | "user", value: string) =>
 const switchTo = async (model: string, clientId: string, userId = OWNER) =>
     await run(async (ctx) => await switchThreadAgentHandler(ctx, { clientId, target: { kind: "model", model }, threadId: threadId as never, userId }));
 
+const insertStream = async (status: string, messageId: string) =>
+    await run(
+        async (ctx) =>
+            await ctx.db.insert("persistentStreams", {
+                expiresAt: Date.now() + 60_000,
+                messageId,
+                status,
+                streamingConfig: { contentType: "text", model: A },
+                threadId,
+                userId: OWNER,
+            }),
+    );
+
+// Distinct creation times, so "newest" is unambiguous.
+const nextMillisecond = async () => {
+    await new Promise<void>((resolve) => {
+        setTimeout(resolve, 2);
+    });
+};
+
 const thread = async (): Promise<any> => await run(async (ctx) => await ctx.db.get(threadId));
 const activeAgentOf = async () => {
     const { activeAgent } = await thread();
@@ -131,6 +151,18 @@ describe("a switch in a thread that never branched", () => {
         expect(await runModel()).toBe(C);
     });
 
+    it("claims the clientId of a pick that changed nothing, so its replay cannot undo a later switch", async () => {
+        expect(await switchTo(A, "click-1")).toMatchObject({ switched: false });
+
+        await switchTo(B, "click-2");
+
+        const replay = await switchTo(A, "click-1");
+
+        expect(replay).toMatchObject({ agent: { kind: "model", model: B }, messageId: null, switched: false });
+        expect(await switchRows()).toHaveLength(1);
+        expect(await runModel()).toBe(B);
+    });
+
     it("writes nothing when the thread is already on the target", async () => {
         expect(await switchTo(A, "click-1")).toMatchObject({ messageId: null, switched: false });
         expect(await switchRows()).toHaveLength(0);
@@ -179,6 +211,18 @@ describe("a switch in a thread that never branched", () => {
         await run(async (ctx) => await ctx.db.patch(streamId, { state: { endedAt: Date.now(), kind: "finished" }, stateKind: "finished" }));
 
         expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
+    });
+
+    it("is refused while an older run streams, however many newer runs have finished since", async () => {
+        await insertStream("streaming", ids.u1 as string);
+
+        for (let index = 0; index < 6; index += 1) {
+            await nextMillisecond();
+            await insertStream("done", ids.a1 as string);
+        }
+
+        await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_STREAMING } });
+        expect(await switchRows()).toHaveLength(0);
     });
 
     it("refuses a host target with a typed error, and a model that is not an enabled chat model", async () => {
@@ -252,6 +296,29 @@ describe("a switch in a thread that never branched", () => {
         expect(await switchTo(B, "click-2")).toMatchObject({ switched: true });
     });
 
+    it("refuses a paid model the thread's owner cannot run when a collaborator picks it, before writing", async () => {
+        await run(async (ctx) => await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: COLLABORATOR }));
+
+        // The collaborator is on a paid plan; the owner is not.
+        const asCollaborator = async (ctx: any) =>
+            await switchThreadAgentHandler(
+                new Proxy(ctx, {
+                    get: (target, property) =>
+                        property === "runQuery"
+                            ? async (_reference: unknown, queryArgs: { userId: string }) => {
+                                  const premium = queryArgs.userId === COLLABORATOR;
+
+                                  return { isAdmin: false, plan: premium ? "premium" : null };
+                              }
+                            : target[property],
+                }),
+                { clientId: "c", target: { kind: "model", model: "anthropic/claude-opus-4.1" }, threadId: threadId as never, userId: COLLABORATOR },
+            );
+
+        await expect(run(asCollaborator)).rejects.toThrow(PRO_PLAN);
+        expect(await switchRows()).toHaveLength(0);
+    });
+
     it("is refused for a guest", async () => {
         const guestId = await run(
             async (ctx) =>
@@ -268,6 +335,13 @@ describe("a switch in a thread that never branched", () => {
         await run(async (ctx) => await ctx.db.patch(threadId, { groupChat: { mode: "round-robin", participants: [] } }));
 
         await expect(switchTo(B, "c")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
+    });
+
+    it("refuses a coding-agent thread, whose turns run on its host", async () => {
+        await run(async (ctx) => await ctx.db.patch(threadId, { runner: "host" }));
+
+        await expect(switchTo(B, "c")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
+        expect(await switchRows()).toHaveLength(0);
     });
 
     it("refuses a messenger thread, which replies on its connection's model", async () => {
@@ -304,6 +378,19 @@ describe("a switch in a thread that never branched", () => {
                     userId: OWNER,
                 }),
         );
+
+        expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
+    });
+
+    it("finds the run of a prompt among more than the newest few streams of the thread", async () => {
+        await insertRow("u2", 1, 0, text("user", "and now?"));
+
+        await insertStream("aborted", ids.u2 as string);
+
+        for (let index = 0; index < 6; index += 1) {
+            await nextMillisecond();
+            await insertStream("done", ids.u1 as string);
+        }
 
         expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
     });
