@@ -89,6 +89,22 @@ describe("tool progress in the persisted body", () => {
         expect(toolProgress).toStrictEqual([{ ...tool, message: "Page 2", progress: 2, total: 4 }]);
     });
 
+    it("reads every chunk, however many progress rows came before the reply's later text and the end marker", async () => {
+        await write({ text: "Start. " });
+
+        for (let report = 1; report <= 60; report += 1) {
+            await write({ text: "", toolProgress: { ...tool, progress: report } });
+        }
+
+        await write({ text: "", toolProgress: { ...tool, ended: true } });
+        await write({ text: "Done." });
+
+        const { text, toolProgress } = await body();
+
+        expect(text).toBe("Start. Done.");
+        expect(toolProgress).toBeUndefined();
+    });
+
     it("returns none when no call reported, or every call ended", async () => {
         await write({ text: "Hello" });
 
