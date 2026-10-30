@@ -501,7 +501,7 @@ export const generateExportFile = internalAction
     .action(async ({ args, ctx: context }) => {
         const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
         const exportData = {
-            acpSessions: args.acpSessions ?? { sessions: [] },
+            acpSessions: args.acpSessions ?? { events: [], sessions: [] },
             bots: args.bots ?? { bots: [] },
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,

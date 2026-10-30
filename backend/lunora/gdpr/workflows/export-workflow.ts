@@ -86,10 +86,27 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         );
         const pages = await context.step.do("collect-pages", async () => await context.run(internal.pages.gdpr.collectPagesForExport, { userId }));
         const devices = await context.step.do("collect-devices", async () => await context.run(internal.devices.gdpr.collectDevicesForExport, { userId }));
-        const acpSessions = await context.step.do(
-            "collect-acp-sessions",
-            async () => await context.run(internal.acp.gdpr.collectAcpSessionsForExport, { userId }),
-        );
+        // Sessions, then their host events, a page per step. The first keeps its original name for runs already in
+        // flight; their stored result has no `next`, which ends the loop. A result that is not a page (a stub) too.
+        const acpSessions: { events: unknown[]; sessions: unknown[] } = { events: [], sessions: [] };
+        let acpCursor: unknown;
+
+        for (let page = 0; ; page += 1) {
+            const result = (await context.step.do(
+                page === 0 ? "collect-acp-sessions" : `collect-acp-sessions-${String(page)}`,
+                async () => await context.run(internal.acp.gdpr.collectAcpSessionsForExport, { cursor: acpCursor as never, userId }),
+            )) as { events?: unknown[]; next?: unknown; sessions?: unknown[] } | undefined;
+
+            acpSessions.sessions.push(...(result?.sessions ?? []));
+            acpSessions.events.push(...(result?.events ?? []));
+
+            if (!result?.next) {
+                break;
+            }
+
+            acpCursor = result.next;
+        }
+
         const activity = await context.step.do("collect-activity", async () => await context.run(internal.gdpr.steps.collectActivityForExport, { userId }));
 
         await progress({ currentStep: "generating_export", progress: 80 });
