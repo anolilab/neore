@@ -199,7 +199,17 @@ export interface ServeUploadOptions {
  * or a device signature). `admit` runs first on every request; a create is then charged against `createLimit`,
  * and its staging key gets the same reap a finalize would have made moot.
  */
-export const serveUserUpload = async ({ admit, allowedTypes, bucket, createLimit = "uploads/create", purpose, request, scheduler, shardCtx, userId }: ServeUploadOptions): Promise<Response> => {
+export const serveUserUpload = async ({
+    admit,
+    allowedTypes,
+    bucket,
+    createLimit = "uploads/create",
+    purpose,
+    request,
+    scheduler,
+    shardCtx,
+    userId,
+}: ServeUploadOptions): Promise<Response> => {
     const refused = await admit?.(shardCtx, request);
 
     if (refused) {
