@@ -21,12 +21,12 @@ export const resolveGithubToken = async (ctx: Pick<ActionCtx, "runMutation" | "r
         return { problem: "not_connected" };
     }
 
-    // A forced refresh, for a token the host refused before its stored expiry.
     const outcomeOf = (result: TokenResult): GithubTokenOutcome => {
         if ("error" in result) {
             return { problem: result.expired ? "expired" : "unavailable" };
         }
 
+        // `renew` forces a refresh, for a token the host refused before its stored expiry.
         return { accessToken: result.accessToken, renew: async () => outcomeOf(await obtainAccessToken(ctx, grant, undefined, { force: true })) };
     };
 
