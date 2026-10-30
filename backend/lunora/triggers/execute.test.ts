@@ -18,6 +18,7 @@ const state = vi.hoisted(() => {
         admissionRefusal: undefined as string | undefined,
         beforeThread: undefined as (() => void) | undefined,
         bot: null as Record<string, unknown> | null,
+        createExecutionError: undefined as Error | undefined,
         mutations: [] as { args: unknown; name: string }[],
         onRun: undefined as (() => void) | undefined,
         queries: [] as string[],
@@ -93,6 +94,10 @@ const ctx = () =>
                 return state.admissionRefusal ?? null;
             }
 
+            if (name === "createExecution" && state.createExecutionError) {
+                throw state.createExecutionError;
+            }
+
             return name === "createExecution" ? "execution-1" : null;
         },
         runQuery: async (path: string) => {
@@ -140,6 +145,7 @@ beforeEach(() => {
     state.admissionError = undefined;
     state.admissionRefusal = undefined;
     state.beforeThread = undefined;
+    state.createExecutionError = undefined;
     state.snapshot = EMPTY;
     state.snapshotError = false;
     state.mutations = [];
@@ -446,5 +452,27 @@ describe("the window a run leaves for the next one", () => {
 
             expect(stats.lastTriggeredAt).toBe(now);
         });
+    });
+});
+
+describe("a delivery that ends before it has an execution row", () => {
+    const firedMoment = { eventSource: { at: 900, kind: "time" }, eventState: { firedAt: 900 }, type: "event" };
+
+    it("switches off the moment it was fired for, since the delivery is never re-run", async () => {
+        state.trigger = { ...state.trigger, ...firedMoment };
+        state.createExecutionError = new Error("database unavailable");
+
+        await expect(run()).rejects.toThrow("database unavailable");
+
+        expect(state.mutations.find((entry) => entry.name === "switchOffConsumedMoment")?.args).toEqual({ triggerId: "trigger-1" });
+    });
+
+    it("leaves the moment to its real firing when the failed run was a manual test", async () => {
+        state.trigger = { ...state.trigger, ...firedMoment };
+        state.createExecutionError = new Error("database unavailable");
+
+        await expect(run({ manual: true })).rejects.toThrow("database unavailable");
+
+        expect(names()).not.toContain("switchOffConsumedMoment");
     });
 });

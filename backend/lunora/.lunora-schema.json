@@ -21403,6 +21403,12 @@
               "optional": true,
               "unique": false
             },
+            "checkRetries": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "checkedAt": {
               "kind": "number",
               "nullable": false,

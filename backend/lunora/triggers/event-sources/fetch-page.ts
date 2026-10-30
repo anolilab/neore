@@ -8,6 +8,10 @@ import { assertOk } from "../../lib/fetch-timeout";
 import { EventCheckError } from "./check-failure";
 import type { FetchedPage } from "./types";
 
+/**
+ * A longer page is read to this cut and hashed as cut: a change past it is not seen (documented in `docs/triggers.mdx` and
+ * on the form). The cap is what bounds a check's memory and time.
+ */
 export const PAGE_MAX_BYTES = 1024 * 1024;
 /** The whole request, body included. */
 const PAGE_DEADLINE_MS = 15_000;

@@ -971,6 +971,24 @@ const switchOffFiredMoment = async (ctx: MutationCtx, trigger: Doc<"triggers">):
     }
 };
 
+/**
+ * A moment's run that ended before an execution row existed (the trigger, its bot or the row itself could not be
+ * written or read): the job was enqueued once and is never re-run, so nothing else would ever switch it off, and it
+ * would hold one of its owner's watcher slots for good. A moment that has not fired, or is already off, is left alone.
+ */
+export const switchOffConsumedMoment = internalMutation
+    .input({ triggerId: v.id("triggers") })
+    .output(v.null())
+    .mutation(async ({ args: { triggerId }, ctx }) => {
+        const trigger = await ctx.db.get(triggerId);
+
+        if (trigger) {
+            await switchOffFiredMoment(ctx, trigger);
+        }
+
+        return null;
+    });
+
 /** The write behind {@link recordFilteredExecution}: the trigger's ONE filtered (skipped) row, created or moved to the front. */
 const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reason: string): Promise<void> => {
     // The trigger may have been deleted after the run read it. Its

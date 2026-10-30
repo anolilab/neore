@@ -1461,6 +1461,10 @@ msgstr "Há uma chave salva. Deixe em branco para mantê-la. Alterar o endpoint,
 msgid "A model with a system prompt"
 msgstr "Um modelo com um prompt de sistema"
 
+#: src/features/settings/components/chat/event-trigger-fields.tsx:314
+msgid "A model's answer to your own message counts as a reply. In a thread you are chatting in, the wait after it fires is what keeps this to one run per wait."
+msgstr ""
+
 #: src/routes/(public)/index.tsx:42
 msgid "A modern AI chat application supporting Claude, GPT, Gemini and more with document canvas, deep research, and workflow tools."
 msgstr "Um app de chat com IA moderno compatível com Claude, GPT, Gemini e mais, com canvas de documentos, pesquisa aprofundada e ferramentas de fluxo de trabalho."
@@ -1498,7 +1502,11 @@ msgid "A placeholder or @mention outside quotes is read as null here, so this er
 msgstr "Um marcador ou @menção fora das aspas é lido aqui como null, então este erro pode vir dele até que uma execução o preencha"
 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:225
-msgid "A public http or https address. The first check only records how the page looks."
+#~ msgid "A public http or https address. The first check only records how the page looks."
+#~ msgstr ""
+
+#: src/features/settings/components/chat/event-trigger-fields.tsx:225
+msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr ""
 
 #: src/features/notifications/lib/notification-labels.ts:27

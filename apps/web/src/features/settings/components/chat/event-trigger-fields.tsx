@@ -222,7 +222,7 @@ const EventTriggerFields: FC<EventTriggerFieldsProps> = ({ event, onChange }) =>
                             type="url"
                             value={event.url}
                         />
-                        <p className="text-muted-foreground text-xs">{t`A public http or https address. The first check only records how the page looks.`}</p>
+                        <p className="text-muted-foreground text-xs">{t`A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read.`}</p>
                     </div>
                     <div className="space-y-1.5">
                         <Label htmlFor={ids.selector}>{t`Watch only this part (optional)`}</Label>
@@ -310,6 +310,9 @@ const EventTriggerFields: FC<EventTriggerFieldsProps> = ({ event, onChange }) =>
                         />
                     </div>
                     <p className="text-muted-foreground col-span-2 text-xs">{t`At least ${EVENT_MIN_INTERVAL_MINUTES} minutes between checks.`}</p>
+                    {event.kind === "thread" && (
+                        <p className="text-muted-foreground col-span-2 text-xs">{t`A model's answer to your own message counts as a reply. In a thread you are chatting in, the wait after it fires is what keeps this to one run per wait.`}</p>
+                    )}
                 </div>
             )}
         </div>

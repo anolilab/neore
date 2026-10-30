@@ -9,7 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { HttpError } from "../lib/fetch-timeout";
 import schema from "../schema";
-import { createExecution, recordFilteredExecution, updateExecution } from "./functions";
+import { createExecution, recordFilteredExecution, switchOffConsumedMoment, updateExecution } from "./functions";
 import { EVENT_CHECK_LEASE_MS, EVENT_FIRE_CLAIM_TTL_MS, dispatchDueEventTriggers, latestThreadReply, performEventCheck, recordEventCheck } from "./events";
 import type { EventCheckContext } from "./event-sources/types";
 import { MAX_ACTIVE_EVENT_WATCHERS } from "./event-sources/types";
@@ -271,6 +271,24 @@ describe("a time watcher", () => {
         const row = await readTrigger(id);
 
         expect(row.enabled).toBe(false);
+    });
+
+    it("switches itself off when its run could not even start, and only once it has fired", async () => {
+        const id = await insertWatcher({ eventSource: { at: AT, kind: "time" }, nextTriggerAt: AT });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(switchOffConsumedMoment, { triggerId: id }));
+
+        const early = await readTrigger(id);
+
+        expect(early.enabled).toBe(true);
+
+        vi.setSystemTime(AT);
+        await check(id, "", AT);
+        await harness.run(async (ctx: any) => await ctx.runMutation(switchOffConsumedMoment, { triggerId: id }));
+
+        const fired = await readTrigger(id);
+
+        expect(fired.enabled).toBe(false);
     });
 
     it("is not switched off by a filtered row before it has fired", async () => {

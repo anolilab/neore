@@ -1460,6 +1460,10 @@ msgstr "A key is saved. Leave blank to keep it. Changing the endpoint, region or
 msgid "A model with a system prompt"
 msgstr "A model with a system prompt"
 
+#: src/features/settings/components/chat/event-trigger-fields.tsx:314
+msgid "A model's answer to your own message counts as a reply. In a thread you are chatting in, the wait after it fires is what keeps this to one run per wait."
+msgstr "A model's answer to your own message counts as a reply. In a thread you are chatting in, the wait after it fires is what keeps this to one run per wait."
+
 #: src/routes/(public)/index.tsx:42
 msgid "A modern AI chat application supporting Claude, GPT, Gemini and more with document canvas, deep research, and workflow tools."
 msgstr "A modern AI chat application supporting Claude, GPT, Gemini and more with document canvas, deep research, and workflow tools."
@@ -1497,8 +1501,12 @@ msgid "A placeholder or @mention outside quotes is read as null here, so this er
 msgstr "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:225
-msgid "A public http or https address. The first check only records how the page looks."
-msgstr "A public http or https address. The first check only records how the page looks."
+#~ msgid "A public http or https address. The first check only records how the page looks."
+#~ msgstr "A public http or https address. The first check only records how the page looks."
+
+#: src/features/settings/components/chat/event-trigger-fields.tsx:225
+msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
+msgstr "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 
 #: src/features/notifications/lib/notification-labels.ts:27
 msgid "A question is waiting for you"

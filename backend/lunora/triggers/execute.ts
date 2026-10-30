@@ -98,6 +98,16 @@ export const executeTrigger = internalAction
             try {
                 return await work();
             } catch (error) {
+                // A moment in time fires once and this delivery is never re-run: leaving it on would hold its slot for good.
+                // A manual test run says nothing about the firing, which may still be on its way.
+                if (manual !== true && ignoreDisabled !== true) {
+                    await ctx
+                        .runMutation(internal.triggers.functions.switchOffConsumedMoment, { triggerId })
+                        .catch((switchOffError: unknown) =>
+                            console.error(`[Triggers] Could not switch off trigger ${triggerId} after its run failed to start:`, switchOffError),
+                        );
+                }
+
                 try {
                     await releaseWindow();
                 } finally {

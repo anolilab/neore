@@ -6498,6 +6498,11 @@
     {
       "from": "function:triggers_execute:default",
       "kind": "call",
+      "to": "function:triggers_functions:switchOffConsumedMoment"
+    },
+    {
+      "from": "function:triggers_execute:default",
+      "kind": "call",
       "to": "function:triggers_functions:updateExecution"
     },
     {
@@ -6612,6 +6617,11 @@
     },
     {
       "from": "function:triggers_functions:setTriggerEnabledInternal",
+      "kind": "write",
+      "to": "table:triggers"
+    },
+    {
+      "from": "function:triggers_functions:switchOffConsumedMoment",
       "kind": "write",
       "to": "table:triggers"
     },
@@ -14756,6 +14766,13 @@
       "module": "triggers"
     },
     {
+      "detail": "mutation",
+      "id": "function:triggers_functions:switchOffConsumedMoment",
+      "kind": "function",
+      "name": "triggers.functions.switchOffConsumedMoment",
+      "module": "triggers"
+    },
+    {
       "detail": "action",
       "id": "function:triggers_functions:testRunTrigger",
       "kind": "function",
@@ -20817,13 +20834,13 @@
     {
       "file": "triggers/events",
       "kind": "call",
-      "line": 286,
+      "line": 296,
       "reason": "\"performEventCheck\" is not a registered function"
     },
     {
       "file": "triggers/events",
       "kind": "call",
-      "line": 294,
+      "line": 304,
       "reason": "\"performEventCheck\" is not a registered function"
     },
     {

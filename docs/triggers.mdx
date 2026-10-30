@@ -96,10 +96,11 @@ An event trigger watches something and runs your agent only when it happens. The
 A few details:
 
 - **The first check only records a baseline.** A page that already looks a certain way does not fire the moment you switch the trigger on; a phrase that was already on the page does not count as arriving.
-- **A page is checked at most every 5 minutes** (15 by default) and must be a public `http` or `https` address. Addresses that point at private or internal networks are refused. Only the page's visible text is compared, so changing scripts, ids or markup do not fire it.
+- **A page is checked at most every 5 minutes** (15 by default) and must be a public `http` or `https` address. Addresses that point at private or internal networks are refused. Only the page's visible text is compared, so changing scripts, ids or markup do not fire it. Only the first 1 MiB of a page is read: a longer page is compared as cut, so a change past that point is not seen.
 - **After it fires, a page or thread watcher waits** for the cooldown you set (an hour by default) before it can fire again.
+- **A model's answer to your own message counts as a reply.** Only your own messages are ignored, so a thread you are chatting in fires on each answer; the cooldown is what keeps that to one run per wait.
 - **You can have 10 event triggers switched on at a time.**
-- **A watcher that cannot check three times in a row switches itself off and tells you.** A page that is gone, a selector that matches nothing and a thread you can no longer read all count. Fix the cause and switch it back on; it starts again from a fresh baseline.
+- **A watcher that cannot check three times in a row because of something you can fix switches itself off and tells you.** An address the server will not fetch, a page that is not text, a page that answers `404` or another client error, a selector that matches nothing and a thread you can no longer read all count. Fix the cause and switch it back on; it starts again from a fresh baseline. A timeout, a network error, a `5xx` answer or a rate limit (`408`, `425`, `429`) does not count: the watcher stays on and waits longer after each one, up to six hours, until the page answers again.
 - **The run says what fired.** Its first message names the event ("The page changed: https://example.com/pricing") and quotes a short excerpt as data. Your input template says what to do about it.
 
 ## Creating a Trigger

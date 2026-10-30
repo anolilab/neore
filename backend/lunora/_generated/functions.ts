@@ -1354,6 +1354,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "triggers_functions:reserveQuietWindow": lunora_triggers_functions_176.reserveQuietWindow as unknown as RegisteredLunoraFunction,
     "triggers_functions:setTriggerEnabled": lunora_triggers_functions_176.setTriggerEnabled as unknown as RegisteredLunoraFunction,
     "triggers_functions:setTriggerEnabledInternal": lunora_triggers_functions_176.setTriggerEnabledInternal as unknown as RegisteredLunoraFunction,
+    "triggers_functions:switchOffConsumedMoment": lunora_triggers_functions_176.switchOffConsumedMoment as unknown as RegisteredLunoraFunction,
     "triggers_functions:testRunTrigger": lunora_triggers_functions_176.testRunTrigger as unknown as RegisteredLunoraFunction,
     "triggers_functions:updateExecution": lunora_triggers_functions_176.updateExecution as unknown as RegisteredLunoraFunction,
     "triggers_functions:updateTrigger": lunora_triggers_functions_176.updateTrigger as unknown as RegisteredLunoraFunction,
@@ -7555,6 +7556,12 @@ if (typeof source["enabled"] !== "boolean") return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "enabled": source["enabled"], "triggerId": source["triggerId"] };
 });
+installCompiledValidatorMap(lunora_triggers_functions_176.switchOffConsumedMoment.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["triggerId"] !== "string") return DEFER;
+return { "triggerId": source["triggerId"] };
+});
 installCompiledValidatorMap(lunora_triggers_functions_176.updateExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -9391,6 +9398,7 @@ export interface Caller {
             reserveQuietWindow: (args: { expected?: number; triggerId: Id<"triggers">; windowStart: number }) => Promise<boolean>;
             setTriggerEnabled: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
             setTriggerEnabledInternal: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<null>;
+            switchOffConsumedMoment: (args: { triggerId: Id<"triggers"> }) => Promise<null>;
             testRunTrigger: (args: { testPayload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
             updateExecution: (args: { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string; userFixable?: boolean }) => Promise<null>;
             updateTrigger: (args: { botComputer?: boolean; botId?: string | null; cronExpression?: string; description?: string | null; eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string }; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model?: string; name?: string; quietWhenEmpty?: boolean; requireDisabled?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; triggerId: Id<"triggers"> }) => Promise<void>;
@@ -11074,6 +11082,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             reserveQuietWindow: (args) => callRegistered(context, "triggers_functions:reserveQuietWindow", args),
             setTriggerEnabled: (args) => callRegistered(context, "triggers_functions:setTriggerEnabled", args),
             setTriggerEnabledInternal: (args) => callRegistered(context, "triggers_functions:setTriggerEnabledInternal", args),
+            switchOffConsumedMoment: (args) => callRegistered(context, "triggers_functions:switchOffConsumedMoment", args),
             testRunTrigger: (args) => callRegistered(context, "triggers_functions:testRunTrigger", args),
             updateExecution: (args) => callRegistered(context, "triggers_functions:updateExecution", args),
             updateTrigger: (args) => callRegistered(context, "triggers_functions:updateTrigger", args),

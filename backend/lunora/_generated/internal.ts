@@ -1003,6 +1003,7 @@ export interface InternalApiTypes {
             releaseQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers"> }, null>;
             reserveQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers">; windowStart: number }, boolean>;
             setTriggerEnabledInternal: FunctionReference<"mutation", { enabled: boolean; triggerId: Id<"triggers"> }, null>;
+            switchOffConsumedMoment: FunctionReference<"mutation", { triggerId: Id<"triggers"> }, null>;
             updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string; userFixable?: boolean }, null>;
             updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
         };
@@ -2052,6 +2053,7 @@ export const internal: InternalApiTypes = {
             releaseQuietWindow: { __lunoraRef: "triggers_functions:releaseQuietWindow" },
             reserveQuietWindow: { __lunoraRef: "triggers_functions:reserveQuietWindow" },
             setTriggerEnabledInternal: { __lunoraRef: "triggers_functions:setTriggerEnabledInternal" },
+            switchOffConsumedMoment: { __lunoraRef: "triggers_functions:switchOffConsumedMoment" },
             updateExecution: { __lunoraRef: "triggers_functions:updateExecution" },
             updateTriggerStats: { __lunoraRef: "triggers_functions:updateTriggerStats" },
         },

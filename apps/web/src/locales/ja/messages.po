@@ -1461,6 +1461,10 @@ msgstr "キーは保存済みです。そのままにするには空欄のまま
 msgid "A model with a system prompt"
 msgstr "システムプロンプト付きのモデル"
 
+#: src/features/settings/components/chat/event-trigger-fields.tsx:314
+msgid "A model's answer to your own message counts as a reply. In a thread you are chatting in, the wait after it fires is what keeps this to one run per wait."
+msgstr ""
+
 #: src/routes/(public)/index.tsx:42
 msgid "A modern AI chat application supporting Claude, GPT, Gemini and more with document canvas, deep research, and workflow tools."
 msgstr "Claude、GPT、Gemini などに対応し、ドキュメントキャンバス、ディープリサーチ、ワークフローツールを備えたモダンな AI チャットアプリケーションです。"
@@ -1498,7 +1502,11 @@ msgid "A placeholder or @mention outside quotes is read as null here, so this er
 msgstr "引用符の外のプレースホルダーまたは @メンションはここでは null として扱われるため、実行時に値が入るまでこのエラーが出ることがあります"
 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:225
-msgid "A public http or https address. The first check only records how the page looks."
+#~ msgid "A public http or https address. The first check only records how the page looks."
+#~ msgstr ""
+
+#: src/features/settings/components/chat/event-trigger-fields.tsx:225
+msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr ""
 
 #: src/features/notifications/lib/notification-labels.ts:27
