@@ -243,6 +243,7 @@ const runSpeaker = async (
                   autoMediaEnrichment: turn.agentPrefs.autoMediaEnrichment,
                   mcpServerNames: turn.mcpServerNames,
                   model,
+                  ...(turn.origin === "outside_agent" && { origin: turn.origin }),
                   searchMode,
                   skillTools: speaker.config ? { additionalTools: speaker.config.additionalTools, disabledTools: speaker.config.disabledTools } : undefined,
                   userId: turn.userId,

@@ -94,7 +94,7 @@ afterEach(() => {
 });
 
 /** A paused run, as `finishRun` leaves it: the request on the assistant's turn and its snapshot. */
-const pause = async (origin: "api-key" | undefined) =>
+const pause = async (origin: "outside_agent" | undefined) =>
     await harness.run(async (ctx: any) => {
         const threadId = await ctx.db.insert("threads", { status: "running", title: "Chat", userId: OWNER });
         const insert = async (order: number, message: Record<string, unknown>) =>
@@ -120,7 +120,7 @@ const pause = async (origin: "api-key" | undefined) =>
 
         await ctx.runMutation(recordPendingToolApprovals, {
             approvalIds: ["ap1"],
-            config: { ...baseConfig, ...(origin && { origin }) },
+            config: { ...baseConfig, ...(origin && { dispatchOrigin: origin }) },
             threadId: String(threadId),
             userId: OWNER,
         });
@@ -132,7 +132,7 @@ const pause = async (origin: "api-key" | undefined) =>
 const approve = async (ids: { streamId: string; threadId: string }) => {
     const claim = (await harness.run(
         async (ctx: any) => await claimToolApproval(ctx, { approvalId: "ap1", callerId: OWNER, decision: "approve", threadId: ids.threadId as never }),
-    )) as { config?: typeof baseConfig & { origin?: "api-key" }; kind: string };
+    )) as { config?: typeof baseConfig & { dispatchOrigin?: "outside_agent" }; kind: string };
 
     expect(claim.kind).toBe("claimed");
 
@@ -151,10 +151,10 @@ const approve = async (ids: { streamId: string; threadId: string }) => {
 
 describe("the continuation of a run started with an API key", () => {
     it("keeps the origin through the saved snapshot, and rebuilds no auto tool and no device tool", async () => {
-        await approve(await pause("api-key"));
+        await approve(await pause("outside_agent"));
 
         expect(buildAgentTools).toHaveBeenCalledOnce();
-        expect(vi.mocked(buildAgentTools).mock.calls[0]?.[1]).toMatchObject({ origin: "api-key" });
+        expect(vi.mocked(buildAgentTools).mock.calls[0]?.[1]).toMatchObject({ origin: "outside_agent" });
         expect(deviceTools).not.toHaveBeenCalled();
 
         const { tools } = rebuilt.results[0]!;

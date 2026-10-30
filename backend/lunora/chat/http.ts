@@ -361,11 +361,6 @@ export interface ChatStartBody {
     model: string;
     negativePrompt?: string;
     numImages?: number;
-    /**
-     * Who started the turn when it is not the app: the public API passes `api-key`, which caps the run's tools at `ask`
-     * and drops device tools. A browser can send it too, which only restricts its own run.
-     */
-    origin?: "api-key";
     /** Browser-extension page capture; untrusted, validated by `parsePageContext`. */
     pageContext?: unknown;
     parentId?: string;
@@ -826,7 +821,6 @@ const runChatStartOnShard = async (
             // The typed text, for skill-command detection. Not on regenerate: that
             // replies to an existing prompt, which the run reads from the message.
             ...(!body.regenerate && body.prompt && { userPrompt: body.prompt }),
-            ...(body.origin === "api-key" && { origin: body.origin }),
             streamId: streamId!,
             streamingConfig: {
                 ...streamingConfig,

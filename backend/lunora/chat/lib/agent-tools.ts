@@ -154,7 +154,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     const [mcpResult, deviceResult] = await Promise.all([
         getMCPTools(selectedServers),
         // A device problem must never take the run down with it.
-        deviceThreadId === undefined || headless || origin === "api-key"
+        deviceThreadId === undefined || headless || origin === "outside_agent"
             ? noDevices
             : buildDeviceTools(ctx, { threadId: deviceThreadId, userId }).catch((error: unknown) => {
                   toolsLogger.warn("[TOOLS] Device tools unavailable:", error);
@@ -196,7 +196,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     };
 
     const { removed, requiresApproval, tools } = applyToolPermissions(candidates, describe, overrides as ToolPermissionOverrides, {
-        ...(origin === "api-key" && { apiKeyOrigin: true }),
+        ...(origin === "outside_agent" && { apiKeyOrigin: true }),
         headless,
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
     });
