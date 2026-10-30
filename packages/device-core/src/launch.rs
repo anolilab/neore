@@ -310,12 +310,21 @@ fn command_line(pid: i64) -> Option<Vec<String>> {
         .output()
         .ok()?;
 
-    (output.status.success() && !output.stdout.is_empty()).then(|| {
-        String::from_utf8_lossy(&output.stdout)
-            .split_whitespace()
-            .map(str::to_owned)
-            .collect()
-    })
+    (output.status.success() && !output.stdout.is_empty())
+        .then(|| split_ps_args(String::from_utf8_lossy(&output.stdout).trim()))
+}
+
+/// `ps` prints one joined line. The program is everything before the first ` --` (its path may hold spaces); the
+/// flags after it carry no spaces of their own.
+#[cfg(unix)]
+fn split_ps_args(line: &str) -> Vec<String> {
+    let Some((program, flags)) = line.split_once(" --") else {
+        return vec![line.to_owned()];
+    };
+
+    std::iter::once(program.to_owned())
+        .chain(format!("--{flags}").split_whitespace().map(str::to_owned))
+        .collect()
 }
 
 /// Whether `pid` is a `neore-host` started as launch `id`: its program is `neore-host` and `--launch <id>` is among
@@ -434,6 +443,18 @@ pub fn reap(_dir: &Path, _ids: &[String], _own: Option<&str>) -> Reaped {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn a_ps_line_keeps_a_program_path_with_spaces_whole() {
+        let args = split_ps_args("/Users/me/Application Support/neore-host --stdio --launch abc");
+
+        assert_eq!(args[0], "/Users/me/Application Support/neore-host");
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--launch" && pair[1] == "abc"));
+        assert_eq!(split_ps_args("sleep 5"), vec!["sleep 5".to_owned()]);
+    }
 
     fn dir(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("neore-launch-{name}-{}", std::process::id()));

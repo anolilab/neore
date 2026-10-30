@@ -33,6 +33,7 @@ const $ = (id: string): HTMLElement => {
 
 // Page-wide state, kept on one object so the functions below assign properties rather than module bindings.
 const state: {
+    countdownTimer?: ReturnType<typeof setInterval>;
     current: Prompt | null;
     expiryTimer?: ReturnType<typeof setInterval>;
     saves: Promise<void>;
@@ -89,9 +90,10 @@ const renderPrompt = (prompt: Prompt | null): void => {
     switch (body.kind) {
         case "hostConnect": {
             setText("prompt-heading", `Connect to ${body.user}@${body.address}?`);
-            const installs = body.installVersion === null
-                ? ""
-                : ` Unless the server already has this exact build, Neore also copies its host program (neore-host ${body.installVersion}) into ~/.neore/host there, replacing a different build of that version.`;
+            const installs
+                = body.installVersion === null
+                    ? ""
+                    : ` Unless the server already has this exact build, Neore also copies its host program (neore-host ${body.installVersion}) into ~/.neore/host there, replacing a different build of that version.`;
 
             setText(
                 "prompt-context",
@@ -169,10 +171,7 @@ const renderPrompt = (prompt: Prompt | null): void => {
         }
         default: {
             setText("prompt-heading", body.host === undefined ? `Allow “${body.tool}”?` : `Allow “${body.tool}” on ${body.host}?`);
-            setText(
-                "prompt-context",
-                body.threadTitle ? `Requested by the agent in “${body.threadTitle}”.` : "Requested by the agent.",
-            );
+            setText("prompt-context", body.threadTitle ? `Requested by the agent in “${body.threadTitle}”.` : "Requested by the agent.");
 
             const taints = body.taintedBy.map((source) => TAINT_LABELS[source] ?? source);
 
@@ -406,6 +405,36 @@ const announceLinkChanges = (hosts: HostView[]): void => {
     }
 };
 
+/** The lines of cards that are counting down to a reconnect; the timer runs only while one is on the page. */
+const countdowns = new Map<HTMLElement, HostView>();
+
+const stopCountdown = (): void => {
+    clearInterval(state.countdownTimer);
+    state.countdownTimer = undefined;
+    countdowns.clear();
+};
+
+const whereOf = (host: HostView): string => `${host.user}@${host.address}:${String(host.port)} — ${describeLink(host, Date.now())}`;
+
+const watchCountdown = (where: HTMLElement, host: HostView): void => {
+    countdowns.set(where, host);
+    state.countdownTimer ??= setInterval(() => {
+        for (const [line, view] of countdowns) {
+            if (line.isConnected) {
+                line.textContent = whereOf(view);
+            } else {
+                countdowns.delete(line);
+            }
+        }
+
+        if (countdowns.size === 0) {
+            stopCountdown();
+        }
+    }, 1000);
+};
+
+window.addEventListener("pagehide", stopCountdown);
+
 const hostCard = (host: HostView): HTMLElement => {
     const card = document.createElement("section");
     const heading = document.createElement("h3");
@@ -424,7 +453,7 @@ const hostCard = (host: HostView): HTMLElement => {
     card.setAttribute("aria-label", host.name);
     heading.textContent = host.name;
     where.className = "muted";
-    where.textContent = `${host.user}@${host.address}:${String(host.port)} — ${describeLink(host, Date.now())}`;
+    where.textContent = whereOf(host);
 
     // A server that is being reconnected can be stopped, or tried at once; one that gave up has a Retry.
     const phase = host.reconnect?.phase;
@@ -433,6 +462,11 @@ const hostCard = (host: HostView): HTMLElement => {
     const stop = (text: string): HTMLElement =>
         button(text, () => hostAction(() => globalThis.neoreDevice.hostDisconnect(host.deviceId), "Disconnected."), host.name);
     const reconnecting = phase === "waiting" || phase === "connecting";
+
+    if (phase === "waiting" && !host.connected) {
+        watchCountdown(where, host);
+    }
+
     let link: HTMLElement[] = [connect("Connect")];
 
     if (host.connected) {
@@ -458,7 +492,9 @@ const hostCard = (host: HostView): HTMLElement => {
     actions.className = "row";
     actions.append(
         ...link,
-        ...state.terminalAvailable && state.terminalServerReason === null ? [button("Terminal", () => hostAction(() => globalThis.neoreDevice.openHostTerminal(host.deviceId), "Terminal opened."), host.name)] : [],
+        ...state.terminalAvailable && state.terminalServerReason === null
+            ? [button("Terminal", () => hostAction(() => globalThis.neoreDevice.openHostTerminal(host.deviceId), "Terminal opened."), host.name)]
+            : [],
         // Installing is refused while a session is open, so the button is for a disconnected server.
         ...reconnecting || host.connected
             ? []
@@ -466,10 +502,13 @@ const hostCard = (host: HostView): HTMLElement => {
                 button(
                     "Install host software",
                     async () => {
-                        if (await globalThis.neoreDevice.confirm(`Copy neore-host into ~/.neore/host on ${host.address} and remove its other versions there?`)) {
+                        if (
+                            await globalThis.neoreDevice.confirm(`Copy neore-host into ~/.neore/host on ${host.address} and remove its other versions there?`)
+                        ) {
                             await hostAction(
                                 () => globalThis.neoreDevice.hostUpgrade(host.deviceId),
-                                (done) => done.alreadyCurrent ? `neore-host ${done.version} is already installed.` : `neore-host ${done.version} installed.`,
+                                (done) =>
+                                    done.alreadyCurrent ? `neore-host ${done.version} is already installed.` : `neore-host ${done.version} installed.`,
                             );
                         }
                     },
@@ -479,7 +518,11 @@ const hostCard = (host: HostView): HTMLElement => {
         button(
             "Forget host key",
             async () => {
-                if (await globalThis.neoreDevice.confirm(`Forget the pinned key of ${host.address}? The next connection asks to trust whatever key it presents.`)) {
+                if (
+                    await globalThis.neoreDevice.confirm(
+                        `Forget the pinned key of ${host.address}? The next connection asks to trust whatever key it presents.`,
+                    )
+                ) {
                     await hostAction(() => globalThis.neoreDevice.hostForgetKey(host.deviceId), "Key forgotten.");
                 }
             },
@@ -499,9 +542,7 @@ const hostCard = (host: HostView): HTMLElement => {
     folders.replaceChildren(
         ...host.roots.length === 0
             ? [listItem("No shared folders: the agent cannot reach this server until you add one.")]
-            : host.roots.map((root) =>
-                listItem(root, "Remove", () => updateHost(host.deviceId, { roots: host.roots.filter((other) => other !== root) })),
-            ),
+            : host.roots.map((root) => listItem(root, "Remove", () => updateHost(host.deviceId, { roots: host.roots.filter((other) => other !== root) }))),
     );
 
     typed.type = "text";
@@ -524,7 +565,12 @@ const hostCard = (host: HostView): HTMLElement => {
     sandboxBox.type = "checkbox";
     sandboxBox.checked = host.requireShellSandbox;
     sandboxBox.addEventListener("change", async () => {
-        if (!sandboxBox.checked && !await globalThis.neoreDevice.confirm(`Allow shell commands on ${host.name} to run WITHOUT a sandbox where it has none? They would run with full access to that server.`)) {
+        if (
+            !sandboxBox.checked
+            && !await globalThis.neoreDevice.confirm(
+                `Allow shell commands on ${host.name} to run WITHOUT a sandbox where it has none? They would run with full access to that server.`,
+            )
+        ) {
             sandboxBox.checked = true;
 
             return;
@@ -1022,8 +1068,24 @@ globalThis.neoreDevice.onChanged(async () => {
         .map((input) => [input.id, input.value] as const);
     const active = document.activeElement instanceof HTMLInputElement && document.activeElement.id.startsWith("host-root-") ? document.activeElement : null;
     const focused = active === null ? null : { end: active.selectionEnd, id: active.id, start: active.selectionStart };
+    const pressed
+        = document.activeElement instanceof HTMLButtonElement && document.activeElement.closest("section[aria-label]") !== null ? document.activeElement : null;
+    const pressedKey
+        = pressed === null
+            ? null
+            : { card: pressed.closest("section[aria-label]")?.getAttribute("aria-label"), label: pressed.getAttribute("aria-label") ?? pressed.textContent };
 
     renderSettings();
+
+    if (pressedKey !== null) {
+        const again = [...document.querySelectorAll<HTMLButtonElement>("section[aria-label] button")].find(
+            (candidate) =>
+                candidate.closest("section[aria-label]")?.getAttribute("aria-label") === pressedKey.card
+                && (candidate.getAttribute("aria-label") ?? candidate.textContent) === pressedKey.label,
+        );
+
+        again?.focus();
+    }
 
     for (const [id, value] of values) {
         const input = document.querySelector(`[id="${CSS.escape(id)}"]`);

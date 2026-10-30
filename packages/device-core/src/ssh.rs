@@ -1624,7 +1624,7 @@ pub fn exec(
 /// What a failed remote command means to the reader. Only ssh itself exits 255, and only then is a "Permission
 /// denied" a refused login; from the command it is a file the account may not write.
 fn exec_failure(target: &Target, code: Option<i32>, said: &str) -> String {
-    if code == Some(255) && said.contains("Permission denied") {
+    if code == Some(255) && refused_login(said) {
         explain(target, said, &Mutex::new(said.to_owned()))
     } else if said.is_empty() {
         match code {
@@ -1639,6 +1639,17 @@ fn exec_failure(target: &Target, code: Option<i32>, said: &str) -> String {
     }
 }
 
+/// Whether ssh's own message says the server turned the login down, however it words it.
+fn refused_login(said: &str) -> bool {
+    [
+        "Permission denied",
+        "Too many authentication failures",
+        "No supported authentication methods",
+    ]
+    .iter()
+    .any(|phrase| said.contains(phrase))
+}
+
 /// What the user needs to read when a connection failed, from what ssh said.
 fn explain(target: &Target, reason: &str, stderr: &Mutex<String>) -> String {
     // The reader sees the stream end a moment before the stderr thread has everything.
@@ -1651,7 +1662,7 @@ fn explain(target: &Target, reason: &str, stderr: &Mutex<String>) -> String {
         said
     };
 
-    if said.contains("Permission denied") {
+    if refused_login(&said) {
         return format!(
             "{} refused the login ({said}). Passwords and one-time codes are not supported yet: use a key or an SSH agent.",
             target.label()
@@ -1723,6 +1734,19 @@ mod tests {
         );
 
         assert!(login.contains("refused the login"), "{login}");
+    }
+
+    #[test]
+    fn every_wording_of_a_refused_login_is_called_one() {
+        for said in [
+            "Too many authentication failures",
+            "No supported authentication methods available (server sent: publickey)",
+        ] {
+            let message = explain(&target(), said, &Mutex::new(said.to_owned()));
+
+            assert!(message.contains("refused the login"), "{message}");
+            assert!(!SshError::from_connect_failure(message).retryable());
+        }
     }
 
     #[test]
