@@ -34,6 +34,9 @@ import { mcpToolMetaKey, resolveMcpToolName } from "../utils/mcp-tool-name";
 import { getPageContextInfo } from "../utils/page-context";
 import { SANDBOX_FILE_TOOL_TYPES, sandboxOutputsOf } from "../utils/sandbox-files";
 import PageContextChip from "./page-context-chip";
+import ToolGroup from "./tool-group";
+import type { ToolGroupSegment } from "./turn-summary";
+import { segmentTurn } from "./turn-summary";
 
 // Lazy-loaded file renderers (code-split per file type). The type predicates live in
 // `file-type-utilities`, a small module with no heavy dependencies, so importing it statically is free.
@@ -616,6 +619,9 @@ CodeExecutionResultView.displayName = "CodeExecutionResultView";
 /** Tool types whose output renders as a document artifact card. */
 const DOCUMENT_ARTIFACT_TOOLS = new Set(["tool-createDocument", "tool-deepResearch", "tool-updateDocument"]);
 
+/** Tools that render their own card or ask the person something; never folded into a summary. */
+const UNFOLDABLE_TOOLS = new Set(["tool-askUser", "tool-browser", "tool-codeExecution", "tool-createPresentation", "tool-updateSlide"]);
+
 const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
     const { t } = useLingui();
     const isLoading = part.state === "input-streaming" || part.state === "input-available";
@@ -754,6 +760,43 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
     const ResolvedToolCall = useMemo(() => ToolCall ?? makeDefaultToolCall(McpApp, toolMeta), [McpApp, ToolCall, toolMeta]);
 
     const isAnimating = isStreaming || message.status === "streaming";
+    const isFinished = !isAnimating && message.status !== "pending";
+
+    // Finished runs of plain tool calls fold into one summary line. Calls with their own view
+    // (artifacts, widgets, device, questions) keep it, so they stay out of the fold.
+    const toolGroups = useMemo(() => {
+        const groups = new Map<number, ToolGroupSegment>();
+
+        if (!isFinished) {
+            return groups;
+        }
+
+        const canFold = (part: ToolPart): boolean => {
+            const name = part.type.replace("tool-", "");
+            const mcpInfo = resolveMcpToolName(part);
+            // Same lookup as DefaultToolCall: an MCP App call keeps its live view under the header.
+            const hasMcpApp =
+                !!McpApp && !!toolMeta && !!mcpInfo && !!(toolMeta.get(mcpToolMetaKey(mcpInfo.serverName, mcpInfo.toolName)) ?? toolMeta.get(name));
+
+            return (
+                !hasMcpApp &&
+                !SANDBOX_FILE_TOOL_TYPES.has(part.type) &&
+                !UNFOLDABLE_TOOLS.has(part.type) &&
+                !DOCUMENT_ARTIFACT_TOOLS.has(part.type) &&
+                !Object.hasOwn(toolViews ?? {}, name) &&
+                !Object.hasOwn(toolWidgets ?? {}, name) &&
+                !(DeviceToolCall && resolveDeviceToolName(part))
+            );
+        };
+
+        for (const segment of segmentTurn(message.parts, canFold)) {
+            if (segment.kind === "group") {
+                groups.set(segment.start, segment);
+            }
+        }
+
+        return groups;
+    }, [DeviceToolCall, isFinished, McpApp, message.parts, toolMeta, toolViews, toolWidgets]);
 
     // Extract generation prompt from metadata (set by generateImage/generateVideo/generateSpeech)
     const generationPrompt = (message.metadata as { prompt?: string } | undefined)?.prompt;
@@ -764,9 +807,16 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
     // Render parts
     const renderedParts: ReactNode[] = [];
 
+    let openGroup: { end: number; group: ToolGroupSegment; mark: number } | undefined;
+
     for (let i = 0; i < message.parts.length; i += 1) {
         const part = message.parts[i] as MessagePart;
         const key = `${message.id}-part-${i}`;
+        const groupHere = toolGroups.get(i);
+
+        if (groupHere) {
+            openGroup = { end: groupHere.end, group: groupHere, mark: renderedParts.length };
+        }
 
         switch (part.type as string) {
             case "file": {
@@ -1023,6 +1073,15 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                 }
                 // Unknown parts are silently skipped
             }
+        }
+
+        if (openGroup && i === openGroup.end) {
+            renderedParts.push(
+                <ToolGroup group={openGroup.group} key={`${key}-group`}>
+                    {renderedParts.splice(openGroup.mark)}
+                </ToolGroup>,
+            );
+            openGroup = undefined;
         }
     }
 
