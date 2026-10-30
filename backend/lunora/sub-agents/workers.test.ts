@@ -410,9 +410,18 @@ describe("a loop unwinding after a Stop", () => {
         // Runs cancelled before they started carry no `startedAt`; enough of them bury the unwinding loop from a fixed-size read.
         await harness.run(async (ctx: any) => {
             for (let index = 1; index <= 25; index += 1) {
-                const { _creationTime, _id, loopExitedAt, startedAt, ...fields } = live;
+                const { _creationTime, _id, ...fields } = live;
 
-                await ctx.db.insert("subAgentRuns", { ...fields, clientId: `buried-${String(index)}`, createdAt: live.createdAt + index, status: "cancelled", toolCallId: `buried-${String(index)}` });
+                await ctx.db.insert("subAgentRuns", {
+                    ...fields,
+                    clientId: `buried-${String(index)}`,
+                    createdAt: live.createdAt + index,
+                    // `insert` drops undefined keys: these runs never started.
+                    loopExitedAt: undefined,
+                    startedAt: undefined,
+                    status: "cancelled",
+                    toolCallId: `buried-${String(index)}`,
+                });
             }
         });
 
