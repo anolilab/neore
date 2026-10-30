@@ -15,7 +15,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -125,6 +125,36 @@ fn keygen_fingerprint(public_key: &Path) -> String {
         .to_owned()
 }
 
+/// Whether this sshd knows `PerSourcePenalties` (OpenSSH 9.8+). Left on, it refuses connections from 127.0.0.1 for
+/// a while after sessions end abruptly, which these tests do on purpose; an older sshd would refuse to start with
+/// the keyword in its config, so it is probed once per process with the first server's host key.
+fn disables_source_penalties(sshd: &Path, dir: &Path) -> bool {
+    static SUPPORTED: OnceLock<bool> = OnceLock::new();
+
+    *SUPPORTED.get_or_init(|| {
+        let probe = dir.join("sshd_probe_config");
+
+        fs::write(
+            &probe,
+            format!(
+                "HostKey {}/host_key\nPerSourcePenalties no\n",
+                dir.display()
+            ),
+        )
+        .unwrap();
+
+        let output = Command::new(sshd)
+            .arg("-t")
+            .arg("-f")
+            .arg(&probe)
+            .output()
+            .unwrap();
+        let complaint = String::from_utf8_lossy(&output.stderr);
+
+        output.status.success() || !complaint.contains("PerSourcePenalties")
+    })
+}
+
 /// A running throwaway sshd and the files around it. A short path under `/tmp` keeps the control socket inside
 /// the Unix socket limit; the product itself never uses `/tmp`.
 struct Server {
@@ -175,8 +205,13 @@ impl Server {
         fs::write(
             dir.join("sshd_config"),
             format!(
-                "Port {port}\nListenAddress 127.0.0.1\nHostKey {dir}/host_key\nAuthorizedKeysFile {dir}/authorized_keys\nPidFile {dir}/sshd.pid\nUsePAM no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nPubkeyAuthentication yes\nStrictModes no\nAllowUsers {user}\nLogLevel INFO\n",
-                dir = dir.display()
+                "Port {port}\nListenAddress 127.0.0.1\nHostKey {dir}/host_key\nAuthorizedKeysFile {dir}/authorized_keys\nPidFile {dir}/sshd.pid\nUsePAM no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nPubkeyAuthentication yes\nStrictModes no\nAllowUsers {user}\nLogLevel INFO\nMaxStartups 100\n{penalties}",
+                dir = dir.display(),
+                penalties = if disables_source_penalties(sshd, &dir) {
+                    "PerSourcePenalties no\n"
+                } else {
+                    ""
+                }
             ),
         )
         .unwrap();
@@ -236,6 +271,16 @@ impl Drop for Server {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+
+        // The log goes with the directory: a failing test prints it first, so a refused connection explains itself.
+        if thread::panicking() {
+            eprintln!(
+                "--- sshd log ({}) ---\n{}",
+                self.dir.display(),
+                fs::read_to_string(self.dir.join("sshd.log")).unwrap_or_default()
+            );
+        }
+
         let _ = fs::remove_dir_all(&self.dir);
     }
 }
