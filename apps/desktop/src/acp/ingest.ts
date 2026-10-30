@@ -212,7 +212,7 @@ export class HostPoster implements SessionObserver {
         this.texts.delete(turnId);
 
         // A turn that failed leaves no reply to show files in; one without an image reference has nothing to read.
-        if (endReasonOf(reason) === "failed" || this.stopped || info === undefined || this.options.media === undefined || imageReferences(text).length === 0) {
+        if (info === undefined || this.stopped || this.options.media === undefined || endReasonOf(reason) === "failed" || imageReferences(text).length === 0) {
             channel.end(endReasonOf(reason), error);
 
             return;
@@ -221,34 +221,6 @@ export class HostPoster implements SessionObserver {
         // Never rejects: every failure inside is caught, and the turn ends whatever happens.
         // eslint-disable-next-line unicorn/prefer-await -- turnEnded is synchronous, and the call has no rejection to await
         this.attachMediaThenEnd(channel, info, text, endReasonOf(reason), error).catch(() => {});
-    }
-
-    /**
-     * Reads and uploads the files the reply refers to, queues their events and only then the end of the turn: the
-     * channel takes nothing after it. The turn stays open meanwhile (its keepalive keeps the backend's reaper off).
-     * Whatever goes wrong, the turn still ends.
-     */
-    private async attachMediaThenEnd(channel: TurnChannel, info: HostSessionInfo, text: string, reason: "cancelled" | "failed" | "finished", error?: string): Promise<void> {
-        const { media } = this.options;
-
-        try {
-            if (media !== undefined) {
-                const events = await collectMedia(
-                    { ...media, deviceId: this.options.deviceId, ...this.options.fetch && { fetch: this.options.fetch }, ...this.options.log && { log: this.options.log }, now: () => this.now() },
-                    info.agentKey,
-                    info.folderId,
-                    text,
-                );
-
-                for (const event of events) {
-                    channel.enqueue(event);
-                }
-            }
-        } catch (error_) {
-            this.options.log?.(`[acp-host] a reply's files could not be attached: ${(error_ as Error).name}`);
-        } finally {
-            channel.end(reason, error);
-        }
     }
 
     // ─── Start and stop ─────────────────────────────────────────────────────
@@ -301,6 +273,34 @@ export class HostPoster implements SessionObserver {
         }
 
         return false;
+    }
+
+    /**
+     * Reads and uploads the files the reply refers to, queues their events and only then the end of the turn: the
+     * channel takes nothing after it. The turn stays open meanwhile (its keepalive keeps the backend's reaper off).
+     * Whatever goes wrong, the turn still ends.
+     */
+    private async attachMediaThenEnd(channel: TurnChannel, info: HostSessionInfo, text: string, reason: "cancelled" | "failed" | "finished", error?: string): Promise<void> {
+        const { media } = this.options;
+
+        try {
+            if (media !== undefined) {
+                const events = await collectMedia(
+                    { ...media, deviceId: this.options.deviceId, ...this.options.fetch && { fetch: this.options.fetch }, ...this.options.log && { log: this.options.log }, now: () => this.now() },
+                    info.agentKey,
+                    info.folderId,
+                    text,
+                );
+
+                for (const event of events) {
+                    channel.enqueue(event);
+                }
+            }
+        } catch (error_) {
+            this.options.log?.(`[acp-host] a reply's files could not be attached: ${(error_ as Error).name}`);
+        } finally {
+            channel.end(reason, error);
+        }
     }
 
     // ─── Posting ────────────────────────────────────────────────────────────

@@ -129,7 +129,7 @@ export const uploadFile = async (options: MediaOptions, file: MediaRead & { byte
     await created.body?.cancel();
 
     const location = created.headers.get("location");
-    const uploadId = created.status === 201 && location !== null ? new URL(location, options.endpoint).pathname.split("/").pop() : undefined;
+    const uploadId = location !== null && created.status === 201 ? new URL(location, options.endpoint).pathname.split("/").pop() : undefined;
 
     if (uploadId === undefined || uploadId === "") {
         return null;

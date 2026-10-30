@@ -9,8 +9,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { HostEvent } from "./ingest";
-import type { PosterOptions } from "./ingest";
+import type { HostEvent, PosterOptions } from "./ingest";
 import { HostPoster, KEEPALIVE_MS, POST_INTERVAL_MS } from "./ingest";
 
 interface Post {
@@ -114,7 +113,7 @@ const poster = (media?: PosterOptions["media"], fetcher: typeof fetch = backend.
         log: (message) => {
             logs.push(message);
         },
-        ...(media && { media }),
+        ...media && { media },
         now: () => clock,
         random: () => 0.5,
         sign: (payload) => `sig:${String(payload.length)}`,
@@ -179,7 +178,7 @@ afterEach(async () => {
 
 describe("a turn's files", () => {
     const UPLOAD_ID = "abcdefghijklmnopqrstu";
-    const PNG = { bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1]), kind: "image", mime: "image/png", name: "chart.png", size: 5, status: "read" };
+    const PNG = { bytes: new Uint8Array([0x89, 0x50, 0x4E, 0x47, 1]), kind: "image", mime: "image/png", name: "chart.png", size: 5, status: "read" };
 
     /** The backend for a poster that also uploads: ingest posts go to the stand-in, upload requests are accepted. */
     const withUploads = () => {
@@ -232,6 +231,7 @@ describe("a turn's files", () => {
         host.turnEnded("s1", "t1", "end_turn");
 
         for (let step = 0; step < 4; step += 1) {
+            // eslint-disable-next-line no-await-in-loop -- each tick must run before the next is armed
             await settle(POST_INTERVAL_MS);
         }
 
@@ -262,7 +262,9 @@ describe("a turn's files", () => {
 
     it("posts nothing for a reference the core refuses, and still ends the turn", async () => {
         const { fetcher, uploads } = withUploads();
-        const host = poster(media(async () => ({ kind: "", mime: "", name: "", size: 0, status: "refused" })), fetcher);
+        const host = poster(media(async () => {
+            return { kind: "", mime: "", name: "", size: 0, status: "refused" };
+        }), fetcher);
 
         await open(host);
         host.turnStarted("s1", "t1", "go");
@@ -292,7 +294,9 @@ describe("a turn's files", () => {
 
     it("ends the turn even when reading throws", async () => {
         const { fetcher } = withUploads();
-        const host = poster(media(async () => { throw new Error("boom"); }), fetcher);
+        const host = poster(media(async () => {
+            throw new Error("boom");
+        }), fetcher);
 
         await open(host);
         host.turnStarted("s1", "t1", "go");
