@@ -699,6 +699,9 @@ const files: { folder: string | null; next: string | null; request: number; root
 
 const filesHost = (): HostView | undefined => state.settings?.hosts.find((host) => host.deviceId === ($("files-host") as HTMLSelectElement).value);
 
+/** The server the tree shows and the folders it shares: what a redraw compares to tell the tree is stale. */
+const filesKey = (): string => JSON.stringify([($("files-host") as HTMLSelectElement).value, filesHost()?.roots ?? []]);
+
 const TRAILING_SLASH = /\/$/u;
 
 const joinPath = (folder: string, name: string): string => `${folder.replace(TRAILING_SLASH, "")}/${name}`;
@@ -720,18 +723,19 @@ const renderFilesHosts = (): void => {
     );
 
     const current = hosts.find((host) => host.deviceId === kept);
-    const roots = JSON.stringify(current?.roots ?? []);
 
     if (current !== undefined) {
         select.value = kept;
     }
 
+    const key = filesKey();
+
     // A folder opened under shared folders that have since changed may no longer be shared: back to the list.
-    if (current === undefined || roots !== files.roots) {
+    if (current === undefined || key !== files.roots) {
         showFolder(null);
     }
 
-    files.roots = roots;
+    files.roots = key;
 
     select.disabled = hosts.length === 0;
     setText("files-path", hosts.length === 0 ? "Connect a server to browse it." : files.folder ?? "Shared folders");
@@ -846,7 +850,10 @@ const showFolder = (folder: string | null): void => {
     loadFiles(true);
 };
 
-$("files-host").addEventListener("change", () => showFolder(null));
+$("files-host").addEventListener("change", () => {
+    files.roots = filesKey();
+    showFolder(null);
+});
 $("files-more").addEventListener("click", () => loadFiles(false));
 $("files-up").addEventListener("click", () => {
     const { folder } = files;
