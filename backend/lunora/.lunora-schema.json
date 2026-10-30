@@ -5543,11 +5543,25 @@
           "optional": true,
           "unique": false
         },
+        "transport": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "\"ssh\""
+        },
         "userId": {
           "kind": "string",
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "viaDeviceId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "devices"
         }
       },
       "indexes": {
@@ -20091,6 +20105,28 @@
     "threads": {
       "commitOrdered": false,
       "fields": {
+        "activeAgent": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "kind": {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"model\""
+            },
+            "model": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            }
+          }
+        },
         "activeLeafMessageId": {
           "kind": "string",
           "nullable": false,

@@ -4,6 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useMutation as useReactQueryMutation, useQuery } from "@tanstack/react-query";
+import { useRef } from "react";
 
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { trackEvent } from "@/lib/analytics";
@@ -11,6 +12,7 @@ import { useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { showError, showInfo } from "@/lib/toast";
 
 import { canSwitchAgent } from "./can-switch-agent";
+import { createLatestPickQueue } from "./latest-pick-queue";
 
 interface UseModelComboboxProps {
     threadId?: string;
@@ -37,6 +39,10 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     const { mutateAsync: updateThreadAction } = useReactQueryMutation(useLunoraActionOptions(api.chat.functions.updateThread));
 
     const { mutateAsync: switchAgent } = useReactQueryMutation(crpc.chat.agent_switch.switchThreadAgent.mutationOptions());
+
+    // Picks go to the server one at a time, in the order made, and only the newest may touch the store: a slow
+    // answer to an earlier pick must not put its model back over the one the user ended on.
+    const pickQueueRef = useRef(createLatestPickQueue());
 
     // Get effective model (the agent of a switched thread, then the thread's model, then the pick)
     const effectiveModel = thread?.activeAgent?.model ?? thread?.model ?? selectedModel;
@@ -76,12 +82,21 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         // A text thread records the change as a switch in its transcript; the thread's own model stays
         // what it was created with, which is what a branch from before the switch runs on.
         if (threadId && thread && canSwitchAgent(thread, newModel)) {
+            const { isLatest: isLatestPick, result: request } = pickQueueRef.current.run(
+                async () =>
+                    await switchAgent({
+                        clientId: crypto.randomUUID(),
+                        target: { kind: "model", model: newModel },
+                        threadId: threadId as Id<"threads">,
+                    }),
+            );
+
             try {
-                const result = await switchAgent({
-                    clientId: crypto.randomUUID(),
-                    target: { kind: "model", model: newModel },
-                    threadId: threadId as Id<"threads">,
-                });
+                const result = await request;
+
+                if (!isLatestPick()) {
+                    return;
+                }
 
                 // The thread decides the agent from here on, so a branch switch can move it: no local pick to keep.
                 loadThreadData({ mode: thread.mode, model: result.agent.model }, threadId);
@@ -94,6 +109,10 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
             } catch (error) {
                 // A thread with nothing to switch from yet (no messages) has no transcript to put a divider in: the
                 // pick is an edit of the thread's model, below.
+                if (!isLatestPick()) {
+                    return;
+                }
+
                 if ((error as { data?: { code?: string } }).data?.code !== "AGENT_SWITCH_UNSUPPORTED") {
                     loadThreadData({ mode: thread.mode, model: thread.activeAgent?.model ?? thread.model }, threadId);
                     showError(error instanceof Error ? error : t`Could not switch the model. Please try again.`);

@@ -159,7 +159,9 @@ describe("/chat/start after a switch", () => {
         expect(agentModelQueries).toBe(0);
     });
 
-    it("runs a regenerate of a message before the switch on the model recorded on its path", async () => {
+    it("runs a regenerate of an earlier turn on the model recorded on its path", async () => {
+        await insertRow("u2", 1, 0, "user", "more");
+        await insertRow("a2", 1, 1, "assistant", "sure");
         await switchTo(B);
 
         const response = await start({ model: B, parentId: ids.u1, regenerate: true });
@@ -168,8 +170,20 @@ describe("/chat/start after a switch", () => {
         expect(streamingConfigs.at(-1)?.model).toBe(A);
     });
 
+    it("runs a regenerate of the latest turn on the model picked after its reply", async () => {
+        // The divider hangs under the reply being redone, off the path through its prompt.
+        await switchTo(B);
+
+        const response = await start({ model: A, parentId: ids.u1, regenerate: true });
+
+        expect(response.status).toBe(200);
+        expect(streamingConfigs.at(-1)?.model).toBe(B);
+    });
+
     it("does not let a pre-switch model outside the registry override a regenerate", async () => {
         await run(async (ctx) => await ctx.db.patch(threadId, { model: "custom/local-llama" }));
+        await insertRow("u2", 1, 0, "user", "more");
+        await insertRow("a2", 1, 1, "assistant", "sure");
         await switchTo(B);
 
         const response = await start({ model: A, parentId: ids.u1, regenerate: true });

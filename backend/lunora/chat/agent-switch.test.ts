@@ -468,6 +468,15 @@ describe("the agent of each branch", () => {
         expect(await runModel({ replacedMessageId: u3._id })).toBe(B);
     });
 
+    it("runs a regenerate of the latest turn on the agent picked after its reply, an earlier turn on its own path", async () => {
+        await run(async (ctx) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.a2 }));
+        await switchTo(B, "click-1");
+
+        // The divider hangs under a2, off the path through u2; u2 is still the newest turn.
+        expect(await runModel({ promptMessageId: ids.u2 })).toBe(B);
+        expect(await runModel({ promptMessageId: ids.u1 })).toBe(A);
+    });
+
     it("keeps the cache in step when a regenerate points the thread at an older prompt", async () => {
         await run(async (ctx) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.a2 }));
         await switchTo(B, "click-1");
