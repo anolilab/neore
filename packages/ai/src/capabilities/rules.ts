@@ -47,13 +47,19 @@ const isCapability = (value: unknown): value is Capability => {
     return supported === false && UNSUPPORTED_REASONS.has(reason);
 };
 
-/** The member, or `unknown` when the report does not carry it. */
-export const capabilityOf = (report: CapabilityReportInput | null | undefined, key: CapabilityKey): Capability => {
+/**
+ * The member `"group.member"` of any group map, or `unknown` when it is absent or
+ * malformed. Reports for other kinds of host (a Git host's) read through this too.
+ */
+export const capabilityIn = (groups: unknown, key: string): Capability => {
     const [group, member] = key.split(".") as [string, string];
-    const value = (report?.groups as LooseGroups | undefined)?.[group]?.[member];
+    const value = (groups as LooseGroups | null | undefined)?.[group]?.[member];
 
     return isCapability(value) ? value : UNKNOWN_CAPABILITY;
 };
+
+/** The member, or `unknown` when the report does not carry it. */
+export const capabilityOf = (report: CapabilityReportInput | null | undefined, key: CapabilityKey): Capability => capabilityIn(report?.groups, key);
 
 export const followUpControl = (report: CapabilityReportInput | null | undefined): FollowUpControl => {
     const followUp = report?.groups?.turns?.followUp;
