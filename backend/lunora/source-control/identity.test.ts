@@ -171,6 +171,7 @@ describe("parseRepoRemote", () => {
         ["Azure SSH with a short path", "git@ssh.dev.azure.com:v3/contoso/Web"],
         ["a newline", "https://github.com/octo/hello\nhttps://evil.example/x"],
         ["an oversized string", `https://github.com/${"a".repeat(3000)}/b`],
+        ["an SCP host that is not a URL authority", "git@bad%.example.com:owner/repo.git"],
     ])("rejects %s", (_name, remote) => {
         it("returns null", () => {
             expect(parseRepoRemote(remote)).toBeNull();
