@@ -333,9 +333,30 @@ jobs:
             # captcha plugin and the credential flows are exercised for real; a
             # runner that does set it would skip them with a reason rather than
             # time out twelve times over.
+            #
+            # The sampler prints memory, disk and the largest processes every 5s.
+            # Shard 3 has been dying mid-test with "The runner has received a
+            # shutdown signal" (exit 143) during the guest-conversion test, and a
+            # killed runner skips every later step, so nothing uploads; only this
+            # step's own output survives up to the kill.
             - name: "Run e2e tests"
               shell: "bash"
-              run: "pnpm --filter @neore/web run test:e2e --shard=${{ matrix.shard }}/3"
+              run: |
+                  (
+                      # The step runs under `-eo pipefail`; a SIGPIPE from `head` must not end the loop.
+                      set +eo pipefail
+                      while sleep 5; do
+                          free -m | awk -v disk="$(df -h --output=avail / | tail -1 | tr -d ' ')" \
+                              '/^Mem:/ { mem = sprintf("mem used %s of %s MiB, available %s MiB", $3, $2, $7) }
+                               /^Swap:/ { swap = sprintf("swap used %s MiB", $3) }
+                               END { printf "[resources] %s, %s, disk free %s\n", mem, swap, disk }'
+                          ps -eo rss=,args= --sort=-rss | head -4 | awk '{ rss = $1; $1 = ""; printf "[resources]   %5d MiB%s\n", rss / 1024, substr($0, 1, 90) }'
+                      done
+                  ) &
+                  sampler=$!
+                  # The sampler's own `sleep` child holds stdout too: end it with the loop, or the step waits on it.
+                  trap 'pkill -P "$sampler" 2>/dev/null; kill "$sampler" 2>/dev/null' EXIT
+                  pnpm --filter @neore/web run test:e2e --shard=${{ matrix.shard }}/3
 
             - name: "Upload the Playwright report"
               if: "!cancelled()"
