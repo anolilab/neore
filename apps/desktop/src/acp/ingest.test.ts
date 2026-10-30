@@ -13,6 +13,7 @@ import type { HostEvent } from "./ingest";
 import { HostPoster, KEEPALIVE_MS, POST_INTERVAL_MS } from "./ingest";
 
 interface Post {
+    close?: boolean;
     deviceId: string;
     events: HostEvent[];
     firstSeq?: number;
@@ -33,6 +34,9 @@ class FakeBackend {
 
     public ended = new Set<string>();
 
+    /** The `redirect` mode of every request, as `fetch` was called with it. */
+    public readonly redirects: (RequestRedirect | undefined)[] = [];
+
     public failNext: ("network" | number)[] = [];
 
     public respond: ((post: Post) => Response | undefined) | undefined;
@@ -42,6 +46,7 @@ class FakeBackend {
         const post = JSON.parse(payload) as Post;
 
         this.posts.push({ at: clock, post, signature });
+        this.redirects.push(init?.redirect);
         this.bodyBytes.push(Buffer.byteLength(String(init?.body)));
 
         const failure = this.failNext.shift();
@@ -96,6 +101,7 @@ let scratch: string;
 let backend: FakeBackend;
 let paired: string | undefined;
 let clock: number;
+let logs: string[];
 
 const hosts: HostPoster[] = [];
 
@@ -104,7 +110,9 @@ const poster = () => {
         deviceId: () => paired,
         endpoint: new URL("https://backend.test/hosts/ingest"),
         fetch: backend.fetch as typeof fetch,
-        log: () => {},
+        log: (message) => {
+            logs.push(message);
+        },
         now: () => clock,
         random: () => 0.5,
         sign: (payload) => `sig:${String(payload.length)}`,
@@ -130,6 +138,14 @@ const settle = async (ms = 0): Promise<void> => {
     await vi.advanceTimersByTimeAsync(0);
 };
 
+/** Like `settle`, but the clock moves in steps the retries can see, so a streak has a length in time. */
+const settleInSteps = async (ms: number, step = 5000): Promise<void> => {
+    for (let elapsed = 0; elapsed < ms; elapsed += step) {
+        // eslint-disable-next-line no-await-in-loop -- each step must run before the next moves the clock
+        await settle(step);
+    }
+};
+
 const open = async (host: HostPoster, sessionId = "s1") => {
     host.sessionOpened(sessionId, INFO);
     await settle();
@@ -141,6 +157,7 @@ beforeEach(async () => {
     backend = new FakeBackend();
     paired = "dev1";
     clock = 1_000_000;
+    logs = [];
 });
 
 afterEach(async () => {
@@ -507,6 +524,187 @@ describe("a turn", () => {
         await settle(POST_INTERVAL_MS);
 
         expect(backend.chunks.get("t1")?.map((event) => event.kind)).toEqual(["turn_start", "permission_request", "permission_resolved"]);
+    });
+});
+
+describe("the signed post", () => {
+    it("never follows a redirect, so the signed body goes to the configured endpoint only", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.redirects.length).toBeGreaterThanOrEqual(2);
+        expect(backend.redirects.every((mode) => mode === "error")).toBe(true);
+    });
+
+    it("keeps the batch and tries it again when fetch rejects a redirect", async () => {
+        const host = poster();
+
+        await open(host);
+
+        const original = backend.fetch;
+        let rejected = 0;
+
+        const flaky = async (url: URL | string, init?: RequestInit): Promise<Response> => {
+            if (rejected === 0 && String(init?.body).includes(String.raw`\"turnId\"`)) {
+                rejected += 1;
+                throw new TypeError("fetch failed: unexpected redirect");
+            }
+
+            return await original(url, init);
+        };
+
+        const retrying = new HostPoster({
+            deviceId: () => paired,
+            endpoint: new URL("https://backend.test/hosts/ingest"),
+            fetch: flaky as typeof fetch,
+            log: () => {},
+            now: () => clock,
+            random: () => 0.5,
+            sign: (payload) => `sig:${String(payload.length)}`,
+            stateFile: path.join(scratch, "acp-host-turns-2.json"),
+        });
+
+        hosts.push(retrying);
+        retrying.sessionOpened("s2", INFO);
+        await settle();
+        retrying.turnStarted("s2", "t2", "go");
+        await settle(60_000);
+
+        expect(rejected).toBe(1);
+        expect(backend.chunks.get("t2")?.[0]).toMatchObject({ kind: "turn_start" });
+    });
+});
+
+describe("a computer the backend no longer knows", () => {
+    it("retries a 401 that passes (a clock blip) and keeps the turn", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext = [401, 401, 401];
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "hello");
+        await settle(60_000);
+
+        expect(backend.texts("t1")).toBe("hello");
+        expect(logs).toEqual([]);
+    });
+
+    it("stops a turn whose posts keep answering 401 for a minute, and says why once", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.respond = (post) => post.turnId === undefined ? undefined : Response.json({ error: "unauthorized" }, { status: 401 });
+        host.turnStarted("s1", "t1", "go");
+        host.turnStarted("s1", "t2", "again");
+        await settleInSteps(180_000);
+
+        const posts = backend.posts.length;
+
+        await settleInSteps(180_000);
+
+        expect(host.busy).toBe(false);
+        expect(backend.posts).toHaveLength(posts);
+        expect(logs.filter((message) => message.includes("no longer accepts this computer"))).toHaveLength(1);
+        await host.persisted();
+        expect(await runningTurns()).toEqual({ turns: [] });
+    });
+
+    it("does not count 401s across an answer in between", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        await settle(POST_INTERVAL_MS);
+        backend.failNext = [401, 401, 401, 401];
+        host.text("s1", "t1", "a");
+        await settleInSteps(100_000);
+        backend.failNext = [401, 401, 401, 401];
+        host.text("s1", "t1", "b");
+        await settleInSteps(100_000);
+
+        expect(backend.texts("t1")).toBe("ab");
+        expect(logs).toEqual([]);
+    });
+});
+
+describe("a session that ends locally", () => {
+    const closes = () => backend.posts.filter(({ post }) => post.close === true);
+
+    it("tells the backend after its last turn was delivered, not before", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "done");
+        host.turnEnded("s1", "t1", "end_turn");
+        host.sessionEnded("s1");
+        await settle(POST_INTERVAL_MS);
+
+        const [close] = closes();
+        const endIndex = backend.posts.findIndex(({ post }) => post.events.some((event) => event.kind === "turn_end"));
+
+        expect(closes()).toHaveLength(1);
+        expect(close?.post).toMatchObject({ close: true, deviceId: "dev1", events: [], kind: "turn", sessionId: "s1", v: 1 });
+        expect(close?.post.threadId).toBeUndefined();
+        expect(close?.signature).toMatch(SIGNED);
+        expect(backend.posts.indexOf(close as never)).toBeGreaterThan(endIndex);
+    });
+
+    it("holds the close while a turn's output is still being retried", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        await settle(POST_INTERVAL_MS);
+        backend.failNext = [503, 503];
+        host.turnEnded("s1", "t1", "end_turn");
+        host.sessionEnded("s1");
+        await settle(POST_INTERVAL_MS);
+
+        expect(closes()).toHaveLength(0);
+
+        await settle(60_000);
+
+        expect(backend.ended.has("t1")).toBe(true);
+        expect(closes()).toHaveLength(1);
+    });
+
+    it("sends the close at once when no turn ever ran", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionEnded("s1");
+        await settle();
+
+        expect(closes()).toHaveLength(1);
+    });
+
+    it("tries a close that failed again, and gives up after a few tries", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.respond = (post) => post.close === true ? Response.json({ error: "down" }, { status: 503 }) : undefined;
+        host.sessionEnded("s1");
+        await settleInSteps(600_000);
+
+        expect(closes().length).toBeGreaterThan(1);
+        expect(closes().length).toBeLessThanOrEqual(7);
+    });
+
+    it("has nothing to close for a session that stayed local", async () => {
+        paired = undefined;
+
+        const host = poster();
+
+        await open(host);
+        host.sessionEnded("s1");
+        await settle(60_000);
+
+        expect(backend.posts).toEqual([]);
     });
 });
 
