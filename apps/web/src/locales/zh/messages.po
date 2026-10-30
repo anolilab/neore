@@ -14,10 +14,6 @@ msgstr ""
 "Plural-Forms: \n"
 "X-Generator: @lingui/cli\n"
 
-#: src/routes/admin/gateway/keys.tsx:421
-#~ msgid "Virtual API Keys"
-#~ msgstr "虚拟 API 密钥"
-
 #: src/features/settings/components/chat/usage-settings.tsx:630
 msgid " · model: {modelFilter}"
 msgstr " · 模型：{modelFilter}"
@@ -186,7 +182,10 @@ msgid "{0, plural, one {# char} other {# chars}}"
 msgstr "{0, plural, other {# 个字符}}"
 
 #. placeholder {0}: files.length
+#. placeholder {0}: listed.length
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:707
+#: src/features/develop/components/files-tab.tsx:118
+#: src/features/develop/components/files-tab.tsx:126
 msgid "{0, plural, one {# file} other {# files}}"
 msgstr "{0, plural, other {# 个文件}}"
 
@@ -434,6 +433,11 @@ msgstr "{0} 个符合条件 · 已删除 {1} 个 · {2}ms"
 msgid "{0} failed"
 msgstr "{0} 个失败"
 
+#. placeholder {0}: listed.length
+#: src/features/develop/components/files-tab.tsx:105
+#~ msgid "{0} files"
+#~ msgstr ""
+
 #. placeholder {0}: modeLabels[mode]
 #. placeholder {1}: tool.name
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:88
@@ -598,6 +602,22 @@ msgstr "{0} 条未读"
 #: src/features/skills/components/skill-marketplace.tsx:88
 msgid "{0} uses"
 msgstr "{0} 次使用"
+
+#. placeholder {0}: detail.authorLogin
+#. placeholder {1}: detail.commitCount
+#. placeholder {2}: detail.baseBranch
+#. placeholder {3}: detail.headBranch
+#: src/features/develop/components/pull-request-view.tsx:94
+msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
+msgstr ""
+
+#. placeholder {0}: detail.authorLogin
+#. placeholder {1}: detail.commitCount
+#. placeholder {2}: detail.baseBranch
+#. placeholder {3}: detail.headBranch
+#: src/features/develop/components/pull-request-view.tsx:87
+#~ msgid "{0} wants to merge {1} commits into {2} from {3}"
+#~ msgstr ""
 
 #. placeholder {0}: String(percent)
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:106
@@ -833,10 +853,26 @@ msgstr "{itemCount, plural, other {{nodeName}：包含 # 项的对象}}"
 msgid "{itemCount, plural, one {# item} other {# items}}"
 msgstr "{itemCount, plural, other {# 项}}"
 
+#: src/features/develop/components/failure-notice.tsx:17
+msgid "{label} could not be reached or answered unexpectedly. Try again in a moment."
+msgstr ""
+
+#: src/features/develop/components/failure-notice.tsx:21
+msgid "{label} is limiting requests for this account. Try again in a few minutes."
+msgstr ""
+
+#: src/features/develop/components/failure-notice.tsx:19
+msgid "{label} is not connected"
+msgstr ""
+
 #. placeholder {0}: ids.length
 #: src/components/model-picker/model-picker.tsx:910
 msgid "{label} moved to position {position} of {0} in starred"
 msgstr "{label}已移至星标中的第{position}位（共{0}位）"
+
+#: src/features/develop/components/failure-notice.tsx:14
+msgid "{label} refused this request. Your account may lack access, or an organization may require you to authorize the app."
+msgstr ""
 
 #: src/features/settings/components/chat/usage-settings.tsx:606
 msgid "{metricLabel} > {threshold} per day"
@@ -1992,6 +2028,7 @@ msgstr ""
 msgid "Add/Replace Object"
 msgstr "添加/替换对象"
 
+#: src/features/develop/components/files-tab.tsx:31
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:99
 msgid "Added"
 msgstr "已添加"
@@ -2056,7 +2093,7 @@ msgstr "调整"
 #: src/features/auth/components/team/team-switcher.tsx:143
 #: src/features/chat/sharing/thread-share-button.tsx:186
 #: src/features/chat/sharing/thread-share-button.tsx:290
-#: src/features/layout/components/sidebar-shortcut.tsx:242
+#: src/features/layout/components/sidebar-shortcut.tsx:250
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:51
 #: src/routes/admin/route.tsx:70
@@ -3137,6 +3174,10 @@ msgstr "批准一次 {tool}"
 #: src/features/chat/thread/tool-approval.tsx:74
 msgid "Approved — running tool"
 msgstr "已批准——正在运行工具"
+
+#: src/features/develop/components/inbox-list.tsx:56
+msgid "Approved and not a draft. Branch protection is not checked."
+msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:246
 msgid "AppSecret from the same page"
@@ -4720,6 +4761,7 @@ msgstr "取消/退出"
 
 #: src/features/chat/thread/widgets/flight-widget.tsx:56
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:164
+#: src/features/develop/components/checks-tab.tsx:47
 #: src/features/evals/components/run-status.tsx:12
 #: src/features/tasks/components/task-detail-dialog.tsx:132
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:62
@@ -4920,6 +4962,11 @@ msgstr "修改组织的显示名称"
 #: src/features/auth/components/organization/organization-slug-card.tsx:158
 msgid "Change your organization's unique identifier"
 msgstr "修改组织的唯一标识符"
+
+#: src/features/develop/components/files-tab.tsx:32
+#: src/features/develop/components/files-tab.tsx:57
+msgid "Changed"
+msgstr ""
 
 #: src/features/skills/components/skill-builder-diff.tsx:44
 msgid "Changes from the last refinement"
@@ -5123,6 +5170,7 @@ msgstr "正在检查..."
 msgid "Checking…"
 msgstr ""
 
+#: src/features/develop/components/pull-request-view.tsx:64
 #: src/features/evals/components/case-fields.tsx:150
 #: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
@@ -5574,6 +5622,7 @@ msgstr "关闭翻译"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread/widgets/places-widget.tsx:165
+#: src/features/develop/components/pull-request-view.tsx:65
 msgid "Closed"
 msgstr "已关闭"
 
@@ -5875,6 +5924,10 @@ msgstr "商业设计"
 #: src/features/marketing/data/models-data.ts:56
 msgid "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 msgstr "需要 Black Forest Labs 顶级图像质量的商业项目"
+
+#: src/features/develop/components/pull-request-view.tsx:64
+msgid "Commits"
+msgstr ""
 
 #: src/features/settings/connectors/connector-category.ts:6
 #: src/features/skills/components/skill-form-dialog.tsx:121
@@ -6239,6 +6292,19 @@ msgstr "连接"
 msgid "Connect {0}"
 msgstr "连接 {0}"
 
+#: src/features/develop/components/connect-host-card.tsx:20
+#: src/features/develop/components/connect-host-card.tsx:24
+msgid "Connect {label}"
+msgstr ""
+
+#: src/features/develop/components/failure-notice.tsx:19
+#~ msgid "Connect {label} to read your pull requests here."
+#~ msgstr ""
+
+#: src/features/develop/components/failure-notice.tsx:19
+msgid "Connect {label} to see what needs your review here."
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-page.tsx:61
 msgid "Connect a LINE Official Account through the Messaging API. Each chat or group becomes its own thread."
 msgstr "通过 Messaging API 连接 LINE 官方账号。每个聊天或群组都会成为单独的对话。"
@@ -6331,6 +6397,10 @@ msgstr "连接 WeChat 公众号"
 msgid "Connect WhatsApp"
 msgstr "连接 WhatsApp"
 
+#: src/features/develop/components/connect-host-card.tsx:21
+msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-page.tsx:115
 msgid "Connect your messenger accounts to send messages to the AI from your favorite chat apps. The AI will auto-respond on the platform, and all conversations are synced to your thread list."
 msgstr "连接你的即时通讯账号，在常用聊天应用中向 AI 发送消息。AI 会在该平台上自动回复，所有对话都会同步到你的对话列表。"
@@ -6417,11 +6487,11 @@ msgstr "连接成功"
 msgid "Connection test failed"
 msgstr "连接测试失败"
 
-#: src/features/settings/connectors/hooks/use-connector-actions.ts:43
+#: src/features/settings/connectors/hooks/use-connector-actions.ts:46
 msgid "Connector disconnected and access revoked"
 msgstr "连接器已断开，访问权限已撤销"
 
-#: src/features/settings/connectors/hooks/use-connector-actions.ts:45
+#: src/features/settings/connectors/hooks/use-connector-actions.ts:48
 msgid "Connector disconnected. Revoke access in the provider's settings if it is still listed there."
 msgstr "连接器已断开。如果提供商的设置中仍列有它，请在那里撤销访问权限。"
 
@@ -6743,6 +6813,7 @@ msgstr ""
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:211
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:34
+#: src/features/develop/components/files-tab.tsx:33
 #: src/features/local-models/components/local-setup-guide.tsx:44
 #: src/features/pages/components/page-kept-draft.tsx:30
 msgid "Copied"
@@ -7071,6 +7142,10 @@ msgstr "无法加载记忆。"
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:76
 msgid "Could not load the skill breakdown."
 msgstr "无法加载技能明细。"
+
+#: src/features/develop/components/failure-notice.tsx:17
+msgid "Could not load this"
+msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:131
 msgid "Could not load tools: {error}"
@@ -8671,6 +8746,7 @@ msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it,
 msgstr "描述你的工作流……例如“根据文本生成图片，放大后再移除背景”"
 
 #: src/components/model-picker/model-picker.tsx:165
+#: src/features/develop/components/pull-request-view.tsx:64
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:213
@@ -8759,6 +8835,10 @@ msgstr "每个答案都必须通过的确定性检查。"
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:24
 msgid "Deterministic, consistent"
 msgstr "确定、一致"
+
+#: src/features/develop/components/develop-page.tsx:42
+msgid "Develop"
+msgstr ""
 
 #: src/components/model-picker/model-picker.tsx:232
 #: src/features/marketing/components/tutorials-page.tsx:131
@@ -8849,6 +8929,10 @@ msgstr "未通过"
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "Did you mean: {suggestion}?"
 msgstr "你是不是想找：{suggestion}？"
+
+#: src/features/develop/components/files-tab.tsx:64
+msgid "Diffs are not available from this host."
+msgstr ""
 
 #: src/features/chat/thread/composer-image-settings.tsx:57
 msgid "Digital"
@@ -9245,6 +9329,8 @@ msgid "Downloads open the GitHub releases page. If no installers are listed ther
 msgstr "下载会打开 GitHub 发布页面。如果页面上还没有安装包，说明桌面版尚未发布。"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
+#: src/features/develop/components/inbox-list.tsx:118
+#: src/features/develop/components/pull-request-view.tsx:73
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
 msgstr "草稿"
@@ -9264,6 +9350,10 @@ msgstr "草稿已就绪——保存前请检查下方字段。"
 #: src/features/marketing/components/landing-page.tsx:214
 msgid "Draft, edit, and refine long-form content in a side-by-side canvas. AI handles the first draft — you shape the final version."
 msgstr "在并排画布中起草、编辑和润色长篇内容。AI 负责初稿——你来打磨定稿。"
+
+#: src/features/develop/components/inbox-list.tsx:50
+msgid "Drafts"
+msgstr ""
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:313
 msgid "Drag & drop files here, or click to browse"
@@ -11126,6 +11216,7 @@ msgstr "失败"
 
 #: src/features/chat/thread-list/thread-node.tsx:503
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
+#: src/features/develop/components/checks-tab.tsx:48
 #: src/features/devices/components/devices-settings.tsx:172
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
@@ -11357,7 +11448,7 @@ msgstr "禁用所有模型失败"
 msgid "Failed to disconnect"
 msgstr "断开连接失败"
 
-#: src/features/settings/connectors/hooks/use-connector-actions.ts:48
+#: src/features/settings/connectors/hooks/use-connector-actions.ts:51
 msgid "Failed to disconnect connector"
 msgstr "断开连接器失败"
 
@@ -11691,7 +11782,7 @@ msgstr "开始导入失败"
 msgid "Failed to start test run"
 msgstr "启动测试运行失败"
 
-#: src/features/settings/connectors/hooks/use-connector-actions.ts:32
+#: src/features/settings/connectors/hooks/use-connector-actions.ts:33
 msgid "Failed to start the connection"
 msgstr "开始连接失败"
 
@@ -12343,6 +12434,10 @@ msgstr "文件上传被拒绝。"
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:625
 msgid "Filename cannot be empty"
 msgstr "文件名不能为空"
+
+#: src/features/develop/components/pull-request-view.tsx:64
+msgid "Files"
+msgstr ""
 
 #: src/features/settings/components/privacy/data-access.tsx:52
 msgid "Files:"
@@ -14050,7 +14145,7 @@ msgstr "高度"
 msgid "Hello {0}! What would you like to do today?"
 msgstr "你好，{0}！今天想做点什么？"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:275
+#: src/features/layout/components/sidebar-shortcut.tsx:283
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:109
 msgid "Help"
 msgstr "帮助"
@@ -14902,6 +14997,16 @@ msgstr "正在优化你的提示词..."
 msgid "Improving..."
 msgstr "正在优化..."
 
+#. placeholder {0}: detail.changedFiles
+#: src/features/develop/components/pull-request-view.tsx:99
+msgid "in {0, plural, one {# file} other {# files}}"
+msgstr ""
+
+#. placeholder {0}: detail.changedFiles
+#: src/features/develop/components/pull-request-view.tsx:92
+#~ msgid "in {0} files"
+#~ msgstr ""
+
 #. placeholder {0}: info.latencyMs
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:31
 msgid "in {0}ms"
@@ -14951,6 +15056,14 @@ msgstr "不活跃阈值"
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:96
 msgid "Inactivity threshold (days)"
 msgstr "不活跃阈值（天）"
+
+#: src/features/develop/components/develop-page.tsx:47
+msgid "Inbox"
+msgstr ""
+
+#: src/features/develop/components/inbox-list.tsx:71
+msgid "Inbox sections"
+msgstr ""
 
 #: src/lib/model-descriptions.ts:120
 msgid "Inception's diffusion-based language model"
@@ -15392,6 +15505,10 @@ msgstr ""
 #: src/features/settings/components/chat/mcp/popular-servers.ts:51
 msgid "Issue tracking and project management"
 msgstr "问题跟踪与项目管理"
+
+#: src/features/develop/components/failure-notice.tsx:20
+msgid "It does not exist, or your {label} account cannot see it."
+msgstr ""
 
 #: src/features/pages/components/page-view.tsx:190
 msgid "It may have been deleted, or you no longer have access."
@@ -16389,10 +16506,19 @@ msgid "Load earlier messages"
 msgstr "加载更早的消息"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:181
+#: src/features/develop/components/inbox-list.tsx:128
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:222
 #: src/features/skills/components/skill-marketplace.tsx:227
 msgid "Load more"
 msgstr "加载更多"
+
+#: src/features/develop/components/commits-tab.tsx:49
+msgid "Load more commits"
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:142
+msgid "Load more files"
+msgstr ""
 
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:222
 msgid "Load new prompt"
@@ -16402,13 +16528,36 @@ msgstr "加载新提示词"
 msgid "Load preset"
 msgstr "加载预设"
 
+#. placeholder {0}: listed.length
+#. placeholder {1}: Math.min(fileCount, fileLimit)
+#: src/features/develop/components/files-tab.tsx:122
+msgid "Loaded {0} of {1, plural, one {# file} other {# files}}…"
+msgstr ""
+
+#. placeholder {0}: listed.length
+#. placeholder {1}: Math.min(fileCount, fileLimit)
+#: src/features/develop/components/files-tab.tsx:105
+#~ msgid "Loaded {0} of {1} files…"
+#~ msgstr ""
+
 #: ../../packages/ui/src/components/spinner.tsx:8
+#: src/features/develop/components/develop-page.tsx:26
+#: src/features/develop/components/inbox-list.tsx:86
+#: src/features/develop/components/pull-request-view.tsx:49
 msgid "Loading"
 msgstr "加载中"
 
 #: src/features/canvas/canvas-panel.tsx:318
 msgid "Loading canvas editor..."
 msgstr "正在加载画布编辑器..."
+
+#: src/features/develop/components/checks-tab.tsx:29
+msgid "Loading checks"
+msgstr ""
+
+#: src/features/develop/components/commits-tab.tsx:18
+msgid "Loading commits"
+msgstr ""
 
 #: src/features/evals/components/model-comparison.tsx:70
 #: src/features/evals/components/run-comparison.tsx:45
@@ -16455,6 +16604,14 @@ msgstr "正在加载编辑器…"
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "正在加载文件…"
+
+#: src/features/develop/components/files-tab.tsx:104
+msgid "Loading files"
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:118
+msgid "Loading files…"
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:358
 msgid "Loading image editor..."
@@ -17390,6 +17547,10 @@ msgstr "仅限提及"
 msgid "Menu"
 msgstr "菜单"
 
+#: src/features/develop/lib/use-request-noun.ts:8
+msgid "merge request"
+msgstr ""
+
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:84
 msgid "Merge request merged"
 msgstr ""
@@ -17399,6 +17560,7 @@ msgid "Merge request opened"
 msgstr ""
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
+#: src/features/develop/components/pull-request-view.tsx:65
 msgid "Merged"
 msgstr "已合并"
 
@@ -17522,6 +17684,10 @@ msgstr ""
 #: src/features/appearance/components/appearance-controls.tsx:153
 msgid "Min"
 msgstr "Min"
+
+#: src/features/develop/components/inbox-list.tsx:51
+msgid "Mine"
+msgstr ""
 
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:29
 msgid "Mini map"
@@ -17861,6 +18027,7 @@ msgid "Modern gradient background"
 msgstr "现代渐变背景"
 
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:771
+#: src/features/develop/components/files-tab.tsx:34
 msgid "Modified"
 msgstr "已修改"
 
@@ -18440,6 +18607,10 @@ msgstr "导航"
 msgid "Need more help? Check the <0>documentation</0> or reach out in the chat."
 msgstr "需要更多帮助？请查看<0>文档</0>或在聊天中联系我们。"
 
+#: src/features/develop/components/inbox-list.tsx:52
+msgid "Needs my review"
+msgstr ""
+
 #: src/features/tasks/components/task-status.tsx:18
 msgid "Needs review"
 msgstr "待审核"
@@ -18467,7 +18638,7 @@ msgstr "neore"
 msgid "Neore"
 msgstr "Neore"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:212
+#: src/features/layout/components/sidebar-shortcut.tsx:220
 #: src/features/marketing/components/navbar-menu.tsx:44
 msgid "Neore - AI Text & Video & Audio & Image & Documents Generation Platform"
 msgstr "Neore - AI 文本、视频、音频、图像和文档生成平台"
@@ -18555,6 +18726,7 @@ msgid "Netherlands"
 msgstr "荷兰"
 
 #: src/features/appearance/components/appearance-controls.tsx:166
+#: src/features/develop/components/checks-tab.tsx:49
 msgid "Neutral"
 msgstr "中性"
 
@@ -18870,6 +19042,10 @@ msgstr ""
 msgid "No"
 msgstr "否"
 
+#: src/features/develop/components/failure-notice.tsx:15
+msgid "No access"
+msgstr ""
+
 #: src/components/settings/session-freshness-dialog.tsx:46
 msgid "No active session found. Please sign in again."
 msgstr "未找到活跃会话。请重新登录。"
@@ -18921,6 +19097,10 @@ msgstr "还没有用例。手动添加一个、导入 CSV 或 JSONL 文件，或
 #: src/features/home/components/home-page.tsx:252
 msgid "No chats yet. Start one above."
 msgstr "还没有对话，在上方开始一个吧。"
+
+#: src/features/develop/components/checks-tab.tsx:43
+msgid "No checks have run for this commit."
+msgstr ""
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:351
 msgid "No cleanup runs yet"
@@ -19008,6 +19188,10 @@ msgstr "还没有数据集"
 #: src/features/prompts/components/prompt-list-view.tsx:114
 msgid "No description"
 msgstr "无描述"
+
+#: src/features/develop/components/pull-request-view.tsx:116
+msgid "No description provided."
+msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:407
 msgid "No devices paired."
@@ -19572,6 +19756,14 @@ msgstr "运营方未配置"
 msgid "Not delivered to the lead"
 msgstr ""
 
+#: src/features/develop/components/failure-notice.tsx:20
+msgid "Not found"
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:42
+msgid "Not loaded: the diffs on this page were already large."
+msgstr ""
+
 #: src/features/evals/components/run-detail.tsx:80
 msgid "not measured"
 msgstr "未测量"
@@ -19617,6 +19809,10 @@ msgstr "未找到结果"
 #: src/features/devices/components/devices-settings.tsx:164
 msgid "Nothing has run on a device yet."
 msgstr "尚未在任何设备上运行过操作。"
+
+#: src/features/develop/components/inbox-list.tsx:94
+msgid "Nothing here."
+msgstr ""
 
 #: src/features/local-models/lib/local-errors.ts:192
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
@@ -20015,6 +20211,7 @@ msgstr "不透明度"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:669
 #: src/components/command-palette.tsx:618
 #: src/features/chat/link-preview/link-preview-card.tsx:117
+#: src/features/develop/components/pull-request-view.tsx:65
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
 msgstr "打开"
@@ -20041,11 +20238,19 @@ msgstr "用更改创建拉取请求（GitHub，需要 GitHub 连接器）"
 msgid "Open as page"
 msgstr "作为页面打开"
 
+#: src/features/develop/components/failure-notice.tsx:35
+msgid "Open connectors"
+msgstr ""
+
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:205
 msgid "Open current URL"
 msgstr "打开当前 URL"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:100
+#: src/features/layout/components/sidebar-shortcut.tsx:108
+msgid "Open Develop"
+msgstr ""
+
+#: src/features/layout/components/sidebar-shortcut.tsx:101
 msgid "Open Evals"
 msgstr "打开评测"
 
@@ -20061,7 +20266,7 @@ msgstr "Open Graph 图片"
 msgid "Open home"
 msgstr "打开主页"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:67
+#: src/features/layout/components/sidebar-shortcut.tsx:68
 msgid "Open Home"
 msgstr "打开主页"
 
@@ -20095,7 +20300,7 @@ msgstr "打开链接"
 msgid "Open menu"
 msgstr "打开菜单"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:74
+#: src/features/layout/components/sidebar-shortcut.tsx:75
 msgid "Open messages"
 msgstr "打开消息"
 
@@ -20112,7 +20317,12 @@ msgstr "请在桌面应用中打开 Neore 以配对此计算机。之前配对�
 msgid "Open new chat"
 msgstr "打开新聊天"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:107
+#. placeholder {0}: host.label
+#: src/features/develop/components/pull-request-view.tsx:85
+msgid "Open on {0}"
+msgstr ""
+
+#: src/features/layout/components/sidebar-shortcut.tsx:115
 msgid "Open Pages"
 msgstr "打开页面"
 
@@ -20120,7 +20330,7 @@ msgstr "打开页面"
 msgid "Open preview in new tab"
 msgstr "在新标签页中打开预览"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:81
+#: src/features/layout/components/sidebar-shortcut.tsx:82
 msgid "Open Prompts"
 msgstr "打开提示词"
 
@@ -20136,11 +20346,11 @@ msgstr "打开搜索"
 msgid "Open settings"
 msgstr "打开设置"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:256
+#: src/features/layout/components/sidebar-shortcut.tsx:264
 msgid "Open Settings"
 msgstr "打开设置"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:87
+#: src/features/layout/components/sidebar-shortcut.tsx:88
 msgid "Open Skills"
 msgstr "打开技能"
 
@@ -20177,7 +20387,7 @@ msgstr "开源的灵活性"
 msgid "Open source foundation with broad community support"
 msgstr "拥有广泛社区支持的开源基础"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:93
+#: src/features/layout/components/sidebar-shortcut.tsx:94
 msgid "Open Tasks"
 msgstr "打开任务"
 
@@ -20212,12 +20422,12 @@ msgstr ""
 msgid "Open thread"
 msgstr "打开对话"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:195
-#: src/features/layout/components/sidebar-shortcut.tsx:302
+#: src/features/layout/components/sidebar-shortcut.tsx:203
+#: src/features/layout/components/sidebar-shortcut.tsx:310
 msgid "Open user menu"
 msgstr "打开用户菜单"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:121
+#: src/features/layout/components/sidebar-shortcut.tsx:129
 msgid "Open Vault"
 msgstr "打开文件库"
 
@@ -20233,7 +20443,7 @@ msgstr "开放权重，部署灵活"
 msgid "Open weights for flexible deployment options"
 msgstr "开放权重，部署选择灵活"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:115
+#: src/features/layout/components/sidebar-shortcut.tsx:123
 msgid "Open Workflows"
 msgstr "打开工作流"
 
@@ -21014,6 +21224,7 @@ msgstr ""
 msgid "passed"
 msgstr "已通过"
 
+#: src/features/develop/components/checks-tab.tsx:52
 #: src/features/evals/components/model-comparison.tsx:111
 #: src/features/tasks/components/task-detail-dialog.tsx:135
 msgid "Passed"
@@ -21205,6 +21416,7 @@ msgstr "PE 可执行文件"
 msgid "Pen"
 msgstr "画笔"
 
+#: src/features/develop/components/checks-tab.tsx:50
 #: src/features/settings/components/chat/trigger-settings.tsx:166
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:59
 #: src/features/workflow/components/canvas/workflow-controls.tsx:53
@@ -21361,6 +21573,10 @@ msgstr "选择一个起点，或直接开始聊天。"
 #: src/features/chat/thread/composer-draw-dialog.tsx:309
 msgid "Pick color"
 msgstr "选择颜色"
+
+#: src/features/develop/components/develop-page.tsx:67
+msgid "Pick one from the inbox to read it."
+msgstr ""
 
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:212
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
@@ -22534,6 +22750,10 @@ msgstr "正在发布..."
 msgid "Pull"
 msgstr "拉取"
 
+#: src/features/develop/lib/use-request-noun.ts:8
+msgid "pull request"
+msgstr ""
+
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:86
 msgid "Pull request merged"
 msgstr ""
@@ -22746,6 +22966,10 @@ msgstr "超出速率限制，请稍后重试。"
 msgid "Rate limit reached. You can improve {minutes, plural, one {# more prompt} other {# more prompts}} in {minutes, plural, one {# minute} other {# minutes}}."
 msgstr "已达到速率限制。你可以在 {minutes, plural, other {# 分钟}}后再优化 {minutes, plural, other {# 个提示词}}。"
 
+#: src/features/develop/components/failure-notice.tsx:21
+msgid "Rate limited"
+msgstr ""
+
 #: src/features/marketing/components/gateway-landing-page.tsx:80
 msgid "Rate limiting"
 msgstr "速率限制"
@@ -22800,6 +23024,10 @@ msgstr "只读"
 msgid "Read the docs"
 msgstr "阅读文档"
 
+#: src/features/develop/components/develop-page.tsx:43
+msgid "Read what needs you: the description, commits, files, diff and checks of each change."
+msgstr ""
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:65
 msgid "read-only"
 msgstr "只读"
@@ -22819,6 +23047,10 @@ msgstr "正在读取“{attachmentName}”…"
 #: src/features/canvas/canvas-panel.tsx:237
 msgid "Ready"
 msgstr "就绪"
+
+#: src/features/develop/components/inbox-list.tsx:53
+msgid "Ready to merge"
+msgstr ""
 
 #: src/features/marketing/components/gateway-landing-page.tsx:123
 msgid "Real-time analytics"
@@ -23595,6 +23827,10 @@ msgstr "移除用户"
 msgid "Remove variable {0}"
 msgstr ""
 
+#: src/features/develop/components/files-tab.tsx:35
+msgid "Removed"
+msgstr ""
+
 #: src/features/prompts/components/prompt-list.tsx:331
 msgid "Removed from favorites"
 msgstr "已从收藏中移除"
@@ -23602,6 +23838,10 @@ msgstr "已从收藏中移除"
 #: src/features/skills/components/skill-builder-diff.tsx:40
 msgid "Removed:"
 msgstr "移除："
+
+#: src/features/develop/components/files-tab.tsx:36
+msgid "Renamed"
+msgstr ""
 
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Reopen"
@@ -25156,6 +25396,15 @@ msgstr "选择组织成员可以使用的 AI 模型。企业版留空则允许�
 msgid "Select your message"
 msgstr "选择你的消息"
 
+#. placeholder {0}: info.requestNoun
+#: src/features/develop/components/develop-page.tsx:54
+#~ msgid "Selected {0}"
+#~ msgstr ""
+
+#: src/features/develop/components/develop-page.tsx:56
+msgid "Selected {requestNoun}"
+msgstr ""
+
 #: src/features/chat/thread/media-gallery-view.tsx:357
 msgid "Selected reference"
 msgstr "已选参考"
@@ -25686,6 +25935,16 @@ msgstr "显示/隐藏列"
 msgid "Show/hide help"
 msgstr "显示/隐藏帮助"
 
+#. placeholder {0}: list.length
+#: src/features/develop/components/checks-tab.tsx:59
+msgid "Showing {0} of {total, plural, one {# check} other {# checks}}."
+msgstr ""
+
+#. placeholder {0}: list.length
+#: src/features/develop/components/checks-tab.tsx:58
+#~ msgid "Showing {0} of {total} checks."
+#~ msgstr ""
+
 #. placeholder {0}: data.page.length
 #: src/features/admin/components/users-management-card.tsx:167
 msgid "Showing {0} users. More users available."
@@ -25745,6 +26004,10 @@ msgstr "重新登录"
 #: src/features/settings/components/chat/mcp-settings.tsx:485
 msgid "Sign in on another site?"
 msgstr "要在另一个网站登录吗？"
+
+#: src/features/develop/components/failure-notice.tsx:18
+msgid "Sign in to {label} again"
+msgstr ""
 
 #: src/routes/(chat)/workflow/shared/$token.tsx:140
 msgid "Sign in to fork this workflow"
@@ -25997,6 +26260,7 @@ msgstr "跳到内容"
 msgid "Skip tour"
 msgstr "跳过导览"
 
+#: src/features/develop/components/checks-tab.tsx:51
 #: src/features/evals/components/run-detail.tsx:36
 #: src/features/settings/components/chat/trigger-settings.tsx:165
 msgid "Skipped"
@@ -28252,6 +28516,10 @@ msgstr "费用上限必须是正数（美元）。"
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "数据集、其用例及所有运行记录都将被删除。"
 
+#: src/features/develop/components/pull-request-view.tsx:118
+msgid "The description is cut short."
+msgstr ""
+
 #: src/features/download/components/download-page.tsx:71
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "桌面应用支持 macOS、Windows 和 Linux。安装包附在 GitHub 上的桌面版发布中，发布后会在那里显示。"
@@ -28337,6 +28605,30 @@ msgstr "目标将被删除；其任务会保留，但不再属于任何目标。
 #: src/features/marketing/data/models-data.ts:423
 msgid "The highest-quality AI video model available"
 msgstr "目前质量最高的 AI 视频模型"
+
+#: src/features/develop/components/develop-page.tsx:30
+msgid "The host"
+msgstr ""
+
+#: src/features/develop/components/commits-tab.tsx:34
+msgid "The host lists at most {commitLimit, plural, one {# commit} other {# commits}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
+msgstr ""
+
+#: src/features/develop/components/commits-tab.tsx:37
+#~ msgid "The host lists at most {commitLimit} commits for one change. {leftOut} more are not shown here."
+#~ msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:131
+msgid "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:109
+#~ msgid "The host lists at most {fileLimit} files for one change. {leftOut} more are not shown here."
+#~ msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:41
+msgid "The host sent no diff for this file (binary, or too large for it)."
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:638
 msgid "The imported file appears to be empty."
@@ -28761,6 +29053,10 @@ msgstr "此对话不可用"
 msgid "This CSV file appears to be empty or invalid."
 msgstr "此 CSV 文件似乎为空或无效。"
 
+#: src/features/develop/components/files-tab.tsx:43
+msgid "This diff is cut short."
+msgstr ""
+
 #: src/features/local-models/components/ollama-model-manager.tsx:177
 msgid "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 msgstr "此端点不是 Ollama。模型管理仅适用于 Ollama——在 LM Studio 中请在应用内下载模型。"
@@ -28796,6 +29092,19 @@ msgstr "此文件过大（{0} KB），无法在浏览器中预览或编辑。为
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:705
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "此文件过大（约 {0} 个 token），超出了模型的上下文窗口。模型可能无法有效处理此文件。"
+
+#: src/features/develop/components/inbox-list.tsx:45
+msgid "This host does not offer an inbox yet."
+msgstr ""
+
+#. placeholder {0}: host.requestNoun
+#: src/features/develop/components/pull-request-view.tsx:96
+#~ msgid "This host does not offer any view of a {0} yet."
+#~ msgstr ""
+
+#: src/features/develop/components/pull-request-view.tsx:103
+msgid "This host does not offer any view of a {requestNoun} yet."
+msgstr ""
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:372
 msgid "This image has been flagged for review"
@@ -29992,6 +30301,7 @@ msgstr "未分类（{0}）"
 msgid "Uncategorized"
 msgstr "未分类"
 
+#: src/features/develop/components/files-tab.tsx:37
 #: src/features/evals/components/run-comparison.tsx:56
 msgid "Unchanged"
 msgstr "不变"
@@ -30321,7 +30631,7 @@ msgstr "Z.AI 更新的视觉模型"
 msgid "Updated: {timestamp}"
 msgstr "更新于：{timestamp}"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:281
+#: src/features/layout/components/sidebar-shortcut.tsx:289
 msgid "Updates"
 msgstr "更新动态"
 
@@ -30672,7 +30982,7 @@ msgstr "用户"
 #: src/features/devices/components/devices-settings.tsx:273
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
-#: src/features/layout/components/sidebar-shortcut.tsx:186
+#: src/features/layout/components/sidebar-shortcut.tsx:194
 msgid "User"
 msgstr "用户"
 
@@ -31302,6 +31612,10 @@ msgstr "复古独立电影，粗颗粒"
 msgid "Violet"
 msgstr "紫罗兰色"
 
+#: src/routes/admin/gateway/keys.tsx:421
+#~ msgid "Virtual API Keys"
+#~ msgstr "虚拟 API 密钥"
+
 #: src/features/skills/components/skill-form-dialog.tsx:459
 msgid "Visibility"
 msgstr "可见性"
@@ -31808,7 +32122,7 @@ msgid "What's included in the free plan?"
 msgstr "免费套餐包含哪些内容？"
 
 #: src/features/changelog/components/changelog-panel.tsx:103
-#: src/features/layout/components/sidebar-shortcut.tsx:288
+#: src/features/layout/components/sidebar-shortcut.tsx:296
 msgid "What's New"
 msgstr "新功能"
 
@@ -32308,6 +32622,10 @@ msgstr "你已达到速率限制。请在 {minutes, plural, other {# 分钟}}后
 msgid "You've successfully joined the thread. Redirecting..."
 msgstr "你已成功加入对话，正在跳转..."
 
+#: src/features/develop/components/failure-notice.tsx:18
+msgid "Your {label} sign-in has expired. Connect it again to keep reading."
+msgstr ""
+
 #: src/features/auth/components/settings/account/delete-account-card.tsx:56
 msgid "Your account and all associated data are being deleted. This cannot be cancelled."
 msgstr "你的账号及所有相关数据正在被删除，此操作无法取消。"
@@ -32632,297 +32950,3 @@ msgstr "苏黎世"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ 分数"
-
-#. placeholder {0}: listed.length
-#: src/features/develop/components/files-tab.tsx:105
-msgid "{0} files"
-msgstr ""
-
-#. placeholder {0}: detail.authorLogin
-#. placeholder {1}: detail.commitCount
-#. placeholder {2}: detail.baseBranch
-#. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:87
-msgid "{0} wants to merge {1} commits into {2} from {3}"
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:17
-msgid "{label} could not be reached or answered unexpectedly. Try again in a moment."
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:21
-msgid "{label} is limiting requests for this account. Try again in a few minutes."
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:19
-msgid "{label} is not connected"
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:14
-msgid "{label} refused this request. Your account may lack access, or an organization may require you to authorize the app."
-msgstr ""
-
-#: src/features/develop/components/pull-request-view.tsx:59
-msgid "Commits"
-msgstr ""
-
-#: src/features/develop/components/connect-host-card.tsx:20
-#: src/features/develop/components/connect-host-card.tsx:24
-msgid "Connect {label}"
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:19
-msgid "Connect {label} to read your pull requests here."
-msgstr ""
-
-#: src/features/develop/components/connect-host-card.tsx:21
-msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:17
-msgid "Could not load this"
-msgstr ""
-
-#: src/features/develop/components/develop-page.tsx:40
-msgid "Develop"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:54
-msgid "Diffs are not available from this host."
-msgstr ""
-
-#: src/features/develop/components/inbox-list.tsx:51
-msgid "Drafts"
-msgstr ""
-
-#: src/features/develop/components/pull-request-view.tsx:59
-msgid "Files"
-msgstr ""
-
-#. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:92
-msgid "in {0} files"
-msgstr ""
-
-#: src/features/develop/components/develop-page.tsx:45
-msgid "Inbox"
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:20
-msgid "It does not exist, or your {label} account cannot see it."
-msgstr ""
-
-#: src/features/develop/components/commits-tab.tsx:51
-msgid "Load more commits"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:119
-msgid "Load more files"
-msgstr ""
-
-#. placeholder {0}: listed.length
-#. placeholder {1}: Math.min(fileCount, fileLimit)
-#: src/features/develop/components/files-tab.tsx:105
-msgid "Loaded {0} of {1} files…"
-msgstr ""
-
-#: src/features/develop/components/inbox-list.tsx:52
-msgid "Mine"
-msgstr ""
-
-#: src/features/develop/components/inbox-list.tsx:53
-msgid "Needs my review"
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:15
-msgid "No access"
-msgstr ""
-
-#: src/features/develop/components/checks-tab.tsx:42
-msgid "No checks have run for this commit."
-msgstr ""
-
-#: src/features/develop/components/pull-request-view.tsx:109
-msgid "No description provided."
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:20
-msgid "Not found"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:32
-msgid "Not loaded: the diffs on this page were already large."
-msgstr ""
-
-#: src/features/develop/components/inbox-list.tsx:84
-msgid "Nothing here."
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:35
-msgid "Open connectors"
-msgstr ""
-
-#: src/features/layout/components/sidebar-shortcut.tsx:108
-msgid "Open Develop"
-msgstr ""
-
-#. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-view.tsx:78
-msgid "Open on {0}"
-msgstr ""
-
-#: src/features/develop/components/develop-page.tsx:65
-msgid "Pick one from the inbox to read it."
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:21
-msgid "Rate limited"
-msgstr ""
-
-#: src/features/develop/components/develop-page.tsx:41
-msgid "Read what needs you: the description, commits, files, diff and checks of each change."
-msgstr ""
-
-#: src/features/develop/components/inbox-list.tsx:54
-msgid "Ready to merge"
-msgstr ""
-
-#. placeholder {0}: info.requestNoun
-#: src/features/develop/components/develop-page.tsx:54
-msgid "Selected {0}"
-msgstr ""
-
-#. placeholder {0}: list.length
-#: src/features/develop/components/checks-tab.tsx:58
-msgid "Showing {0} of {total} checks."
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:18
-msgid "Sign in to {label} again"
-msgstr ""
-
-#: src/features/develop/components/pull-request-view.tsx:111
-msgid "The description is cut short."
-msgstr ""
-
-#: src/features/develop/components/develop-page.tsx:28
-msgid "The host"
-msgstr ""
-
-#: src/features/develop/components/commits-tab.tsx:37
-msgid "The host lists at most {commitLimit} commits for one change. {leftOut} more are not shown here."
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:109
-msgid "The host lists at most {fileLimit} files for one change. {leftOut} more are not shown here."
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:31
-msgid "The host sent no diff for this file (binary, or too large for it)."
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:33
-msgid "This diff is cut short."
-msgstr ""
-
-#: src/features/develop/components/inbox-list.tsx:46
-msgid "This host does not offer an inbox yet."
-msgstr ""
-
-#. placeholder {0}: host.requestNoun
-#: src/features/develop/components/pull-request-view.tsx:96
-msgid "This host does not offer any view of a {0} yet."
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:18
-msgid "Your {label} sign-in has expired. Connect it again to keep reading."
-msgstr ""
-
-#. placeholder {0}: detail.authorLogin
-#. placeholder {1}: detail.commitCount
-#. placeholder {2}: detail.baseBranch
-#. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:90
-msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
-msgstr ""
-
-#: src/features/develop/components/inbox-list.tsx:56
-msgid "Approved and not a draft. Branch protection is not checked."
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:32
-#: src/features/develop/components/files-tab.tsx:57
-msgid "Changed"
-msgstr ""
-
-#: src/features/develop/components/failure-notice.tsx:19
-msgid "Connect {label} to see what needs your review here."
-msgstr ""
-
-#. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:95
-msgid "in {0, plural, one {# file} other {# files}}"
-msgstr ""
-
-#: src/features/develop/components/inbox-list.tsx:68
-msgid "Inbox sections"
-msgstr ""
-
-#. placeholder {0}: listed.length
-#. placeholder {1}: Math.min(fileCount, fileLimit)
-#: src/features/develop/components/files-tab.tsx:122
-msgid "Loaded {0} of {1, plural, one {# file} other {# files}}…"
-msgstr ""
-
-#: src/features/develop/components/checks-tab.tsx:29
-msgid "Loading checks"
-msgstr ""
-
-#: src/features/develop/components/commits-tab.tsx:18
-msgid "Loading commits"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:101
-msgid "Loading files"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:118
-msgid "Loading files…"
-msgstr ""
-
-#: src/features/develop/lib/use-request-noun.ts:8
-msgid "merge request"
-msgstr ""
-
-#: src/features/develop/lib/use-request-noun.ts:8
-msgid "pull request"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:35
-msgid "Removed"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:36
-msgid "Renamed"
-msgstr ""
-
-#: src/features/develop/components/develop-page.tsx:56
-msgid "Selected {requestNoun}"
-msgstr ""
-
-#. placeholder {0}: list.length
-#: src/features/develop/components/checks-tab.tsx:59
-msgid "Showing {0} of {total, plural, one {# check} other {# checks}}."
-msgstr ""
-
-#: src/features/develop/components/commits-tab.tsx:38
-msgid "The host lists at most {commitLimit, plural, one {# commit} other {# commits}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:131
-msgid "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
-msgstr ""
-
-#: src/features/develop/components/pull-request-view.tsx:99
-msgid "This host does not offer any view of a {requestNoun} yet."
-msgstr ""
