@@ -115,7 +115,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
         if (result.ok) {
             attempt.current = undefined;
-            setText("");
+            // Continue sends a fixed prompt: a draft being typed beside it stays.
+            setText((current) => (current.trim() === prompt ? "" : current));
 
             return;
         }
