@@ -262,6 +262,30 @@ describe("a device's project scope past one page of reads", () => {
     });
 });
 
+describe("the device list with many scoped projects", () => {
+    it("checks more projects than one read may name, and keeps every device's scope", async () => {
+        const scopes: string[][] = [];
+
+        for (let device = 0; device < 3; device += 1) {
+            const { deviceId } = await register(ownerId);
+            const projects: string[] = [];
+
+            for (let index = 0; index < 40; index += 1) {
+                projects.push(await insertProject(ownerId, { title: `D${device} P${index}` }));
+            }
+
+            await setScope(ownerId, deviceId, projects);
+            scopes.push(projects);
+        }
+
+        const listed = await deviceRows();
+
+        expect(listed.map((device) => new Set(device.projectIds)).toSorted((a, b) => [...a][0]!.localeCompare([...b][0]!))).toStrictEqual(
+            scopes.map((projects) => new Set(projects)).toSorted((a, b) => [...a][0]!.localeCompare([...b][0]!)),
+        );
+    });
+});
+
 describe("a device's project scope in the GDPR export", () => {
     it("is part of the exported device", async () => {
         const { deviceId } = await register(ownerId);

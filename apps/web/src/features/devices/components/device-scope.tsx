@@ -19,14 +19,15 @@ const DeviceScope: FC<{ deviceId: string; projectIds?: string[] }> = ({ deviceId
     const { t } = useLingui();
     const crpc = useCRPC();
     const baseId = useId();
-    const { projects } = useProjectList();
+    const scoped = projectIds !== undefined;
+    // The project list is only needed to draw the picker, so a device offered in any chat starts no query.
+    const { projects } = useProjectList(scoped);
     const setScope = useMutation(crpc.devices.functions.setDeviceProjectScope.mutationOptions());
     const chat = projects.filter((project) => project.projectType !== "workflow");
     const chosen = new Set(projectIds);
     const listed = new Set(projects.map((project) => project._id as string));
     // A chosen project outside the loaded page can still be taken out of the scope.
     const unlisted = [...chosen].filter((id) => !listed.has(id));
-    const scoped = projectIds !== undefined;
 
     const save = (scope: { kind: "any" } | { kind: "projects"; projectIds: Id<"projects">[] }): void => {
         setScope.mutate({ deviceId: deviceId as Id<"devices">, scope }, { onError: () => toast.error(t`Could not change where this device is offered.`) });

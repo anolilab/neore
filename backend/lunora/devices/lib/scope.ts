@@ -10,17 +10,21 @@ import type { QueryCtx } from "../../_generated/server";
 export const isDeviceInScope = (device: Pick<Doc<"devices">, "projectIds">, threadProjectId: Id<"projects"> | undefined): boolean =>
     device.projectIds === undefined || (threadProjectId !== undefined && device.projectIds.includes(threadProjectId));
 
-/** Which of `ids` are projects of `userId` that still exist: one read through the `.global()` facade, however many ids. */
+/** D1 caps bound parameters per statement at 100; each read leaves room for `userId` and the query's own. */
+const IDS_PER_READ = 90;
+
+/** Which of `ids` are projects of `userId` that still exist: a few reads through the `.global()` facade, in batches D1 accepts. */
 export const filterOwnProjectIds = async (ctx: Pick<QueryCtx, "db">, userId: string, ids: Iterable<Id<"projects">>): Promise<Set<Id<"projects">>> => {
     const unique = [...new Set(ids)];
+    const batches: Id<"projects">[][] = [];
 
-    if (unique.length === 0) {
-        return new Set();
+    for (let start = 0; start < unique.length; start += IDS_PER_READ) {
+        batches.push(unique.slice(start, start + IDS_PER_READ));
     }
 
-    const { page } = await ctx.db.projects.findMany({ where: { _id: { in: unique }, userId } });
+    const pages = await Promise.all(batches.map(async (batch) => await ctx.db.projects.findMany({ where: { _id: { in: batch }, userId } })));
 
-    return new Set(page.map((project) => project._id));
+    return new Set(pages.flatMap(({ page }) => page.map((project) => project._id)));
 };
 
 /**
