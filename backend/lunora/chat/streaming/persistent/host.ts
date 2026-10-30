@@ -4,7 +4,7 @@
  * The host posts its events, and each event takes the `seq` the host gave it instead of the next free one
  * (`addChunk` stamps its own). The stored `seq` is the claim that makes a redelivered post a no-op.
  */
-import { HOST_STREAM_IDLE_MS } from "../../../acp/lib/constants";
+import { HOST_STREAM_IDLE_MS, HOST_TURN_MAX_MS } from "../../../acp/lib/constants";
 import type { Doc, Id } from "../../../_generated/dataModel";
 import type { MutationCtx } from "../../../_generated/server";
 import { patchThread } from "../../../agent/table-writes";
@@ -74,8 +74,11 @@ export const updateHostStream = async (
 };
 
 /** Moves a live host stream's reaper window on from `now`: it is waiting on a person, not on its host. */
+/** The latest a host stream may expire: no window moves it past `HOST_TURN_MAX_MS` from its creation. */
+const hardDeadlineOf = (stream: Pick<Stream, "_creationTime">): number => stream._creationTime + HOST_TURN_MAX_MS;
+
 export const extendHostStream = async (ctx: Pick<MutationCtx, "db">, stream: Stream, now: number): Promise<void> => {
-    await ctx.db.patch(stream._id, { expiresAt: now + HOST_STREAM_IDLE_MS });
+    await ctx.db.patch(stream._id, { expiresAt: Math.min(now + HOST_STREAM_IDLE_MS, hardDeadlineOf(stream)) });
 };
 
 /** The `seq` the next event must carry: one past the last chunk, read off `by_streamId_seq`. */
@@ -104,8 +107,16 @@ export const appendHostChunk = async (
  * Moves the reaper window forward, but only once half of it is gone: the stream row is read by a live query
  * (`getActiveStreamForThread`), so a write on every post would re-run it for every viewer four times a second.
  */
-export const bumpedExpiry = (stream: Pick<Stream, "expiresAt">, now: number): number | undefined =>
-    stream.expiresAt - now < HOST_STREAM_IDLE_MS / 2 ? now + HOST_STREAM_IDLE_MS : undefined;
+export const bumpedExpiry = (stream: Pick<Stream, "_creationTime" | "expiresAt">, now: number): number | undefined => {
+    if (stream.expiresAt - now >= HOST_STREAM_IDLE_MS / 2) {
+        return undefined;
+    }
+
+    // Keepalives move the window on, but never past the turn's hard deadline, so the reaper always ends it.
+    const next = Math.min(now + HOST_STREAM_IDLE_MS, hardDeadlineOf(stream));
+
+    return next > stream.expiresAt ? next : undefined;
+};
 
 /** Hands the thread back from `running` unless another live stream or an edit on it still holds it. */
 export const releaseThread = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">, now: number): Promise<void> => {
