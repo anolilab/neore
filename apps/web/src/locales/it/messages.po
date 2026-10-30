@@ -192,6 +192,11 @@ msgid "{0, plural, one {# check is still running} other {# checks are still runn
 msgstr ""
 
 #. placeholder {0}: files.length
+#: src/features/chat/thread/host-changes.tsx:44
+msgid "{0, plural, one {# file changed} other {# files changed}}"
+msgstr ""
+
+#. placeholder {0}: files.length
 #. placeholder {0}: listed.length
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:707
 #: src/features/develop/components/files-tab.tsx:256
@@ -3564,7 +3569,7 @@ msgstr "Assistente (nessuna skill)"
 msgid "Assistant replied:"
 msgstr "L'assistente ha risposto:"
 
-#: src/features/chat/thread/message-item.tsx:205
+#: src/features/chat/thread/message-item.tsx:206
 #: src/features/chat/thread/streaming-placeholder.tsx:723
 #: src/features/chat/thread/streaming-placeholder.tsx:760
 msgid "Assistant Reply:"
@@ -5128,6 +5133,10 @@ msgstr ""
 #: src/features/skills/components/skill-builder-diff.tsx:44
 msgid "Changes from the last refinement"
 msgstr "Modifiche dall'ultimo perfezionamento"
+
+#: src/features/chat/thread/host-changes.tsx:75
+msgid "Changes in this turn"
+msgstr ""
 
 #: src/features/workflow/components/version-history.tsx:129
 msgid "Changes will appear here"
@@ -7017,7 +7026,7 @@ msgstr "Copiato negli appunti"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:353
+#: src/features/chat/thread/message-item.tsx:354
 #: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copied!"
 msgstr "Copiato!"
@@ -7027,7 +7036,7 @@ msgstr "Copiato!"
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
-#: src/features/chat/thread/message-item.tsx:353
+#: src/features/chat/thread/message-item.tsx:354
 #: src/features/chat/thread/text-selection-menu.tsx:385
 #: src/features/settings/components/chat/trigger-settings.tsx:739
 msgid "Copy"
@@ -7043,7 +7052,7 @@ msgstr ""
 msgid "Copy as Markdown"
 msgstr "Copia come Markdown"
 
-#: src/features/chat/thread/message-item.tsx:370
+#: src/features/chat/thread/message-item.tsx:371
 msgid "Copy as plain text"
 msgstr ""
 
@@ -9491,7 +9500,7 @@ msgstr "Scarica un modello"
 msgid "Download as CSV"
 msgstr "Scarica come CSV"
 
-#: src/features/chat/thread/message-item.tsx:374
+#: src/features/chat/thread/message-item.tsx:375
 msgid "Download as Markdown"
 msgstr "Scarica come Markdown"
 
@@ -9865,7 +9874,7 @@ msgstr "Generazione guidata dai bordi"
 #: src/features/canvas/canvas-panel.tsx:767
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:393
+#: src/features/chat/thread/message-item.tsx:394
 #: src/features/develop/components/draft-comment-card.tsx:51
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
@@ -12687,6 +12696,10 @@ msgstr "Il nome del file non può essere vuoto"
 msgid "Files"
 msgstr ""
 
+#: src/features/chat/thread/host-changes.tsx:41
+msgid "Files changed by this turn"
+msgstr ""
+
 #: src/features/settings/components/privacy/data-access.tsx:52
 msgid "Files:"
 msgstr "File:"
@@ -13056,7 +13069,7 @@ msgstr "Duplica"
 msgid "Fork {0} to edit a copy"
 msgstr "Duplica {0} per modificarne una copia"
 
-#: src/features/chat/thread/message-item.tsx:403
+#: src/features/chat/thread/message-item.tsx:404
 msgid "Fork conversation"
 msgstr "Duplica conversazione"
 
@@ -13572,7 +13585,7 @@ msgstr "Genera da una descrizione"
 msgid "Generate ideas for a creative writing story"
 msgstr "Trova idee per un racconto di scrittura creativa"
 
-#: src/features/chat/thread/message-item.tsx:422
+#: src/features/chat/thread/message-item.tsx:423
 msgid "Generate image"
 msgstr "Genera immagine"
 
@@ -13598,7 +13611,7 @@ msgstr "Genera un seed casuale"
 msgid "Generate unique business ideas for 2025"
 msgstr "Trova idee di business originali per il 2025"
 
-#: src/features/chat/thread/message-item.tsx:432
+#: src/features/chat/thread/message-item.tsx:433
 msgid "Generate video"
 msgstr "Genera video"
 
@@ -13611,7 +13624,7 @@ msgstr "Genera video"
 msgid "Generate videos from text or images"
 msgstr "Genera video da testo o immagini"
 
-#: src/features/chat/thread/message-item.tsx:442
+#: src/features/chat/thread/message-item.tsx:443
 msgid "Generate voice"
 msgstr "Genera voce"
 
@@ -18458,7 +18471,7 @@ msgstr "Altro su di te"
 msgid "More actions for {0}"
 msgstr ""
 
-#: src/features/chat/thread/message-item.tsx:362
+#: src/features/chat/thread/message-item.tsx:363
 msgid "More copy options"
 msgstr ""
 
@@ -20604,6 +20617,10 @@ msgstr "Apri l’URL corrente"
 msgid "Open Develop"
 msgstr ""
 
+#: src/features/chat/thread/host-changes.tsx:50
+msgid "Open diff"
+msgstr ""
+
 #: src/features/layout/components/sidebar-shortcut.tsx:101
 msgid "Open Evals"
 msgstr "Apri Valutazioni"
@@ -21997,7 +22014,7 @@ msgstr "Fissa ricordo"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:144
 #: ../../packages/chat-ui/src/chat/message-item.tsx:193
-#: src/features/chat/thread/message-item.tsx:381
+#: src/features/chat/thread/message-item.tsx:382
 msgid "Pin message"
 msgstr "Fissa messaggio"
 
@@ -23848,7 +23865,7 @@ msgid "Refresh installed models"
 msgstr "Aggiorna i modelli installati"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:198
-#: src/features/chat/thread/message-item.tsx:387
+#: src/features/chat/thread/message-item.tsx:388
 msgid "Regenerate"
 msgstr "Rigenera"
 
@@ -28274,7 +28291,7 @@ msgstr "Sintetizzatore (valuta entrambe le parti)"
 msgid "System default"
 msgstr "Predefinito di sistema"
 
-#: src/features/chat/thread/message-item.tsx:232
+#: src/features/chat/thread/message-item.tsx:233
 msgid "System message:"
 msgstr "Messaggio di sistema:"
 
@@ -29000,6 +29017,14 @@ msgstr ""
 #: src/features/download/components/download-page.tsx:71
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "L'app desktop funziona su macOS, Windows e Linux. I programmi di installazione sono allegati a una release desktop su GitHub e compaiono lì quando la release viene pubblicata."
+
+#: src/features/chat/thread/host-changes.tsx:78
+msgid "The diff as it was when the turn ended. Later edits to these files are not part of it."
+msgstr ""
+
+#: src/features/chat/thread/host-changes.tsx:67
+msgid "The diff is too large to keep. The files and their line counts are shown."
+msgstr ""
 
 #: src/features/evals/components/case-fields.tsx:115
 msgid "The documents the answer should be retrieved from. Used for hit rate, MRR, precision and recall."
@@ -33337,7 +33362,7 @@ msgstr "La tua località (ad es. \"Roma, Italia\", \"Berlino, Germania\")."
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Il tuo messaggio contiene contenuti inappropriati e non può essere inviato."
 
-#: src/features/chat/thread/message-item.tsx:177
+#: src/features/chat/thread/message-item.tsx:178
 msgid "Your message:"
 msgstr "Il tuo messaggio:"
 

@@ -17612,6 +17612,80 @@
                       "literal": "\"interrupted\""
                     }
                   ]
+                },
+                "summary": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "files": {
+                      "kind": "array",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "of": {
+                        "kind": "object",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "fields": {
+                          "added": {
+                            "kind": "number",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "refined": true
+                          },
+                          "path": {
+                            "kind": "string",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "refined": true
+                          },
+                          "removed": {
+                            "kind": "number",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "refined": true
+                          }
+                        }
+                      },
+                      "refined": true
+                    },
+                    "patch": {
+                      "kind": "union",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false,
+                      "members": [
+                        {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": false,
+                          "unique": false,
+                          "fields": {
+                            "tooLarge": {
+                              "kind": "literal",
+                              "nullable": false,
+                              "optional": false,
+                              "unique": false,
+                              "literal": "true"
+                            }
+                          }
+                        },
+                        {
+                          "kind": "string",
+                          "nullable": false,
+                          "optional": false,
+                          "unique": false,
+                          "refined": true
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             },

@@ -192,6 +192,11 @@ msgid "{0, plural, one {# check is still running} other {# checks are still runn
 msgstr ""
 
 #. placeholder {0}: files.length
+#: src/features/chat/thread/host-changes.tsx:44
+msgid "{0, plural, one {# file changed} other {# files changed}}"
+msgstr ""
+
+#. placeholder {0}: files.length
 #. placeholder {0}: listed.length
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:707
 #: src/features/develop/components/files-tab.tsx:256
@@ -3564,7 +3569,7 @@ msgstr "Assistente (sem habilidade)"
 msgid "Assistant replied:"
 msgstr "O assistente respondeu:"
 
-#: src/features/chat/thread/message-item.tsx:205
+#: src/features/chat/thread/message-item.tsx:206
 #: src/features/chat/thread/streaming-placeholder.tsx:723
 #: src/features/chat/thread/streaming-placeholder.tsx:760
 msgid "Assistant Reply:"
@@ -5128,6 +5133,10 @@ msgstr ""
 #: src/features/skills/components/skill-builder-diff.tsx:44
 msgid "Changes from the last refinement"
 msgstr "Alterações do último refinamento"
+
+#: src/features/chat/thread/host-changes.tsx:75
+msgid "Changes in this turn"
+msgstr ""
 
 #: src/features/workflow/components/version-history.tsx:129
 msgid "Changes will appear here"
@@ -7017,7 +7026,7 @@ msgstr "Copiado para a área de transferência"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:353
+#: src/features/chat/thread/message-item.tsx:354
 #: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copied!"
 msgstr "Copiado!"
@@ -7027,7 +7036,7 @@ msgstr "Copiado!"
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
-#: src/features/chat/thread/message-item.tsx:353
+#: src/features/chat/thread/message-item.tsx:354
 #: src/features/chat/thread/text-selection-menu.tsx:385
 #: src/features/settings/components/chat/trigger-settings.tsx:739
 msgid "Copy"
@@ -7043,7 +7052,7 @@ msgstr ""
 msgid "Copy as Markdown"
 msgstr "Copiar como Markdown"
 
-#: src/features/chat/thread/message-item.tsx:370
+#: src/features/chat/thread/message-item.tsx:371
 msgid "Copy as plain text"
 msgstr ""
 
@@ -9491,7 +9500,7 @@ msgstr "Baixar um modelo"
 msgid "Download as CSV"
 msgstr "Baixar como CSV"
 
-#: src/features/chat/thread/message-item.tsx:374
+#: src/features/chat/thread/message-item.tsx:375
 msgid "Download as Markdown"
 msgstr "Baixar como Markdown"
 
@@ -9865,7 +9874,7 @@ msgstr "Geração guiada por bordas"
 #: src/features/canvas/canvas-panel.tsx:767
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:393
+#: src/features/chat/thread/message-item.tsx:394
 #: src/features/develop/components/draft-comment-card.tsx:51
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
@@ -12687,6 +12696,10 @@ msgstr "O nome do arquivo não pode ficar vazio"
 msgid "Files"
 msgstr ""
 
+#: src/features/chat/thread/host-changes.tsx:41
+msgid "Files changed by this turn"
+msgstr ""
+
 #: src/features/settings/components/privacy/data-access.tsx:52
 msgid "Files:"
 msgstr "Arquivos:"
@@ -13056,7 +13069,7 @@ msgstr "Criar cópia"
 msgid "Fork {0} to edit a copy"
 msgstr "Criar uma cópia de {0} para editar"
 
-#: src/features/chat/thread/message-item.tsx:403
+#: src/features/chat/thread/message-item.tsx:404
 msgid "Fork conversation"
 msgstr "Ramificar conversa"
 
@@ -13572,7 +13585,7 @@ msgstr "Gerar a partir de uma descrição"
 msgid "Generate ideas for a creative writing story"
 msgstr "Gere ideias para uma história criativa"
 
-#: src/features/chat/thread/message-item.tsx:422
+#: src/features/chat/thread/message-item.tsx:423
 msgid "Generate image"
 msgstr "Gerar imagem"
 
@@ -13598,7 +13611,7 @@ msgstr "Gerar seed aleatória"
 msgid "Generate unique business ideas for 2025"
 msgstr "Gere ideias de negócio originais para 2025"
 
-#: src/features/chat/thread/message-item.tsx:432
+#: src/features/chat/thread/message-item.tsx:433
 msgid "Generate video"
 msgstr "Gerar vídeo"
 
@@ -13611,7 +13624,7 @@ msgstr "Gerar vídeo"
 msgid "Generate videos from text or images"
 msgstr "Gere vídeos a partir de texto ou imagens"
 
-#: src/features/chat/thread/message-item.tsx:442
+#: src/features/chat/thread/message-item.tsx:443
 msgid "Generate voice"
 msgstr "Gerar voz"
 
@@ -18458,7 +18471,7 @@ msgstr "Mais sobre você"
 msgid "More actions for {0}"
 msgstr ""
 
-#: src/features/chat/thread/message-item.tsx:362
+#: src/features/chat/thread/message-item.tsx:363
 msgid "More copy options"
 msgstr ""
 
@@ -20604,6 +20617,10 @@ msgstr "Abrir URL atual"
 msgid "Open Develop"
 msgstr ""
 
+#: src/features/chat/thread/host-changes.tsx:50
+msgid "Open diff"
+msgstr ""
+
 #: src/features/layout/components/sidebar-shortcut.tsx:101
 msgid "Open Evals"
 msgstr "Abrir avaliações"
@@ -21997,7 +22014,7 @@ msgstr "Fixar memória"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:144
 #: ../../packages/chat-ui/src/chat/message-item.tsx:193
-#: src/features/chat/thread/message-item.tsx:381
+#: src/features/chat/thread/message-item.tsx:382
 msgid "Pin message"
 msgstr "Fixar mensagem"
 
@@ -23848,7 +23865,7 @@ msgid "Refresh installed models"
 msgstr "Atualizar modelos instalados"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:198
-#: src/features/chat/thread/message-item.tsx:387
+#: src/features/chat/thread/message-item.tsx:388
 msgid "Regenerate"
 msgstr "Gerar novamente"
 
@@ -28274,7 +28291,7 @@ msgstr "Sintetizador (pondera os dois lados)"
 msgid "System default"
 msgstr "Padrão do sistema"
 
-#: src/features/chat/thread/message-item.tsx:232
+#: src/features/chat/thread/message-item.tsx:233
 msgid "System message:"
 msgstr "Mensagem do sistema:"
 
@@ -29000,6 +29017,14 @@ msgstr ""
 #: src/features/download/components/download-page.tsx:71
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "O app desktop funciona no macOS, Windows e Linux. Os instaladores ficam anexados a uma versão desktop no GitHub e aparecem lá assim que ela for publicada."
+
+#: src/features/chat/thread/host-changes.tsx:78
+msgid "The diff as it was when the turn ended. Later edits to these files are not part of it."
+msgstr ""
+
+#: src/features/chat/thread/host-changes.tsx:67
+msgid "The diff is too large to keep. The files and their line counts are shown."
+msgstr ""
 
 #: src/features/evals/components/case-fields.tsx:115
 msgid "The documents the answer should be retrieved from. Used for hit rate, MRR, precision and recall."
@@ -33337,7 +33362,7 @@ msgstr "Sua localização (ex.: \"São Paulo, Brasil\", \"Berlim, Alemanha\")."
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Sua mensagem contém conteúdo impróprio e não pode ser enviada."
 
-#: src/features/chat/thread/message-item.tsx:177
+#: src/features/chat/thread/message-item.tsx:178
 msgid "Your message:"
 msgstr "Sua mensagem:"
 
