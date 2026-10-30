@@ -37,6 +37,7 @@ export type ThreadPatch = Partial<
         | "activeLeafMessageId"
         | "awaitingInput"
         | "groupChat"
+        | "hasHandoff"
         | "lastCompressionStartedAt"
         | "lastReplyAt"
         | "model"

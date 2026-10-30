@@ -2695,6 +2695,9 @@ export const schema = defineSchema({
         // Multi-agent group chat: participants (skill ids) and who-speaks mode.
         // Written only by `chat/group/functions.ts`, which checks access.
         groupChat: v.optional(vGroupChat),
+        // Set once a switch on this thread stores a handoff (`chat/agent-switch.ts`): unset, a reply never
+        // walks the path looking for one (`agent/agent-switch.ts#handoffAboveOf`).
+        hasHandoff: v.optional(v.boolean()),
         isPublic: v.optional(v.boolean()),
         isTemporary: v.optional(v.boolean()),
         language: v.optional(v.string()),

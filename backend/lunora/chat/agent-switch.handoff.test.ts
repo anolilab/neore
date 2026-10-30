@@ -563,4 +563,21 @@ describe("a window that starts below the divider", () => {
 
         expect(above).toStrictEqual([all.map((row) => agentSwitchOf(row)).find(Boolean)!.handoff]);
     });
+    it("marks only a thread a switch stored a handoff on, so one switched with its full history walks nothing", async () => {
+        const handoffFlag = async () => await run(async (ctx) => ((await ctx.db.get(threadId as never)) as { hasHandoff?: boolean } | null)?.hasHandoff);
+
+        await addTurn("hello", "hi");
+        await switchTo(B, "click-1", "full");
+        await addTurn("later question", "later answer");
+
+        const all = await rows();
+        const below = all.find((row) => row.text === "later question")!._id;
+
+        expect(await handoffFlag()).toBeUndefined();
+        expect(await run(async (ctx) => await handoffAboveOf(ctx, { belowMessageId: below, threadId: threadId as never }))).toStrictEqual([]);
+
+        await switchTo(A, "click-2", "portable");
+
+        expect(await handoffFlag()).toBe(true);
+    });
 });

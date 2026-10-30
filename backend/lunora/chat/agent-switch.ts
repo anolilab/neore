@@ -296,6 +296,7 @@ export const switchThreadAgentHandler = async (
 
     await patchThread(ctx.db, thread._id, {
         activeAgent: to,
+        ...(args.handoff?.text && { hasHandoff: true }),
         // The row now ends the path the thread displays.
         ...(thread.activeLeafMessageId && { activeLeafMessageId: messageId }),
         updatedAt: Date.now(),

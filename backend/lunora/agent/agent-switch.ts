@@ -129,13 +129,13 @@ const deltaBase = async (context: Reader, threadId: Id<"threads">, part: AgentSw
 
 /**
  * The stored handoffs a context window needs when it starts below the divider that holds them, oldest first,
- * for the rows above `belowMessageId`. Empty for a thread that was never switched, which is every thread but
- * the few that were and costs them one thread read.
+ * for the rows above `belowMessageId`. Empty for a thread no switch ever stored a handoff on — never switched,
+ * or switched only with its full history — at the cost of one thread read.
  */
 export const handoffAboveOf = async (context: QueryCtx, args: { belowMessageId: Id<"messages">; threadId: Id<"threads"> }): Promise<string[]> => {
     const thread = await context.db.get(args.threadId);
 
-    if (!thread?.activeAgent) {
+    if (!thread?.activeAgent || !thread.hasHandoff) {
         return [];
     }
 
@@ -311,7 +311,8 @@ export const getRunAgentModel = internalQuery
  * A fork copies the switch dividers of the path it takes, but not the `activeAgent` cache that makes
  * the fork run on what they say, and a copied divider still names a row of the SOURCE as the one it
  * follows. Points each at the row before it in the fork (the copy is a straight line, so that is its
- * parent) and sets the cache from the newest; a fork cut before the first switch has neither to fix.
+ * parent) and sets the cache from the newest, and `hasHandoff` when a copied divider carries one; a fork cut
+ * before the first switch has neither to fix.
  */
 export const adoptForkAgentOf = async (context: MutationCtx, threadId: Id<"threads">): Promise<void> => {
     const thread = await context.db.get(threadId);
@@ -331,7 +332,10 @@ export const adoptForkAgentOf = async (context: MutationCtx, threadId: Id<"threa
     }
 
     if (switches[0]) {
-        await patchThread(context.db, threadId, { activeAgent: switches[0].part.to });
+        await patchThread(context.db, threadId, {
+            activeAgent: switches[0].part.to,
+            ...(switches.some(({ part }) => Boolean(part.handoff)) && { hasHandoff: true }),
+        });
     }
 };
 

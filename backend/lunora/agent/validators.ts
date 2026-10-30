@@ -696,6 +696,8 @@ export const vThreadDocFields = {
     // Written only by `chat/group/functions.ts`, which checks every participant
     // is a skill the owner may use — so it is deliberately not a create field.
     groupChat: v.optional(vGroupChat),
+    // Written only by `chat/agent-switch.ts`, when a switch stores a handoff.
+    hasHandoff: v.optional(v.boolean()),
     // Written with the status write that ends a successful run, never by a client.
     lastReplyAt: v.optional(v.number()),
     // Written only by `agent/messages.ts#addMessagesHandler`, never by a client.
