@@ -402,6 +402,7 @@ export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: Too
 
     if (decision === "always") {
         await writeToolPermission(ctx, key, "auto");
+        await writeToolGrant(ctx, key, null);
     } else if (decision === "hour" || decision === "today") {
         // A device call is approved again on the device, with taint only known there, so no allow covers it here.
         // The throw rolls the claim back.

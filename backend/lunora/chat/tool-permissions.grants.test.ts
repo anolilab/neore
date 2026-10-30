@@ -98,6 +98,16 @@ describe("recordApprovalPreference", () => {
         expect(await grantsOf()).toStrictEqual({ [KEY]: Date.UTC(2026, 9, 31, 4, 0) });
     });
 
+    it("ends a running time-boxed allow when the user picks Always", async () => {
+        await record("hour", KEY);
+        await record("always", KEY);
+
+        const row = await stored();
+
+        expect(row?.toolPermissions).toStrictEqual({ [KEY]: "auto" });
+        expect(row?.toolPermissionGrants).toStrictEqual({});
+    });
+
     it("stores nothing for a plain approval or a denial", async () => {
         await record("approve", KEY);
         await record("deny", KEY);

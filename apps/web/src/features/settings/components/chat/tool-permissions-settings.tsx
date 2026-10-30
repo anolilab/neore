@@ -44,13 +44,15 @@ interface ToolRowData {
 }
 
 interface ToolRowProps {
+    /** A time-boxed allow is running for this tool: choosing its current mode must still end it. */
+    hasGrant: boolean;
     isSaving: boolean;
     onChange: (key: string, mode: Mode | null) => void;
     override: Mode | undefined;
     tool: ToolRowData;
 }
 
-const ToolRow: FC<ToolRowProps> = ({ isSaving, onChange, override, tool }) => {
+const ToolRow: FC<ToolRowProps> = ({ hasGrant, isSaving, onChange, override, tool }) => {
     const { t } = useLingui();
     const nameId = useId();
     const effective = override ?? tool.defaultMode;
@@ -75,9 +77,10 @@ const ToolRow: FC<ToolRowProps> = ({ isSaving, onChange, override, tool }) => {
                     aria-labelledby={nameId}
                     disabled={isSaving}
                     onValueChange={(value) => {
-                        const next = value?.[0];
+                        // Clicking the pressed mode clears the group's value; with an allow running it is still a choice.
+                        const next = value?.[0] ?? (hasGrant ? effective : undefined);
 
-                        if (isMode(next) && next !== effective) {
+                        if (isMode(next) && (next !== effective || hasGrant)) {
                             onChange(tool.key, next);
                         }
                     }}
@@ -110,6 +113,7 @@ const ToolRow: FC<ToolRowProps> = ({ isSaving, onChange, override, tool }) => {
 interface ToolGroupProps {
     description?: string;
     error?: string | null;
+    grants: Record<string, number>;
     isSaving: boolean;
     onChange: (key: string, mode: Mode | null) => void;
     overrides: Record<string, Mode>;
@@ -117,7 +121,7 @@ interface ToolGroupProps {
     tools: ToolRowData[];
 }
 
-const ToolGroup: FC<ToolGroupProps> = ({ description, error, isSaving, onChange, overrides, title, tools }) => {
+const ToolGroup: FC<ToolGroupProps> = ({ description, error, grants, isSaving, onChange, overrides, title, tools }) => {
     const { t } = useLingui();
 
     return (
@@ -135,7 +139,14 @@ const ToolGroup: FC<ToolGroupProps> = ({ description, error, isSaving, onChange,
                 {!error && tools.length === 0 && <p className="text-muted-foreground text-sm">{t`No tools.`}</p>}
                 <ul className="divide-y">
                     {tools.map((tool) => (
-                        <ToolRow isSaving={isSaving} key={tool.key} onChange={onChange} override={overrides[tool.key]} tool={tool} />
+                        <ToolRow
+                            hasGrant={grants[tool.key] !== undefined}
+                            isSaving={isSaving}
+                            key={tool.key}
+                            onChange={onChange}
+                            override={overrides[tool.key]}
+                            tool={tool}
+                        />
                     ))}
                 </ul>
             </CardContent>
@@ -301,7 +312,15 @@ const ToolPermissionsSettings: FC = () => {
                     <Heading className="text-lg font-semibold" fallbackLevel={3}>{t`Built-in tools`}</Heading>
                     <HeadingSection>
                         {[...builtInByCategory].map(([category, tools]) => (
-                            <ToolGroup isSaving={isSaving} key={category} onChange={handleChange} overrides={overrides} title={category} tools={tools} />
+                            <ToolGroup
+                                grants={settings?.grants ?? {}}
+                                isSaving={isSaving}
+                                key={category}
+                                onChange={handleChange}
+                                overrides={overrides}
+                                title={category}
+                                tools={tools}
+                            />
                         ))}
                     </HeadingSection>
                 </section>
@@ -319,6 +338,7 @@ const ToolPermissionsSettings: FC = () => {
                             <ToolGroup
                                 description={t`MCP server`}
                                 error={server.error}
+                                grants={settings?.grants ?? {}}
                                 isSaving={isSaving}
                                 key={server.name}
                                 onChange={handleChange}
