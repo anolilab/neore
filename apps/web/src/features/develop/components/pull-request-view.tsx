@@ -11,6 +11,7 @@ import { ExternalLink } from "lucide-react";
 
 import { safeExternalUrl } from "../lib/format";
 import type { DevelopTab } from "../lib/search";
+import { DEVELOP_TABS } from "../lib/search";
 import { usePullRequest } from "../lib/use-develop";
 import { useRequestNoun } from "../lib/use-request-noun";
 import ChecksTab from "./checks-tab";
@@ -57,7 +58,8 @@ const PullRequestView = ({
     }
 
     const { detail, leftOut } = pull.data;
-    const tabs = (Object.keys(TAB_CAPABILITY) as DevelopTab[]).filter((candidate) => isHostCapabilityAvailable(host.capabilities, TAB_CAPABILITY[candidate]));
+    // In the declared order, so a pull request opens on its description.
+    const tabs = DEVELOP_TABS.filter((candidate) => isHostCapabilityAvailable(host.capabilities, TAB_CAPABILITY[candidate]));
     const current = tab !== undefined && tabs.includes(tab) ? tab : tabs[0];
     const tabLabels: Record<DevelopTab, string> = { checks: t`Checks`, commits: t`Commits`, description: t`Description`, files: t`Files` };
     const stateLabels = { closed: t`Closed`, merged: t`Merged`, open: t`Open` };
