@@ -2,6 +2,7 @@ import { isBillingMode } from "@neore/ai/gateway";
 import type { HttpActionCtx } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
+import { systemRunners } from "../../lib/http-shard";
 import { verifySignedRequest } from "../../lib/sign-request";
 
 interface UsageReport {
@@ -20,7 +21,7 @@ interface UsageReport {
  * HTTP action handler for POST /gateway/usage-report.
  * Called by the LLM Gateway after each LLM call to deduct credits.
  */
-export const gatewayUsageReportHttpAction = async (context: HttpActionCtx, request: Request): Promise<Response> => {
+export const gatewayUsageReportHttpAction = async (_context: HttpActionCtx, request: Request): Promise<Response> => {
     // Verify HMAC signature
     const secret = process.env.LLM_GATEWAY_SIGNING_SECRET!;
     const valid = await verifySignedRequest(request, secret);
@@ -37,15 +38,17 @@ export const gatewayUsageReportHttpAction = async (context: HttpActionCtx, reque
         return Response.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    if (!report.userId || !report.requestId || report.costMicrodollars === undefined) {
+    if (typeof report.userId !== "string" || !report.userId || !report.requestId || report.costMicrodollars === undefined) {
         return Response.json({ error: "Missing required fields: userId, requestId, costMicrodollars" }, { status: 400 });
     }
 
     // Deduct credits — propagate failures so the gateway retries.
     // The mutation is idempotent on requestId, so retries are safe.
     try {
-        // The deduction row is the user's: it goes on their shard.
-        await context.forShard(report.userId).runMutation(internal.auth.billing.deductCreditsFromGateway, {
+        // The deduction row is the user's: it goes on their shard. The request is HMAC-signed
+        // (body included), so `userId` is the gateway's; the runtime would refuse a user-less
+        // request's `forShard`, so the crossing is as the system.
+        await systemRunners(report.userId).runMutation(internal.auth.billing.deductCreditsFromGateway, {
             // An unrecognised mode is dropped rather than rejected (a 500 would make the
             // gateway's report fail outright); absent means "platform".
             billingMode: isBillingMode(report.billingMode) ? report.billingMode : undefined,

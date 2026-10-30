@@ -28,7 +28,7 @@ import { internal } from "../_generated/internal";
 import { DEVICE_SIGNATURE_WINDOW_MS } from "../devices/lib/constants";
 import { isDeviceSignature } from "../devices/lib/signing";
 import { sha256Hex, timingSafeEqual } from "../lib/crypto";
-import { inShard } from "../lib/http-shard";
+import { inSystemShard, systemRunners } from "../lib/http-shard";
 import { isUploadId } from "../lib/chat-upload-staging";
 import { isUploadBucket, refusal, serveUserUpload } from "../lib/upload-route";
 import { MAX_LENGTH } from "../lib/validators";
@@ -161,7 +161,12 @@ const bindContinue = async (post: Record<string, unknown>, request: Request, pat
 
     const { bodySha256, offset } = post;
 
-    if (!isNonNegativeInteger(offset) || typeof bodySha256 !== "string" || !SHA256_HEX.test(bodySha256) || request.headers.get("upload-offset") !== String(offset)) {
+    if (
+        !isNonNegativeInteger(offset) ||
+        typeof bodySha256 !== "string" ||
+        !SHA256_HEX.test(bodySha256) ||
+        request.headers.get("upload-offset") !== String(offset)
+    ) {
         return null;
     }
 
@@ -216,14 +221,15 @@ export const hostUploadHttpAction = async (context: HttpActionCtx, request: Requ
 
     const { scheduler } = context;
 
-    return await inShard(context, ownerId, async (shardCtx) => {
-        const verified = await shardCtx.runQuery(internal.acp.upload.verifyHostUpload, { deviceId, now, payload, signature });
+    // A device post carries no identity, so the shard is crossed as the system, and only after the signature is known good.
+    // The route said whose device this is; the shard's own device row must agree.
+    const verified = await systemRunners(ownerId).runQuery(internal.acp.upload.verifyHostUpload, { deviceId, now, payload, signature });
 
-        // The route said whose device this is; the shard's own device row must agree.
-        if (verified?.userId !== ownerId) {
-            return unauthorized();
-        }
+    if (verified?.userId !== ownerId) {
+        return unauthorized();
+    }
 
+    return await inSystemShard(context, ownerId, async (shardCtx) => {
         const post = parseJson(payload);
 
         if (!isRecord(post) || post.method !== method) {

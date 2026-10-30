@@ -2,11 +2,12 @@ import type { HttpActionCtx } from "lunorash/server";
 
 import { internal } from "../../../_generated/internal";
 import type { Id } from "../../../_generated/dataModel";
-import { shardContext } from "../../../lib/http-shard";
+import { inSystemShard, systemRunners } from "../../../lib/http-shard";
 import { verifySignedRequest } from "../../../lib/sign-request";
 import { threadShardFor } from "../../../lib/thread-shard";
 import { streamLogger } from "../../../lib/logger";
 import { THREAD_LOCKED_CODE } from "../../../lib/thread-lock";
+import { MAX_LENGTH } from "../../../lib/validators";
 import type { StreamStatus } from "./schema";
 
 /**
@@ -99,9 +100,9 @@ export const getChunksHttpAction = async (context: HttpActionCtx, request: Reque
     }
 
     // Parse request body
-    // `threadId`/`userId` come from the stream token the gateway verified; this
-    // request is signed, so they are as trustworthy as that token.
-    let body: { afterIndex: number; streamId: string; threadId?: string; userId?: string; waitMs?: unknown };
+    // `threadId`/`userId` come from the stream token the gateway verified, and the
+    // body is covered by the HMAC above, so they are as trustworthy as that token.
+    let body: { afterIndex: number; streamId: string; threadId?: unknown; userId?: unknown; waitMs?: unknown };
 
     try {
         body = await request.json();
@@ -115,14 +116,31 @@ export const getChunksHttpAction = async (context: HttpActionCtx, request: Reque
         return Response.json({ error: "Missing required parameters: streamId, afterIndex" }, { status: 400 });
     }
 
-    // The stream lives on its thread's shard.
-    // A poll with no user (an older gateway) can only look on `__root__`.
-    if (userId) {
-        context = shardContext(context, await threadShardFor(context, userId, threadId));
+    const isId = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= MAX_LENGTH.id;
+
+    if ((userId !== undefined && !isId(userId)) || (threadId !== undefined && !isId(threadId))) {
+        return Response.json({ error: "Invalid userId or threadId" }, { status: 400 });
     }
 
     const waitMs = toChunkWaitMs(body.waitMs);
 
+    // A poll with no user (an older gateway) can only look on `__root__`.
+    if (userId === undefined) {
+        return await serveChunks(context, { afterIndex, streamId, waitMs });
+    }
+
+    // The request is verified, so it may cross into a shard as the system (the
+    // runtime would refuse a user-less request). The stream lives on its thread's
+    // shard; the read below also checks the stream is this user's and this thread's.
+    const shardKey = await threadShardFor(context, userId, threadId, systemRunners(userId));
+
+    return await inSystemShard(context, shardKey, async (shardCtx) => await serveChunks(shardCtx, { afterIndex, streamId, threadId, userId, waitMs }));
+};
+
+const serveChunks = async (
+    context: HttpActionCtx,
+    { afterIndex, streamId, threadId, userId, waitMs }: { afterIndex: number; streamId: string; threadId?: string; userId?: string; waitMs: number },
+): Promise<Response> => {
     try {
         // Chunks, status and the lock in ONE query (see `getChunksAfter`), so a
         // `done` answer always carries the final chunk. This poll carries no
@@ -130,11 +148,14 @@ export const getChunksHttpAction = async (context: HttpActionCtx, request: Reque
         // at once, and nothing may read on from it.
         // The lock is checked on the first read and whenever a read returns chunks, so an
         // idle wait reads no thread. A poll that ends empty is checked once more.
+        // `userId`/`threadId` make the query answer "no such stream" for another user's stream.
         const readChunks = async (checkLock: boolean) =>
             await context.runQuery(internal.chat.streaming.persistent.library.getChunksAfter, {
                 afterIndex,
                 checkLock,
                 streamId: streamId as Id<"persistentStreams">,
+                ...(threadId !== undefined && { threadId }),
+                ...(userId !== undefined && { userId }),
             });
 
         let reads = 0;

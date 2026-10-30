@@ -26,7 +26,7 @@ import { internal } from "../_generated/internal";
 import { isDeviceSignature } from "../devices/lib/signing";
 import { vCapabilityReport } from "../lib/capability-report";
 import { isUploadId } from "../lib/chat-upload-staging";
-import { inShard } from "../lib/http-shard";
+import { inSystemShard, systemRunners } from "../lib/http-shard";
 import { threadShardFor } from "../lib/thread-shard";
 import { MAX_LENGTH } from "../lib/validators";
 import { INGEST_FLOOD_LIMIT_PER_MINUTE, MAX_EVENTS_PER_POST, MAX_INGEST_BYTES, MAX_MEDIA_PER_TURN } from "./lib/constants";
@@ -304,14 +304,8 @@ const withoutUpload = ({ contentType, kind, name, reference, size }: MediaEvent)
     return { kind, name, reference, size, ...(contentType !== undefined && { contentType }) };
 };
 
-const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: string, payload: string, signature: string): Promise<Response> => {
-    // The route said whose device this is; the shard's own device row must agree.
-    const verified = await context.runQuery(internal.acp.ingest.verifyHostPost, { deviceId, now: Date.now(), payload, signature });
-
-    if (verified?.userId !== ownerId) {
-        return unauthorized();
-    }
-
+/** The post, applied on the owner's shard. The caller has verified the device's signature. */
+const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: string, payload: string): Promise<Response> => {
     const post = readPost(parseJson(payload) as Record<string, unknown>, deviceId);
 
     if (!post) {
@@ -319,7 +313,7 @@ const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: 
     }
 
     // A host-run thread is never shared, so it lives on its owner's shard: anything else is refused.
-    if (post.threadId !== undefined && (await threadShardFor(context, ownerId, post.threadId)) !== ownerId) {
+    if (post.threadId !== undefined && (await threadShardFor(context, ownerId, post.threadId, systemRunners(ownerId))) !== ownerId) {
         return json({ error: "refused" }, 403);
     }
 
@@ -406,5 +400,14 @@ export const hostIngestHttpAction = async (context: HttpActionCtx, request: Requ
         return unauthorized();
     }
 
-    return await inShard(context, ownerId, async (shardContext) => await handleOnShard(shardContext, ownerId, deviceId, payload, signature));
+    // The route said whose device this is; the shard's own device row must agree. This is the only call made
+    // before the signature is known good: a fixed query that returns the owner or null, never data.
+    const verified = await systemRunners(ownerId).runQuery(internal.acp.ingest.verifyHostPost, { deviceId, now: Date.now(), payload, signature });
+
+    if (verified?.userId !== ownerId) {
+        return unauthorized();
+    }
+
+    // Verified: the host has no session, so the crossing is as the system.
+    return await inSystemShard(context, ownerId, async (shardContext) => await handleOnShard(shardContext, ownerId, deviceId, payload));
 };

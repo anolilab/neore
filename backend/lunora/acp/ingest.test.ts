@@ -36,6 +36,24 @@ vi.mock("../lib/chat-upload", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/chat-upload")>()), finalizeStagedUploadFile: stagedFinalize };
 });
 
+/**
+ * Signed host routes cross to the owner's shard as the system (`systemRunners` → `callOnShard`), past the
+ * request's own runners: route those calls through the same runners the test's `httpContext` has, so the
+ * finalize stub and the failing mutation still apply.
+ */
+vi.mock("../lib/cross-shard", () => {
+    return {
+        callOnShard: async (reference: { __lunoraRef?: string; kind?: string }, args: never) => {
+            const registered = reference.kind === undefined ? await import("../_generated/functions") : undefined;
+            const kind = reference.kind ?? registered?.LUNORA_FUNCTIONS[reference.__lunoraRef ?? ""]?.kind;
+            const runners = httpContext() as unknown as Record<"runAction" | "runMutation" | "runQuery", (r: unknown, a: never) => Promise<unknown>>;
+            const method = kind === "action" ? "runAction" : kind === "mutation" ? "runMutation" : "runQuery";
+
+            return await runners[method](reference, args);
+        },
+    };
+});
+
 vi.mock("../_generated/internal", async (importOriginal) => {
     const { registeredApi } = await import("../../test/registered-api");
 
