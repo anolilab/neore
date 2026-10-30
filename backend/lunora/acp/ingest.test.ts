@@ -57,7 +57,7 @@ const composite = await import("../chat/composite");
 const { measureDb } = await import("../../test/db-cost");
 const { HOST_STREAM_IDLE_MS, HOST_TURN_MAX_MS, INGEST_FLOOD_LIMIT_PER_MINUTE } = await import("./lib/constants");
 const { streamLogger } = await import("../lib/logger");
-const { MAX_OPEN_ACP_CALLS_PER_DEVICE } = await import("../devices/lib/constants");
+const { MAX_OPEN_ACP_CALLS_PER_DEVICE, MAX_OPEN_ACP_CANCELS_PER_DEVICE } = await import("../devices/lib/constants");
 
 registerModule(registry, "lib_shard_routes", await import("../lib/shard-routes"));
 registerModule(registry, "lib_shard_housekeeping", await import("../lib/shard-housekeeping"));
@@ -1346,14 +1346,9 @@ describe("deleting a host thread", () => {
 });
 
 describe("the cancel a stop or a delete sends", () => {
-    it("is logged, not lost silently, when the device's call budget is spent", async () => {
-        const device = await pair(ownerId);
-        const threadId = await openSession(device);
-        const warn = vi.spyOn(streamLogger, "warn").mockImplementation(() => {});
-
-        await turn(device, threadId, "t1", 0, [START(), TEXT("x")]);
+    const fillOpenCalls = async (device: { deviceId: string }, threadId: string, toolName: string, count: number) => {
         await harness.run(async (ctx: any) => {
-            for (let index = 0; index < MAX_OPEN_ACP_CALLS_PER_DEVICE; index += 1) {
+            for (let index = 0; index < count; index += 1) {
                 await ctx.db.insert("deviceCalls", {
                     createdAt: Date.now(),
                     deadline: Date.now() + 600_000,
@@ -1365,15 +1360,36 @@ describe("the cancel a stop or a delete sends", () => {
                     status: "claimed",
                     taintedBy: [],
                     threadId,
-                    toolName: "acp_send",
+                    toolName,
                     userId: ownerId,
                 });
             }
         });
+    };
+
+    it("still reaches the agent when the device's send budget is spent", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("x")]);
+        await fillOpenCalls(device, threadId, "acp_send", MAX_OPEN_ACP_CALLS_PER_DEVICE);
         await harness.run(async (ctx: any) => await ctx.runMutation(library.stopActiveForThread, { threadId }));
 
         expect(await streamFor("t1")).toMatchObject({ hostEndReason: "stopped", status: "done" });
-        expect(await cancelCalls()).toHaveLength(0);
+        expect(await cancelCalls()).toHaveLength(1);
+    });
+
+    it("is logged, not lost silently, when the device's cancel budget is spent", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const warn = vi.spyOn(streamLogger, "warn").mockImplementation(() => {});
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("x")]);
+        await fillOpenCalls(device, threadId, "acp_cancel", MAX_OPEN_ACP_CANCELS_PER_DEVICE);
+        await harness.run(async (ctx: any) => await ctx.runMutation(library.stopActiveForThread, { threadId }));
+
+        expect(await streamFor("t1")).toMatchObject({ hostEndReason: "stopped", status: "done" });
+        expect(await cancelCalls()).toHaveLength(MAX_OPEN_ACP_CANCELS_PER_DEVICE);
         expect(warn).toHaveBeenCalledWith(expect.stringContaining("busy"));
         warn.mockRestore();
     });
