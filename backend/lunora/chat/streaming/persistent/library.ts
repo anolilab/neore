@@ -442,6 +442,13 @@ export const getChunksAfter = internalQuery
          */
         checkLock: v.optional(v.boolean()),
         streamId: v.id("persistentStreams"),
+        /**
+         * The thread and user the caller says the stream belongs to. A stream of anyone else answers as a
+         * missing one. Passed by `/chat/chunks`, which crosses shards as the system and so cannot lean on
+         * the shard's own caller checks.
+         */
+        threadId: v.optional(v.string().max(MAX_LENGTH.id)),
+        userId: v.optional(v.string().max(MAX_LENGTH.id)),
     })
     .output(
         v.object({
@@ -470,12 +477,13 @@ export const getChunksAfter = internalQuery
             totalChunks: v.number(),
         }),
     )
-    .query(async ({ args: { afterIndex, checkLock = true, streamId }, ctx }) => {
+    .query(async ({ args: { afterIndex, checkLock = true, streamId, threadId, userId }, ctx }) => {
         // One indexed row, not an un-hinted `db.get` (which probes every table).
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } });
 
         // A missing stream is an error, not a lock: an expired one must not read as "This chat is locked."
-        if (!stream) {
+        // Someone else's stream is the same answer, so it cannot be told from a missing one.
+        if (!stream || (userId !== undefined && stream.userId !== userId) || (threadId !== undefined && stream.threadId !== threadId)) {
             return { chunks: [], locked: false, status: "error", totalChunks: afterIndex };
         }
 

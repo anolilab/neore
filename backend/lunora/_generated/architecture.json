@@ -17978,7 +17978,7 @@
     {
       "file": "chat/lib/gateway-notifications",
       "kind": "call",
-      "line": 124,
+      "line": 125,
       "reason": "\"gatewayNotificationsHttpAction\" is not a registered function"
     },
     {
@@ -19592,7 +19592,7 @@
     {
       "file": "lib/http-shard",
       "kind": "call",
-      "line": 159,
+      "line": 160,
       "reason": "\"onRoutedShard\" is not a registered function"
     },
     {
@@ -19718,7 +19718,7 @@
     {
       "file": "lib/thread-shard",
       "kind": "call",
-      "line": 43,
+      "line": 49,
       "reason": "\"threadShardFor\" is not a registered function"
     },
     {
