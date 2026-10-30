@@ -12,6 +12,7 @@ import {
     File,
     FileText,
     FlaskConical,
+    GitPullRequest,
     HelpCircle,
     House,
     ListChecks,
@@ -101,6 +102,13 @@ const NAV_LINK_DEFS: NavLinkDef[] = [
         matcher: (p) => p.startsWith("/evals"),
         requiresAuth: true,
         to: "/evals",
+    },
+    {
+        icon: GitPullRequest,
+        labelKey: msg`Open Develop`,
+        matcher: (p) => p.startsWith("/develop"),
+        requiresAuth: true,
+        to: "/develop",
     },
     {
         icon: NotebookText,

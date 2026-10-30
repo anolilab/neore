@@ -487,6 +487,10 @@ export const RATE_LIMIT_CONFIGS = {
     "skills/invoke:premium": Ratelimit.tokenBucket(100, MINUTE, 200),
     "skills/update:free": Ratelimit.fixedWindow(20, MINUTE),
     "skills/update:premium": Ratelimit.fixedWindow(60, MINUTE),
+    // Develop mode (`source-control/`): every read is an outbound call to the Git host with
+    // the user's own token, and opening one pull request fans out to a few (files page by page).
+    "sourceControl/read:free": Ratelimit.fixedWindow(240, MINUTE),
+    "sourceControl/read:premium": Ratelimit.fixedWindow(600, MINUTE),
     // Sub-agent starts (`sub-agents/functions.ts`), on top of the task quotas
     // each start is charged (`tasks/account.ts:chargeRound`) and the fan-out cap.
     "subAgents/run:free": Ratelimit.fixedWindow(10, HOUR),
