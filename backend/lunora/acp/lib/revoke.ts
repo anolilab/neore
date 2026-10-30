@@ -13,7 +13,7 @@ export const endHostSessionsOfDevice = async (ctx: MutationCtx, deviceId: Id<"de
     let cursor: string | undefined;
 
     do {
-        const { continueCursor, page: sessions } = await ctx.db.acpSessions.findMany({ cursor, limit: SESSION_BATCH, where: { deviceId } });
+        const { continueCursor, isDone, page: sessions } = await ctx.db.acpSessions.findMany({ cursor, limit: SESSION_BATCH, where: { deviceId } });
 
         for (const session of sessions) {
             if (session.status !== "ended") {
@@ -29,6 +29,6 @@ export const endHostSessionsOfDevice = async (ctx: MutationCtx, deviceId: Id<"de
             }
         }
 
-        cursor = continueCursor ?? undefined;
+        cursor = isDone ? undefined : (continueCursor ?? undefined);
     } while (cursor !== undefined);
 };
