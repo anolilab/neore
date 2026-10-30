@@ -44,14 +44,14 @@ export const hasLiveDeltaStream = async (ctx: Pick<MutationCtx, "db">, threadId:
 
 /** Whether a run was ever started for `messageId` (a prompt), in any state — a run stopped before its first token counts. */
 export const hasStreamFor = async (ctx: Pick<MutationCtx, "db">, threadId: string, messageId: string): Promise<boolean> => {
-    // The whole thread, not its newest streams: an older prompt can become the displayed leaf (a branch switch)
-    // after any number of later runs. Streams are purged after their retention, so this stays small.
-    const streams = await ctx.db
+    // Any stream of that prompt, however many later runs the thread had: an older prompt can become the displayed
+    // leaf (a branch switch). One indexed read, so a busy thread's retained streams are never loaded.
+    const stream = await ctx.db
         .query("persistentStreams")
-        .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
-        .collect();
+        .withIndex("by_threadId_messageId", (q) => q.eq("threadId", threadId).eq("messageId", messageId))
+        .first();
 
-    return streams.some((stream) => stream.messageId === messageId);
+    return stream !== null;
 };
 
 /**

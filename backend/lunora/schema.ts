@@ -1787,6 +1787,7 @@ export const schema = defineSchema({
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId_status", ["userId", "status"])
         .index("by_threadId", ["threadId"])
+        .index("by_threadId_messageId", ["threadId", "messageId"])
         .index("by_threadId_status", ["threadId", "status"])
         .index("by_hostTurnId", ["hostTurnId"])
         .relations((r) => {

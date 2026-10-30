@@ -2302,7 +2302,7 @@ export interface IndexNamesByTable {
     pageVersions: "by_user" | "by_page_and_created";
     passkey: "credentialID" | "userId";
     persistentChunks: "by_streamId_seq";
-    persistentStreams: "by_hostTurnId" | "by_threadId_status" | "by_threadId" | "by_userId_status" | "by_expiresAt" | "by_status";
+    persistentStreams: "by_hostTurnId" | "by_threadId_status" | "by_threadId_messageId" | "by_threadId" | "by_userId_status" | "by_expiresAt" | "by_status";
     playgroundApiKeys: "name";
     presentations: "by_thread_and_status" | "by_user_and_thread";
     presentationSlides: "by_presentation_and_number";
