@@ -19,6 +19,7 @@ import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { internalQuery } from "../_generated/server";
 import schema from "../schema";
 import { scriptedModel, textStep } from "./group/test-models";
@@ -160,6 +161,7 @@ beforeAll(async () => {
 }, 60_000);
 
 beforeEach(async () => {
+    jobsQueueMessages.length = 0;
     vi.mocked(scheduleReplyUsage).mockClear();
     vi.mocked(runGroupTurn).mockClear();
     groupState.calls = 0;
@@ -376,5 +378,53 @@ describe("runStreamingAgent: group chats and skill commands", () => {
         expect(state.chunkText).toContain("The skill is disabled.");
         expect(state.streamStatus).toBe("done");
         expect(state.threadStatus).toBe("error");
+    });
+});
+
+describe("runStreamingAgent: a run that belongs to a goal", () => {
+    const insertGoal = async (): Promise<string> =>
+        await harness.run(async (ctx: any) =>
+            String(
+                await ctx.db.insert("threadGoals", {
+                    config: { model: "test-model" },
+                    costMicrodollars: 0,
+                    createdAt: 1,
+                    maxCostMicrodollars: 2_000_000,
+                    maxRounds: 5,
+                    promptMessageId: ids.messageId,
+                    round: 0,
+                    startMessageId: ids.messageId,
+                    status: "active",
+                    text: "Say hello twice",
+                    threadId: ids.threadId,
+                    updatedAt: 1,
+                    userId: OWNER,
+                    verdicts: [],
+                }),
+            ),
+        );
+
+    it("queues the round's review and leaves the thread running until the goal ends", async () => {
+        const goalId = await insertGoal();
+
+        await run();
+
+        const state = await readState();
+        const reviews = jobsQueueMessages.filter((message) => message.body.functionPath.includes("reviewGoalRound"));
+
+        expect(reviews).toHaveLength(1);
+        expect(reviews[0]!.body.args).toEqual({ goalId, round: 1 });
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("running");
+    });
+
+    it("settles the thread as usual for a run with no goal", async () => {
+        await run();
+
+        expect(jobsQueueMessages.filter((message) => message.body.functionPath.includes("reviewGoalRound"))).toHaveLength(0);
+
+        const state = await readState();
+
+        expect(state.threadStatus).toBe("active");
     });
 });

@@ -611,6 +611,15 @@ const runChatStartOnShard = async (
         return workerThreadResponse();
     }
 
+    // A goal spends the owner's budget over several rounds: refuse it in a shared thread now, before the turn is saved and charged.
+    if (body.goal !== undefined && validThreadId) {
+        const goalThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> });
+
+        if (goalThread?.userId !== userId) {
+            return Response.json({ error: "A goal can only be set in your own chat." }, { status: 403 });
+        }
+    }
+
     // A coding agent's thread runs on its paired device, not on a cloud model. This is the one turn-start path
     // every caller shares (the app, the public API, the MCP server), so it is also the refusal they hit.
     if (access?.hostRun) {

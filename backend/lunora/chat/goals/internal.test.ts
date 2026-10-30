@@ -146,6 +146,8 @@ describe("recordGoalVerdict", () => {
         expect(goal).toMatchObject({ promptMessageId: outcome.next.messageId, round: 1, startMessageId: promptId, status: "active" });
         expect(instruction.agentName).toBe(GOAL_CONTINUATION_AGENT);
         expect(instruction.message.role).toBe("user");
+        // The run takes its prompt from the row's text.
+        expect(instruction.text).toContain("The charts are missing.");
         expect(JSON.stringify(instruction.message.content)).toContain("The charts are missing.");
         expect(JSON.stringify(instruction.message.content)).toContain("Ship the report");
         expect(stream).toMatchObject({ messageId: outcome.next.messageId, status: "pending", threadId, userId: OWNER });
