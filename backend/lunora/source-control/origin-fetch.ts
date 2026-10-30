@@ -139,7 +139,8 @@ export const createBoundRequester = ({
             await response.body?.cancel().catch(() => undefined);
 
             if (method !== "GET") {
-                throw new HostApiError("The host redirected a write", 0);
+                // The request reached the host, which may have acted before it redirected: the caller must not retry blind.
+                throw new HostApiError("The host redirected a write", 0, false, { unconfirmed: true });
             }
 
             if (location === null || hop >= maxRedirects) {

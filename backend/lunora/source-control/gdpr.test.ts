@@ -10,6 +10,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
+import { collectAllReviewDrafts } from "./export-pages";
 import { collectReviewDraftsForExport, deleteUserReviewDrafts } from "./gdpr";
 
 const A = "user-a";
@@ -82,8 +83,39 @@ describe("review drafts in GDPR flows", () => {
         const exported = await harness.run(async (ctx: any) => await ctx.runQuery(collectReviewDraftsForExport, { userId: A }));
 
         expect(exported.drafts).toHaveLength(2);
+        expect(exported.cursor).toBeNull();
         expect(exported.drafts[0].comments).toHaveLength(1);
         expect(JSON.stringify(exported)).not.toContain(B);
+    });
+
+    it("exports every draft page by page, past the size of one page", async () => {
+        await seed(A, MANY);
+        await seed(B, 1);
+
+        let pages = 0;
+        const { drafts } = await collectAllReviewDrafts(async (cursor) => {
+            pages += 1;
+
+            return await harness.run(async (ctx: any) => await ctx.runQuery(collectReviewDraftsForExport, { cursor, userId: A }));
+        });
+
+        expect(pages).toBeGreaterThan(1);
+        expect(drafts).toHaveLength(MANY);
+        expect(new Set(drafts.map((draft) => (draft as { number: number }).number)).size).toBe(MANY);
+    });
+});
+
+describe("collectAllReviewDrafts", () => {
+    it("treats a result recorded before paging existed as the only page", async () => {
+        const seen: number[] = [];
+        const { drafts } = await collectAllReviewDrafts(async (_cursor, page) => {
+            seen.push(page);
+
+            return { drafts: [{ number: 1 }] };
+        });
+
+        expect(seen).toEqual([0]);
+        expect(drafts).toHaveLength(1);
     });
 });
 

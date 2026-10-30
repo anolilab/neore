@@ -45,6 +45,24 @@ describe("createBoundRequester", () => {
         await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/repos/o/r")).rejects.toMatchObject({ name: "HostApiError", status: 0 });
     });
 
+    it("marks a write the host answered with a redirect unconfirmed, and a read not", async () => {
+        const write = transport(() => redirect("/repos/o/new", 307));
+
+        await expect(
+            createBoundRequester({ origin: ORIGIN, token: "tkn", via: write.via })("/repos/o/r/pulls/1/merge", { json: {}, method: "PUT" }),
+        ).rejects.toMatchObject({
+            name: "HostApiError",
+            unconfirmed: true,
+        });
+        expect(write.seen).toHaveLength(1);
+
+        const loop = transport(() => redirect("/again"));
+
+        await expect(createBoundRequester({ maxRedirects: 0, origin: ORIGIN, token: "tkn", via: loop.via })("/start")).rejects.toMatchObject({
+            unconfirmed: false,
+        });
+    });
+
     it("never sends the token to a plain-http origin", async () => {
         const { seen, via } = transport(() => Response.json({}));
 
