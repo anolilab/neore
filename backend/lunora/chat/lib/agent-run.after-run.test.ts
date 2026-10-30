@@ -159,3 +159,52 @@ describe(afterRun, () => {
         expect(returned).toBe(true);
     });
 });
+
+describe("the idle-thread summary job", () => {
+    const summaryJobs = (runAfter: ReturnType<typeof vi.fn>) =>
+        runAfter.mock.calls.filter((call: unknown[]) => call[1] === internal.agent.thread_summaries.runThreadSummary);
+
+    const run = async (rows: { _id: string; order: number; stepOrder: number }[]) => {
+        const runAfter = vi.fn(async () => "job");
+
+        await afterRun({ runMutation: vi.fn(async () => undefined), scheduler: { runAfter } } as never, {
+            ...baseArgs,
+            savedMessages: rows.map((row) => {
+                return { ...row, message: { content: "x", role: "assistant" } };
+            }) as never,
+        });
+
+        return runAfter;
+    };
+
+    it("is scheduled a few minutes after a reply in a long-running thread, naming the reply's last row", async () => {
+        expect.assertions(3);
+
+        const runAfter = await run([
+            { _id: "user-row", order: 40, stepOrder: 0 },
+            { _id: "tool-row", order: 40, stepOrder: 1 },
+            { _id: "last-row", order: 40, stepOrder: 2 },
+        ]);
+        const [job] = summaryJobs(runAfter);
+
+        expect(summaryJobs(runAfter)).toHaveLength(1);
+        expect(job?.[0]).toBe(5 * 60 * 1000);
+        expect(job?.[2]).toStrictEqual({ afterMessageId: "last-row", threadId: "thread-1" });
+    });
+
+    it("is not scheduled for a thread of only a few turns", async () => {
+        expect.assertions(1);
+
+        expect(summaryJobs(await run([{ _id: "last-row", order: 3, stepOrder: 1 }]))).toHaveLength(0);
+    });
+
+    it("moves with each reply: a second reply schedules its own job for its own last row", async () => {
+        expect.assertions(2);
+
+        const first = summaryJobs(await run([{ _id: "reply-1", order: 40, stepOrder: 1 }]));
+        const second = summaryJobs(await run([{ _id: "reply-2", order: 41, stepOrder: 1 }]));
+
+        expect(first[0]?.[2].afterMessageId).toBe("reply-1");
+        expect(second[0]?.[2].afterMessageId).toBe("reply-2");
+    });
+});

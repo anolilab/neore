@@ -1349,6 +1349,19 @@ export const temporaryThreads = sqliteTable("temporaryThreads", {
     by_thread: index("by_thread").on(t.threadId),
 }));
 
+export const threadContextSummaries = sqliteTable("threadContextSummaries", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    coveredCount: real("coveredCount").notNull(),
+    coveredUpToMessageId: text("coveredUpToMessageId").references((): AnySQLiteColumn => messages._id).notNull(),
+    createdAt: real("createdAt").notNull(),
+    summary: text("summary").notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_threadId: index("by_threadId").on(t.threadId),
+}));
+
 export const threadKnowledge = sqliteTable("threadKnowledge", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
@@ -1684,6 +1697,7 @@ export const userSettings = sqliteTable("userSettings", {
     sendBehavior: text("sendBehavior"),
     taskEmailEnabled: integer("taskEmailEnabled", { mode: "boolean" }),
     temporaryChatRetentionHours: real("temporaryChatRetentionHours"),
+    threadSummariesEnabled: integer("threadSummariesEnabled", { mode: "boolean" }),
     threadTitleInstructions: text("threadTitleInstructions"),
     timezone: text("timezone"),
     userId: text("userId").notNull(),

@@ -10199,6 +10199,9 @@
                       "temporaryChatRetentionHours": {
                         "type": "number"
                       },
+                      "threadSummariesEnabled": {
+                        "type": "boolean"
+                      },
                       "threadTitleInstructions": {
                         "type": "string"
                       },

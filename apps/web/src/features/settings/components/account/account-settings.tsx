@@ -69,6 +69,8 @@ const AccountSettings: FC = () => {
     const currentLocation = userSettings?.location;
     const currentTimezone = userSettings?.timezone;
     const isEnableFollowupSuggestions = userSettings?.enableFollowupSuggestions !== false;
+    // On unless explicitly turned off.
+    const isThreadSummariesEnabled = userSettings?.threadSummariesEnabled !== false;
     // Opt-in: absent means off.
     const isAutoReadReplies = userSettings?.autoReadReplies === true;
     const currentSpeechVoice = userSettings?.voiceModeVoice ?? DEFAULT_SPEECH_VOICE ?? null;
@@ -324,6 +326,27 @@ const AccountSettings: FC = () => {
                                     "enableFollowupSuggestions",
                                     checked,
                                     checked ? t`Follow-up suggestions enabled` : t`Follow-up suggestions disabled`,
+                                );
+                            }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-base font-medium" htmlFor="thread-summaries">
+                                {t`Summarise long chats`}
+                            </Label>
+                            <p className="text-muted-foreground text-sm">
+                                {t`While a long chat sits idle, condense its older messages so the assistant keeps them in mind. Uses a small amount of credits.`}
+                            </p>
+                        </div>
+                        <Switch
+                            checked={isThreadSummariesEnabled}
+                            id="thread-summaries"
+                            onCheckedChange={(checked) => {
+                                handleUpdateSetting(
+                                    "threadSummariesEnabled",
+                                    checked,
+                                    checked ? t`Long chats will be summarised` : t`Long chats will no longer be summarised`,
                                 );
                             }}
                         />

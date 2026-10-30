@@ -22,6 +22,7 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import type { ContextHandler, TakeSteer } from "../../agent/client/types";
 import type { ResearchDepth } from "../../agent/client/create-tool";
+import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/thread-summary-logic";
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
@@ -583,6 +584,20 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
                 memories: [...args.retrievedMemories],
                 messageId: firstReplyRow._id as Id<"messages">,
                 userId,
+            }),
+        );
+    }
+
+    // A long thread's older turns are summarised once it has been idle (`agent/thread-summaries.ts`). The job
+    // names this reply's last row; a newer reply makes it a no-op, which is the debounce. It belongs to the thread,
+    // so it runs on the thread's shard whoever replied.
+    const lastSaved = lastRowOf(savedMessages);
+
+    if (lastSaved && lastSaved.order >= SUMMARY_MIN_ORDER) {
+        scheduled.push(
+            ctx.scheduler.runAfter(SUMMARY_IDLE_MS, internal.agent.thread_summaries.runThreadSummary, {
+                afterMessageId: lastSaved._id as Id<"messages">,
+                threadId: threadId as Id<"threads">,
             }),
         );
     }

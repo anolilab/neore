@@ -5543,11 +5543,25 @@
           "optional": true,
           "unique": false
         },
+        "transport": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "\"ssh\""
+        },
         "userId": {
           "kind": "string",
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "viaDeviceId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "devices"
         }
       },
       "indexes": {
@@ -18419,6 +18433,13 @@
           ],
           "unique": false
         },
+        "by_childThreadId_and_status": {
+          "fields": [
+            "childThreadId",
+            "status"
+          ],
+          "unique": false
+        },
         "by_createdAt": {
           "fields": [
             "createdAt"
@@ -19416,6 +19437,60 @@
         }
       },
       "shardMode": "global:d1"
+    },
+    "threadContextSummaries": {
+      "commitOrdered": false,
+      "fields": {
+        "coveredCount": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "coveredUpToMessageId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "messages"
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "summary": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_threadId": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "root"
     },
     "threadInvites": {
       "commitOrdered": false,
@@ -22476,6 +22551,12 @@
         },
         "temporaryChatRetentionHours": {
           "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "threadSummariesEnabled": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false

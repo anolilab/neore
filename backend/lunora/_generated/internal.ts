@@ -150,6 +150,12 @@ export interface InternalApiTypes {
             dropThreadPasscodeRows: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
             inheritThreadPasscode: FunctionReference<"mutation", { sourceThreadId: Id<"threads">; targetThreadId: Id<"threads"> }, null>;
         };
+        thread_summaries: {
+            finishThreadSummary: FunctionReference<"mutation", { coveredCount: number; coveredUpToMessageId: Id<"messages">; previousSummaryId?: Id<"threadContextSummaries">; summary?: string; threadId: Id<"threads"> }, boolean>;
+            getThreadSummaryForContext: FunctionReference<"query", { promptMessageId?: Id<"messages">; threadId: Id<"threads"> }, string | null>;
+            prepareThreadSummary: FunctionReference<"mutation", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, { coveredCount: number; coveredUpToMessageId: Id<"messages">; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; transcript: string; userId: string } | null>;
+            runThreadSummary: FunctionReference<"action", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, null>;
+        };
         threads: {
             _deletePageForThreadId: FunctionReference<"mutation", { cursor?: string; deltaCursor?: string; limit?: number; messagesDone?: boolean; streamOrder?: number; streamsDone?: boolean; threadId: Id<"threads"> }, {} & { cursor: string | null; isDone: boolean; }>;
             archiveThread: FunctionReference<"mutation", { threadId: Id<"threads"> }, { activeLeafMessageId?: string | undefined; botId?: string | undefined; createdAt?: number | undefined; groupChat?: ({ debateRounds?: number | undefined; stopRequestedAt?: number | undefined; synthesizerSkillId?: string | undefined; } & { mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: ({} & { addedAt: number; skillId: string; })[]; }) | undefined; lastUserMessageAt?: number | undefined; lockedAt?: number | undefined; order?: number | undefined; runner?: "host" | undefined; tagIds?: string[] | undefined; workerPolicy?: ({ maxDispatchesPerHour?: number | undefined; } & { allowedSources: ("user" | "lead" | "trigger" | "messenger" | "outside_agent")[]; hostDispatch: "ask"; }) | undefined; category?: string | undefined; createdBy?: string | undefined; customSystemPrompt?: string | undefined; deleted?: boolean | undefined; deletedAt?: number | undefined; dictationLanguage?: string | undefined; enabledFeatures?: string[] | undefined; externalThreadId?: string | undefined; isPublic?: boolean | undefined; isTemporary?: boolean | undefined; language?: string | undefined; lastCompressionStartedAt?: number | undefined; messengerConnectionId?: string | undefined; mode?: "text" | "image" | "video" | undefined; model?: string | undefined; multiChat?: boolean | undefined; organizationId?: string | undefined; parentThreadIds?: string[] | undefined; pinnedAt?: number | undefined; projectId?: string | undefined; publicAccessToken?: string | undefined; reasoningEffort?: number | undefined; source?: string | undefined; statelessMode?: boolean | undefined; summary?: string | undefined; tags?: string[] | undefined; teamId?: string | undefined; title?: string | undefined; updatedAt?: number | undefined; userId?: string | undefined; } & { _creationTime: number; _id: string; status: "error" | "running" | "active" | "archived" | "abort" | "finish"; }>;
@@ -1192,6 +1198,12 @@ export const internal: InternalApiTypes = {
         thread_lock: {
             dropThreadPasscodeRows: { __lunoraRef: "agent_thread_lock:dropThreadPasscodeRows" },
             inheritThreadPasscode: { __lunoraRef: "agent_thread_lock:inheritThreadPasscode" },
+        },
+        thread_summaries: {
+            finishThreadSummary: { __lunoraRef: "agent_thread_summaries:finishThreadSummary" },
+            getThreadSummaryForContext: { __lunoraRef: "agent_thread_summaries:getThreadSummaryForContext" },
+            prepareThreadSummary: { __lunoraRef: "agent_thread_summaries:prepareThreadSummary" },
+            runThreadSummary: { __lunoraRef: "agent_thread_summaries:runThreadSummary" },
         },
         threads: {
             _deletePageForThreadId: { __lunoraRef: "agent_threads:_deletePageForThreadId" },

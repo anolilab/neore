@@ -2520,6 +2520,25 @@ export const schema = defineSchema({
             };
         }),
 
+    /**
+     * A rolling summary of the older rows of ONE path of a thread, made while it
+     * sits idle (`agent/thread-summaries.ts`) and fed to the agent ahead of the
+     * recent rows. Keyed on the thread and the last row it covers: the context
+     * builder uses it only while that row is still an ancestor of the prompt, so
+     * a branch the user switched away from never leaks into the other. A few rows
+     * per thread (`SUMMARIES_KEPT_PER_THREAD`), erased with the thread.
+     */
+    threadContextSummaries: defineTable({
+        /** Rows of the path covered, counted from its top; orders the rows of one thread. */
+        coveredCount: v.number(),
+        coveredUpToMessageId: v.id("messages"),
+        createdAt: v.number(),
+        summary: v.string(),
+        threadId: v.id("threads"),
+        /** The thread's owner, whose shard this row lives on and whose account erases it. */
+        userId: v.string(),
+    }).index("by_threadId", ["threadId"]),
+
     threadInvites: defineTable({
         acceptedAt: v.optional(v.number()),
         acceptedBy: v.optional(v.string()),
@@ -3045,6 +3064,8 @@ export const schema = defineSchema({
         // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
         taskEmailEnabled: v.optional(v.boolean()),
         temporaryChatRetentionHours: v.optional(v.number()),
+        // Summaries of a long thread's older turns, made while it sits idle (`agent/thread-summaries.ts`). Absent = ON; only `false` turns it off.
+        threadSummariesEnabled: v.optional(v.boolean()),
         // How the user wants thread titles worded; appended to the title prompt (`chat/functions.ts#createTitleChat`). Blank or absent = none.
         threadTitleInstructions: v.optional(v.string().max(MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH)),
         timezone: v.optional(v.string()),

@@ -444,6 +444,28 @@ written here is what is not.
   (never over `off`, never to other tools, withheld at the depth cap).
   Triggers, tasks and messenger replies inherit nothing, so they lose it.
 
+- **Idle-thread summaries** (`backend/lunora/agent/thread-summaries.ts`, rules in
+  `thread-summary-logic.ts`) — the agent reads only the last 100 rows of the
+  prompt's path (`DEFAULT_RECENT_MESSAGES`, one constant shared by the planner and
+  `fetchContextWithPrompt`), so `threadContextSummaries` holds a condensed copy of
+  the rows above it. **A summary belongs to ONE path**: it is keyed on the last row
+  it covers, and `getThreadSummaryForContext` uses it only while that row is an
+  ancestor of the prompt (a bounded `walkPath`), so a branch the user left never
+  leaks into the one they are on; a few rows are kept per thread, one per path.
+  `afterRun` schedules `runThreadSummary` 5 min out naming the reply's last row;
+  the job is its own debounce (it exits when that row is no longer the thread's
+  latest or a stream is running), then claims `<thread>:<last covered row>`
+  (`claimOnce`) before the one utility-model call, so a redelivery does nothing
+  twice. The cut reaches 20 rows INTO the window: a summary is read after more rows
+  landed, and without the overlap the rows that fall out meanwhile are uncovered.
+  It is injected as a `user`-role block ahead of `recent` (the compressor's role),
+  not a mid-array `system` message. Billed by the gateway against the thread OWNER
+  like title/category (no `chargeRound`). **Opt-OUT**, `userSettings.threadSummariesEnabled`
+  (absent = on). Never made for temporary, locked, deleted, stateless or host-run
+  threads; locking a chat and deleting a thread erase the rows, and the reader
+  re-applies the same rules. Not `threads.summary` — that is the user-triggered,
+  thread-wide `createSummarizeChat` output.
+
 - **Auto-continue ("Deep Work")** — raises the agent loop from 5 to 25
   `maxSteps`. All triggers use it by default.
 
