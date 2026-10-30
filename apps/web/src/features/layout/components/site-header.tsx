@@ -4,12 +4,21 @@ import { useMediaMatch } from "rooks";
 
 import BlurGradientOverlay from "@/components/blur-gradient-overlay";
 import MobileHeaderActions from "@/features/layout/components/mobile-header-actions";
+import WorkspaceSwitch from "@/features/layout/components/workspace-switch";
 
 const PHONE_QUERY = "(max-width: 639px)";
 
 const SiteHeader: FC<
-    PropsWithChildren<{ anonymousUserBanner?: ReactNode; menu?: ReactNode; themeToggle?: ReactNode; title?: string; trigger?: ReactNode }>
-> = ({ anonymousUserBanner, children, menu, themeToggle, title, trigger }) => {
+    PropsWithChildren<{
+        anonymousUserBanner?: ReactNode;
+        menu?: ReactNode;
+        notch?: boolean;
+        themeToggle?: ReactNode;
+        title?: string;
+        trigger?: ReactNode;
+        workspaceSwitch?: boolean;
+    }>
+> = ({ anonymousUserBanner, children, menu, notch, themeToggle, title, trigger, workspaceSwitch }) => {
     // Phones get the overflow button; everything else the cluster. Mounted once, never both.
     const isPhone = useMediaMatch(PHONE_QUERY);
 
@@ -18,7 +27,8 @@ const SiteHeader: FC<
             <header className="text-foreground relative flex h-(--header-height) w-full shrink-0 items-center gap-2 transition-[width,height] ease-linear">
                 <div className="relative z-20 flex h-full w-full items-center gap-1">
                     {trigger}
-                    <Separator className="mx-2 mt-2 data-[orientation=vertical]:h-6" orientation="vertical" />
+                    {(trigger || !workspaceSwitch) && <Separator className="mx-2 mt-2 data-[orientation=vertical]:h-6" orientation="vertical" />}
+                    {workspaceSwitch && <WorkspaceSwitch />}
                     {title && <h1 className="text-lg font-bold">{title}</h1>}
                     {children}
                     <div className="grow" />
@@ -30,7 +40,7 @@ const SiteHeader: FC<
                             {menu}
                         </MobileHeaderActions>
                     )}
-                    {!isPhone && (
+                    {!isPhone && notch !== false && (
                         <div className="bg-sidebar dark:bg-brand-obsidian absolute top-0 right-0 flex h-(--header-height) flex-row max-sm:hidden">
                             <div className="bg-sidebar absolute -top-px left-px z-10 h-px w-20" />
                             <div
