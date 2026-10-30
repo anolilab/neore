@@ -7042,6 +7042,13 @@
     },
     {
       "detail": "query",
+      "id": "function:acp_functions:getThreadCapabilities",
+      "kind": "function",
+      "name": "acp.functions.getThreadCapabilities",
+      "module": "acp"
+    },
+    {
+      "detail": "query",
       "id": "function:acp_functions:listHostSessions",
       "kind": "function",
       "name": "acp.functions.listHostSessions",
@@ -16341,19 +16348,19 @@
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 125,
+      "line": 127,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 206,
+      "line": 231,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 223,
+      "line": 248,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
@@ -17995,6 +18002,12 @@
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
+      "file": "chat/lib/local-turn",
+      "kind": "read",
+      "line": 84,
+      "reason": "\"loadCustomProviders\" is not a registered function"
+    },
+    {
       "file": "chat/lib/mcp-apps",
       "kind": "call",
       "line": 303,
@@ -18129,19 +18142,13 @@
     {
       "file": "chat/local-models",
       "kind": "read",
-      "line": 75,
-      "reason": "\"saveLocalTurnHandler\" is not a registered function"
-    },
-    {
-      "file": "chat/local-models",
-      "kind": "read",
-      "line": 138,
+      "line": 127,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {
       "file": "chat/local-models",
       "kind": "call",
-      "line": 144,
+      "line": 133,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {

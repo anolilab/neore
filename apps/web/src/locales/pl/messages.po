@@ -415,7 +415,7 @@ msgid "{0} deleted"
 msgstr "Usunięto {0}"
 
 #. placeholder {0}: formatDuration(elapsedMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:555
+#: src/features/chat/thread/streaming-placeholder.tsx:557
 msgid "{0} elapsed"
 msgstr "upłynęło {0}"
 
@@ -575,7 +575,7 @@ msgid "{0} tok/s"
 msgstr ""
 
 #. placeholder {0}: tokPerSec.toFixed(1)
-#: src/features/chat/thread/streaming-placeholder.tsx:545
+#: src/features/chat/thread/streaming-placeholder.tsx:547
 msgid "{0} tokens/s"
 msgstr "{0} tokenów/s"
 
@@ -945,7 +945,7 @@ msgid "{name} is installed"
 msgstr "{name} jest zainstalowany"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:241
-#: src/features/chat/thread/streaming-placeholder.tsx:473
+#: src/features/chat/thread/streaming-placeholder.tsx:475
 msgid "{name} is responding"
 msgstr "{name} odpowiada"
 
@@ -1169,7 +1169,7 @@ msgstr "<0>Harmonogram</0> — uruchamiaj według harmonogramu cron (np. codzien
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0> — odbieraj żądania HTTP POST z usług zewnętrznych (Stripe, GitHub, Zapier). Żądania są podpisywane HMAC ze znacznikiem czasu, a powtórzenia są odrzucane."
 
-#: src/features/chat/thread/streaming-placeholder.tsx:546
+#: src/features/chat/thread/streaming-placeholder.tsx:548
 msgid "~{approxTokenCount} tokens"
 msgstr "~{approxTokenCount} tokenów"
 
@@ -3466,8 +3466,8 @@ msgid "Assistant replied:"
 msgstr "Asystent odpowiedział:"
 
 #: src/features/chat/thread/message-item.tsx:203
-#: src/features/chat/thread/streaming-placeholder.tsx:687
 #: src/features/chat/thread/streaming-placeholder.tsx:723
+#: src/features/chat/thread/streaming-placeholder.tsx:760
 msgid "Assistant Reply:"
 msgstr "Odpowiedź asystenta:"
 
@@ -12759,7 +12759,7 @@ msgid "First slide"
 msgstr "Pierwszy slajd"
 
 #. placeholder {0}: formatDuration(ttftMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:547
+#: src/features/chat/thread/streaming-placeholder.tsx:549
 msgid "First token {0}"
 msgstr "Pierwszy token {0}"
 
@@ -18813,7 +18813,7 @@ msgstr "Neore - platforma do generowania tekstu, wideo, audio, obrazów i dokume
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:643
+#: src/features/chat/thread/composer.tsx:655
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore może popełniać błędy. Sprawdzaj ważne informacje."
 
@@ -23426,7 +23426,7 @@ msgstr "Połącz ponownie {0}"
 msgid "Reconnecting to the server…"
 msgstr "Ponowne łączenie z serwerem…"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:537
+#: src/features/chat/thread/streaming-placeholder.tsx:539
 msgid "Reconnecting…"
 msgstr "Ponowne łączenie…"
 
@@ -25710,6 +25710,10 @@ msgstr "Wyślij kod weryfikacyjny"
 #: src/features/chat/voice-mode/voice-mode-button.tsx:88
 msgid "Sending your message and waiting for the reply"
 msgstr "Wysyłanie wiadomości i oczekiwanie na odpowiedź"
+
+#: src/features/chat/thread/streaming-placeholder.tsx:587
+msgid "Sending…"
+msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:173
 msgid "Sent"
@@ -29152,7 +29156,7 @@ msgstr "Model wizyjno-językowy z myśleniem"
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1036
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
-#: src/features/chat/thread/streaming-placeholder.tsx:727
+#: src/features/chat/thread/streaming-placeholder.tsx:764
 msgid "Thinking..."
 msgstr "Myślenie..."
 
@@ -29176,6 +29180,10 @@ msgstr "Ta przeglądarka nie może tu odbierać powiadomień push."
 
 #: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
+msgstr ""
+
+#: src/features/chat/thread/composer.tsx:584
+msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 msgstr ""
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:294
@@ -32022,6 +32030,10 @@ msgstr "{device}: oczekuje na zatwierdzenie"
 msgid "Waiting for output…"
 msgstr "Oczekiwanie na wynik…"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:594
+msgid "Waiting for the agent…"
+msgstr ""
+
 #: src/features/chat/thread/ask-user-prompt.tsx:124
 msgid "Waiting for the owner to answer"
 msgstr "Oczekiwanie na odpowiedź właściciela"
@@ -32481,6 +32493,7 @@ msgstr "Przepływy pracy"
 msgid "Working"
 msgstr "W toku"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:601
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"
