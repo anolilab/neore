@@ -53,15 +53,23 @@ const alternativesUnder = async (context: QueryContext, threadId: Id<"threads">,
     return alternatives;
 };
 
-/** The alternatives `row` is one of: those under its nearest ancestor that is not a divider. */
-const siblingsOf = async (context: QueryContext, threadId: Id<"threads">, parent: Doc<"messages"> | null): Promise<Doc<"messages">[]> => {
+const isPrompt = (row: Doc<"messages">): boolean => (row.message as { role?: string } | undefined)?.role === "user";
+
+/**
+ * The alternatives `row` is one of: those under its nearest ancestor that is not a divider, of the same kind
+ * as `row`. A prompt sent after a switch hangs under the divider too, and it is the next turn, not a version
+ * of a reply regenerated there.
+ */
+const siblingsOf = async (context: QueryContext, threadId: Id<"threads">, row: Doc<"messages">, parent: Doc<"messages"> | null): Promise<Doc<"messages">[]> => {
     let anchor = parent;
 
     while (anchor && agentSwitchOf(anchor)) {
         anchor = await parentOf(context, threadId, anchor);
     }
 
-    return await alternativesUnder(context, threadId, anchor);
+    const alternatives = await alternativesUnder(context, threadId, anchor);
+
+    return alternatives.filter((alternative) => isPrompt(alternative) === isPrompt(row));
 };
 
 /**
@@ -119,7 +127,7 @@ export const listActivePathPage = async (
     if (withSiblings) {
         await Promise.all(
             rows.map(async (row, index) => {
-                const siblings = await siblingsOf(context, threadId, rows[index + 1] ?? next);
+                const siblings = await siblingsOf(context, threadId, row, rows[index + 1] ?? next);
                 const position = siblings.findIndex((sibling) => sibling._id === row._id);
 
                 if (siblings.length > 1 && position !== -1) {
