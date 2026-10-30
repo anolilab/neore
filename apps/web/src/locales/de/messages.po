@@ -415,7 +415,7 @@ msgid "{0} deleted"
 msgstr "{0} gelöscht"
 
 #. placeholder {0}: formatDuration(elapsedMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:555
+#: src/features/chat/thread/streaming-placeholder.tsx:557
 msgid "{0} elapsed"
 msgstr "{0} vergangen"
 
@@ -575,7 +575,7 @@ msgid "{0} tok/s"
 msgstr ""
 
 #. placeholder {0}: tokPerSec.toFixed(1)
-#: src/features/chat/thread/streaming-placeholder.tsx:545
+#: src/features/chat/thread/streaming-placeholder.tsx:547
 msgid "{0} tokens/s"
 msgstr "{0} Tokens/s"
 
@@ -945,7 +945,7 @@ msgid "{name} is installed"
 msgstr "{name} ist installiert"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:241
-#: src/features/chat/thread/streaming-placeholder.tsx:473
+#: src/features/chat/thread/streaming-placeholder.tsx:475
 msgid "{name} is responding"
 msgstr "{name} antwortet"
 
@@ -1169,7 +1169,7 @@ msgstr "<0>Zeitplan</0> — Nach einem Cron-Zeitplan ausführen (z. B. täglich 
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0> — HTTP-POST-Anfragen von externen Diensten empfangen (Stripe, GitHub, Zapier). Anfragen werden mit einem HMAC mit Zeitstempel signiert und Wiederholungen werden abgelehnt."
 
-#: src/features/chat/thread/streaming-placeholder.tsx:546
+#: src/features/chat/thread/streaming-placeholder.tsx:548
 msgid "~{approxTokenCount} tokens"
 msgstr "~{approxTokenCount} Tokens"
 
@@ -3465,9 +3465,9 @@ msgstr "Assistent (kein Skill)"
 msgid "Assistant replied:"
 msgstr "Assistent antwortete:"
 
-#: src/features/chat/thread/message-item.tsx:203
-#: src/features/chat/thread/streaming-placeholder.tsx:687
+#: src/features/chat/thread/message-item.tsx:205
 #: src/features/chat/thread/streaming-placeholder.tsx:723
+#: src/features/chat/thread/streaming-placeholder.tsx:760
 msgid "Assistant Reply:"
 msgstr "Antwort des Assistenten:"
 
@@ -6897,7 +6897,7 @@ msgstr "In die Zwischenablage kopiert"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:351
+#: src/features/chat/thread/message-item.tsx:353
 #: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copied!"
 msgstr "Kopiert!"
@@ -6907,7 +6907,7 @@ msgstr "Kopiert!"
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
-#: src/features/chat/thread/message-item.tsx:351
+#: src/features/chat/thread/message-item.tsx:353
 #: src/features/chat/thread/text-selection-menu.tsx:385
 #: src/features/settings/components/chat/trigger-settings.tsx:739
 msgid "Copy"
@@ -6931,7 +6931,7 @@ msgstr ""
 msgid "Copy as Markdown"
 msgstr "Als Markdown kopieren"
 
-#: src/features/chat/thread/message-item.tsx:368
+#: src/features/chat/thread/message-item.tsx:370
 msgid "Copy as plain text"
 msgstr ""
 
@@ -7268,7 +7268,7 @@ msgstr "Vorschau nicht möglich · Zum Herunterladen klicken"
 msgid "Could not pull {0}: {1}"
 msgstr "{0} konnte nicht heruntergeladen werden: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:650
+#: src/features/chat/core/context/chat-context.tsx:653
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
@@ -7366,6 +7366,10 @@ msgstr ""
 #: src/features/sub-agents/components/worker-list.tsx:52
 #: src/features/sub-agents/components/worker-stop-bar.tsx:40
 msgid "Could not stop the worker."
+msgstr ""
+
+#: src/features/chat/model-settings/use-model-combobox.ts:121
+msgid "Could not switch the model. Please try again."
 msgstr ""
 
 #: src/features/home/components/home-page.tsx:228
@@ -9337,7 +9341,7 @@ msgstr "Ein Modell herunterladen"
 msgid "Download as CSV"
 msgstr "Als CSV herunterladen"
 
-#: src/features/chat/thread/message-item.tsx:372
+#: src/features/chat/thread/message-item.tsx:374
 msgid "Download as Markdown"
 msgstr "Als Markdown herunterladen"
 
@@ -9709,7 +9713,7 @@ msgstr "Kantengeführte Generierung"
 #: src/features/canvas/canvas-panel.tsx:767
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:391
+#: src/features/chat/thread/message-item.tsx:393
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:218
@@ -12759,7 +12763,7 @@ msgid "First slide"
 msgstr "Erste Folie"
 
 #. placeholder {0}: formatDuration(ttftMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:547
+#: src/features/chat/thread/streaming-placeholder.tsx:549
 msgid "First token {0}"
 msgstr "Erstes Token {0}"
 
@@ -12958,7 +12962,7 @@ msgstr "Forken"
 msgid "Fork {0} to edit a copy"
 msgstr "{0} forken, um eine Kopie zu bearbeiten"
 
-#: src/features/chat/thread/message-item.tsx:401
+#: src/features/chat/thread/message-item.tsx:403
 msgid "Fork conversation"
 msgstr "Unterhaltung verzweigen"
 
@@ -13478,7 +13482,7 @@ msgstr "Aus einer Beschreibung generieren"
 msgid "Generate ideas for a creative writing story"
 msgstr "Ideen für eine kreative Geschichte generieren"
 
-#: src/features/chat/thread/message-item.tsx:420
+#: src/features/chat/thread/message-item.tsx:422
 msgid "Generate image"
 msgstr "Bild generieren"
 
@@ -13504,7 +13508,7 @@ msgstr "Zufälligen Seed generieren"
 msgid "Generate unique business ideas for 2025"
 msgstr "Einzigartige Geschäftsideen für 2025 generieren"
 
-#: src/features/chat/thread/message-item.tsx:430
+#: src/features/chat/thread/message-item.tsx:432
 msgid "Generate video"
 msgstr "Video generieren"
 
@@ -13517,7 +13521,7 @@ msgstr "Video generieren"
 msgid "Generate videos from text or images"
 msgstr "Videos aus Text oder Bildern generieren"
 
-#: src/features/chat/thread/message-item.tsx:440
+#: src/features/chat/thread/message-item.tsx:442
 msgid "Generate voice"
 msgstr "Stimme generieren"
 
@@ -14340,8 +14344,8 @@ msgstr "Angehängten Inhalt ausblenden"
 msgid "Hide column"
 msgstr "Spalte ausblenden"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:239
-#: src/features/chat/thread/composer-followup-suggestions.tsx:255
+#: src/features/chat/thread/composer-followup-suggestions.tsx:240
+#: src/features/chat/thread/composer-followup-suggestions.tsx:256
 msgid "Hide follow-up suggestions"
 msgstr "Folgevorschläge ausblenden"
 
@@ -16899,7 +16903,7 @@ msgstr "Wird geladen…"
 msgid "local"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:686
+#: src/features/chat/core/context/chat-context.tsx:689
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Lokale Modelle verarbeiten nur Text. Entferne die Anhänge, um zu senden."
 
@@ -18295,7 +18299,7 @@ msgstr "Mehr über dich"
 msgid "More actions for {0}"
 msgstr ""
 
-#: src/features/chat/thread/message-item.tsx:360
+#: src/features/chat/thread/message-item.tsx:362
 msgid "More copy options"
 msgstr ""
 
@@ -18813,7 +18817,7 @@ msgstr "Neore - KI-Plattform für Text-, Video-, Audio-, Bild- und Dokumenteners
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:643
+#: src/features/chat/thread/composer.tsx:655
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore kann Fehler machen. Überprüfe wichtige Informationen."
 
@@ -21781,7 +21785,7 @@ msgstr "Erinnerung anheften"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:144
 #: ../../packages/chat-ui/src/chat/message-item.tsx:193
-#: src/features/chat/thread/message-item.tsx:379
+#: src/features/chat/thread/message-item.tsx:381
 msgid "Pin message"
 msgstr "Nachricht anheften"
 
@@ -23426,7 +23430,7 @@ msgstr "{0} neu verbinden"
 msgid "Reconnecting to the server…"
 msgstr "Verbindung zum Server wird wiederhergestellt…"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:537
+#: src/features/chat/thread/streaming-placeholder.tsx:539
 msgid "Reconnecting…"
 msgstr "Verbindung wird wiederhergestellt…"
 
@@ -23610,7 +23614,7 @@ msgid "Refresh installed models"
 msgstr "Installierte Modelle aktualisieren"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:198
-#: src/features/chat/thread/message-item.tsx:385
+#: src/features/chat/thread/message-item.tsx:387
 msgid "Regenerate"
 msgstr "Neu generieren"
 
@@ -24081,7 +24085,7 @@ msgstr "Antworten"
 msgid "Reply complete"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:618
+#: src/features/chat/core/context/chat-context.tsx:621
 msgid "Reply ready"
 msgstr "Antwort bereit"
 
@@ -25711,6 +25715,10 @@ msgstr "Verifizierungscode senden"
 msgid "Sending your message and waiting for the reply"
 msgstr "Deine Nachricht wird gesendet, warte auf die Antwort"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:587
+msgid "Sending…"
+msgstr ""
+
 #: src/features/devices/components/devices-settings.tsx:173
 msgid "Sent"
 msgstr "Gesendet"
@@ -26043,8 +26051,8 @@ msgstr "Alle Aufgaben anzeigen"
 msgid "Show attached content"
 msgstr "Angehängten Inhalt anzeigen"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:239
-#: src/features/chat/thread/composer-followup-suggestions.tsx:255
+#: src/features/chat/thread/composer-followup-suggestions.tsx:240
+#: src/features/chat/thread/composer-followup-suggestions.tsx:256
 msgid "Show follow-up suggestions"
 msgstr "Folgevorschläge anzeigen"
 
@@ -27983,6 +27991,12 @@ msgstr "Wechsle zu einer Organisation, um den Skill mit ihr zu teilen."
 msgid "Switch workspace: currently {triggerLabel}"
 msgstr "Arbeitsbereich wechseln: aktuell {triggerLabel}"
 
+#. placeholder {0}: nameOf(part.from.model)
+#. placeholder {1}: nameOf(part.to.model)
+#: src/features/chat/thread/agent-switch-divider.tsx:14
+msgid "Switched from {0} to {1}"
+msgstr ""
+
 #: src/features/auth/components/team/team-switcher.tsx:73
 msgid "Switched to organization view"
 msgstr "Zur Organisationsansicht gewechselt"
@@ -28024,7 +28038,7 @@ msgstr "Synthesizer (wägt beide Seiten ab)"
 msgid "System default"
 msgstr "Systemstandard"
 
-#: src/features/chat/thread/message-item.tsx:230
+#: src/features/chat/thread/message-item.tsx:232
 msgid "System message:"
 msgstr "Systemnachricht:"
 
@@ -28675,7 +28689,7 @@ msgstr "Der Assistent hat eine Frage"
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:86
+#: src/features/chat/thread/composer-model-selector.tsx:88
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -28910,6 +28924,10 @@ msgstr "Die Neore-App auf diesem Gerät wird als {0} angemeldet. Fahre nur fort,
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:117
 msgid "The new passcode needs {MIN_PASSCODE_LENGTH} characters, typed twice the same."
+msgstr ""
+
+#: src/features/chat/model-settings/use-model-combobox.ts:108
+msgid "The next reply re-reads this whole conversation without the model's cache, so it costs more than usual."
 msgstr ""
 
 #: src/features/pages/components/page-agent-dialog.tsx:64
@@ -29152,7 +29170,7 @@ msgstr "Vision-Language-Modell mit Denkmodus"
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1036
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
-#: src/features/chat/thread/streaming-placeholder.tsx:727
+#: src/features/chat/thread/streaming-placeholder.tsx:764
 msgid "Thinking..."
 msgstr "Denkt nach..."
 
@@ -29176,6 +29194,10 @@ msgstr "Dieser Browser kann hier keine Push-Benachrichtigungen empfangen."
 
 #: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
+msgstr ""
+
+#: src/features/chat/thread/composer.tsx:584
+msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 msgstr ""
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:294
@@ -32022,6 +32044,10 @@ msgstr "{device}: wartet auf Genehmigung"
 msgid "Waiting for output…"
 msgstr "Wartet auf Ausgabe…"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:594
+msgid "Waiting for the agent…"
+msgstr ""
+
 #: src/features/chat/thread/ask-user-prompt.tsx:124
 msgid "Waiting for the owner to answer"
 msgstr "Wartet auf die Antwort des Eigentümers"
@@ -32059,7 +32085,7 @@ msgstr "Wartet auf: {0}"
 msgid "Want to continue from here?"
 msgstr "Möchtest du hier weitermachen?"
 
-#: src/features/chat/core/context/chat-context.tsx:688
+#: src/features/chat/core/context/chat-context.tsx:691
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "Wir konnten deine Sitzung nicht rechtzeitig bestätigen. Deine Nachricht ist noch im Eingabefeld. Bitte versuche erneut, sie zu senden."
 
@@ -32481,6 +32507,7 @@ msgstr "Workflows"
 msgid "Working"
 msgstr "In Arbeit"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:601
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"
@@ -32831,7 +32858,7 @@ msgstr "Dein KI-Arbeitsbereich <0>beginnt hier.</0>"
 msgid "Your answer"
 msgstr "Deine Antwort"
 
-#: src/features/chat/core/context/chat-context.tsx:618
+#: src/features/chat/core/context/chat-context.tsx:621
 msgid "Your answer in Neore has finished."
 msgstr "Die Antwort in Neore ist fertig."
 
@@ -32938,11 +32965,11 @@ msgstr "Dein lokaler Server hat geantwortet, diese Website aber abgelehnt (CORS)
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Dein Standort (z. B. „New York, USA“, „Berlin, Deutschland“)."
 
-#: src/features/chat/core/context/chat-context.tsx:685
+#: src/features/chat/core/context/chat-context.tsx:688
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Deine Nachricht enthält unangemessene Inhalte und kann nicht gesendet werden."
 
-#: src/features/chat/thread/message-item.tsx:175
+#: src/features/chat/thread/message-item.tsx:177
 msgid "Your message:"
 msgstr "Deine Nachricht:"
 
