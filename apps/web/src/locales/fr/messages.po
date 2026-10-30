@@ -2251,7 +2251,7 @@ msgstr "Ajuster"
 #: src/features/auth/components/team/team-switcher.tsx:143
 #: src/features/chat/sharing/thread-share-button.tsx:186
 #: src/features/chat/sharing/thread-share-button.tsx:290
-#: src/features/layout/components/sidebar-shortcut.tsx:267
+#: src/features/layout/components/sidebar-shortcut.tsx:268
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:51
 #: src/routes/admin/route.tsx:70
@@ -9205,6 +9205,7 @@ msgid "Deterministic, consistent"
 msgstr "Déterministe, cohérent"
 
 #: src/features/develop/components/develop-page.tsx:42
+#: src/features/layout/components/sidebar-shortcut.tsx:117
 msgid "Develop"
 msgstr ""
 
@@ -14582,7 +14583,7 @@ msgid "Hello {0}! What would you like to do today?"
 msgstr "Bonjour {0} ! Que souhaitez-vous faire aujourd’hui ?"
 
 #: src/features/layout/components/mobile-section-nav.tsx:71
-#: src/features/layout/components/sidebar-shortcut.tsx:300
+#: src/features/layout/components/sidebar-shortcut.tsx:301
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:111
 msgid "Help"
 msgstr "Aide"
@@ -19182,7 +19183,7 @@ msgstr "neore"
 msgid "Neore"
 msgstr "Neore"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:237
+#: src/features/layout/components/sidebar-shortcut.tsx:238
 #: src/features/marketing/components/navbar-menu.tsx:44
 msgid "Neore - AI Text & Video & Audio & Image & Documents Generation Platform"
 msgstr "Neore - Plateforme de génération de texte, vidéo, audio, images et documents par IA"
@@ -20930,7 +20931,7 @@ msgstr "Ouvrir une nouvelle discussion"
 msgid "Open on {0}"
 msgstr ""
 
-#: src/features/layout/components/sidebar-shortcut.tsx:123
+#: src/features/layout/components/sidebar-shortcut.tsx:124
 msgid "Open Pages"
 msgstr "Ouvrir les pages"
 
@@ -20954,7 +20955,7 @@ msgstr "Ouvrir la recherche"
 msgid "Open settings"
 msgstr "Ouvrir les paramètres"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:281
+#: src/features/layout/components/sidebar-shortcut.tsx:282
 msgid "Open Settings"
 msgstr "Ouvrir les paramètres"
 
@@ -21043,12 +21044,12 @@ msgstr ""
 msgid "Open thread"
 msgstr "Ouvrir la conversation"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:220
-#: src/features/layout/components/sidebar-shortcut.tsx:327
+#: src/features/layout/components/sidebar-shortcut.tsx:221
+#: src/features/layout/components/sidebar-shortcut.tsx:328
 msgid "Open user menu"
 msgstr "Ouvrir le menu utilisateur"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:139
+#: src/features/layout/components/sidebar-shortcut.tsx:140
 msgid "Open Vault"
 msgstr "Ouvrir le coffre-fort"
 
@@ -21064,7 +21065,7 @@ msgstr "Poids ouverts pour un déploiement flexible"
 msgid "Open weights for flexible deployment options"
 msgstr "Poids ouverts pour des options de déploiement flexibles"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:132
+#: src/features/layout/components/sidebar-shortcut.tsx:133
 msgid "Open Workflows"
 msgstr "Ouvrir les workflows"
 
@@ -21748,7 +21749,7 @@ msgstr "Titre de la page"
 msgid "Page Up"
 msgstr "Page précédente"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:124
+#: src/features/layout/components/sidebar-shortcut.tsx:125
 #: src/features/pages/components/pages-sidebar.tsx:150
 #: src/features/pages/components/pages-sidebar.tsx:152
 #: src/routes/_shortcut/pages/index.tsx:11
@@ -31619,7 +31620,7 @@ msgstr "Modèle de vision mis à jour de Z.AI"
 msgid "Updated: {timestamp}"
 msgstr "Mis à jour : {timestamp}"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:306
+#: src/features/layout/components/sidebar-shortcut.tsx:307
 msgid "Updates"
 msgstr "Nouveautés"
 
@@ -31977,7 +31978,7 @@ msgstr "utilisateur"
 #: src/features/devices/components/devices-settings.tsx:342
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
-#: src/features/layout/components/sidebar-shortcut.tsx:211
+#: src/features/layout/components/sidebar-shortcut.tsx:212
 msgid "User"
 msgstr "Utilisateur"
 
@@ -32168,7 +32169,7 @@ msgstr "Les variables commençant par « context. » ou « user. » sont gérée
 msgid "Variables:"
 msgstr "Variables :"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:140
+#: src/features/layout/components/sidebar-shortcut.tsx:141
 msgid "Vault"
 msgstr ""
 
@@ -33149,7 +33150,7 @@ msgid "What's included in the free plan?"
 msgstr "Que comprend le forfait gratuit ?"
 
 #: src/features/changelog/components/changelog-panel.tsx:103
-#: src/features/layout/components/sidebar-shortcut.tsx:313
+#: src/features/layout/components/sidebar-shortcut.tsx:314
 msgid "What's New"
 msgstr "Nouveautés"
 
@@ -33301,7 +33302,7 @@ msgstr "L’exécution du workflow est terminée"
 msgid "Workflow Templates"
 msgstr "Modèles de workflow"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:133
+#: src/features/layout/components/sidebar-shortcut.tsx:134
 #: src/routes/(chat)/workflow/index.tsx:40
 msgid "Workflows"
 msgstr "Workflows"

@@ -114,6 +114,7 @@ export const NAV_LINK_DEFS: NavLinkDef[] = [
     {
         icon: GitPullRequest,
         labelKey: msg`Open Develop`,
+        shortLabelKey: msg`Develop`,
         matcher: (p) => p.startsWith("/develop"),
         requiresAuth: true,
         to: "/develop",

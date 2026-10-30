@@ -2251,7 +2251,7 @@ msgstr "调整"
 #: src/features/auth/components/team/team-switcher.tsx:143
 #: src/features/chat/sharing/thread-share-button.tsx:186
 #: src/features/chat/sharing/thread-share-button.tsx:290
-#: src/features/layout/components/sidebar-shortcut.tsx:267
+#: src/features/layout/components/sidebar-shortcut.tsx:268
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:51
 #: src/routes/admin/route.tsx:70
@@ -9205,6 +9205,7 @@ msgid "Deterministic, consistent"
 msgstr "确定、一致"
 
 #: src/features/develop/components/develop-page.tsx:42
+#: src/features/layout/components/sidebar-shortcut.tsx:117
 msgid "Develop"
 msgstr ""
 
@@ -14582,7 +14583,7 @@ msgid "Hello {0}! What would you like to do today?"
 msgstr "你好，{0}！今天想做点什么？"
 
 #: src/features/layout/components/mobile-section-nav.tsx:71
-#: src/features/layout/components/sidebar-shortcut.tsx:300
+#: src/features/layout/components/sidebar-shortcut.tsx:301
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:111
 msgid "Help"
 msgstr "帮助"
@@ -19182,7 +19183,7 @@ msgstr "neore"
 msgid "Neore"
 msgstr "Neore"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:237
+#: src/features/layout/components/sidebar-shortcut.tsx:238
 #: src/features/marketing/components/navbar-menu.tsx:44
 msgid "Neore - AI Text & Video & Audio & Image & Documents Generation Platform"
 msgstr "Neore - AI 文本、视频、音频、图像和文档生成平台"
@@ -20930,7 +20931,7 @@ msgstr "打开新聊天"
 msgid "Open on {0}"
 msgstr ""
 
-#: src/features/layout/components/sidebar-shortcut.tsx:123
+#: src/features/layout/components/sidebar-shortcut.tsx:124
 msgid "Open Pages"
 msgstr "打开页面"
 
@@ -20954,7 +20955,7 @@ msgstr "打开搜索"
 msgid "Open settings"
 msgstr "打开设置"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:281
+#: src/features/layout/components/sidebar-shortcut.tsx:282
 msgid "Open Settings"
 msgstr "打开设置"
 
@@ -21043,12 +21044,12 @@ msgstr ""
 msgid "Open thread"
 msgstr "打开对话"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:220
-#: src/features/layout/components/sidebar-shortcut.tsx:327
+#: src/features/layout/components/sidebar-shortcut.tsx:221
+#: src/features/layout/components/sidebar-shortcut.tsx:328
 msgid "Open user menu"
 msgstr "打开用户菜单"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:139
+#: src/features/layout/components/sidebar-shortcut.tsx:140
 msgid "Open Vault"
 msgstr "打开文件库"
 
@@ -21064,7 +21065,7 @@ msgstr "开放权重，部署灵活"
 msgid "Open weights for flexible deployment options"
 msgstr "开放权重，部署选择灵活"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:132
+#: src/features/layout/components/sidebar-shortcut.tsx:133
 msgid "Open Workflows"
 msgstr "打开工作流"
 
@@ -21748,7 +21749,7 @@ msgstr "页面标题"
 msgid "Page Up"
 msgstr "Page Up"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:124
+#: src/features/layout/components/sidebar-shortcut.tsx:125
 #: src/features/pages/components/pages-sidebar.tsx:150
 #: src/features/pages/components/pages-sidebar.tsx:152
 #: src/routes/_shortcut/pages/index.tsx:11
@@ -31619,7 +31620,7 @@ msgstr "Z.AI 更新的视觉模型"
 msgid "Updated: {timestamp}"
 msgstr "更新于：{timestamp}"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:306
+#: src/features/layout/components/sidebar-shortcut.tsx:307
 msgid "Updates"
 msgstr "更新动态"
 
@@ -31977,7 +31978,7 @@ msgstr "用户"
 #: src/features/devices/components/devices-settings.tsx:342
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
-#: src/features/layout/components/sidebar-shortcut.tsx:211
+#: src/features/layout/components/sidebar-shortcut.tsx:212
 msgid "User"
 msgstr "用户"
 
@@ -32168,7 +32169,7 @@ msgstr "以“context.”或“user.”开头的变量由系统管理，无法�
 msgid "Variables:"
 msgstr "变量："
 
-#: src/features/layout/components/sidebar-shortcut.tsx:140
+#: src/features/layout/components/sidebar-shortcut.tsx:141
 msgid "Vault"
 msgstr ""
 
@@ -33149,7 +33150,7 @@ msgid "What's included in the free plan?"
 msgstr "免费套餐包含哪些内容？"
 
 #: src/features/changelog/components/changelog-panel.tsx:103
-#: src/features/layout/components/sidebar-shortcut.tsx:313
+#: src/features/layout/components/sidebar-shortcut.tsx:314
 msgid "What's New"
 msgstr "新功能"
 
@@ -33301,7 +33302,7 @@ msgstr "工作流运行完成"
 msgid "Workflow Templates"
 msgstr "工作流模板"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:133
+#: src/features/layout/components/sidebar-shortcut.tsx:134
 #: src/routes/(chat)/workflow/index.tsx:40
 msgid "Workflows"
 msgstr "工作流"
