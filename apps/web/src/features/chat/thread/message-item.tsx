@@ -204,7 +204,7 @@ const DefaultAssistantMessage: FC<AssistantMessageRendererProps> = ({ actionBar,
             </span>
             <MessageContentWrapper
                 className={cn(
-                    "message-text col-span-2 col-start-2 row-start-1 leading-7 wrap-break-word",
+                    "message-text col-span-2 col-start-2 row-start-1 text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading) wrap-break-word",
                     hasRateLimitError ? "text-destructive dark:text-red-400" : "text-foreground dark:text-white",
                 )}
             >
