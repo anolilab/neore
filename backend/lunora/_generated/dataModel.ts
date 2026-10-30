@@ -1717,6 +1717,7 @@ export interface Doc_threads {
     enabledFeatures?: Array<string>;
     externalThreadId?: string;
     groupChat?: { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ addedAt: number; skillId: string }>; stopRequestedAt?: number; synthesizerSkillId?: string };
+    hasHandoff?: boolean;
     isPublic?: boolean;
     isTemporary?: boolean;
     language?: string;
@@ -4528,6 +4529,7 @@ export interface Insert_threads {
     enabledFeatures?: Array<string>;
     externalThreadId?: string;
     groupChat?: { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ addedAt: number; skillId: string }>; stopRequestedAt?: number; synthesizerSkillId?: string };
+    hasHandoff?: boolean;
     isPublic?: boolean;
     isTemporary?: boolean;
     language?: string;

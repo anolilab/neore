@@ -1453,6 +1453,7 @@ export const threads = sqliteTable("threads", {
     enabledFeatures: text("enabledFeatures", { mode: "json" }).$type<Array<string>>(),
     externalThreadId: text("externalThreadId"),
     groupChat: text("groupChat", { mode: "json" }).$type<{ debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ addedAt: number; skillId: string }>; stopRequestedAt?: number; synthesizerSkillId?: string }>(),
+    hasHandoff: integer("hasHandoff", { mode: "boolean" }),
     isPublic: integer("isPublic", { mode: "boolean" }),
     isTemporary: integer("isTemporary", { mode: "boolean" }),
     language: text("language"),

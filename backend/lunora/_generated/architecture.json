@@ -16826,25 +16826,25 @@
     {
       "file": "acp/lib/import",
       "kind": "write",
-      "line": 66,
+      "line": 67,
       "reason": "\"openImport\" is not a registered function"
     },
     {
       "file": "acp/lib/import",
       "kind": "write",
-      "line": 70,
+      "line": 75,
       "reason": "\"openImport\" is not a registered function"
     },
     {
       "file": "acp/lib/import",
       "kind": "write",
-      "line": 94,
+      "line": 99,
       "reason": "\"openImport\" is not a registered function"
     },
     {
       "file": "acp/lib/import",
       "kind": "write",
-      "line": 205,
+      "line": 210,
       "reason": "\"applyImportTurns\" is not a registered function"
     },
     {
@@ -17552,79 +17552,79 @@
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 60,
+      "line": 61,
       "reason": "\"insertThread\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 83,
+      "line": 84,
       "reason": "\"patchThread\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 104,
+      "line": 105,
       "reason": "\"markThreadViewedAt\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 119,
+      "line": 120,
       "reason": "\"setThreadSnooze\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 128,
+      "line": 129,
       "reason": "\"insertMessageRow\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 159,
+      "line": 160,
       "reason": "\"patchAgentSwitchRow\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 163,
+      "line": 164,
       "reason": "\"patchMessage\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 167,
+      "line": 168,
       "reason": "\"patchTemporaryThread\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 171,
+      "line": 172,
       "reason": "\"insertThreadRelationship\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "read",
-      "line": 180,
+      "line": 181,
       "reason": "\"leaseTemporaryThreadMarkers\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 185,
+      "line": 186,
       "reason": "\"leaseTemporaryThreadMarkers\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 189,
+      "line": 190,
       "reason": "\"insertChatFileAccess\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 194,
+      "line": 195,
       "reason": "\"deleteVectorRow\" is not a registered function"
     },
     {
@@ -18014,37 +18014,37 @@
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 540,
+      "line": 541,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 558,
+      "line": 559,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 569,
+      "line": 570,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 588,
+      "line": 589,
       "reason": "\"runAgentSwitch\" is not a registered function"
-    },
-    {
-      "file": "chat/agent-switch",
-      "kind": "call",
-      "line": 611,
-      "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
       "line": 612,
+      "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 613,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {

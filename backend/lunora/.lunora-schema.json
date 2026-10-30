@@ -23539,6 +23539,12 @@
             }
           }
         },
+        "hasHandoff": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "isPublic": {
           "kind": "boolean",
           "nullable": false,

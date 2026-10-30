@@ -17570,6 +17570,9 @@
                         ],
                         "type": "object"
                       },
+                      "hasHandoff": {
+                        "type": "boolean"
+                      },
                       "lastReplyAt": {
                         "type": "number"
                       },
