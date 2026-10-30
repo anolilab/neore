@@ -27,6 +27,8 @@ const rpc = async (path: string, args: unknown): Promise<unknown> => {
         body: JSON.stringify({ args, functionPath: path }),
         headers: { authorization: `Bearer ${process.env.NEORE_BEARER ?? ""}`, "content-type": "application/json" },
         method: "POST",
+        // One stalled poll must not stop an hour of sampling: it fails, is recorded, and the loop goes on.
+        signal: AbortSignal.timeout(30_000),
     });
 
     if (!response.ok) {

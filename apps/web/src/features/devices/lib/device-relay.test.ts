@@ -179,7 +179,6 @@ describe("createDeviceRelay", () => {
         await vi.waitFor(() => expect(relay.claim).toHaveBeenCalledTimes(2));
     });
 
-
     it("relays each call once however often the live list repeats it", async () => {
         const relay = ports();
         const push = createDeviceRelay(relay);

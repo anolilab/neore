@@ -48,7 +48,9 @@ const PermissionRequestCard: FC<{ busy: boolean; onAnswer: (optionId: string) =>
                 <span>{request.tool}</span>
             </p>
             {request.target !== undefined && <p className="text-muted-foreground mt-1 font-mono text-xs break-all">{request.target}</p>}
-            {request.command !== undefined && <pre className="mt-1 max-h-32 overflow-auto rounded border p-2 font-mono text-xs whitespace-pre-wrap">{request.command}</pre>}
+            {request.command !== undefined && (
+                <pre className="mt-1 max-h-32 overflow-auto rounded border p-2 font-mono text-xs whitespace-pre-wrap">{request.command}</pre>
+            )}
             {request.folder !== undefined && <p className="text-muted-foreground mt-1 text-xs">{t`In ${request.folder}`}</p>}
             {request.incomplete === true && (
                 <p className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="note">
@@ -157,7 +159,12 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
             {waiting !== undefined && waiting.length > 0 && (
                 <ul aria-label={t`Permission requests from the agent`} className="flex flex-col gap-2">
                     {waiting.map((request) => (
-                        <PermissionRequestCard busy={answer.isPending} key={request.requestId} onAnswer={(optionId) => answerRequest(request, optionId)} request={request} />
+                        <PermissionRequestCard
+                            busy={answer.isPending}
+                            key={request.requestId}
+                            onAnswer={(optionId) => answerRequest(request, optionId)}
+                            request={request}
+                        />
                     ))}
                 </ul>
             )}
@@ -175,9 +182,15 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
             {offerContinue && (
                 <div className="bg-muted flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm" role="status">
                     <span>{t`The last turn stopped before it finished.`}</span>
-                    <Button disabled={sending} onClick={() => {
+                    <Button
+                        disabled={sending}
+                        onClick={() => {
                             send(t`Continue where you left off.`);
-                        }} size="sm" type="button" variant="outline">
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                    >
                         {t`Continue`}
                     </Button>
                 </div>
@@ -199,9 +212,13 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                         <Square aria-hidden="true" className="size-4" />
                     </Button>
                 ) : (
-                    <Button disabled={!canSend} onClick={() => {
+                    <Button
+                        disabled={!canSend}
+                        onClick={() => {
                             send(trimmed);
-                        }} type="button">
+                        }}
+                        type="button"
+                    >
                         {t`Send`}
                     </Button>
                 )}

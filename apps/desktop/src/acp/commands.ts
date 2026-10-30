@@ -18,7 +18,7 @@
  * The receipt log is the replay defence for these calls: a captured envelope can be delivered again, and finds
  * its receipt, until the envelope expires. Receipts are kept for that long and a little more.
  */
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename } from "node:fs/promises";
 import path from "node:path";
 
 import type { Signed } from "../device/types";
@@ -85,6 +85,21 @@ interface Receipt {
     expiresAt: number;
     refusal?: string;
 }
+
+/** Makes the rename itself durable. Windows cannot open a folder to sync it, and does not need to. */
+const syncDirectory = async (directory: string): Promise<void> => {
+    if (process.platform === "win32") {
+        return;
+    }
+
+    const handle = await open(directory, "r");
+
+    try {
+        await handle.sync();
+    } finally {
+        await handle.close();
+    }
+};
 
 export class HostCommands {
     /** callId → receipt. In memory first, so two deliveries at once cannot both run. */
@@ -234,7 +249,18 @@ export class HostCommands {
         const { receiptFile } = this.options;
 
         await mkdir(path.dirname(receiptFile), { recursive: true });
-        await writeFile(`${receiptFile}.tmp`, JSON.stringify({ receipts: [...this.receipts].map(([callId, { expiresAt, refusal }]) => refusal === undefined ? [callId, expiresAt] : [callId, expiresAt, refusal]) }), { mode: 0o600 });
+        const content = JSON.stringify({ receipts: [...this.receipts].map(([callId, { expiresAt, refusal }]) => refusal === undefined ? [callId, expiresAt] : [callId, expiresAt, refusal]) });
+        const handle = await open(`${receiptFile}.tmp`, "w", 0o600);
+
+        try {
+            await handle.writeFile(content);
+            // On disk, not in the page cache: the receipt is the only thing that stops a redelivered command running twice.
+            await handle.sync();
+        } finally {
+            await handle.close();
+        }
+
         await rename(`${receiptFile}.tmp`, receiptFile);
+        await syncDirectory(path.dirname(receiptFile));
     }
 }

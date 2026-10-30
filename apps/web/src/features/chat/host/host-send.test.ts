@@ -33,8 +33,14 @@ describe("sendHostMessage", () => {
 
     it("names why the backend refused, and calls anything else unreachable", async () => {
         await expect(sendHostMessage(INPUT, { fetch: answering(409, { error: "offline" }) as never })).resolves.toEqual({ error: "offline", ok: false });
-        await expect(sendHostMessage(INPUT, { fetch: answering(409, { error: "turn_running" }) as never })).resolves.toEqual({ error: "turn_running", ok: false });
-        await expect(sendHostMessage(INPUT, { fetch: answering(500, { error: "something new" }) as never })).resolves.toEqual({ error: "unreachable", ok: false });
+        await expect(sendHostMessage(INPUT, { fetch: answering(409, { error: "turn_running" }) as never })).resolves.toEqual({
+            error: "turn_running",
+            ok: false,
+        });
+        await expect(sendHostMessage(INPUT, { fetch: answering(500, { error: "something new" }) as never })).resolves.toEqual({
+            error: "unreachable",
+            ok: false,
+        });
         await expect(sendHostMessage(INPUT, { fetch: vi.fn(async () => new Response("<html>", { status: 502 })) as never })).resolves.toEqual({
             error: "unreachable",
             ok: false,

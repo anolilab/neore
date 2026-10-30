@@ -195,7 +195,13 @@ const streamOf = async (threadId: string): Promise<Row> => {
     return stream as Row;
 };
 
-const addRequest = async (streamId: string, seq: number, requestId: string, kinds: string[] = ["allow_once", "allow_always", "reject_once"], complete?: boolean) =>
+const addRequest = async (
+    streamId: string,
+    seq: number,
+    requestId: string,
+    kinds: string[] = ["allow_once", "allow_always", "reject_once"],
+    complete?: boolean,
+) =>
     await run(async (ctx) => {
         await ctx.db.persistentChunks.insert({
             event: {
@@ -263,7 +269,9 @@ describe("the offers in a manifest", () => {
 
     it("refuses a malformed list whole and bounds every field", () => {
         expect(parseAcpOffers([{ ...OFFER, agentKey: "" }])).toBeNull();
-        expect(parseAcpOffers([{ ...OFFER, folderLabel: "x".repeat(201) }])).toBeNull();
+        // A label is only shown, so a long one is cut; an id too long to match is still refused.
+        expect(parseAcpOffers([{ ...OFFER, folderLabel: "x".repeat(201) }])?.[0]?.folderLabel).toBe("x".repeat(200));
+        expect(parseAcpOffers([{ ...OFFER, folderId: "x".repeat(129) }])).toBeNull();
         expect(parseAcpOffers([{ agentKey: "claude" }])).toBeNull();
         expect(parseAcpOffers("claude")).toBeNull();
         const tooMany = Array.from({ length: 51 }, (_, index) => {
@@ -277,10 +285,7 @@ describe("the offers in a manifest", () => {
 
 describe("startHostSession", () => {
     const start = async (clientId = "tap-1", overrides: Record<string, unknown> = {}, deviceId = "") =>
-        await as(ownerId).mutation(
-            remote.startHostSession as never,
-            { agentKey: "claude", clientId, deviceId, folderId: "f1", ...overrides } as never,
-        );
+        await as(ownerId).mutation(remote.startHostSession as never, { agentKey: "claude", clientId, deviceId, folderId: "f1", ...overrides } as never);
 
     it("makes a host thread and a starting session and queues a signed acp_start for the approved pair", async () => {
         const device = await pairedDevice(ownerId);
@@ -337,7 +342,10 @@ describe("startHostSession", () => {
 
         const [session] = await rows("acpSessions");
 
-        await run(async (ctx) => await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }));
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }),
+        );
         expect(await sessionStatus()).toBe("idle");
         expect(await rows("acpSessions")).toHaveLength(1);
         expect(await rows("threads", { runner: "host" })).toHaveLength(1);
@@ -376,7 +384,9 @@ describe("a start the computer accepted", () => {
         const silent = await start("a");
         const opened = await start("b");
 
-        await run(async (ctx) => await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: opened.hostSessionId }));
+        await run(
+            async (ctx) => await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: opened.hostSessionId }),
+        );
         await end(silent);
         await end(opened);
 
@@ -501,7 +511,9 @@ describe("a continue from the web", () => {
         const device = await pairedDevice(ownerId);
         const threadId = await openSession(device);
         const post = async (firstSeq: number, events: unknown[], turnId: string) =>
-            await run(async (ctx) => await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events, firstSeq, sessionId: "host-s1", threadId, turnId }));
+            await run(
+                async (ctx) => await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events, firstSeq, sessionId: "host-s1", threadId, turnId }),
+            );
         const bodyOf = async (streamId: string) => (await as(ownerId).query(streaming.getStreamBody as never, { streamId } as never)) as Row;
 
         // The web sends: stored, signed, not yet anywhere near the agent.
@@ -520,10 +532,24 @@ describe("a continue from the web", () => {
         expect(await bodyOf(sent.streamId)).toMatchObject({ hostState: "received" });
 
         // The agent starts: the computer posts the turn under the id the backend minted, from the first event.
-        await post(0, [{ kind: "turn_start", text: "now add a test" }, { kind: "text", text: "Adding " }], turnId);
+        await post(
+            0,
+            [
+                { kind: "turn_start", text: "now add a test" },
+                { kind: "text", text: "Adding " },
+            ],
+            turnId,
+        );
         expect(await bodyOf(sent.streamId)).toMatchObject({ hostState: "running", status: "streaming", text: "Adding " });
 
-        await post(2, [{ kind: "text", text: "the test." }, { kind: "turn_end", reason: "finished" }], turnId);
+        await post(
+            2,
+            [
+                { kind: "text", text: "the test." },
+                { kind: "turn_end", reason: "finished" },
+            ],
+            turnId,
+        );
 
         // Every client reads the same end, and the reply is saved under the prompt that was sent.
         expect(await bodyOf(sent.streamId)).toMatchObject({ hostState: "ended", status: "done", text: "Adding the test." });
@@ -650,8 +676,7 @@ describe("the clock on a command", () => {
 });
 
 describe("cancelHostTurn", () => {
-    const cancel = async (threadId: string, userId = ownerId) =>
-        await as(userId).mutation(remote.cancelHostTurn as never, { threadId } as never);
+    const cancel = async (threadId: string, userId = ownerId) => await as(userId).mutation(remote.cancelHostTurn as never, { threadId } as never);
 
     it("ends the turn, keeps what was written and tells the computer to cancel; a prompt it never received is withdrawn", async () => {
         const device = await pairedDevice(ownerId);
@@ -690,7 +715,17 @@ describe("cancelHostTurn", () => {
 
         const full = await run(
             async (ctx) =>
-                await createAcpCall(ctx, { deviceId: device.deviceId as never, input: { optionId: "x", requestId: "r2", sessionId: "host-s1" }, kind: "acp_permission_answer", threadId: threadId as never, userId: ownerId }, Date.now()),
+                await createAcpCall(
+                    ctx,
+                    {
+                        deviceId: device.deviceId as never,
+                        input: { optionId: "x", requestId: "r2", sessionId: "host-s1" },
+                        kind: "acp_permission_answer",
+                        threadId: threadId as never,
+                        userId: ownerId,
+                    },
+                    Date.now(),
+                ),
         );
 
         expect(full).toEqual({ error: "busy" });
@@ -721,7 +756,17 @@ describe("cancelHostTurn", () => {
 
         const cancelCall = await run(
             async (ctx) =>
-                await createAcpCall(ctx, { deviceId: device.deviceId as never, input: { sessionId: "host-s1", turnId: stream.hostTurnId }, kind: "acp_cancel", threadId: threadId as never, userId: ownerId }, Date.now()),
+                await createAcpCall(
+                    ctx,
+                    {
+                        deviceId: device.deviceId as never,
+                        input: { sessionId: "host-s1", turnId: stream.hostTurnId },
+                        kind: "acp_cancel",
+                        threadId: threadId as never,
+                        userId: ownerId,
+                    },
+                    Date.now(),
+                ),
         );
 
         expect(cancelCall).toEqual({ callId: expect.any(String) });
@@ -848,8 +893,10 @@ describe("POST /hosts/send", () => {
 
         await expect(post("not json")).resolves.toBe(400);
         await expect(post({ requestId: "r", text: "hi" })).resolves.toBe(400);
-        await expect(post({ requestId: "r", text: ' '.repeat(3), threadId: "t" })).resolves.toBe(400);
+        await expect(post({ requestId: "r", text: " ".repeat(3), threadId: "t" })).resolves.toBe(400);
         await expect(post({ requestId: "r", text: "x".repeat(30_001), threadId: "t" })).resolves.toBe(400);
+        // A body far past a prompt's worth is refused unread, with or without a Content-Length.
+        await expect(post({ extra: "x".repeat(200_000), requestId: "r", text: "hi", threadId: "t" })).resolves.toBe(413);
         await expect(post({ requestId: "", text: "hi", threadId: "t" })).resolves.toBe(400);
     });
 });
