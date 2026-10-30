@@ -145,10 +145,33 @@ export const syncActiveAgent = async (context: MutationCtx, threadId: Id<"thread
 };
 
 /**
+ * Whether `prompt` is the newest turn of the path ending at `leaf`: the only rows below it are its
+ * replies and switch dividers, no later prompt. A switch made after that turn hangs under its
+ * reply, so it is the thread's current agent a regenerate of the turn is meant to run on.
+ */
+const isLatestTurn = async (context: Reader, threadId: Id<"threads">, leaf: Row, prompt: Row): Promise<boolean> => {
+    let cursor: Row | null = leaf;
+
+    while (cursor && cursor._id !== prompt._id) {
+        const { next, rows } = await walkPath(context, threadId, cursor, { limit: PATH_PAGE_ROWS, stopAtId: prompt._id });
+
+        if (rows.some((row) => (row.message as { role?: string } | undefined)?.role === "user")) {
+            return false;
+        }
+
+        cursor = next;
+    }
+
+    return cursor !== null;
+};
+
+/**
  * The model a send must run on, or `null` to keep the one it brought: the thread was never
  * switched, or its creation model is unknown. A regenerate names its prompt (`promptMessageId`:
- * the path through it, inclusive), an edit the message it replaces (`replacedMessageId`: the path
- * above it); a plain send continues the displayed path.
+ * the path through it, inclusive) — except for the newest turn of the displayed path, which
+ * runs on the displayed leaf's agent, so a pick made after its reply applies to the redo; an edit
+ * names the message it replaces (`replacedMessageId`: the path above it); a plain send continues
+ * the displayed path.
  */
 export const runAgentModelOf = async (
     context: QueryCtx,
@@ -167,7 +190,10 @@ export const runAgentModelOf = async (
 
         from = replaced ? await parentOf(context, args.threadId, replaced) : null;
     } else {
-        from = args.promptMessageId ? await getThreadRow(context, args.threadId, args.promptMessageId) : await leafRowOf(context, thread);
+        const leaf = await leafRowOf(context, thread);
+        const prompt = args.promptMessageId ? await getThreadRow(context, args.threadId, args.promptMessageId) : null;
+
+        from = args.promptMessageId && !(leaf && prompt && (await isLatestTurn(context, args.threadId, leaf, prompt))) ? prompt : leaf;
     }
 
     const agent = await resolvePathAgent(context, thread, from);
