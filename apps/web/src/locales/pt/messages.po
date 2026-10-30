@@ -997,6 +997,10 @@ msgstr "{providerName} · sua própria conta Bedrock ({region})"
 msgid "{requestCount} req"
 msgstr "{requestCount} req."
 
+#: src/features/develop/components/pull-request-view.tsx:106
+msgid "{requestNoun} views"
+msgstr ""
+
 #: src/components/settings/settings-search.tsx:93
 msgid "{resultCount, plural, one {# result} other {# results}}"
 msgstr ""
