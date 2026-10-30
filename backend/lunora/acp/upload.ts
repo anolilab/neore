@@ -80,9 +80,11 @@ export const finalizeHostUpload = internalAction
             const finalized = { fileId: fileId as string, mediaType, storageKey: storageId };
 
             // A memo that could not be written costs only a resend its file; the finalize itself stands.
-            await ctx.runMutation(internal.lib.action_cache.put, { key, name: FINALIZE_MEMO, ttl: FINALIZE_MEMO_TTL_MS, value: finalized }).catch((error: unknown) => {
-                storageLogger.warn("A host's finalized upload could not be remembered", error);
-            });
+            await ctx
+                .runMutation(internal.lib.action_cache.put, { key, name: FINALIZE_MEMO, ttl: FINALIZE_MEMO_TTL_MS, value: finalized })
+                .catch((error: unknown) => {
+                    storageLogger.warn("A host's finalized upload could not be remembered", error);
+                });
 
             return finalized;
         } catch (error) {

@@ -1,6 +1,6 @@
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { endHostTurn } from "./finish";
+import { endLiveHostTurns } from "./finish";
 
 const SESSION_BATCH = 200;
 
@@ -20,13 +20,7 @@ export const endHostSessionsOfDevice = async (ctx: MutationCtx, deviceId: Id<"de
                 await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
             }
 
-            const { page: live } = await ctx.db.persistentStreams.findMany({
-                where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId: session.threadId },
-            });
-
-            for (const stream of live) {
-                await endHostTurn(ctx, stream, { reason: "revoked" }, now);
-            }
+            await endLiveHostTurns(ctx, session.threadId, { reason: "revoked" }, now);
         }
 
         cursor = isDone ? undefined : (continueCursor ?? undefined);

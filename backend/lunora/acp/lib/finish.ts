@@ -95,7 +95,9 @@ export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId:
     if (tail.length > 0) {
         tail.reverse();
 
-        if (!reachedFront && transcript.text.length > 0) {
+        // The marker says the middle is missing, so it belongs wherever the tail adds text after a gap, even when the
+        // front held only tool events; a tail with no text of its own has nothing for it to separate.
+        if (!reachedFront && tail.some((chunk) => chunk.text.length > 0)) {
             appendToTranscript(transcript, { text: OMITTED_MARKER });
         }
 
@@ -188,6 +190,38 @@ export const finishHostTurn = async (ctx: MutationCtx, stream: Stream, end: { er
     return ended;
 };
 
+/** Live host streams read per pass by {@link endLiveHostTurns}. A thread runs one turn at a time, so a pass is rarely more than one. */
+export const LIVE_STREAM_BATCH = 50;
+
+/**
+ * Ends every live host stream of a thread through {@link endHostTurn}, each saving its reply. Read in bounded
+ * passes: a stream that ended is no longer live, so the next pass starts from the front and finds the rest.
+ */
+export const endLiveHostTurns = async (
+    ctx: MutationCtx,
+    threadId: Id<"threads">,
+    end: { error?: string; reason: HostReplyReason },
+    now: number,
+): Promise<void> => {
+    for (;;) {
+        const { page: live } = await ctx.db.persistentStreams.findMany({
+            limit: LIVE_STREAM_BATCH,
+            where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId },
+        });
+        let ended = 0;
+
+        for (const stream of live) {
+            if (await endHostTurn(ctx, stream, end, now)) {
+                ended += 1;
+            }
+        }
+
+        if (live.length < LIVE_STREAM_BATCH || ended === 0) {
+            return;
+        }
+    }
+};
+
 /** Asks the stream's host to stop the turn. Best effort: a refusal (budget, device gone) leaves the stream ended all the same. */
 export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: number): Promise<void> => {
     if (!stream.hostTurnId) {
@@ -201,7 +235,7 @@ export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: numb
     }
 
     try {
-        await createAcpCancelCall(
+        const result = await createAcpCancelCall(
             ctx,
             {
                 deviceId: session.deviceId,
@@ -212,6 +246,12 @@ export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: numb
             },
             now,
         );
+
+        // A refusal is an answer, not a throw: the device already holds its whole budget of open calls (`busy`) or is
+        // gone (`ineligible`). The stream ends all the same, and the host stops the turn when its own cap or restart does.
+        if ("error" in result) {
+            streamLogger.warn(`[acp] could not ask the host to cancel a turn: ${result.error}`);
+        }
     } catch (error) {
         // Best effort, as above: the stream ends either way.
         streamLogger.warn("[acp] could not ask the host to cancel a turn", error);

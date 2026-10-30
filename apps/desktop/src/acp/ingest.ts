@@ -13,8 +13,13 @@
  * - **A post the backend will never take** (403 not ours, 400 a field past its limits, 413 a body past its cap) ends
  * the turn's posting. The host cuts every field to the backend's limits and every batch to its byte cap first,
  * so these mean version skew, not a long prompt.
- * - **Backoff, jittered and capped**, for anything that is not an answer: a network error, a 5xx, a 429, a 401
- * (a skewed clock or a revoked device looks like this). The batch is kept; the queue behind it is bounded.
+ * - **Backoff, jittered and capped**, for anything that is not an answer: a network error, a 5xx, a 429, a 409 that
+ * names no `next` (the session's previous turn is still ending), a redirect (never followed: the signed body is
+ * not sent to wherever it points). The batch is kept; the queue behind it is bounded.
+ * - **A 401 is retried for a while, then it ends the posting.** The backend answers 401 alike for a skewed clock
+ * and for a device that was removed, so one blip must not drop a turn; but a streak of them that has lasted a
+ * minute is a revoked computer, and posting for ever would only keep its turns in memory and in the running-turns
+ * file. The streak ends with any other answer, and with a gap of a minute between two 401s.
  * - **A keepalive** (a post with no events) while a turn runs, so a long tool call is not mistaken for a dead host.
  * - **A turn cut off by a restart** is recorded on disk while it runs. On the next start each such turn is ended
  * with the reason `interrupted`, at the `seq` the backend says is next.
@@ -38,6 +43,9 @@ const REQUEST_TIMEOUT_MS = 20_000;
 /** The most of a turn's text kept for its references; a reply is capped at the same length on the backend. */
 const MAX_TURN_TEXT_CHARS = 256_000;
 const REFUSED_STATUSES = new Set([400, 403, 413]);
+/** A run of 401s this long and this many is a device the backend no longer knows, not a clock blip. */
+const REVOKED_AFTER_MS = 60_000;
+const REVOKED_AFTER_ATTEMPTS = 5;
 
 export interface PosterOptions {
     /** This computer's paired device id; undefined while it is not paired. */
@@ -71,12 +79,18 @@ export class HostPoster implements SessionObserver {
     /** What each session shows the backend, to name its agent and folder when a reply's files are read. */
     private readonly infos = new Map<string, HostSessionInfo>();
 
+    /** Sessions that ended locally and wait for their turns to drain before the backend is told. */
+    private readonly closing = new Set<string>();
+
     private readonly sessions = new Map<string, SessionLink>();
 
     /** The text of each running turn, kept for the references its reply makes (capped). */
     private readonly texts = new Map<string, string>();
 
     private stopped = false;
+
+    /** The run of consecutive 401s, if any: its length, when it began and when the latest came. */
+    private unauthorized: { count: number; last: number; reported: boolean; since: number } | undefined;
 
     /** Serialises writes of the state file; a write never overtakes the one before it. */
     private writing: Promise<void> = Promise.resolve();
@@ -87,6 +101,7 @@ export class HostPoster implements SessionObserver {
                 this.channels.delete(channel.turnId);
                 this.texts.delete(channel.turnId);
                 this.persist();
+                this.closeWhenDrained(channel.sessionId);
             },
             log: (message) => this.options.log?.(message),
             now: () => this.now(),
@@ -131,6 +146,8 @@ export class HostPoster implements SessionObserver {
 
     public sessionEnded(sessionId: string): void {
         this.sessions.get(sessionId)?.close();
+        this.closing.add(sessionId);
+        this.closeWhenDrained(sessionId);
     }
 
     public turnStarted(sessionId: string, turnId: string, user: string): void {
@@ -297,6 +314,25 @@ export class HostPoster implements SessionObserver {
         }
     }
 
+    /**
+     * Tells the backend a local session is over, once its last turn has been delivered: the backend refuses turn
+     * posts into an ended session, so closing first would lose the final reply.
+     */
+    private closeWhenDrained(sessionId: string): void {
+        if (!this.closing.has(sessionId) || this.stopped) {
+            return;
+        }
+
+        for (const channel of this.channels.values()) {
+            if (channel.sessionId === sessionId) {
+                return;
+            }
+        }
+
+        this.closing.delete(sessionId);
+        this.sessions.get(sessionId)?.announceClose();
+    }
+
     private bindThread(sessionId: string, threadId: string): void {
         for (const channel of this.channels.values()) {
             if (channel.sessionId === sessionId) {
@@ -337,6 +373,8 @@ export class HostPoster implements SessionObserver {
             body: JSON.stringify({ payload, signature: this.options.sign(payload) }),
             headers: { "content-type": "application/json" },
             method: "POST",
+            // The signed body goes to the configured endpoint only: a redirect would resend it elsewhere.
+            redirect: "error",
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         });
         let body: unknown = null;
@@ -346,6 +384,12 @@ export class HostPoster implements SessionObserver {
         } catch {
             // Not JSON (a proxy's error page): the status below decides.
         }
+
+        if (response.status === 401) {
+            return this.unauthorizedResult();
+        }
+
+        this.unauthorized = undefined;
 
         const fields = isRecord(body) ? body : {};
 
@@ -365,6 +409,30 @@ export class HostPoster implements SessionObserver {
         // 403, 400 and 413 are the backend saying it will never take this post (not our turn, a field past its limits,
         // a body past its cap); sending the same batch again would loop for ever. Every other failure is worth another try.
         return REFUSED_STATUSES.has(response.status) ? { kind: "refused" } : { kind: "retry" };
+    }
+
+    /** A 401: another try, until the streak is long enough to be a device the backend removed. */
+    private unauthorizedResult(): PostResult {
+        const now = this.now();
+        // Retries come at most ~50 s apart (a request timeout plus the longest backoff), so a longer gap (the computer
+        // slept, the network was down, a close gave up) ends the streak: only 401s that keep arriving count.
+        const streak
+            = this.unauthorized === undefined || now - this.unauthorized.last > REVOKED_AFTER_MS
+                ? { count: 1, last: now, reported: false, since: now }
+                : { ...this.unauthorized, count: this.unauthorized.count + 1, last: now };
+
+        this.unauthorized = streak;
+
+        if (streak.count < REVOKED_AFTER_ATTEMPTS || now - streak.since < REVOKED_AFTER_MS) {
+            return { kind: "retry" };
+        }
+
+        if (!streak.reported) {
+            streak.reported = true;
+            this.options.log?.("[acp-host] the backend no longer accepts this computer (it was removed, or its clock is far off); agent output is no longer posted");
+        }
+
+        return { kind: "refused" };
     }
 
     // ─── The turns that are running, on disk ────────────────────────────────

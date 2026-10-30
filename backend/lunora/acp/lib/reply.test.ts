@@ -72,18 +72,25 @@ describe("a reply's files", () => {
         const reply = buildHostReply({
             agentKey: "claude",
             reason: "finished",
-            transcript: transcript("Look: ![the chart](out/my%20chart.png) and ![x](https://example.test/a.png) and ![y](<other.png> \"t\")", "", [
+            transcript: transcript('Look: ![the chart](out/my%20chart.png) and ![x](https://example.test/a.png) and ![y](<other.png> "t")', "", [
                 { ...attached, reference: "out/my chart.png" },
             ]),
         });
         const [text] = reply?.message.content ?? [];
 
-        expect(text).toMatchObject({ text: "Look: the chart and ![x](https://example.test/a.png) and ![y](<other.png> \"t\")" });
+        expect(text).toMatchObject({ text: 'Look: the chart and ![x](https://example.test/a.png) and ![y](<other.png> "t")' });
     });
 
     it("offers an image over the inline cap, and a document, as a download with its size", () => {
         const large: HostMedia = { ...attached, name: "photo.png", size: 12 * 1024 * 1024 };
-        const doc: HostMedia = { ...attached, contentType: "application/pdf", fileId: "file2", name: "report.pdf", size: 2048, storageKey: `agent-files/${"c".repeat(64)}` };
+        const doc: HostMedia = {
+            ...attached,
+            contentType: "application/pdf",
+            fileId: "file2",
+            name: "report.pdf",
+            size: 2048,
+            storageKey: `agent-files/${"c".repeat(64)}`,
+        };
         const reply = buildHostReply({ agentKey: "claude", reason: "finished", transcript: transcript("", "", [large, doc]) });
 
         expect(reply?.message.content).toEqual([
@@ -100,7 +107,9 @@ describe("a reply's files", () => {
     it("names a file over the cap with its size, and attaches nothing", () => {
         const reply = buildHostReply({ agentKey: "claude", reason: "finished", transcript: transcript("", "", [{ name: "big.pdf", size: 30 * 1024 * 1024 }]) });
 
-        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`big.pdf` (30.0 MiB) is over the 20.0 MiB limit and was not attached.", type: "text" }]);
+        expect(reply?.message.content).toEqual([
+            { providerMetadata: HOST_TEXT, text: "`big.pdf` (30.0 MiB) is over the 20.0 MiB limit and was not attached.", type: "text" },
+        ]);
         expect(reply).not.toHaveProperty("fileIds");
     });
 

@@ -5,8 +5,8 @@
  *
  *   { v: 1, kind: "turn", deviceId, issuedAt, sessionId, threadId?, turnId?, firstSeq?, events: [...] }
  *
- * No `threadId` = a session-level post (`session_open`, which makes the host thread). Otherwise a turn post: the
- * event at index `i` takes `seq = firstSeq + i`.
+ * No `threadId` = a session-level post (`session_open`, which makes the host thread; or `close: true` with no events,
+ * which ends the session). Otherwise a turn post: the event at index `i` takes `seq = firstSeq + i`.
  *
  * The checks, in the order that keeps a forged post from costing anything:
  * 1. an in-isolate per-address counter and a body cap, before anything is parsed or any database is touched;
@@ -173,6 +173,7 @@ const withoutStorage = ({ contentType, kind, name, reference, size, uploadId }: 
 };
 
 interface Post {
+    close: boolean;
     events: Infer<typeof vHostEvent>[];
     firstSeq: number | undefined;
     sessionId: string;
@@ -194,6 +195,7 @@ const readPost = (payload: Record<string, unknown>): Post | null => {
         (threadId?.length ?? 0) > MAX_LENGTH.id ||
         (turnId?.length ?? 0) > MAX_LENGTH.id ||
         (firstSeq !== undefined && typeof firstSeq !== "number") ||
+        (payload.close !== undefined && typeof payload.close !== "boolean") ||
         !Array.isArray(payload.events) ||
         payload.events.length > MAX_EVENTS_PER_POST
     ) {
@@ -217,7 +219,7 @@ const readPost = (payload: Record<string, unknown>): Post | null => {
         return null;
     }
 
-    return { events, firstSeq, sessionId: payload.sessionId, threadId, turnId };
+    return { close: payload.close === true, events, firstSeq, sessionId: payload.sessionId, threadId, turnId };
 };
 
 /**
@@ -257,9 +259,15 @@ const resolveMedia = async (context: HttpActionCtx, ownerId: string, post: Post)
 /** The event as it is stored once its upload is finalized, or without a file when that fails for any reason. */
 const finalizeMedia = async (context: HttpActionCtx, ownerId: string, event: MediaEvent, uploadId: string): Promise<MediaEvent> => {
     try {
-        const stored = await context.runAction(internal.acp.upload.finalizeHostUpload, { filename: event.name.slice(0, MAX_LENGTH.short), uploadId, userId: ownerId });
+        const stored = await context.runAction(internal.acp.upload.finalizeHostUpload, {
+            filename: event.name.slice(0, MAX_LENGTH.short),
+            uploadId,
+            userId: ownerId,
+        });
 
-        return stored === null ? withoutUpload(event) : { ...withoutUpload(event), contentType: stored.mediaType, fileId: stored.fileId, storageKey: stored.storageKey };
+        return stored === null
+            ? withoutUpload(event)
+            : { ...withoutUpload(event), contentType: stored.mediaType, fileId: stored.fileId, storageKey: stored.storageKey };
     } catch {
         // A thrown finalize must not become a 5xx: the host retries those for ever.
         return withoutUpload(event);
@@ -302,6 +310,7 @@ const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: 
         deviceId,
         events: await resolveMedia(context, ownerId, post),
         sessionId: post.sessionId,
+        ...(post.close && { close: true }),
         ...(post.firstSeq !== undefined && { firstSeq: post.firstSeq }),
         ...(post.threadId !== undefined && { threadId: post.threadId }),
         ...(post.turnId !== undefined && { turnId: post.turnId }),
@@ -310,6 +319,10 @@ const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: 
     switch (result.outcome) {
         case "applied": {
             return json({ ended: result.ended, next: result.next, ...(result.threadId !== undefined && { threadId: result.threadId }) }, 200);
+        }
+        case "busy": {
+            // A conflict with no `next`: the host reads it as "try again", not as a gap to fill.
+            return json({ error: "turn_in_progress" }, 409);
         }
         case "gap": {
             return json({ error: "gap", next: result.next }, 409);

@@ -71,9 +71,12 @@ const decodedTarget = (target: string): string => {
 
 /** The text with each image that became an attachment replaced by its alt text: the file is shown below, not as Markdown. */
 const withoutAttachedImages = (text: string, references: ReadonlySet<string>): string =>
-    references.size === 0 ? text : text.replaceAll(MARKDOWN_IMAGE, (whole, alt: string, target: string) => (references.has(decodedTarget(target)) ? alt : whole));
+    references.size === 0
+        ? text
+        : text.replaceAll(MARKDOWN_IMAGE, (whole, alt: string, target: string) => (references.has(decodedTarget(target)) ? alt : whole));
 
-const formatSize = (bytes: number): string => (bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MiB` : `${Math.max(1, Math.round(bytes / 1024))} KiB`);
+const formatSize = (bytes: number): string =>
+    bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MiB` : `${Math.max(1, Math.round(bytes / 1024))} KiB`;
 
 /** A file name as inline code: the name is the agent's text, and must not become Markdown, a link or an image. */
 const asCode = (name: string): string => `\`${name.replaceAll(/[`\r\n]/gu, " ").trim()}\``;
@@ -148,7 +151,10 @@ export const buildHostReply = (input: { agentKey: string; error?: string; reason
 
     const attached = media.filter((file) => file.storageKey !== undefined && file.fileId !== undefined);
     const notAttached = media.filter((file) => file.storageKey === undefined || file.fileId === undefined);
-    const notes = [...attached.filter((file) => !isInline(file)).map((file) => attachedNote(file)), ...(notAttached.length > 0 ? [notAttachedNote(notAttached)] : [])];
+    const notes = [
+        ...attached.filter((file) => !isInline(file)).map((file) => attachedNote(file)),
+        ...(notAttached.length > 0 ? [notAttachedNote(notAttached)] : []),
+    ];
     const shownText = withoutAttachedImages(text, new Set(attached.flatMap((file) => (file.reference === undefined ? [] : [file.reference]))));
     const parts = [
         ...(shownText ? [{ providerMetadata: HOST_TEXT_MARK, text: shownText, type: "text" as const }] : []),

@@ -161,7 +161,12 @@ const bindContinue = async (post: Record<string, unknown>, request: Request, pat
 
     const { bodySha256, offset } = post;
 
-    if (!isNonNegativeInteger(offset) || typeof bodySha256 !== "string" || !SHA256_HEX.test(bodySha256) || request.headers.get("upload-offset") !== String(offset)) {
+    if (
+        !isNonNegativeInteger(offset) ||
+        typeof bodySha256 !== "string" ||
+        !SHA256_HEX.test(bodySha256) ||
+        request.headers.get("upload-offset") !== String(offset)
+    ) {
         return null;
     }
 

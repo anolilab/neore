@@ -101,7 +101,11 @@ const pair = async (userId: string): Promise<Paired> => {
     return { deviceId, secret, userId };
 };
 
-const base64url = (text: string): string => btoa(String.fromCodePoint(...new TextEncoder().encode(text))).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+const base64url = (text: string): string =>
+    btoa(String.fromCodePoint(...new TextEncoder().encode(text)))
+        .replaceAll("+", "-")
+        .replaceAll("/", "_")
+        .replaceAll("=", "");
 const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 const metadata = (type: string): string => `filename ${btoa("chart.png")},filetype ${btoa(type)}`;
 
@@ -129,11 +133,20 @@ const sign = async (device: Paired, fields: Record<string, unknown>, signing: Si
 
 const send = async (request: Request): Promise<Response> => await hostUploadHttpAction(httpContext(), request, bucket.bucket);
 
-const createRequest = async (device: Paired, overrides: { fields?: Record<string, unknown>; headers?: Record<string, string>; signing?: Signing; url?: string } = {}) => {
+const createRequest = async (
+    device: Paired,
+    overrides: { fields?: Record<string, unknown>; headers?: Record<string, string>; signing?: Signing; url?: string } = {},
+) => {
     const signed = await sign(device, { method: "POST", nonce: nonce(), size: PNG.byteLength, type: "image/png", ...overrides.fields }, overrides.signing);
 
     return new Request(overrides.url ?? `${ORIGIN}${HOST_UPLOAD_PATH}`, {
-        headers: { "Tus-Resumable": "1.0.0", "Upload-Length": String(PNG.byteLength), "Upload-Metadata": metadata("image/png"), ...signed, ...overrides.headers },
+        headers: {
+            "Tus-Resumable": "1.0.0",
+            "Upload-Length": String(PNG.byteLength),
+            "Upload-Metadata": metadata("image/png"),
+            ...signed,
+            ...overrides.headers,
+        },
         method: "POST",
     });
 };
@@ -305,7 +318,12 @@ describe("a signed upload from a paired computer", () => {
 
         expect(await statusOf(new Request(`${ORIGIN}${HOST_UPLOAD_PATH}`, { headers: base, method: "POST" }))).toBe(401);
         expect(
-            await statusOf(new Request(`${ORIGIN}${HOST_UPLOAD_PATH}`, { headers: { ...base, [HOST_UPLOAD_PAYLOAD_HEADER]: "!!", [HOST_UPLOAD_SIGNATURE_HEADER]: "x" }, method: "POST" })),
+            await statusOf(
+                new Request(`${ORIGIN}${HOST_UPLOAD_PATH}`, {
+                    headers: { ...base, [HOST_UPLOAD_PAYLOAD_HEADER]: "!!", [HOST_UPLOAD_SIGNATURE_HEADER]: "x" },
+                    method: "POST",
+                }),
+            ),
         ).toBe(401);
         expect(await statusOf(await createRequest(owner, { fields: { deviceId: "someoneelse" } }))).toBe(401);
     });

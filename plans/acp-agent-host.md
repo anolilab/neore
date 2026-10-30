@@ -173,7 +173,18 @@ host's `seq` instead of stamping its own. In `applyHostEvents`, one transaction:
 - events with `seq <= lastSeq` are dropped (redelivery);
 - if `firstSeq > lastSeq + 1`, the whole post answers 409 with `{ next }` and the
   desktop resends from there;
-- `turn_start` with a `hostTurnId` that already exists is dropped.
+- `turn_start` with a `hostTurnId` that already exists is dropped;
+- `turn_start` for a new turn while the thread still has a live host stream answers 409 with
+  `{ error: "turn_in_progress" }` and no `next`: the earlier turn's end is still on its way
+  (its output is being retried), so the desktop tries again with backoff; the reaper bounds the
+  wait;
+- a session-level post `{ close: true, events: [] }` (no `threadId`) ends the session at once and
+  any turn still live on it as `interrupted`. The desktop sends it once the session's turns have
+  been delivered (a turn post into an ended session is refused). It is idempotent, and answers
+  success for a session it does not know.
+
+The desktop stops posting when 401 has answered every try for a minute and at least five tries
+(a removed computer; one clock blip is retried), and never follows a redirect from the ingest URL.
 
 The stored `seq` is the claim, so no `idempotencyClaims` row per chunk is needed.
 A replay older than the signed window fails step 4. A replay inside it is
@@ -398,7 +409,12 @@ the folder and refers to it in its reply. Rules:
 - `backend/lunora/acp/module.ts` owns `acpSessions`. `backend/lunora/acp/gdpr.ts` erases them
   and is wired into the deletion workflow (`backend/lunora/gdpr/workflows/deletion-workflow.ts`).
   Its export collector goes in the export workflow the same way, so a user's ACP
-  sessions appear in their export.
+  sessions appear in their export, followed by the tool, permission and turn-end events of their
+  host turns (the prompt and the saved reply are ordinary messages, exported with the
+  conversations). It is paged: the workflow asks again with `next` until there is none.
+- Deleting a host thread, soft or hard (`acp/lib/thread-removed.ts`), ends its live turn without a
+  reply, queues the host an `acp_cancel` and ends the session; the `acpSessions` row stays as the
+  tombstone a redelivered `session_open` reads.
 - Thread, message and stream writes go through their owners' write surfaces
   (`backend/lunora/agent/table-writes.ts`, the streaming library).
 - `revokeDevice` also sets each of the device's `acpSessions` to `ended` and ends
