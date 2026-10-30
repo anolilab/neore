@@ -490,7 +490,7 @@ mod unix {
             while left > 0 {
                 self.stopped()?;
 
-                let want = buffer.len().min(left as usize);
+                let want = left.min(buffer.len() as u64) as usize;
                 let read = match file.read(&mut buffer[..want]) {
                     Ok(0) => {
                         return Err(format!(
