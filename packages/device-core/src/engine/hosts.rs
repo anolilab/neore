@@ -3360,13 +3360,13 @@ mod tests {
         let second = FakeLink::new(true);
         let gate = Arc::new(Barrier::new(2));
         let (next, wait) = (Arc::clone(&second), Arc::clone(&gate));
-        let (state, dir) = kept("repair", &first, move || {
+        let (state, dir) = kept("repaired", &first, move || {
             wait.wait();
             wait.wait();
 
             Ok(Arc::clone(&next) as Arc<dyn HostLink>)
         });
-        let (id, now) = (host_id("repair"), Instant::now());
+        let (id, now) = (host_id("repaired"), Instant::now());
 
         first.alive.store(false, Ordering::SeqCst);
         state.reconnect_tick(now);
