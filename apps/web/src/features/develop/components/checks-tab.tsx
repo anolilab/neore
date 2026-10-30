@@ -135,7 +135,7 @@ const ChecksTab = ({
                 className={rollup.state === "failing" ? "text-destructive text-sm font-medium" : "text-sm font-medium"}
                 role={rollup.state === "failing" ? "alert" : "status"}
             >
-                {summaries[rollup.state]}
+                {rollup.state === "passing" && !rollup.complete ? t`No failures in the checks shown.` : summaries[rollup.state]}
                 {knowsRequired && rollup.optionalFailing > 0 && (
                     <span className="text-muted-foreground font-normal">
                         {" "}

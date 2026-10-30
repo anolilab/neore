@@ -121,6 +121,17 @@ describe("required checks", () => {
         expect(required).toEqual({ build: true, docs: null });
     });
 
+    it("keeps the branch's own required-check summary when the protection read answers 403", async () => {
+        const required = await listed({
+            ...checksRoutes([run(1, "build"), run(2, "docs")]),
+            [`${REPO}/branches/main/protection/required_status_checks`]: new HostApiError("Must have admin rights", 403),
+            [`${REPO}/branches/main`]: { protected: true, protection: { required_status_checks: { contexts: ["build"] } } },
+            [`${REPO}/rules/branches/main`]: [],
+        });
+
+        expect(required).toEqual({ build: true, docs: false });
+    });
+
     it("leaves every check unknown when no rules could be read, and still lists them", async () => {
         expect(await listed(checksRoutes([run(1, "build")]))).toEqual({ build: null });
     });
@@ -320,6 +331,12 @@ describe("mergePullRequest", () => {
 
         expect(await githubDriver.mergePullRequest(request, REF, { headSha: SHA, method: "squash" })).toEqual({ sha: "b".repeat(40) });
         expect(sent).toEqual([{ json: { merge_method: "squash", sha: SHA }, method: "PUT", path: `${REPO}/pulls/7/merge` }]);
+    });
+
+    it("counts a 2xx with a null sha as merged", async () => {
+        const { request } = host({ [`${REPO}/pulls/7/merge`]: { merged: true, sha: null } });
+
+        expect(await githubDriver.mergePullRequest(request, REF, { headSha: SHA, method: "squash" })).toEqual({ sha: null });
     });
 
     it("treats a 2xx that says it did not merge as a refusal with the host's reason", async () => {

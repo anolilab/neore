@@ -3607,8 +3607,8 @@ msgid "Assistant replied:"
 msgstr "L'assistente ha risposto:"
 
 #: src/features/chat/thread/message-item.tsx:206
-#: src/features/chat/thread/streaming-placeholder.tsx:725
-#: src/features/chat/thread/streaming-placeholder.tsx:762
+#: src/features/chat/thread/streaming-placeholder.tsx:727
+#: src/features/chat/thread/streaming-placeholder.tsx:764
 msgid "Assistant Reply:"
 msgstr "Risposta dell'assistente:"
 
@@ -6950,12 +6950,12 @@ msgid "Context-aware generation"
 msgstr "Generazione consapevole del contesto"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/chat/host/host-composer.tsx:193
+#: src/features/chat/host/host-composer.tsx:194
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "Continua"
 
-#: src/features/chat/host/host-composer.tsx:187
+#: src/features/chat/host/host-composer.tsx:188
 msgid "Continue where you left off."
 msgstr ""
 
@@ -7592,7 +7592,7 @@ msgstr ""
 msgid "Could not send the message."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:146
+#: src/features/chat/host/host-composer.tsx:147
 msgid "Could not send your answer."
 msgstr ""
 
@@ -7647,7 +7647,7 @@ msgstr ""
 #~ msgid "Could not submit the review. Your review is kept."
 #~ msgstr ""
 
-#: src/features/chat/model-settings/use-model-combobox.ts:120
+#: src/features/chat/model-settings/use-model-combobox.ts:132
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
@@ -18112,7 +18112,7 @@ msgstr "Campo messaggio"
 msgid "Message selection"
 msgstr "Selezione dei messaggi"
 
-#: src/features/chat/host/host-composer.tsx:205
+#: src/features/chat/host/host-composer.tsx:206
 msgid "Message the agent on your computer"
 msgstr ""
 
@@ -18124,7 +18124,7 @@ msgstr ""
 msgid "Message the worker..."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:199
+#: src/features/chat/host/host-composer.tsx:200
 msgid "Message to the coding agent"
 msgstr ""
 
@@ -19781,6 +19781,10 @@ msgstr "Ancora nessuna esecuzione"
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:152
 msgid "No expiration"
 msgstr "Nessuna scadenza"
+
+#: src/features/develop/components/checks-tab.tsx:138
+msgid "No failures in the checks shown."
+msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:264
 msgid "No fields found."
@@ -22152,7 +22156,7 @@ msgstr "Elimina definitivamente il tuo account e tutti i dati associati"
 msgid "Permission Level"
 msgstr "Livello di permesso"
 
-#: src/features/chat/host/host-composer.tsx:159
+#: src/features/chat/host/host-composer.tsx:160
 msgid "Permission requests from the agent"
 msgstr ""
 
@@ -26240,7 +26244,7 @@ msgstr "Modello semi-realistico con buona aderenza al prompt"
 msgid "Semi-realistic visual style"
 msgstr "Stile visivo semi-realistico"
 
-#: src/features/chat/host/host-composer.tsx:221
+#: src/features/chat/host/host-composer.tsx:222
 #: src/features/sub-agents/components/worker-composer.tsx:104
 msgid "Send"
 msgstr ""
@@ -27864,7 +27868,7 @@ msgstr "Avvio dell'importazione..."
 msgid "Starting test drive…"
 msgstr "Avvio della prova…"
 
-#: src/features/chat/host/host-composer.tsx:173
+#: src/features/chat/host/host-composer.tsx:174
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr ""
 
@@ -27975,7 +27979,7 @@ msgstr "Azioni"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:210
+#: src/features/chat/host/host-composer.tsx:211
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:313
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:326
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
@@ -29327,7 +29331,7 @@ msgstr ""
 msgid "That passcode is not right."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:149
+#: src/features/chat/host/host-composer.tsx:150
 msgid "That request is no longer waiting."
 msgstr ""
 
@@ -29566,7 +29570,7 @@ msgstr "L'ultima richiesta di eliminazione non è andata a buon fine. Puoi richi
 msgid "the last time"
 msgstr "l'ultima volta"
 
-#: src/features/chat/host/host-composer.tsx:183
+#: src/features/chat/host/host-composer.tsx:184
 msgid "The last turn stopped before it finished."
 msgstr ""
 
@@ -29893,7 +29897,7 @@ msgstr "Modello visione-linguaggio con pensiero"
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1103
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
-#: src/features/chat/thread/streaming-placeholder.tsx:766
+#: src/features/chat/thread/streaming-placeholder.tsx:768
 msgid "Thinking..."
 msgstr "Sto pensando..."
 
@@ -30195,7 +30199,7 @@ msgid "This server's registry entry asks for the values below. They fill in the 
 msgstr "La voce di registro di questo server richiede i valori qui sotto. Servono a completare l'URL e gli header."
 
 #: src/features/chat/host/host-composer.tsx:96
-#: src/features/chat/host/host-composer.tsx:178
+#: src/features/chat/host/host-composer.tsx:179
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr ""
 
@@ -33757,7 +33761,7 @@ msgid "your computer"
 msgstr "il tuo computer"
 
 #: src/features/chat/host/host-composer.tsx:91
-#: src/features/chat/host/host-composer.tsx:149
+#: src/features/chat/host/host-composer.tsx:150
 msgid "Your computer is busy. Try again in a moment."
 msgstr ""
 

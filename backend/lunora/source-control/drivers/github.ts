@@ -803,7 +803,7 @@ const protectionPatterns = async (request: HostRequest, ref: PullRequestRef, bra
     try {
         return contextsOf(parse(protectionSchema, await readJson(await request(`${repo}/branches/${branch}/protection/required_status_checks`))));
     } catch (error) {
-        if (!(error instanceof HostApiError) || error.status !== 404) {
+        if (!(error instanceof HostApiError) || error.rateLimited || ![403, 404].includes(error.status)) {
             throw error;
         }
     }
@@ -983,7 +983,7 @@ const getMergeStatus = async (request: HostRequest, ref: PullRequestRef): Promis
     };
 };
 
-const mergedSchema = z.object({ merged: z.boolean(), message: z.string().optional(), sha: z.string().optional() });
+const mergedSchema = z.object({ merged: z.boolean(), message: z.string().optional(), sha: z.string().nullish() });
 
 const mergedPullSchema = z.object({ head: z.object({ sha: z.string() }), merge_commit_sha: z.string().nullable().optional(), merged: z.boolean().optional() });
 
