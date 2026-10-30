@@ -63,6 +63,20 @@ describe("status beat clock", () => {
         expect(vi.getTimerCount()).toBe(0);
     });
 
+    it("alternates the tick on every step, also across the wrap from 2 to 0", () => {
+        const stop = subscribeStatusBeat();
+        const ticks: (string | undefined)[] = [root.dataset.statusTick];
+
+        for (let step = 0; step < 4; step += 1) {
+            vi.advanceTimersByTime(500);
+            ticks.push(root.dataset.statusTick);
+        }
+
+        expect(ticks).toEqual(["0", "1", "0", "1", "0"]);
+        stop();
+        expect(root.dataset.statusTick).toBeUndefined();
+    });
+
     it("runs one interval for many subscribers", () => {
         const stops = [subscribeStatusBeat(), subscribeStatusBeat(), subscribeStatusBeat()];
 

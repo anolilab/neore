@@ -5,6 +5,7 @@ import type { UIMessage } from "@/lib/agent";
 import type { AppError } from "@/lib/errors";
 import type { useLunora } from "@/lib/lunora/crpc";
 
+import type { ThreadOwnerState } from "../../thread-list/lib/thread-state-rules";
 import type { PendingAttachment } from "../stores/chat-ui-store";
 
 /**
@@ -26,7 +27,7 @@ export interface ThreadCapabilities {
 /** The exact row shape `chat_functions.getThread` returns (superset of {@link ThreadData}). */
 export type ThreadRow = NonNullable<ReturnOf<typeof api.chat.functions.getThread>>;
 
-export interface ThreadData {
+export interface ThreadData extends ThreadOwnerState {
     _id: string;
     /** The agent the thread's active path runs on, once it has been switched (`agent/agent-switch.ts`). */
     activeAgent?: { kind: "model"; model: string };

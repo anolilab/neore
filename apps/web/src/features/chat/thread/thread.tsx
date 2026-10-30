@@ -14,7 +14,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import cn from "@neore/ui/utils/cn";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { ArrowDownIcon, CornerLeftUpIcon } from "lucide-react";
 import type { FC } from "react";
@@ -29,6 +29,7 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import ForwardSelectionBar from "@/features/chat/forward/forward-selection-bar";
+import { hasUnseenReply } from "@/features/chat/thread-list/lib/thread-state-rules";
 import WorkerComposer from "@/features/sub-agents/components/worker-composer";
 import WorkerList from "@/features/sub-agents/components/worker-list";
 import WorkerRunLog from "@/features/sub-agents/components/worker-run-log";
@@ -121,6 +122,17 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
 
     const crpc = useCRPC();
     const afterFirstPaint = useAfterFirstPaint();
+
+    // Owner-only fields, absent on a thread shared with the caller. Opening a thread, or a reply finishing in it, marks it seen once.
+    const { mutate: markThreadViewed } = useMutation(crpc.chat.thread_state.markThreadViewed.mutationOptions());
+    const hasUnseen = !isNewThread && !isStreaming && hasUnseenReply(thread ?? {});
+    const lastReplyAt = thread?.lastReplyAt;
+
+    useEffect(() => {
+        if (hasUnseen && threadId) {
+            markThreadViewed({ threadId: threadId as Id<"threads"> });
+        }
+    }, [hasUnseen, lastReplyAt, markThreadViewed, threadId]);
     // A comparison parent needs its children at once; any other thread reads them after first paint,
     // to learn whether it has workers to list.
     const { data: childThreads } = useQuery(
