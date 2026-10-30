@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createStreamToken, verifyStreamToken } from "../chat/streaming/persistent/stream-token";
 import { errorBody, errorResponse, fromProcedureError, PublicApiError } from "./errors";
 import type { IdempotencyRecord, IdempotencyStore } from "./idempotency";
-import { decideIdempotency, parseIdempotencyKey, requestFingerprint, withIdempotency } from "./idempotency";
+import { decideIdempotency, idempotencyStorageKey, parseIdempotencyKey, requestFingerprint, withIdempotency } from "./idempotency";
 import { extractApiKey, isPublicApiPath, readApiKeyIdentity, resolveApiKeyIdentity } from "./identity";
 import { decodeNativeCursor, encodeNativeCursor, MAX_PAGE_SIZE, paginateArray, parseLimit } from "./pagination";
 import { DEFAULT_API_SCOPES, hasScope, parseScopes, scopesFromStrings, scopesToStrings } from "./scopes";
@@ -177,6 +177,20 @@ describe("identity", () => {
 });
 
 describe("idempotency", () => {
+    /** A claim table: `claim(key)` is the hold the router takes for that storage key. */
+    const claimTable = () => {
+        const held = new Set<string>();
+        const claim = (key: string) => {
+            return {
+                acquire: async () => !held.has(key) && Boolean(held.add(key)),
+                release: async () => {
+                    held.delete(key);
+                },
+            };
+        };
+
+        return { claim, held };
+    };
     const memoryStore = (): IdempotencyStore & { rows: Map<string, IdempotencyRecord> } => {
         const rows = new Map<string, IdempotencyRecord>();
 
@@ -233,6 +247,88 @@ describe("idempotency", () => {
         });
     });
 
+    it("holds a claim so two first attempts that both missed the store run once", async () => {
+        const store = { ...memoryStore(), get: async () => undefined };
+        const { claim, held } = claimTable();
+        let finish!: () => void;
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node >= 22.11; the configured range starts at 22.0
+        const gate = new Promise<void>((resolve) => {
+            finish = resolve;
+        });
+        const handler = vi.fn(async () => {
+            await gate;
+
+            return Response.json({ id: "t1" });
+        });
+        const first = withIdempotency(store, { ...options, claim }, handler);
+        const second = withIdempotency(store, { ...options, claim }, handler);
+
+        await expect(second).rejects.toMatchObject({ code: "idempotency_outcome_unknown" });
+        finish();
+        const completed = await first;
+
+        expect(completed.status).toBe(200);
+        expect(handler).toHaveBeenCalledTimes(1);
+        // A stored response keeps the key held; the claim is only given back when nothing was stored.
+        expect(held.size).toBe(1);
+    });
+
+    it("tells the loser of a race that the winner is still running, not that the outcome is lost", async () => {
+        const fingerprint = await requestFingerprint(options.method, options.pathAndQuery, options.body);
+        const { claim, held } = claimTable();
+        let reads = 0;
+        const nextRead = () => {
+            reads += 1;
+
+            return reads;
+        };
+        // Both requests missed the store; by the loser's second look the winner has written its pending marker.
+        const store = { ...memoryStore(), get: async () => (nextRead() === 1 ? undefined : { fingerprint, state: "pending" }) };
+
+        held.add(await idempotencyStorageKey(options.apiKeyId, options.idempotencyKey));
+
+        await expect(withIdempotency(store, { ...options, claim }, async () => Response.json({}))).rejects.toMatchObject({ code: "idempotency_in_progress" });
+    });
+
+    it("gives the claim back when the handler fails or answers a 5xx", async () => {
+        const { claim, held } = claimTable();
+
+        await withIdempotency(memoryStore(), { ...options, claim }, async () => Response.json({ error: "x" }, { status: 503 }));
+        expect(held.size).toBe(0);
+        await expect(
+            withIdempotency(memoryStore(), { ...options, claim }, async () => {
+                throw new Error("boom");
+            }),
+        ).rejects.toThrow("boom");
+        expect(held.size).toBe(0);
+    });
+
+    it("gives the claim back when writing the pending marker fails", async () => {
+        const { claim, held } = claimTable();
+        const store = {
+            ...memoryStore(),
+            put: async () => {
+                throw new Error("store down");
+            },
+        };
+
+        await expect(withIdempotency(store, { ...options, claim }, async () => Response.json({}))).rejects.toThrow("store down");
+        expect(held.size).toBe(0);
+    });
+
+    it("refuses a retry of a request that died mid-run, instead of running it twice", async () => {
+        const store = memoryStore();
+        const { claim } = claimTable();
+
+        // The first request wrote its claim and was killed: its pending marker has expired, nothing was stored.
+        await claim(await idempotencyStorageKey(options.apiKeyId, options.idempotencyKey)).acquire();
+
+        const handler = vi.fn(async () => Response.json({}));
+
+        await expect(withIdempotency(store, { ...options, claim }, handler)).rejects.toMatchObject({ code: "idempotency_outcome_unknown", status: 409 });
+        expect(handler).not.toHaveBeenCalled();
+    });
+
     it("does not store failures, so a retry runs again", async () => {
         const store = memoryStore();
 
@@ -287,6 +383,44 @@ describe("stream relay", () => {
             { text: "lo", type: "text" },
             { status: "done", type: "done" },
         ]);
+    });
+
+    it("ends a run that paused for a person as waiting_on_person, within one read", async () => {
+        const pendingRequest = { question: "Which one?", toolCallId: "c1", toolName: "askUser" };
+        const read = vi.fn(async () => {
+            return { chunks: [{ text: "Checking." }], pendingRequest, status: "done" };
+        });
+
+        expect(await Array.fromAsync(pollStream({ read }, { sleep: async () => {} }))).toEqual([
+            { text: "Checking.", type: "text" },
+            { pendingRequest, status: "waiting_on_person", type: "done" },
+        ]);
+        expect(read).toHaveBeenCalledOnce();
+        expect(await collectStream({ read }, { sleep: async () => {} })).toEqual({
+            pendingRequest,
+            reasoning: "",
+            status: "waiting_on_person",
+            text: "Checking.",
+        });
+    });
+
+    it("ends a blocking read whose stream read throws as interrupted, with what arrived", async () => {
+        let reads = 0;
+        const read = vi.fn(async () => {
+            reads += 1;
+
+            if (reads > 1) {
+                throw new Error("shard unreachable");
+            }
+
+            return { chunks: [{ text: "Part one. " }], status: "streaming" };
+        });
+
+        expect(await collectStream({ read }, { sleep: async () => {} })).toEqual({ reasoning: "", status: "interrupted", text: "Part one. " });
+    });
+
+    it("keeps a plain done as done when nothing is pending", async () => {
+        expect(await collectStream(source(["done"], [[{ text: "Hi" }]]), { sleep: async () => {} })).toEqual({ reasoning: "", status: "done", text: "Hi" });
     });
 
     it("maps a steering marker chunk to a reply.restart event, before the chunk's own text", () => {

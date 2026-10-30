@@ -42,8 +42,12 @@ export declare class DeviceCore {
    * confirms it in the local window. Resolves `false` when declined.
    */
   hostPair(spec: string, deviceId: string, secret: string): Promise<boolean>
-  /** Connects a paired server again. Resolves what the server reported (JSON). */
-  hostConnect(deviceId: string): Promise<string>
+  /**
+   * Connects a paired server, or tries again once reconnecting gave up; from then on a lost link is retried in
+   * the background. `retry` is the Retry of the local window and starts the attempts over; a page's connect
+   * counts as one more attempt of the window. Resolves what the server reported (JSON).
+   */
+  hostConnect(deviceId: string, retry: boolean): Promise<string>
   /**
    * The `ssh` arguments of an interactive shell on a paired server (a JSON array), once it is connected and its
    * key is trusted. The desktop runs `ssh` with them on a pseudo-terminal.

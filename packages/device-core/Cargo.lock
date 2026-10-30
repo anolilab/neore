@@ -309,6 +309,7 @@ dependencies = [
 name = "device-core"
 version = "0.1.0"
 dependencies = [
+ "device-core",
  "keyring",
  "landlock",
  "libc",

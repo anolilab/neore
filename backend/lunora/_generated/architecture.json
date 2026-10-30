@@ -2766,6 +2766,11 @@
       "to": "table:persistentStreams"
     },
     {
+      "from": "function:chat_streaming_persistent_library:getChunksAfter",
+      "kind": "read",
+      "to": "table:toolApprovalRuns"
+    },
+    {
       "from": "function:chat_streaming_persistent_library:setStreamStatus",
       "kind": "write",
       "to": "table:persistentStreams"
@@ -17568,85 +17573,73 @@
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 323,
+      "line": 324,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 323,
+      "line": 324,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 344,
+      "line": 345,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 344,
+      "line": 345,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 521,
+      "line": 522,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 521,
+      "line": 522,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 530,
+      "line": 531,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 530,
+      "line": 531,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 560,
+      "line": 561,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 560,
+      "line": 561,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 568,
+      "line": 569,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 568,
-      "reason": "\"runGroupTurn\" is not a registered function"
-    },
-    {
-      "file": "chat/group/run",
-      "kind": "call",
-      "line": 597,
-      "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
-    },
-    {
-      "file": "chat/group/run",
-      "kind": "call",
-      "line": 597,
+      "line": 569,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
@@ -17664,25 +17657,37 @@
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 647,
+      "line": 599,
+      "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
+    },
+    {
+      "file": "chat/group/run",
+      "kind": "call",
+      "line": 599,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 736,
+      "line": 648,
+      "reason": "\"runGroupTurn\" is not a registered function"
+    },
+    {
+      "file": "chat/group/run",
+      "kind": "call",
+      "line": 737,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 754,
+      "line": 755,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 764,
+      "line": 765,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
@@ -17766,25 +17771,19 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 915,
+      "line": 923,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 930,
+      "line": 938,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 939,
-      "reason": "\"editMessageHttpAction\" is not a registered function"
-    },
-    {
-      "file": "chat/http",
-      "kind": "call",
-      "line": 1060,
+      "line": 947,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
@@ -17796,13 +17795,19 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1209,
+      "line": 1076,
+      "reason": "\"editMessageHttpAction\" is not a registered function"
+    },
+    {
+      "file": "chat/http",
+      "kind": "call",
+      "line": 1217,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1235,
+      "line": 1243,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
@@ -17928,55 +17933,55 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 946,
+      "line": 947,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 953,
+      "line": 954,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1045,
+      "line": 1046,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1130,
+      "line": 1131,
       "reason": "\"setThreadStatus\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1150,
+      "line": 1151,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1157,
+      "line": 1158,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1168,
+      "line": 1169,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-tools",
       "kind": "call",
-      "line": 108,
+      "line": 123,
       "reason": "\"buildAgentTools\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-tools",
       "kind": "call",
-      "line": 109,
+      "line": 124,
       "reason": "\"buildAgentTools\" is not a registered function"
     },
     {
@@ -18108,19 +18113,19 @@
     {
       "file": "chat/lib/tool-approval-claim",
       "kind": "read",
-      "line": 61,
-      "reason": "\"findPendingApprovalOnLatestTurn\" is not a registered function"
+      "line": 73,
+      "reason": "\"findPendingRequestOnLatestTurn\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-claim",
       "kind": "read",
-      "line": 140,
+      "line": 152,
       "reason": "\"claimToolApproval\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-claim",
       "kind": "write",
-      "line": 167,
+      "line": 179,
       "reason": "\"claimToolApproval\" is not a registered function"
     },
     {
@@ -19548,79 +19553,79 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 120,
+      "line": 121,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 120,
+      "line": 121,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 120,
+      "line": 121,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 120,
+      "line": 121,
       "reason": "\"hasClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 120,
+      "line": 121,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 139,
+      "line": 140,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 139,
+      "line": 140,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 142,
+      "line": 143,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 142,
+      "line": 143,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 196,
+      "line": 197,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 219,
+      "line": 220,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 224,
+      "line": 225,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 341,
+      "line": 342,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -20086,147 +20091,159 @@
       "reason": "\"createPublicApiRouter\" is not a registered function"
     },
     {
+      "file": "public-api/router",
+      "kind": "call",
+      "line": 152,
+      "reason": "\"createPublicApiRouter\" is not a registered function"
+    },
+    {
+      "file": "public-api/router",
+      "kind": "call",
+      "line": 164,
+      "reason": "\"createPublicApiRouter\" is not a registered function"
+    },
+    {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 178,
+      "line": 195,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 256,
+      "line": 304,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 363,
+      "line": 411,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 423,
+      "line": 471,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 521,
+      "line": 584,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 551,
+      "line": 614,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 616,
+      "line": 679,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 633,
+      "line": 696,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 719,
+      "line": 783,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 743,
+      "line": 807,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 765,
+      "line": 829,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 766,
+      "line": 830,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 803,
+      "line": 867,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 822,
+      "line": 886,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 826,
+      "line": 890,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 836,
+      "line": 900,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 858,
+      "line": 922,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 902,
+      "line": 966,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 924,
+      "line": 988,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 951,
+      "line": 1015,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 985,
-      "reason": "\"ROUTES\" is not a registered function"
-    },
-    {
-      "file": "public-api/routes",
-      "kind": "call",
-      "line": 1004,
-      "reason": "\"ROUTES\" is not a registered function"
-    },
-    {
-      "file": "public-api/routes",
-      "kind": "call",
-      "line": 1048,
+      "line": 1049,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
       "line": 1068,
+      "reason": "\"ROUTES\" is not a registered function"
+    },
+    {
+      "file": "public-api/routes",
+      "kind": "call",
+      "line": 1112,
+      "reason": "\"ROUTES\" is not a registered function"
+    },
+    {
+      "file": "public-api/routes",
+      "kind": "call",
+      "line": 1132,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
