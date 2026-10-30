@@ -7,7 +7,8 @@
  * Built-ins come from a query; MCP tools need a live connection to enumerate, so
  * they come from an action and load separately. Overrides are written one key at
  * a time (`setToolPermission`), and "Reset" removes the override so the tool
- * falls back to its default.
+ * falls back to its default. Tools allowed for an hour or for today
+ * (`respondToToolApproval`) are listed with their expiry and can be revoked early.
  */
 
 import { useLingui } from "@lingui/react/macro";
@@ -21,7 +22,7 @@ import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Info } from "lucide-react";
 import type { FC } from "react";
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
@@ -142,6 +143,71 @@ const ToolGroup: FC<ToolGroupProps> = ({ description, error, isSaving, onChange,
     );
 };
 
+/** `mcp:<server>:<tool>` / `connector:<slug>:<tool>` / `builtin:<tool>` to a name a person reads. */
+const describeGrantKey = (key: string): { server?: string; tool: string } => {
+    const [source, ...rest] = key.split(":");
+    const tool = rest.at(-1) ?? key;
+
+    return source === "builtin" || rest.length < 2 ? { tool } : { server: rest.slice(0, -1).join(":"), tool };
+};
+
+interface TimedAllowsProps {
+    grants: Record<string, number>;
+    isRevoking: boolean;
+    onRevoke: (key: string) => void;
+}
+
+const TimedAllows: FC<TimedAllowsProps> = ({ grants, isRevoking, onRevoke }) => {
+    const { i18n, t } = useLingui();
+    // Ticks so an allow that lapses while the page is open drops off the list.
+    const [now, setNow] = useState(() => Date.now());
+
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), 30_000);
+
+        return () => clearInterval(timer);
+    }, []);
+
+    const active = Object.entries(grants)
+        .filter(([, expiresAt]) => expiresAt > now)
+        .toSorted(([, a], [, b]) => a - b);
+
+    if (active.length === 0) {
+        return null;
+    }
+
+    return (
+        <section aria-label={t`Allowed for a limited time`} className="space-y-2">
+            <Heading className="text-lg font-semibold" fallbackLevel={3}>{t`Allowed for a limited time`}</Heading>
+            <p className="text-muted-foreground text-sm">{t`These tools run without asking until the time shown. Revoke one to be asked again right away.`}</p>
+            <ul className="divide-y rounded-lg border px-4">
+                {active.map(([key, expiresAt]) => {
+                    const { server, tool } = describeGrantKey(key);
+                    const until = i18n.date(new Date(expiresAt), { dateStyle: "short", timeStyle: "short" });
+
+                    return (
+                        <li className="flex items-center justify-between gap-2 py-3" key={key}>
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium">{tool}</p>
+                                <p className="text-muted-foreground truncate text-xs">{server ? t`${server} · until ${until}` : t`Until ${until}`}</p>
+                            </div>
+                            <Button
+                                aria-label={t`Revoke the allow for ${tool}`}
+                                disabled={isRevoking}
+                                onClick={() => onRevoke(key)}
+                                size="sm"
+                                variant="outline"
+                            >
+                                {t`Revoke`}
+                            </Button>
+                        </li>
+                    );
+                })}
+            </ul>
+        </section>
+    );
+};
+
 const ToolPermissionsSettings: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
@@ -159,6 +225,8 @@ const ToolPermissionsSettings: FC = () => {
 
     const { isPending: isSaving, mutate: setToolPermission } = useMutation(crpc.chat.tool_permissions.setToolPermission.mutationOptions());
 
+    const { isPending: isRevoking, mutate: revokeGrant } = useMutation(crpc.chat.tool_permissions.revokeToolPermissionGrant.mutationOptions());
+
     if (isLoading) {
         return (
             <div className="text-muted-foreground text-sm" role="status">
@@ -172,6 +240,18 @@ const ToolPermissionsSettings: FC = () => {
             { key, mode },
             {
                 onError: (error) => showError(error instanceof Error ? error : t`Failed to update tool permission`),
+                onSettled: () => {
+                    void queryClient.invalidateQueries({ queryKey: settingsOptions.queryKey });
+                },
+            },
+        );
+    };
+
+    const handleRevoke = (key: string) => {
+        revokeGrant(
+            { key },
+            {
+                onError: (error) => showError(error instanceof Error ? error : t`Failed to revoke the allow`),
                 onSettled: () => {
                     void queryClient.invalidateQueries({ queryKey: settingsOptions.queryKey });
                 },
@@ -213,6 +293,8 @@ const ToolPermissionsSettings: FC = () => {
                     {t`Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so "Ask" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only.`}
                 </AlertDescription>
             </Alert>
+
+            <TimedAllows grants={settings?.grants ?? {}} isRevoking={isRevoking} onRevoke={handleRevoke} />
 
             <HeadingSection>
                 <section aria-label={t`Built-in tools`} className="space-y-4">

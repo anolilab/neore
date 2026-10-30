@@ -1,5 +1,5 @@
 import type { ToolSet } from "ai";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { applyToolPermissions, BUILTIN_TOOLS_ASK_BY_DEFAULT, defaultToolPermission, resolveToolPermission, toolPermissionKey } from "./tool-permissions";
 
@@ -245,5 +245,51 @@ describe("applyToolPermissions", () => {
         expect(Object.keys(result.tools)).not.toContain("mcp_My_Server__delete");
         expect(result.requiresApproval).toStrictEqual([]);
         expect(result.removed).toStrictEqual(["mcp_My_Server__delete"]);
+    });
+});
+
+describe("time-boxed grants", () => {
+    const NOW = Date.UTC(2026, 9, 30, 12, 0, 0);
+    const mcp = { key: toolPermissionKey("mcp", "delete", "Files"), source: "mcp" as const };
+    const grants = { [mcp.key]: NOW + 60_000 };
+
+    it("lifts an ask tool to auto before the expiry and not after", () => {
+        expect(resolveToolPermission(mcp, undefined, { now: NOW, timedGrants: grants })).toBe("auto");
+        expect(resolveToolPermission(mcp, undefined, { now: NOW + 59_999, timedGrants: grants })).toBe("auto");
+        expect(resolveToolPermission(mcp, undefined, { now: NOW + 60_000, timedGrants: grants })).toBe("ask");
+    });
+
+    it("never widens past off", () => {
+        expect(resolveToolPermission(mcp, { [mcp.key]: "off" }, { now: NOW, timedGrants: grants })).toBe("off");
+    });
+
+    it("is not inherited by a headless run", () => {
+        expect(resolveToolPermission(mcp, undefined, { headless: true, now: NOW, timedGrants: grants })).toBe("off");
+    });
+
+    it("does not lift an outside agent's tool past ask", () => {
+        expect(resolveToolPermission(mcp, undefined, { apiKeyOrigin: true, now: NOW, timedGrants: grants })).toBe("ask");
+    });
+
+    it("ignores a grant on a device tool or on askUser", () => {
+        const device = { key: toolPermissionKey("device", "fs_read", "dev-1"), source: "device" as const };
+        const askUser = { key: toolPermissionKey("builtin", "askUser"), source: "builtin" as const };
+
+        expect(resolveToolPermission(device, { [device.key]: "ask" }, { now: NOW, timedGrants: { [device.key]: NOW + 1000 } })).toBe("ask");
+        expect(resolveToolPermission(askUser, undefined, { now: NOW, timedGrants: { [askUser.key]: NOW + 1000 } })).toBe("ask");
+    });
+
+    it("re-checks the expiry on every call of a tool built while the grant was in force", async () => {
+        const tools = { mcp_Files__delete: { execute: async () => "ok" } } as unknown as ToolSet;
+        const expiresAt = Date.now() + 60_000;
+        const { tools: built } = applyToolPermissions(tools, () => mcp, undefined, { timedGrants: { [mcp.key]: expiresAt } });
+        const { needsApproval } = built.mcp_Files__delete as unknown as { needsApproval: () => boolean };
+
+        expect(needsApproval()).toBe(false);
+
+        const clock = vi.spyOn(Date, "now").mockReturnValue(expiresAt + 1);
+
+        expect(needsApproval()).toBe(true);
+        clock.mockRestore();
     });
 });
