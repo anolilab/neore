@@ -45,6 +45,7 @@ export interface ControllerDependencies {
     hasHelper: () => boolean;
     insert: (text: string) => void;
     log: (message: string) => void;
+
     /**
      * The OS-level microphone decision; `false` stops before a window opens. `"prompted"` means the system just asked
      * the person: the key may be up by now and nothing could see it, so this press ends and the next one records.
@@ -163,6 +164,38 @@ export const createDictationController = (dependencies: ControllerDependencies):
         }
     };
 
+    /** No model on disk: tell the person it is downloading, or ask before starting the download. */
+    const handleMissingModel = async (mine: number, model: ModelSpec): Promise<void> => {
+        if (dependencies.models.isDownloading(model)) {
+            settle("downloading");
+            dependencies.notify(TITLE, "The speech model is still downloading. You will be told when it is ready.");
+
+            return;
+        }
+
+        const accepted = mine === generation && await dependencies.confirmDownload(model);
+
+        if (mine !== generation) {
+            return;
+        }
+
+        // Switched off while the question was open: nothing is fetched.
+        if (accepted && !dependencies.enabled()) {
+            settle("disabled");
+
+            return;
+        }
+
+        if (!accepted) {
+            settle("download-declined");
+
+            return;
+        }
+
+        settle("download-started");
+        download(model);
+    };
+
     /** Whether a window should open now. Every step that waits checks that this dictation is still the current one. */
     const prepare = async (mine: number, model: ModelSpec): Promise<boolean> => {
         if (!dependencies.enabled()) {
@@ -181,34 +214,7 @@ export const createDictationController = (dependencies: ControllerDependencies):
         const { state: modelState } = await dependencies.models.status(model);
 
         if (modelState === "missing") {
-            if (dependencies.models.isDownloading(model)) {
-                settle("downloading");
-                dependencies.notify(TITLE, "The speech model is still downloading. You will be told when it is ready.");
-
-                return false;
-            }
-
-            const accepted = mine === generation && await dependencies.confirmDownload(model);
-
-            if (mine !== generation) {
-                return false;
-            }
-
-            // Switched off while the question was open: nothing is fetched.
-            if (accepted && !dependencies.enabled()) {
-                settle("disabled");
-
-                return false;
-            }
-
-            if (!accepted) {
-                settle("download-declined");
-
-                return false;
-            }
-
-            settle("download-started");
-            download(model);
+            await handleMissingModel(mine, model);
 
             return false;
         }
