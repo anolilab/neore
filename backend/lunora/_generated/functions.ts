@@ -4029,39 +4029,6 @@ if (typeof source["streamId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "streamId": source["streamId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_chat_streaming_persistent_library_70.addChunk.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["final"] !== "boolean") return DEFER;
-let __has1 = false;
-let __val1;
-if (source["reasoning"] !== undefined) {
-if (typeof source["reasoning"] !== "string") return DEFER;
-__val1 = source["reasoning"];
-__has1 = true;
-}
-let __has2 = false;
-let __val2;
-if (source["restart"] !== undefined) {
-if (typeof source["restart"] !== "boolean") return DEFER;
-__val2 = source["restart"];
-__has2 = true;
-}
-let __has4 = false;
-let __val4;
-if (source["speaker"] !== undefined) {
-if (typeof source["speaker"] !== "object" || source["speaker"] === null || Array.isArray(source["speaker"])) return DEFER;
-if (Object.getPrototypeOf(source["speaker"]) !== Object.prototype && Object.getPrototypeOf(source["speaker"]) !== null) return DEFER;
-if (typeof source["speaker"]["name"] !== "string") return DEFER;
-if (typeof source["speaker"]["skillId"] !== "string") return DEFER;
-const __obj3 = { "name": source["speaker"]["name"], "skillId": source["speaker"]["skillId"] };
-__val4 = __obj3;
-__has4 = true;
-}
-if (typeof source["streamId"] !== "string") return DEFER;
-if (typeof source["text"] !== "string") return DEFER;
-return { "final": source["final"], ...(__has1 ? { "reasoning": __val1 } : {}), ...(__has2 ? { "restart": __val2 } : {}), ...(__has4 ? { "speaker": __val4 } : {}), "streamId": source["streamId"], "text": source["text"] };
-});
 installCompiledValidatorMap(lunora_chat_streaming_persistent_library_70.claimStreamRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8464,11 +8431,11 @@ export interface Caller {
                     cleanupExpiredStreams: (args?: {}) => Promise<void>;
                 };
                 library: {
-                    addChunk: (args: { final: boolean; reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string }) => Promise<void>;
+                    addChunk: (args: { final: boolean; reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string; toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number } }) => Promise<void>;
                     claimStreamRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<boolean>;
                     createStream: (args: { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }) => Promise<Id<"persistentStreams">>;
                     finishStoppedReply: (args: { agentName?: string; continuation: boolean; order: number; pendingReasoning: string; pendingText: string; promptMessageId: string; streamId: Id<"persistentStreams"> }) => Promise<{ messageId?: Id<"messages">; stopped: boolean }>;
-                    getChunksAfter: (args: { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams">; withPendingRequest?: boolean }) => Promise<{ chunks: Array<{ reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string }>; locked: boolean; pendingRequest?: { question?: string; toolCallId: string; toolName: string | null }; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
+                    getChunksAfter: (args: { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams">; withPendingRequest?: boolean }) => Promise<{ chunks: Array<{ reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string; toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number } }>; locked: boolean; pendingRequest?: { question?: string; toolCallId: string; toolName: string | null }; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
                     getStreamStatus: (args: { streamId: Id<"persistentStreams"> }) => Promise<"streaming" | "pending" | "error" | "timeout" | "done">;
                     getStreamText: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ hostState?: "accepted" | "received" | "running" | "ended"; messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
                     setStreamStatus: (args: { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }) => Promise<void>;

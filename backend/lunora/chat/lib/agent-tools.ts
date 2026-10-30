@@ -19,6 +19,7 @@ import { buildDeviceTools } from "./device-tools";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import type { MCPServerConfig } from "./mcp-tools";
 import { getMCPTools } from "./mcp-tools";
+import type { ToolProgressSink } from "./mcp-progress";
 import type { SearchMode } from "./tool-builder";
 import { ToolName } from "../tools";
 import { admittedKnowledgeSearchTool } from "../tools/knowledge-search";
@@ -56,6 +57,8 @@ export interface BuildAgentToolsOptions {
     /** Restrict MCP servers to these names; empty/undefined means every enabled server. */
     mcpServerNames?: string[];
     model: LanguageModel | string;
+    /** Interactive runs: where a long MCP call's progress is shown. Omitted, none is relayed. */
+    mcpProgress?: ToolProgressSink;
     /** Who started the run, when not the person at the app: an API key's run gets no device tools and no `auto` tool. */
     origin?: RunOrigin;
     searchMode: SearchMode;
@@ -98,6 +101,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         deviceThreadId,
         headless,
         headlessApproved,
+        mcpProgress,
         mcpServerNames,
         model,
         origin,
@@ -152,7 +156,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
     const noDevices: DeviceToolsResult = { descriptors: new Map(), tools: {} };
     const [mcpResult, deviceResult] = await Promise.all([
-        getMCPTools(selectedServers),
+        getMCPTools(selectedServers, { progress: mcpProgress }),
         // A device problem must never take the run down with it.
         deviceThreadId === undefined || headless || origin === "outside_agent"
             ? noDevices

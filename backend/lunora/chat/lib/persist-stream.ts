@@ -33,6 +33,8 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { stepCountIs } from "ai";
 import type { ActionCtx } from "../../_generated/server";
+import { createToolProgressWriter } from "./mcp-progress";
+import type { ToolProgressSink } from "./mcp-progress";
 
 /** Sentence delimiter check — same as persistent/client.ts:30. */
 const hasDelimeter = (text: string) => text.includes(".") || text.includes("!") || text.includes("?");
@@ -121,6 +123,20 @@ export const stopWhenStopped = (ctx: Partial<Pick<ActionCtx, "runQuery">>, strea
     stepCountIs(maxSteps),
     async () => await isStreamStopped(ctx, streamId),
 ];
+
+/**
+ * Where a run's MCP tool calls report progress: a chunk on `streamId`, throttled per call (`mcp-progress.ts`).
+ * A refused write (the stream was stopped) is the writer's to swallow; it never fails the tool.
+ */
+export const toolProgressSink = (ctx: Pick<ActionCtx, "runMutation">, streamId: string): ToolProgressSink =>
+    createToolProgressWriter(async (toolProgress) => {
+        await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
+            final: false,
+            streamId: streamId as Id<"persistentStreams">,
+            text: "",
+            toolProgress,
+        });
+    });
 
 export interface PipedStream {
     /** Wall-clock ms of the first non-empty delta, if any. */

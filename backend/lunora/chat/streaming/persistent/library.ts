@@ -96,6 +96,18 @@ export const addChunk = internalMutation
         speaker: v.optional(v.object({ name: v.string(), skillId: v.string() })),
         streamId: v.id("persistentStreams"),
         text: v.string(),
+        /** A long MCP tool call's progress, or its end (`chat/lib/mcp-progress.ts`). A chunk with it carries no text. */
+        toolProgress: v.optional(
+            v.object({
+                ended: v.optional(v.boolean()),
+                message: v.optional(v.string().max(MAX_LENGTH.short)),
+                progress: v.optional(v.number()),
+                serverName: v.string().max(MAX_LENGTH.short),
+                toolCallId: v.string().max(MAX_LENGTH.id),
+                toolName: v.string().max(MAX_LENGTH.short),
+                total: v.optional(v.number()),
+            }),
+        ),
     })
     .mutation(async ({ args, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
@@ -126,6 +138,7 @@ export const addChunk = internalMutation
             ...(args.speaker && { speaker: args.speaker }),
             streamId: args.streamId,
             text: args.text,
+            ...(args.toolProgress && { toolProgress: args.toolProgress }),
         });
 
         // The stream row changes only when its status does: on the first chunk
@@ -490,6 +503,17 @@ export const getChunksAfter = internalQuery
                     restart: v.optional(v.boolean()),
                     speaker: v.optional(v.object({ name: v.string(), skillId: v.string() })),
                     text: v.string(),
+                    toolProgress: v.optional(
+                        v.object({
+                            ended: v.optional(v.boolean()),
+                            message: v.optional(v.string().max(MAX_LENGTH.short)),
+                            progress: v.optional(v.number()),
+                            serverName: v.string().max(MAX_LENGTH.short),
+                            toolCallId: v.string().max(MAX_LENGTH.id),
+                            toolName: v.string().max(MAX_LENGTH.short),
+                            total: v.optional(v.number()),
+                        }),
+                    ),
                 }),
             ),
             /**
@@ -533,8 +557,14 @@ export const getChunksAfter = internalQuery
             return lockedAnswer;
         }
 
-        const toChunk = (c: { reasoning?: string | null; restart?: boolean | null; speaker?: { name: string; skillId: string } | null; text: string }) => {
-            return { reasoning: c.reasoning ?? undefined, ...(c.restart && { restart: true }), ...(c.speaker && { speaker: c.speaker }), text: c.text };
+        const toChunk = (c: Pick<Doc<"persistentChunks">, "reasoning" | "restart" | "speaker" | "text" | "toolProgress">) => {
+            return {
+                reasoning: c.reasoning ?? undefined,
+                ...(c.restart && { restart: true }),
+                ...(c.speaker && { speaker: c.speaker }),
+                text: c.text,
+                ...(c.toolProgress && { toolProgress: c.toolProgress }),
+            };
         };
 
         // Only the chunks past the cursor, in order. With nothing new this is

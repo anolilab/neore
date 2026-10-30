@@ -11,6 +11,8 @@ import type { MCPServerConfig } from "./mcp-tools";
 // One fake client per server URL; `tools()` returns that server's tools.
 const SERVER_TOOLS: Record<string, Record<string, unknown>> = {
     "https://a.example/mcp": { delete: { description: "a delete", metadata: { annotations: { destructiveHint: true } } } },
+    "https://c.example/mcp": { run: { description: "c run", execute: async () => "ok" } },
+    "https://d.example/mcp": { run: { description: "d run", execute: async () => Promise.reject(new Error("boom")) } },
     "https://b.example/mcp": { delete: { description: "b delete", metadata: { annotations: { readOnlyHint: true } } }, list: { description: "b list" } },
 };
 
@@ -97,5 +99,48 @@ describe("getMCPTools with an OAuth-backed server", () => {
         expect(result.tools).toStrictEqual({});
         expect(result.errors).toHaveLength(1);
         expect(oauth.markExpired).not.toHaveBeenCalled();
+    });
+});
+
+describe("getMCPTools progress", () => {
+    const sink = () => {
+        const events: string[] = [];
+        const progress = vi.fn(({ serverName, toolCallId, toolName }: { serverName: string; toolCallId: string; toolName: string }) => {
+            events.push(`start ${serverName}/${toolName}#${toolCallId}`);
+
+            return {
+                finish: async () => {
+                    events.push("finish");
+                },
+                push: () => {},
+            };
+        });
+
+        return { events, progress };
+    };
+
+    it("opens a progress report per call, labelled with the real names, and ends it with the call", async () => {
+        const { events, progress } = sink();
+        const result = await getMCPTools([server("my server", "https://c.example/mcp")], { progress });
+        const run = result.tools["mcp_my_server__run"]!;
+
+        await expect((run.execute as any)({}, { messages: [], toolCallId: "call_9" })).resolves.toBe("ok");
+
+        expect(events).toStrictEqual(["start my server/run#call_9", "finish"]);
+    });
+
+    it("ends the report when the call throws", async () => {
+        const { events, progress } = sink();
+        const result = await getMCPTools([server("d", "https://d.example/mcp")], { progress });
+
+        await expect((result.tools["mcp_d__run"]!.execute as any)({}, { messages: [], toolCallId: "call_1" })).rejects.toThrow("boom");
+
+        expect(events).toStrictEqual(["start d/run#call_1", "finish"]);
+    });
+
+    it("leaves the tools untouched without a sink", async () => {
+        const result = await getMCPTools([server("c", "https://c.example/mcp")]);
+
+        await expect((result.tools["mcp_c__run"]!.execute as any)({}, { messages: [], toolCallId: "call_1" })).resolves.toBe("ok");
     });
 });

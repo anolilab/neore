@@ -5543,11 +5543,25 @@
           "optional": true,
           "unique": false
         },
+        "transport": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "\"ssh\""
+        },
         "userId": {
           "kind": "string",
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "viaDeviceId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "devices"
         }
       },
       "indexes": {
@@ -15247,6 +15261,60 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "toolProgress": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "ended": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "message": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
+            "progress": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "serverName": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            },
+            "toolCallId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            },
+            "toolName": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            },
+            "total": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
         }
       },
       "indexes": {
@@ -18416,6 +18484,13 @@
         "by_childThreadId": {
           "fields": [
             "childThreadId"
+          ],
+          "unique": false
+        },
+        "by_childThreadId_and_status": {
+          "fields": [
+            "childThreadId",
+            "status"
           ],
           "unique": false
         },
