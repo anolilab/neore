@@ -40,6 +40,7 @@ import type { MCPServerConfig } from "./lib/mcp-tools";
 import { assertSafeMcpUrl, headersToRecord } from "./lib/mcp-tools";
 import type { ToolPermissionGrants } from "./lib/tool-permission-grants";
 import { activeGrants, grantExpiry, isGrantableKey, MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
+import type { ToolApprovalDecision } from "./lib/tool-approval-claim";
 import { claimToolApproval, findPendingApprovalOnLatestTurn } from "./lib/tool-approval-claim";
 import { purgeExpiredToolApprovalRunsForUser } from "./lib/tool-approval-cleanup";
 import { listBuiltInTools } from "./lib/tool-builder";
@@ -379,11 +380,7 @@ export const recordPendingToolApprovals = internalMutation
  * allow. `key` is the permission key recorded when the tool was built; a snapshot without one approves this call
  * and stores nothing, rather than guessing.
  */
-export const recordApprovalPreference = async (
-    ctx: PreferenceCtx,
-    decision: "always" | "approve" | "deny" | "hour" | "today",
-    key: string | undefined,
-): Promise<void> => {
+export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: ToolApprovalDecision, key: string | undefined): Promise<void> => {
     if (!key) {
         return;
     }
