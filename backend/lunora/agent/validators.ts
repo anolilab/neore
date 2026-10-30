@@ -617,6 +617,18 @@ export const vMessageDocFields = {
 };
 
 export const vMessageDoc = v.object(vMessageDocFields);
+
+/** The columns `updateMessage` may patch; literal for the reason on `vThreadPatchFields`. */
+export const vMessagePatchFields = {
+    error: v.optional(v.string()),
+    fileIds: v.optional(v.array(v.string())),
+    finishReason: v.optional(vFinishReason),
+    message: v.optional(vMessage),
+    model: v.optional(v.string()),
+    provider: v.optional(v.string()),
+    providerOptions: v.optional(vProviderOptions),
+    status: v.optional(vMessageStatus),
+};
 export type MessageDoc = Infer<typeof vMessageDoc>; // Public
 
 /**
@@ -698,6 +710,43 @@ export const vThreadDocFields = {
 };
 
 export const vThreadDoc = v.object(vThreadDocFields);
+
+/**
+ * The columns `updateThread` may patch: each one optional, spelled out as an
+ * object literal because codegen reads `.input()` only from a literal (a
+ * `partial(pick(…))` call registers an EMPTY shape and the runtime strips every
+ * key). `threadFieldsSupportingPatch` in `threads.ts` must list exactly these keys.
+ */
+export const vThreadPatchFields = {
+    botId: v.optional(v.string()),
+    category: v.optional(v.string()),
+    createdBy: v.optional(v.string()),
+    customSystemPrompt: v.optional(v.string()),
+    deleted: v.optional(v.boolean()),
+    deletedAt: v.optional(v.number()),
+    dictationLanguage: v.optional(v.string()),
+    enabledFeatures: v.optional(v.array(v.string())),
+    isPublic: v.optional(v.boolean()),
+    isTemporary: v.optional(v.boolean()),
+    language: v.optional(v.string()),
+    mode: v.optional(v.union(v.literal("text"), v.literal("image"), v.literal("video"))),
+    model: v.optional(v.string()),
+    multiChat: v.optional(v.boolean()),
+    order: v.optional(v.number()),
+    organizationId: v.optional(v.string()),
+    pinnedAt: v.optional(v.number()),
+    projectId: v.optional(v.string()),
+    publicAccessToken: v.optional(v.string()),
+    reasoningEffort: v.optional(v.number()),
+    statelessMode: v.optional(v.boolean()),
+    status: v.optional(vThreadStatus),
+    summary: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    teamId: v.optional(v.string()),
+    title: v.optional(v.string()),
+    updatedAt: v.optional(v.number()),
+    userId: v.optional(v.string()),
+};
 export type ThreadDoc = Infer<typeof vThreadDoc>;
 
 export const vThreadRelationship = v.object({
@@ -809,6 +858,30 @@ export const vProjectDocFields = {
 };
 
 export const vProjectDoc = v.object(vProjectDocFields);
+
+/** The columns `updateProject` may patch; literal for the reason on `vThreadPatchFields`. */
+export const vProjectPatchFields = {
+    color: v.optional(v.string()),
+    context: v.optional(v.string()),
+    defaultEnabledFeatures: v.optional(v.array(v.string())),
+    defaultModel: v.optional(v.string()),
+    defaultReasoningEffort: v.optional(v.number()),
+    description: v.optional(v.string()),
+    forkedFromId: v.optional(v.string()),
+    galleryCategory: v.optional(v.string()),
+    galleryFeatured: v.optional(v.boolean()),
+    galleryForkCount: v.optional(v.number()),
+    galleryPublishedAt: v.optional(v.number()),
+    galleryTags: v.optional(v.array(v.string())),
+    galleryViewCount: v.optional(v.number()),
+    icon: v.optional(v.string()),
+    isPublic: v.optional(v.boolean()),
+    organizationId: v.optional(v.string()),
+    projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
+    publicAccessToken: v.optional(v.string()),
+    title: v.optional(v.string()),
+    workflowContent: v.optional(vWorkflowContent),
+};
 export type ProjectDoc = Infer<typeof vProjectDoc>;
 
 // Workflow execution validators

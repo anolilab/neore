@@ -258,7 +258,7 @@ export const abortActiveForThread = internalMutation
 
 export const abort = internalMutation
     .input({
-        finalDelta: v.optional(v.object(streamDeltasFields)),
+        finalDelta: v.optional(v.object({ ...streamDeltasFields })),
         reason: v.string(),
         streamId: v.id("streamingMessages"),
     })
@@ -326,7 +326,7 @@ const updateThreadStatusAfterStreamEnd = async (context: MutationContext, thread
 
 export const finish = internalMutation
     .input({
-        finalDelta: v.optional(v.object(streamDeltasFields)),
+        finalDelta: v.optional(v.object({ ...streamDeltasFields })),
         streamId: v.id("streamingMessages"),
     })
     .output(v.null())

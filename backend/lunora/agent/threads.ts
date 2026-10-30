@@ -13,17 +13,17 @@ import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-clean
  * Thread operations.
  * Migrated from `@neore/backend-agent` component.
  */
-import { omit, pick } from "../lib/collections";
+import { omit } from "../lib/collections";
 import { assert } from "../lib/error-helpers";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
-import { paginationOptionsValidator, partial, MAX_LENGTH } from "../lib/validators";
+import { paginationOptionsValidator, MAX_LENGTH } from "../lib/validators";
 import { endHostThread, restoreHostThread } from "../acp/lib/thread-removed";
 import { deleteMessage } from "./messages";
 import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
 import { isThreadLocked, toLockedThreadStub } from "../lib/thread-lock";
 import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread, resolveThreadReadAccess, type ThreadPermission } from "./thread-read-access";
-import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadDocFields, vThreadStatus } from "./validators";
+import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadPatchFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
 
@@ -244,7 +244,7 @@ export type ThreadFieldsSupportingPatch = (typeof threadFieldsSupportingPatch)[n
 
 export const updateThread = internalMutation
     .input({
-        patch: v.object(partial(pick(vThreadDocFields, [...threadFieldsSupportingPatch]))),
+        patch: v.object({ ...vThreadPatchFields }),
         threadId: v.id("threads"),
     })
     .output(v.from(vThreadDocument))
