@@ -1,10 +1,12 @@
 import { api } from "@neore/backend/api";
 import type { InboxSection } from "@neore/backend/source-control/types";
 import { LIVE_META_KEY } from "@neore/client-runtime";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { createLunoraActionQueryOptions, useAction, useLunora } from "@/lib/lunora/crpc";
+
+import { retryFailedPage } from "./failed-pages";
 
 const MINUTE_MS = 60_000;
 
@@ -88,17 +90,24 @@ export const usePullRequestCommits = (address: PullRequestAddress | undefined, e
 
 export const usePullRequestFiles = (address: PullRequestAddress | undefined, enabled: boolean) => {
     const getFiles = useAction(api.source_control.functions.getPullRequestFiles);
+    const queryClient = useQueryClient();
     const userId = useDevelopUser();
-
-    return useInfiniteQuery({
+    const queryKey = [DEVELOP_QUERY_ROOT, userId, "files", address];
+    const query = useInfiniteQuery({
         ...READ,
         enabled: enabled && address !== undefined && userId !== undefined,
         queryFn: async ({ pageParam }: { pageParam: number }) => await getFiles({ ...(address as PullRequestAddress), page: pageParam }),
         initialPageParam: 1,
         getNextPageParam: (last: Awaited<ReturnType<typeof getFiles>>) => (last.status === "ok" && last.hasMore ? last.page + 1 : undefined),
-        queryKey: [DEVELOP_QUERY_ROOT, userId, "files", address],
+        queryKey,
         staleTime: MINUTE_MS,
     });
+
+    return {
+        ...query,
+        /** Asks the host again for the page that failed (and lets the ones after it load), not for the pages already read. */
+        retry: async () => await retryFailedPage(queryClient, queryKey, query.fetchNextPage),
+    };
 };
 
 export const usePullRequestChecks = (address: PullRequestAddress | undefined, headSha: string | undefined, enabled: boolean) => {

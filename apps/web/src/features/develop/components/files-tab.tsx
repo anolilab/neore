@@ -227,9 +227,20 @@ const FilesTab = ({
         return <Skeleton aria-label={t`Loading files`} className="h-24 w-full" role="status" />;
     }
 
+    const retryButton = (
+        <Button disabled={files.isFetching} onClick={() => files.retry()} variant="outline">
+            {t`Try again`}
+        </Button>
+    );
+
     // A later page that fails leaves the earlier ones on screen, with the failure below them.
     if (failure && listed.length === 0) {
-        return <FailureNotice label={hostLabel} status={failure} />;
+        return (
+            <div className="space-y-3">
+                <FailureNotice label={hostLabel} status={failure} />
+                {retryButton}
+            </div>
+        );
     }
 
     const loading = !failure && (hasNextPage || isFetchingNextPage);
@@ -294,7 +305,12 @@ const FilesTab = ({
                     />
                 ))}
             </ul>
-            {failure && <FailureNotice label={hostLabel} status={failure} />}
+            {failure && (
+                <>
+                    <FailureNotice label={hostLabel} status={failure} />
+                    {retryButton}
+                </>
+            )}
             {reviewFailure && reviewFailure !== failure && <FailureNotice label={hostLabel} status={reviewFailure} />}
             {hasNextPage && !isFetchingNextPage && !failure && (
                 <Button onClick={() => fetchNextPage()} variant="outline">
