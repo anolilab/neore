@@ -14,7 +14,7 @@ const isObject = (value: unknown): value is { neore?: unknown; runner?: unknown 
 export const HOST_RUN_METADATA = { neore: { runner: "host" } } as const;
 
 export const isHostRunText = (part: PartLike): boolean => {
-    if (part.type !== "text" || !isObject(part.providerMetadata)) {
+    if ((part.type !== "text" && part.type !== "reasoning") || !isObject(part.providerMetadata)) {
         return false;
     }
 

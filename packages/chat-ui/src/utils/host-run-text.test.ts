@@ -9,6 +9,8 @@ describe(isHostRunText, () => {
         expect(isHostRunText({ type: "text" })).toBe(false);
         expect(isHostRunText({ providerMetadata: { neore: { pageContext: {} } }, type: "text" })).toBe(false);
         expect(isHostRunText({ providerMetadata: null, type: "text" })).toBe(false);
-        expect(isHostRunText({ providerMetadata: HOST_RUN_METADATA, type: "reasoning" })).toBe(false);
+        // A coding agent's reasoning is as untrusted as its text.
+        expect(isHostRunText({ providerMetadata: HOST_RUN_METADATA, type: "reasoning" })).toBe(true);
+        expect(isHostRunText({ providerMetadata: HOST_RUN_METADATA, type: "tool-call" })).toBe(false);
     });
 });

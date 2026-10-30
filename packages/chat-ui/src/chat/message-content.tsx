@@ -80,7 +80,7 @@ interface MessageContentProps {
         Image?: FC<{ part: ImagePart }>;
         McpApp?: FC<{ part: ToolPart; resourceUri: string; serverName: string; toolName: string }>;
         PresentationArtifact?: FC<{ presentationId: string; slideCount: number; styleName?: string; title: string }>;
-        Reasoning?: FC<{ isStreaming?: boolean; text: string }>;
+        Reasoning?: FC<{ isStreaming?: boolean; literalImages?: boolean; text: string }>;
         /** Files a code-execution or shell run saved to its output directory (`utils/sandbox-files.ts`). */
         SandboxFiles?: FC<SandboxOutputs>;
         SourceGroup?: FC<{ sources: (SourceDocumentPart | SourceUrlPart)[] }>;
@@ -134,10 +134,10 @@ DefaultText.displayName = "DefaultText";
 /**
  * Default Reasoning renderer with collapsible
  */
-const DefaultReasoning: FC<{ isStreaming?: boolean; text: string }> = memo(({ isStreaming, text }) => (
+const DefaultReasoning: FC<{ isStreaming?: boolean; literalImages?: boolean; text: string }> = memo(({ isStreaming, literalImages, text }) => (
     <Reasoning isStreaming={isStreaming ?? false}>
         <ReasoningTrigger />
-        <ReasoningContent>{text}</ReasoningContent>
+        <ReasoningContent {...(literalImages && { components: hostMarkdownComponents })}>{text}</ReasoningContent>
     </Reasoning>
 ));
 
@@ -803,7 +803,9 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                     // answer (or a tool call) starts, the panel should collapse.
                     const isReasoningStreaming = isAnimating && i === message.parts.length - 1;
 
-                    renderedParts.push(<ReasoningRenderer isStreaming={isReasoningStreaming} key={key} text={reasoningPart.text} />);
+                    renderedParts.push(
+                        <ReasoningRenderer isStreaming={isReasoningStreaming} key={key} literalImages={isHostRunText(reasoningPart) || message.parts.some((other) => isHostRunText(other))} text={reasoningPart.text} />,
+                    );
                 }
 
                 break;

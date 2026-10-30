@@ -641,9 +641,11 @@ impl DeviceState {
             return MediaRead::Refused;
         }
 
-        let roots = confined_fs::canonical_roots(&[folder]);
+        let roots = confined_fs::canonical_roots(std::slice::from_ref(&folder));
 
-        if roots.is_empty() {
+        // Resolved again here, so a folder swapped for a link since the consent check would resolve somewhere else:
+        // only the very folder the user approved is a root.
+        if roots.len() != 1 || roots[0].to_string_lossy() != folder.as_str() {
             return MediaRead::Refused;
         }
 
@@ -1145,6 +1147,35 @@ mod tests {
         // The folder's sibling is not reachable through the approved one.
         assert!(matches!(
             state.acp_read_media("alpha", one.to_str().unwrap(), "../two/chart.png"),
+            MediaRead::Refused
+        ));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_folder_replaced_by_a_link_after_approval_reads_nothing() {
+        let (state, dir) = state("media-swap");
+        let (one, two) = (dir.join("one"), dir.join("two"));
+        let png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0];
+
+        fs::create_dir_all(&one).unwrap();
+        fs::create_dir_all(&two).unwrap();
+        fs::write(one.join("chart.png"), png).unwrap();
+        fs::write(two.join("chart.png"), png).unwrap();
+        save(&state, "alpha");
+        grant(&state, "alpha", &one);
+        assert!(matches!(
+            state.acp_read_media("alpha", one.to_str().unwrap(), "chart.png"),
+            MediaRead::Read(_)
+        ));
+
+        fs::remove_dir_all(&one).unwrap();
+        std::os::unix::fs::symlink(&two, &one).unwrap();
+
+        assert!(matches!(
+            state.acp_read_media("alpha", one.to_str().unwrap(), "chart.png"),
             MediaRead::Refused
         ));
 
