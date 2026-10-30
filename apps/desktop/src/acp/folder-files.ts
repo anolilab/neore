@@ -29,7 +29,8 @@ export interface FileIo {
 const STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true });
 
 const readRegular = async (file: string, maxBytes: number): Promise<Buffer | undefined> => {
-    const handle = await open(file, constants.O_RDONLY + (constants.O_NOFOLLOW ?? 0));
+    // O_NONBLOCK: opening a named pipe with no writer would otherwise wait for one, tying up a filesystem worker.
+    const handle = await open(file, constants.O_RDONLY + (constants.O_NOFOLLOW ?? 0) + (constants.O_NONBLOCK ?? 0));
 
     try {
         const info = await handle.stat();

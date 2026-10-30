@@ -345,6 +345,12 @@ export class TurnChanges {
 
         for (const [relative, snapshot] of call.before) {
             if (call.diffs.has(relative)) {
+                // The diff stands in for the snapshot; the bytes the read held go back once it has finished.
+                this.enqueue(async () => {
+                    await snapshot.read;
+                    this.held -= snapshot.size;
+                });
+
                 continue;
             }
 
