@@ -8,6 +8,9 @@ import { createLunoraActionQueryOptions, useAction, useLunora } from "@/lib/luno
 
 const MINUTE_MS = 60_000;
 
+/** Every Develop query key starts with this, so disconnecting a host can drop what it left in the cache in one call. */
+export const DEVELOP_QUERY_ROOT = "develop";
+
 /** Reads from the host cost API budget and never change under a subscription: cache a little, never go live. */
 const READ = { meta: { [LIVE_META_KEY]: false }, retry: false };
 
@@ -33,7 +36,7 @@ export const useDevelopHost = () => {
     const userId = useDevelopUser();
     const options = createLunoraActionQueryOptions(client, api.source_control.functions.getDevelopHost, {});
 
-    return useQuery({ ...READ, ...options, enabled: userId !== undefined, queryKey: [...options.queryKey, userId], staleTime: 5 * MINUTE_MS });
+    return useQuery({ ...READ, ...options, enabled: userId !== undefined, queryKey: [DEVELOP_QUERY_ROOT, userId, "host"], staleTime: 5 * MINUTE_MS });
 };
 
 export const useInbox = (section: InboxSection | undefined) => {
@@ -46,7 +49,7 @@ export const useInbox = (section: InboxSection | undefined) => {
         queryFn: async ({ pageParam }: { pageParam: number }) => await getInbox({ page: pageParam, section: section as InboxSection }),
         initialPageParam: 1,
         getNextPageParam: (last: Awaited<ReturnType<typeof getInbox>>) => (last.status === "ok" && last.hasMore ? last.page + 1 : undefined),
-        queryKey: ["develop", userId, "inbox", section],
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "inbox", section],
         staleTime: MINUTE_MS,
     });
 };
@@ -60,7 +63,7 @@ export const usePullRequest = (address: PullRequestAddress | undefined) => {
         ...READ,
         ...options,
         enabled: address !== undefined && userId !== undefined,
-        queryKey: [...options.queryKey, userId],
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "pull", address],
         staleTime: MINUTE_MS,
     });
 };
@@ -75,7 +78,7 @@ export const usePullRequestCommits = (address: PullRequestAddress | undefined, e
         queryFn: async ({ pageParam }: { pageParam: number }) => await getCommits({ ...(address as PullRequestAddress), page: pageParam }),
         initialPageParam: 1,
         getNextPageParam: (last: Awaited<ReturnType<typeof getCommits>>) => (last.status === "ok" && last.hasMore ? last.page + 1 : undefined),
-        queryKey: ["develop", userId, "commits", address],
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "commits", address],
         staleTime: MINUTE_MS,
     });
 };
@@ -90,7 +93,7 @@ export const usePullRequestFiles = (address: PullRequestAddress | undefined, ena
         queryFn: async ({ pageParam }: { pageParam: number }) => await getFiles({ ...(address as PullRequestAddress), page: pageParam }),
         initialPageParam: 1,
         getNextPageParam: (last: Awaited<ReturnType<typeof getFiles>>) => (last.status === "ok" && last.hasMore ? last.page + 1 : undefined),
-        queryKey: ["develop", userId, "files", address],
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "files", address],
         staleTime: MINUTE_MS,
     });
 };
@@ -107,7 +110,7 @@ export const usePullRequestChecks = (address: PullRequestAddress | undefined, he
         ...READ,
         ...options,
         enabled: enabled && address !== undefined && headSha !== undefined && userId !== undefined,
-        queryKey: [...options.queryKey, userId],
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "checks", address, headSha],
         staleTime: MINUTE_MS,
     });
 };
