@@ -92,11 +92,15 @@ export const needsHousekeeping = (row: { housekeptAt?: number; lastActiveAt: num
  * (a sign-up, a trigger save) in D1 — not atomically with it. A failed hint must
  * never fail that work; the worst it costs is a late sweep.
  */
-const bestEffort = async (what: string, write: () => Promise<void>): Promise<void> => {
+const bestEffort = async (what: string, write: () => Promise<void>): Promise<boolean> => {
     try {
         await write();
+
+        return true;
     } catch (error) {
         cronsLogger.warn(`[housekeeping] ${what} failed:`, error);
+
+        return false;
     }
 };
 
@@ -213,7 +217,7 @@ export const runShardTick = internalMutation
         // Also schedules `checkDueTasks` (see `triggers/schedule.ts`).
         await ctx.runMutation(internal.triggers.schedule.checkDueTriggers, {});
         // Coding-agent turns that went silent; re-arms this shard for the next one to expire.
-        await bestEffort("reapHostStreams", async () => {
+        const reaped = await bestEffort("reapHostStreams", async () => {
             await ctx.runMutation(internal.acp.ingest.reapHostStreams, {});
         });
 
@@ -232,6 +236,11 @@ export const runShardTick = internalMutation
                 .first(),
         ]);
         const candidates = [trigger?.nextTriggerAt, task?.nextRunAt].filter((at): at is number => at !== undefined);
+
+        // The dispatch cleared this shard's due time; a reap that failed never recorded the next expiry, so try again.
+        if (!reaped) {
+            candidates.push(now);
+        }
 
         if (candidates.length > 0) {
             await noteShardDue(ctx, Math.max(Math.min(...candidates), now + MIN_TICK_INTERVAL_MS));

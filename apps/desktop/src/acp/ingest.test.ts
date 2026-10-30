@@ -213,6 +213,34 @@ describe("pairing after a session opened", () => {
     });
 });
 
+describe("a session that never gets a thread", () => {
+    it("ends a turn that started during session_open when the backend refuses the open", async () => {
+        backend.respond = (post) => post.threadId === undefined ? Response.json({ error: "no" }, { status: 403 }) : undefined;
+
+        const host = poster();
+
+        host.sessionOpened("s1", INFO);
+        host.turnStarted("s1", "t1", "hello");
+        await settle(1000);
+
+        expect(host.busy).toBe(false);
+    });
+
+    it("stops retrying session_open once the local session has ended", async () => {
+        backend.failNext = ["network"];
+
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "hello");
+        host.sessionEnded("s1");
+        await settle(60_000);
+
+        expect(backend.posts).toHaveLength(1);
+        expect(host.busy).toBe(false);
+    });
+});
+
 describe("a turn", () => {
     it("merges deltas into one post per 250 ms, with consecutive seqs", async () => {
         const host = poster();

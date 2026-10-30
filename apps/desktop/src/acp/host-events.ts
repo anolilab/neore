@@ -33,6 +33,7 @@ export interface HostSessionInfo {
 export interface SessionObserver {
     permissionRequested: (sessionId: string, turnId: string, request: PermissionRequestEvent) => void;
     permissionResolved: (sessionId: string, turnId: string, requestId: string, outcome: PermissionOutcomeKind) => void;
+    sessionEnded: (sessionId: string) => void;
     sessionOpened: (sessionId: string, info: HostSessionInfo) => void;
     text: (sessionId: string, turnId: string, delta: string) => void;
     thought: (sessionId: string, turnId: string, delta: string) => void;

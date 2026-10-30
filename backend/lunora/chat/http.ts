@@ -1250,6 +1250,11 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
         return workerThreadResponse();
     }
 
+    // The reply would come from a cloud model, in a thread the desktop owns.
+    if (access.hostRun) {
+        return hostRunThreadResponse();
+    }
+
     // Extract config from request body (already validated above)
     const { cinemaSettings, contentType, duration, imageSize, model, negativePrompt, referenceImages, seed } = streamingConfig;
 

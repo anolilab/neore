@@ -390,6 +390,7 @@ export class AgentSession {
         }
 
         this.current = undefined;
+        this.observe((observer) => observer.sessionEnded(this.id));
         this.options.onChange();
     }
 

@@ -134,6 +134,11 @@ export class TurnChannel {
         this.schedule(0);
     }
 
+    /** The session will not be posted: a flush now finds that and ends the channel. */
+    public release(): void {
+        this.schedule(0);
+    }
+
     public stop(): void {
         this.stopped = true;
         clearTimeout(this.timer);
@@ -260,7 +265,10 @@ export class TurnChannel {
             }
             default: {
                 this.attempts += 1;
-                // `inflight` stays as it is; what is queued meanwhile waits behind it.
+                // `inflight` stays as it is; what is queued meanwhile waits behind it. Output that arrived during the
+                // post left a 250 ms timer: the backoff replaces it, or the outage is retried at the normal cadence.
+                clearTimeout(this.timer);
+                this.timer = undefined;
                 this.schedule(jitteredBackoff(this.attempts, this.host.random));
             }
         }

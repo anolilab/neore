@@ -50,6 +50,11 @@ export interface PosterOptions {
     stateFile: string;
 }
 
+const settledAfter = async (previous: Promise<void>, read: Promise<unknown>): Promise<void> => {
+    await previous;
+    await read;
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 export class HostPoster implements SessionObserver {
@@ -86,6 +91,7 @@ export class HostPoster implements SessionObserver {
             deviceId: () => this.options.deviceId(),
             now: () => this.now(),
             random: () => this.random(),
+            released: (id) => this.releaseChannels(id),
             request: async (payload) => await this.request(payload),
         });
 
@@ -106,6 +112,10 @@ export class HostPoster implements SessionObserver {
         for (const link of this.sessions.values()) {
             link.paired();
         }
+    }
+
+    public sessionEnded(sessionId: string): void {
+        this.sessions.get(sessionId)?.close();
     }
 
     public turnStarted(sessionId: string, turnId: string, user: string): void {
@@ -150,7 +160,12 @@ export class HostPoster implements SessionObserver {
 
     /** Ends, as `interrupted`, every turn a previous run left behind. Call once after the core is up. */
     public async recover(): Promise<void> {
-        const leftovers = await this.readState();
+        const read = this.readState();
+
+        // A write queued from here on lands after the read, so it cannot drop the turns the read is about to find.
+        this.writing = settledAfter(this.writing, read);
+
+        const leftovers = await read;
 
         for (const left of leftovers) {
             if (this.channels.has(left.turnId)) {
@@ -194,6 +209,15 @@ export class HostPoster implements SessionObserver {
     }
 
     // ─── Posting ────────────────────────────────────────────────────────────
+
+    /** A session that will not be posted: the turns still waiting on its thread end instead of holding output for ever. */
+    private releaseChannels(sessionId: string): void {
+        for (const channel of this.channels.values()) {
+            if (channel.sessionId === sessionId && channel.threadId === undefined) {
+                channel.release();
+            }
+        }
+    }
 
     private bindThread(sessionId: string, threadId: string): void {
         for (const channel of this.channels.values()) {

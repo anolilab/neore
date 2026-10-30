@@ -134,8 +134,7 @@ describe("registerDevice", () => {
     });
 });
 
-const routeOf = async (deviceId: string) =>
-    await harness.run(async (ctx: any) => await ctx.db.shardRoutes.findFirst({ where: { key: `device:${deviceId}` } }));
+const routeOf = async (deviceId: string) => await harness.run(async (ctx: any) => await ctx.db.shardRoutes.findFirst({ where: { key: `device:${deviceId}` } }));
 
 describe("a device's ingest route", () => {
     it("is written when the device is paired and gone once it is revoked", async () => {

@@ -62,6 +62,15 @@ describe("/chat/media on a shared thread", () => {
         expect(runMutation).not.toHaveBeenCalled();
     });
 
+    it("refuses a thread a paired computer runs, before charging anything", async () => {
+        runQuery.mockResolvedValueOnce({ hostRun: true, outcome: "ok" });
+
+        const response = await mediaGenerationHttpAction({ runMutation, runQuery } as never, post({ threadId: THREAD_ID }));
+
+        expect(response.status).toBe(409);
+        expect(runMutation).not.toHaveBeenCalled();
+    });
+
     it("goes on to the daily charge with write access (control)", async () => {
         runQuery.mockResolvedValueOnce({ outcome: "ok" });
 

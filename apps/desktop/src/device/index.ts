@@ -316,7 +316,10 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const paired = await requireTransport().pair(deviceId, secret, accountLabel);
 
         // Sessions opened before pairing stayed on this computer; they open on the backend now.
-        state.host?.paired();
+        // A declined pairing keeps the existing one: nothing to open.
+        if (paired) {
+            state.host?.paired();
+        }
 
         return paired;
     };

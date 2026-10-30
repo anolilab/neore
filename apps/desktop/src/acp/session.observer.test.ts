@@ -22,6 +22,7 @@ const recorder = () => {
     const observer: SessionObserver = {
         permissionRequested: record("permissionRequested"),
         permissionResolved: record("permissionResolved"),
+        sessionEnded: () => {},
         sessionOpened: (...args) => {
             calls.push(["sessionOpened", ...args.slice(1)]);
         },
