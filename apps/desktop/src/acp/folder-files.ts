@@ -42,8 +42,8 @@ const readRegular = async (file: string, maxBytes: number): Promise<Buffer | und
         const buffer = Buffer.alloc(Math.min(info.size, maxBytes) + 1);
         const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
 
-        // The file grew between `fstat` and the read.
-        return bytesRead > maxBytes ? undefined : buffer.subarray(0, bytesRead);
+        // The file grew between `fstat` and the read: what was read is a cut-off copy of it.
+        return bytesRead > info.size || bytesRead > maxBytes ? undefined : buffer.subarray(0, bytesRead);
     } finally {
         await handle.close();
     }
