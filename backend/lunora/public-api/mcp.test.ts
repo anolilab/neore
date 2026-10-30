@@ -496,6 +496,8 @@ describe("MCP write tools", () => {
         expect(chatStart).toHaveBeenCalledOnce();
         // The run is capped at ask-mode tools with no device tools (`origin`).
         expect(chatStart.mock.calls[0]?.[1]).toMatchObject({ mode: "text", prompt: "hello", threadId: "t1" });
+        // The origin is set by the server for every API-key chat start, never taken from the request: it caps the run's tools.
+        expect(chatStart.mock.calls[0]?.[3]).toBe("outside_agent");
         expect(rateLimitCalls(calls)).toEqual([
             { args: { identifier: "key1", key: "publicApi/write:free" }, name: "lib_rate_limiter_mutations:applyRateLimit" },
         ]);
@@ -540,7 +542,7 @@ describe("MCP write tools", () => {
         expect(chatStart).toHaveBeenCalledOnce();
     });
 
-    it("refuses an idempotencyKey that is not a string, so `true` is never the key \"true\"", async () => {
+    it('refuses an idempotencyKey that is not a string, so `true` is never the key "true"', async () => {
         const harness = setup({ scopes: WRITE_SCOPES });
 
         for (const idempotencyKey of [true, 7]) {
