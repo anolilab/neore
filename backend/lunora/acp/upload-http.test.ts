@@ -259,6 +259,10 @@ describe("a signed upload from a paired computer", () => {
         // Another size or type than the ones signed.
         expect(await statusOf(await createRequest(owner, { headers: { "Upload-Length": String(PNG.byteLength + 1) } }))).toBe(401);
         expect(await statusOf(await createRequest(owner, { headers: { "Upload-Metadata": metadata("application/pdf") } }))).toBe(401);
+        // A second type under the name the upload handler prefers.
+        expect(await statusOf(await createRequest(owner, { headers: { "Upload-Metadata": `${metadata("image/png")},mimeType ${btoa("image/gif")}` } }))).toBe(
+            401,
+        );
         // A signed HEAD cannot be used to write.
         const head = await headRequest(owner, uploadId);
 

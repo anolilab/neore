@@ -81,21 +81,25 @@ const decodeBase64Url = (value: string): string | null => {
 
 /** The `filetype` the TUS client declared in `Upload-Metadata` (`key base64` pairs, comma separated), lower-cased. */
 const declaredType = (request: Request): string | null => {
-    const pairs = (request.headers.get("upload-metadata") ?? "").split(",");
+    const pairs = (request.headers.get("upload-metadata") ?? "").split(",").map((pair) => pair.trim().split(" ", 2));
 
-    for (const pair of pairs) {
-        const [key, value] = pair.trim().split(" ", 2);
-
-        if (key === "filetype" && value !== undefined) {
-            try {
-                return atob(value).split(";", 1)[0]?.trim().toLowerCase() ?? null;
-            } catch {
-                return null;
-            }
-        }
+    // The upload handler lets `mimeType` take precedence over `filetype`, so the signed type would not be the
+    // stored one: a create that names it is not bound to its signature.
+    if (pairs.some(([key]) => key?.toLowerCase() === "mimetype")) {
+        return null;
     }
 
-    return null;
+    const declared = pairs.find(([key, value]) => key === "filetype" && value !== undefined)?.[1];
+
+    if (declared === undefined) {
+        return null;
+    }
+
+    try {
+        return atob(declared).split(";", 1)[0]?.trim().toLowerCase() ?? null;
+    } catch {
+        return null;
+    }
 };
 
 /** The upload id in the path of a `PATCH` or `HEAD`, or null for any other path. */
