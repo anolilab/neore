@@ -120,6 +120,15 @@ const known = (host: string): HostKind | undefined => {
  * Which host a remote points at. `webOrigin` is the origin for an http(s) form,
  * and `undefined` for an SSH form, which can match a declared host by name only.
  */
+/** Whether a host from an SCP-style remote parses as a URL authority, so the origin built from it is valid. */
+const isPlainHost = (host: string): boolean => {
+    try {
+        return new URL(`https://${host}`).hostname !== "";
+    } catch {
+        return false;
+    }
+};
+
 const locate = (host: string, webOrigin: string | undefined, segments: string[], declared: DeclaredHost[]): Located => {
     let best: (DeclaredHost & { base: string }) | undefined;
 
@@ -247,8 +256,14 @@ export const parseRepoRemote = (remote: string, declared: DeclaredHost[] = []): 
             return null;
         }
 
-        viaSsh = true;
         host = (scp[1] as string).toLowerCase();
+
+        // The host becomes the origin of every request, so it must parse as a URL authority.
+        if (!isPlainHost(host)) {
+            return null;
+        }
+
+        viaSsh = true;
         rawPath = scp[2] as string;
     }
 
