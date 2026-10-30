@@ -15635,6 +15635,13 @@
           ],
           "unique": false
         },
+        "by_threadId_messageId": {
+          "fields": [
+            "threadId",
+            "messageId"
+          ],
+          "unique": false
+        },
         "by_threadId_status": {
           "fields": [
             "threadId",
@@ -18436,6 +18443,13 @@
         "by_childThreadId": {
           "fields": [
             "childThreadId"
+          ],
+          "unique": false
+        },
+        "by_childThreadId_and_status": {
+          "fields": [
+            "childThreadId",
+            "status"
           ],
           "unique": false
         },

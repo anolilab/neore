@@ -1059,6 +1059,7 @@ export const persistentStreams = sqliteTable("persistentStreams", {
 }, (t) => ({
     by_hostTurnId: index("by_hostTurnId").on(t.hostTurnId),
     by_threadId_status: index("by_threadId_status").on(t.threadId, t.status),
+    by_threadId_messageId: index("by_threadId_messageId").on(t.threadId, t.messageId),
     by_threadId: index("by_threadId").on(t.threadId),
     by_userId_status: index("by_userId_status").on(t.userId, t.status),
     by_expiresAt: index("by_expiresAt").on(t.expiresAt),

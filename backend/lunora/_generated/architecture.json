@@ -16434,19 +16434,19 @@
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 282,
+      "line": 281,
       "reason": "\"setActiveLeafHandler\" is not a registered function"
     },
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 328,
+      "line": 327,
       "reason": "\"saveEditedSiblingHandler\" is not a registered function"
     },
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 423,
+      "line": 422,
       "reason": "\"editAssistantReplyHandler\" is not a registered function"
     },
     {
@@ -17161,25 +17161,25 @@
       "file": "agent/thread-streaming",
       "kind": "read",
       "line": 7,
-      "reason": "\"hasStreamFor\" is not a registered function"
-    },
-    {
-      "file": "agent/thread-streaming",
-      "kind": "read",
-      "line": 7,
       "reason": "\"hasUnsettledStop\" is not a registered function"
     },
     {
       "file": "agent/thread-streaming",
       "kind": "read",
-      "line": 7,
+      "line": 19,
       "reason": "\"isThreadStreaming\" is not a registered function"
     },
     {
       "file": "agent/thread-streaming",
       "kind": "read",
-      "line": 25,
+      "line": 37,
       "reason": "\"hasLiveDeltaStream\" is not a registered function"
+    },
+    {
+      "file": "agent/thread-streaming",
+      "kind": "read",
+      "line": 49,
+      "reason": "\"hasStreamFor\" is not a registered function"
     },
     {
       "file": "agent/threads",
@@ -18234,13 +18234,13 @@
     {
       "file": "chat/local-models",
       "kind": "read",
-      "line": 139,
+      "line": 141,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {
       "file": "chat/local-models",
       "kind": "call",
-      "line": 145,
+      "line": 147,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {
