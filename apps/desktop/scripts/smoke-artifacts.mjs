@@ -2,7 +2,8 @@
 // unpacked app with its device-execution addon outside the asar, and the update feed exist.
 // Run after `electron-builder` (see the `smoke:artifacts` script and desktop.yml). With `--unpacked-only` (an
 // `electron-builder --dir` run, which writes no installer and no feed) only the unpacked apps are checked.
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -114,10 +115,63 @@ if (process.platform === "win32") {
     }
 }
 
+// The `neore-host` binaries the app uploads to servers ship as `resources/neore-host`, next to the asar, with the
+// checksums they are verified against. Every platform the Rust side knows must be there and match its checksum.
+const findHostBundles = (dir, depth = 0) => {
+    if (depth > 6) {
+        return [];
+    }
+
+    return readdirSync(dir).flatMap((name) => {
+        const full = path.join(dir, name);
+
+        if (!statSync(full).isDirectory()) {
+            return [];
+        }
+
+        return name === "neore-host" && existsSync(path.join(full, "manifest.json")) ? [full] : findHostBundles(full, depth + 1);
+    });
+};
+
+// `--unpacked-only` runs in CI jobs that package without building the host bundle, so it checks no bundle.
+const hostBundles = unpackedOnly ? [] : findHostBundles(release);
+
+if (!unpackedOnly && hostBundles.length === 0) {
+    fail(`no resources/neore-host bundle under ${release}; extraResources did not pick up host-bundle/`);
+}
+
+// One run packages several architectures; each app's bundle sits in its own `resources`, next to its `app.asar.unpacked`.
+for (const dir of unpackedOnly ? [] : unpacked) {
+    const bundle = path.join(path.dirname(dir), "neore-host");
+
+    if (!existsSync(path.join(bundle, "manifest.json"))) {
+        fail(`${path.dirname(dir)} has no neore-host bundle; that app could not install the host software on a server`);
+    }
+}
+
+for (const dir of hostBundles) {
+    const manifest = JSON.parse(readFileSync(path.join(dir, "manifest.json"), "utf8"));
+    const triples = Object.keys(manifest.targets ?? {});
+
+    for (const triple of ["aarch64-apple-darwin", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "x86_64-unknown-linux-musl"]) {
+        if (!triples.includes(triple)) {
+            fail(`${dir} has no neore-host for ${triple}`);
+        }
+    }
+
+    for (const [triple, entry] of Object.entries(manifest.targets)) {
+        const file = path.join(dir, entry.file);
+
+        if (!existsSync(file) || createHash("sha256").update(readFileSync(file)).digest("hex") !== entry.sha256) {
+            fail(`${file} (${triple}) is missing or does not match the checksum in ${dir}/manifest.json`);
+        }
+    }
+}
+
 if (!unpackedOnly && !names.some((name) => /^latest.*\.yml$/.test(name))) {
     fail(`no latest*.yml update feed in ${release}`);
 }
 
 console.log(
-    `smoke-artifacts: ok (${process.platform}: ${unpackedOnly ? "" : "installer, "}${unpacked.length} unpacked app(s)${unpackedOnly ? "" : ", update feed"})`,
+    `smoke-artifacts: ok (${process.platform}: ${unpackedOnly ? "" : "installer, "}${unpacked.length} unpacked app(s), ${hostBundles.length} host bundle(s)${unpackedOnly ? "" : ", update feed"})`,
 );

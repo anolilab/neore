@@ -384,7 +384,7 @@ pub fn remote_command(forward_agent: bool, binary: &str) -> String {
 }
 
 pub fn default_binary() -> String {
-    format!("\"$HOME/.neore/host/{HOST_VERSION}/neore-host\"")
+    crate::install::Root::Home.binary(HOST_VERSION)
 }
 
 // ─── Host keys ───────────────────────────────────────────────────────────
@@ -589,6 +589,10 @@ pub enum SshError {
     },
     /// The user did not trust the key on first use.
     HostKeyDeclined,
+    /// The server's shell could not find `neore-host` (exit status 127): it is not installed there yet.
+    HostMissing {
+        target: String,
+    },
     Other(String),
 }
 
@@ -606,6 +610,10 @@ impl fmt::Display for SshError {
                 presented.join(", ")
             ),
             SshError::HostKeyDeclined => f.write_str("the server's host key was not trusted"),
+            SshError::HostMissing { target } => write!(
+                f,
+                "neore-host {HOST_VERSION} is not installed on {target}. Install it from the server's settings (\"Install host software\")."
+            ),
             SshError::Other(message) => f.write_str(message),
         }
     }
@@ -629,7 +637,7 @@ pub trait Interact: Send + Sync {
 
 /// Pins the server's key after the user trusts it, or refuses a key that changed. Read before ssh runs; ssh then
 /// enforces the same store itself.
-fn check_host_key(
+pub(crate) fn check_host_key(
     target: &Target,
     paths: &SshPaths,
     interact: &dyn Interact,
@@ -1021,8 +1029,16 @@ impl HostConnection {
                 )));
             }
             Err(reason) => {
+                let missing = exited_with(&mut child, 127);
+
                 let _ = child.kill();
                 let _ = child.wait();
+
+                if missing {
+                    return Err(SshError::HostMissing {
+                        target: target.label(),
+                    });
+                }
 
                 return Err(SshError::Other(explain(target, &reason, &stderr)));
             }
@@ -1158,6 +1174,137 @@ fn route(pending: &Pending, frame: &[u8]) {
     let _ = sender.send(reply);
 }
 
+/// Whether `child` ends with `code` within a moment: a shell reports a command it cannot find as 127.
+fn exited_with(child: &mut Child, code: i32) -> bool {
+    for _ in 0..20 {
+        if let Ok(Some(status)) = child.try_wait() {
+            return status.code() == Some(code);
+        }
+
+        thread::sleep(Duration::from_millis(100));
+    }
+
+    false
+}
+
+/// The most of a remote command's stdout or stderr that is kept; a server cannot make this computer hold more.
+const EXEC_OUTPUT_LIMIT: u64 = 1 << 20;
+
+/// Reads `stream` to its end, keeping its first [`EXEC_OUTPUT_LIMIT`] bytes. The rest is read and dropped, so a
+/// chatty server never blocks on a full pipe.
+fn drain(mut stream: impl Read + Send + 'static) -> thread::JoinHandle<Vec<u8>> {
+    thread::spawn(move || {
+        let mut bytes = Vec::new();
+
+        let _ = (&mut stream)
+            .take(EXEC_OUTPUT_LIMIT)
+            .read_to_end(&mut bytes);
+        let _ = io::copy(&mut stream, &mut io::sink());
+
+        bytes
+    })
+}
+
+/// What one remote command printed.
+pub struct Exec {
+    pub stdout: String,
+}
+
+/// Runs `command` on the server with `input` on its stdin, over the same options, pinned key and master as a host
+/// session: the key is checked first, and a passphrase is asked through the helper. A non-zero exit is an error
+/// carrying what ssh and the command said. An `input` that fails kills the ssh child, which is what a dropped
+/// upload looks like to the server.
+pub fn exec(
+    target: &Target,
+    paths: &SshPaths,
+    interact: &Arc<dyn Interact>,
+    command: &str,
+    input: &mut dyn Read,
+) -> Result<Exec, SshError> {
+    target.validate().map_err(SshError::Other)?;
+    paths.prepare().map_err(SshError::Other)?;
+    check_host_key(target, paths, interact.as_ref())?;
+
+    let mut process = Command::new("ssh");
+
+    process
+        .args(ssh_args(target, paths))
+        .arg(command)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    #[cfg(unix)]
+    let askpass = Askpass::start(paths, target.clone(), Arc::clone(interact))
+        .map_err(|error| SshError::Other(format!("the passphrase channel failed: {error}")))?;
+
+    #[cfg(unix)]
+    process.envs(askpass.environment(paths));
+
+    let mut child = process
+        .spawn()
+        .map_err(|error| SshError::Other(format!("ssh could not run: {error}")))?;
+    let mut stdin = child.stdin.take().expect("piped stdin");
+    // Drained while the input is still going: a server that answers more than a pipe holds before it has read all
+    // of its stdin would otherwise block on its write while this blocks on the write of the input.
+    let stdout = drain(child.stdout.take().expect("piped stdout"));
+    let stderr = drain(child.stderr.take().expect("piped stderr"));
+
+    // The server may stop reading (a failed `mkdir`, say): its stderr then says why, and that is the error.
+    match io::copy(input, &mut stdin) {
+        Err(error) if error.kind() != io::ErrorKind::BrokenPipe => {
+            let _ = child.kill();
+            let _ = child.wait();
+
+            return Err(SshError::Other(format!("the upload stopped: {error}")));
+        }
+        _ => {}
+    }
+
+    drop(stdin);
+
+    let status = child
+        .wait()
+        .map_err(|error| SshError::Other(format!("ssh failed: {error}")))?;
+    let (stdout, stderr) = (
+        stdout.join().unwrap_or_default(),
+        stderr.join().unwrap_or_default(),
+    );
+
+    #[cfg(unix)]
+    drop(askpass);
+
+    if status.success() {
+        return Ok(Exec {
+            stdout: String::from_utf8_lossy(&stdout).into_owned(),
+        });
+    }
+
+    Err(SshError::Other(exec_failure(
+        target,
+        status.code(),
+        String::from_utf8_lossy(&stderr).trim(),
+    )))
+}
+
+/// What a failed remote command means to the reader. Only ssh itself exits 255, and only then is a "Permission
+/// denied" a refused login; from the command it is a file the account may not write.
+fn exec_failure(target: &Target, code: Option<i32>, said: &str) -> String {
+    if code == Some(255) && said.contains("Permission denied") {
+        explain(target, said, &Mutex::new(said.to_owned()))
+    } else if said.is_empty() {
+        match code {
+            Some(code) => format!(
+                "the command on {} failed (exit status: {code})",
+                target.label()
+            ),
+            None => format!("the command on {} was killed", target.label()),
+        }
+    } else {
+        format!("on {}: {said}", target.label())
+    }
+}
+
 /// What the user needs to read when a connection failed, from what ssh said.
 fn explain(target: &Target, reason: &str, stderr: &Mutex<String>) -> String {
     // The reader sees the stream end a moment before the stderr thread has everything.
@@ -1225,6 +1372,31 @@ mod tests {
         assert_ne!(first, second);
         assert_ne!(first, control_path(None));
         assert_eq!(first, control_path(Some("/home/me/.ssh/one")));
+    }
+
+    #[test]
+    fn a_permission_error_from_a_remote_command_is_not_called_a_refused_login() {
+        let said = "mkdir: cannot create directory '/home/me/.neore': Permission denied";
+        let message = exec_failure(&target(), Some(1), said);
+
+        assert!(message.contains(said), "{message}");
+        assert!(!message.contains("refused the login"), "{message}");
+
+        let login = exec_failure(
+            &target(),
+            Some(255),
+            "deploy@build.example.com: Permission denied (publickey).",
+        );
+
+        assert!(login.contains("refused the login"), "{login}");
+    }
+
+    #[test]
+    fn a_remote_command_keeps_only_the_start_of_what_it_prints() {
+        let long = vec![b'x'; EXEC_OUTPUT_LIMIT as usize + 4096];
+        let kept = drain(io::Cursor::new(long)).join().unwrap();
+
+        assert_eq!(kept.len(), EXEC_OUTPUT_LIMIT as usize);
     }
 
     fn option_values(args: &[String]) -> Vec<&str> {

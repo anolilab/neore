@@ -6,7 +6,7 @@
  * values cross the addon as JSON strings and are parsed here, so a transport hands back typed values.
  */
 import { loadDeviceCore } from "./addon";
-import type { CoreEvent, DeviceCore as DeviceCoreHandle, DeviceStatus, HostProbe, HostSpec, Prompt, SettingsView, Signed } from "./types";
+import type { CoreEvent, DeviceCore as DeviceCoreHandle, DeviceStatus, HostProbe, HostSpec, HostUpgrade, Prompt, SettingsView, Signed } from "./types";
 
 export interface HostTransport {
     auditTail: () => string[];
@@ -28,6 +28,8 @@ export interface HostTransport {
     hostTerminal: (deviceId: string) => Promise<string[]>;
     /** The same arguments for a new shell on a connection that is still up; never connects. */
     hostTerminalAttach: (deviceId: string) => Promise<string[]>;
+    /** Installs the pinned host software on a paired server and removes its older versions; refused while a session is open. */
+    hostUpgrade: (deviceId: string) => Promise<HostUpgrade>;
     readonly kind: "local";
     /** This computer's signed tool list, or a server's (signed with that server's own secret). */
     manifest: (deviceId?: string) => Promise<Signed>;
@@ -43,10 +45,13 @@ export interface HostTransport {
     stop: () => void;
 }
 
-/** Loads the addon and wraps it. Throws when the addon cannot load; the caller keeps the shell running. */
-export const createLocalTransport = (dataDirectory: string, onEvent: (event: CoreEvent) => void): HostTransport & { core: DeviceCoreHandle } => {
+/**
+ * Loads the addon and wraps it. Throws when the addon cannot load; the caller keeps the shell running.
+ * `hostBundle` is the folder with the `neore-host` binaries and their checksums that this build ships.
+ */
+export const createLocalTransport = (dataDirectory: string, onEvent: (event: CoreEvent) => void, hostBundle?: string): HostTransport & { core: DeviceCoreHandle } => {
     const DeviceCore = loadDeviceCore();
-    const core = new DeviceCore(dataDirectory, (json) => onEvent(JSON.parse(json) as CoreEvent));
+    const core = new DeviceCore(dataDirectory, (json) => onEvent(JSON.parse(json) as CoreEvent), hostBundle);
 
     return {
         auditTail: () => core.auditTail(),
@@ -62,6 +67,7 @@ export const createLocalTransport = (dataDirectory: string, onEvent: (event: Cor
         hostRemove: (deviceId) => core.hostRemove(deviceId),
         hostTerminal: async (deviceId) => JSON.parse(await core.hostTerminal(deviceId)) as string[],
         hostTerminalAttach: async (deviceId) => JSON.parse(await core.hostTerminalAttach(deviceId)) as string[],
+        hostUpgrade: async (deviceId) => JSON.parse(await core.hostUpgrade(deviceId)) as HostUpgrade,
         kind: "local",
         manifest: async (deviceId) => JSON.parse(await core.manifest(deviceId)) as Signed,
         pair: (deviceId, secret, accountLabel) => core.pair(deviceId, secret, accountLabel),

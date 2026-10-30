@@ -88,9 +88,13 @@ const renderPrompt = (prompt: Prompt | null): void => {
     switch (body.kind) {
         case "hostConnect": {
             setText("prompt-heading", `Connect to ${body.user}@${body.address}?`);
+            const installs = body.installVersion === null
+                ? ""
+                : ` Unless the server already has this exact build, Neore also copies its host program (neore-host ${body.installVersion}) into ~/.neore/host there, replacing a different build of that version.`;
+
             setText(
                 "prompt-context",
-                "A page in Neore asks this computer to open an SSH connection so it can add this server. Nothing is sent until you agree; if you did not just start adding a server, cancel.",
+                `A page in Neore asks this computer to open an SSH connection so it can add this server.${installs} Nothing is sent until you agree; if you did not just start adding a server, cancel.`,
             );
             setText("prompt-detail", `${body.user}@${body.address}:${String(body.port)}\n${identityLine(body.identityFile)}`);
             setText("once", "Connect");
@@ -348,12 +352,13 @@ const updateHost = (deviceId: string, change: Record<string, unknown>): Promise<
         return { host: { deviceId, ...change } };
     });
 
-const hostAction = async (work: () => Promise<unknown>, done: string): Promise<void> => {
+const hostAction = async <T>(work: () => Promise<T>, done: string | ((result: T) => string)): Promise<void> => {
     status("Working…");
 
     try {
-        await work();
-        status(done);
+        const result = await work();
+
+        status(typeof done === "string" ? done : done(result));
     } catch (error) {
         status(String(error));
     }
@@ -403,6 +408,23 @@ const hostCard = (host: HostView): HTMLElement => {
             ? button("Disconnect", () => hostAction(() => globalThis.neoreDevice.hostDisconnect(host.deviceId), "Disconnected."), host.name)
             : button("Connect", () => hostAction(() => globalThis.neoreDevice.hostConnect(host.deviceId), "Connected."), host.name),
         ...state.terminalAvailable && state.terminalServerReason === null ? [button("Terminal", () => hostAction(() => globalThis.neoreDevice.openHostTerminal(host.deviceId), "Terminal opened."), host.name)] : [],
+        // Installing is refused while a session is open, so the button is for a disconnected server.
+        ...host.connected
+            ? []
+            : [
+                button(
+                    "Install host software",
+                    async () => {
+                        if (await globalThis.neoreDevice.confirm(`Copy neore-host into ~/.neore/host on ${host.address} and remove its other versions there?`)) {
+                            await hostAction(
+                                () => globalThis.neoreDevice.hostUpgrade(host.deviceId),
+                                (done) => done.alreadyCurrent ? `neore-host ${done.version} is already installed.` : `neore-host ${done.version} installed.`,
+                            );
+                        }
+                    },
+                    host.name,
+                ),
+            ],
         button(
             "Forget host key",
             async () => {

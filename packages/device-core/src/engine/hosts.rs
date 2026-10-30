@@ -8,7 +8,8 @@ use std::path::PathBuf;
 use std::thread;
 
 use super::*;
-use crate::ssh::{Hello, HostConnection, HostKey, Interact};
+use crate::install::{self, Installed, Remote};
+use crate::ssh::{Hello, HostConnection, HostKey, Interact, HOST_VERSION};
 
 /// At most as many servers as the backend lets one account pair devices.
 const MAX_HOSTS: usize = 10;
@@ -75,6 +76,35 @@ impl HostProbe {
         }
     }
 }
+
+/// What an install or upgrade of a server's host software did.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostUpgrade {
+    /// The server already had this exact binary: nothing was uploaded.
+    pub already_current: bool,
+    pub version: String,
+}
+
+/// Marks a server as being installed or upgraded until dropped, so no session starts on it meanwhile.
+struct UpgradeGuard<'a> {
+    device_id: String,
+    state: &'a DeviceState,
+    target: Target,
+}
+
+impl Drop for UpgradeGuard<'_> {
+    fn drop(&mut self) {
+        self.state
+            .ssh
+            .upgrading
+            .lock()
+            .unwrap()
+            .retain(|(id, target)| !(*id == self.device_id && *target == self.target));
+    }
+}
+
+const INSTALLING: &str = "that server's host software is being installed; try again in a moment";
 
 /// What the relay needs of a server: whether to beat for it.
 #[derive(Clone, Debug, Serialize)]
@@ -186,6 +216,17 @@ pub(super) fn host_named_by(settings: &Settings, payload: &str) -> Option<Host> 
         .iter()
         .find(|host| host.device_id == device_id)
         .cloned()
+}
+
+/// Whether two targets reach the same account on the same server: the host software lives in that account's home,
+/// whatever key or forwarding a session logs in with.
+fn same_server(a: &Target, b: &Target) -> bool {
+    a.address == b.address && a.user == b.user && a.port == b.port
+}
+
+fn holds(slot: &Option<(Target, Arc<dyn HostLink>)>, link: &Arc<dyn HostLink>) -> bool {
+    slot.as_ref()
+        .is_some_and(|(_, held)| std::ptr::addr_eq(Arc::as_ptr(held), Arc::as_ptr(link)))
 }
 
 fn target_of(host: &Host) -> Target {
@@ -435,7 +476,8 @@ impl DeviceState {
     }
 
     /// Ends a session, and the server's master with it when no other session still rides it (a probe of the same
-    /// server, a reconnect that already took its place).
+    /// server, a reconnect that already took its place). Not while host software is being installed there: the
+    /// install runs over that same master, and exits it itself.
     fn retire(&self, link: &Arc<dyn HostLink>) {
         link.close();
 
@@ -461,7 +503,7 @@ impl DeviceState {
                     && other.target() == Some(target)
             });
 
-        if !shared {
+        if !shared && !self.upgrade_running(target) {
             link.exit_master();
         }
     }
@@ -512,6 +554,11 @@ impl DeviceState {
     }
 
     fn connect_target(&self, target: &Target) -> Result<Arc<dyn HostLink>, String> {
+        #[cfg(test)]
+        if let Some(connector) = &self.ssh.connector {
+            return connector(target);
+        }
+
         let link: Arc<dyn HostLink> = Arc::new(HostConnection::connect(
             target,
             &self.ssh.paths,
@@ -520,6 +567,96 @@ impl DeviceState {
         )?);
 
         Ok(link)
+    }
+
+    /// Whether host software is being installed on `target` right now.
+    fn upgrade_running(&self, target: &Target) -> bool {
+        self.ssh
+            .upgrading
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(_, upgrading)| same_server(upgrading, target))
+    }
+
+    /// Marks `target` as being installed on, or `None` when it already is. `id` names the mark.
+    fn begin_upgrade(&self, id: &str, target: &Target) -> Option<UpgradeGuard<'_>> {
+        let mut upgrading = self.ssh.upgrading.lock().unwrap();
+
+        if upgrading
+            .iter()
+            .any(|(_, running)| same_server(running, target))
+        {
+            return None;
+        }
+
+        upgrading.push((id.to_owned(), target.clone()));
+
+        Some(UpgradeGuard {
+            device_id: id.to_owned(),
+            state: self,
+            target: target.clone(),
+        })
+    }
+
+    /// Runs `commit` (which makes a session visible) unless host software is being installed on `target`, with the
+    /// `upgrading` lock held across both. An upgrade marks the server before it looks for open sessions, so it
+    /// sees either this session or this refusal, never neither.
+    fn commit_unless_upgrading<T>(&self, target: &Target, commit: impl FnOnce() -> T) -> Option<T> {
+        let upgrading = self.ssh.upgrading.lock().unwrap();
+
+        if upgrading
+            .iter()
+            .any(|(_, running)| same_server(running, target))
+        {
+            return None;
+        }
+
+        let committed = commit();
+
+        drop(upgrading);
+
+        Some(committed)
+    }
+
+    /// Whether a live connection (not a probe) is open to `target`.
+    fn connection_open(&self, target: &Target) -> bool {
+        self.ssh.connections.lock().unwrap().values().any(|link| {
+            link.is_alive()
+                && link
+                    .target()
+                    .is_some_and(|other| same_server(other, target))
+        })
+    }
+
+    /// Whether a session (a live connection or the probe, which a pairing in flight stays in) is open to `target`.
+    fn session_open(&self, target: &Target) -> bool {
+        self.connection_open(target)
+            || self
+                .ssh
+                .probe
+                .lock()
+                .unwrap()
+                .as_ref()
+                .is_some_and(|(_, link)| {
+                    link.is_alive()
+                        && link
+                            .target()
+                            .is_some_and(|other| same_server(other, target))
+                })
+    }
+
+    fn probe_holds(&self, link: &Arc<dyn HostLink>) -> bool {
+        holds(&self.ssh.probe.lock().unwrap(), link)
+    }
+
+    /// Takes `link` out of the probe slot, if it is still what the slot holds.
+    fn leave_probe(&self, link: &Arc<dyn HostLink>) {
+        let mut probe = self.ssh.probe.lock().unwrap();
+
+        if holds(&probe, link) {
+            *probe = None;
+        }
     }
 
     /// Connects to a server that is not paired yet, so the page can register it (it needs the server's platform)
@@ -534,6 +671,7 @@ impl DeviceState {
             PromptBody::HostConnect {
                 address: target.address.clone(),
                 identity_file: target.identity_file.clone(),
+                install_version: self.ssh.bundle.is_ok().then(|| HOST_VERSION.to_owned()),
                 name: spec.name.trim().to_owned(),
                 port: target.port,
                 user: target.user.clone(),
@@ -551,6 +689,67 @@ impl DeviceState {
             return Err("the connection was not approved on this computer".into());
         }
 
+        // The person agreed above to the connection, which includes putting the host software there if the pinned
+        // version is not. Removing other versions is not part of it: that is `host_upgrade`, from the local window.
+        if self.upgrade_running(&target) {
+            return Err(INSTALLING.into());
+        }
+
+        if let Ok(bundle) = &self.ssh.bundle {
+            let marked = self
+                .begin_upgrade(&format!("probe:{}", target.host_spec()), &target)
+                .ok_or(INSTALLING)?;
+
+            // A session on the binary being replaced is the same hazard as in an upgrade.
+            if self.connection_open(&target) {
+                return Err(format!(
+                    "{} has an open session. Disconnect it before installing its host software.",
+                    spec.name.trim()
+                ));
+            }
+
+            // An earlier probe of this server that was never paired is replaced by this one anyway; it must not
+            // keep a session on the binary being replaced.
+            let earlier = {
+                let mut probe = self.ssh.probe.lock().unwrap();
+
+                match probe.as_ref() {
+                    Some((_, link))
+                        if link
+                            .target()
+                            .is_some_and(|other| same_server(other, &target)) =>
+                    {
+                        probe.take()
+                    }
+                    _ => None,
+                }
+            };
+
+            let earlier = earlier.map(|(_, link)| link);
+
+            if let Some(link) = &earlier {
+                self.retire(link);
+            }
+
+            let interact = self.ask_user();
+            let remote = Remote {
+                interact: &interact,
+                paths: &self.ssh.paths,
+                target: &target,
+            };
+
+            if let Err(error) = install::install(&remote, bundle, &self.ssh.root) {
+                // The retired probe left its master up for the install; with the install over, nothing else holds it.
+                if let Some(link) = &earlier {
+                    link.exit_master();
+                }
+
+                return Err(error);
+            }
+
+            drop(marked);
+        }
+
         let link = self.connect_target(&target)?;
 
         // Unpaired while the person was answering or the connection was opening: nothing may keep it.
@@ -561,13 +760,28 @@ impl DeviceState {
         }
 
         let probe = HostProbe::of(link.hello());
-        let replaced = self.ssh.probe.lock().unwrap().replace((target, link));
+        let committed = self.commit_unless_upgrading(&target, || {
+            self.ssh
+                .probe
+                .lock()
+                .unwrap()
+                .replace((target.clone(), Arc::clone(&link)))
+        });
 
-        if let Some((_, previous)) = replaced {
-            self.retire(&previous);
+        match committed {
+            Some(replaced) => {
+                if let Some((_, previous)) = replaced {
+                    self.retire(&previous);
+                }
+
+                Ok(probe)
+            }
+            None => {
+                self.retire(&link);
+
+                Err(INSTALLING.into())
+            }
         }
-
-        Ok(probe)
     }
 
     /// Stores a server as a device of its own once the user confirms it here. `secret` is the one the backend
@@ -593,25 +807,21 @@ impl DeviceState {
             return Err("that id is this computer's own".into());
         }
 
-        let link = {
-            let mut probe = self.ssh.probe.lock().unwrap();
-
-            match probe.take() {
-                Some((probed, link)) if probed == target => link,
-                other => {
-                    *probe = other;
-
-                    return Err("connect to the server first".into());
-                }
-            }
+        // The link stays in the probe slot while the person decides, so an upgrade of this server still sees an
+        // open session. A second probe replacing it ends it (see `host_probe`) and the pairing then fails.
+        let link = match &*self.ssh.probe.lock().unwrap() {
+            Some((probed, link)) if *probed == target => Arc::clone(link),
+            _ => return Err("connect to the server first".into()),
         };
 
         // A forwarding change can end the master this probe rode: a dead link is no connection to pair.
         if !link.is_alive() {
+            self.leave_probe(&link);
             self.retire(&link);
 
             return Err("the connection to the server dropped; connect to it again".into());
         }
+
         let answer = self.prompts.ask(
             PromptBody::HostPairing {
                 address: target.address.clone(),
@@ -630,9 +840,15 @@ impl DeviceState {
         );
 
         if !matches!(answer, Answer::Once | Answer::Always) {
+            self.leave_probe(&link);
             self.retire(&link);
 
             return Ok(false);
+        }
+
+        // Another probe took the slot meanwhile and ended this link.
+        if !self.probe_holds(&link) {
+            return Err("the connection changed while waiting; connect to the server again".into());
         }
 
         let saved = self.change_settings_counted(true, |settings| {
@@ -664,20 +880,44 @@ impl DeviceState {
         });
 
         if let Err(error) = saved {
+            self.leave_probe(&link);
             self.retire(&link);
 
             return Err(error);
         }
 
-        let previous = self
-            .ssh
-            .connections
-            .lock()
-            .unwrap()
-            .insert(device_id.to_owned(), link);
+        // An upgrade can mark the server during the prompt and check connections before this insert and the probe
+        // after the link left it. Then the server is paired but not connected: it waits for that upgrade, as
+        // `host_connect` does. The two lock steps inside are sequential, never nested, like `session_open`'s.
+        // A second probe can also have replaced this one since the check above, which ends the link. `probe_holds`
+        // is read under the same `upgrading` lock the probe's replacement takes, so it is either still ours here or
+        // already gone, and a closed link is never recorded for the new server.
+        let committed = self
+            .commit_unless_upgrading(&target, || {
+                if !self.probe_holds(&link) {
+                    return None;
+                }
 
-        if let Some(previous) = previous {
-            self.retire(&previous);
+                let previous = self
+                    .ssh
+                    .connections
+                    .lock()
+                    .unwrap()
+                    .insert(device_id.to_owned(), Arc::clone(&link));
+
+                self.leave_probe(&link);
+
+                Some(previous)
+            })
+            .flatten();
+
+        match committed {
+            Some(Some(previous)) => self.retire(&previous),
+            Some(None) => {}
+            None => {
+                self.leave_probe(&link);
+                self.retire(&link);
+            }
         }
 
         self.emit(Event::Changed);
@@ -698,8 +938,17 @@ impl DeviceState {
             return Ok(HostProbe::of(link.hello()));
         }
 
+        let target = target_of(&host);
+
+        if self.upgrade_running(&target) {
+            return Err(format!(
+                "{}'s host software is being upgraded; connect again in a moment",
+                host.name
+            ));
+        }
+
         let disconnects = self.ssh.disconnects.load(Ordering::SeqCst);
-        let link = self.connect_target(&target_of(&host))?;
+        let link = self.connect_target(&target)?;
         let probe = HostProbe::of(link.hello());
 
         // Disconnected while the connect was waiting: the user asked for that, and it stays asked.
@@ -721,12 +970,23 @@ impl DeviceState {
             return Err("that server was removed meanwhile".into());
         }
 
-        let previous = self
-            .ssh
-            .connections
-            .lock()
-            .unwrap()
-            .insert(device_id.to_owned(), link);
+        // An upgrade can begin while this was connecting (a passphrase prompt can take a while). It looks for open
+        // sessions after it marks the server, so the last check and the insert are one step under that lock.
+        let committed = self.commit_unless_upgrading(&target, || {
+            self.ssh
+                .connections
+                .lock()
+                .unwrap()
+                .insert(device_id.to_owned(), Arc::clone(&link))
+        });
+        let Some(previous) = committed else {
+            self.retire(&link);
+
+            return Err(format!(
+                "{}'s host software is being upgraded; connect again in a moment",
+                host.name
+            ));
+        };
 
         if let Some(previous) = previous {
             self.retire(&previous);
@@ -843,6 +1103,68 @@ impl DeviceState {
 
         crate::ssh::forget_keys(&self.ssh.paths, &target_of(&host).host_spec())
             .map_err(|error| error.to_string())
+    }
+
+    /// Installs (or reinstalls) the pinned `neore-host` on a paired server and removes its other versions. Local
+    /// window only. Refused while any session is open to that server, this computer's or the probe's, and no
+    /// session can start meanwhile. The old versions go only after the new binary answered its handshake.
+    pub fn host_upgrade(&self, device_id: &str) -> Result<HostUpgrade, String> {
+        let host = self
+            .settings()
+            .hosts
+            .into_iter()
+            .find(|host| host.device_id == device_id)
+            .ok_or("that server is not paired with this computer")?;
+        let bundle = self.ssh.bundle.as_ref().map_err(Clone::clone)?;
+        let target = target_of(&host);
+        let _guard = self
+            .begin_upgrade(device_id, &target)
+            .ok_or_else(|| format!("{} is already being upgraded", host.name))?;
+
+        // Checked after the mark above, so a session that starts now sees the mark and yields.
+        if self.session_open(&target) {
+            return Err(format!(
+                "{} has an open session. Disconnect it before upgrading its host software.",
+                host.name
+            ));
+        }
+
+        let interact = self.ask_user();
+        let remote = Remote {
+            interact: &interact,
+            paths: &self.ssh.paths,
+            target: &target,
+        };
+        let installed = install::install(&remote, bundle, &self.ssh.root)?;
+        let link = HostConnection::connect(
+            &target,
+            &self.ssh.paths,
+            &self.ssh.root.binary(HOST_VERSION),
+            &interact,
+        )?;
+        let version = link.hello().version.clone();
+
+        link.close();
+
+        if version != HOST_VERSION {
+            link.exit_master();
+
+            return Err(format!(
+                "the installed host reports version {version}, not {HOST_VERSION}; the old versions were kept"
+            ));
+        }
+
+        // The master stays up for the prune, which would otherwise log in again (and ask for the key's passphrase again).
+        let pruned = install::prune(&remote, &self.ssh.root);
+
+        link.exit_master();
+        pruned?;
+        self.emit(Event::Changed);
+
+        Ok(HostUpgrade {
+            already_current: installed == Installed::Current,
+            version,
+        })
     }
 
     /// A server's signed tool list: its built-in tools over ITS folders, worded for it, signed with its secret.
@@ -1024,6 +1346,7 @@ mod tests {
     use crate::ssh::{RemoteOutcome, RemoteSandbox};
     use crate::store::test_keychain;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
+    use std::sync::Barrier;
 
     const DESKTOP_SECRET: &str = "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0";
     const HOST_SECRET: &str = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1";
@@ -1036,6 +1359,8 @@ mod tests {
         runs: Mutex<Vec<Value>>,
         closed: AtomicUsize,
         master_exits: AtomicUsize,
+        /// Makes the first `hello()` rendezvous twice with the test, which acts in between.
+        gate: Mutex<Option<Arc<Barrier>>>,
         target: Option<Target>,
     }
 
@@ -1044,6 +1369,7 @@ mod tests {
             Arc::new(FakeLink {
                 alive: AtomicBool::new(true),
                 closed: AtomicUsize::new(0),
+                gate: Mutex::default(),
                 master_exits: AtomicUsize::new(0),
                 target: Some(target_of(&server("host-1"))),
                 hello: Hello {
@@ -1078,6 +1404,13 @@ mod tests {
         }
 
         fn hello(&self) -> &Hello {
+            let gate = self.gate.lock().unwrap().take();
+
+            if let Some(gate) = gate {
+                gate.wait();
+                gate.wait();
+            }
+
             &self.hello
         }
 
@@ -1669,6 +2002,344 @@ mod tests {
         state.host_disconnect(host_id("master").as_str());
 
         assert_eq!(link.master_exits.load(Ordering::SeqCst), 1);
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    /// A bundle with one entry, in a folder of its own. Nothing here reaches a server.
+    fn bundle_in(dir: &std::path::Path) -> crate::install::Bundle {
+        let folder = dir.join("bundle");
+
+        stdfs::create_dir_all(&folder).unwrap();
+        stdfs::write(
+            folder.join("manifest.json"),
+            json!({
+                "version": HOST_VERSION,
+                "targets": { "x86_64-unknown-linux-musl": { "file": "neore-host-linux", "sha256": "0".repeat(64) } },
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        crate::install::Bundle::load(&folder).unwrap()
+    }
+
+    #[test]
+    fn an_upgrade_is_refused_while_any_session_is_open_to_the_server() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("upgrade", &link);
+        let state = state.with_host_bundle(
+            Ok(bundle_in(&dir)),
+            crate::install::Root::dir("/neore-test/remote").unwrap(),
+        );
+        let id = host_id("upgrade");
+
+        // The server's own connection.
+        let error = state.host_upgrade(&id).unwrap_err();
+
+        assert!(error.contains("open session"), "{error}");
+        assert_eq!(
+            link.closed.load(Ordering::SeqCst),
+            0,
+            "the session was ended for it"
+        );
+
+        // A probe of the same server counts as well.
+        link.close();
+
+        let probed = FakeLink::new(true);
+
+        *state.ssh.probe.lock().unwrap() = Some((
+            target_of(&server(&id)),
+            Arc::clone(&probed) as Arc<dyn HostLink>,
+        ));
+
+        assert!(state
+            .host_upgrade(&id)
+            .unwrap_err()
+            .contains("open session"));
+
+        // The same account reached with another key is the same server: the host software is shared.
+        *state.ssh.probe.lock().unwrap() = Some((
+            Target {
+                identity_file: Some("/keys/other".into()),
+                ..target_of(&server(&id))
+            },
+            FakeLink::new(true) as Arc<dyn HostLink>,
+        ));
+        assert!(state
+            .host_upgrade(&id)
+            .unwrap_err()
+            .contains("open session"));
+        assert!(
+            state.ssh.upgrading.lock().unwrap().is_empty(),
+            "a refused upgrade left the server marked"
+        );
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn an_upgrade_needs_the_host_software_to_be_part_of_the_build() {
+        let link = FakeLink::new(false);
+        let (state, dir, _) = engine("nobundle", &link);
+
+        link.close();
+
+        assert!(state
+            .host_upgrade(&host_id("nobundle"))
+            .unwrap_err()
+            .contains("no host software"));
+        assert!(state
+            .host_upgrade("not-a-server")
+            .unwrap_err()
+            .contains("not paired"));
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn no_session_starts_on_a_server_while_its_host_software_is_upgraded() {
+        let link = FakeLink::new(true);
+        let (state, dir, _) = engine("during", &link);
+        let id = host_id("during");
+
+        link.close();
+        state
+            .ssh
+            .upgrading
+            .lock()
+            .unwrap()
+            .push((id.clone(), target_of(&server(&id))));
+
+        let error = state.host_connect(&id).unwrap_err();
+
+        assert!(error.contains("being upgraded"), "{error}");
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    /// The paired server of `engine(name, ..)` as a page names it.
+    fn spec_of_server() -> HostSpec {
+        serde_json::from_value(
+            json!({ "address": "build.example.com", "name": "build-box", "user": "deploy" }),
+        )
+        .unwrap()
+    }
+
+    /// Makes the engine "connect" to `link` instead of running ssh.
+    fn connecting_to(state: &mut DeviceState, link: &Arc<FakeLink>) {
+        let link = Arc::clone(link);
+
+        state.ssh.connector = Some(Box::new(
+            move |_| Ok(Arc::clone(&link) as Arc<dyn HostLink>),
+        ));
+    }
+
+    #[test]
+    fn a_probe_does_not_land_on_a_server_an_upgrade_began_on_after_it_connected() {
+        let paired = FakeLink::new(true);
+        let (mut state, dir, _) = engine("race-probe", &paired);
+        let id = host_id("race-probe");
+        let probed = FakeLink::new(true);
+        let gate = Arc::new(Barrier::new(2));
+
+        paired.close();
+        *probed.gate.lock().unwrap() = Some(Arc::clone(&gate));
+        connecting_to(&mut state, &probed);
+
+        let state = Arc::new(state);
+
+        answering(&state, "once");
+
+        let probing = {
+            let state = Arc::clone(&state);
+
+            thread::spawn(move || state.host_probe(&spec_of_server()))
+        };
+
+        // The probe is connected and has not yet taken its place. An upgrade marks the server now and, finding
+        // no session, goes on to replace the binary.
+        gate.wait();
+        state
+            .ssh
+            .upgrading
+            .lock()
+            .unwrap()
+            .push((id.clone(), target_of(&server(&id))));
+        assert!(!state.session_open(&target_of(&server(&id))));
+        gate.wait();
+
+        let error = probing.join().unwrap().unwrap_err();
+
+        assert!(error.contains("being installed"), "{error}");
+        assert!(state.ssh.probe.lock().unwrap().is_none());
+        assert_eq!(probed.closed.load(Ordering::SeqCst), 1);
+        assert_eq!(probed.master_exits.load(Ordering::SeqCst), 0);
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_reconnect_does_not_land_on_a_server_an_upgrade_began_on_after_it_connected() {
+        let paired = FakeLink::new(true);
+        let (mut state, dir, _) = engine("race-connect", &paired);
+        let id = host_id("race-connect");
+        let again = FakeLink::new(true);
+        let gate = Arc::new(Barrier::new(2));
+
+        paired.close();
+        *again.gate.lock().unwrap() = Some(Arc::clone(&gate));
+        connecting_to(&mut state, &again);
+
+        let state = Arc::new(state);
+        let connecting = {
+            let (state, id) = (Arc::clone(&state), id.clone());
+
+            thread::spawn(move || state.host_connect(&id))
+        };
+
+        gate.wait();
+        state
+            .ssh
+            .upgrading
+            .lock()
+            .unwrap()
+            .push((id.clone(), target_of(&server(&id))));
+        gate.wait();
+
+        let error = connecting.join().unwrap().unwrap_err();
+
+        assert!(error.contains("being upgraded"), "{error}");
+        assert!(!state.connection(&id).is_some_and(|link| link.is_alive()));
+        assert_eq!(again.closed.load(Ordering::SeqCst), 1);
+        assert_eq!(again.master_exits.load(Ordering::SeqCst), 0);
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_server_being_paired_still_counts_as_a_session_to_an_upgrade() {
+        let paired = FakeLink::new(true);
+        let (state, dir, _) = engine("race-pair", &paired);
+        let state = state.with_host_bundle(
+            Ok(bundle_in(&dir)),
+            crate::install::Root::dir("/neore-test/remote").unwrap(),
+        );
+        let (id, new_id) = (host_id("race-pair"), other_id("race-pair"));
+        let target = target_of(&server(&id));
+        let probed = FakeLink::new(true);
+
+        paired.close();
+        *state.ssh.probe.lock().unwrap() =
+            Some((target.clone(), Arc::clone(&probed) as Arc<dyn HostLink>));
+
+        let state = Arc::new(state);
+        let pairing = {
+            let (state, new_id) = (Arc::clone(&state), new_id.clone());
+
+            thread::spawn(move || state.host_pair(&spec_of_server(), &new_id, HOST_SECRET))
+        };
+        let prompt = loop {
+            if let Some(prompt) = state.prompt_current() {
+                break prompt;
+            }
+
+            thread::sleep(Duration::from_millis(5));
+        };
+
+        // The person is still deciding: the session is in neither the connections nor lost.
+        assert!(state.session_open(&target));
+        assert!(state
+            .host_upgrade(&id)
+            .unwrap_err()
+            .contains("open session"));
+
+        state.prompt_answer(prompt.id, "once").unwrap();
+        assert!(pairing.join().unwrap().unwrap());
+        assert!(state.ssh.probe.lock().unwrap().is_none());
+        assert!(state
+            .connection(&new_id)
+            .is_some_and(|link| link.is_alive()));
+        assert!(state.session_open(&target));
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_pairing_that_commits_during_an_upgrade_is_paired_but_not_connected() {
+        let paired = FakeLink::new(true);
+        let (state, dir, _) = engine("race-commit", &paired);
+        let (id, new_id) = (host_id("race-commit"), other_id("race-commit"));
+        let target = target_of(&server(&id));
+        let probed = FakeLink::new(true);
+
+        paired.close();
+        *state.ssh.probe.lock().unwrap() =
+            Some((target.clone(), Arc::clone(&probed) as Arc<dyn HostLink>));
+
+        let state = Arc::new(state);
+        let pairing = {
+            let (state, new_id) = (Arc::clone(&state), new_id.clone());
+
+            thread::spawn(move || state.host_pair(&spec_of_server(), &new_id, HOST_SECRET))
+        };
+        let prompt = loop {
+            if let Some(prompt) = state.prompt_current() {
+                break prompt;
+            }
+
+            thread::sleep(Duration::from_millis(5));
+        };
+
+        // An upgrade marks the server while the probe is still the open session.
+        state
+            .ssh
+            .upgrading
+            .lock()
+            .unwrap()
+            .push((id.clone(), target));
+        state.prompt_answer(prompt.id, "once").unwrap();
+
+        assert!(pairing.join().unwrap().unwrap());
+        assert!(state
+            .settings()
+            .hosts
+            .iter()
+            .any(|host| host.device_id == new_id));
+        assert!(!state
+            .connection(&new_id)
+            .is_some_and(|link| link.is_alive()));
+        assert!(state.ssh.probe.lock().unwrap().is_none());
+        assert_eq!(probed.closed.load(Ordering::SeqCst), 1);
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_first_install_is_refused_while_a_session_is_open_to_the_server() {
+        let paired = FakeLink::new(true);
+        let (mut state, dir, _) = engine("race-install", &paired);
+        let spare = FakeLink::new(true);
+
+        connecting_to(&mut state, &spare);
+
+        let state = Arc::new(state.with_host_bundle(
+            Ok(bundle_in(&dir)),
+            crate::install::Root::dir("/neore-test/remote").unwrap(),
+        ));
+
+        answering(&state, "once");
+
+        let error = state.host_probe(&spec_of_server()).unwrap_err();
+
+        assert!(error.contains("open session"), "{error}");
+        assert!(
+            state.ssh.upgrading.lock().unwrap().is_empty(),
+            "a refused install left the server marked"
+        );
+        assert_eq!(paired.closed.load(Ordering::SeqCst), 0);
+        assert!(state.ssh.probe.lock().unwrap().is_none());
 
         let _ = stdfs::remove_dir_all(dir);
     }

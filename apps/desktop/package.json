@@ -9,6 +9,7 @@
         "build": "node scripts/build.mjs",
         "build:dictation-helper": "node scripts/build-dictation-helper.mjs",
         "dist": "NEORE_RELEASE=1 node scripts/build.mjs && electron-builder --config electron-builder.yml --publish never",
+        "host-bundle": "node scripts/host-bundle.mjs",
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:types": "tsc --noEmit",
         "pack": "NEORE_RELEASE=1 node scripts/build.mjs && electron-builder --dir --config electron-builder.yml",

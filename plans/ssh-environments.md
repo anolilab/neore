@@ -220,12 +220,35 @@ Where S3 departs from the text above:
   desktop's own device id.
 - `~/.ssh/config` suggestions (§4) and the Windows-desktop askpass are not built.
 
-**S4 — Install and upgrade.** §8. The release build of `neore-host` must pass
+**S4 — Install and upgrade (built).** §8. The release build of `neore-host` must pass
 `--no-default-features`: a plain `cargo build` links the keyring (the binary logs an error at
 startup when it does), so the packaging step is where that is enforced.
 - Acceptance: a wrong checksum and a killed upload both leave no executable at
   the final path; an architecture mismatch is refused before upload; an upgrade
   with an active session is refused.
+
+Where S4 departs from the text above:
+- The checksums are a `manifest.json` beside the binaries in the app's `resources/neore-host`, written by
+  `apps/desktop/scripts/host-bundle.mjs` (which builds with `--no-default-features`, fails if `cargo tree` still
+  shows `keyring`/`dbus`, and checks the Linux binaries are static). The desktop checks the file against the manifest
+  before it uploads, and the server checks the upload against the same digest. Both sets of binaries are built once
+  (`desktop.yml`'s `host` job) because every installer carries every target.
+- First install happens inside `host_probe`, after the person agreed to the connection in the local window (the
+  prompt says it will copy `neore-host` into `~/.neore/host`). A paired server whose pinned version is missing fails
+  with "not installed" (exit status 127 from the server's shell) and is fixed from the server's settings: "Install
+  host software" (`host_upgrade`, local window only). That is also the upgrade: it installs the pinned version,
+  starts it once to check its handshake, and only then removes the other version folders (names that start with a
+  digit; `run/` and `logs/` stay).
+- An upgrade is refused while any session is open to the same address, user and port (this computer's connection or
+  the pairing probe), and a session cannot start while one runs. The refusal and the mark are in the engine, so a
+  connect that was already waiting on a passphrase yields as well.
+- A server is not asked to install for a platform the bundle lacks: `uname -sm` is read first and the run stops
+  before anything is created there.
+- The cleanup cannot see sessions another computer holds on the same server (the pid files of S5 will show them),
+  so it may remove the folder of a version that computer runs. Linux and macOS keep a running binary alive after
+  its file is unlinked.
+- The Windows desktop cannot install yet: it has no ControlMaster and no askpass (S3), and the bundle has no
+  Windows server target.
 
 **S5 — Lifecycle.** Backoff, Retry, ownership-based stop, stale-process
 detection, ControlMaster reuse.

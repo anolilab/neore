@@ -6,9 +6,10 @@ export declare class DeviceCore {
    * `dataDir` holds `device.json` and the audit log. `onEvent` receives a JSON
    * string per engine event: `{"type":"prompt","prompt":…}`,
    * `{"type":"progress",…}` or `{"type":"changed"}`. It is called from engine
-   * threads and must not block.
+   * threads and must not block. `hostBundle` is the folder with the `neore-host` binaries this build ships and
+   * their checksums; without it a server's host software cannot be installed from here.
    */
-  constructor(dataDir: string, onEvent: (arg: string) => void)
+  constructor(dataDir: string, onEvent: (arg: string) => void, hostBundle?: string | undefined | null)
   /** `{ accountLabel, deviceId, platform }` (JSON). */
   status(): string
   /**
@@ -45,6 +46,11 @@ export declare class DeviceCore {
   hostTerminal(deviceId: string): Promise<string>
   /** The same arguments for a new shell on a connection that is still up. Never connects; rejects when it is not. */
   hostTerminalAttach(deviceId: string): Promise<string>
+  /**
+   * Installs the pinned `neore-host` on a paired server and removes its other versions; refused while a session
+   * is open to it. Resolves `{ alreadyCurrent, version }` (JSON).
+   */
+  hostUpgrade(deviceId: string): Promise<string>
   hostDisconnect(deviceId: string): void
   /** Forgets a server on this computer: its secret, folders and connection. */
   hostRemove(deviceId: string): void

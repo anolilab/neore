@@ -30,6 +30,7 @@ const api: DeviceWindowApi = {
     hostDisconnect: (deviceId) => ipcRenderer.invoke(LOCAL_CHANNEL.hostDisconnect, deviceId),
     hostForgetKey: (deviceId) => ipcRenderer.invoke(LOCAL_CHANNEL.hostForgetKey, deviceId),
     hostRemove: (deviceId) => ipcRenderer.invoke(LOCAL_CHANNEL.hostRemove, deviceId),
+    hostUpgrade: (deviceId) => ipcRenderer.invoke(LOCAL_CHANNEL.hostUpgrade, deviceId),
     onAcpChanged: (handler) => {
         const listener = () => handler();
 

@@ -50,8 +50,72 @@ permissions:
     contents: "read"
 
 jobs:
+    # The `neore-host` binaries the app uploads to servers over SSH. Every installer carries every target (a Mac
+    # connects to Linux servers), so they are built once here, per OS that can build them, and the packaging legs
+    # download both sets. `--no-default-features` is enforced by scripts/host-bundle.mjs, which also checks that
+    # the Linux binaries are static. Unverified until a tag run: the aarch64 musl build links with rust-lld.
+    host:
+        name: "neore-host (${{ matrix.name }})"
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - name: "linux"
+                      runner: "ubuntu-22.04"
+                      targets: "x86_64-unknown-linux-musl aarch64-unknown-linux-musl"
+                    - name: "macos"
+                      runner: "macos-latest"
+                      targets: "aarch64-apple-darwin x86_64-apple-darwin"
+        runs-on: "${{ matrix.runner }}"
+        timeout-minutes: 30
+        env:
+            # Pure Rust with the keychain feature off: rust-lld links the cross target and the musl libc is self-contained.
+            CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: "rust-lld"
+        permissions:
+            contents: "read"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Install Rust (stable)"
+              uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # master
+              with:
+                  toolchain: "stable"
+                  targets: "${{ matrix.targets }}"
+
+            # The runner's own Node runs the script: it uses nothing but the standard library.
+            - name: "Build the host binaries"
+              run: "node apps/desktop/scripts/host-bundle.mjs build ${{ matrix.targets }}"
+
+            # Signing rewrites a Mach-O, so it happens before the manifest hashes the binaries and electron-builder is
+            # told to leave them alone (`mac.signIgnore`). Does nothing while CSC_LINK is empty, like the packaging
+            # step's unsigned macOS build. Unverified until a tag run with the certificate set.
+            - name: "Sign the macOS host binaries"
+              if: "matrix.name == 'macos'"
+              env:
+                  CSC_LINK: "${{ secrets.CSC_LINK }}"
+                  CSC_KEY_PASSWORD: "${{ secrets.CSC_KEY_PASSWORD }}"
+                  CSC_NAME: "${{ secrets.CSC_NAME }}"
+              run: "node apps/desktop/scripts/host-bundle.mjs sign"
+
+            - name: "Upload the host binaries"
+              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              with:
+                  name: "neore-host-${{ matrix.name }}"
+                  if-no-files-found: "error"
+                  retention-days: 7
+                  path: "apps/desktop/host-bundle/neore-host-*"
+
     build:
         name: "Package (${{ matrix.name }}-${{ matrix.arch }})"
+        needs: host
         strategy:
             fail-fast: false
             matrix:
@@ -167,6 +231,17 @@ jobs:
                       exit 1
                   fi
                   node -e "const fs = require('node:fs'); const file = 'apps/desktop/package.json'; const pkg = JSON.parse(fs.readFileSync(file, 'utf8')); pkg.version = process.argv[1]; fs.writeFileSync(file, JSON.stringify(pkg, null, 4) + '\n');" "$version"
+
+            - name: "Download the host binaries"
+              uses: "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093" # v4.3.0
+              with:
+                  pattern: "neore-host-*"
+                  merge-multiple: true
+                  path: "apps/desktop/host-bundle"
+
+            # Hashes what was downloaded; fails unless all four targets are there.
+            - name: "Write the host checksum manifest"
+              run: "pnpm --filter @neore/desktop run host-bundle manifest"
 
             # On-device dictation (plans/desktop-dictation.md): whisper.cpp at its pinned commit, built for the runner's
             # architecture with Metal. Only Apple Silicon has it for now; the x64 macOS app and the other OSes ship without

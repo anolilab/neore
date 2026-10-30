@@ -1,7 +1,7 @@
 /** What the local device window's preload exposes as `window.neoreDevice`. */
 import type { AcpUpdate, AcpView, PermissionView, ProbeResult, SessionSnapshot, SessionSummary } from "../../acp/types";
 import type { Availability } from "../../terminal/shell";
-import type { HostProbe, Prompt, SettingsView } from "../types";
+import type { HostProbe, HostUpgrade, Prompt, SettingsView } from "../types";
 
 declare global {
     // The preload exposes this on the page's global object; the device page reads it from there.
@@ -30,6 +30,7 @@ export interface DeviceWindowApi {
     hostDisconnect: (deviceId: string) => Promise<void>;
     hostForgetKey: (deviceId: string) => Promise<void>;
     hostRemove: (deviceId: string) => Promise<void>;
+    hostUpgrade: (deviceId: string) => Promise<HostUpgrade>;
     onAcpChanged: (handler: () => void) => () => void;
     onPromptQueued: (handler: () => void) => () => void;
     /** Opens a terminal on a paired server, connecting it first (which asks to trust its key). */

@@ -628,6 +628,13 @@ written here is what is not.
   it connects, so with the master gone it fails instead of opening a connection of its own. No remote command; the
   server starts the user's login shell. Ending the master (Disconnect, forgetting the key) ends the terminal; ssh
   exits 255 and the page words it as the connection ending.
+  **Host software on a server** (`device-core/src/install.rs`, `apps/desktop/scripts/host-bundle.mjs`, plans/ssh-environments.md
+  §8): the desktop uploads `neore-host` over the server's own ssh master and the server checks the SHA-256 against the
+  one shipped in `resources/neore-host/manifest.json` BEFORE `chmod 700` and the rename, so a wrong digest or a dropped
+  upload leaves nothing executable at `~/.neore/host/<version>/neore-host`. The remote root is a parameter
+  (`Root::dir`) because the sshd tests run as the developer: they must never touch the real `~/.neore`. Release binaries
+  are built `--no-default-features`; a plain `cargo build` of `neore-host` links the keyring. `host_upgrade` is a
+  LOCAL-window channel only and refuses while any session is open to the target.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay

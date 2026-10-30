@@ -1,5 +1,7 @@
 # Bundles from scripts/build.mjs.
 /dist/
+# The neore-host binaries and their checksum manifest (scripts/host-bundle.mjs); built per release, shipped as resources/neore-host.
+/host-bundle/
 # electron-builder output: packaged apps, installers and their debug files.
 /release/
 # Playwright run artifacts.

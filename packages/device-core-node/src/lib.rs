@@ -17,6 +17,7 @@ use device_core::acp::AcpUpdate;
 use device_core::acp_permission::PermissionRequest;
 use device_core::engine::{HostSpec, SettingsUpdate};
 use device_core::envelope::Signed;
+use device_core::install::{Bundle, Root};
 use device_core::{DeviceState, Event};
 use napi::bindgen_prelude::{
     spawn_blocking, Env, Error, Function, PromiseRaw, Result, ToNapiValue,
@@ -64,9 +65,14 @@ impl DeviceCore {
     /// `dataDir` holds `device.json` and the audit log. `onEvent` receives a JSON
     /// string per engine event: `{"type":"prompt","prompt":…}`,
     /// `{"type":"progress",…}` or `{"type":"changed"}`. It is called from engine
-    /// threads and must not block.
+    /// threads and must not block. `hostBundle` is the folder with the `neore-host` binaries this build ships and
+    /// their checksums; without it a server's host software cannot be installed from here.
     #[napi(constructor)]
-    pub fn new(data_dir: String, on_event: Function<String, ()>) -> Result<Self> {
+    pub fn new(
+        data_dir: String,
+        on_event: Function<String, ()>,
+        host_bundle: Option<String>,
+    ) -> Result<Self> {
         // Weak: the sink never keeps the Node process alive by itself.
         let sink = on_event
             .build_threadsafe_function::<String>()
@@ -81,6 +87,13 @@ impl DeviceCore {
                 }
             }),
         );
+        // A bundle that cannot be read is kept as the reason an install is refused, not as a failure to start.
+        let state = match host_bundle {
+            Some(folder) => {
+                state.with_host_bundle(Bundle::load(std::path::Path::new(&folder)), Root::Home)
+            }
+            None => state,
+        };
 
         Ok(DeviceCore {
             state: Arc::new(state),
@@ -229,6 +242,23 @@ impl DeviceCore {
             let args = state.host_terminal_attach(&device_id)?;
 
             serde_json::to_string(&args).map_err(|error| error.to_string())
+        })
+    }
+
+    /// Installs the pinned `neore-host` on a paired server and removes its other versions; refused while a session
+    /// is open to it. Resolves `{ alreadyCurrent, version }` (JSON).
+    #[napi]
+    pub fn host_upgrade<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let report = state.host_upgrade(&device_id)?;
+
+            serde_json::to_string(&report).map_err(|error| error.to_string())
         })
     }
 
