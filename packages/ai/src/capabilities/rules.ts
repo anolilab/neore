@@ -26,7 +26,9 @@ export type FollowUpControl = "none" | "queue" | "steer" | "steer-restart";
 export const UNKNOWN_CAPABILITY: Capability = { reason: "unknown", supported: false };
 
 /** A report that says nothing: every member reads as `unknown`, so every control it gates is hidden. */
-export const unknownCapabilityReport = (reportedAt: number): CapabilityReport => ({ groups: {}, reportedAt, version: 1 });
+export const unknownCapabilityReport = (reportedAt: number): CapabilityReport => {
+    return { groups: {}, reportedAt, version: 1 };
+};
 
 export const isAvailable = (capability: Capability | null | undefined): boolean => capability?.supported === true;
 

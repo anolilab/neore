@@ -63,7 +63,9 @@ describe("capabilityOf", () => {
     });
 
     it.each(ALL_KEYS)("reads %s as unsupported on an unknown report", (key) => {
-        expect(isAvailable(capabilityOf(unknownCapabilityReport(5), key))).toBe(false);
+        const capability = capabilityOf(unknownCapabilityReport(5), key);
+
+        expect(isAvailable(capability)).toBe(false);
         expect(unknownCapabilityReport(5)).toEqual({ groups: {}, reportedAt: 5, version: 1 });
     });
 
