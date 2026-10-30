@@ -463,7 +463,7 @@ msgid "{0} deleted"
 msgstr "{0} supprimé"
 
 #. placeholder {0}: formatDuration(elapsedMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:557
+#: src/features/chat/thread/streaming-placeholder.tsx:558
 msgid "{0} elapsed"
 msgstr "{0} écoulées"
 
@@ -623,7 +623,7 @@ msgid "{0} tok/s"
 msgstr ""
 
 #. placeholder {0}: tokPerSec.toFixed(1)
-#: src/features/chat/thread/streaming-placeholder.tsx:547
+#: src/features/chat/thread/streaming-placeholder.tsx:548
 msgid "{0} tokens/s"
 msgstr "{0} tokens/s"
 
@@ -1091,7 +1091,7 @@ msgid "{name} is installed"
 msgstr "{name} est installé"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:241
-#: src/features/chat/thread/streaming-placeholder.tsx:475
+#: src/features/chat/thread/streaming-placeholder.tsx:476
 msgid "{name} is responding"
 msgstr "{name} répond"
 
@@ -1303,7 +1303,7 @@ msgstr "<0>Planification</0> — Exécution selon une planification cron (par ex
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0> — Recevez des requêtes HTTP POST de services externes (Stripe, GitHub, Zapier). Les requêtes sont signées avec un HMAC horodaté et les rejeux sont refusés."
 
-#: src/features/chat/thread/streaming-placeholder.tsx:548
+#: src/features/chat/thread/streaming-placeholder.tsx:549
 msgid "~{approxTokenCount} tokens"
 msgstr "~{approxTokenCount} tokens"
 
@@ -2581,7 +2581,7 @@ msgstr "Génération vidéo par IA"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "Tri des bugs assisté par IA avec le contexte d’enregistrement complet"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:350
+#: ../../packages/chat-ui/src/chat/message-content.tsx:351
 msgid "AI-generated"
 msgstr "Généré par IA"
 
@@ -2987,7 +2987,7 @@ msgstr "Une erreur s’est produite"
 msgid "An error occurred during One Tap sign in"
 msgstr "Une erreur s’est produite lors de la connexion One Tap"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1040
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1043
 msgid "An error occurred while generating the response."
 msgstr "Une erreur s’est produite lors de la génération de la réponse."
 
@@ -3570,8 +3570,8 @@ msgid "Assistant replied:"
 msgstr "L’assistant a répondu :"
 
 #: src/features/chat/thread/message-item.tsx:206
-#: src/features/chat/thread/streaming-placeholder.tsx:723
-#: src/features/chat/thread/streaming-placeholder.tsx:760
+#: src/features/chat/thread/streaming-placeholder.tsx:725
+#: src/features/chat/thread/streaming-placeholder.tsx:762
 msgid "Assistant Reply:"
 msgstr "Réponse de l’assistant :"
 
@@ -4500,11 +4500,11 @@ msgstr "Parcourez et restaurez les versions précédentes de votre workflow."
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Parcourez, dupliquez et remixez les workflows partagés par la communauté"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:691
+#: ../../packages/chat-ui/src/chat/message-content.tsx:692
 msgid "Browser"
 msgstr "Navigateur"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:713
+#: ../../packages/chat-ui/src/chat/message-content.tsx:714
 msgid "Browser action failed"
 msgstr "Échec de l’action du navigateur"
 
@@ -4512,7 +4512,7 @@ msgstr "Échec de l’action du navigateur"
 msgid "Browser Automation"
 msgstr "Automatisation du navigateur"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:711
+#: ../../packages/chat-ui/src/chat/message-content.tsx:712
 msgid "Browser error"
 msgstr "Erreur du navigateur"
 
@@ -4521,7 +4521,7 @@ msgid "Browser notes"
 msgstr "Remarques sur les navigateurs"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:259
-#: ../../packages/chat-ui/src/chat/message-content.tsx:674
+#: ../../packages/chat-ui/src/chat/message-content.tsx:675
 msgid "Browser screenshot"
 msgstr "Capture d’écran du navigateur"
 
@@ -4529,7 +4529,7 @@ msgstr "Capture d’écran du navigateur"
 msgid "Browser Session"
 msgstr "Session de navigateur"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:632
+#: ../../packages/chat-ui/src/chat/message-content.tsx:633
 msgid "Browser working..."
 msgstr "Le navigateur travaille..."
 
@@ -5324,7 +5324,7 @@ msgstr "Case à cocher"
 msgid "Checked integrations are offered for setup after you save. Nothing connects until you confirm it there."
 msgstr "Les intégrations cochées vous seront proposées à la configuration après l’enregistrement. Rien n’est connecté tant que vous ne l’avez pas confirmé."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:367
+#: ../../packages/chat-ui/src/chat/message-content.tsx:368
 msgid "Checking image safety..."
 msgstr "Vérification de la sécurité de l’image..."
 
@@ -5711,7 +5711,7 @@ msgstr "Cliquer pour modifier"
 msgid "Click to edit..."
 msgstr "Cliquez pour modifier..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:624
+#: ../../packages/chat-ui/src/chat/message-content.tsx:625
 msgid "Clicking element..."
 msgstr "Clic sur l’élément..."
 
@@ -5826,7 +5826,7 @@ msgstr "Exécution de code"
 msgid "Code execution and sandbox files"
 msgstr "Exécution de code et fichiers du sandbox"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:603
+#: ../../packages/chat-ui/src/chat/message-content.tsx:604
 msgid "Code execution failed"
 msgstr "Échec de l’exécution du code"
 
@@ -5842,7 +5842,7 @@ msgstr "Thème de coloration du code mis à jour"
 msgid "Code is required"
 msgstr "Le code est obligatoire"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:562
+#: ../../packages/chat-ui/src/chat/message-content.tsx:563
 msgid "Code output"
 msgstr "Sortie du code"
 
@@ -5939,7 +5939,7 @@ msgstr "Le modèle Command le plus performant de Cohere"
 msgid "Collaborate with shared AI workflows."
 msgstr "Collaborez avec des workflows d’IA partagés."
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:208
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:212
 #: ../../packages/ui/src/components/sidebar.tsx:406
 #: src/features/workflow/components/canvas/workflow-toolbar.tsx:197
 #: src/features/workflow/components/nodes/group-node.tsx:216
@@ -7005,7 +7005,7 @@ msgstr "Conversion..."
 msgid "cookies"
 msgstr ""
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:211
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:215
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:34
 #: src/features/develop/components/files-tab.tsx:65
@@ -7094,7 +7094,7 @@ msgstr "Copier le prompt"
 msgid "Copy public link"
 msgstr "Copier le lien public"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:204
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:208
 msgid "Copy reasoning"
 msgstr "Copier le raisonnement"
 
@@ -7818,7 +7818,7 @@ msgstr "Crée un lien à usage unique, valable 7 jours. Toute personne connecté
 msgid "Creating branch..."
 msgstr "Création de la branche..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:291
+#: ../../packages/chat-ui/src/chat/message-content.tsx:292
 msgid "Creating slides..."
 msgstr "Création des diapositives..."
 
@@ -9372,7 +9372,7 @@ msgid "Do you want to add more rows?"
 msgstr "Voulez-vous ajouter des lignes ?"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:266
+#: ../../packages/chat-ui/src/chat/message-content.tsx:267
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 msgid "Document"
 msgstr "Document"
@@ -9520,7 +9520,7 @@ msgstr "Télécharger le document"
 msgid "Download Export"
 msgstr "Télécharger l’export"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:429
+#: ../../packages/chat-ui/src/chat/message-content.tsx:430
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "Télécharger le fichier"
@@ -10834,7 +10834,7 @@ msgstr "Taux d’erreur"
 msgid "Error trace:"
 msgstr "Trace de l’erreur :"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:227
+#: ../../packages/chat-ui/src/chat/message-content.tsx:228
 msgid "Error:"
 msgstr "Erreur :"
 
@@ -11092,7 +11092,7 @@ msgstr "Exécution des outils..."
 msgid "Execution"
 msgstr "Exécution"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:593
+#: ../../packages/chat-ui/src/chat/message-content.tsx:594
 msgid "Execution failed"
 msgstr "Échec de l’exécution"
 
@@ -11417,11 +11417,11 @@ msgstr "Extraire la page"
 msgid "Extract subject"
 msgstr "Extraire le sujet"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:682
+#: ../../packages/chat-ui/src/chat/message-content.tsx:683
 msgid "Extracted"
 msgstr "Extrait"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:625
+#: ../../packages/chat-ui/src/chat/message-content.tsx:626
 msgid "Extracting content..."
 msgstr "Extraction du contenu..."
 
@@ -12870,7 +12870,7 @@ msgid "First slide"
 msgstr "Première diapositive"
 
 #. placeholder {0}: formatDuration(ttftMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:549
+#: src/features/chat/thread/streaming-placeholder.tsx:550
 msgid "First token {0}"
 msgstr "Premier token {0}"
 
@@ -13657,7 +13657,7 @@ msgstr "Vidéo générée"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "Les vidéos générées apparaîtront ici. Commencez par décrire ce que vous voulez créer dans la zone de saisie ci-dessous."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:444
+#: ../../packages/chat-ui/src/chat/message-content.tsx:445
 msgid "Generating audio..."
 msgstr "Génération de l’audio..."
 
@@ -13665,12 +13665,12 @@ msgstr "Génération de l’audio..."
 msgid "Generating draft…"
 msgstr "Génération du brouillon…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:445
+#: ../../packages/chat-ui/src/chat/message-content.tsx:446
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating image..."
 msgstr "Génération de l’image..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:288
+#: ../../packages/chat-ui/src/chat/message-content.tsx:289
 msgid "Generating presentation..."
 msgstr "Génération de la présentation..."
 
@@ -13678,7 +13678,7 @@ msgstr "Génération de la présentation..."
 msgid "Generating response"
 msgstr "Génération de la réponse"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:446
+#: ../../packages/chat-ui/src/chat/message-content.tsx:447
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating video..."
 msgstr "Génération de la vidéo..."
@@ -14900,7 +14900,7 @@ msgid "illustration"
 msgstr "illustration"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:396
+#: ../../packages/chat-ui/src/chat/message-content.tsx:397
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:641
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -15462,7 +15462,7 @@ msgstr "Modèle d’entrée"
 msgid "Input tokens"
 msgstr "Tokens d’entrée"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:211
+#: ../../packages/chat-ui/src/chat/message-content.tsx:212
 msgid "Input:"
 msgstr "Entrée :"
 
@@ -15816,7 +15816,7 @@ msgstr "Elle a peut-être été supprimée, ou vous n’y avez plus accès."
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "Il a peut-être expiré, été révoqué ou déjà été utilisé. Demandez un nouveau lien."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:373
+#: ../../packages/chat-ui/src/chat/message-content.tsx:374
 msgid "It will be visible once approved by a moderator"
 msgstr "Il sera visible une fois approuvé par un modérateur"
 
@@ -16904,7 +16904,7 @@ msgstr "Chargement de l’éditeur..."
 msgid "Loading editor…"
 msgstr "Chargement de l’éditeur…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:310
+#: ../../packages/chat-ui/src/chat/message-content.tsx:311
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "Chargement du fichier…"
@@ -17051,7 +17051,7 @@ msgstr "Chargement de votre aperçu…"
 msgid "Loading..."
 msgstr "Chargement..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:313
+#: ../../packages/chat-ui/src/chat/message-content.tsx:314
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
@@ -18936,11 +18936,11 @@ msgstr "Parcourir les conversations"
 msgid "navigate within each column"
 msgstr "naviguer dans chaque colonne"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:683
+#: ../../packages/chat-ui/src/chat/message-content.tsx:684
 msgid "Navigated"
 msgstr "Navigation effectuée"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:632
+#: ../../packages/chat-ui/src/chat/message-content.tsx:633
 msgid "Navigating to {target}..."
 msgstr "Navigation vers {target}..."
 
@@ -20575,7 +20575,7 @@ msgstr "Oups ! Une erreur s’est produite"
 msgid "Opacity"
 msgstr "Opacité"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:669
+#: ../../packages/chat-ui/src/chat/message-content.tsx:670
 #: src/components/command-palette.tsx:618
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-view.tsx:67
@@ -21367,7 +21367,7 @@ msgstr ""
 msgid "Outpaint"
 msgstr "Outpainting"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:540
+#: ../../packages/chat-ui/src/chat/message-content.tsx:541
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/components/model-picker/model-picker.tsx:204
 #: src/features/devices/components/device-tool-call.tsx:95
@@ -21406,7 +21406,7 @@ msgstr "Type de sortie"
 msgid "Output-format focused"
 msgstr "Axé sur le format de sortie"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:219
+#: ../../packages/chat-ui/src/chat/message-content.tsx:220
 msgid "Output:"
 msgstr "Sortie :"
 
@@ -21446,7 +21446,7 @@ msgstr "Propriétaire"
 msgid "Pacific Time (US & Canada)"
 msgstr "Heure du Pacifique (États-Unis et Canada)"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:631
+#: ../../packages/chat-ui/src/chat/message-content.tsx:632
 msgid "page"
 msgstr "page"
 
@@ -23681,7 +23681,7 @@ msgstr ""
 msgid "Reconnecting to the server…"
 msgstr "Reconnexion au serveur…"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:539
+#: src/features/chat/thread/streaming-placeholder.tsx:540
 msgid "Reconnecting…"
 msgstr "Reconnexion…"
 
@@ -24989,7 +24989,7 @@ msgstr "Exécutez votre workflow pour voir l’historique d’exécution ici."
 msgid "Running"
 msgstr "En cours"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:501
+#: ../../packages/chat-ui/src/chat/message-content.tsx:502
 msgid "Running code..."
 msgstr "Exécution du code..."
 
@@ -24997,7 +24997,7 @@ msgstr "Exécution du code..."
 msgid "Running on {device}…"
 msgstr "En cours sur {device}…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:188
+#: ../../packages/chat-ui/src/chat/message-content.tsx:189
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -25309,7 +25309,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "La capture d’écran a échoué. Veuillez réessayer."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:665
+#: ../../packages/chat-ui/src/chat/message-content.tsx:666
 msgid "Screenshot"
 msgstr "Capture d’écran"
 
@@ -25951,7 +25951,7 @@ msgstr "Envoyer le code de vérification"
 msgid "Sending your message and waiting for the reply"
 msgstr "Envoi de votre message et attente de la réponse"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:587
+#: src/features/chat/thread/streaming-placeholder.tsx:588
 msgid "Sending…"
 msgstr ""
 
@@ -26758,7 +26758,7 @@ msgstr "Diapositive {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "Titre de la diapositive"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:982
+#: ../../packages/chat-ui/src/chat/message-content.tsx:985
 msgid "Slide updated"
 msgstr "Diapositive mise à jour"
 
@@ -26963,7 +26963,7 @@ msgstr "Effets sonores activés"
 msgid "Source"
 msgstr "Source"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1110
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1113
 #: src/features/chat/thread/message-content.tsx:125
 msgid "Source {index}"
 msgstr "Source {index}"
@@ -28379,7 +28379,7 @@ msgstr "Prendre une image en entrée, supprimer l’arrière-plan, puis applique
 msgid "Take turns"
 msgstr "À tour de rôle"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:626
+#: ../../packages/chat-ui/src/chat/message-content.tsx:627
 msgid "Taking screenshot..."
 msgstr "Capture d’écran en cours..."
 
@@ -29465,9 +29465,9 @@ msgid "Thinking-enabled vision-language model"
 msgstr "Modèle vision-langage doté de la réflexion"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1036
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1039
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
-#: src/features/chat/thread/streaming-placeholder.tsx:764
+#: src/features/chat/thread/streaming-placeholder.tsx:766
 msgid "Thinking..."
 msgstr "Réflexion..."
 
@@ -29627,7 +29627,7 @@ msgstr ""
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:372
+#: ../../packages/chat-ui/src/chat/message-content.tsx:373
 msgid "This image has been flagged for review"
 msgstr "Cette image a été signalée pour vérification"
 
@@ -30727,7 +30727,7 @@ msgstr "Saisissez votre message..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:627
+#: ../../packages/chat-ui/src/chat/message-content.tsx:628
 msgid "Typing text..."
 msgstr "Saisie du texte..."
 
@@ -31172,11 +31172,11 @@ msgstr "Performances de pointe d’OpenAI mises à jour"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "Capacités de raisonnement mises à jour par rapport au R1 d’origine"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:980
+#: ../../packages/chat-ui/src/chat/message-content.tsx:983
 msgid "Updated slide"
 msgstr "Diapositive mise à jour"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:980
+#: ../../packages/chat-ui/src/chat/message-content.tsx:983
 msgid "Updated slide {slideNumber}"
 msgstr "Diapositive {slideNumber} mise à jour"
 
@@ -32404,7 +32404,7 @@ msgstr "En attente d'approbation sur {device}"
 msgid "Waiting for output…"
 msgstr "En attente de la sortie…"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:594
+#: src/features/chat/thread/streaming-placeholder.tsx:595
 msgid "Waiting for the agent…"
 msgstr ""
 
@@ -32867,7 +32867,7 @@ msgstr "Workflows"
 msgid "Working"
 msgstr "En cours"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:601
+#: src/features/chat/thread/streaming-placeholder.tsx:602
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"
