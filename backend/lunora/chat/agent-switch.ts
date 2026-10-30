@@ -17,7 +17,6 @@
  * daily allowance is spent, `beginSwitchSummary` lets one summary run per thread at a time and counts it
  * against its own rate limit, and only then does the action call the gateway.
  */
-import { PROMPT_CACHE_COLD_START_TOKENS } from "@neore/ai/models";
 import { generateText } from "ai";
 import { LunoraError, v } from "lunorash/server";
 
@@ -218,6 +217,7 @@ const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> =>
     }
 
     const to: AgentRef = { kind: "model", model: definition.id };
+
     if (sameAgent(from, to)) {
         return { agent: from, kind: "same" };
     }
@@ -271,7 +271,7 @@ export const switchThreadAgentHandler = async (
     if (args.handoff?.summarized) {
         const account = await loadTaskAccount(ctx, args.userId);
 
-        if (!account || !(await chargeRound(ctx, args.userId, account))) {
+        if (!account || !(await chargeRound(ctx, args.userId, account, "chat"))) {
             throw limitReached();
         }
     }
@@ -321,12 +321,12 @@ const modeFor = async (
     ctx: QueryCtx,
     checked: Extract<Checked, { kind: "ready" }>,
     requested: RequestedMode | undefined,
-): Promise<{ boundaryId?: string; contextTokens: number; mode: "delta" | "full" | "portable" }> => {
-    const contextTokens = await pathTokens(ctx, checked.thread._id, checked.leaf, { cap: PREVIEW_TOKEN_CAP });
-    const wanted = requested ?? (contextTokens > PROMPT_CACHE_COLD_START_TOKENS ? "portable" : "full");
+): Promise<{ boundaryId?: string; mode: "delta" | "full" | "portable" }> => {
+    // Only an unrequested mode needs the size of the path, and only whether it passes the threshold.
+    const wanted = requested ?? ((await pathExceedsColdStart(ctx, checked.thread._id, checked.leaf)) ? "portable" : "full");
 
     if (wanted === "full") {
-        return { contextTokens, mode: "full" };
+        return { mode: "full" };
     }
 
     const earlier = await findDividerLeaving(ctx, checked.thread._id, checked.leaf, checked.to.model);
@@ -334,10 +334,10 @@ const modeFor = async (
     // A model's earlier context is only sent while it is inside the context window; past it, a delta would tell the
     // model it had worked on a conversation of which it is given none.
     if (earlier && (await rowsSince(ctx, checked.thread._id, checked.leaf, earlier.part.startMessageId, DEFAULT_RECENT_MESSAGES)) < DEFAULT_RECENT_MESSAGES) {
-        return { boundaryId: earlier.part.startMessageId, contextTokens, mode: "delta" };
+        return { boundaryId: earlier.part.startMessageId, mode: "delta" };
     }
 
-    return { contextTokens, mode: "portable" };
+    return { mode: "portable" };
 };
 
 const vTurn = v.object({ role: v.union(v.literal("assistant"), v.literal("user")), text: v.string() });
@@ -403,7 +403,7 @@ export const planAgentSwitchHandler = async (
     // Read now, before the summary is paid for: the commit charges the round, but it comes after the call.
     const account = await loadTaskAccount(ctx, args.userId);
 
-    return { ...base, allowance: account !== null && (await hasRoundAllowance(ctx, args.userId, account)) };
+    return { ...base, allowance: account !== null && (await hasRoundAllowance(ctx, args.userId, account, "chat")) };
 };
 
 export const planAgentSwitch = internalQuery
@@ -644,11 +644,14 @@ export const previewAgentSwitchHandler = async (ctx: QueryCtx, args: Omit<Switch
         return { alreadyThere: true, coldStartCostly: false, contextTokens: 0, defaultMode: "full", handoffTokens: 0 };
     }
 
-    const { boundaryId, contextTokens } = await modeFor(ctx, checked, "portable");
-    const sinceTokens = boundaryId ? await pathTokens(ctx, checked.thread._id, checked.leaf, { cap: PREVIEW_TOKEN_CAP, stopAtId: boundaryId }) : contextTokens;
+    const { boundaryId } = await modeFor(ctx, checked, "portable");
+    // A reply reads the last DEFAULT_RECENT_MESSAGES rows, so that is what keeping the history costs.
+    const window = { cap: PREVIEW_TOKEN_CAP, maxRows: DEFAULT_RECENT_MESSAGES };
+    const contextTokens = await pathTokens(ctx, checked.thread._id, checked.leaf, window);
+    const sinceTokens = boundaryId ? await pathTokens(ctx, checked.thread._id, checked.leaf, { ...window, stopAtId: boundaryId }) : contextTokens;
     // A switch back keeps what the model saw and hands over only what came since; a first handoff is the whole of it.
     const handoffTokens = contextTokens - sinceTokens + Math.min(sinceTokens, HANDOFF_BUDGET_TOKENS);
-    const coldStartCostly = contextTokens > PROMPT_CACHE_COLD_START_TOKENS;
+    const coldStartCostly = await pathExceedsColdStart(ctx, checked.thread._id, checked.leaf);
 
     return { alreadyThere: false, coldStartCostly, contextTokens, defaultMode: coldStartCostly ? "portable" : "full", handoffTokens };
 };

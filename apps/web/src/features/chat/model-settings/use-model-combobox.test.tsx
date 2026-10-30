@@ -6,7 +6,15 @@ import { useModelStore } from "@/features/chat/core/stores/model-store";
 import useModelCombobox from "./use-model-combobox";
 
 const hoisted = vi.hoisted(() => {
-    return { showError: vi.fn(), switchAgent: vi.fn(), thread: { current: undefined as unknown } };
+    return {
+        preview: vi.fn(async (): Promise<unknown> => {
+            return { coldStartCostly: false };
+        }),
+        showError: vi.fn(),
+        switchAgent: vi.fn(),
+        thread: { current: undefined as unknown },
+        trackEvent: vi.fn(),
+    };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -32,9 +40,7 @@ vi.mock("@tanstack/react-query", () => {
         },
         useQueryClient: () => {
             return {
-                fetchQuery: async () => {
-                    return { coldStartCostly: false };
-                },
+                fetchQuery: async () => await hoisted.preview(),
             };
         },
     };
@@ -74,7 +80,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 });
 
 vi.mock("@/lib/analytics", () => {
-    return { trackEvent: vi.fn() };
+    return { trackEvent: hoisted.trackEvent };
 });
 
 vi.mock("@/lib/toast", () => {
@@ -112,6 +118,8 @@ describe("useModelCombobox: a switch that settles after the user opened another 
             controls = { reject, resolve };
         });
 
+        // The pick can be dropped before it reaches the server, leaving this rejection unclaimed.
+        answer.catch(() => {});
         hoisted.switchAgent.mockReturnValue(answer);
 
         const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
@@ -143,5 +151,90 @@ describe("useModelCombobox: a switch that settles after the user opened another 
 
         expect(useModelStore.getState()).toMatchObject({ selectedModel: "openai/gpt-5-nano", selectedModelThreadId: "t2" });
         expect(hoisted.showError).not.toHaveBeenCalled();
+    });
+});
+
+describe("useModelCombobox: the confirmation step", () => {
+    beforeEach(() => {
+        hoisted.thread.current = { _id: "t1", mode: "text", model: A };
+        hoisted.switchAgent.mockReset();
+        hoisted.trackEvent.mockReset();
+        hoisted.preview.mockReset();
+        useModelStore.getState().loadThreadData({ mode: "text", model: A }, "t1");
+    });
+
+    it("counts no switch while the confirmation is open or after it is cancelled", async () => {
+        hoisted.preview.mockResolvedValue({ coldStartCostly: true });
+
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        await act(async () => {
+            await result.current.changeModel(B);
+        });
+
+        expect(result.current.pendingSwitch).toMatchObject({ model: B });
+
+        act(() => {
+            result.current.cancelSwitch();
+        });
+
+        expect(hoisted.trackEvent).not.toHaveBeenCalled();
+        expect(hoisted.switchAgent).not.toHaveBeenCalled();
+    });
+
+    it("counts the switch once the thread took it", async () => {
+        hoisted.switchAgent.mockResolvedValue({ agent: { kind: "model", model: B }, coldStartCostly: false, messageId: "m", switched: true });
+        hoisted.preview.mockResolvedValue({ coldStartCostly: false });
+
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        await act(async () => {
+            await result.current.changeModel(B);
+        });
+
+        expect(hoisted.trackEvent).toHaveBeenCalledExactlyOnceWith("model_switched", { from_model: A, to_model: B });
+    });
+
+    it("keeps the whole history, with no summary, when the estimate fails", async () => {
+        hoisted.preview.mockRejectedValue(new Error("offline"));
+        hoisted.switchAgent.mockResolvedValue({ agent: { kind: "model", model: B }, coldStartCostly: false, messageId: "m", switched: true });
+
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        await act(async () => {
+            await result.current.changeModel(B);
+        });
+
+        expect(hoisted.switchAgent).toHaveBeenCalledWith(expect.objectContaining({ mode: "full" }));
+    });
+
+    it("drops a preview that lands after the user picked another model", async () => {
+        let controls = { resolve: (_value: unknown) => {} };
+
+        hoisted.preview.mockReturnValue(
+            new Promise((resolve) => {
+                controls = { resolve };
+            }),
+        );
+
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+        let pick: Promise<void> = Promise.resolve();
+
+        act(() => {
+            pick = result.current.changeModel(B);
+        });
+
+        // A second pick replaces the first before its estimate lands.
+        act(() => {
+            useModelStore.getState().setSelectedModel("openai/gpt-4.1-nano", "t1");
+        });
+
+        await act(async () => {
+            controls.resolve({ coldStartCostly: true });
+            await pick;
+        });
+
+        expect(result.current.pendingSwitch).toBeNull();
+        expect(hoisted.switchAgent).not.toHaveBeenCalled();
     });
 });

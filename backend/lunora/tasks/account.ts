@@ -66,15 +66,24 @@ export const requireTaskAccount = async (ctx: QueryCtx, userId: string): Promise
     return account;
 };
 
-/** The daily limits one round is charged against, in the order they are reported. */
-export const roundQuotaKeys = (account: TaskAccount): string[] =>
-    account.isAdmin ? [] : [`chat/dailyText:${account.tier}`, `tasks/dailyRuns:${account.tier}`];
+/**
+ * The daily limits one round is charged against, in the order they are reported. A `chat` round (a model call
+ * made on the user's behalf in a conversation, such as an agent-switch summary) is not a task run, so it spends
+ * the chat allowance alone.
+ */
+export const roundQuotaKeys = (account: TaskAccount, kind: "chat" | "task" = "task"): string[] => {
+    if (account.isAdmin) {
+        return [];
+    }
+
+    return kind === "chat" ? [`chat/dailyText:${account.tier}`] : [`chat/dailyText:${account.tier}`, `tasks/dailyRuns:${account.tier}`];
+};
 
 export const DAILY_LIMIT_MESSAGE = "You've reached your daily limit for task runs. Run the task again tomorrow.";
 
 /** Whether every daily limit still has room for one round — a read, nothing is consumed. */
-export const hasRoundAllowance = async (ctx: Pick<QueryCtx, "db">, userId: string, account: TaskAccount): Promise<boolean> => {
-    for (const key of roundQuotaKeys(account)) {
+export const hasRoundAllowance = async (ctx: Pick<QueryCtx, "db">, userId: string, account: TaskAccount, kind: "chat" | "task" = "task"): Promise<boolean> => {
+    for (const key of roundQuotaKeys(account, kind)) {
         const { remaining } = await createRatelimit(key, ctx.db as never).getRemaining(userId);
 
         if (remaining < 1) {
@@ -90,12 +99,12 @@ export const hasRoundAllowance = async (ctx: Pick<QueryCtx, "db">, userId: strin
  * consumed, so a round refused by one limit does not spend the others. Returns
  * `false` when a limit is exhausted.
  */
-export const chargeRound = async (ctx: MutationCtx, userId: string, account: TaskAccount): Promise<boolean> => {
-    if (!(await hasRoundAllowance(ctx, userId, account))) {
+export const chargeRound = async (ctx: MutationCtx, userId: string, account: TaskAccount, kind: "chat" | "task" = "task"): Promise<boolean> => {
+    if (!(await hasRoundAllowance(ctx, userId, account, kind))) {
         return false;
     }
 
-    const limiters = roundQuotaKeys(account).map((key) => createRatelimit(key, ctx.db as never));
+    const limiters = roundQuotaKeys(account, kind).map((key) => createRatelimit(key, ctx.db as never));
 
     for (const limiter of limiters) {
         const { ok } = await limiter.limit(userId);

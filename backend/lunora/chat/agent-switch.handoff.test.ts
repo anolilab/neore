@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { agentSwitchOf } from "../agent/agent-switch-logic";
 import { handoffAboveOf, handoffBeforeDeltaOf } from "../agent/agent-switch";
+import { collectHandoffSource } from "../agent/handoff-source";
 import { HANDOFF_REFUSED_TOO_LARGE, HANDOFF_BUDGET_TOKENS, HANDOFF_SUMMARY_MAX_TOKENS, handoffTokens } from "../agent/handoff";
 import { assembleHandoffContext } from "../agent/handoff-context";
 import { hasClaim, releaseClaim } from "../lib/claim-once";
@@ -30,6 +31,7 @@ const B = "google/gemini-2.0-flash-001";
 const C = "openai/gpt-4.1-nano";
 
 const QUOTA = "chat/dailyText:free";
+const TASK_QUOTA = "tasks/dailyRuns:free";
 const PAIR = 2000;
 
 let harness: Harness;
@@ -72,9 +74,9 @@ const longThread = async (pairs: number) => {
     }
 };
 
-const remaining = async (): Promise<number> =>
+const remaining = async (key = QUOTA): Promise<number> =>
     await run(async (ctx) => {
-        const { remaining: left } = await createRatelimit(QUOTA, ctx.db as never).getRemaining(owner);
+        const { remaining: left } = await createRatelimit(key, ctx.db as never).getRemaining(owner);
 
         return left;
     });
@@ -160,6 +162,14 @@ describe("a switch above the cold-start threshold", () => {
         expect(part!.handoff).toContain("> the last question, verbatim");
         expect(part!.handoff).toContain("> The user and the assistant went through");
         expect(await remaining()).toBe(before - 1);
+    });
+
+    it("spends the chat allowance only, never a daily task run", async () => {
+        const tasksBefore = await remaining(TASK_QUOTA);
+
+        await switchTo(B, "click-1");
+
+        expect(await remaining(TASK_QUOTA)).toBe(tasksBefore);
     });
 
     it("is charged once: a repeat of the click neither summarises nor charges again", async () => {
@@ -358,6 +368,40 @@ describe("a switch above the cold-start threshold", () => {
         expect(preview.contextTokens).toBeGreaterThan(30_000);
         expect(preview.handoffTokens).toBeLessThanOrEqual(HANDOFF_BUDGET_TOKENS);
         expect(await dividers()).toHaveLength(0);
+    });
+});
+
+describe("the source of a handoff", () => {
+    it("stops at its limit inside a page of large messages instead of taking the whole page", async () => {
+        // Five turns of 100,000 characters each way sit in one page, against a limit of 240,000.
+        for (let index = 0; index < 5; index += 1) {
+            await addTurn(`q${index} ${"q".repeat(100_000)}`, `a${index} ${"a".repeat(100_000)}`);
+        }
+
+        const source = await run(async (ctx) => {
+            const thread = await ctx.db.get(threadId);
+            const all: any[] = await ctx.db.query("messages").collect();
+            const [leaf] = all.toSorted((a, b) => b.order - a.order || b.stepOrder - a.stepOrder);
+
+            return await collectHandoffSource(ctx, thread._id, leaf);
+        });
+        const characters = source.turns.reduce((sum, turn) => sum + turn.text.length, 0);
+
+        expect(characters).toBeLessThan(400_000);
+        expect(source.omittedEarlier).toBe(true);
+    });
+});
+
+describe("the cost preview of a long thread", () => {
+    it("prices keeping the history from the rows a reply reads, not the whole path", async () => {
+        // 150 rows of about 500 tokens: the whole path is 75k tokens, the last 100 rows 50k.
+        await longThread(75);
+
+        const preview = await run(async (ctx) => await previewAgentSwitchHandler(ctx, { model: B, threadId: threadId as never, userId: owner }));
+
+        expect(preview.coldStartCostly).toBe(true);
+        expect(preview.contextTokens).toBeLessThan(55_000);
+        expect(preview.contextTokens).toBeGreaterThan(45_000);
     });
 });
 

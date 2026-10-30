@@ -84,16 +84,23 @@ export const collectHandoffSource = async (
     const turns: HandoffTurn[] = [];
     let characters = 0;
     let cursor: Row | null = leaf;
+    let cutShort = false;
 
     while (cursor && cursor._id !== options.stopAtId && characters < limit) {
         const { next, rows } = await walkPath(context, threadId, cursor, { limit: PAGE_ROWS, stopAtId: options.stopAtId });
 
-        for (const row of rows) {
+        for (const [index, row] of rows.entries()) {
             const turn = turnOfRow(row);
 
             if (turn) {
                 turns.push(turn);
                 characters += turn.text.length;
+            }
+
+            // The limit is checked per row, not per page, so one page of large messages cannot overshoot it.
+            if (characters >= limit) {
+                cutShort = index < rows.length - 1;
+                break;
             }
         }
 
@@ -101,23 +108,25 @@ export const collectHandoffSource = async (
     }
 
     // The walk stops AT `stopAtId`, leaving it as `cursor`: not a row that was left unread.
-    return { omittedEarlier: cursor !== null && cursor._id !== options.stopAtId, turns: joinSameRole(turns) };
+    return { omittedEarlier: cutShort || (cursor !== null && cursor._id !== options.stopAtId), turns: joinSameRole(turns) };
 };
 
 /**
  * Estimated tokens of the stored text of the path ending at `from` (inclusive), counting up toward `cap` and
  * stopping the walk once past it. `stopAtId` ends the count at that row (exclusive). `maxPages` bounds the read:
- * a path longer than that many pages counts as past the cap whatever its rows say.
+ * a path longer than that many pages counts as past the cap whatever its rows say. `maxRows` counts only that many
+ * rows from `from`: the window a reply actually reads.
  */
 export const pathTokens = async (
     context: Reader,
     threadId: Id<"threads">,
     from: Row | null,
-    options: { cap: number; maxPages?: number; stopAtId?: string },
+    options: { cap: number; maxPages?: number; maxRows?: number; stopAtId?: string },
 ): Promise<number> => {
     let characters = 0;
     let cursor = from;
     let pages = 0;
+    let rowsLeft = options.maxRows ?? Infinity;
 
     while (cursor && cursor._id !== options.stopAtId) {
         pages += 1;
@@ -126,13 +135,15 @@ export const pathTokens = async (
             return options.cap + 1;
         }
 
-        const { next, rows } = await walkPath(context, threadId, cursor, { limit: PAGE_ROWS, stopAtId: options.stopAtId });
+        const { next, rows } = await walkPath(context, threadId, cursor, { limit: Math.min(PAGE_ROWS, rowsLeft), stopAtId: options.stopAtId });
 
         for (const row of rows) {
             characters += row.text?.length ?? 0;
         }
 
-        if (estimateTokensFromCharacters(characters) > options.cap) {
+        rowsLeft -= rows.length;
+
+        if (rowsLeft <= 0 || estimateTokensFromCharacters(characters) > options.cap) {
             break;
         }
 

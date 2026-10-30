@@ -94,6 +94,11 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         try {
             const result = await request;
 
+            // Counted once the thread took the switch, not when it was picked: a cancelled confirm is no switch.
+            if (result.switched) {
+                trackEvent("model_switched", { from_model: row.activeAgent?.model ?? row.model ?? "", to_model: newModel });
+            }
+
             if (!isLatestPick() || !isOnThread()) {
                 return true;
             }
@@ -127,13 +132,20 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
                 staleTime: 0,
             });
 
+            // The user picked again while this was in flight: that pick owns the thread now.
+            if (useModelStore.getState().selectedModel !== newModel) {
+                return true;
+            }
+
             if (preview.coldStartCostly) {
                 setPendingSwitch({ model: newModel, preview });
 
                 return true;
             }
         } catch {
-            // No estimate is no reason to refuse; the switch itself says what is wrong, if anything is.
+            // No estimate is no reason to refuse, but the server must not pick a summary (and charge for it)
+            // unasked: keep the whole history, which costs nothing extra.
+            return await runSwitch(newModel, id, row, "full");
         }
 
         return await runSwitch(newModel, id, row);
@@ -164,16 +176,10 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         // Always update local store for immediate UI feedback
         setSelectedModel(newModel, threadId);
 
-        if (previousModel && previousModel !== newModel) {
-            trackEvent("model_switched", { from_model: previousModel, to_model: newModel });
-        }
-
         // A text thread records the change as a switch in its transcript; the thread's own model stays
         // what it was created with, which is what a branch from before the switch runs on.
-        if (threadId && thread && canSwitchAgent(thread, newModel)) {
-            if (await startSwitch(newModel, threadId, thread)) {
-                return;
-            }
+        if (threadId && thread && canSwitchAgent(thread, newModel) && (await startSwitch(newModel, threadId, thread))) {
+            return;
         }
 
         // If existing thread, also persist to Lunora. A switched thread keeps its model: it is the agent of every
@@ -183,6 +189,11 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
                 model: newModel,
                 threadId: threadId as Id<"threads">,
             });
+        }
+
+        // Switches on a thread are counted by `runSwitch`; this pick changed the model without one.
+        if (previousModel && previousModel !== newModel) {
+            trackEvent("model_switched", { from_model: previousModel, to_model: newModel });
         }
     };
 
