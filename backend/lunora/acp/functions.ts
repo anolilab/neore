@@ -149,6 +149,11 @@ export const getThreadCapabilities = authQuery
             return onLocalEndpoint ? LOCAL_BROWSER_CAPABILITIES : CLOUD_INTERACTIVE_CAPABILITIES;
         }
 
+        // A host thread is its owner's alone: a live grant reads the thread, not the computer's report.
+        if (access.thread.userId !== ctx.user.userId) {
+            return null;
+        }
+
         const session = await ctx.db.acpSessions.findFirst({ where: { threadId: access.thread._id, userId: ctx.user.userId } });
 
         return session?.capabilities ?? unknownCapabilityReport(0);
