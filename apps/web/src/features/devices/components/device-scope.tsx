@@ -23,6 +23,9 @@ const DeviceScope: FC<{ deviceId: string; projectIds?: string[] }> = ({ deviceId
     const setScope = useMutation(crpc.devices.functions.setDeviceProjectScope.mutationOptions());
     const chat = projects.filter((project) => project.projectType !== "workflow");
     const chosen = new Set(projectIds);
+    const listed = new Set(projects.map((project) => project._id as string));
+    // A chosen project outside the loaded page can still be taken out of the scope.
+    const unlisted = [...chosen].filter((id) => !listed.has(id));
     const scoped = projectIds !== undefined;
 
     const save = (scope: { kind: "any" } | { kind: "projects"; projectIds: Id<"projects">[] }): void => {
@@ -55,7 +58,7 @@ const DeviceScope: FC<{ deviceId: string; projectIds?: string[] }> = ({ deviceId
             </RadioGroup>
             {scoped && (
                 <div className="space-y-2 pl-6">
-                    {chat.length > 0 ? (
+                    {chat.length > 0 || unlisted.length > 0 ? (
                         <ul aria-label={t`Projects this device is offered in`} className="space-y-1">
                             {chat.map((project) => (
                                 <li className="flex items-center gap-2" key={project._id}>
@@ -80,10 +83,26 @@ const DeviceScope: FC<{ deviceId: string; projectIds?: string[] }> = ({ deviceId
                                     </Label>
                                 </li>
                             ))}
+                            {unlisted.map((id) => (
+                                <li className="flex items-center gap-2" key={id}>
+                                    <Checkbox
+                                        checked
+                                        disabled={setScope.isPending}
+                                        id={`${baseId}-${id}`}
+                                        onCheckedChange={() => {
+                                            save({ kind: "projects", projectIds: [...chosen].filter((other) => other !== id) as Id<"projects">[] });
+                                        }}
+                                    />
+                                    <Label className="text-xs font-normal" htmlFor={`${baseId}-${id}`}>
+                                        {t`An older project not listed here`}
+                                    </Label>
+                                </li>
+                            ))}
                         </ul>
                     ) : (
                         <p className="text-muted-foreground text-xs">{t`You have no projects yet.`}</p>
                     )}
+                    {projects.length >= 100 && <p className="text-muted-foreground text-xs">{t`Only your 100 most recent projects are listed.`}</p>}
                     <p className="text-muted-foreground text-xs" role="status">
                         {chosen.size === 0
                             ? t`Not offered in any chat until you choose a project.`
