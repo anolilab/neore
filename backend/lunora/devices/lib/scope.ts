@@ -6,7 +6,7 @@
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { QueryCtx } from "../../_generated/server";
 
-/** Pure: the thread's project is the one that counts, and a thread without one is outside every project scope. */
+/** The thread's project is the one that counts, and a thread without one is outside every project scope. */
 export const isDeviceInScope = (device: Pick<Doc<"devices">, "projectIds">, threadProjectId: Id<"projects"> | undefined): boolean =>
     device.projectIds === undefined || (threadProjectId !== undefined && device.projectIds.includes(threadProjectId));
 
@@ -34,5 +34,5 @@ export const resolveThreadProject = async (
 
     const project = await ctx.db.projects.findFirst({ where: { _id: thread.projectId, userId } });
 
-    return project ? project._id : undefined;
+    return project?._id;
 };
