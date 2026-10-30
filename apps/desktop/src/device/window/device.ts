@@ -6,6 +6,7 @@
  * Everything in a prompt came from a model or the network, so it is rendered
  * with textContent only — never as HTML.
  */
+import { describeLink, multiplexingNote } from "../link-status";
 import type { HostView, Prompt, SettingsView } from "../types";
 import { initAcp } from "./acp-page";
 
@@ -382,6 +383,29 @@ const button = (label: string, onClick: () => void, description?: string): HTMLB
     return element;
 };
 
+/** What each server's connection said the last time the list was drawn, so only a change is announced. */
+const lastLink = new Map<string, string>();
+
+/** The cards are drawn anew on every change, so a screen reader hears a lost or restored connection through one live region. */
+const announceLinkChanges = (hosts: HostView[]): void => {
+    const changes: string[] = [];
+
+    for (const host of hosts) {
+        const link = host.connected ? "connected" : host.reconnect?.phase ?? "not connected";
+        const before = lastLink.get(host.deviceId);
+
+        lastLink.set(host.deviceId, link);
+
+        if (before !== undefined && before !== link) {
+            changes.push(`${host.name}: ${describeLink(host, Date.now())}`);
+        }
+    }
+
+    if (changes.length > 0) {
+        $("link-announcement").textContent = changes.join(". ");
+    }
+};
+
 const hostCard = (host: HostView): HTMLElement => {
     const card = document.createElement("section");
     const heading = document.createElement("h3");
@@ -400,16 +424,43 @@ const hostCard = (host: HostView): HTMLElement => {
     card.setAttribute("aria-label", host.name);
     heading.textContent = host.name;
     where.className = "muted";
-    where.textContent = `${host.user}@${host.address}:${String(host.port)} — ${host.connected ? `connected (${host.platform ?? "unknown"})` : "not connected"}`;
+    where.textContent = `${host.user}@${host.address}:${String(host.port)} — ${describeLink(host, Date.now())}`;
+
+    // A server that is being reconnected can be stopped, or tried at once; one that gave up has a Retry.
+    const phase = host.reconnect?.phase;
+    const connect = (text: string): HTMLElement =>
+        button(text, () => hostAction(() => globalThis.neoreDevice.hostConnect(host.deviceId), "Connected."), host.name);
+    const stop = (text: string): HTMLElement =>
+        button(text, () => hostAction(() => globalThis.neoreDevice.hostDisconnect(host.deviceId), "Disconnected."), host.name);
+    const reconnecting = phase === "waiting" || phase === "connecting";
+    let link: HTMLElement[] = [connect("Connect")];
+
+    if (host.connected) {
+        link = [stop("Disconnect")];
+    } else {
+        switch (phase) {
+            case "connecting": {
+                link = [stop("Stop reconnecting")];
+                break;
+            }
+            case "gaveUp": {
+                link = [connect("Retry"), stop("Dismiss")];
+                break;
+            }
+            case "waiting": {
+                link = [connect("Retry now"), stop("Stop reconnecting")];
+                break;
+            }
+            default:
+        }
+    }
 
     actions.className = "row";
     actions.append(
-        host.connected
-            ? button("Disconnect", () => hostAction(() => globalThis.neoreDevice.hostDisconnect(host.deviceId), "Disconnected."), host.name)
-            : button("Connect", () => hostAction(() => globalThis.neoreDevice.hostConnect(host.deviceId), "Connected."), host.name),
+        ...link,
         ...state.terminalAvailable && state.terminalServerReason === null ? [button("Terminal", () => hostAction(() => globalThis.neoreDevice.openHostTerminal(host.deviceId), "Terminal opened."), host.name)] : [],
         // Installing is refused while a session is open, so the button is for a disconnected server.
-        ...host.connected
+        ...reconnecting || host.connected
             ? []
             : [
                 button(
@@ -521,7 +572,15 @@ const hostCard = (host: HostView): HTMLElement => {
 
     row.className = "row";
     row.append(label, typed, addFolder);
-    card.append(heading, where, actions, folders, row, sandbox, network, forward);
+
+    const sharing = multiplexingNote(host.multiplexed);
+    const sharingNote = document.createElement("p");
+
+    sharingNote.className = "muted";
+    sharingNote.textContent = sharing ?? "";
+    sharingNote.hidden = sharing === null;
+
+    card.append(heading, where, sharingNote, actions, folders, row, sandbox, network, forward);
 
     if (state.terminalAvailable && state.terminalServerReason !== null) {
         const why = document.createElement("p");
@@ -588,6 +647,7 @@ const renderSettings = (): void => {
     none.className = "muted";
     none.textContent = "None.";
     $("hosts").replaceChildren(...view.hosts.length === 0 ? [none] : view.hosts.map((host) => hostCard(host)));
+    announceLinkChanges(view.hosts);
     $("roots").replaceChildren(...view.roots.map((root) => rootItem(root)));
     $("servers").replaceChildren(
         ...view.mcpServers.map((server) =>
@@ -748,6 +808,46 @@ $("server-form").addEventListener("submit", async (event) => {
     (event.target as HTMLFormElement).reset();
 });
 
+// A link that drops or comes back while this window stays open: show the Retry / Stop reconnecting it now needs.
+const refresh = { latest: 0 };
+
+globalThis.neoreDevice.onChanged(async () => {
+    refresh.latest += 1;
+
+    const mine = refresh.latest;
+    const settings = await globalThis.neoreDevice.settingsGet();
+
+    // Overlapping notices can answer out of order; only the newest read may redraw.
+    if (mine !== refresh.latest) {
+        return;
+    }
+
+    state.settings = settings;
+
+    // The redraw rebuilds every server card; carry over a folder path that is half typed there, and the caret in it.
+    const values = [...document.querySelectorAll<HTMLInputElement>("input[id^='host-root-']")]
+        .filter((input) => input.value !== "")
+        .map((input) => [input.id, input.value] as const);
+    const active = document.activeElement instanceof HTMLInputElement && document.activeElement.id.startsWith("host-root-") ? document.activeElement : null;
+    const focused = active === null ? null : { end: active.selectionEnd, id: active.id, start: active.selectionStart };
+
+    renderSettings();
+
+    for (const [id, value] of values) {
+        const input = document.querySelector(`[id="${CSS.escape(id)}"]`);
+
+        if (input instanceof HTMLInputElement) {
+            input.value = value;
+        }
+    }
+
+    const input = focused === null ? null : document.querySelector(`[id="${CSS.escape(focused.id)}"]`);
+
+    if (focused !== null && input instanceof HTMLInputElement) {
+        input.focus();
+        input.setSelectionRange(focused.start, focused.end);
+    }
+});
 globalThis.neoreDevice.onPromptQueued(() => refreshPrompt());
 window.addEventListener("focus", () => refreshPrompt());
 // eslint-disable-next-line unicorn/prefer-top-level-await -- the page builds as an IIFE, where top-level await does not parse

@@ -10,11 +10,12 @@
 mod vectors;
 
 use std::fs;
-use std::net::{Ipv4Addr, TcpListener, TcpStream};
+use std::io::{Read, Write};
+use std::net::{Ipv4Addr, Shutdown, TcpListener, TcpStream};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -24,6 +25,8 @@ use device_core::ssh::{
     control_args, forget_keys, pinned_keys, terminal_args, HostConnection, HostKey, HostLink,
     Interact, SshError, SshPaths, Target, HOST_VERSION,
 };
+use device_core::store::{self, test_keychain, Host, Pairing, Settings};
+use device_core::{DeviceState, Event};
 use serde_json::json;
 
 const PASSPHRASE: &str = "correct horse battery staple 7f3a";
@@ -191,9 +194,9 @@ impl Server {
         fs::write(
             &wrapper,
             format!(
-                "#!/bin/sh\nenv > '{}/remote-env.txt'\nexec '{}' \"$@\"\n",
-                dir.display(),
-                env!("CARGO_BIN_EXE_neore-host")
+                "#!/bin/sh\nenv > '{dir}/remote-env.txt'\nNEORE_HOST_RUN_DIR='{dir}/run'\nexport NEORE_HOST_RUN_DIR\nexec '{host}' \"$@\"\n",
+                dir = dir.display(),
+                host = env!("CARGO_BIN_EXE_neore-host")
             ),
         )
         .unwrap();
@@ -258,6 +261,11 @@ impl Server {
         format!("'{}'", self.dir.join("host-wrapper.sh").display())
     }
 
+    /// Where the hosts started through the wrapper file their launches.
+    fn run_dir(&self) -> PathBuf {
+        self.dir.join("run")
+    }
+
     fn remote_env(&self) -> String {
         fs::read_to_string(self.dir.join("remote-env.txt")).unwrap_or_default()
     }
@@ -285,6 +293,9 @@ impl Drop for Server {
     }
 }
 
+/// The environment is the process's, so the tests that set `SSH_AUTH_SOCK` for a connect take turns.
+static CLIENT_ENVIRONMENT: Mutex<()> = Mutex::new(());
+
 fn connect(
     server: &Server,
     target: &Target,
@@ -292,7 +303,27 @@ fn connect(
     interact: &Arc<Scripted>,
 ) -> Result<HostConnection, SshError> {
     // A client that carries an agent socket: the server must not see it.
-    std::env::set_var("SSH_AUTH_SOCK", server.dir.join("no-agent.sock"));
+    connect_with_agent(
+        server,
+        target,
+        paths,
+        interact,
+        &server.dir.join("no-agent.sock"),
+    )
+}
+
+fn connect_with_agent(
+    server: &Server,
+    target: &Target,
+    paths: &SshPaths,
+    interact: &Arc<Scripted>,
+    agent: &Path,
+) -> Result<HostConnection, SshError> {
+    let _turn = CLIENT_ENVIRONMENT
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    std::env::set_var("SSH_AUTH_SOCK", agent);
 
     let interact: Arc<dyn Interact> = Arc::clone(interact) as Arc<dyn Interact>;
 
@@ -1042,5 +1073,761 @@ fn a_missing_host_is_reported_as_not_installed_and_not_as_a_dead_connection() {
     assert!(matches!(error, SshError::HostMissing { .. }), "{error}");
     assert!(error.to_string().contains("not installed"), "{error}");
 
+    end_master(&target, &paths);
+}
+
+// ─── Lifecycle ───────────────────────────────────────────────────────────
+
+fn wait_for(what: &str, within: Duration, mut condition: impl FnMut() -> bool) {
+    let deadline = Instant::now() + within;
+
+    while !condition() {
+        assert!(Instant::now() < deadline, "{what}");
+        thread::sleep(Duration::from_millis(100));
+    }
+}
+
+/// Whether `pid` is a live process (a zombie waiting to be reaped is not).
+fn running(pid: i64) -> bool {
+    let output = Command::new("ps")
+        .args(["-o", "stat=", "-p", &pid.to_string()])
+        .output()
+        .unwrap();
+    let state = String::from_utf8_lossy(&output.stdout);
+
+    output.status.success() && !state.trim().is_empty() && !state.trim().starts_with('Z')
+}
+
+/// The pid a launch filed in the server's run folder, once it has.
+fn launch_pid(server: &Server, id: &str) -> Option<i64> {
+    fs::read_to_string(server.run_dir().join(format!("{id}.pid")))
+        .ok()?
+        .lines()
+        .next()?
+        .trim()
+        .parse()
+        .ok()
+}
+
+/// A `neore-host --stdio --launch <id>` this test starts itself, the way another computer's session or an earlier
+/// run of the desktop would have: the desktop under test did not start it. It lives while the returned child's
+/// stdin is open.
+fn spawn_host(server: &Server, id: &str) -> Child {
+    let child = Command::new(env!("CARGO_BIN_EXE_neore-host"))
+        .args(["--stdio", "--launch", id])
+        .env("NEORE_HOST_RUN_DIR", server.run_dir())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+
+    wait_for(
+        "the host did not file its launch",
+        Duration::from_secs(10),
+        || launch_pid(server, id).is_some(),
+    );
+
+    child
+}
+
+const FOREIGN: &str = "f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0";
+const SPARE: &str = "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a";
+
+/// A TCP relay in front of the sshd that can be partitioned, as a network that drops everything for a while and
+/// forgets the connections it carried: while partitioned it answers nothing and discards what it is sent, and a
+/// connection from before the partition never carries a byte again, and is never closed toward the server, so the
+/// server has no way to tell the client is gone.
+struct Relay {
+    accept: Option<thread::JoinHandle<()>>,
+    port: u16,
+    shared: Arc<RelayShared>,
+}
+
+struct RelayShared {
+    generation: AtomicU64,
+    /// Sockets nobody will answer: connections made during the partition.
+    held: Mutex<Vec<TcpStream>>,
+    partitioned: AtomicBool,
+    stop: AtomicBool,
+    upstream: u16,
+}
+
+impl RelayShared {
+    fn carries(&self, generation: u64) -> bool {
+        !self.partitioned.load(Ordering::SeqCst)
+            && self.generation.load(Ordering::SeqCst) == generation
+    }
+}
+
+impl Relay {
+    fn start(upstream: u16) -> Relay {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let shared = Arc::new(RelayShared {
+            generation: AtomicU64::new(0),
+            held: Mutex::default(),
+            partitioned: AtomicBool::new(false),
+            stop: AtomicBool::new(false),
+            upstream,
+        });
+        let state = Arc::clone(&shared);
+
+        listener.set_nonblocking(true).unwrap();
+
+        let accept = thread::spawn(move || {
+            while !state.stop.load(Ordering::SeqCst) {
+                let Ok((client, _)) = listener.accept() else {
+                    thread::sleep(Duration::from_millis(20));
+
+                    continue;
+                };
+
+                if state.partitioned.load(Ordering::SeqCst) {
+                    state.held.lock().unwrap().push(client);
+
+                    continue;
+                }
+
+                let Ok(server) = TcpStream::connect((Ipv4Addr::LOCALHOST, state.upstream)) else {
+                    continue;
+                };
+                let generation = state.generation.load(Ordering::SeqCst);
+
+                client.set_nonblocking(false).unwrap();
+                pump(
+                    client.try_clone().unwrap(),
+                    server.try_clone().unwrap(),
+                    generation,
+                    &state,
+                );
+                pump(server, client, generation, &state);
+            }
+        });
+
+        Relay {
+            accept: Some(accept),
+            port,
+            shared,
+        }
+    }
+
+    fn partition(&self) {
+        self.shared.generation.fetch_add(1, Ordering::SeqCst);
+        self.shared.partitioned.store(true, Ordering::SeqCst);
+    }
+
+    fn restore(&self) {
+        self.shared.partitioned.store(false, Ordering::SeqCst);
+    }
+}
+
+impl Drop for Relay {
+    fn drop(&mut self) {
+        self.shared.stop.store(true, Ordering::SeqCst);
+
+        if let Some(accept) = self.accept.take() {
+            let _ = accept.join();
+        }
+    }
+}
+
+/// Copies `from` to `to` while the connection (born in `generation`) is carried. A connection that was cut off keeps
+/// reading and dropping, and leaves `to` open when `from` ends.
+fn pump(mut from: TcpStream, mut to: TcpStream, generation: u64, shared: &Arc<RelayShared>) {
+    let shared = Arc::clone(shared);
+
+    from.set_read_timeout(Some(Duration::from_millis(100)))
+        .unwrap();
+    thread::spawn(move || {
+        let mut buffer = [0u8; 16 * 1024];
+
+        while !shared.stop.load(Ordering::SeqCst) {
+            match from.read(&mut buffer) {
+                Ok(0) => {
+                    if shared.carries(generation) {
+                        let _ = to.shutdown(Shutdown::Both);
+                    }
+
+                    break;
+                }
+                Ok(read) => {
+                    if shared.carries(generation) && to.write_all(&buffer[..read]).is_err() {
+                        break;
+                    }
+                }
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    ) => {}
+                Err(_) => break,
+            }
+        }
+    });
+}
+
+/// Counts the `ssh` processes of one client (those whose command line names its control folder), however they are
+/// parented: the multiplexed master is daemonized.
+struct Sampler {
+    most: Arc<AtomicUsize>,
+    stop: Arc<AtomicBool>,
+    thread: Option<thread::JoinHandle<()>>,
+}
+
+fn ssh_processes(marker: &str) -> usize {
+    let output = Command::new("ps")
+        .args(["-axww", "-o", "pid=,comm=,args="])
+        .output()
+        .unwrap();
+
+    // A session shows as `ssh`; the master retitles itself `ssh: <control path> [mux]`, which can also cut its
+    // command name short.
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| {
+            let command = line.split_whitespace().nth(1).unwrap_or("");
+
+            line.contains(marker)
+                && (command.rsplit('/').next() == Some("ssh") || line.contains(" ssh: "))
+        })
+        .count()
+}
+
+impl Sampler {
+    fn start(marker: String) -> Sampler {
+        let (most, stop) = (
+            Arc::new(AtomicUsize::new(0)),
+            Arc::new(AtomicBool::new(false)),
+        );
+        let (seen, halt) = (Arc::clone(&most), Arc::clone(&stop));
+        let thread = thread::spawn(move || {
+            while !halt.load(Ordering::SeqCst) {
+                seen.fetch_max(ssh_processes(&marker), Ordering::SeqCst);
+                thread::sleep(Duration::from_millis(50));
+            }
+        });
+
+        Sampler {
+            most,
+            stop,
+            thread: Some(thread),
+        }
+    }
+
+    fn finish(mut self) -> usize {
+        self.stop.store(true, Ordering::SeqCst);
+        self.thread.take().unwrap().join().unwrap();
+
+        self.most.load(Ordering::SeqCst)
+    }
+}
+
+/// A whole engine for one server behind `relay`, with the real connector: the server is paired in a throwaway data
+/// folder (the keychain is the in-memory one), its host key is pinned by an earlier connection, and `supervise`
+/// runs the reconnect tick on its own thread, exactly as the desktop does.
+struct Desktop {
+    events: Arc<Mutex<Vec<Event>>>,
+    host_id: String,
+    paths: SshPaths,
+    state: Arc<DeviceState>,
+}
+
+impl Desktop {
+    fn start(server: &Server, relay: &Relay, name: &str) -> Desktop {
+        test_keychain::install();
+
+        let data_dir = server.dir.join(name);
+        // The engine's own layout: what it pins and where it keeps its control sockets.
+        let paths = SshPaths::under(&data_dir, device_core::sandbox::home().as_deref());
+        let host_id = format!("host-{name}");
+        let mut target = server.target("client");
+
+        target.port = relay.port;
+
+        // The first sight of a server asks the person; the key is pinned here so nothing is asked later.
+        let first = connect(server, &target, &paths, &trusting()).unwrap();
+
+        finish(&first, &target, &paths);
+        drop(first);
+
+        fs::create_dir_all(&data_dir).unwrap();
+        store::save(
+            &data_dir.join("device.json"),
+            &Settings {
+                hosts: vec![Host {
+                    address: target.address.clone(),
+                    allow_shell_network: false,
+                    allow_unsandboxed_shell: false,
+                    device_id: host_id.clone(),
+                    forward_agent: false,
+                    identity_file: target.identity_file.clone(),
+                    name: "outage-box".into(),
+                    port: relay.port,
+                    roots: Vec::new(),
+                    secret: "a1".repeat(32),
+                    user: target.user.clone(),
+                }],
+                pairing: Some(Pairing {
+                    account_label: "me".into(),
+                    device_id: format!("desk-{name}"),
+                    secret: "b2".repeat(32),
+                }),
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&events);
+        let state = Arc::new(DeviceState::with_host_binary(
+            &data_dir,
+            Box::new(move |event| seen.lock().unwrap().push(event)),
+            &server.binary(),
+        ));
+
+        state.supervise();
+
+        Desktop {
+            events,
+            host_id,
+            paths,
+            state,
+        }
+    }
+
+    fn connected(&self) -> bool {
+        self.state.status().hosts[0].connected
+    }
+
+    /// The attempt the server is waiting to make, when it is.
+    fn waiting_attempt(&self) -> Option<u32> {
+        self.state.status().hosts[0]
+            .reconnect
+            .as_ref()
+            .filter(|view| view.phase == "waiting")
+            .and_then(|view| view.attempt)
+    }
+
+    /// The marker that names this desktop's ssh processes.
+    fn marker(&self) -> String {
+        self.paths.control_dir.to_string_lossy().into_owned()
+    }
+
+    /// The launches filed on the server, other than those in `except`.
+    fn launches(server: &Server, except: &[&str]) -> Vec<String> {
+        let mut found: Vec<String> = fs::read_dir(server.run_dir())
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|entry| {
+                entry
+                    .file_name()
+                    .to_str()?
+                    .strip_suffix(".pid")
+                    .map(str::to_owned)
+            })
+            .filter(|id| !except.contains(&id.as_str()))
+            .collect();
+
+        found.sort();
+        found
+    }
+
+    fn prompts(&self) -> usize {
+        self.events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|event| matches!(event, Event::Prompt { .. }))
+            .count()
+    }
+}
+
+/// The 50 ms `ps` sampling of [`Sampler`] can miss a process that lives for less than that, so the count of two is
+/// a floor on what ran at once, not a proof; the structure (one attempt per server, the old session closed first)
+/// is what keeps it there.
+#[test]
+fn a_minute_without_network_reconnects_with_at_most_two_ssh_processes_and_stops_only_its_own_stale_host(
+) {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "outage");
+    let relay = Relay::start(server.port);
+    let desktop = Desktop::start(&server, &relay, "o");
+    let sampler = Sampler::start(desktop.marker());
+
+    desktop.state.host_connect(&desktop.host_id, true).unwrap();
+
+    let first = Desktop::launches(&server, &[]);
+
+    assert_eq!(first.len(), 1, "{first:?}");
+
+    let (first_launch, first_pid) = (first[0].clone(), launch_pid(&server, &first[0]).unwrap());
+    // Another computer's session on the same server, which this one did not start.
+    let mut foreign = spawn_host(&server, FOREIGN);
+    let foreign_pid = launch_pid(&server, FOREIGN).unwrap();
+
+    assert!(running(first_pid) && running(foreign_pid));
+
+    // The network goes away for a minute and then comes back.
+    let began = Instant::now();
+    let mut attempts = Vec::new();
+    let mut lost_at = None;
+
+    relay.partition();
+
+    // ssh gives the connection up after its keepalives go unanswered (15 s, three misses and one more interval:
+    // about a minute), so a loss can land just past the minute on a slow runner; the outage lasts until it has.
+    while began.elapsed() < Duration::from_secs(60)
+        || (lost_at.is_none() && began.elapsed() < Duration::from_secs(100))
+    {
+        if lost_at.is_none() && !desktop.connected() {
+            lost_at = Some(began.elapsed());
+
+            // The server never learned the session is gone: the host from before the loss is still there.
+            assert!(
+                running(first_pid),
+                "the old host ended by itself, so there is nothing to reap"
+            );
+        }
+
+        if let Some(attempt) = desktop.waiting_attempt() {
+            if attempts.last() != Some(&attempt) {
+                attempts.push(attempt);
+            }
+        }
+
+        thread::sleep(Duration::from_millis(100));
+    }
+
+    relay.restore();
+    println!("link lost after {lost_at:?}; attempts seen while waiting: {attempts:?}");
+
+    wait_for(
+        "the host did not reconnect within two minutes of the network coming back",
+        Duration::from_secs(120),
+        || desktop.connected() && !Desktop::launches(&server, &[&first_launch, FOREIGN]).is_empty(),
+    );
+
+    assert!(lost_at.is_some(), "the loss was never seen");
+
+    // The stale host of this computer was stopped, and the one it did not start was left alone.
+    wait_for(
+        "the stale host was not stopped",
+        Duration::from_secs(10),
+        || !running(first_pid),
+    );
+
+    assert!(
+        running(foreign_pid),
+        "a host this computer did not start was stopped"
+    );
+    assert!(
+        launch_pid(&server, FOREIGN).is_some(),
+        "its launch file was removed"
+    );
+    assert!(
+        launch_pid(&server, &first_launch).is_none(),
+        "the stale host's launch file stayed"
+    );
+    assert_eq!(
+        desktop.prompts(),
+        0,
+        "a reconnect in the background asked the person something"
+    );
+
+    desktop.state.host_disconnect(&desktop.host_id);
+
+    let _ = foreign.kill();
+    let _ = foreign.wait();
+    drop(relay);
+
+    let most = sampler.finish();
+
+    assert!(
+        most >= 2,
+        "the sampler never saw the master and a session: it counted {most}"
+    );
+    assert!(most <= 2, "{most} ssh processes were alive at once");
+}
+
+#[test]
+fn a_host_this_computer_did_not_start_survives_a_reap_and_a_disconnect() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "foreign");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let connection = connect(&server, &target, &paths, &trusting()).unwrap();
+    let own = connection.launch_id().unwrap().to_owned();
+    let own_pid = launch_pid(&server, &own).expect("the host filed no launch");
+
+    // One host left by an earlier session of this computer, one that another computer started.
+    let mut earlier = spawn_host(&server, SPARE);
+    let mut foreign = spawn_host(&server, FOREIGN);
+    let (earlier_pid, foreign_pid) = (
+        launch_pid(&server, SPARE).unwrap(),
+        launch_pid(&server, FOREIGN).unwrap(),
+    );
+
+    let reaped = connection
+        .reap(&[
+            SPARE.to_owned(),
+            "c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0".to_owned(),
+            "../../etc".to_owned(),
+        ])
+        .unwrap();
+
+    assert_eq!(reaped.stopped, [SPARE]);
+    assert_eq!(reaped.gone, ["c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0"]);
+    assert_eq!(
+        reaped.others, 1,
+        "the foreign host is counted and nothing else"
+    );
+    wait_for(
+        "the named launch kept running",
+        Duration::from_secs(10),
+        || !running(earlier_pid),
+    );
+    let _ = earlier.wait();
+
+    // Disconnecting ends this computer's own session and host, and nothing else.
+    finish(&connection, &target, &paths);
+    drop(connection);
+    wait_for(
+        "the session's own host kept running",
+        Duration::from_secs(10),
+        || !running(own_pid),
+    );
+    wait_for(
+        "the host did not remove its launch file",
+        Duration::from_secs(10),
+        || launch_pid(&server, &own).is_none(),
+    );
+
+    assert!(
+        running(foreign_pid),
+        "a disconnect stopped a host this computer did not start"
+    );
+    assert!(launch_pid(&server, FOREIGN).is_some());
+
+    let _ = foreign.kill();
+    let _ = foreign.wait();
+}
+
+#[test]
+fn a_forwarded_agent_is_linked_from_a_stable_path_in_the_run_folder() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "agent");
+    let socket = server.dir.join("agent.sock");
+    let mut agent = Command::new("ssh-agent")
+        .args(["-D", "-a"])
+        .arg(&socket)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("ssh-agent did not start");
+
+    wait_for("ssh-agent did not listen", Duration::from_secs(10), || {
+        socket.exists()
+    });
+
+    let mut target = server.target("client");
+
+    target.forward_agent = true;
+
+    let paths = server.paths("a");
+    let connection = connect_with_agent(&server, &target, &paths, &trusting(), &socket).unwrap();
+    // The link is named for this desktop, so another desktop on the account never re-points it.
+    let tag = paths.desktop_tag().unwrap();
+    let stable = server.run_dir().join(format!("agent-{tag}.sock"));
+
+    // What the launch started with is the session's own socket, which dies with the session. The host re-points
+    // its (and its children's) `SSH_AUTH_SOCK` at a link in the run folder that a later session replaces.
+    let session = server
+        .remote_env()
+        .lines()
+        .find_map(|line| line.strip_prefix("SSH_AUTH_SOCK=").map(str::to_owned))
+        .expect("no agent was forwarded to the session");
+
+    assert_ne!(Path::new(&session), stable);
+    assert_eq!(fs::read_link(&stable).unwrap(), Path::new(&session));
+
+    finish(&connection, &target, &paths);
+
+    // Without forwarding the host links nothing.
+    let plain = Server::start(&sshd, "no-agent");
+    let connection = connect(
+        &plain,
+        &plain.target("client"),
+        &plain.paths("a"),
+        &trusting(),
+    )
+    .unwrap();
+
+    assert!(
+        Desktop::launches(&plain, &[]).len() == 1
+            && !fs::read_dir(plain.run_dir())
+                .unwrap()
+                .flatten()
+                .any(|entry| entry.file_name().to_string_lossy().starts_with("agent-")),
+        "the host linked an agent that was not forwarded"
+    );
+    assert!(!plain.remote_env().contains("SSH_AUTH_SOCK"));
+
+    finish(&connection, &plain.target("client"), &plain.paths("a"));
+
+    let _ = agent.kill();
+    let _ = agent.wait();
+}
+
+/// Attempts that fail while the server cannot be reached back off, and never stack ssh processes.
+#[test]
+fn attempts_that_fail_while_the_server_is_unreachable_back_off_and_never_stack_ssh_processes() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "unreachable");
+    let relay = Relay::start(server.port);
+    let desktop = Desktop::start(&server, &relay, "u");
+    let sampler = Sampler::start(desktop.marker());
+
+    desktop.state.host_connect(&desktop.host_id, true).unwrap();
+
+    // The network goes away and takes the connection with it at once (a quicker loss than ssh notices on its
+    // own): nothing reaches the server, and what the master and session held is gone.
+    relay.partition();
+    Command::new("pkill")
+        .args(["-f", &desktop.marker()])
+        .status()
+        .unwrap();
+
+    wait_for("the loss was not seen", Duration::from_secs(10), || {
+        !desktop.connected()
+    });
+
+    let began = Instant::now();
+    let mut attempts = Vec::new();
+
+    while began.elapsed() < Duration::from_secs(30) {
+        assert!(!desktop.connected());
+
+        if let Some(attempt) = desktop.waiting_attempt() {
+            if attempts.last() != Some(&attempt) {
+                attempts.push(attempt);
+            }
+        }
+
+        thread::sleep(Duration::from_millis(100));
+    }
+
+    relay.restore();
+
+    assert!(
+        attempts.contains(&2) && attempts.contains(&3),
+        "attempts did not back off through 2 and 3: {attempts:?}"
+    );
+    assert!(
+        desktop.state.status().hosts[0]
+            .reconnect
+            .as_ref()
+            .is_some_and(|view| view.phase != "gaveUp"),
+        "it gave up"
+    );
+
+    wait_for(
+        "the host did not reconnect once the server was reachable",
+        Duration::from_secs(90),
+        || desktop.connected(),
+    );
+
+    assert_eq!(desktop.prompts(), 0);
+
+    desktop.state.host_disconnect(&desktop.host_id);
+    drop(relay);
+
+    let most = sampler.finish();
+
+    assert!(most <= 2, "{most} ssh processes were alive at once");
+}
+
+/// A host killed mid-command must take the command with it: only the host's own thread enforces a timeout.
+#[test]
+fn reaping_a_host_ends_the_commands_it_was_running() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "reapgroup");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let connection = connect(&server, &target, &paths, &trusting()).unwrap();
+    let mut stale = spawn_host(&server, SPARE);
+    let root = vectors::fixture("ssh-reap-group");
+    let request = json!({
+        "kind": "request",
+        "id": 1,
+        "op": "run",
+        "params": {
+            "tool": "shell_run",
+            "input": { "command": "ls /dev/fd > command.fds; echo $$ > command.pid; exec sleep 600", "timeoutSeconds": 600 },
+            "roots": [root],
+            "remainingMs": 700_000,
+            "allowUnsandboxedShell": true,
+        },
+    });
+
+    device_core::frame::write_frame(
+        stale.stdin.as_mut().unwrap(),
+        &serde_json::to_vec(&request).unwrap(),
+    )
+    .unwrap();
+
+    let marker = root.join("command.pid");
+
+    wait_for("the command did not start", Duration::from_secs(20), || {
+        fs::read_to_string(&marker).is_ok_and(|text| text.trim().parse::<i64>().is_ok())
+    });
+
+    let command: i64 = fs::read_to_string(&marker).unwrap().trim().parse().unwrap();
+
+    // The host's stop pipe is not among what the command inherited: it sees what any shell of this test sees.
+    let baseline = String::from_utf8(
+        Command::new("sh")
+            .args(["-c", "ls /dev/fd"])
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap();
+    let inherited = fs::read_to_string(root.join("command.fds")).unwrap();
+
+    assert!(
+        inherited.lines().count() <= baseline.lines().count(),
+        "the command inherited descriptors: {inherited} (a plain shell has {baseline})"
+    );
+    assert!(running(command));
+
+    let reaped = connection.reap(&[SPARE.to_owned()]).unwrap();
+
+    assert_eq!(reaped.stopped, [SPARE]);
+    wait_for(
+        "the reaped host's command kept running",
+        Duration::from_secs(10),
+        || !running(command),
+    );
+
+    let _ = stale.wait();
+
+    finish(&connection, &target, &paths);
+}
+
+/// A host that refuses how it is started (an old binary under the same version) is not a network problem.
+#[test]
+fn a_host_that_refuses_its_command_line_needs_a_reinstall_and_is_not_retried() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "outdated");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let interact: Arc<dyn Interact> = trusting();
+    let outdated = "sh -c 'exit 2'";
+    let error = HostConnection::connect(&target, &paths, outdated, &interact)
+        .err()
+        .expect("a host that exits 2 connected");
+
+    assert!(matches!(error, SshError::HostOutdated { .. }), "{error}");
+    assert!(!error.retryable());
+    assert!(error.to_string().contains("Reinstall"));
     end_master(&target, &paths);
 }

@@ -231,6 +231,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
                     send(site, DEVICE_CHANNEL.changed);
                 }
 
+                send(state.local?.webContents, LOCAL_EVENT.changed);
+
                 break;
             }
             case "progress": {
@@ -400,7 +402,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return requireTransport().hostPair(spec, deviceId, secret);
     });
 
-    relay(DEVICE_CHANNEL.hostConnect, async (_event, deviceId) => requireTransport().hostConnect(readDeviceId(deviceId)));
+    relay(DEVICE_CHANNEL.hostConnect, async (_event, deviceId) => requireTransport().hostConnect(readDeviceId(deviceId), false));
 
     relay(DEVICE_CHANNEL.hostDisconnect, (_event, deviceId) => {
         requireTransport().hostDisconnect(readDeviceId(deviceId));
@@ -438,7 +440,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         requireTransport().promptSecret(checked.id, checked.secret);
     });
 
-    local(LOCAL_CHANNEL.hostConnect, async (deviceId) => requireTransport().hostConnect(readDeviceId(deviceId)));
+    local(LOCAL_CHANNEL.hostConnect, async (deviceId) => requireTransport().hostConnect(readDeviceId(deviceId), true));
 
     local(LOCAL_CHANNEL.hostDisconnect, (deviceId) => {
         requireTransport().hostDisconnect(readDeviceId(deviceId));

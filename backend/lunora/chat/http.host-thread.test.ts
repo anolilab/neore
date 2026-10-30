@@ -25,6 +25,7 @@ vi.mock("../auth/lib/helper", async (importOriginal) => {
 const { registerModule } = await import("../../test/registered-api");
 const { default: schema } = await import("../schema");
 const { runChatStart } = await import("./http");
+const { ROUTES } = await import("../public-api/routes");
 
 registerModule(registry, "agent_sharing", await import("../agent/sharing"));
 registerModule(registry, "agent_threads", await import("../agent/threads"));
@@ -122,6 +123,28 @@ describe("runChatStart on a host-run thread", () => {
         expect(hostResponse.status).toBe(cloudResponse.status);
         expect(await hostResponse.json()).toEqual(await cloudResponse.json());
         expect(await streamCount()).toBe(0);
+    });
+
+    it("is answered host_thread_read_only by the public API chat route, which send_message shares", async () => {
+        vi.stubEnv("LLM_GATEWAY_SIGNING_SECRET", "secret");
+
+        try {
+            const threadId = await insertThread({ runner: "host" });
+            const route = ROUTES.find((candidate) => candidate.operationId === "createChat");
+            const input = {
+                body: { prompt: "hello", stream: false, threadId },
+                ctx: httpContext(),
+                identity: { apiKeyId: "k1", apiKeyScopes: { chat: ["write"] }, authMethod: "api_key", userId: "owner" },
+                params: {},
+                query: {},
+                signal: new AbortController().signal,
+            };
+
+            await expect(route?.handler(input as never)).rejects.toMatchObject({ code: "host_thread_read_only", status: 409 });
+            expect(await streamCount()).toBe(0);
+        } finally {
+            vi.unstubAllEnvs();
+        }
     });
 
     it("control: the gate reports a host thread, and only a host thread", async () => {

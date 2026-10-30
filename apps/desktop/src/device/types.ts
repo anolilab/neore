@@ -9,11 +9,28 @@ export interface Signed {
     signature: string;
 }
 
+/**
+ * Where the connection of a server the person connected stands when it is not simply up (`ReconnectView` in
+ * `engine/reconnect.rs`): waiting for the next attempt, trying, or out of attempts and waiting for a Retry.
+ */
+export interface ReconnectView {
+    /** The attempt in the window, once one is scheduled or running. */
+    attempt: number | null;
+    maxAttempts: number;
+    /** When the next attempt starts, in milliseconds since the epoch. */
+    nextAttemptAt: number | null;
+    phase: "connecting" | "gaveUp" | "waiting";
+    /** Why it gave up. */
+    reason: string | null;
+}
+
 /** A server this computer speaks for, and whether it is connected right now (`HostStatus` in `engine/hosts.rs`). */
 export interface HostStatus {
     connected: boolean;
     deviceId: string;
     name: string;
+    /** Absent while the connection is simply up or was never connected. */
+    reconnect?: ReconnectView;
 }
 
 /** Who this computer is paired as (`StatusView` in `device-core/src/engine.rs`). */
@@ -56,9 +73,12 @@ export interface HostView {
     deviceId: string;
     forwardAgent: boolean;
     identityFile: string | null;
+    /** False where Neore does not share one connection between sessions (Windows): the server has an ssh process of its own. */
+    multiplexed: boolean;
     name: string;
     platform: string | null;
     port: number;
+    reconnect: ReconnectView | null;
     requireShellSandbox: boolean;
     roots: string[];
     sandboxDetail: string | null;
@@ -130,7 +150,7 @@ export interface DeviceCore {
     auditTail: () => string[];
     denyPrompts: () => void;
     execute: (envelope: string, signature: string) => Promise<string>;
-    hostConnect: (deviceId: string) => Promise<string>;
+    hostConnect: (deviceId: string, retry: boolean) => Promise<string>;
     hostDisconnect: (deviceId: string) => void;
     hostForgetKey: (deviceId: string) => void;
     hostPair: (spec: string, deviceId: string, secret: string) => Promise<boolean>;

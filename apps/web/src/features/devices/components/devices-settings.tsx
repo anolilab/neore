@@ -16,11 +16,12 @@ import { toast } from "sonner";
 import SettingsCard from "@/components/settings/settings-card";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useCRPC } from "@/lib/lunora/crpc";
-import type { NativeDevicePlatform, NativeDeviceStatus, NativeHostSpec } from "@/lib/native/bridge";
+import type { NativeDevicePlatform, NativeDeviceStatus, NativeHostReconnect, NativeHostSpec } from "@/lib/native/bridge";
 import {
     connectNativeHost,
     disconnectNativeHost,
     getNativeDeviceStatus,
+    onNativeDeviceChanged,
     openNativeDeviceSettings,
     pairNativeDevice,
     pairNativeHost,
@@ -108,7 +109,8 @@ const DeviceRow: FC<{
     isThisComputer: boolean;
     now: number;
     onConnectionChange: () => void;
-}> = ({ connected, device, isThisComputer, now, onConnectionChange }) => {
+    reconnect?: NativeHostReconnect;
+}> = ({ connected, device, isThisComputer, now, onConnectionChange, reconnect }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const [name, setName] = useState(device.name);
@@ -117,6 +119,27 @@ const DeviceRow: FC<{
     const revoke = useMutation(crpc.devices.functions.revokeDevice.mutationOptions());
     const online = isDeviceOnline(device.lastSeenAt, now);
     const nameId = `device-name-${device._id}`;
+    // A server being reconnected is stopped by "Disconnect"; one that gave up is tried again by "Retry" or let go by "Dismiss".
+    const stoppable = connected || reconnect?.phase === "waiting" || reconnect?.phase === "connecting";
+    let buttonLabel = t`Connect`;
+
+    if (stoppable) {
+        buttonLabel = t`Disconnect`;
+    } else if (reconnect?.phase === "gaveUp") {
+        buttonLabel = t`Retry`;
+    }
+
+    const connection = (action: () => Promise<unknown>) => {
+        void (async () => {
+            try {
+                await action();
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : t`Could not connect to the server.`);
+            } finally {
+                onConnectionChange();
+            }
+        })();
+    };
 
     return (
         <li className="flex flex-wrap items-center gap-3 border-b py-3 last:border-b-0">
@@ -147,23 +170,20 @@ const DeviceRow: FC<{
                 {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}
                 {device.transport === "ssh" && <Badge variant="outline">{t`Server over SSH`}</Badge>}
                 <Badge variant={online ? "default" : "secondary"}>{online ? t`Online` : t`Offline`}</Badge>
+                {reconnect?.phase === "gaveUp" && <Badge variant="destructive">{t`Connection lost`}</Badge>}
+                {(reconnect?.phase === "waiting" || reconnect?.phase === "connecting") && <Badge variant="secondary">{t`Reconnecting`}</Badge>}
                 {connected !== undefined && (
                     <Button
-                        onClick={() => {
-                            void (async () => {
-                                try {
-                                    await (connected ? disconnectNativeHost(device._id) : connectNativeHost(device._id));
-                                } catch (error) {
-                                    toast.error(error instanceof Error ? error.message : t`Could not connect to the server.`);
-                                } finally {
-                                    onConnectionChange();
-                                }
-                            })();
-                        }}
+                        onClick={() => connection(() => (stoppable ? disconnectNativeHost(device._id) : connectNativeHost(device._id)))}
                         size="sm"
                         variant="outline"
                     >
-                        {connected ? t`Disconnect` : t`Connect`}
+                        {buttonLabel}
+                    </Button>
+                )}
+                {reconnect?.phase === "gaveUp" && (
+                    <Button onClick={() => connection(() => disconnectNativeHost(device._id))} size="sm" variant="outline">
+                        {t`Dismiss`}
                     </Button>
                 )}
                 <Button onClick={() => setConfirming(true)} size="sm" variant="outline">
@@ -358,9 +378,14 @@ const DevicesSettings: FC = () => {
     const register = useMutation(crpc.devices.functions.registerDevice.mutationOptions());
     const revoke = useMutation(crpc.devices.functions.revokeDevice.mutationOptions());
 
-    useEffect(() => {
-        void getNativeDeviceStatus().then(setNative);
-    }, []);
+    // Once, and again on each change of the shell (a reconnect in the background, say): the buttons follow it.
+    useEffect(
+        () =>
+            onNativeDeviceChanged(() => {
+                void getNativeDeviceStatus().then(setNative);
+            }),
+        [],
+    );
 
     const pairedHere = native?.deviceId ? devices?.find((device) => device._id === native.deviceId) : undefined;
     const refreshNative = (): void => {
@@ -449,6 +474,7 @@ const DevicesSettings: FC = () => {
                                     key={device._id}
                                     now={now}
                                     onConnectionChange={refreshNative}
+                                    reconnect={native?.hosts?.find((host) => host.deviceId === device._id)?.reconnect}
                                 />
                             ))}
                         </ul>

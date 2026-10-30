@@ -22,6 +22,12 @@ default = ["keychain"]
 # The paired-device side: envelopes, approvals, the engine and the pairing store (the secret lives in the OS
 # keychain). `actions`, `fs`, `shell` and `sandbox` build without it.
 keychain = ["dep:keyring"]
+# `store::test_keychain`, the in-memory keychain the integration tests install. Off in every build that ships: only
+# this crate's own dev-dependency below turns it on, so `install()` is not in the addon or the host.
+test-support = []
+
+[dev-dependencies]
+device-core = { path = ".", default-features = false, features = ["test-support"] }
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
