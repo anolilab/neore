@@ -157,7 +157,12 @@ export class HostPoster implements SessionObserver {
         channel.append("text", delta);
 
         if (this.options.media !== undefined) {
-            this.texts.set(turnId, ((this.texts.get(turnId) ?? "") + delta).slice(0, MAX_TURN_TEXT_CHARS));
+            const kept = this.texts.get(turnId) ?? "";
+
+            // Past the cap nothing more is kept, so a long turn costs nothing more per delta.
+            if (kept.length < MAX_TURN_TEXT_CHARS) {
+                this.texts.set(turnId, (kept + delta).slice(0, MAX_TURN_TEXT_CHARS));
+            }
         }
     }
 

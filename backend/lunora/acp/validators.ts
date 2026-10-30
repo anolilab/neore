@@ -90,7 +90,7 @@ export const vHostEvent = v.union(
         kind: v.literal("media"),
         name: v.string().max(255),
         reference: v.string().max(1024),
-        size: v.number(),
+        size: v.number().check((size) => Number.isSafeInteger(size) && size >= 0, { message: "Invalid size" }),
         storageKey: v.optional(v.string().max(512)),
         uploadId: v.optional(v.string().max(64)),
     }),
