@@ -63,6 +63,7 @@ let threadId: string;
 const ids: Record<string, string> = {};
 let streamingConfigs: { model: string }[] = [];
 let agentModelQueries = 0;
+let activeLeafCalls: { runModel?: string }[] = [];
 
 const run = async <T>(body: (ctx: any) => Promise<T>): Promise<T> => await harness.run(body);
 
@@ -91,6 +92,10 @@ const fakeContext = (): any => {
                 streamingConfigs.push(args.streamingConfig);
 
                 return "stream-1";
+            }
+
+            if (reference.__lunoraRef === "agent_branches:setActiveLeaf") {
+                activeLeafCalls.push(args);
             }
 
             return null;
@@ -131,6 +136,7 @@ const switchTo = async (model: string) =>
 beforeEach(async () => {
     streamingConfigs = [];
     agentModelQueries = 0;
+    activeLeafCalls = [];
     harness = lunoraTest(schema as never);
     threadId = await run(async (ctx) => await ctx.db.insert("threads", { model: A, status: "active", title: "T", userId: OWNER }));
     await insertRow("u1", 0, 0, "user", "hello");
@@ -178,6 +184,8 @@ describe("/chat/start after a switch", () => {
 
         expect(response.status).toBe(200);
         expect(streamingConfigs.at(-1)?.model).toBe(B);
+        // The run's model reaches the branch write, which keeps it on the regenerated path.
+        expect(activeLeafCalls).toMatchObject([{ runModel: B }]);
     });
 
     it("does not let a pre-switch model outside the registry override a regenerate", async () => {

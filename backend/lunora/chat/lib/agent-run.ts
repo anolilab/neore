@@ -1173,6 +1173,13 @@ export const failRun = async (
         }
     }
 
+    // A stopped run that fails here never saves the text it owed, so its stop is over (`settleStoppedRun`).
+    if (endedElsewhere) {
+        await ctx
+            .runMutation(internal.chat.streaming.persistent.library.settleStoppedRun, { streamId: streamId as Id<"persistentStreams"> })
+            .catch(() => undefined);
+    }
+
     try {
         await setThreadStatus(ctx, threadId, endedElsewhere ? "active" : threadStatus);
     } catch {

@@ -35,6 +35,7 @@ import {
     vMessageWithMetadataInternal,
     vPaginationResult,
 } from "./validators";
+import { agentSwitchOf } from "./agent-switch-logic";
 import { loadBranchTree, parentOf, resolveLeafRow } from "./branch-rows";
 import { BRANCH_ROOT, resolveActivePath, resolveBranchParent } from "./branch-tree";
 import { changeMessageFiles, changeRefcount } from "./files";
@@ -196,6 +197,8 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
         {
             activeLeafId,
             continuationHasRows: lastInOverrideOrder !== null,
+            dividerUnderPromptId:
+                failPendingSteps && promptMessage && activeLeafId ? await dividerUnder(context, activeLeafId as Id<"messages">, promptMessage._id) : undefined,
             explicitParentId: parentMessageId,
             failPendingSteps,
             firstRole: messages[0]?.message.role,
@@ -435,6 +438,13 @@ const withToolResultFiles = async <M extends { fileIds?: Id<"chatFiles">[]; mess
     return { ...message, fileIds: [...new Set([...(message.fileIds ?? []), ...referenced])] };
 };
 
+/** `leafId` when it is an agent-switch divider hanging directly under `promptId` — what a regenerate of the newest turn points at. */
+const dividerUnder = async (context: MutationContext, leafId: Id<"messages">, promptId: Id<"messages">): Promise<Id<"messages"> | undefined> => {
+    const leaf = await context.db.get(leafId);
+
+    return leaf && leaf.parentMessageId === promptId && agentSwitchOf(leaf) ? leaf._id : undefined;
+};
+
 /**
  * A row with no `parentMessageId` follows the row before it (`branch-tree.ts`).
  * Inserting at the end of an `order` that is NOT the thread's last — a
@@ -443,7 +453,7 @@ const withToolResultFiles = async <M extends { fileIds?: Id<"chatFiles">[]; mess
  * its current parent first, so the insert changes nothing that was there.
  * One indexed read, and nothing more, for an ordinary append at the end.
  */
-const pinFollowingRowParent = async (context: MutationContext, threadId: Id<"threads">, order: number): Promise<void> => {
+export const pinFollowingRowParent = async (context: MutationContext, threadId: Id<"threads">, order: number): Promise<void> => {
     const nextRow = await context.db
         .query("messages")
         .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId).gt("order", order))

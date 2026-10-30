@@ -753,6 +753,7 @@ const runChatStartOnShard = async (
         // thread at the prompt puts it on the displayed path once it exists.
         await context.runMutation(internal.agent.branches.setActiveLeaf, {
             messageId: prompt._id as Id<"messages">,
+            runModel: effectiveModel,
             threadId: validThreadId as Id<"threads">,
         });
 

@@ -71,7 +71,7 @@ export const insertMessageRow = async (db: Database, row: NewRow<"messages">): P
  */
 export const insertAgentSwitchRow = async (
     db: Database,
-    row: { order: number; parentMessageId?: string; part: AgentSwitchPart; threadId: Id<"threads">; userId: string },
+    row: { order: number; parentMessageId?: string; part: AgentSwitchPart; stepOrder?: number; threadId: Id<"threads">; userId: string },
 ): Promise<Id<"messages">> => {
     const { message, providerMetadata } = agentSwitchRowContent(row.part);
 
@@ -81,7 +81,7 @@ export const insertAgentSwitchRow = async (
         parentMessageId: row.parentMessageId,
         providerMetadata,
         status: "success",
-        stepOrder: 0,
+        stepOrder: row.stepOrder ?? 0,
         threadId: row.threadId,
         tool: false,
         userId: row.userId,

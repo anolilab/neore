@@ -17,9 +17,9 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { agentSwitchOf, lastAgentSwitch, sameAgent } from "./agent-switch-logic";
 import type { AgentRef, AgentSwitchPart } from "./agent-switch-validators";
-import { getThreadRow, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
-import { getMaxMessage } from "./messages";
-import { patchAgentSwitchRow, patchThread } from "./table-writes";
+import { childrenOf, getThreadRow, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
+import { getMaxMessage, pinFollowingRowParent } from "./messages";
+import { insertAgentSwitchRow, patchAgentSwitchRow, patchThread } from "./table-writes";
 
 type Row = Doc<"messages">;
 type Reader = Pick<QueryCtx, "db">;
@@ -199,6 +199,65 @@ export const runAgentModelOf = async (
     const agent = await resolvePathAgent(context, thread, from);
 
     return agent?.model ?? null;
+};
+
+/**
+ * Where a regenerate of `promptId` points the thread, as the row its new reply will hang under.
+ *
+ * The prompt itself, except for the newest turn of a switched thread whose run picked up the agent of the
+ * displayed leaf (`runAgentModelOf`): the prompt's own path does not carry that agent, so a reply hung
+ * straight under it would put the thread back on the older one for the next send. A divider under the prompt
+ * (an earlier regenerate's, when it names the same switch) is the parent instead, at the end of the prompt's
+ * `order` so it sorts before the reply that follows. `runModel` is the model the run actually uses: the
+ * divider is written only when it is the one the path ends on.
+ */
+export const regenerateParentOf = async (
+    context: MutationCtx,
+    thread: Doc<"threads">,
+    promptId: Id<"messages">,
+    runModel: string | undefined,
+): Promise<string> => {
+    if (!thread.activeAgent || runModel === undefined || thread.userId === undefined) {
+        return promptId;
+    }
+
+    const prompt = await getThreadRow(context, thread._id, promptId);
+    const leaf = await leafRowOf(context, thread);
+
+    if (!prompt || !leaf || !(await isLatestTurn(context, thread._id, leaf, prompt))) {
+        return promptId;
+    }
+
+    const to = await resolvePathAgent(context, thread, leaf);
+    const from = await resolvePathAgent(context, thread, prompt);
+
+    if (!to || !from || to.model !== runModel || sameAgent(from, to)) {
+        return promptId;
+    }
+
+    const siblings = await childrenOf(context, thread._id, prompt);
+    const existing = siblings.findLast((row) => {
+        const part = agentSwitchOf(row);
+
+        return part !== undefined && sameAgent(part.from, from) && sameAgent(part.to, to);
+    });
+
+    if (existing) {
+        return existing._id;
+    }
+
+    await pinFollowingRowParent(context, thread._id, prompt.order);
+
+    const last = await getMaxMessage(context, thread._id, prompt.order);
+
+    return await insertAgentSwitchRow(context.db, {
+        order: prompt.order,
+        parentMessageId: prompt._id,
+        part: { from, mode: "full", startMessageId: prompt._id, to },
+        stepOrder: (last?.stepOrder ?? prompt.stepOrder) + 1,
+        threadId: thread._id,
+        userId: thread.userId,
+    });
 };
 
 export const getRunAgentModel = internalQuery
