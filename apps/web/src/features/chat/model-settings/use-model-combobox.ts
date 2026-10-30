@@ -4,7 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useMutation as useReactQueryMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { ThreadRow } from "@/features/chat/core/context/chat-context-types";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
@@ -49,6 +49,14 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     // answer to an earlier pick must not put its model back over the one the user ended on.
     const pickQueueRef = useRef(createLatestPickQueue());
 
+    // A failed pick restores what the thread runs on NOW: the row captured when the pick was made can predate an
+    // earlier pick that already switched it, and the live row may have landed before the failure did.
+    const liveThreadRef = useRef(thread);
+
+    useEffect(() => {
+        liveThreadRef.current = thread;
+    }, [thread]);
+
     // Get effective model (the agent of a switched thread, then the thread's model, then the pick)
     const effectiveModel = thread?.activeAgent?.model ?? thread?.model ?? selectedModel;
 
@@ -73,7 +81,11 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         }
     };
 
-    const revertSwitch = (id: string, row: ThreadRow) => loadThreadData({ mode: row.mode, model: row.activeAgent?.model ?? row.model }, id);
+    const revertSwitch = (id: string, row: ThreadRow) => {
+        const live = liveThreadRef.current?._id === id ? liveThreadRef.current : row;
+
+        loadThreadData({ mode: live.mode, model: live.activeAgent?.model ?? live.model }, id);
+    };
 
     // Resolves true when the thread took the switch or the user was told why not; false when the server has no
     // transcript to switch in yet (no messages) and the pick is an edit of the thread's model instead.

@@ -140,6 +140,35 @@ describe("useModelCombobox: a switch that settles after the user opened another 
         });
     };
 
+    it("restores the thread's current agent, not the one it had when the failed pick was made", async () => {
+        let controls = { reject: (_error: Error) => {} };
+        // The tsconfig lib predates `Promise.withResolvers`.
+
+        const answer = new Promise((_resolve, reject) => {
+            controls = { reject };
+        });
+
+        hoisted.switchAgent.mockReturnValue(answer);
+
+        const { rerender, result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+        let pick: Promise<void> = Promise.resolve();
+
+        act(() => {
+            pick = result.current.changeModel("openai/gpt-5-nano");
+        });
+
+        // An earlier pick already switched the thread to B on the server, and the live row arrives first.
+        hoisted.thread.current = { _id: "t1", activeAgent: { kind: "model", model: B }, mode: "text", model: A };
+        rerender();
+
+        await act(async () => {
+            controls.reject(new Error("boom"));
+            await pick;
+        });
+
+        expect(useModelStore.getState()).toMatchObject({ selectedModel: B, selectedModelThreadId: "t1" });
+    });
+
     it("leaves the store to the new thread when the answer lands after navigating", async () => {
         await pickThenNavigate(({ resolve }) => resolve({ agent: { kind: "model", model: B }, coldStartCostly: false, messageId: "m", switched: true }));
 
