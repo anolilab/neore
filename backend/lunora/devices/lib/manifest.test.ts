@@ -34,6 +34,14 @@ describe("parseManifestTools", () => {
         expect(parseManifestTools([tool({ inputSchema: { description: "x".repeat(20_000), type: "object" } })])).toBeNull();
     });
 
+    it.each(["acp_start", "acp_send", "acp_cancel", "acp_permission_answer"])("refuses a tool named like the backend's coding-agent call %s", (name) => {
+        expect(parseManifestTools([tool({ name })])).toBeNull();
+    });
+
+    it("accepts other names that merely start with acp_", () => {
+        expect(parseManifestTools([tool({ name: "acp_backup" })])).toHaveLength(1);
+    });
+
     it("truncates long descriptions", () => {
         expect(parseManifestTools([tool({ description: "x".repeat(5000) })])?.[0]?.description).toHaveLength(2000);
     });

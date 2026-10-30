@@ -88,6 +88,23 @@ describe("readHostTranscript", () => {
         expect(await textOf(ctx)).toBe(`Looking. ${OMITTED_MARKER}All done.`);
     });
 
+    it("marks what it left out even when the front held only tool events", async () => {
+        const chunks = [
+            ...events(200 * (MAX_TRANSCRIPT_PAGES + MAX_TAIL_PAGES) + 50),
+            { seq: 200 * (MAX_TRANSCRIPT_PAGES + MAX_TAIL_PAGES) + 50, text: "All done." },
+        ];
+        const { ctx } = chunkTable(chunks);
+
+        expect(await textOf(ctx)).toBe(`${OMITTED_MARKER}All done.`);
+    });
+
+    it("adds no marker when the tail has no text to separate from the front", async () => {
+        const chunks = [{ seq: 0, text: "Looking. " }, ...events(200 * (MAX_TRANSCRIPT_PAGES + MAX_TAIL_PAGES) + 50, 1)];
+        const { ctx } = chunkTable(chunks);
+
+        expect(await textOf(ctx)).toBe("Looking. ");
+    });
+
     it("joins the tail on without a marker when it starts where the front read stopped", async () => {
         const chunks = [...events(200 * MAX_TRANSCRIPT_PAGES), { seq: 200 * MAX_TRANSCRIPT_PAGES, text: "Done." }];
         const { ctx } = chunkTable(chunks);

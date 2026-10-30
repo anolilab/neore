@@ -34,6 +34,8 @@ const internals = await import("./internal");
 const { signDevicePayload, verifyDevicePayload } = await import("./lib/signing");
 const gdpr = await import("./gdpr");
 const { MAX_OPEN_CALLS_PER_DEVICE } = await import("./lib/constants");
+const { ACP_CLAIM_WINDOW_MS, DEVICE_CLAIM_WINDOW_MS } = await import("./lib/constants");
+const { claimWindowMs, isAcpTool, OPEN_CALL_PAGE } = await import("./lib/state");
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -309,6 +311,48 @@ describe("the relay", () => {
         }
 
         await expect(createCall({ deviceId, threadId, userId: ownerId })).resolves.toEqual({ error: "busy" });
+    });
+
+    it("counts its ordinary calls however many coding-agent calls pile up before them", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const threadId = await insertThread(ownerId);
+
+        // More stale cancels than one page reads, all older than the ordinary calls.
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < OPEN_CALL_PAGE + 10; index += 1) {
+                await ctx.db.insert("deviceCalls", {
+                    createdAt: 1,
+                    deadline: 2,
+                    deviceId,
+                    deviceName: "Laptop",
+                    envelope: "",
+                    input: "{}",
+                    signature: "",
+                    status: "pending",
+                    taintedBy: [],
+                    threadId,
+                    toolName: "acp_cancel",
+                    userId: ownerId,
+                });
+            }
+        });
+
+        for (let index = 0; index < MAX_OPEN_CALLS_PER_DEVICE; index += 1) {
+            expect("callId" in (await createCall({ deviceId, threadId, userId: ownerId }))).toBe(true);
+        }
+
+        await expect(createCall({ deviceId, threadId, userId: ownerId })).resolves.toEqual({ error: "busy" });
+    });
+
+    it("takes only the four coding-agent call names for one, so no other acp_ tool gets their window", () => {
+        for (const name of ["acp_start", "acp_send", "acp_cancel", "acp_permission_answer"]) {
+            expect(isAcpTool(name)).toBe(true);
+            expect(claimWindowMs(name)).toBe(ACP_CLAIM_WINDOW_MS);
+        }
+
+        expect(isAcpTool("acp_backup")).toBe(false);
+        expect(claimWindowMs("acp_backup")).toBe(DEVICE_CLAIM_WINDOW_MS);
+        expect(isAcpTool("fs_read")).toBe(false);
     });
 
     it("never signs a call for a thread the device may not reach", async () => {

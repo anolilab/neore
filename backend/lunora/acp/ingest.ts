@@ -7,7 +7,8 @@
  * - {@link applyHostEvents}: ONE mutation per post. The rate limit comes first, then the owner comparisons (an
  *   internal mutation runs without RLS, so nothing else stands between a verified device and a thread), then the
  *   claim by `(turnId, seq)`: events at or before the last stored `seq` are dropped, a post that starts past
- *   the next free `seq` answers `gap`, and the rest are written.
+ *   the next free `seq` answers `gap`, and the rest are written. A turn that begins while the session's previous
+ *   turn is still live answers `busy` (the host retries: the earlier turn's end is still on its way).
  *
  * `lastSeq` is never a counter on the stream row (a write per post would re-run `getActiveStreamForThread` for
  * every viewer); it is the last chunk of `by_streamId_seq`, so every event, tool and permission events and the
@@ -37,7 +38,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { DEVICE_SIGNATURE_WINDOW_MS } from "../devices/lib/constants";
 import { isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "../devices/lib/signing";
 import { MAX_EVENTS_PER_POST } from "./lib/constants";
-import { finishHostTurn } from "./lib/finish";
+import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
 import { reapExpiredHostStreams } from "./lib/reap";
 import { sessionOfThread, touchSession } from "./lib/sessions";
@@ -73,6 +74,7 @@ const vApplyResult = v.union(
     v.object({ next: v.number(), outcome: v.literal("gap") }),
     v.object({ outcome: v.literal("refused") }),
     v.object({ outcome: v.literal("limited") }),
+    v.object({ outcome: v.literal("busy") }),
 );
 
 type ApplyResult = Infer<typeof vApplyResult>;
@@ -143,6 +145,24 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
     });
 
     return { ended: false, next: 0, outcome: "applied", threadId: threadId as string };
+};
+
+/**
+ * The desktop's session ended: the session ends now instead of waiting to be read as stale. A turn still live on it
+ * lost its host's end (the desktop sends the close only after delivering its turns), so it ends as interrupted.
+ * Answers success for a session it does not know or has already ended: the desktop has nothing more to try.
+ */
+const closeSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessionId: string, now: number): Promise<ApplyResult> => {
+    const session = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
+
+    if (!session || session.status === "ended") {
+        return { ended: true, next: 0, outcome: "applied" };
+    }
+
+    await endLiveHostTurns(ctx, session.threadId, { reason: "interrupted" }, now);
+    await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+
+    return { ended: true, next: 0, outcome: "applied", threadId: session.threadId as string };
 };
 
 /** Events that come from the agent itself: the first of them moves a turn to `running`. */
@@ -223,6 +243,15 @@ const applyTurnPost = async (
         // A turn the backend did not queue begins with the user's prompt, as the host's first event.
         if (first?.kind !== "turn_start" || firstSeq !== 0) {
             return REFUSED;
+        }
+
+        // The session runs one turn at a time, so the thread has at most one live stream. A new turn can still
+        // arrive while the earlier one's end is on its way (its output is being retried after an outage); a second
+        // live stream would hide the new turn from every viewer, so the host waits and asks again. The reaper bounds the wait.
+        const live = await ctx.db.persistentStreams.findFirst({ where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId } });
+
+        if (live) {
+            return { outcome: "busy" };
         }
 
         const { messages } = await addMessagesHandler(ctx, {
@@ -331,11 +360,13 @@ const applyTurnPost = async (
 };
 
 /**
- * One verified post. `threadId` absent = a session-level post (`session_open`); present = a turn post.
+ * One verified post. `threadId` absent = a session-level post (`session_open`, or `close` with no events); present = a turn post.
  * `limited` and `refused` change nothing.
  */
 export const applyHostEvents = internalMutation
     .input({
+        // A session-level post with no events: the desktop's session ended.
+        close: v.optional(v.boolean()),
         deviceId: v.string().max(MAX_LENGTH.id),
         events: v.array(vHostEvent).check((events) => events.length <= MAX_EVENTS_PER_POST, { message: "Too many events" }),
         firstSeq: v.optional(v.number()),
@@ -360,6 +391,10 @@ export const applyHostEvents = internalMutation
         }
 
         const { now } = ctx;
+
+        if (args.close === true) {
+            return args.threadId === undefined && args.events.length === 0 ? await closeSession(ctx, device, args.sessionId, now) : REFUSED;
+        }
 
         if (args.threadId === undefined) {
             return await openSession(ctx, device, args.sessionId, args.events, now);

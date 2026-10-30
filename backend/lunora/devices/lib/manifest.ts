@@ -7,7 +7,7 @@
 import type { Infer } from "lunorash/server";
 
 import type { vDeviceManifestTool } from "../validators";
-import { MAX_MANIFEST_DESCRIPTION_CHARS, MAX_MANIFEST_SCHEMA_BYTES, MAX_MANIFEST_TOOLS } from "./constants";
+import { ACP_TOOLS, MAX_MANIFEST_DESCRIPTION_CHARS, MAX_MANIFEST_SCHEMA_BYTES, MAX_MANIFEST_TOOLS } from "./constants";
 import { utf8Length } from "./signing";
 
 export type DeviceManifestTool = Infer<typeof vDeviceManifestTool>;
@@ -34,7 +34,8 @@ export const parseManifestTools = (value: unknown): DeviceManifestTool[] | null 
 
         const { description, inputSchema, kind, name, readOnly } = entry;
 
-        if (typeof name !== "string" || !DEVICE_TOOL_NAME.test(name) || seen.has(name)) {
+        // The coding-agent call names are the backend's own: a device tool by one of them would be given an `acp_*` call's budget and claim window.
+        if (typeof name !== "string" || !DEVICE_TOOL_NAME.test(name) || seen.has(name) || ACP_TOOLS.includes(name)) {
             return null;
         }
 
