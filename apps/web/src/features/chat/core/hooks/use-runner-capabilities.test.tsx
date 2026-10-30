@@ -11,6 +11,8 @@ const chat = vi.hoisted(() => {
     return {
         data: undefined as CapabilityReport | null | undefined,
         isLocalModel: false,
+        isLocalStreaming: false,
+        isStreaming: false,
         queryArgs: undefined as unknown,
         runner: undefined as "host" | undefined,
         threadLoaded: true,
@@ -47,7 +49,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 vi.mock("@/features/chat/core/context/chat-context", () => {
     return {
         useChatIsStreaming: () => {
-            return { isLocalModel: chat.isLocalModel };
+            return { isLocalModel: chat.isLocalModel, isLocalStreaming: chat.isLocalStreaming, isStreaming: chat.isStreaming };
         },
         useChatThread: () => {
             return { thread: chat.threadLoaded ? { runner: chat.runner } : undefined, threadId: "thread-1" };
@@ -59,6 +61,8 @@ describe("useRunnerCapabilities", () => {
     beforeEach(() => {
         chat.data = undefined;
         chat.isLocalModel = false;
+        chat.isLocalStreaming = false;
+        chat.isStreaming = false;
         chat.queryArgs = undefined;
         chat.runner = undefined;
         chat.threadLoaded = true;
@@ -79,6 +83,24 @@ describe("useRunnerCapabilities", () => {
         expect(result.current).toBe(LOCAL_BROWSER_CAPABILITIES);
         expect(followUpControl(result.current)).toBe("queue");
         expect(result.current?.groups.tools).toBeUndefined();
+    });
+
+    it("keeps a streaming cloud turn's controls when the picker moves to a local model", () => {
+        chat.isLocalModel = true;
+        chat.isStreaming = true;
+
+        const { result } = renderHook(() => useRunnerCapabilities());
+
+        expect(result.current).toBe(CLOUD_INTERACTIVE_CAPABILITIES);
+    });
+
+    it("keeps a streaming local turn's controls when the picker moves to a cloud model", () => {
+        chat.isLocalStreaming = true;
+        chat.isStreaming = true;
+
+        const { result } = renderHook(() => useRunnerCapabilities());
+
+        expect(result.current).toBe(LOCAL_BROWSER_CAPABILITIES);
     });
 
     it("reads a host thread's report from the backend, and none until it arrives", () => {

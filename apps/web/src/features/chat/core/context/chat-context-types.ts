@@ -75,6 +75,8 @@ export interface ChatStreamingContextValue {
     gatewayUrl: string | null;
     /** The model runs on a `local-browser` endpoint: the browser streams it and the backend saves text only. */
     isLocalModel: boolean;
+    /** The running turn is the browser's own `local-browser` stream (not the picked model's). */
+    isLocalStreaming: boolean;
     isStreaming: boolean;
 
     /**

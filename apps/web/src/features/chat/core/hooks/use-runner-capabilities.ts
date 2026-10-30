@@ -28,7 +28,7 @@ const withoutNativeSteer = (report: CapabilityReport): CapabilityReport => {
  */
 const useRunnerCapabilities = (): CapabilityReport | null => {
     const crpc = useCRPC();
-    const { isLocalModel } = useChatIsStreaming();
+    const { isLocalModel, isLocalStreaming, isStreaming } = useChatIsStreaming();
     const { thread, threadId } = useChatThread();
     const isHostRun = thread?.runner === "host";
     const { data } = useQuery(crpc.acp.functions.getThreadCapabilities.queryOptions(isHostRun && threadId ? { threadId } : skipToken));
@@ -41,7 +41,10 @@ const useRunnerCapabilities = (): CapabilityReport | null => {
         return data ? withoutNativeSteer(data) : null;
     }
 
-    return isLocalModel ? LOCAL_BROWSER_CAPABILITIES : CLOUD_INTERACTIVE_CAPABILITIES;
+    // A turn in flight keeps the runner it started on: picking another model mid-stream must not swap the controls.
+    const runsLocal = isStreaming ? isLocalStreaming : isLocalModel;
+
+    return runsLocal ? LOCAL_BROWSER_CAPABILITIES : CLOUD_INTERACTIVE_CAPABILITIES;
 };
 
 export default useRunnerCapabilities;
