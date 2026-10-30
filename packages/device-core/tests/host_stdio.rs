@@ -9,7 +9,9 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -69,6 +71,8 @@ fn host_command() -> Command {
 struct Host {
     child: Child,
     frames: Receiver<Value>,
+    /// While set, the reader stops taking frames off stdout, so the pipe fills and the host stalls on its writes.
+    held: Arc<AtomicBool>,
     stdin: Option<ChildStdin>,
 }
 
@@ -84,26 +88,39 @@ impl Host {
         let mut stdout = child.stdout.take().unwrap();
         let stdin = child.stdin.take();
         let (sender, frames) = channel();
+        let held = Arc::new(AtomicBool::new(false));
+        let reader_held = Arc::clone(&held);
 
-        thread::spawn(move || {
-            while let Ok(Some(bytes)) = read_frame(&mut stdout) {
-                // A chunk is raw bytes; the tests see it as `{ kind: "chunk", id, bytes: [..] }`.
-                let frame = chunk_of(&bytes).map_or_else(
-                    || serde_json::from_slice(&bytes).unwrap(),
-                    |(id, data)| json!({ "kind": "chunk", "id": id, "bytes": data }),
-                );
+        thread::spawn(move || loop {
+            while reader_held.load(Ordering::SeqCst) {
+                thread::sleep(Duration::from_millis(10));
+            }
 
-                if sender.send(frame).is_err() {
-                    break;
-                }
+            let Ok(Some(bytes)) = read_frame(&mut stdout) else {
+                break;
+            };
+            // A chunk is raw bytes; the tests see it as `{ kind: "chunk", id, bytes: [..] }`.
+            let frame = chunk_of(&bytes).map_or_else(
+                || serde_json::from_slice(&bytes).unwrap(),
+                |(id, data)| json!({ "kind": "chunk", "id": id, "bytes": data }),
+            );
+
+            if sender.send(frame).is_err() {
+                break;
             }
         });
 
         Host {
             child,
             frames,
+            held,
             stdin,
         }
+    }
+
+    /// Stops (or resumes) reading the host's stdout.
+    fn hold(&self, held: bool) {
+        self.held.store(held, Ordering::SeqCst);
     }
 
     fn next(&self) -> Value {
@@ -632,7 +649,8 @@ mod tar {
         assert_eq!(response["ok"], false);
     }
 
-    /// The host stalls on a stdout nobody reads; a `cancel` is read all the same and ends the archive.
+    /// The host stalls on a stdout nobody reads (the test stops reading it); a `cancel` is read all the same and
+    /// ends the archive.
     #[test]
     fn a_cancel_stops_an_archive_that_is_still_being_written() {
         let root = folder_of("cancel", &[]);
@@ -642,9 +660,11 @@ mod tar {
         let mut host = Host::start();
 
         host.next();
+        host.hold(true);
         host.request(5, "tar", files(&root, ""));
         thread::sleep(Duration::from_millis(500));
         host.request(6, "cancel", json!({ "target": 5 }));
+        host.hold(false);
 
         let (mut archive, mut answers) = (0usize, Vec::new());
 
