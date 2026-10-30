@@ -379,9 +379,13 @@ const DevicesSettings: FC = () => {
     const revoke = useMutation(crpc.devices.functions.revokeDevice.mutationOptions());
 
     // Once, and again on each change of the shell (a reconnect in the background, say): the buttons follow it.
-    useEffect(() => onNativeDeviceChanged(() => {
-        void getNativeDeviceStatus().then(setNative);
-    }), []);
+    useEffect(
+        () =>
+            onNativeDeviceChanged(() => {
+                void getNativeDeviceStatus().then(setNative);
+            }),
+        [],
+    );
 
     const pairedHere = native?.deviceId ? devices?.find((device) => device._id === native.deviceId) : undefined;
     const refreshNative = (): void => {
