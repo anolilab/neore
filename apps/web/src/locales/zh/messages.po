@@ -19281,7 +19281,7 @@ msgstr "中性色彩，大片质感"
 
 #: src/features/code/components/host-details.tsx:36
 msgid "Never"
-msgstr ""
+msgstr "从不"
 
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:32
 #: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:61

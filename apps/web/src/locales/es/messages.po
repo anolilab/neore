@@ -19281,7 +19281,7 @@ msgstr "Color neutro, estética de superproducción"
 
 #: src/features/code/components/host-details.tsx:36
 msgid "Never"
-msgstr ""
+msgstr "Nunca"
 
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:32
 #: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:61
