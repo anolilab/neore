@@ -87,4 +87,29 @@ describe("<DeviceScope>", () => {
         expect(screen.queryByText("You have no projects yet.")).toBeNull();
         expect(screen.getByText("Loading your projects…")).toBeTruthy();
     });
+
+    it("does not label chosen projects as older ones while the list is loading", () => {
+        projectList.current = { isAnswered: false, projects: [] };
+
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <DeviceScope deviceId="d1" projectIds={["p-a", "p-b"]} />
+            </QueryClientProvider>,
+        );
+
+        expect(screen.queryByText("An older project not listed here")).toBeNull();
+        expect(screen.getByText("Loading your projects…")).toBeTruthy();
+    });
+
+    it("shows a chosen workflow project so it can be cleared", () => {
+        projectList.current = { isAnswered: true, projects: [{ _id: "p-flow", projectType: "workflow", title: "Flow" }] };
+
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <DeviceScope deviceId="d1" projectIds={["p-flow"]} />
+            </QueryClientProvider>,
+        );
+
+        expect(screen.getByRole("checkbox", { name: "Flow" }).getAttribute("aria-checked")).toBe("true");
+    });
 });
