@@ -16,6 +16,9 @@ import { submitBlocker } from "./draft-logic";
 import type { ReviewSubmission, SubmittedReview } from "./types";
 import type { WriteOutcome } from "./write-host";
 
+/** How often clearing a posted draft is tried before it is left to the lease. */
+const FINISH_ATTEMPTS = 3;
+
 export interface ClaimedDraft {
     body: string;
     comments: DraftComment[];
@@ -74,14 +77,19 @@ export const submitDraft = async (ports: SubmitPorts): Promise<SubmitOutcome> =>
     }
 
     // The host has the review. If clearing the draft fails, that is not a failed submit: telling the
-    // person so would have them post the review a second time. The lease keeps the draft locked meanwhile.
-    await ports
-        .finish(
-            draft.revision,
-            draft.comments.map((comment) => comment.id),
-            lease,
-        )
-        .catch(() => undefined);
+    // person so would have them post the review a second time. Once the lease runs out another submit may
+    // claim the draft and post it again, so clearing is retried before it is given up.
+    const sentIds = draft.comments.map((comment) => comment.id);
+
+    for (let attempt = 0; attempt < FINISH_ATTEMPTS; attempt += 1) {
+        try {
+            await ports.finish(draft.revision, sentIds, lease);
+
+            break;
+        } catch {
+            // Tried again, then left to the lease.
+        }
+    }
 
     return { reviewUrl: outcome.review.url, status: "ok" };
 };

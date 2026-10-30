@@ -88,10 +88,14 @@ const ReviewThread = ({
                             onClick={async () => {
                                 setResolveError(null);
 
-                                const outcome = await actions.resolve.mutateAsync({ resolved: !thread.isResolved, threadId: thread.id });
+                                try {
+                                    const outcome = await actions.resolve.mutateAsync({ resolved: !thread.isResolved, threadId: thread.id });
 
-                                if (outcome.status !== "ok") {
-                                    setResolveError(messages.write(outcome));
+                                    if (outcome.status !== "ok") {
+                                        setResolveError(messages.write(outcome));
+                                    }
+                                } catch {
+                                    setResolveError(messages.write({ status: "failed" }));
                                 }
                             }}
                             size="sm"

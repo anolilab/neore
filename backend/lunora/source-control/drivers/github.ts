@@ -506,10 +506,15 @@ const replyToThread = async (request: HostRequest, ref: PullRequestRef, commentI
         throw new HostApiError("Not a comment id", 404);
     }
 
-    const reply = parse(
-        replySchema,
-        await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}/comments/${commentId}/replies`, { json: { body }, method: "POST" })),
-    );
+    const response = await request(`${repoPath(ref)}/pulls/${ref.number}/comments/${commentId}/replies`, { json: { body }, method: "POST" });
+    let reply: z.infer<typeof replySchema>;
+
+    try {
+        reply = parse(replySchema, await readJson(response));
+    } catch {
+        // The host answered 2xx, so it took the reply; a retry would post it a second time.
+        throw new HostApiError("The host's answer to the reply could not be read", 0, false, { unconfirmed: true });
+    }
 
     return { id: String(reply.id) };
 };

@@ -200,6 +200,14 @@ describe("replies and resolving", () => {
         expect(sent).toEqual([{ json: { body: "Fixed" }, method: "POST", path: "/repos/octo/hello/pulls/7/comments/1001/replies" }]);
     });
 
+    it("calls a reply answer it cannot read unconfirmed: the host has the reply, and a retry would post it twice", async () => {
+        const { request } = host(() => {
+            return { surprise: true };
+        });
+
+        await expect(githubDriver.replyToThread(request, REF, "1001", "Fixed")).rejects.toMatchObject({ unconfirmed: true });
+    });
+
     it("sends nothing for a comment id that is not a number", async () => {
         const { request, sent } = host(() => {
             return { id: 1 };

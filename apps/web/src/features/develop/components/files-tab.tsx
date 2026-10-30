@@ -22,6 +22,7 @@ import type { ReadFailureStatus } from "./failure-notice";
 import FailureNotice from "./failure-notice";
 import type { DraftCommentEntry } from "./review-diff";
 import ReviewDiff from "./review-diff";
+import ReviewThreadCard from "./review-thread";
 
 interface FileEntry {
     additions: number;
@@ -133,6 +134,17 @@ const FileRow = ({ context, file, review, showDiff }: { context: ReviewContext; 
                     />
                 )}
                 {open && showDiff && file.patch !== null && !reviewable && <DiffView patch={file.patch} />}
+                {open &&
+                    !(showDiff && file.patch !== null && reviewable) &&
+                    review.threads.map((thread) => (
+                        <ReviewThreadCard
+                            address={context.address}
+                            capabilities={context.capabilities}
+                            hostLabel={context.hostLabel}
+                            key={thread.id}
+                            thread={thread}
+                        />
+                    ))}
                 {open && notes[file.patchState] && <p className="text-muted-foreground px-3 py-2 text-xs">{notes[file.patchState]}</p>}
                 {open && !showDiff && <p className="text-muted-foreground px-3 py-2 text-xs">{t`Diffs are not available from this host.`}</p>}
             </div>
@@ -264,10 +276,14 @@ const FilesTab = ({
                             onToggleViewed: async (next) => {
                                 setViewedError(null);
 
-                                const outcome = await actions.setViewed.mutateAsync({ path: file.path, viewed: next });
+                                try {
+                                    const outcome = await actions.setViewed.mutateAsync({ path: file.path, viewed: next });
 
-                                if (outcome.status !== "ok") {
-                                    setViewedError(messages.write(outcome));
+                                    if (outcome.status !== "ok") {
+                                        setViewedError(messages.write(outcome));
+                                    }
+                                } catch {
+                                    setViewedError(messages.write({ status: "failed" }));
                                 }
                             },
                             threads: threadsByPath.get(file.path) ?? [],
