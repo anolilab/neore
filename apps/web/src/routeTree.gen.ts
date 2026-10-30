@@ -22,6 +22,7 @@ import { Route as chatWorkflowRouteRouteImport } from './routes/(chat)/workflow/
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
 import { Route as publicDatenschutzRouteImport } from './routes/(public)/datenschutz'
 import { Route as publicImpressumRouteImport } from './routes/(public)/impressum'
+import { Route as ShortcutDevelopRouteImport } from './routes/_shortcut/develop'
 import { Route as ShortcutEvalsRouteImport } from './routes/_shortcut/evals'
 import { Route as ShortcutPagesRouteImport } from './routes/_shortcut/pages'
 import { Route as ShortcutPromptsRouteImport } from './routes/_shortcut/prompts'
@@ -154,6 +155,11 @@ const publicImpressumRoute = publicImpressumRouteImport.update({
   id: '/(public)/impressum',
   path: '/impressum',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ShortcutDevelopRoute = ShortcutDevelopRouteImport.update({
+  id: '/develop',
+  path: '/develop',
+  getParentRoute: () => ShortcutRoute,
 } as any)
 const ShortcutEvalsRoute = ShortcutEvalsRouteImport.update({
   id: '/evals',
@@ -538,6 +544,7 @@ export interface FileRoutesByFullPath {
   '/workflow': typeof chatWorkflowRouteRouteWithChildren
   '/datenschutz': typeof publicDatenschutzRoute
   '/impressum': typeof publicImpressumRoute
+  '/develop': typeof ShortcutDevelopRoute
   '/evals': typeof ShortcutEvalsRoute
   '/pages': typeof ShortcutPagesRouteWithChildren
   '/prompts': typeof ShortcutPromptsRoute
@@ -616,6 +623,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/datenschutz': typeof publicDatenschutzRoute
   '/impressum': typeof publicImpressumRoute
+  '/develop': typeof ShortcutDevelopRoute
   '/evals': typeof ShortcutEvalsRoute
   '/prompts': typeof ShortcutPromptsRoute
   '/skills': typeof ShortcutSkillsRoute
@@ -698,6 +706,7 @@ export interface FileRoutesById {
   '/(chat)/workflow': typeof chatWorkflowRouteRouteWithChildren
   '/(public)/datenschutz': typeof publicDatenschutzRoute
   '/(public)/impressum': typeof publicImpressumRoute
+  '/_shortcut/develop': typeof ShortcutDevelopRoute
   '/_shortcut/evals': typeof ShortcutEvalsRoute
   '/_shortcut/pages': typeof ShortcutPagesRouteWithChildren
   '/_shortcut/prompts': typeof ShortcutPromptsRoute
@@ -783,6 +792,7 @@ export interface FileRouteTypes {
     | '/workflow'
     | '/datenschutz'
     | '/impressum'
+    | '/develop'
     | '/evals'
     | '/pages'
     | '/prompts'
@@ -861,6 +871,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/datenschutz'
     | '/impressum'
+    | '/develop'
     | '/evals'
     | '/prompts'
     | '/skills'
@@ -942,6 +953,7 @@ export interface FileRouteTypes {
     | '/(chat)/workflow'
     | '/(public)/datenschutz'
     | '/(public)/impressum'
+    | '/_shortcut/develop'
     | '/_shortcut/evals'
     | '/_shortcut/pages'
     | '/_shortcut/prompts'
@@ -1130,6 +1142,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/impressum'
       preLoaderRoute: typeof publicImpressumRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_shortcut/develop': {
+      id: '/_shortcut/develop'
+      path: '/develop'
+      fullPath: '/develop'
+      preLoaderRoute: typeof ShortcutDevelopRouteImport
+      parentRoute: typeof ShortcutRoute
     }
     '/_shortcut/evals': {
       id: '/_shortcut/evals'
@@ -1816,6 +1835,7 @@ const ShortcutPagesRouteWithChildren = ShortcutPagesRoute._addFileChildren(
 )
 
 interface ShortcutRouteChildren {
+  ShortcutDevelopRoute: typeof ShortcutDevelopRoute
   ShortcutEvalsRoute: typeof ShortcutEvalsRoute
   ShortcutPagesRoute: typeof ShortcutPagesRouteWithChildren
   ShortcutPromptsRoute: typeof ShortcutPromptsRoute
@@ -1825,6 +1845,7 @@ interface ShortcutRouteChildren {
 }
 
 const ShortcutRouteChildren: ShortcutRouteChildren = {
+  ShortcutDevelopRoute: ShortcutDevelopRoute,
   ShortcutEvalsRoute: ShortcutEvalsRoute,
   ShortcutPagesRoute: ShortcutPagesRouteWithChildren,
   ShortcutPromptsRoute: ShortcutPromptsRoute,
@@ -1863,13 +1884,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
