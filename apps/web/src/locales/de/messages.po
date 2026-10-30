@@ -52,23 +52,23 @@ msgstr "\"{0}\" enthält Variablen, die Werte benötigen."
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "\"{0}\" startet, sobald seine Abhängigkeiten erledigt sind"
 
-#: src/features/chat/thread/composer-input.tsx:512
+#: src/features/chat/thread/composer-input.tsx:515
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "„{fileName}“ kann nicht angehängt werden: Dieser Dateityp wird nicht unterstützt."
 
-#: src/features/chat/thread/composer-input.tsx:505
+#: src/features/chat/thread/composer-input.tsx:508
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "„{fileName}“ konnte nicht angehängt werden: Der Inhalt passt nicht zum Dateityp."
 
-#: src/features/chat/thread/composer-input.tsx:507
+#: src/features/chat/thread/composer-input.tsx:510
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "„{fileName}“ konnte nicht hochgeladen werden. Prüfe deine Verbindung und versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:510
+#: src/features/chat/thread/composer-input.tsx:513
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dokumente dürfen höchstens {maxMegabytes} MB groß sein."
 
-#: src/features/chat/thread/composer-input.tsx:511
+#: src/features/chat/thread/composer-input.tsx:514
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dateien dieses Typs dürfen höchstens {maxMegabytes} MB groß sein."
 
@@ -184,8 +184,8 @@ msgstr "{0, plural, one {# Zeichen} other {# Zeichen}}"
 #. placeholder {0}: files.length
 #. placeholder {0}: listed.length
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:707
-#: src/features/develop/components/files-tab.tsx:118
-#: src/features/develop/components/files-tab.tsx:126
+#: src/features/develop/components/files-tab.tsx:245
+#: src/features/develop/components/files-tab.tsx:253
 msgid "{0, plural, one {# file} other {# files}}"
 msgstr "{0, plural, one {# Datei} other {# Dateien}}"
 
@@ -239,6 +239,11 @@ msgstr "{0, plural, one {# weiteres Ziel wird nicht angezeigt.} other {# weitere
 msgid "{0, plural, one {# node} other {# nodes}}"
 msgstr "{0, plural, one {# Node} other {# Nodes}}"
 
+#. placeholder {0}: review.draftComments.length
+#: src/features/develop/components/files-tab.tsx:101
+msgid "{0, plural, one {# pending comment} other {# pending comments}}"
+msgstr ""
+
 #. placeholder {0}: selectedPromptIds.size
 #: src/features/prompts/components/prompt-list.tsx:627
 msgid "{0, plural, one {# prompt selected} other {# prompts selected}}"
@@ -275,6 +280,11 @@ msgstr "{0, plural, one {# Skill} other {# Skills}}"
 #: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:266
 msgid "{0, plural, one {# slide} other {# slides}}"
 msgstr "{0, plural, one {# Folie} other {# Folien}}"
+
+#. placeholder {0}: review.threads.length
+#: src/features/develop/components/files-tab.tsx:96
+msgid "{0, plural, one {# thread} other {# threads}}"
+msgstr ""
 
 #. placeholder {0}: stats.estimatedTokens
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:765
@@ -413,7 +423,7 @@ msgid "{0} deleted"
 msgstr "{0} gelöscht"
 
 #. placeholder {0}: formatDuration(elapsedMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:555
+#: src/features/chat/thread/streaming-placeholder.tsx:557
 msgid "{0} elapsed"
 msgstr "{0} vergangen"
 
@@ -432,10 +442,6 @@ msgstr "{0} geeignet · {1} gelöscht · {2}ms"
 #: src/features/tasks/components/goal-list.tsx:47
 msgid "{0} failed"
 msgstr "{0} fehlgeschlagen"
-
-#: src/routes/admin/gateway/keys.tsx:421
-#~ msgid "Virtual API Keys"
-#~ msgstr "Virtuelle API-Schlüssel"
 
 #. placeholder {0}: modeLabels[mode]
 #. placeholder {1}: tool.name
@@ -577,7 +583,7 @@ msgid "{0} tok/s"
 msgstr ""
 
 #. placeholder {0}: tokPerSec.toFixed(1)
-#: src/features/chat/thread/streaming-placeholder.tsx:545
+#: src/features/chat/thread/streaming-placeholder.tsx:547
 msgid "{0} tokens/s"
 msgstr "{0} Tokens/s"
 
@@ -588,7 +594,7 @@ msgstr "{0} Tools erkannt"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:95
+#: src/features/devices/components/devices-settings.tsx:166
 msgid "{0} tools: {1}"
 msgstr "{0} Tools: {1}"
 
@@ -606,7 +612,7 @@ msgstr "{0} Nutzungen"
 #. placeholder {1}: detail.commitCount
 #. placeholder {2}: detail.baseBranch
 #. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:94
+#: src/features/develop/components/pull-request-view.tsx:95
 msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
 msgstr ""
 
@@ -671,6 +677,10 @@ msgstr "{characterCount}/{maxLength} Zeichen"
 #: src/features/workflow/components/nodes/group-node.tsx:320
 msgid "{childCount, plural, one {# node} other {# nodes}}"
 msgstr "{childCount, plural, one {# Node} other {# Nodes}}"
+
+#: src/features/develop/components/review-panel.tsx:192
+msgid "{commentCount, plural, one {# comment is waiting to be submitted} other {# comments are waiting to be submitted}}"
+msgstr ""
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:138
 msgid "{comparisonCount, plural, one {# model} other {# models}}"
@@ -807,8 +817,20 @@ msgstr "{fileCount, plural, one {# Datei konnte nicht hochgeladen werden} other 
 msgid "{fps} fps"
 msgstr "{fps} fps"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:65
+msgid "{full} credits"
+msgstr ""
+
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:61
+msgid "{handoff} credits"
+msgstr ""
+
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:54
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:235
+msgid "{hostLabel} has no batched review: your comments are posted one after another when you submit."
 msgstr ""
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:84
@@ -845,15 +867,34 @@ msgid "{itemCount, plural, one {# item} other {# items}}"
 msgstr "{itemCount, plural, one {# Element} other {# Elemente}}"
 
 #: src/features/develop/components/failure-notice.tsx:17
+#: src/features/develop/lib/use-review-messages.ts:20
 msgid "{label} could not be reached or answered unexpectedly. Try again in a moment."
 msgstr ""
 
+#. placeholder {0}: result.reason
+#: src/features/develop/lib/use-review-messages.ts:37
+msgid "{label} did not accept this: {0}"
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:37
+msgid "{label} did not accept this."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:25
+msgid "{label} did not answer, so it may have taken this. Check on {label} before trying again."
+msgstr ""
+
 #: src/features/develop/components/failure-notice.tsx:21
+#: src/features/develop/lib/use-review-messages.ts:24
 msgid "{label} is limiting requests for this account. Try again in a few minutes."
 msgstr ""
 
 #: src/features/develop/components/failure-notice.tsx:19
 msgid "{label} is not connected"
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:22
+msgid "{label} is not connected."
 msgstr ""
 
 #. placeholder {0}: ids.length
@@ -863,6 +904,10 @@ msgstr "{label} auf Position {position} von {0} in Markierungen verschoben"
 
 #: src/features/develop/components/failure-notice.tsx:14
 msgid "{label} refused this request. Your account may lack access, or an organization may require you to authorize the app."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:19
+msgid "{label} refused this. Your account may lack access."
 msgstr ""
 
 #: src/features/settings/components/chat/usage-settings.tsx:606
@@ -898,7 +943,7 @@ msgstr "vor {minutes} Min."
 msgid "{minutes}m remaining"
 msgstr "{minutes}m verbleibend"
 
-#: src/features/chat/thread/composer.tsx:222
+#: src/features/chat/thread/composer.tsx:223
 msgid "{modeLabel} mode — click to change"
 msgstr "Modus {modeLabel} – zum Ändern klicken"
 
@@ -971,7 +1016,7 @@ msgid "{name} is installed"
 msgstr "{name} ist installiert"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:241
-#: src/features/chat/thread/streaming-placeholder.tsx:473
+#: src/features/chat/thread/streaming-placeholder.tsx:475
 msgid "{name} is responding"
 msgstr "{name} antwortet"
 
@@ -1023,6 +1068,10 @@ msgstr "{providerName} · dein eigenes Bedrock-Konto ({region})"
 #: src/routes/admin/gateway/index.tsx:67
 msgid "{requestCount} req"
 msgstr "{requestCount} Anfr."
+
+#: src/features/develop/components/pull-request-view.tsx:108
+msgid "{requestNoun} views"
+msgstr ""
 
 #: src/components/settings/settings-search.tsx:93
 msgid "{resultCount, plural, one {# result} other {# results}}"
@@ -1179,7 +1228,7 @@ msgstr "<0>Zeitplan</0> — Nach einem Cron-Zeitplan ausführen (z. B. täglich 
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0> — HTTP-POST-Anfragen von externen Diensten empfangen (Stripe, GitHub, Zapier). Anfragen werden mit einem HMAC mit Zeitstempel signiert und Wiederholungen werden abgelehnt."
 
-#: src/features/chat/thread/streaming-placeholder.tsx:546
+#: src/features/chat/thread/streaming-placeholder.tsx:548
 msgid "~{approxTokenCount} tokens"
 msgstr "~{approxTokenCount} Tokens"
 
@@ -1489,6 +1538,14 @@ msgstr "Ein Referenzvideo darf höchstens {0} Sekunden lang sein."
 msgid "A regular expression the answer must match"
 msgstr "Ein regulärer Ausdruck, dem die Antwort entsprechen muss"
 
+#: src/features/develop/components/review-thread.tsx:76
+msgid "A reply is posted straight away, not with the rest of your review."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:16
+#~ msgid "A review holds at most 100 comments. Submit this one first."
+#~ msgstr ""
+
 #: src/features/settings/components/chat/bots-settings.tsx:141
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr ""
@@ -1774,7 +1831,7 @@ msgstr "Notiz hinzufügen..."
 msgid "Add a note…"
 msgstr "Notiz hinzufügen…"
 
-#: src/features/devices/components/devices-settings.tsx:256
+#: src/features/devices/components/devices-settings.tsx:325
 msgid "Add a server over SSH"
 msgstr ""
 
@@ -1815,9 +1872,9 @@ msgstr "Füge mindestens ein Modell hinzu – nutze \"Modelle abrufen\" oder gib
 msgid "Add at least one model id"
 msgstr "Füge mindestens eine Modell-ID hinzu"
 
-#: src/features/chat/thread/composer-input-area.tsx:180
-#: src/features/chat/thread/composer-input-area.tsx:214
-#: src/features/chat/thread/composer-input-area.tsx:234
+#: src/features/chat/thread/composer-input-area.tsx:188
+#: src/features/chat/thread/composer-input-area.tsx:222
+#: src/features/chat/thread/composer-input-area.tsx:242
 #: src/features/chat/thread/edit-composer.tsx:125
 msgid "Add attachment"
 msgstr "Anhang hinzufügen"
@@ -1846,6 +1903,10 @@ msgstr "Kreis hinzufügen"
 #: src/features/canvas/components/canvas-toolbar.tsx:40
 msgid "Add comments"
 msgstr "Kommentare hinzufügen"
+
+#: src/features/develop/components/review-panel.tsx:194
+msgid "Add comments on a line of the diff, then submit."
+msgstr ""
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:329
 #: src/features/settings/components/chat/custom-providers-settings.tsx:439
@@ -2006,6 +2067,10 @@ msgstr "Zu Favoriten hinzufügen"
 msgid "Add to Favorites"
 msgstr "Zu Favoriten hinzufügen"
 
+#: src/features/develop/components/review-diff.tsx:166
+msgid "Add to review"
+msgstr ""
+
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
 #: src/components/model-picker/model-picker.tsx:340
 msgid "Add to starred"
@@ -2019,7 +2084,7 @@ msgstr ""
 msgid "Add/Replace Object"
 msgstr "Objekt hinzufügen/ersetzen"
 
-#: src/features/develop/components/files-tab.tsx:31
+#: src/features/develop/components/files-tab.tsx:63
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:99
 msgid "Added"
 msgstr "Hinzugefügt"
@@ -2056,7 +2121,7 @@ msgstr "Hinzugefügt:"
 msgid "Adding documents… {0} of {1}"
 msgstr "Dokumente werden hinzugefügt… {0} von {1}"
 
-#: src/features/devices/components/devices-settings.tsx:238
+#: src/features/devices/components/devices-settings.tsx:307
 msgid "Adding the server was cancelled on this computer."
 msgstr ""
 
@@ -2064,7 +2129,7 @@ msgstr ""
 msgid "Adding your earlier replies…"
 msgstr "Deine früheren Antworten werden hinzugefügt…"
 
-#: src/features/devices/components/devices-settings.tsx:269
+#: src/features/devices/components/devices-settings.tsx:338
 msgid "Address"
 msgstr ""
 
@@ -2295,7 +2360,7 @@ msgstr "Nachdem du die Verbindung hier aktiviert hast, erhältst du eine Webhook
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "Nachdem du die Verbindung hier aktiviert hast, erhältst du eine Webhook-URL, die du als Request URL in den Event Subscriptions deiner Slack-App einträgst."
 
-#: src/features/devices/components/devices-settings.tsx:185
+#: src/features/devices/components/devices-settings.tsx:254
 msgid "After outside content"
 msgstr "Nach externem Inhalt"
 
@@ -2733,6 +2798,10 @@ msgstr "\"{tool}\" von {server} erlauben?"
 msgid "Allow \"{tool}\"?"
 msgstr "\"{tool}\" erlauben?"
 
+#: src/features/chat/host/host-composer.tsx:63
+msgid "Allow once"
+msgstr ""
+
 #. placeholder {0}: osLabels[key]
 #: src/features/local-models/components/local-setup-guide.tsx:115
 msgid "Allow this site ({0})"
@@ -3154,6 +3223,7 @@ msgid "approval"
 msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:116
+#: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:102
 msgid "Approve"
 msgstr "Genehmigen"
@@ -3379,7 +3449,7 @@ msgstr "Frag irgendetwas, um einen neuen Chat zu starten…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "Stell GPT-4, Claude und Gemini dieselbe Frage. Lass denselben Prompt über FLUX, Imagen und Stable Diffusion laufen. Wähle den Gewinner – nicht den Standard."
 
-#: src/features/chat/thread/composer.tsx:258
+#: src/features/chat/thread/composer.tsx:259
 msgid "Ask me anything..."
 msgstr "Frag mich alles..."
 
@@ -3412,9 +3482,9 @@ msgstr "Assistent (kein Skill)"
 msgid "Assistant replied:"
 msgstr "Assistent antwortete:"
 
-#: src/features/chat/thread/message-item.tsx:203
-#: src/features/chat/thread/streaming-placeholder.tsx:687
+#: src/features/chat/thread/message-item.tsx:205
 #: src/features/chat/thread/streaming-placeholder.tsx:723
+#: src/features/chat/thread/streaming-placeholder.tsx:760
 msgid "Assistant Reply:"
 msgstr "Antwort des Assistenten:"
 
@@ -3458,7 +3528,7 @@ msgstr "Auckland"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
 #: src/components/model-picker/model-picker.tsx:1119
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:120
+#: src/features/chat/thread/composer.tsx:121
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -4672,6 +4742,7 @@ msgstr "Kanada"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
 #: src/features/chat/pins/pin-item.tsx:282
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
@@ -4680,6 +4751,7 @@ msgstr "Kanada"
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:162
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
+#: src/features/develop/components/comment-composer.tsx:62
 #: src/features/evals/components/case-form-dialog.tsx:68
 #: src/features/evals/components/dataset-form-dialog.tsx:168
 #: src/features/evals/components/import-cases-dialog.tsx:113
@@ -4826,7 +4898,7 @@ msgstr "Bildunterschrift"
 msgid "Caption text"
 msgstr "Bildunterschrift"
 
-#: src/features/chat/thread/composer-input-area.tsx:209
+#: src/features/chat/thread/composer-input-area.tsx:217
 msgid "Capture screen"
 msgstr "Bildschirm aufnehmen"
 
@@ -4954,8 +5026,8 @@ msgstr "Anzeigenamen deiner Organisation ändern"
 msgid "Change your organization's unique identifier"
 msgstr "Eindeutige Kennung deiner Organisation ändern"
 
-#: src/features/develop/components/files-tab.tsx:32
-#: src/features/develop/components/files-tab.tsx:57
+#: src/features/develop/components/files-tab.tsx:64
+#: src/features/develop/components/files-tab.tsx:104
 msgid "Changed"
 msgstr ""
 
@@ -5161,7 +5233,7 @@ msgstr "Wird geprüft..."
 msgid "Checking…"
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:64
+#: src/features/develop/components/pull-request-view.tsx:65
 #: src/features/evals/components/case-fields.tsx:150
 #: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
@@ -5237,6 +5309,10 @@ msgstr "Lege fest, wie Neore dich über erledigte Arbeit und offene Punkte infor
 #: src/features/settings/components/account/account-settings.tsx:183
 msgid "Choose how to send messages in the chat."
 msgstr "Wähle, wie Nachrichten im Chat gesendet werden sollen."
+
+#: src/features/develop/components/review-panel.tsx:129
+msgid "Choose how you review this before you submit it."
+msgstr ""
 
 #: src/features/chat/prompt-improvement/components/composer-prompt-improvement-button.tsx:107
 msgid "Choose prompt improvement style"
@@ -5520,7 +5596,7 @@ msgstr "Klicke auf das Pin-Symbol bei einer Nachricht, um sie hier zu speichern.
 msgid "Click the star on any model in All models to add it here."
 msgstr "Klicke bei einem beliebigen Modell unter Alle Modelle auf den Stern, um es hier hinzuzufügen."
 
-#: src/features/chat/thread/composer-input.tsx:277
+#: src/features/chat/thread/composer-input.tsx:280
 msgid "Click to edit"
 msgstr "Zum Bearbeiten klicken"
 
@@ -5613,7 +5689,7 @@ msgstr "Übersetzung schließen"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread/widgets/places-widget.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 msgid "Closed"
 msgstr "Geschlossen"
 
@@ -5717,6 +5793,11 @@ msgstr "Coding-Agent-Lauf abgeschlossen"
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:37
 msgid "Coding agent run was not approved."
 msgstr "Der Durchlauf des Coding-Agents wurde nicht genehmigt."
+
+#. placeholder {0}: device.name
+#: src/features/devices/components/devices-settings.tsx:77
+msgid "Coding agents you can start on {0}"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:561
 #: src/features/marketing/data/models-data.ts:746
@@ -5880,6 +5961,7 @@ msgstr ""
 msgid "Commands"
 msgstr "Befehle"
 
+#: src/features/develop/components/review-panel.tsx:64
 #: src/features/pages/components/page-comments-panel.tsx:146
 #: src/features/pages/components/page-view.tsx:429
 #: src/features/workflow/components/nodes/comment-node.tsx:95
@@ -5891,6 +5973,12 @@ msgstr "Kommentieren"
 #: src/features/workflow/components/nodes/comment-node.tsx:74
 msgid "Comment color"
 msgstr "Kommentarfarbe"
+
+#. placeholder {0}: target.line
+#: src/features/develop/components/review-diff.tsx:134
+#: src/features/develop/components/review-diff.tsx:155
+msgid "Comment on line {0}"
+msgstr ""
 
 #: src/features/pages/components/page-comments-panel.tsx:135
 #: src/features/pages/components/page-comments-panel.tsx:137
@@ -5916,7 +6004,7 @@ msgstr "kommerzielles Design"
 msgid "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 msgstr "Kommerzielle Projekte, die die absolut beste Bildqualität von Black Forest Labs verlangen"
 
-#: src/features/develop/components/pull-request-view.tsx:64
+#: src/features/develop/components/pull-request-view.tsx:65
 msgid "Commits"
 msgstr ""
 
@@ -6271,7 +6359,7 @@ msgstr "Passwortbestätigung ist erforderlich"
 msgid "Confirm your password"
 msgstr "Passwort bestätigen"
 
-#: src/features/devices/components/devices-settings.tsx:118
+#: src/features/devices/components/devices-settings.tsx:124
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
 #: src/routes/auth/extension.tsx:154
@@ -6307,7 +6395,7 @@ msgstr "Einen Audio-/Datei-Node als Eingabe verbinden"
 msgid "Connect an image node as input"
 msgstr "Einen Bild-Node als Eingabe verbinden"
 
-#: src/features/devices/components/devices-settings.tsx:287
+#: src/features/devices/components/devices-settings.tsx:356
 msgid "Connect and add"
 msgstr ""
 
@@ -6455,6 +6543,10 @@ msgstr "Verbindungsfehler. Bitte prüfe deine Internetverbindung und versuch es 
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:61
 msgid "Connection failed"
 msgstr "Verbindung fehlgeschlagen"
+
+#: src/features/devices/components/devices-settings.tsx:173
+msgid "Connection lost"
+msgstr ""
 
 #: src/components/error-boundaries/route-error-boundary.tsx:63
 msgid "Connection Problem"
@@ -6643,9 +6735,14 @@ msgid "Context-aware generation"
 msgstr "Kontextbewusste Generierung"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
+#: src/features/chat/host/host-composer.tsx:193
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "Weiter"
+
+#: src/features/chat/host/host-composer.tsx:187
+msgid "Continue where you left off."
+msgstr ""
 
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:388
 msgid "Continue with authenticator"
@@ -6745,8 +6842,12 @@ msgstr "Unterhaltungsverlauf"
 msgid "Conversation not available"
 msgstr "Unterhaltung nicht verfügbar"
 
-#: src/features/chat/thread/composer-input.tsx:714
-#: src/features/chat/thread/composer-input.tsx:1070
+#: src/features/develop/components/review-diff.tsx:183
+msgid "Conversations on lines this diff no longer shows"
+msgstr ""
+
+#: src/features/chat/thread/composer-input.tsx:717
+#: src/features/chat/thread/composer-input.tsx:1080
 msgid "Conversion failed"
 msgstr "Konvertierung fehlgeschlagen"
 
@@ -6800,7 +6901,7 @@ msgstr ""
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:211
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:34
-#: src/features/develop/components/files-tab.tsx:33
+#: src/features/develop/components/files-tab.tsx:65
 #: src/features/local-models/components/local-setup-guide.tsx:44
 #: src/features/pages/components/page-kept-draft.tsx:30
 msgid "Copied"
@@ -6818,7 +6919,7 @@ msgstr "In die Zwischenablage kopiert"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:351
+#: src/features/chat/thread/message-item.tsx:353
 #: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copied!"
 msgstr "Kopiert!"
@@ -6828,7 +6929,7 @@ msgstr "Kopiert!"
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
-#: src/features/chat/thread/message-item.tsx:351
+#: src/features/chat/thread/message-item.tsx:353
 #: src/features/chat/thread/text-selection-menu.tsx:385
 #: src/features/settings/components/chat/trigger-settings.tsx:739
 msgid "Copy"
@@ -6844,7 +6945,7 @@ msgstr ""
 msgid "Copy as Markdown"
 msgstr "Als Markdown kopieren"
 
-#: src/features/chat/thread/message-item.tsx:368
+#: src/features/chat/thread/message-item.tsx:370
 msgid "Copy as plain text"
 msgstr ""
 
@@ -7012,7 +7113,7 @@ msgstr "Kostensensible Anwendungen, die zuverlässige Google-KI in der günstigs
 msgid "Costa Rica"
 msgstr "Costa Rica"
 
-#: src/features/devices/components/devices-settings.tsx:248
+#: src/features/devices/components/devices-settings.tsx:317
 msgid "Could not add the server."
 msgstr ""
 
@@ -7020,7 +7121,7 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "Die Änderungen konnten nicht übernommen werden"
 
-#: src/features/chat/thread/composer-input.tsx:1092
+#: src/features/chat/thread/composer-input.tsx:1102
 msgid "Could not attach the chat"
 msgstr "Der Chat konnte nicht angehängt werden"
 
@@ -7040,7 +7141,11 @@ msgstr "Der Durchlauf konnte nicht abgebrochen werden."
 msgid "Could not change push notifications. Try again."
 msgstr "Push-Benachrichtigungen konnten nicht geändert werden. Versuch es erneut."
 
-#: src/features/devices/components/devices-settings.tsx:109
+#: src/features/develop/components/review-panel.tsx:160
+msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
+msgstr ""
+
+#: src/features/devices/components/devices-settings.tsx:137
 msgid "Could not connect to the server."
 msgstr ""
 
@@ -7096,6 +7201,10 @@ msgstr "Die Seite konnte nicht gelöscht werden"
 
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:119
 msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, Claude, or a Neore data export."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:34
+msgid "Could not do this. Try again."
 msgstr ""
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:58
@@ -7154,7 +7263,7 @@ msgstr "Konnte nicht als Seite geöffnet werden"
 msgid "Could not open the pull request."
 msgstr "Der Pull Request konnte nicht geöffnet werden."
 
-#: src/features/devices/components/devices-settings.tsx:347
+#: src/features/devices/components/devices-settings.tsx:421
 msgid "Could not pair this computer. Try again."
 msgstr "Dieser Computer konnte nicht gekoppelt werden. Versuche es erneut."
 
@@ -7177,15 +7286,19 @@ msgstr "Vorschau nicht möglich · Zum Herunterladen klicken"
 msgid "Could not pull {0}: {1}"
 msgstr "{0} konnte nicht heruntergeladen werden: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:650
+#: src/features/chat/core/context/chat-context.tsx:653
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1095
+#: src/features/chat/host/host-composer.tsx:99
+msgid "Could not reach the server. Try again."
+msgstr ""
+
+#: src/features/chat/thread/composer-input.tsx:1105
 msgid "Could not read that chat"
 msgstr "Dieser Chat konnte nicht gelesen werden"
 
-#: src/features/chat/thread/composer-input.tsx:1096
+#: src/features/chat/thread/composer-input.tsx:1106
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Dieser Chat konnte nicht gelesen werden. Ist er gesperrt, entsperre ihn zuerst."
 
@@ -7193,7 +7306,7 @@ msgstr "Dieser Chat konnte nicht gelesen werden. Ist er gesperrt, entsperre ihn 
 msgid "Could not refine the draft. Try again."
 msgstr "Der Entwurf konnte nicht verfeinert werden. Versuche es erneut."
 
-#: src/features/devices/components/devices-settings.tsx:133
+#: src/features/devices/components/devices-settings.tsx:202
 msgid "Could not remove the device."
 msgstr "Das Gerät konnte nicht entfernt werden."
 
@@ -7201,7 +7314,7 @@ msgstr "Das Gerät konnte nicht entfernt werden."
 msgid "Could not remove the participant"
 msgstr "Der Teilnehmer konnte nicht entfernt werden"
 
-#: src/features/devices/components/devices-settings.tsx:87
+#: src/features/devices/components/devices-settings.tsx:158
 msgid "Could not rename the device."
 msgstr "Das Gerät konnte nicht umbenannt werden."
 
@@ -7230,8 +7343,21 @@ msgstr "Die neue Reihenfolge für {label} konnte nicht gespeichert werden"
 msgid "Could not save the page"
 msgstr "Die Seite konnte nicht gespeichert werden"
 
+#: src/features/develop/components/review-panel.tsx:177
+msgid "Could not save the summary, so nothing was submitted. Try again."
+msgstr ""
+
+#: src/features/develop/components/comment-composer.tsx:42
+#: src/features/develop/lib/use-review-messages.ts:30
+msgid "Could not save this. Try again."
+msgstr ""
+
 #: src/features/sub-agents/components/worker-composer.tsx:59
 msgid "Could not send the message."
+msgstr ""
+
+#: src/features/chat/host/host-composer.tsx:146
+msgid "Could not send your answer."
 msgstr ""
 
 #: src/features/chat/thread/ask-user-prompt.tsx:83
@@ -7275,6 +7401,14 @@ msgstr ""
 #: src/features/sub-agents/components/worker-list.tsx:52
 #: src/features/sub-agents/components/worker-stop-bar.tsx:40
 msgid "Could not stop the worker."
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:117
+#~ msgid "Could not submit the review. Your review is kept."
+#~ msgstr ""
+
+#: src/features/chat/model-settings/use-model-combobox.ts:115
+msgid "Could not switch the model. Please try again."
 msgstr ""
 
 #: src/features/home/components/home-page.tsx:228
@@ -8035,9 +8169,13 @@ msgstr "Debatte"
 msgid "Debate rounds"
 msgstr "Debattenrunden"
 
-#: src/features/chat/thread/composer.tsx:264
+#: src/features/chat/thread/composer.tsx:265
 msgid "Debug an error or review my code..."
 msgstr "Einen Fehler debuggen oder meinen Code prüfen..."
+
+#: src/features/chat/host/host-composer.tsx:68
+msgid "Decline"
+msgstr ""
 
 #: src/features/chat/prompt-improvement/hooks/use-optimizer-style-labels.ts:50
 msgid "Decompose the goal into an actionable plan."
@@ -8273,6 +8411,7 @@ msgstr "Aufgaben an Devin delegieren, den KI-Softwareentwickler"
 #: src/features/auth/components/settings/passkey/passkey-cell.tsx:98
 #: src/features/chat/thread-list/group-header.tsx:150
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:166
+#: src/features/develop/components/draft-comment-card.tsx:60
 #: src/features/evals/components/dataset-panel.tsx:322
 #: src/features/evals/components/evals-page.tsx:163
 #: src/features/local-models/components/ollama-model-manager.tsx:336
@@ -8590,7 +8729,7 @@ msgstr "Anspruchsvolle Aufgaben, die das leistungsstärkste GLM-Frontier-Modell 
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "Anspruchsvolle Aufgaben, bei denen maximale KI-Leistung und verfeinertes Reasoning am meisten zählen"
 
-#: src/features/devices/components/devices-settings.tsx:170
+#: src/features/devices/components/devices-settings.tsx:239
 msgid "Denied"
 msgstr "Abgelehnt"
 
@@ -8733,7 +8872,7 @@ msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it,
 msgstr "Beschreibe deinen Workflow... z. B. „Ein Bild aus Text generieren, hochskalieren und dann den Hintergrund entfernen“"
 
 #: src/components/model-picker/model-picker.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:64
+#: src/features/develop/components/pull-request-view.tsx:65
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:213
@@ -8872,19 +9011,19 @@ msgstr "Entwickler, die starke Coding- und Allzweckfähigkeiten aus einem Open-S
 msgid "Development"
 msgstr "Entwicklung"
 
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:496
 msgid "Device activity"
 msgstr "Geräteaktivität"
 
-#: src/features/devices/components/devices-settings.tsx:76
+#: src/features/devices/components/devices-settings.tsx:147
 msgid "Device name"
 msgstr "Gerätename"
 
-#: src/features/devices/components/devices-settings.tsx:136
+#: src/features/devices/components/devices-settings.tsx:205
 msgid "Device removed"
 msgstr "Gerät entfernt"
 
-#: src/features/devices/components/devices-settings.tsx:357
+#: src/features/devices/components/devices-settings.tsx:431
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "Geräte"
@@ -8917,7 +9056,7 @@ msgstr "Nicht bestanden"
 msgid "Did you mean: {suggestion}?"
 msgstr "Meintest du: {suggestion}?"
 
-#: src/features/develop/components/files-tab.tsx:64
+#: src/features/develop/components/files-tab.tsx:149
 msgid "Diffs are not available from this host."
 msgstr ""
 
@@ -8977,12 +9116,17 @@ msgid "Disabling..."
 msgstr "Wird deaktiviert..."
 
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:808
+#: src/features/develop/components/review-panel.tsx:276
 #: src/features/pages/components/page-agent-dialog.tsx:139
 #: src/features/pages/components/page-kept-draft.tsx:42
 msgid "Discard"
 msgstr "Verwerfen"
 
-#: src/features/devices/components/devices-settings.tsx:118
+#: src/features/develop/components/review-panel.tsx:267
+msgid "Discard the review"
+msgstr ""
+
+#: src/features/devices/components/devices-settings.tsx:127
 #: src/features/settings/connectors/connector-card.tsx:186
 #: src/features/settings/connectors/connector-card.tsx:206
 msgid "Disconnect"
@@ -9018,6 +9162,7 @@ msgstr "Discord Public Key"
 #: src/features/changelog/components/changelog-card.tsx:59
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
+#: src/features/devices/components/devices-settings.tsx:186
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Verwerfen"
@@ -9156,7 +9301,7 @@ msgstr "Noch kein Konto?"
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:171
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
-#: src/features/devices/components/devices-settings.tsx:169
+#: src/features/devices/components/devices-settings.tsx:238
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:16
@@ -9235,7 +9380,7 @@ msgstr "Ein Modell herunterladen"
 msgid "Download as CSV"
 msgstr "Als CSV herunterladen"
 
-#: src/features/chat/thread/message-item.tsx:372
+#: src/features/chat/thread/message-item.tsx:374
 msgid "Download as Markdown"
 msgstr "Als Markdown herunterladen"
 
@@ -9317,7 +9462,7 @@ msgstr "Downloads öffnen die GitHub-Releaseseite. Wenn dort noch keine Installa
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/inbox-list.tsx:118
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
 msgstr "Entwurf"
@@ -9326,7 +9471,7 @@ msgstr "Entwurf"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "Ein Anschreiben für eine Stelle als Softwareentwickler entwerfen"
 
-#: src/features/chat/thread/composer.tsx:262
+#: src/features/chat/thread/composer.tsx:263
 msgid "Draft an email, report, or essay..."
 msgstr "Eine E-Mail, einen Bericht oder einen Aufsatz entwerfen..."
 
@@ -9358,7 +9503,7 @@ msgstr "Dateien hierher ziehen"
 msgid "Draw an image"
 msgstr "Ein Bild zeichnen"
 
-#: src/features/chat/thread/composer-input-area.tsx:203
+#: src/features/chat/thread/composer-input-area.tsx:211
 msgid "Draw image"
 msgstr "Bild zeichnen"
 
@@ -9380,7 +9525,7 @@ msgstr "Datei ablegen oder zum Hochladen klicken"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1270
+#: src/features/chat/thread/composer-input.tsx:1281
 msgid "Drop files here"
 msgstr "Dateien hier ablegen"
 
@@ -9609,7 +9754,8 @@ msgstr "Kantengeführte Generierung"
 #: src/features/canvas/canvas-panel.tsx:767
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:391
+#: src/features/chat/thread/message-item.tsx:393
+#: src/features/develop/components/draft-comment-card.tsx:51
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:218
@@ -9647,7 +9793,11 @@ msgstr "Testfall {0} bearbeiten"
 msgid "Edit collection"
 msgstr "Sammlung bearbeiten"
 
-#: src/features/chat/thread/composer-input.tsx:295
+#: src/features/develop/components/draft-comment-card.tsx:32
+msgid "Edit comment"
+msgstr ""
+
+#: src/features/chat/thread/composer-input.tsx:298
 msgid "Edit content"
 msgstr "Inhalt bearbeiten"
 
@@ -10960,7 +11110,7 @@ msgid "expired"
 msgstr "abgelaufen"
 
 #: src/features/chat/thread-list/thread-node.tsx:290
-#: src/features/devices/components/devices-settings.tsx:171
+#: src/features/devices/components/devices-settings.tsx:240
 #: src/features/settings/connectors/connector-card.tsx:75
 msgid "Expired"
 msgstr "Abgelaufen"
@@ -11009,7 +11159,7 @@ msgstr "Läuft ab: {expiresAt}"
 msgid "Expiring soon"
 msgstr "Läuft bald ab"
 
-#: src/features/chat/thread/composer.tsx:265
+#: src/features/chat/thread/composer.tsx:266
 msgid "Explain a concept in simple terms..."
 msgstr "Erkläre ein Konzept in einfachen Worten..."
 
@@ -11204,7 +11354,7 @@ msgstr "fehlgeschlagen"
 #: src/features/chat/thread-list/thread-node.tsx:503
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/develop/components/checks-tab.tsx:48
-#: src/features/devices/components/devices-settings.tsx:172
+#: src/features/devices/components/devices-settings.tsx:241
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:164
@@ -11251,7 +11401,7 @@ msgid "Failed to attach collection"
 msgstr "Sammlung konnte nicht angehängt werden"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:962
+#: src/features/chat/thread/composer-input.tsx:972
 msgid "Failed to attach file"
 msgstr "Datei konnte nicht angehängt werden"
 
@@ -11647,7 +11797,7 @@ msgstr "Exportanfrage fehlgeschlagen"
 msgid "Failed to reset to defaults"
 msgstr "Zurücksetzen auf Standard fehlgeschlagen"
 
-#: src/features/chat/thread/composer-input.tsx:994
+#: src/features/chat/thread/composer-input.tsx:1004
 msgid "Failed to restore attachment"
 msgstr "Anhang konnte nicht wiederhergestellt werden"
 
@@ -12422,7 +12572,7 @@ msgstr "Datei-Upload abgelehnt."
 msgid "Filename cannot be empty"
 msgstr "Dateiname darf nicht leer sein"
 
-#: src/features/develop/components/pull-request-view.tsx:64
+#: src/features/develop/components/pull-request-view.tsx:65
 msgid "Files"
 msgstr ""
 
@@ -12596,7 +12746,7 @@ msgid "First slide"
 msgstr "Erste Folie"
 
 #. placeholder {0}: formatDuration(ttftMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:547
+#: src/features/chat/thread/streaming-placeholder.tsx:549
 msgid "First token {0}"
 msgstr "Erstes Token {0}"
 
@@ -12795,7 +12945,7 @@ msgstr "Forken"
 msgid "Fork {0} to edit a copy"
 msgstr "{0} forken, um eine Kopie zu bearbeiten"
 
-#: src/features/chat/thread/message-item.tsx:401
+#: src/features/chat/thread/message-item.tsx:403
 msgid "Fork conversation"
 msgstr "Unterhaltung verzweigen"
 
@@ -13295,7 +13445,7 @@ msgstr "Ein Bild aus einem Text-Prompt generieren und 4-fach hochskalieren"
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Generiere ein Bild einer gemütlichen Leseecke mit warmem Licht und Pflanzen."
 
-#: src/features/chat/thread/composer.tsx:267
+#: src/features/chat/thread/composer.tsx:268
 msgid "Generate an image or video..."
 msgstr "Ein Bild oder Video generieren..."
 
@@ -13311,7 +13461,7 @@ msgstr "Aus einer Beschreibung generieren"
 msgid "Generate ideas for a creative writing story"
 msgstr "Ideen für eine kreative Geschichte generieren"
 
-#: src/features/chat/thread/message-item.tsx:420
+#: src/features/chat/thread/message-item.tsx:422
 msgid "Generate image"
 msgstr "Bild generieren"
 
@@ -13337,7 +13487,7 @@ msgstr "Zufälligen Seed generieren"
 msgid "Generate unique business ideas for 2025"
 msgstr "Einzigartige Geschäftsideen für 2025 generieren"
 
-#: src/features/chat/thread/message-item.tsx:430
+#: src/features/chat/thread/message-item.tsx:432
 msgid "Generate video"
 msgstr "Video generieren"
 
@@ -13350,7 +13500,7 @@ msgstr "Video generieren"
 msgid "Generate videos from text or images"
 msgstr "Videos aus Text oder Bildern generieren"
 
-#: src/features/chat/thread/message-item.tsx:440
+#: src/features/chat/thread/message-item.tsx:442
 msgid "Generate voice"
 msgstr "Stimme generieren"
 
@@ -14051,6 +14201,18 @@ msgstr "H"
 msgid "Hand (pan)"
 msgstr "Hand (verschieben)"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:74
+msgid "Hand over a summary"
+msgstr ""
+
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:60
+msgid "Hand over a summary and the recent messages"
+msgstr ""
+
+#: src/features/chat/thread/agent-switch-divider.tsx:18
+msgid "Handed over"
+msgstr ""
+
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:28
 msgid "Handle"
 msgstr ""
@@ -14169,8 +14331,8 @@ msgstr "Angehängten Inhalt ausblenden"
 msgid "Hide column"
 msgstr "Spalte ausblenden"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:239
-#: src/features/chat/thread/composer-followup-suggestions.tsx:255
+#: src/features/chat/thread/composer-followup-suggestions.tsx:240
+#: src/features/chat/thread/composer-followup-suggestions.tsx:256
 msgid "Hide follow-up suggestions"
 msgstr "Folgevorschläge ausblenden"
 
@@ -14491,6 +14653,10 @@ msgstr "So funktionieren Trigger"
 msgid "How would you like the AI to respond?"
 msgstr "Wie soll die KI antworten?"
 
+#: src/features/develop/components/review-panel.tsx:203
+msgid "How you review this"
+msgstr ""
+
 #: src/features/slides/components/slide-editor-dialog.tsx:97
 msgid "HTML Content"
 msgstr "HTML-Inhalt"
@@ -14588,6 +14754,10 @@ msgstr "Identität"
 msgid "Idle"
 msgstr "Inaktiv"
 
+#: src/features/develop/components/review-panel.tsx:147
+msgid "If it kept the review as pending, submit or delete it there first."
+msgstr ""
+
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:271
 #: src/components/error-boundaries/route-error-boundary.tsx:139
 msgid "If this problem persists, please contact support."
@@ -14610,7 +14780,7 @@ msgstr "Illustration"
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
 #: src/components/model-picker/model-picker.tsx:1093
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:118
+#: src/features/chat/thread/composer.tsx:119
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:40
@@ -14985,8 +15155,13 @@ msgid "Improving..."
 msgstr "Wird verbessert..."
 
 #. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:99
+#: src/features/develop/components/pull-request-view.tsx:100
 msgid "in {0, plural, one {# file} other {# files}}"
+msgstr ""
+
+#. placeholder {0}: request.folder
+#: src/features/chat/host/host-composer.tsx:54
+msgid "In {0}"
 msgstr ""
 
 #. placeholder {0}: info.latencyMs
@@ -15271,6 +15446,14 @@ msgstr "Intelligentes Videomodell, das vor dem Generieren nachdenkt"
 msgid "Intensity"
 msgstr "Intensität"
 
+#: src/features/chat/thread/composer-input-area.tsx:299
+msgid "Interrupt and restart"
+msgstr ""
+
+#: src/features/chat/thread/composer-input-area.tsx:315
+msgid "Interrupt and restart — stops the current reply and sends this"
+msgstr ""
+
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:47
 msgid "Intimate, street photography"
 msgstr "Intim, Straßenfotografie"
@@ -15489,7 +15672,12 @@ msgid "Issue tracking and project management"
 msgstr "Issue-Tracking und Projektmanagement"
 
 #: src/features/develop/components/failure-notice.tsx:20
+#: src/features/develop/lib/use-review-messages.ts:23
 msgid "It does not exist, or your {label} account cannot see it."
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:286
+msgid "It is on {hostLabel} now."
 msgstr ""
 
 #: src/features/pages/components/page-view.tsx:190
@@ -15656,6 +15844,14 @@ msgstr "Aktuelle Zeilen behalten"
 msgid "Keep files"
 msgstr "Dateien behalten"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:72
+msgid "Keep full history"
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:270
+msgid "Keep it"
+msgstr ""
+
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:146
 msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
 msgstr "Einen Teil des Videos behalten. Der behaltene Teil wird in diesem Browser als MP4 neu kodiert, das kann einen Moment dauern."
@@ -15668,11 +15864,15 @@ msgstr "Dauerhaft behalten"
 msgid "Keep the files as uncategorised, or delete them together with the collection. Chats and projects that use the collection stop searching it."
 msgstr "Behalte die Dateien unkategorisiert oder lösche sie zusammen mit der Sammlung. Chats und Projekte, die die Sammlung nutzen, durchsuchen sie nicht mehr."
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:64
+msgid "Keep the full history"
+msgstr ""
+
 #: src/features/chat/core/utils/language-utilities.ts:370
 msgid "Kenya"
 msgstr "Kenia"
 
-#: src/features/devices/components/devices-settings.tsx:281
+#: src/features/devices/components/devices-settings.tsx:350
 msgid "Key file (optional, absolute path)"
 msgstr ""
 
@@ -16247,11 +16447,11 @@ msgstr "Weniger"
 msgid "Let replies use tools"
 msgstr "Antworten dürfen Tools nutzen"
 
-#: src/features/devices/components/devices-settings.tsx:356
+#: src/features/devices/components/devices-settings.tsx:430
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Lass den Agenten über die Neore-Desktop-App Dateien, ein Terminal und lokale MCP-Server auf deinem eigenen Computer nutzen. Jede Aktion fragt dich zuerst auf diesem Computer, und aus geteilten Chats oder Hintergrundaufgaben läuft nichts."
 
-#: src/features/devices/components/devices-settings.tsx:413
+#: src/features/devices/components/devices-settings.tsx:488
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr ""
 
@@ -16498,7 +16698,7 @@ msgstr "Mehr laden"
 msgid "Load more commits"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:142
+#: src/features/develop/components/files-tab.tsx:301
 msgid "Load more files"
 msgstr ""
 
@@ -16512,14 +16712,14 @@ msgstr "Vorlage laden"
 
 #. placeholder {0}: listed.length
 #. placeholder {1}: Math.min(fileCount, fileLimit)
-#: src/features/develop/components/files-tab.tsx:122
+#: src/features/develop/components/files-tab.tsx:249
 msgid "Loaded {0} of {1, plural, one {# file} other {# files}}…"
 msgstr ""
 
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:26
 #: src/features/develop/components/inbox-list.tsx:86
-#: src/features/develop/components/pull-request-view.tsx:49
+#: src/features/develop/components/pull-request-view.tsx:50
 msgid "Loading"
 msgstr "Wird geladen"
 
@@ -16581,11 +16781,11 @@ msgstr "Editor wird geladen…"
 msgid "Loading file…"
 msgstr "Datei wird geladen…"
 
-#: src/features/develop/components/files-tab.tsx:104
+#: src/features/develop/components/files-tab.tsx:227
 msgid "Loading files"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:118
+#: src/features/develop/components/files-tab.tsx:245
 msgid "Loading files…"
 msgstr ""
 
@@ -16735,7 +16935,7 @@ msgstr "Wird geladen…"
 msgid "local"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:686
+#: src/features/chat/core/context/chat-context.tsx:689
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Lokale Modelle verarbeiten nur Text. Entferne die Anhänge, um zu senden."
 
@@ -17536,7 +17736,7 @@ msgid "Merge request opened"
 msgstr ""
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 msgid "Merged"
 msgstr "Zusammengeführt"
 
@@ -17552,12 +17752,20 @@ msgstr "Nachrichteneingabe"
 msgid "Message selection"
 msgstr "Nachrichtenauswahl"
 
+#: src/features/chat/host/host-composer.tsx:205
+msgid "Message the agent on your computer"
+msgstr ""
+
 #: src/features/sub-agents/components/worker-composer.tsx:92
 msgid "Message the worker"
 msgstr ""
 
 #: src/features/sub-agents/components/worker-composer.tsx:101
 msgid "Message the worker..."
+msgstr ""
+
+#: src/features/chat/host/host-composer.tsx:199
+msgid "Message to the coding agent"
 msgstr ""
 
 #: src/features/chat/thread/message-branch-switcher.tsx:55
@@ -18003,7 +18211,7 @@ msgid "Modern gradient background"
 msgstr "Moderner Verlaufshintergrund"
 
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:771
-#: src/features/develop/components/files-tab.tsx:34
+#: src/features/develop/components/files-tab.tsx:66
 msgid "Modified"
 msgstr "Geändert"
 
@@ -18105,7 +18313,7 @@ msgstr "Mehr über dich"
 msgid "More actions for {0}"
 msgstr ""
 
-#: src/features/chat/thread/message-item.tsx:360
+#: src/features/chat/thread/message-item.tsx:362
 msgid "More copy options"
 msgstr ""
 
@@ -18366,11 +18574,11 @@ msgstr "Stummschalten"
 msgid "my data"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:395
 msgid "My Linux computer"
 msgstr "Mein Linux-Computer"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:395
 msgid "My Mac"
 msgstr "Mein Mac"
 
@@ -18382,7 +18590,7 @@ msgstr "Mein MCP-Server"
 msgid "My skills"
 msgstr "Meine Skills"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:395
 msgid "My Windows PC"
 msgstr "Mein Windows-PC"
 
@@ -18395,6 +18603,11 @@ msgstr "Myanmar"
 msgid "Myanmar (Myanmar)"
 msgstr "Birmanisch (Myanmar)"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:61
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:65
+msgid "n/a"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:26
 #: src/features/settings/lib/settings-keywords.ts:87
 msgid "name"
@@ -18403,7 +18616,7 @@ msgstr ""
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:485
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:265
+#: src/features/devices/components/devices-settings.tsx:334
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
@@ -18623,7 +18836,7 @@ msgstr "Neore - KI-Plattform für Text-, Video-, Audio-, Bild- und Dokumenteners
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:643
+#: src/features/chat/thread/composer.tsx:650
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore kann Fehler machen. Überprüfe wichtige Informationen."
 
@@ -18924,7 +19137,7 @@ msgstr "Nächster Treffer"
 msgid "Next option"
 msgstr "Nächste Option"
 
-#: src/features/chat/thread/composer.tsx:228
+#: src/features/chat/thread/composer.tsx:229
 msgid "Next output mode"
 msgstr "Nächster Ausgabemodus"
 
@@ -19165,11 +19378,11 @@ msgstr "Noch keine Datensätze"
 msgid "No description"
 msgstr "Keine Beschreibung"
 
-#: src/features/develop/components/pull-request-view.tsx:116
+#: src/features/develop/components/pull-request-view.tsx:118
 msgid "No description provided."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:407
+#: src/features/devices/components/devices-settings.tsx:482
 msgid "No devices paired."
 msgstr "Keine Geräte gekoppelt."
 
@@ -19563,7 +19776,7 @@ msgstr "Noch keine Threads"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "Noch keine Tarifdaten. Tarifinformationen werden nach dem Gateway-Upgrade für neue Anfragen erfasst."
 
-#: src/features/devices/components/devices-settings.tsx:95
+#: src/features/devices/components/devices-settings.tsx:166
 msgid "No tools shared yet"
 msgstr "Noch keine Tools freigegeben"
 
@@ -19736,7 +19949,7 @@ msgstr ""
 msgid "Not found"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:42
+#: src/features/develop/components/files-tab.tsx:74
 msgid "Not loaded: the diffs on this page were already large."
 msgstr ""
 
@@ -19762,6 +19975,10 @@ msgstr "Nicht festgelegt"
 msgid "Not started"
 msgstr "Nicht gestartet"
 
+#: src/features/develop/components/review-panel.tsx:299
+msgid "Not submitted"
+msgstr ""
+
 #: src/features/workflow/components/nodes/comment-node.tsx:70
 msgid "Note"
 msgstr "Hinweis"
@@ -19782,7 +19999,7 @@ msgstr "Hinweis: Module werden pro Unterhaltung angewendet, nicht pro Nachricht.
 msgid "Nothing found"
 msgstr "Nichts gefunden"
 
-#: src/features/devices/components/devices-settings.tsx:164
+#: src/features/devices/components/devices-settings.tsx:233
 msgid "Nothing has run on a device yet."
 msgstr "Auf einem Gerät ist noch nichts gelaufen."
 
@@ -19917,7 +20134,7 @@ msgstr "Aus"
 msgid "Official"
 msgstr "Offiziell"
 
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:172
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "Offline"
@@ -19957,6 +20174,10 @@ msgstr "Cineastisches Modell der älteren Generation mit höherer Konsistenz"
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:519
 msgid "Older"
 msgstr "Älter"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:18
+msgid "Older messages were summarised"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:66
 msgid "ollama"
@@ -20106,7 +20327,7 @@ msgstr "Das Einmalpasswort ist ungültig"
 msgid "One-time password is required"
 msgstr "Das Einmalpasswort ist erforderlich"
 
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:172
 msgid "Online"
 msgstr "Online"
 
@@ -20187,7 +20408,7 @@ msgstr "Deckkraft"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:669
 #: src/components/command-palette.tsx:618
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
 msgstr "Öffnen"
@@ -20285,7 +20506,7 @@ msgstr "Nachrichten öffnen"
 msgid "Open Model Picker"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:361
+#: src/features/devices/components/devices-settings.tsx:435
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "Öffne Neore in der Desktop-App, um diesen Computer zu koppeln. Bereits gekoppelte Geräte stehen unten."
 
@@ -20294,7 +20515,7 @@ msgid "Open new chat"
 msgstr "Neuen Chat öffnen"
 
 #. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-view.tsx:85
+#: src/features/develop/components/pull-request-view.tsx:86
 msgid "Open on {0}"
 msgstr ""
 
@@ -20958,6 +21179,10 @@ msgstr "Unsere Datenschutzrichtlinie erläutert, wie wir deine persönlichen Dat
 msgid "Outcome of every case per model"
 msgstr "Ergebnis jedes Testfalls pro Modell"
 
+#: src/features/develop/components/review-thread.tsx:44
+msgid "Outdated"
+msgstr ""
+
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
 #: src/features/workflow/types/index.ts:574
 #: src/features/workflow/types/index.ts:578
@@ -20986,7 +21211,7 @@ msgstr "Ausgabedateien"
 msgid "Output Format"
 msgstr "Ausgabeformat"
 
-#: src/features/chat/thread/composer.tsx:239
+#: src/features/chat/thread/composer.tsx:240
 msgid "Output Mode"
 msgstr "Ausgabemodus"
 
@@ -21104,11 +21329,11 @@ msgstr "Male über die Bereiche, die du bearbeiten möchtest. Weiße Bereiche we
 msgid "Paired"
 msgstr "Gekoppelt"
 
-#: src/features/devices/components/devices-settings.tsx:394
+#: src/features/devices/components/devices-settings.tsx:468
 msgid "Paired devices"
 msgstr "Gekoppelte Geräte"
 
-#: src/features/devices/components/devices-settings.tsx:337
+#: src/features/devices/components/devices-settings.tsx:411
 msgid "Pairing was cancelled on this computer."
 msgstr "Die Kopplung wurde auf diesem Computer abgebrochen."
 
@@ -21408,6 +21633,10 @@ msgstr "Ausstehende Einladungen"
 msgid "Pending Invites"
 msgstr "Ausstehende Einladungen"
 
+#: src/features/develop/components/draft-comment-card.tsx:28
+msgid "Pending: posted when you submit the review"
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:210
 msgid "people"
 msgstr "Personen"
@@ -21451,6 +21680,10 @@ msgstr "Dein Konto und alle damit verbundenen Daten dauerhaft löschen"
 #: src/features/chat/sharing/thread-share-button.tsx:282
 msgid "Permission Level"
 msgstr "Berechtigungsstufe"
+
+#: src/features/chat/host/host-composer.tsx:159
+msgid "Permission requests from the agent"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:101
 #: src/features/settings/lib/settings-keywords.ts:102
@@ -21603,7 +21836,7 @@ msgstr "Erinnerung anheften"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:144
 #: ../../packages/chat-ui/src/chat/message-item.tsx:193
-#: src/features/chat/thread/message-item.tsx:379
+#: src/features/chat/thread/message-item.tsx:381
 msgid "Pin message"
 msgstr "Nachricht anheften"
 
@@ -21662,7 +21895,7 @@ msgstr ""
 msgid "plan"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:261
+#: src/features/chat/thread/composer.tsx:262
 msgid "Plan a project or brainstorm ideas..."
 msgstr "Ein Projekt planen oder Ideen sammeln..."
 
@@ -21795,7 +22028,7 @@ msgstr "Polierter Hollywood-Look"
 msgid "Popular"
 msgstr "Beliebt"
 
-#: src/features/devices/components/devices-settings.tsx:277
+#: src/features/devices/components/devices-settings.tsx:346
 msgid "Port"
 msgstr ""
 
@@ -22169,7 +22402,7 @@ msgstr "Vorheriger Treffer"
 msgid "Previous option"
 msgstr "Vorherige Option"
 
-#: src/features/chat/thread/composer.tsx:195
+#: src/features/chat/thread/composer.tsx:196
 msgid "Previous output mode"
 msgstr "Vorheriger Ausgabemodus"
 
@@ -22799,11 +23032,11 @@ msgstr "Vom Routing-Modul zugewiesene Komplexitätsstufen für Anfragen"
 msgid "Query usage analytics and costs"
 msgstr "Nutzungsanalysen und Kosten abfragen"
 
-#: src/features/chat/thread/composer-input-area.tsx:313
+#: src/features/chat/thread/composer-input-area.tsx:325
 msgid "Queue message"
 msgstr "Nachricht einreihen"
 
-#: src/features/chat/thread/composer-input-area.tsx:332
+#: src/features/chat/thread/composer-input-area.tsx:344
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Nachricht einreihen – wird gesendet, wenn die aktuelle Antwort fertig ist"
 
@@ -23001,8 +23234,8 @@ msgid "Read the docs"
 msgstr "Zur Dokumentation"
 
 #: src/features/develop/components/develop-page.tsx:43
-msgid "Read what needs you: the description, commits, files, diff and checks of each change."
-msgstr ""
+#~ msgid "Read what needs you: the description, commits, files, diff and checks of each change."
+#~ msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:65
 msgid "read-only"
@@ -23016,7 +23249,7 @@ msgstr "Schreibgeschützte Vorschau – zum Bearbeiten forken"
 msgid "Read-only shared conversation"
 msgstr "Schreibgeschützte geteilte Unterhaltung"
 
-#: src/features/chat/thread/composer-input.tsx:241
+#: src/features/chat/thread/composer-input.tsx:244
 msgid "Reading \"{attachmentName}\"…"
 msgstr "„{attachmentName}“ wird gelesen …"
 
@@ -23243,11 +23476,15 @@ msgstr "Neu verbinden"
 msgid "Reconnect {0}"
 msgstr "{0} neu verbinden"
 
+#: src/features/devices/components/devices-settings.tsx:174
+msgid "Reconnecting"
+msgstr ""
+
 #: src/features/connection/components/connection-banner.tsx:25
 msgid "Reconnecting to the server…"
 msgstr "Verbindung zum Server wird wiederhergestellt…"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:537
+#: src/features/chat/thread/streaming-placeholder.tsx:539
 msgid "Reconnecting…"
 msgstr "Verbindung wird wiederhergestellt…"
 
@@ -23431,7 +23668,7 @@ msgid "Refresh installed models"
 msgstr "Installierte Modelle aktualisieren"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:198
-#: src/features/chat/thread/message-item.tsx:385
+#: src/features/chat/thread/message-item.tsx:387
 msgid "Regenerate"
 msgstr "Neu generieren"
 
@@ -23584,10 +23821,10 @@ msgstr "Angemeldet bleiben"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:313
-#: src/features/chat/thread/composer-input.tsx:375
-#: src/features/devices/components/devices-settings.tsx:122
-#: src/features/devices/components/devices-settings.tsx:126
+#: src/features/chat/thread/composer-input.tsx:316
+#: src/features/chat/thread/composer-input.tsx:378
+#: src/features/devices/components/devices-settings.tsx:190
+#: src/features/devices/components/devices-settings.tsx:195
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
@@ -23604,7 +23841,7 @@ msgid "Remove \"{0}\"?"
 msgstr "\"{0}\" entfernen?"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:143
+#: src/features/devices/components/devices-settings.tsx:212
 msgid "Remove “{0}”?"
 msgstr "„{0}“ entfernen?"
 
@@ -23803,7 +24040,7 @@ msgstr "Benutzer entfernen"
 msgid "Remove variable {0}"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:35
+#: src/features/develop/components/files-tab.tsx:67
 msgid "Removed"
 msgstr ""
 
@@ -23815,10 +24052,11 @@ msgstr "Aus Favoriten entfernt"
 msgid "Removed:"
 msgstr "Entfernt:"
 
-#: src/features/develop/components/files-tab.tsx:36
+#: src/features/develop/components/files-tab.tsx:68
 msgid "Renamed"
 msgstr ""
 
+#: src/features/develop/components/review-thread.tsx:104
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Reopen"
 msgstr "Wieder öffnen"
@@ -23901,6 +24139,9 @@ msgstr "Antworten werden nicht mehr vorgelesen"
 msgid "Replies, tokens and spend per skill or agent for the selected period"
 msgstr "Antworten, Tokens und Ausgaben pro Skill oder Agent im ausgewählten Zeitraum"
 
+#: src/features/develop/components/review-thread.tsx:61
+#: src/features/develop/components/review-thread.tsx:74
+#: src/features/develop/components/review-thread.tsx:82
 #: src/features/pages/components/page-comments-panel.tsx:204
 #: src/features/pages/components/page-comments-panel.tsx:208
 msgid "Reply"
@@ -23910,7 +24151,7 @@ msgstr "Antworten"
 msgid "Reply complete"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:618
+#: src/features/chat/core/context/chat-context.tsx:621
 msgid "Reply ready"
 msgstr "Antwort bereit"
 
@@ -23921,6 +24162,10 @@ msgstr "Repos, Issues, PRs und Codesuche"
 #: src/features/tasks/components/task-form-dialog.tsx:263
 msgid "Repository"
 msgstr "Repository"
+
+#: src/features/develop/components/review-panel.tsx:64
+msgid "Request changes"
+msgstr ""
 
 #: src/features/settings/components/chat/usage-settings.tsx:92
 msgid "Request count"
@@ -23998,7 +24243,7 @@ msgstr "Recherche"
 msgid "Research a topic"
 msgstr "Ein Thema recherchieren"
 
-#: src/features/chat/thread/composer.tsx:263
+#: src/features/chat/thread/composer.tsx:264
 msgid "Research a topic in depth..."
 msgstr "Ein Thema ausführlich recherchieren..."
 
@@ -24081,9 +24326,14 @@ msgstr "Spalte {label} in der Größe ändern"
 msgid "Resolution"
 msgstr "Auflösung"
 
+#: src/features/develop/components/review-thread.tsx:104
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Resolve"
 msgstr "Erledigen"
+
+#: src/features/develop/components/review-thread.tsx:43
+msgid "Resolved"
+msgstr ""
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:85
 msgid "Resource"
@@ -24209,6 +24459,7 @@ msgstr ""
 
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/translation/message-translation.tsx:88
+#: src/features/devices/components/devices-settings.tsx:129
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -24267,6 +24518,10 @@ msgstr "Unsere Datenschutzrichtlinie und Datenverarbeitungspraktiken überprüfe
 msgid "Review requested on a pull request"
 msgstr ""
 
+#: src/features/develop/components/review-panel.tsx:284
+msgid "Review submitted"
+msgstr ""
+
 #. placeholder {0}: task.title
 #: src/features/home/components/home-page.tsx:163
 msgid "Review task: {0}"
@@ -24275,6 +24530,10 @@ msgstr "Aufgabe prüfen: {0}"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:134
 msgid "Review the optimized prompt below. You can apply it to update your prompt or reject it to try again."
 msgstr "Überprüfe den optimierten Prompt unten. Du kannst ihn anwenden, um deinen Prompt zu aktualisieren, oder ihn ablehnen, um es erneut zu versuchen."
+
+#: src/features/develop/components/develop-page.tsx:43
+msgid "Review what needs you: the description, commits, files, diff and checks of each change, and your own review of it."
+msgstr ""
 
 #: src/features/skills/components/skill-form-dialog.tsx:354
 msgid "review, security"
@@ -24653,6 +24912,7 @@ msgstr "Saudi-Arabien"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:154
+#: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:640
@@ -24846,7 +25106,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Bewertet jede Antwort mit 0–100 % anhand der erwarteten Antwort oder der Bewertungsrubrik. Fügt pro Testfall einen kleinen Modellaufruf hinzu."
 
-#: src/features/chat/thread/composer-input.tsx:921
+#: src/features/chat/thread/composer-input.tsx:931
 msgid "Screen capture failed. Please try again."
 msgstr "Die Bildschirmaufnahme ist fehlgeschlagen. Bitte versuche es erneut."
 
@@ -25408,6 +25668,7 @@ msgstr "Halbrealistisches Modell mit guter Prompt-Treue"
 msgid "Semi-realistic visual style"
 msgstr "Halbrealistischer Bildstil"
 
+#: src/features/chat/host/host-composer.tsx:221
 #: src/features/sub-agents/components/worker-composer.tsx:104
 msgid "Send"
 msgstr ""
@@ -25450,8 +25711,8 @@ msgid "Send Magic Link"
 msgstr "Magic Link senden"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
-#: src/features/chat/thread/composer-input-area.tsx:366
-#: src/features/chat/thread/composer-input-area.tsx:380
+#: src/features/chat/thread/composer-input-area.tsx:378
+#: src/features/chat/thread/composer-input-area.tsx:392
 msgid "Send message"
 msgstr "Nachricht senden"
 
@@ -25467,6 +25728,10 @@ msgstr "Sende über Telegram Nachrichten an den KI-Bot. Unterhaltungen erscheine
 #: src/features/chat/thread/composer-prompt-queue.tsx:438
 msgid "Send next"
 msgstr "Als Nächstes senden"
+
+#: src/features/develop/components/review-thread.tsx:74
+msgid "Send reply now"
+msgstr ""
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:180
 msgid "Send the secret as <0>X-Gitlab-Token</0>, in plain text, as GitLab's secret token works. GitLab does not sign the body and sends no timestamp, so the secret is a bearer token: whoever holds it can send any request. Every delivery must also carry <1>X-Gitlab-Event-UUID</1>, which GitLab sends itself. Each accepted delivery is remembered by that UUID and its body, and a resend of it is answered as a duplicate. Requests carrying other signature headers are rejected."
@@ -25488,7 +25753,11 @@ msgstr "Verifizierungscode senden"
 msgid "Sending your message and waiting for the reply"
 msgstr "Deine Nachricht wird gesendet, warte auf die Antwort"
 
-#: src/features/devices/components/devices-settings.tsx:173
+#: src/features/chat/thread/streaming-placeholder.tsx:587
+msgid "Sending…"
+msgstr ""
+
+#: src/features/devices/components/devices-settings.tsx:242
 msgid "Sent"
 msgstr "Gesendet"
 
@@ -25540,7 +25809,7 @@ msgstr "Serbisch (Serbien)"
 msgid "Serif"
 msgstr "Serif"
 
-#: src/features/devices/components/devices-settings.tsx:245
+#: src/features/devices/components/devices-settings.tsx:314
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr ""
 
@@ -25556,7 +25825,7 @@ msgstr "Serverfehler. Bitte versuche es später erneut."
 msgid "Server name is required"
 msgstr "Servername ist erforderlich"
 
-#: src/features/devices/components/devices-settings.tsx:100
+#: src/features/devices/components/devices-settings.tsx:171
 msgid "Server over SSH"
 msgstr ""
 
@@ -25580,7 +25849,7 @@ msgstr "Serverlose Postgres-Datenbank mit Branching"
 msgid "servers"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:414
+#: src/features/devices/components/devices-settings.tsx:489
 msgid "Servers over SSH"
 msgstr ""
 
@@ -25717,7 +25986,7 @@ msgstr "geteilt"
 msgid "Shared conversation"
 msgstr "Geteilte Unterhaltung"
 
-#: src/features/devices/components/devices-settings.tsx:389
+#: src/features/devices/components/devices-settings.tsx:463
 msgid "Shared folders and local servers…"
 msgstr "Freigegebene Ordner und lokale Server …"
 
@@ -25816,8 +26085,8 @@ msgstr "Alle Aufgaben anzeigen"
 msgid "Show attached content"
 msgstr "Angehängten Inhalt anzeigen"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:239
-#: src/features/chat/thread/composer-followup-suggestions.tsx:255
+#: src/features/chat/thread/composer-followup-suggestions.tsx:240
+#: src/features/chat/thread/composer-followup-suggestions.tsx:256
 msgid "Show follow-up suggestions"
 msgstr "Folgevorschläge anzeigen"
 
@@ -25966,6 +26235,10 @@ msgstr "Anmelden"
 #: src/lib/toast.ts:250
 msgid "Sign In Again"
 msgstr "Erneut anmelden"
+
+#: src/features/chat/host/host-composer.tsx:92
+msgid "Sign in again to send."
+msgstr ""
 
 #: src/features/settings/components/chat/mcp-settings.tsx:485
 msgid "Sign in on another site?"
@@ -26805,6 +27078,12 @@ msgstr "Markiert"
 msgid "Start"
 msgstr "Starten"
 
+#. placeholder {0}: offer.agentLabel
+#. placeholder {1}: offer.folderLabel
+#: src/features/devices/components/devices-settings.tsx:98
+msgid "Start {0} in {1}"
+msgstr ""
+
 #: ../../packages/chat-ui/src/chat/message-list.tsx:63
 msgid "Start a conversation"
 msgstr "Unterhaltung beginnen"
@@ -26963,6 +27242,10 @@ msgstr "Import wird gestartet..."
 msgid "Starting test drive…"
 msgstr "Probelauf wird gestartet…"
 
+#: src/features/chat/host/host-composer.tsx:173
+msgid "Starting the agent on your computer. A message you send now goes out once it is up."
+msgstr ""
+
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:34
 msgid "Starting the coding agent…"
 msgstr "Coding-Agent wird gestartet…"
@@ -27014,11 +27297,11 @@ msgstr "Status"
 msgid "Status Page"
 msgstr "Statusseite"
 
-#: src/features/chat/thread/composer-input-area.tsx:305
+#: src/features/chat/thread/composer-input-area.tsx:316
 msgid "Steer — the current reply reads this at its next step"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:291
+#: src/features/chat/thread/composer-input-area.tsx:299
 msgid "Steer the reply"
 msgstr ""
 
@@ -27069,6 +27352,7 @@ msgstr "Aktien"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/group/group-participant-bar.tsx:234
+#: src/features/chat/host/host-composer.tsx:210
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
@@ -27091,8 +27375,8 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:522
 #: src/features/chat/thread-list/thread-node.tsx:544
-#: src/features/chat/thread/composer-input-area.tsx:340
-#: src/features/chat/thread/composer-input-area.tsx:353
+#: src/features/chat/thread/composer-input-area.tsx:352
+#: src/features/chat/thread/composer-input-area.tsx:365
 msgid "Stop generating"
 msgstr "Generierung stoppen"
 
@@ -27534,6 +27818,14 @@ msgstr "Zwischenüberschrift"
 msgid "submit"
 msgstr ""
 
+#: src/features/develop/components/review-panel.tsx:239
+msgid "Submit review"
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:239
+msgid "Submitting…"
+msgstr ""
+
 #: src/components/model-picker/model-picker.tsx:983
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "Abonniere für 8 $/Monat, um alle Modelle freizuschalten."
@@ -27602,7 +27894,7 @@ msgstr "Geeignet für komplexe Aufgaben: Rolle / Hintergrund / Aufmerksamkeit / 
 msgid "Summarise my notes in three bullets."
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:260
+#: src/features/chat/thread/composer.tsx:261
 msgid "Summarize a document or URL..."
 msgstr "Ein Dokument oder eine URL zusammenfassen..."
 
@@ -27621,6 +27913,10 @@ msgstr "Fasse mein Postfach zusammen und hebe dringende Punkte hervor. Verwende 
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:86
 msgid "Summarize the history of the internet"
 msgstr "Die Geschichte des Internets zusammenfassen"
+
+#: src/features/develop/components/review-panel.tsx:218
+msgid "Summary"
+msgstr ""
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:151
 msgid "Summary is only available for text models."
@@ -27734,6 +28030,10 @@ msgstr "Modell wechseln"
 msgid "Switch to {label}"
 msgstr "Zu {label} wechseln"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:52
+msgid "Switch to {name}?"
+msgstr ""
+
 #: src/features/knowledge/components/collection-dialog.tsx:84
 msgid "Switch to an organization to share a collection with it."
 msgstr "Wechsle zu einer Organisation, um eine Sammlung mit ihr zu teilen."
@@ -27745,6 +28045,12 @@ msgstr "Wechsle zu einer Organisation, um den Skill mit ihr zu teilen."
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:170
 msgid "Switch workspace: currently {triggerLabel}"
 msgstr "Arbeitsbereich wechseln: aktuell {triggerLabel}"
+
+#. placeholder {0}: nameOf(part.from.model)
+#. placeholder {1}: nameOf(part.to.model)
+#: src/features/chat/thread/agent-switch-divider.tsx:14
+msgid "Switched from {0} to {1}"
+msgstr ""
 
 #: src/features/auth/components/team/team-switcher.tsx:73
 msgid "Switched to organization view"
@@ -27783,7 +28089,7 @@ msgstr "Synthesizer (wägt beide Seiten ab)"
 msgid "System default"
 msgstr "Systemstandard"
 
-#: src/features/chat/thread/message-item.tsx:230
+#: src/features/chat/thread/message-item.tsx:232
 msgid "System message:"
 msgstr "Systemnachricht:"
 
@@ -28220,7 +28526,7 @@ msgstr "Text"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1080
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:117
+#: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:44
@@ -28271,7 +28577,7 @@ msgstr "Textrichtung auf LTR gesetzt"
 msgid "Text direction set to RTL"
 msgstr "Textrichtung auf RTL gesetzt"
 
-#: src/features/chat/thread/composer-input.tsx:277
+#: src/features/chat/thread/composer-input.tsx:280
 msgid "Text document"
 msgstr "Textdokument"
 
@@ -28373,6 +28679,10 @@ msgstr "Thailand"
 msgid "Thanks for rating"
 msgstr "Danke für deine Bewertung"
 
+#: src/features/develop/lib/use-review-messages.ts:14
+msgid "That comment is already gone."
+msgstr ""
+
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:168
 msgid "That key combination cannot be used as a shortcut"
 msgstr ""
@@ -28385,17 +28695,29 @@ msgstr ""
 msgid "That message could not be found in this conversation."
 msgstr "Diese Nachricht wurde in dieser Unterhaltung nicht gefunden."
 
+#: src/features/chat/host/host-composer.tsx:97
+msgid "That message is too long to send from here."
+msgstr ""
+
 #: src/features/chat/lock/thread-lock-dialog.tsx:60
 msgid "That passcode is not right."
+msgstr ""
+
+#: src/features/chat/host/host-composer.tsx:149
+msgid "That request is no longer waiting."
 msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:260
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "Der 43 Zeichen lange EncodingAESKey (die Nachrichtenverschlüsselung muss auf sicheren Modus gesetzt sein)"
 
-#: src/features/devices/components/devices-settings.tsx:127
+#: src/features/devices/components/devices-settings.tsx:196
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "Der Agent kann dieses Gerät um nichts mehr bitten. Sein Aktivitätsprotokoll bleibt, bis es abläuft."
+
+#: src/features/chat/host/host-composer.tsx:98
+msgid "The agent is still working on the last message."
+msgstr ""
 
 #: src/features/settings/components/chat/agent-settings.tsx:56
 msgid "The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the AI's capabilities for specific task types."
@@ -28430,7 +28752,7 @@ msgstr "Der Assistent hat eine Frage"
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:86
+#: src/features/chat/thread/composer-model-selector.tsx:90
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -28441,6 +28763,10 @@ msgstr "Der Browser kann dieses Video nicht lesen, um ein Bild aufzunehmen"
 #: src/features/skills/components/skill-builder-dialog.tsx:108
 msgid "The builder could not answer. Try again."
 msgstr "Der Builder konnte nicht antworten. Versuche es erneut."
+
+#: src/features/develop/lib/use-review-messages.ts:13
+msgid "The change has new commits since you started this review. Submit or discard the review first, then comment on the new version."
+msgstr ""
 
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:215
 msgid "The change is too large to show in full."
@@ -28482,7 +28808,7 @@ msgstr "Das Kostenlimit muss ein positiver Dollarbetrag sein."
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "Der Datensatz, seine Testfälle und alle seine Durchläufe werden entfernt."
 
-#: src/features/develop/components/pull-request-view.tsx:118
+#: src/features/develop/components/pull-request-view.tsx:120
 msgid "The description is cut short."
 msgstr ""
 
@@ -28580,11 +28906,11 @@ msgstr ""
 msgid "The host lists at most {commitLimit, plural, one {# commit} other {# commits}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:131
+#: src/features/develop/components/files-tab.tsx:258
 msgid "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:41
+#: src/features/develop/components/files-tab.tsx:73
 msgid "The host sent no diff for this file (binary, or too large for it)."
 msgstr ""
 
@@ -28603,6 +28929,10 @@ msgstr "Die letzte Löschanfrage ist fehlgeschlagen. Du kannst sie erneut stelle
 #: src/features/auth/components/auth/last-signin-message.tsx:87
 msgid "the last time"
 msgstr "das letzte Mal"
+
+#: src/features/chat/host/host-composer.tsx:183
+msgid "The last turn stopped before it finished."
+msgstr ""
 
 #: src/features/chat/sharing/shared-thread-page.tsx:77
 msgid "The link may be wrong, or its owner has made the conversation private or deleted it."
@@ -28786,7 +29116,7 @@ msgstr ""
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "Das einheitliche LLM-Gateway für moderne KI-Anwendungen."
 
-#: src/features/chat/thread/composer-input.tsx:506
+#: src/features/chat/thread/composer-input.tsx:509
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "Der Upload von „{fileName}“ ist abgelaufen. Bitte hänge die Datei erneut an."
 
@@ -28845,6 +29175,10 @@ msgstr "Lade dann ein Modell herunter und nutze diese Basis-URL:"
 #: ../../packages/ui/src/components/image-gallery.tsx:488
 msgid "There are no items to display."
 msgstr "Es gibt keine Einträge zum Anzeigen."
+
+#: src/features/develop/components/review-panel.tsx:134
+msgid "There is nothing to submit."
+msgstr ""
 
 #: src/components/error-boundaries/route-error-boundary.tsx:64
 msgid "There's a problem with your internet connection or our servers."
@@ -28923,7 +29257,7 @@ msgstr "Vision-Language-Modell mit Denkmodus"
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1036
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
-#: src/features/chat/thread/streaming-placeholder.tsx:727
+#: src/features/chat/thread/streaming-placeholder.tsx:764
 msgid "Thinking..."
 msgstr "Denkt nach..."
 
@@ -28945,6 +29279,10 @@ msgstr "Diese Aktion kann nicht rückgängig gemacht werden. Dies wird die Organ
 msgid "This browser cannot receive push notifications here."
 msgstr "Dieser Browser kann hier keine Push-Benachrichtigungen empfangen."
 
+#: src/features/chat/host/host-composer.tsx:93
+msgid "This chat could not be found."
+msgstr ""
+
 #: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
 msgstr ""
@@ -28957,25 +29295,25 @@ msgstr "Diese Sammlung wurde von einem Mitglied deiner Organisation mit dir gete
 msgid "This command name is reserved"
 msgstr "Dieser Befehlsname ist reserviert"
 
-#: src/features/devices/components/devices-settings.tsx:99
+#: src/features/devices/components/devices-settings.tsx:170
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "Dieser Computer"
 
-#: src/features/devices/components/devices-settings.tsx:366
+#: src/features/devices/components/devices-settings.tsx:440
 msgid "This computer is not paired yet."
 msgstr "Dieser Computer ist noch nicht gekoppelt."
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:382
+#: src/features/devices/components/devices-settings.tsx:456
 msgid "This computer is paired as “{0}”."
 msgstr "Dieser Computer ist als „{0}“ gekoppelt."
 
-#: src/features/devices/components/devices-settings.tsx:366
+#: src/features/devices/components/devices-settings.tsx:440
 msgid "This computer is paired with another account."
 msgstr "Dieser Computer ist mit einem anderen Konto gekoppelt."
 
-#: src/features/devices/components/devices-settings.tsx:344
+#: src/features/devices/components/devices-settings.tsx:418
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "Dieser Computer ist gekoppelt. Wähle in der Desktop-App, welche Ordner freigegeben werden."
 
@@ -29003,6 +29341,10 @@ msgstr "Diese Unterhaltung enthält noch keine Nachrichten."
 msgid "This conversation is long, so only its most recent messages are shown."
 msgstr "Diese Unterhaltung ist lang, daher werden nur die neuesten Nachrichten angezeigt."
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:54
+msgid "This conversation is long. {name} has not seen it, so its next reply reads it without the cache and costs more than usual."
+msgstr ""
+
 #: src/features/chat/sharing/shared-thread-page.tsx:71
 msgid "This conversation is not available"
 msgstr "Diese Unterhaltung ist nicht verfügbar"
@@ -29011,7 +29353,7 @@ msgstr "Diese Unterhaltung ist nicht verfügbar"
 msgid "This CSV file appears to be empty or invalid."
 msgstr "Diese CSV-Datei scheint leer oder ungültig zu sein."
 
-#: src/features/develop/components/files-tab.tsx:43
+#: src/features/develop/components/files-tab.tsx:75
 msgid "This diff is cut short."
 msgstr ""
 
@@ -29055,7 +29397,7 @@ msgstr "Diese Datei ist zu groß (~{0} Token) und überschreitet das Kontextfens
 msgid "This host does not offer an inbox yet."
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:103
+#: src/features/develop/components/pull-request-view.tsx:105
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
@@ -29166,6 +29508,18 @@ msgstr "Dieser Prompt wird konfigurieren:"
 msgid "This removes the model files from your computer. You can pull it again later."
 msgstr "Dadurch werden die Modelldateien von deinem Computer entfernt. Du kannst das Modell später erneut herunterladen."
 
+#: src/features/chat/host/host-composer.tsx:57
+msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:119
+msgid "This review is already being submitted, maybe from another device."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:16
+msgid "This review is too long to keep: it holds at most 100 comments and about 1 MB of text. Submit it first, or shorten it."
+msgstr ""
+
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:43
 msgid "This run is no longer available."
 msgstr "Dieser Durchlauf ist nicht mehr verfügbar."
@@ -29181,6 +29535,11 @@ msgstr "Dieser Server erfordert eine Anmeldung. Speichere ihn und wähle dann An
 #: src/features/settings/components/chat/mcp/server-form.tsx:178
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "Der Registry-Eintrag dieses Servers verlangt die folgenden Werte. Sie werden in die URL und die Header eingesetzt."
+
+#: src/features/chat/host/host-composer.tsx:96
+#: src/features/chat/host/host-composer.tsx:178
+msgid "This session has ended. Start a new one from the desktop app."
+msgstr ""
 
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:509
 msgid "This sheet appears to be empty."
@@ -29802,7 +30161,7 @@ msgstr "Umgewandeltes Bild"
 msgid "Translate"
 msgstr "Übersetzen"
 
-#: src/features/chat/thread/composer.tsx:266
+#: src/features/chat/thread/composer.tsx:267
 msgid "Translate text to another language..."
 msgstr "Text in eine andere Sprache übersetzen..."
 
@@ -30114,7 +30473,7 @@ msgstr "Tippen zum Suchen"
 msgid "Type your answer…"
 msgstr "Gib deine Antwort ein…"
 
-#: src/features/chat/thread/composer-input.tsx:1261
+#: src/features/chat/thread/composer-input.tsx:1272
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:166
 msgid "Type your message..."
 msgstr "Nachricht eingeben..."
@@ -30254,7 +30613,7 @@ msgstr "Nicht kategorisiert ({0})"
 msgid "Uncategorized"
 msgstr "Nicht kategorisiert"
 
-#: src/features/develop/components/files-tab.tsx:37
+#: src/features/develop/components/files-tab.tsx:69
 #: src/features/evals/components/run-comparison.tsx:56
 msgid "Unchanged"
 msgstr "Unverändert"
@@ -30475,7 +30834,7 @@ msgstr "Aktuelle Dokumentation für jede Bibliothek und jedes Framework"
 msgid "Update Duration"
 msgstr "Dauer aktualisieren"
 
-#: src/features/chat/thread/composer-input.tsx:1127
+#: src/features/chat/thread/composer-input.tsx:1137
 msgid "Update failed"
 msgstr "Aktualisierung fehlgeschlagen"
 
@@ -30659,11 +31018,11 @@ msgstr "CSVs hochladen, Python-Analysen ausführen und Diagramme exportieren –
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Lade Dokumente in deine Wissensdatenbank hoch und gruppiere sie in Sammlungen. Die KI durchsucht sie nach relevantem Kontext und zitiert die verwendeten Abschnitte."
 
-#: src/features/chat/thread/composer-input.tsx:551
+#: src/features/chat/thread/composer-input.tsx:554
 msgid "Upload failed"
 msgstr "Hochladen fehlgeschlagen"
 
-#: src/features/chat/thread/composer-input-area.tsx:198
+#: src/features/chat/thread/composer-input-area.tsx:206
 msgid "Upload file"
 msgstr "Datei hochladen"
 
@@ -30709,7 +31068,7 @@ msgstr "Hochgeladen"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} hochgeladen"
 
-#: src/features/chat/thread/composer-input.tsx:319
+#: src/features/chat/thread/composer-input.tsx:322
 msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} wird hochgeladen"
 
@@ -30892,7 +31251,7 @@ msgstr "Die erlaubten Modelle der Organisation verwenden"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "Nutze diese Tastenkürzel, um effizienter im Datenraster zu navigieren und damit zu arbeiten."
 
-#: src/features/devices/components/devices-settings.tsx:376
+#: src/features/devices/components/devices-settings.tsx:450
 msgid "Use this computer for agent tools"
 msgstr "Diesen Computer für Agenten-Tools nutzen"
 
@@ -30932,7 +31291,7 @@ msgstr "Nutzer"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:273
+#: src/features/devices/components/devices-settings.tsx:342
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:194
@@ -31342,7 +31701,7 @@ msgstr "Video"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
 #: src/components/model-picker/model-picker.tsx:1106
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:119
+#: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -31519,6 +31878,10 @@ msgstr "Vollständige Dokumentation ansehen"
 msgid "View History"
 msgstr "Verlauf anzeigen"
 
+#: src/features/develop/components/review-panel.tsx:289
+msgid "View it"
+msgstr ""
+
 #. placeholder {0}: latestUnread.title
 #: src/features/changelog/components/changelog-card.tsx:51
 msgid "View latest update: {0}"
@@ -31539,6 +31902,19 @@ msgstr "Pull Request ansehen"
 #: src/features/admin/components/user-cell.tsx:122
 msgid "View Sessions"
 msgstr "Sitzungen anzeigen"
+
+#: src/features/develop/components/files-tab.tsx:117
+msgid "Viewed"
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:117
+msgid "Viewed (changed since)"
+msgstr ""
+
+#. placeholder {0}: listed.length
+#: src/features/develop/components/files-tab.tsx:261
+msgid "Viewed {viewedCount} of {0} files"
+msgstr ""
 
 #: src/features/workflow/components/collab/collaborator-facepile.tsx:73
 msgid "Viewing: {selectedNodeId}"
@@ -31564,6 +31940,10 @@ msgstr "Vintage-Indie, grobes Korn"
 #: src/features/chat/tags/thread-tag-color-picker.tsx:23
 msgid "Violet"
 msgstr "Violett"
+
+#: src/routes/admin/gateway/keys.tsx:421
+#~ msgid "Virtual API Keys"
+#~ msgstr "Virtuelle API-Schlüssel"
 
 #: src/features/skills/components/skill-form-dialog.tsx:459
 msgid "Visibility"
@@ -31762,7 +32142,7 @@ msgstr "B"
 msgid "Waiting for {device} to pick this up…"
 msgstr "{device}: wartet auf Annahme…"
 
-#: src/features/devices/components/devices-settings.tsx:168
+#: src/features/devices/components/devices-settings.tsx:237
 msgid "Waiting for approval"
 msgstr "Wartet auf Genehmigung"
 
@@ -31774,6 +32154,10 @@ msgstr "{device}: wartet auf Genehmigung"
 msgid "Waiting for output…"
 msgstr "Wartet auf Ausgabe…"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:594
+msgid "Waiting for the agent…"
+msgstr ""
+
 #: src/features/chat/thread/ask-user-prompt.tsx:124
 msgid "Waiting for the owner to answer"
 msgstr "Wartet auf die Antwort des Eigentümers"
@@ -31782,10 +32166,10 @@ msgstr "Wartet auf die Antwort des Eigentümers"
 msgid "Waiting for the owner to approve"
 msgstr "Wartet auf die Genehmigung des Eigentümers"
 
-#: src/features/chat/thread/composer-input-area.tsx:313
-#: src/features/chat/thread/composer-input-area.tsx:332
-#: src/features/chat/thread/composer-input-area.tsx:366
-#: src/features/chat/thread/composer-input-area.tsx:380
+#: src/features/chat/thread/composer-input-area.tsx:325
+#: src/features/chat/thread/composer-input-area.tsx:344
+#: src/features/chat/thread/composer-input-area.tsx:378
+#: src/features/chat/thread/composer-input-area.tsx:392
 msgid "Waiting for uploads to complete…"
 msgstr "Wartet, bis die Uploads abgeschlossen sind…"
 
@@ -31811,7 +32195,7 @@ msgstr "Wartet auf: {0}"
 msgid "Want to continue from here?"
 msgstr "Möchtest du hier weitermachen?"
 
-#: src/features/chat/core/context/chat-context.tsx:688
+#: src/features/chat/core/context/chat-context.tsx:691
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "Wir konnten deine Sitzung nicht rechtzeitig bestätigen. Deine Nachricht ist noch im Eingabefeld. Bitte versuche erneut, sie zu senden."
 
@@ -32036,7 +32420,7 @@ msgstr "Was soll der Agent tun?"
 msgid "What should the AI call you?"
 msgstr "Wie soll die KI dich nennen?"
 
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:496
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "Was der Agent in den letzten 30 Tagen von deinen Geräten verlangt hat."
 
@@ -32174,7 +32558,7 @@ msgstr "Mit Administratorrechten"
 msgid "With email/password"
 msgstr "Mit E-Mail/Passwort"
 
-#: src/features/devices/components/devices-settings.tsx:283
+#: src/features/devices/components/devices-settings.tsx:352
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr ""
 
@@ -32233,6 +32617,7 @@ msgstr "Workflows"
 msgid "Working"
 msgstr "In Arbeit"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:601
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"
@@ -32250,6 +32635,10 @@ msgstr "Schreiben"
 msgid "Write a compelling product description for an e-commerce site"
 msgstr "Eine überzeugende Produktbeschreibung für einen Online-Shop schreiben"
 
+#: src/features/develop/components/review-panel.tsx:124
+msgid "Write a summary, or add a comment, before you submit this review."
+msgstr ""
+
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:106
 msgid "Write a video description for a product launch"
 msgstr "Eine Videobeschreibung für eine Produkteinführung schreiben"
@@ -32266,7 +32655,7 @@ msgstr "Lange Texte direkt neben dem Chat schreiben"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Schreibe lange Texte in einem Canvas-Editor direkt neben dem Chat. Vom Chat zum fertigen Dokument, ohne das Tool zu wechseln."
 
-#: src/features/chat/thread/composer.tsx:259
+#: src/features/chat/thread/composer.tsx:260
 msgid "Write some code for me..."
 msgstr "Schreib Code für mich..."
 
@@ -32442,6 +32831,10 @@ msgstr "Du bist offline."
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "Du bist offline. Neore verbindet sich wieder, sobald das Netzwerk verfügbar ist."
 
+#: src/features/chat/host/host-composer.tsx:95
+msgid "You are sending too fast. Wait a moment."
+msgstr ""
+
 #: src/features/pages/components/page-view.tsx:482
 msgid "You can comment on this page but not edit it."
 msgstr "Du kannst diese Seite kommentieren, aber nicht bearbeiten."
@@ -32575,6 +32968,10 @@ msgstr "Du bist dem Thread erfolgreich beigetreten. Weiterleitung..."
 msgid "Your {label} sign-in has expired. Connect it again to keep reading."
 msgstr ""
 
+#: src/features/develop/lib/use-review-messages.ts:21
+msgid "Your {label} sign-in has expired. Connect it again."
+msgstr ""
+
 #: src/features/auth/components/settings/account/delete-account-card.tsx:56
 msgid "Your account and all associated data are being deleted. This cannot be cancelled."
 msgstr "Dein Konto und alle zugehörigen Daten werden gelöscht. Das kann nicht abgebrochen werden."
@@ -32587,7 +32984,7 @@ msgstr "Dein KI-Arbeitsbereich <0>beginnt hier.</0>"
 msgid "Your answer"
 msgstr "Deine Antwort"
 
-#: src/features/chat/core/context/chat-context.tsx:618
+#: src/features/chat/core/context/chat-context.tsx:621
 msgid "Your answer in Neore has finished."
 msgstr "Die Antwort in Neore ist fertig."
 
@@ -32623,9 +33020,26 @@ msgstr "Dein Browser verrät nicht, welchen Prozessor du hast. Wähle daher unte
 msgid "Your browser talks to the server on this computer directly — the prompt and reply never pass through our AI servers, and nothing is billed."
 msgstr "Dein Browser spricht direkt mit dem Server auf diesem Computer – Prompt und Antwort laufen nie über unsere KI-Server, und es wird nichts abgerechnet."
 
+#: src/features/develop/components/review-diff.tsx:177
+msgid "Your comments on lines this diff does not show"
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:199
+msgid "Your comments were written on an earlier version of this change. They are posted against that version, and the lines shown below may have moved."
+msgstr ""
+
 #: src/features/devices/components/device-tool-call.tsx:40
 msgid "your computer"
 msgstr "Dein Computer"
+
+#: src/features/chat/host/host-composer.tsx:91
+#: src/features/chat/host/host-composer.tsx:149
+msgid "Your computer is busy. Try again in a moment."
+msgstr ""
+
+#: src/features/chat/host/host-composer.tsx:94
+msgid "Your computer is offline. Open Neore on it and try again."
+msgstr ""
 
 #: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:19
 msgid "Your connectors and MCP tools set to \"Auto\""
@@ -32660,12 +33074,12 @@ msgid "Your First Chat"
 msgstr "Dein erster Chat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:597
+#: src/features/chat/thread/composer-input.tsx:600
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Deine Eingabe ist groß (~{0} Token) und wird einen erheblichen Teil des Kontextfensters des Modells beanspruchen."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:590
+#: src/features/chat/thread/composer-input.tsx:593
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Deine Eingabe ist zu groß (~{0} Token) und überschreitet das Kontextfenster des Modells. Bitte kürze die Nachricht oder entferne Anhänge, um sie zu senden."
 
@@ -32694,11 +33108,11 @@ msgstr "Dein lokaler Server hat geantwortet, diese Website aber abgelehnt (CORS)
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Dein Standort (z. B. „New York, USA“, „Berlin, Deutschland“)."
 
-#: src/features/chat/core/context/chat-context.tsx:685
+#: src/features/chat/core/context/chat-context.tsx:688
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Deine Nachricht enthält unangemessene Inhalte und kann nicht gesendet werden."
 
-#: src/features/chat/thread/message-item.tsx:175
+#: src/features/chat/thread/message-item.tsx:177
 msgid "Your message:"
 msgstr "Deine Nachricht:"
 
@@ -32738,9 +33152,19 @@ msgstr "Dein Plan und dein Guthaben richten sich nach deinem Abonnement."
 msgid "Your rating"
 msgstr "Deine Bewertung"
 
+#: src/features/develop/components/review-panel.tsx:188
 #: src/features/tasks/components/task-detail-dialog.tsx:88
 msgid "Your review"
 msgstr "Deine Prüfung"
+
+#: src/features/develop/lib/use-review-messages.ts:15
+msgid "Your review is being submitted. Wait for it to finish."
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:147
+#: src/features/develop/components/review-panel.tsx:153
+msgid "Your review is kept."
+msgstr ""
 
 #: src/lib/toast.ts:248
 msgid "Your session has expired"
@@ -32899,222 +33323,3 @@ msgstr "Zürich"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ Punkte"
-
-#. placeholder {0}: review.draftComments.length
-#: src/features/develop/components/files-tab.tsx:95
-msgid "{0, plural, one {# pending comment} other {# pending comments}}"
-msgstr ""
-
-#. placeholder {0}: review.threads.length
-#: src/features/develop/components/files-tab.tsx:90
-msgid "{0, plural, one {# thread} other {# threads}}"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:130
-msgid "{commentCount, plural, one {# comment is waiting to be submitted} other {# comments are waiting to be submitted}}"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:168
-msgid "{hostLabel} has no batched review: your comments are posted one after another when you submit."
-msgstr ""
-
-#. placeholder {0}: result.reason
-#: src/features/develop/lib/use-review-messages.ts:37
-msgid "{label} did not accept this: {0}"
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:37
-msgid "{label} did not accept this."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:25
-msgid "{label} did not answer, so it may have taken this. Check on {label} before trying again."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:22
-msgid "{label} is not connected."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:19
-msgid "{label} refused this. Your account may lack access."
-msgstr ""
-
-#: src/features/develop/components/review-thread.tsx:76
-msgid "A reply is posted straight away, not with the rest of your review."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:16
-msgid "A review holds at most 100 comments. Submit this one first."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:132
-msgid "Add comments on a line of the diff, then submit."
-msgstr ""
-
-#: src/features/develop/components/review-diff.tsx:162
-msgid "Add to review"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:98
-msgid "Choose how you review this before you submit it."
-msgstr ""
-
-#. placeholder {0}: target.line
-#: src/features/develop/components/review-diff.tsx:130
-#: src/features/develop/components/review-diff.tsx:151
-msgid "Comment on line {0}"
-msgstr ""
-
-#: src/features/develop/components/review-diff.tsx:179
-msgid "Conversations on lines this diff no longer shows"
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:34
-msgid "Could not do this. Try again."
-msgstr ""
-
-#: src/features/develop/components/comment-composer.tsx:42
-#: src/features/develop/lib/use-review-messages.ts:30
-msgid "Could not save this. Try again."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:117
-msgid "Could not submit the review. Your review is kept."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:186
-msgid "Discard the review"
-msgstr ""
-
-#: src/features/develop/components/draft-comment-card.tsx:32
-msgid "Edit comment"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:136
-msgid "How you review this"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:205
-msgid "It is on {hostLabel} now."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:189
-msgid "Keep it"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:218
-msgid "Not submitted"
-msgstr ""
-
-#: src/features/develop/components/review-thread.tsx:44
-msgid "Outdated"
-msgstr ""
-
-#: src/features/develop/components/draft-comment-card.tsx:28
-msgid "Pending: posted when you submit the review"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:59
-msgid "Request changes"
-msgstr ""
-
-#: src/features/develop/components/review-thread.tsx:43
-msgid "Resolved"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:203
-msgid "Review submitted"
-msgstr ""
-
-#: src/features/develop/components/develop-page.tsx:43
-msgid "Review what needs you: the description, commits, files, diff and checks of each change, and your own review of it."
-msgstr ""
-
-#: src/features/develop/components/review-thread.tsx:74
-msgid "Send reply now"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:172
-msgid "Submit review"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:172
-msgid "Submitting…"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:151
-msgid "Summary"
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:14
-msgid "That comment is already gone."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:13
-msgid "The change has new commits since you started this review. Submit or discard the review first, then comment on the new version."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:103
-msgid "There is nothing to submit."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:88
-msgid "This review is already being submitted, maybe from another device."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:208
-msgid "View it"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:111
-msgid "Viewed"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:111
-msgid "Viewed (changed since)"
-msgstr ""
-
-#. placeholder {0}: listed.length
-#: src/features/develop/components/files-tab.tsx:242
-msgid "Viewed {viewedCount} of {0} files"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:93
-msgid "Write a summary, or add a comment, before you submit this review."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:21
-msgid "Your {label} sign-in has expired. Connect it again."
-msgstr ""
-
-#: src/features/develop/components/review-diff.tsx:173
-msgid "Your comments on lines this diff does not show"
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:15
-msgid "Your review is being submitted. Wait for it to finish."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:113
-msgid "Your review is kept."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:127
-msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:143
-msgid "Could not save the summary, so nothing was submitted. Try again."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:116
-msgid "If it kept the review as pending, submit or delete it there first."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:16
-msgid "This review is too long to keep: it holds at most 100 comments and about 1 MB of text. Submit it first, or shorten it."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:196
-msgid "Your comments were written on an earlier version of this change. They are posted against that version, and the lines shown below may have moved."
-msgstr ""

@@ -52,23 +52,23 @@ msgstr "“{0}” 中有变量需要填写。"
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "“{0}” 将在其依赖项完成后开始"
 
-#: src/features/chat/thread/composer-input.tsx:512
+#: src/features/chat/thread/composer-input.tsx:515
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "无法附加“{fileName}”：不支持此文件类型。"
 
-#: src/features/chat/thread/composer-input.tsx:505
+#: src/features/chat/thread/composer-input.tsx:508
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "无法附加“{fileName}”：文件内容与其文件类型不符。"
 
-#: src/features/chat/thread/composer-input.tsx:507
+#: src/features/chat/thread/composer-input.tsx:510
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "无法上传“{fileName}”。请检查你的网络连接，然后重试。"
 
-#: src/features/chat/thread/composer-input.tsx:510
+#: src/features/chat/thread/composer-input.tsx:513
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
 
-#: src/features/chat/thread/composer-input.tsx:511
+#: src/features/chat/thread/composer-input.tsx:514
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。此类文件最大为 {maxMegabytes} MB。"
 
@@ -184,8 +184,8 @@ msgstr "{0, plural, other {# 个字符}}"
 #. placeholder {0}: files.length
 #. placeholder {0}: listed.length
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:707
-#: src/features/develop/components/files-tab.tsx:118
-#: src/features/develop/components/files-tab.tsx:126
+#: src/features/develop/components/files-tab.tsx:245
+#: src/features/develop/components/files-tab.tsx:253
 msgid "{0, plural, one {# file} other {# files}}"
 msgstr "{0, plural, other {# 个文件}}"
 
@@ -239,6 +239,11 @@ msgstr "{0, plural, one {还有 # 个目标未显示。} other {还有 # 个目�
 msgid "{0, plural, one {# node} other {# nodes}}"
 msgstr "{0, plural, other {# 个节点}}"
 
+#. placeholder {0}: review.draftComments.length
+#: src/features/develop/components/files-tab.tsx:101
+msgid "{0, plural, one {# pending comment} other {# pending comments}}"
+msgstr ""
+
 #. placeholder {0}: selectedPromptIds.size
 #: src/features/prompts/components/prompt-list.tsx:627
 msgid "{0, plural, one {# prompt selected} other {# prompts selected}}"
@@ -275,6 +280,11 @@ msgstr "{0, plural, other {# 个技能}}"
 #: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:266
 msgid "{0, plural, one {# slide} other {# slides}}"
 msgstr "{0, plural, other {# 张幻灯片}}"
+
+#. placeholder {0}: review.threads.length
+#: src/features/develop/components/files-tab.tsx:96
+msgid "{0, plural, one {# thread} other {# threads}}"
+msgstr ""
 
 #. placeholder {0}: stats.estimatedTokens
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:765
@@ -413,7 +423,7 @@ msgid "{0} deleted"
 msgstr "{0} 已删除"
 
 #. placeholder {0}: formatDuration(elapsedMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:555
+#: src/features/chat/thread/streaming-placeholder.tsx:557
 msgid "{0} elapsed"
 msgstr "已用 {0}"
 
@@ -432,10 +442,6 @@ msgstr "{0} 个符合条件 · 已删除 {1} 个 · {2}ms"
 #: src/features/tasks/components/goal-list.tsx:47
 msgid "{0} failed"
 msgstr "{0} 个失败"
-
-#: src/routes/admin/gateway/keys.tsx:421
-#~ msgid "Virtual API Keys"
-#~ msgstr "虚拟 API 密钥"
 
 #. placeholder {0}: modeLabels[mode]
 #. placeholder {1}: tool.name
@@ -577,7 +583,7 @@ msgid "{0} tok/s"
 msgstr ""
 
 #. placeholder {0}: tokPerSec.toFixed(1)
-#: src/features/chat/thread/streaming-placeholder.tsx:545
+#: src/features/chat/thread/streaming-placeholder.tsx:547
 msgid "{0} tokens/s"
 msgstr "{0} 个 token/秒"
 
@@ -588,7 +594,7 @@ msgstr "发现 {0} 个工具"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:95
+#: src/features/devices/components/devices-settings.tsx:166
 msgid "{0} tools: {1}"
 msgstr "{0} 个工具：{1}"
 
@@ -606,7 +612,7 @@ msgstr "{0} 次使用"
 #. placeholder {1}: detail.commitCount
 #. placeholder {2}: detail.baseBranch
 #. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:94
+#: src/features/develop/components/pull-request-view.tsx:95
 msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
 msgstr ""
 
@@ -671,6 +677,10 @@ msgstr "{characterCount}/{maxLength} 个字符"
 #: src/features/workflow/components/nodes/group-node.tsx:320
 msgid "{childCount, plural, one {# node} other {# nodes}}"
 msgstr "{childCount, plural, other {# 个节点}}"
+
+#: src/features/develop/components/review-panel.tsx:192
+msgid "{commentCount, plural, one {# comment is waiting to be submitted} other {# comments are waiting to be submitted}}"
+msgstr ""
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:138
 msgid "{comparisonCount, plural, one {# model} other {# models}}"
@@ -807,8 +817,20 @@ msgstr "{fileCount, plural, other {# 个文件上传失败}}"
 msgid "{fps} fps"
 msgstr "{fps} fps"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:65
+msgid "{full} credits"
+msgstr ""
+
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:61
+msgid "{handoff} credits"
+msgstr ""
+
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:54
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:235
+msgid "{hostLabel} has no batched review: your comments are posted one after another when you submit."
 msgstr ""
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:84
@@ -845,15 +867,34 @@ msgid "{itemCount, plural, one {# item} other {# items}}"
 msgstr "{itemCount, plural, other {# 项}}"
 
 #: src/features/develop/components/failure-notice.tsx:17
+#: src/features/develop/lib/use-review-messages.ts:20
 msgid "{label} could not be reached or answered unexpectedly. Try again in a moment."
 msgstr ""
 
+#. placeholder {0}: result.reason
+#: src/features/develop/lib/use-review-messages.ts:37
+msgid "{label} did not accept this: {0}"
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:37
+msgid "{label} did not accept this."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:25
+msgid "{label} did not answer, so it may have taken this. Check on {label} before trying again."
+msgstr ""
+
 #: src/features/develop/components/failure-notice.tsx:21
+#: src/features/develop/lib/use-review-messages.ts:24
 msgid "{label} is limiting requests for this account. Try again in a few minutes."
 msgstr ""
 
 #: src/features/develop/components/failure-notice.tsx:19
 msgid "{label} is not connected"
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:22
+msgid "{label} is not connected."
 msgstr ""
 
 #. placeholder {0}: ids.length
@@ -863,6 +904,10 @@ msgstr "{label}已移至星标中的第{position}位（共{0}位）"
 
 #: src/features/develop/components/failure-notice.tsx:14
 msgid "{label} refused this request. Your account may lack access, or an organization may require you to authorize the app."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:19
+msgid "{label} refused this. Your account may lack access."
 msgstr ""
 
 #: src/features/settings/components/chat/usage-settings.tsx:606
@@ -898,7 +943,7 @@ msgstr "{minutes} 分钟前"
 msgid "{minutes}m remaining"
 msgstr "剩余 {minutes} 分钟"
 
-#: src/features/chat/thread/composer.tsx:222
+#: src/features/chat/thread/composer.tsx:223
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel}模式——点击更改"
 
@@ -971,7 +1016,7 @@ msgid "{name} is installed"
 msgstr "{name} 已安装"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:241
-#: src/features/chat/thread/streaming-placeholder.tsx:473
+#: src/features/chat/thread/streaming-placeholder.tsx:475
 msgid "{name} is responding"
 msgstr "{name} 正在回复"
 
@@ -1023,6 +1068,10 @@ msgstr "{providerName} · 你自己的 Bedrock 账号（{region}）"
 #: src/routes/admin/gateway/index.tsx:67
 msgid "{requestCount} req"
 msgstr "{requestCount} 次请求"
+
+#: src/features/develop/components/pull-request-view.tsx:108
+msgid "{requestNoun} views"
+msgstr ""
 
 #: src/components/settings/settings-search.tsx:93
 msgid "{resultCount, plural, one {# result} other {# results}}"
@@ -1179,7 +1228,7 @@ msgstr "<0>定时</0>——按 cron 计划运行（例如每天早上 8 点）�
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0>——接收来自外部服务（Stripe、GitHub、Zapier）的 HTTP POST 请求。请求使用带时间戳的 HMAC 签名，重放请求会被拒绝。"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:546
+#: src/features/chat/thread/streaming-placeholder.tsx:548
 msgid "~{approxTokenCount} tokens"
 msgstr "约 {approxTokenCount} 个 token"
 
@@ -1489,6 +1538,14 @@ msgstr "参考视频最长 {0} 秒。"
 msgid "A regular expression the answer must match"
 msgstr "答案必须匹配的正则表达式"
 
+#: src/features/develop/components/review-thread.tsx:76
+msgid "A reply is posted straight away, not with the rest of your review."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:16
+#~ msgid "A review holds at most 100 comments. Submit this one first."
+#~ msgstr ""
+
 #: src/features/settings/components/chat/bots-settings.tsx:141
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr ""
@@ -1774,7 +1831,7 @@ msgstr "添加备注..."
 msgid "Add a note…"
 msgstr "添加备注…"
 
-#: src/features/devices/components/devices-settings.tsx:256
+#: src/features/devices/components/devices-settings.tsx:325
 msgid "Add a server over SSH"
 msgstr ""
 
@@ -1815,9 +1872,9 @@ msgstr "至少添加一个模型——使用“获取模型”或手动输入 ID
 msgid "Add at least one model id"
 msgstr "请至少添加一个模型 ID"
 
-#: src/features/chat/thread/composer-input-area.tsx:180
-#: src/features/chat/thread/composer-input-area.tsx:214
-#: src/features/chat/thread/composer-input-area.tsx:234
+#: src/features/chat/thread/composer-input-area.tsx:188
+#: src/features/chat/thread/composer-input-area.tsx:222
+#: src/features/chat/thread/composer-input-area.tsx:242
 #: src/features/chat/thread/edit-composer.tsx:125
 msgid "Add attachment"
 msgstr "添加附件"
@@ -1846,6 +1903,10 @@ msgstr "添加圆形"
 #: src/features/canvas/components/canvas-toolbar.tsx:40
 msgid "Add comments"
 msgstr "添加注释"
+
+#: src/features/develop/components/review-panel.tsx:194
+msgid "Add comments on a line of the diff, then submit."
+msgstr ""
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:329
 #: src/features/settings/components/chat/custom-providers-settings.tsx:439
@@ -2006,6 +2067,10 @@ msgstr "添加到收藏"
 msgid "Add to Favorites"
 msgstr "添加到收藏"
 
+#: src/features/develop/components/review-diff.tsx:166
+msgid "Add to review"
+msgstr ""
+
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
 #: src/components/model-picker/model-picker.tsx:340
 msgid "Add to starred"
@@ -2019,7 +2084,7 @@ msgstr ""
 msgid "Add/Replace Object"
 msgstr "添加/替换对象"
 
-#: src/features/develop/components/files-tab.tsx:31
+#: src/features/develop/components/files-tab.tsx:63
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:99
 msgid "Added"
 msgstr "已添加"
@@ -2056,7 +2121,7 @@ msgstr "新增："
 msgid "Adding documents… {0} of {1}"
 msgstr "正在添加文档… {0} / {1}"
 
-#: src/features/devices/components/devices-settings.tsx:238
+#: src/features/devices/components/devices-settings.tsx:307
 msgid "Adding the server was cancelled on this computer."
 msgstr ""
 
@@ -2064,7 +2129,7 @@ msgstr ""
 msgid "Adding your earlier replies…"
 msgstr "正在添加你之前的回复…"
 
-#: src/features/devices/components/devices-settings.tsx:269
+#: src/features/devices/components/devices-settings.tsx:338
 msgid "Address"
 msgstr ""
 
@@ -2295,7 +2360,7 @@ msgstr "在此激活连接后，你将获得一个 webhook URL，需在 Discord 
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "在此激活连接后，你将获得一个 webhook URL，需在 Slack 应用的 Event Subscriptions 中将其设为 Request URL。"
 
-#: src/features/devices/components/devices-settings.tsx:185
+#: src/features/devices/components/devices-settings.tsx:254
 msgid "After outside content"
 msgstr "在外部内容之后"
 
@@ -2733,6 +2798,10 @@ msgstr "允许来自 {server} 的“{tool}”吗？"
 msgid "Allow \"{tool}\"?"
 msgstr "允许“{tool}”吗？"
 
+#: src/features/chat/host/host-composer.tsx:63
+msgid "Allow once"
+msgstr ""
+
 #. placeholder {0}: osLabels[key]
 #: src/features/local-models/components/local-setup-guide.tsx:115
 msgid "Allow this site ({0})"
@@ -3154,6 +3223,7 @@ msgid "approval"
 msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:116
+#: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:102
 msgid "Approve"
 msgstr "批准"
@@ -3379,7 +3449,7 @@ msgstr "输入任何问题来开始新对话…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "向 GPT-4、Claude 和 Gemini 提出同一个问题。在 FLUX、Imagen 和 Stable Diffusion 上运行同一个提示词。选出最优的——而不是默认的。"
 
-#: src/features/chat/thread/composer.tsx:258
+#: src/features/chat/thread/composer.tsx:259
 msgid "Ask me anything..."
 msgstr "问我任何问题..."
 
@@ -3412,9 +3482,9 @@ msgstr "助手（无技能）"
 msgid "Assistant replied:"
 msgstr "助手回复："
 
-#: src/features/chat/thread/message-item.tsx:203
-#: src/features/chat/thread/streaming-placeholder.tsx:687
+#: src/features/chat/thread/message-item.tsx:205
 #: src/features/chat/thread/streaming-placeholder.tsx:723
+#: src/features/chat/thread/streaming-placeholder.tsx:760
 msgid "Assistant Reply:"
 msgstr "助手回复："
 
@@ -3458,7 +3528,7 @@ msgstr "奥克兰"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
 #: src/components/model-picker/model-picker.tsx:1119
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:120
+#: src/features/chat/thread/composer.tsx:121
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -4672,6 +4742,7 @@ msgstr "加拿大"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
 #: src/features/chat/pins/pin-item.tsx:282
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
@@ -4680,6 +4751,7 @@ msgstr "加拿大"
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:162
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
+#: src/features/develop/components/comment-composer.tsx:62
 #: src/features/evals/components/case-form-dialog.tsx:68
 #: src/features/evals/components/dataset-form-dialog.tsx:168
 #: src/features/evals/components/import-cases-dialog.tsx:113
@@ -4826,7 +4898,7 @@ msgstr "说明文字"
 msgid "Caption text"
 msgstr "说明文字"
 
-#: src/features/chat/thread/composer-input-area.tsx:209
+#: src/features/chat/thread/composer-input-area.tsx:217
 msgid "Capture screen"
 msgstr "截取屏幕"
 
@@ -4954,8 +5026,8 @@ msgstr "修改组织的显示名称"
 msgid "Change your organization's unique identifier"
 msgstr "修改组织的唯一标识符"
 
-#: src/features/develop/components/files-tab.tsx:32
-#: src/features/develop/components/files-tab.tsx:57
+#: src/features/develop/components/files-tab.tsx:64
+#: src/features/develop/components/files-tab.tsx:104
 msgid "Changed"
 msgstr ""
 
@@ -5161,7 +5233,7 @@ msgstr "正在检查..."
 msgid "Checking…"
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:64
+#: src/features/develop/components/pull-request-view.tsx:65
 #: src/features/evals/components/case-fields.tsx:150
 #: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
@@ -5237,6 +5309,10 @@ msgstr "选择 Neore 如何通知你已完成的工作和需要你处理的事�
 #: src/features/settings/components/account/account-settings.tsx:183
 msgid "Choose how to send messages in the chat."
 msgstr "选择在聊天中发送消息的方式。"
+
+#: src/features/develop/components/review-panel.tsx:129
+msgid "Choose how you review this before you submit it."
+msgstr ""
 
 #: src/features/chat/prompt-improvement/components/composer-prompt-improvement-button.tsx:107
 msgid "Choose prompt improvement style"
@@ -5520,7 +5596,7 @@ msgstr "点击任意消息上的图钉图标即可保存到这里。"
 msgid "Click the star on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型的星标即可将其添加到这里。"
 
-#: src/features/chat/thread/composer-input.tsx:277
+#: src/features/chat/thread/composer-input.tsx:280
 msgid "Click to edit"
 msgstr "点击编辑"
 
@@ -5613,7 +5689,7 @@ msgstr "关闭翻译"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread/widgets/places-widget.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 msgid "Closed"
 msgstr "已关闭"
 
@@ -5717,6 +5793,11 @@ msgstr "编程智能体运行完成"
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:37
 msgid "Coding agent run was not approved."
 msgstr "编程智能体运行未获批准。"
+
+#. placeholder {0}: device.name
+#: src/features/devices/components/devices-settings.tsx:77
+msgid "Coding agents you can start on {0}"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:561
 #: src/features/marketing/data/models-data.ts:746
@@ -5880,6 +5961,7 @@ msgstr ""
 msgid "Commands"
 msgstr "命令"
 
+#: src/features/develop/components/review-panel.tsx:64
 #: src/features/pages/components/page-comments-panel.tsx:146
 #: src/features/pages/components/page-view.tsx:429
 #: src/features/workflow/components/nodes/comment-node.tsx:95
@@ -5891,6 +5973,12 @@ msgstr "评论"
 #: src/features/workflow/components/nodes/comment-node.tsx:74
 msgid "Comment color"
 msgstr "备注颜色"
+
+#. placeholder {0}: target.line
+#: src/features/develop/components/review-diff.tsx:134
+#: src/features/develop/components/review-diff.tsx:155
+msgid "Comment on line {0}"
+msgstr ""
 
 #: src/features/pages/components/page-comments-panel.tsx:135
 #: src/features/pages/components/page-comments-panel.tsx:137
@@ -5916,7 +6004,7 @@ msgstr "商业设计"
 msgid "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 msgstr "需要 Black Forest Labs 顶级图像质量的商业项目"
 
-#: src/features/develop/components/pull-request-view.tsx:64
+#: src/features/develop/components/pull-request-view.tsx:65
 msgid "Commits"
 msgstr ""
 
@@ -6271,7 +6359,7 @@ msgstr "请确认密码"
 msgid "Confirm your password"
 msgstr "确认你的密码"
 
-#: src/features/devices/components/devices-settings.tsx:118
+#: src/features/devices/components/devices-settings.tsx:124
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
 #: src/routes/auth/extension.tsx:154
@@ -6307,7 +6395,7 @@ msgstr "连接一个音频/文件节点作为输入"
 msgid "Connect an image node as input"
 msgstr "连接一个图像节点作为输入"
 
-#: src/features/devices/components/devices-settings.tsx:287
+#: src/features/devices/components/devices-settings.tsx:356
 msgid "Connect and add"
 msgstr ""
 
@@ -6455,6 +6543,10 @@ msgstr "连接错误，请检查网络连接后重试。"
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:61
 msgid "Connection failed"
 msgstr "连接失败"
+
+#: src/features/devices/components/devices-settings.tsx:173
+msgid "Connection lost"
+msgstr ""
 
 #: src/components/error-boundaries/route-error-boundary.tsx:63
 msgid "Connection Problem"
@@ -6643,9 +6735,14 @@ msgid "Context-aware generation"
 msgstr "上下文感知生成"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
+#: src/features/chat/host/host-composer.tsx:193
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "继续"
+
+#: src/features/chat/host/host-composer.tsx:187
+msgid "Continue where you left off."
+msgstr ""
 
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:388
 msgid "Continue with authenticator"
@@ -6745,8 +6842,12 @@ msgstr "对话历史"
 msgid "Conversation not available"
 msgstr "对话不可用"
 
-#: src/features/chat/thread/composer-input.tsx:714
-#: src/features/chat/thread/composer-input.tsx:1070
+#: src/features/develop/components/review-diff.tsx:183
+msgid "Conversations on lines this diff no longer shows"
+msgstr ""
+
+#: src/features/chat/thread/composer-input.tsx:717
+#: src/features/chat/thread/composer-input.tsx:1080
 msgid "Conversion failed"
 msgstr "转换失败"
 
@@ -6800,7 +6901,7 @@ msgstr ""
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:211
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:34
-#: src/features/develop/components/files-tab.tsx:33
+#: src/features/develop/components/files-tab.tsx:65
 #: src/features/local-models/components/local-setup-guide.tsx:44
 #: src/features/pages/components/page-kept-draft.tsx:30
 msgid "Copied"
@@ -6818,7 +6919,7 @@ msgstr "已复制到剪贴板"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:351
+#: src/features/chat/thread/message-item.tsx:353
 #: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copied!"
 msgstr "已复制！"
@@ -6828,7 +6929,7 @@ msgstr "已复制！"
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
-#: src/features/chat/thread/message-item.tsx:351
+#: src/features/chat/thread/message-item.tsx:353
 #: src/features/chat/thread/text-selection-menu.tsx:385
 #: src/features/settings/components/chat/trigger-settings.tsx:739
 msgid "Copy"
@@ -6844,7 +6945,7 @@ msgstr ""
 msgid "Copy as Markdown"
 msgstr "复制为 Markdown"
 
-#: src/features/chat/thread/message-item.tsx:368
+#: src/features/chat/thread/message-item.tsx:370
 msgid "Copy as plain text"
 msgstr ""
 
@@ -7012,7 +7113,7 @@ msgstr "需要以 Gemini 2.5 最低档获得可靠 Google AI 的成本敏感型�
 msgid "Costa Rica"
 msgstr "哥斯达黎加"
 
-#: src/features/devices/components/devices-settings.tsx:248
+#: src/features/devices/components/devices-settings.tsx:317
 msgid "Could not add the server."
 msgstr ""
 
@@ -7020,7 +7121,7 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "无法应用更改"
 
-#: src/features/chat/thread/composer-input.tsx:1092
+#: src/features/chat/thread/composer-input.tsx:1102
 msgid "Could not attach the chat"
 msgstr "无法附加该聊天"
 
@@ -7040,7 +7141,11 @@ msgstr "无法取消运行。"
 msgid "Could not change push notifications. Try again."
 msgstr "无法更改推送通知，请重试。"
 
-#: src/features/devices/components/devices-settings.tsx:109
+#: src/features/develop/components/review-panel.tsx:160
+msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
+msgstr ""
+
+#: src/features/devices/components/devices-settings.tsx:137
 msgid "Could not connect to the server."
 msgstr ""
 
@@ -7096,6 +7201,10 @@ msgstr "无法删除页面"
 
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:119
 msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, Claude, or a Neore data export."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:34
+msgid "Could not do this. Try again."
 msgstr ""
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:58
@@ -7154,7 +7263,7 @@ msgstr "无法作为页面打开"
 msgid "Could not open the pull request."
 msgstr "无法打开拉取请求。"
 
-#: src/features/devices/components/devices-settings.tsx:347
+#: src/features/devices/components/devices-settings.tsx:421
 msgid "Could not pair this computer. Try again."
 msgstr "无法配对此计算机。请重试。"
 
@@ -7177,15 +7286,19 @@ msgstr "无法预览 · 点击下载"
 msgid "Could not pull {0}: {1}"
 msgstr "无法拉取 {0}：{1}"
 
-#: src/features/chat/core/context/chat-context.tsx:650
+#: src/features/chat/core/context/chat-context.tsx:653
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1095
+#: src/features/chat/host/host-composer.tsx:99
+msgid "Could not reach the server. Try again."
+msgstr ""
+
+#: src/features/chat/thread/composer-input.tsx:1105
 msgid "Could not read that chat"
 msgstr "无法读取该聊天"
 
-#: src/features/chat/thread/composer-input.tsx:1096
+#: src/features/chat/thread/composer-input.tsx:1106
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 
@@ -7193,7 +7306,7 @@ msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 msgid "Could not refine the draft. Try again."
 msgstr "无法优化草稿，请重试。"
 
-#: src/features/devices/components/devices-settings.tsx:133
+#: src/features/devices/components/devices-settings.tsx:202
 msgid "Could not remove the device."
 msgstr "无法移除该设备。"
 
@@ -7201,7 +7314,7 @@ msgstr "无法移除该设备。"
 msgid "Could not remove the participant"
 msgstr "无法移除参与者"
 
-#: src/features/devices/components/devices-settings.tsx:87
+#: src/features/devices/components/devices-settings.tsx:158
 msgid "Could not rename the device."
 msgstr "无法重命名该设备。"
 
@@ -7230,8 +7343,21 @@ msgstr "无法保存{label}的新顺序"
 msgid "Could not save the page"
 msgstr "无法保存页面"
 
+#: src/features/develop/components/review-panel.tsx:177
+msgid "Could not save the summary, so nothing was submitted. Try again."
+msgstr ""
+
+#: src/features/develop/components/comment-composer.tsx:42
+#: src/features/develop/lib/use-review-messages.ts:30
+msgid "Could not save this. Try again."
+msgstr ""
+
 #: src/features/sub-agents/components/worker-composer.tsx:59
 msgid "Could not send the message."
+msgstr ""
+
+#: src/features/chat/host/host-composer.tsx:146
+msgid "Could not send your answer."
 msgstr ""
 
 #: src/features/chat/thread/ask-user-prompt.tsx:83
@@ -7275,6 +7401,14 @@ msgstr ""
 #: src/features/sub-agents/components/worker-list.tsx:52
 #: src/features/sub-agents/components/worker-stop-bar.tsx:40
 msgid "Could not stop the worker."
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:117
+#~ msgid "Could not submit the review. Your review is kept."
+#~ msgstr ""
+
+#: src/features/chat/model-settings/use-model-combobox.ts:115
+msgid "Could not switch the model. Please try again."
 msgstr ""
 
 #: src/features/home/components/home-page.tsx:228
@@ -8035,9 +8169,13 @@ msgstr "辩论"
 msgid "Debate rounds"
 msgstr "辩论轮数"
 
-#: src/features/chat/thread/composer.tsx:264
+#: src/features/chat/thread/composer.tsx:265
 msgid "Debug an error or review my code..."
 msgstr "调试错误或审查我的代码..."
+
+#: src/features/chat/host/host-composer.tsx:68
+msgid "Decline"
+msgstr ""
 
 #: src/features/chat/prompt-improvement/hooks/use-optimizer-style-labels.ts:50
 msgid "Decompose the goal into an actionable plan."
@@ -8273,6 +8411,7 @@ msgstr "将任务委派给 AI 软件工程师 Devin"
 #: src/features/auth/components/settings/passkey/passkey-cell.tsx:98
 #: src/features/chat/thread-list/group-header.tsx:150
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:166
+#: src/features/develop/components/draft-comment-card.tsx:60
 #: src/features/evals/components/dataset-panel.tsx:322
 #: src/features/evals/components/evals-page.tsx:163
 #: src/features/local-models/components/ollama-model-manager.tsx:336
@@ -8590,7 +8729,7 @@ msgstr "需要 Z.AI 最强大前沿 GLM 模型的高要求任务"
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "最看重极致 AI 能力和精细推理的高要求任务"
 
-#: src/features/devices/components/devices-settings.tsx:170
+#: src/features/devices/components/devices-settings.tsx:239
 msgid "Denied"
 msgstr "已拒绝"
 
@@ -8733,7 +8872,7 @@ msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it,
 msgstr "描述你的工作流……例如“根据文本生成图片，放大后再移除背景”"
 
 #: src/components/model-picker/model-picker.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:64
+#: src/features/develop/components/pull-request-view.tsx:65
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:213
@@ -8872,19 +9011,19 @@ msgstr "需要开源模型具备强大编程和通用能力的开发者"
 msgid "Development"
 msgstr "开发"
 
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:496
 msgid "Device activity"
 msgstr "设备活动"
 
-#: src/features/devices/components/devices-settings.tsx:76
+#: src/features/devices/components/devices-settings.tsx:147
 msgid "Device name"
 msgstr "设备名称"
 
-#: src/features/devices/components/devices-settings.tsx:136
+#: src/features/devices/components/devices-settings.tsx:205
 msgid "Device removed"
 msgstr "设备已移除"
 
-#: src/features/devices/components/devices-settings.tsx:357
+#: src/features/devices/components/devices-settings.tsx:431
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "设备"
@@ -8917,7 +9056,7 @@ msgstr "未通过"
 msgid "Did you mean: {suggestion}?"
 msgstr "你是不是想找：{suggestion}？"
 
-#: src/features/develop/components/files-tab.tsx:64
+#: src/features/develop/components/files-tab.tsx:149
 msgid "Diffs are not available from this host."
 msgstr ""
 
@@ -8977,12 +9116,17 @@ msgid "Disabling..."
 msgstr "正在停用..."
 
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:808
+#: src/features/develop/components/review-panel.tsx:276
 #: src/features/pages/components/page-agent-dialog.tsx:139
 #: src/features/pages/components/page-kept-draft.tsx:42
 msgid "Discard"
 msgstr "放弃"
 
-#: src/features/devices/components/devices-settings.tsx:118
+#: src/features/develop/components/review-panel.tsx:267
+msgid "Discard the review"
+msgstr ""
+
+#: src/features/devices/components/devices-settings.tsx:127
 #: src/features/settings/connectors/connector-card.tsx:186
 #: src/features/settings/connectors/connector-card.tsx:206
 msgid "Disconnect"
@@ -9018,6 +9162,7 @@ msgstr "Discord 公钥"
 #: src/features/changelog/components/changelog-card.tsx:59
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
+#: src/features/devices/components/devices-settings.tsx:186
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "关闭"
@@ -9156,7 +9301,7 @@ msgstr "还没有账号？"
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:171
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
-#: src/features/devices/components/devices-settings.tsx:169
+#: src/features/devices/components/devices-settings.tsx:238
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:16
@@ -9235,7 +9380,7 @@ msgstr "下载模型"
 msgid "Download as CSV"
 msgstr "下载为 CSV"
 
-#: src/features/chat/thread/message-item.tsx:372
+#: src/features/chat/thread/message-item.tsx:374
 msgid "Download as Markdown"
 msgstr "下载为 Markdown"
 
@@ -9317,7 +9462,7 @@ msgstr "下载会打开 GitHub 发布页面。如果页面上还没有安装包�
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/inbox-list.tsx:118
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
 msgstr "草稿"
@@ -9326,7 +9471,7 @@ msgstr "草稿"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "为软件工程师职位起草一封求职信"
 
-#: src/features/chat/thread/composer.tsx:262
+#: src/features/chat/thread/composer.tsx:263
 msgid "Draft an email, report, or essay..."
 msgstr "起草邮件、报告或文章..."
 
@@ -9358,7 +9503,7 @@ msgstr "将文件拖到此处"
 msgid "Draw an image"
 msgstr "绘制图像"
 
-#: src/features/chat/thread/composer-input-area.tsx:203
+#: src/features/chat/thread/composer-input-area.tsx:211
 msgid "Draw image"
 msgstr "绘制图像"
 
@@ -9380,7 +9525,7 @@ msgstr "拖放文件或点击上传"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1270
+#: src/features/chat/thread/composer-input.tsx:1281
 msgid "Drop files here"
 msgstr "将文件拖放到此处"
 
@@ -9609,7 +9754,8 @@ msgstr "边缘引导生成"
 #: src/features/canvas/canvas-panel.tsx:767
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:391
+#: src/features/chat/thread/message-item.tsx:393
+#: src/features/develop/components/draft-comment-card.tsx:51
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:218
@@ -9647,7 +9793,11 @@ msgstr "编辑用例 {0}"
 msgid "Edit collection"
 msgstr "编辑集合"
 
-#: src/features/chat/thread/composer-input.tsx:295
+#: src/features/develop/components/draft-comment-card.tsx:32
+msgid "Edit comment"
+msgstr ""
+
+#: src/features/chat/thread/composer-input.tsx:298
 msgid "Edit content"
 msgstr "编辑内容"
 
@@ -10960,7 +11110,7 @@ msgid "expired"
 msgstr "已过期"
 
 #: src/features/chat/thread-list/thread-node.tsx:290
-#: src/features/devices/components/devices-settings.tsx:171
+#: src/features/devices/components/devices-settings.tsx:240
 #: src/features/settings/connectors/connector-card.tsx:75
 msgid "Expired"
 msgstr "已过期"
@@ -11009,7 +11159,7 @@ msgstr "过期时间：{expiresAt}"
 msgid "Expiring soon"
 msgstr "即将过期"
 
-#: src/features/chat/thread/composer.tsx:265
+#: src/features/chat/thread/composer.tsx:266
 msgid "Explain a concept in simple terms..."
 msgstr "用简单的话解释一个概念..."
 
@@ -11204,7 +11354,7 @@ msgstr "失败"
 #: src/features/chat/thread-list/thread-node.tsx:503
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/develop/components/checks-tab.tsx:48
-#: src/features/devices/components/devices-settings.tsx:172
+#: src/features/devices/components/devices-settings.tsx:241
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:164
@@ -11251,7 +11401,7 @@ msgid "Failed to attach collection"
 msgstr "附加集合失败"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:962
+#: src/features/chat/thread/composer-input.tsx:972
 msgid "Failed to attach file"
 msgstr "附加文件失败"
 
@@ -11647,7 +11797,7 @@ msgstr "请求导出失败"
 msgid "Failed to reset to defaults"
 msgstr "恢复默认设置失败"
 
-#: src/features/chat/thread/composer-input.tsx:994
+#: src/features/chat/thread/composer-input.tsx:1004
 msgid "Failed to restore attachment"
 msgstr "恢复附件失败"
 
@@ -12422,7 +12572,7 @@ msgstr "文件上传被拒绝。"
 msgid "Filename cannot be empty"
 msgstr "文件名不能为空"
 
-#: src/features/develop/components/pull-request-view.tsx:64
+#: src/features/develop/components/pull-request-view.tsx:65
 msgid "Files"
 msgstr ""
 
@@ -12596,7 +12746,7 @@ msgid "First slide"
 msgstr "第一张幻灯片"
 
 #. placeholder {0}: formatDuration(ttftMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:547
+#: src/features/chat/thread/streaming-placeholder.tsx:549
 msgid "First token {0}"
 msgstr "首个 token {0}"
 
@@ -12795,7 +12945,7 @@ msgstr "复刻"
 msgid "Fork {0} to edit a copy"
 msgstr "复刻 {0} 以编辑副本"
 
-#: src/features/chat/thread/message-item.tsx:401
+#: src/features/chat/thread/message-item.tsx:403
 msgid "Fork conversation"
 msgstr "复刻对话"
 
@@ -13295,7 +13445,7 @@ msgstr "根据文本提示词生成图像并放大 4 倍"
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "生成一张温馨阅读角的图像，带有暖色灯光和绿植。"
 
-#: src/features/chat/thread/composer.tsx:267
+#: src/features/chat/thread/composer.tsx:268
 msgid "Generate an image or video..."
 msgstr "生成图像或视频..."
 
@@ -13311,7 +13461,7 @@ msgstr "根据描述生成"
 msgid "Generate ideas for a creative writing story"
 msgstr "为创意写作故事构思点子"
 
-#: src/features/chat/thread/message-item.tsx:420
+#: src/features/chat/thread/message-item.tsx:422
 msgid "Generate image"
 msgstr "生成图像"
 
@@ -13337,7 +13487,7 @@ msgstr "生成随机种子"
 msgid "Generate unique business ideas for 2025"
 msgstr "为 2025 年构思独特的商业点子"
 
-#: src/features/chat/thread/message-item.tsx:430
+#: src/features/chat/thread/message-item.tsx:432
 msgid "Generate video"
 msgstr "生成视频"
 
@@ -13350,7 +13500,7 @@ msgstr "生成视频"
 msgid "Generate videos from text or images"
 msgstr "根据文本或图像生成视频"
 
-#: src/features/chat/thread/message-item.tsx:440
+#: src/features/chat/thread/message-item.tsx:442
 msgid "Generate voice"
 msgstr "生成语音"
 
@@ -14051,6 +14201,18 @@ msgstr "高"
 msgid "Hand (pan)"
 msgstr "抓手（平移）"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:74
+msgid "Hand over a summary"
+msgstr ""
+
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:60
+msgid "Hand over a summary and the recent messages"
+msgstr ""
+
+#: src/features/chat/thread/agent-switch-divider.tsx:18
+msgid "Handed over"
+msgstr ""
+
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:28
 msgid "Handle"
 msgstr ""
@@ -14169,8 +14331,8 @@ msgstr "隐藏附加内容"
 msgid "Hide column"
 msgstr "隐藏列"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:239
-#: src/features/chat/thread/composer-followup-suggestions.tsx:255
+#: src/features/chat/thread/composer-followup-suggestions.tsx:240
+#: src/features/chat/thread/composer-followup-suggestions.tsx:256
 msgid "Hide follow-up suggestions"
 msgstr "隐藏后续建议"
 
@@ -14491,6 +14653,10 @@ msgstr "触发器的工作原理"
 msgid "How would you like the AI to respond?"
 msgstr "你希望 AI 如何回复？"
 
+#: src/features/develop/components/review-panel.tsx:203
+msgid "How you review this"
+msgstr ""
+
 #: src/features/slides/components/slide-editor-dialog.tsx:97
 msgid "HTML Content"
 msgstr "HTML 内容"
@@ -14588,6 +14754,10 @@ msgstr "身份"
 msgid "Idle"
 msgstr "空闲"
 
+#: src/features/develop/components/review-panel.tsx:147
+msgid "If it kept the review as pending, submit or delete it there first."
+msgstr ""
+
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:271
 #: src/components/error-boundaries/route-error-boundary.tsx:139
 msgid "If this problem persists, please contact support."
@@ -14610,7 +14780,7 @@ msgstr "插画"
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
 #: src/components/model-picker/model-picker.tsx:1093
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:118
+#: src/features/chat/thread/composer.tsx:119
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:40
@@ -14985,8 +15155,13 @@ msgid "Improving..."
 msgstr "正在优化..."
 
 #. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:99
+#: src/features/develop/components/pull-request-view.tsx:100
 msgid "in {0, plural, one {# file} other {# files}}"
+msgstr ""
+
+#. placeholder {0}: request.folder
+#: src/features/chat/host/host-composer.tsx:54
+msgid "In {0}"
 msgstr ""
 
 #. placeholder {0}: info.latencyMs
@@ -15271,6 +15446,14 @@ msgstr "先思考再生成的智能视频模型"
 msgid "Intensity"
 msgstr "强度"
 
+#: src/features/chat/thread/composer-input-area.tsx:299
+msgid "Interrupt and restart"
+msgstr ""
+
+#: src/features/chat/thread/composer-input-area.tsx:315
+msgid "Interrupt and restart — stops the current reply and sends this"
+msgstr ""
+
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:47
 msgid "Intimate, street photography"
 msgstr "亲近感，街头摄影"
@@ -15489,7 +15672,12 @@ msgid "Issue tracking and project management"
 msgstr "问题跟踪与项目管理"
 
 #: src/features/develop/components/failure-notice.tsx:20
+#: src/features/develop/lib/use-review-messages.ts:23
 msgid "It does not exist, or your {label} account cannot see it."
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:286
+msgid "It is on {hostLabel} now."
 msgstr ""
 
 #: src/features/pages/components/page-view.tsx:190
@@ -15656,6 +15844,14 @@ msgstr "保留当前行"
 msgid "Keep files"
 msgstr "保留文件"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:72
+msgid "Keep full history"
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:270
+msgid "Keep it"
+msgstr ""
+
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:146
 msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
 msgstr "保留视频的一部分。保留的部分会在此浏览器中重新编码为 MP4，可能需要一点时间。"
@@ -15668,11 +15864,15 @@ msgstr "永久保留"
 msgid "Keep the files as uncategorised, or delete them together with the collection. Chats and projects that use the collection stop searching it."
 msgstr "将文件保留为未分类，或与集合一起删除。使用该集合的聊天和项目将不再搜索它。"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:64
+msgid "Keep the full history"
+msgstr ""
+
 #: src/features/chat/core/utils/language-utilities.ts:370
 msgid "Kenya"
 msgstr "肯尼亚"
 
-#: src/features/devices/components/devices-settings.tsx:281
+#: src/features/devices/components/devices-settings.tsx:350
 msgid "Key file (optional, absolute path)"
 msgstr ""
 
@@ -16247,11 +16447,11 @@ msgstr "少"
 msgid "Let replies use tools"
 msgstr "允许回复使用工具"
 
-#: src/features/devices/components/devices-settings.tsx:356
+#: src/features/devices/components/devices-settings.tsx:430
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "通过 Neore 桌面应用，让智能体使用你自己电脑上的文件、终端和本地 MCP 服务器。每个操作都会先在那台电脑上征求你的同意，共享聊天或后台任务不会运行任何操作。"
 
-#: src/features/devices/components/devices-settings.tsx:413
+#: src/features/devices/components/devices-settings.tsx:488
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr ""
 
@@ -16498,7 +16698,7 @@ msgstr "加载更多"
 msgid "Load more commits"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:142
+#: src/features/develop/components/files-tab.tsx:301
 msgid "Load more files"
 msgstr ""
 
@@ -16512,14 +16712,14 @@ msgstr "加载预设"
 
 #. placeholder {0}: listed.length
 #. placeholder {1}: Math.min(fileCount, fileLimit)
-#: src/features/develop/components/files-tab.tsx:122
+#: src/features/develop/components/files-tab.tsx:249
 msgid "Loaded {0} of {1, plural, one {# file} other {# files}}…"
 msgstr ""
 
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:26
 #: src/features/develop/components/inbox-list.tsx:86
-#: src/features/develop/components/pull-request-view.tsx:49
+#: src/features/develop/components/pull-request-view.tsx:50
 msgid "Loading"
 msgstr "加载中"
 
@@ -16581,11 +16781,11 @@ msgstr "正在加载编辑器…"
 msgid "Loading file…"
 msgstr "正在加载文件…"
 
-#: src/features/develop/components/files-tab.tsx:104
+#: src/features/develop/components/files-tab.tsx:227
 msgid "Loading files"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:118
+#: src/features/develop/components/files-tab.tsx:245
 msgid "Loading files…"
 msgstr ""
 
@@ -16735,7 +16935,7 @@ msgstr "正在加载…"
 msgid "local"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:686
+#: src/features/chat/core/context/chat-context.tsx:689
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "本地模型仅支持文本。请移除附件后再发送。"
 
@@ -17536,7 +17736,7 @@ msgid "Merge request opened"
 msgstr ""
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 msgid "Merged"
 msgstr "已合并"
 
@@ -17552,12 +17752,20 @@ msgstr "消息输入"
 msgid "Message selection"
 msgstr "消息选择"
 
+#: src/features/chat/host/host-composer.tsx:205
+msgid "Message the agent on your computer"
+msgstr ""
+
 #: src/features/sub-agents/components/worker-composer.tsx:92
 msgid "Message the worker"
 msgstr ""
 
 #: src/features/sub-agents/components/worker-composer.tsx:101
 msgid "Message the worker..."
+msgstr ""
+
+#: src/features/chat/host/host-composer.tsx:199
+msgid "Message to the coding agent"
 msgstr ""
 
 #: src/features/chat/thread/message-branch-switcher.tsx:55
@@ -18003,7 +18211,7 @@ msgid "Modern gradient background"
 msgstr "现代渐变背景"
 
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:771
-#: src/features/develop/components/files-tab.tsx:34
+#: src/features/develop/components/files-tab.tsx:66
 msgid "Modified"
 msgstr "已修改"
 
@@ -18105,7 +18313,7 @@ msgstr "关于你的更多信息"
 msgid "More actions for {0}"
 msgstr ""
 
-#: src/features/chat/thread/message-item.tsx:360
+#: src/features/chat/thread/message-item.tsx:362
 msgid "More copy options"
 msgstr ""
 
@@ -18366,11 +18574,11 @@ msgstr "静音"
 msgid "my data"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:395
 msgid "My Linux computer"
 msgstr "我的 Linux 电脑"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:395
 msgid "My Mac"
 msgstr "我的 Mac"
 
@@ -18382,7 +18590,7 @@ msgstr "我的 MCP 服务器"
 msgid "My skills"
 msgstr "我的技能"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:395
 msgid "My Windows PC"
 msgstr "我的 Windows 电脑"
 
@@ -18395,6 +18603,11 @@ msgstr "缅甸"
 msgid "Myanmar (Myanmar)"
 msgstr "缅甸语（缅甸）"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:61
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:65
+msgid "n/a"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:26
 #: src/features/settings/lib/settings-keywords.ts:87
 msgid "name"
@@ -18403,7 +18616,7 @@ msgstr ""
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:485
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:265
+#: src/features/devices/components/devices-settings.tsx:334
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
@@ -18623,7 +18836,7 @@ msgstr "Neore - AI 文本、视频、音频、图像和文档生成平台"
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:643
+#: src/features/chat/thread/composer.tsx:650
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore 可能会出错。请核实重要信息。"
 
@@ -18924,7 +19137,7 @@ msgstr "下一个匹配项"
 msgid "Next option"
 msgstr "下一个选项"
 
-#: src/features/chat/thread/composer.tsx:228
+#: src/features/chat/thread/composer.tsx:229
 msgid "Next output mode"
 msgstr "下一个输出模式"
 
@@ -19165,11 +19378,11 @@ msgstr "还没有数据集"
 msgid "No description"
 msgstr "无描述"
 
-#: src/features/develop/components/pull-request-view.tsx:116
+#: src/features/develop/components/pull-request-view.tsx:118
 msgid "No description provided."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:407
+#: src/features/devices/components/devices-settings.tsx:482
 msgid "No devices paired."
 msgstr "没有已配对的设备。"
 
@@ -19563,7 +19776,7 @@ msgstr "还没有对话"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "暂无套餐等级数据。网关升级后，新请求会记录等级信息。"
 
-#: src/features/devices/components/devices-settings.tsx:95
+#: src/features/devices/components/devices-settings.tsx:166
 msgid "No tools shared yet"
 msgstr "尚未共享任何工具"
 
@@ -19736,7 +19949,7 @@ msgstr ""
 msgid "Not found"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:42
+#: src/features/develop/components/files-tab.tsx:74
 msgid "Not loaded: the diffs on this page were already large."
 msgstr ""
 
@@ -19762,6 +19975,10 @@ msgstr "未设置"
 msgid "Not started"
 msgstr "未开始"
 
+#: src/features/develop/components/review-panel.tsx:299
+msgid "Not submitted"
+msgstr ""
+
 #: src/features/workflow/components/nodes/comment-node.tsx:70
 msgid "Note"
 msgstr "备注"
@@ -19782,7 +19999,7 @@ msgstr "注意：模块按对话而非按消息应用。仅启用你需要的模
 msgid "Nothing found"
 msgstr "未找到结果"
 
-#: src/features/devices/components/devices-settings.tsx:164
+#: src/features/devices/components/devices-settings.tsx:233
 msgid "Nothing has run on a device yet."
 msgstr "尚未在任何设备上运行过操作。"
 
@@ -19917,7 +20134,7 @@ msgstr "关闭"
 msgid "Official"
 msgstr "官方"
 
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:172
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "离线"
@@ -19957,6 +20174,10 @@ msgstr "一致性更高的上一代电影感模型"
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:519
 msgid "Older"
 msgstr "更早"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:18
+msgid "Older messages were summarised"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:66
 msgid "ollama"
@@ -20106,7 +20327,7 @@ msgstr "一次性密码无效"
 msgid "One-time password is required"
 msgstr "请输入一次性密码"
 
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:172
 msgid "Online"
 msgstr "在线"
 
@@ -20187,7 +20408,7 @@ msgstr "不透明度"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:669
 #: src/components/command-palette.tsx:618
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
 msgstr "打开"
@@ -20285,7 +20506,7 @@ msgstr "打开消息"
 msgid "Open Model Picker"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:361
+#: src/features/devices/components/devices-settings.tsx:435
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "请在桌面应用中打开 Neore 以配对此计算机。之前配对的设备列在下方。"
 
@@ -20294,7 +20515,7 @@ msgid "Open new chat"
 msgstr "打开新聊天"
 
 #. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-view.tsx:85
+#: src/features/develop/components/pull-request-view.tsx:86
 msgid "Open on {0}"
 msgstr ""
 
@@ -20958,6 +21179,10 @@ msgstr "我们的隐私政策说明了我们如何依据 GDPR 及其他适用的
 msgid "Outcome of every case per model"
 msgstr "每个模型每个用例的结果"
 
+#: src/features/develop/components/review-thread.tsx:44
+msgid "Outdated"
+msgstr ""
+
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
 #: src/features/workflow/types/index.ts:574
 #: src/features/workflow/types/index.ts:578
@@ -20986,7 +21211,7 @@ msgstr "输出文件"
 msgid "Output Format"
 msgstr "输出格式"
 
-#: src/features/chat/thread/composer.tsx:239
+#: src/features/chat/thread/composer.tsx:240
 msgid "Output Mode"
 msgstr "输出模式"
 
@@ -21104,11 +21329,11 @@ msgstr "涂抹你想编辑的区域。白色区域将重新生成，深色区域
 msgid "Paired"
 msgstr "已配对"
 
-#: src/features/devices/components/devices-settings.tsx:394
+#: src/features/devices/components/devices-settings.tsx:468
 msgid "Paired devices"
 msgstr "已配对的设备"
 
-#: src/features/devices/components/devices-settings.tsx:337
+#: src/features/devices/components/devices-settings.tsx:411
 msgid "Pairing was cancelled on this computer."
 msgstr "已在此计算机上取消配对。"
 
@@ -21408,6 +21633,10 @@ msgstr "待处理的邀请"
 msgid "Pending Invites"
 msgstr "待处理的邀请"
 
+#: src/features/develop/components/draft-comment-card.tsx:28
+msgid "Pending: posted when you submit the review"
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:210
 msgid "people"
 msgstr "人物"
@@ -21451,6 +21680,10 @@ msgstr "永久删除你的账号及所有相关数据"
 #: src/features/chat/sharing/thread-share-button.tsx:282
 msgid "Permission Level"
 msgstr "权限级别"
+
+#: src/features/chat/host/host-composer.tsx:159
+msgid "Permission requests from the agent"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:101
 #: src/features/settings/lib/settings-keywords.ts:102
@@ -21603,7 +21836,7 @@ msgstr "置顶记忆"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:144
 #: ../../packages/chat-ui/src/chat/message-item.tsx:193
-#: src/features/chat/thread/message-item.tsx:379
+#: src/features/chat/thread/message-item.tsx:381
 msgid "Pin message"
 msgstr "置顶消息"
 
@@ -21662,7 +21895,7 @@ msgstr ""
 msgid "plan"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:261
+#: src/features/chat/thread/composer.tsx:262
 msgid "Plan a project or brainstorm ideas..."
 msgstr "规划项目或头脑风暴..."
 
@@ -21795,7 +22028,7 @@ msgstr "精致的好莱坞风格"
 msgid "Popular"
 msgstr "热门"
 
-#: src/features/devices/components/devices-settings.tsx:277
+#: src/features/devices/components/devices-settings.tsx:346
 msgid "Port"
 msgstr ""
 
@@ -22169,7 +22402,7 @@ msgstr "上一个匹配项"
 msgid "Previous option"
 msgstr "上一个选项"
 
-#: src/features/chat/thread/composer.tsx:195
+#: src/features/chat/thread/composer.tsx:196
 msgid "Previous output mode"
 msgstr "上一个输出模式"
 
@@ -22799,11 +23032,11 @@ msgstr "路由引擎分配的查询复杂度等级"
 msgid "Query usage analytics and costs"
 msgstr "查询用量分析和成本"
 
-#: src/features/chat/thread/composer-input-area.tsx:313
+#: src/features/chat/thread/composer-input-area.tsx:325
 msgid "Queue message"
 msgstr "排队消息"
 
-#: src/features/chat/thread/composer-input-area.tsx:332
+#: src/features/chat/thread/composer-input-area.tsx:344
 msgid "Queue message — sends when the current reply finishes"
 msgstr "排队消息——当前回复完成后发送"
 
@@ -23001,8 +23234,8 @@ msgid "Read the docs"
 msgstr "阅读文档"
 
 #: src/features/develop/components/develop-page.tsx:43
-msgid "Read what needs you: the description, commits, files, diff and checks of each change."
-msgstr ""
+#~ msgid "Read what needs you: the description, commits, files, diff and checks of each change."
+#~ msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:65
 msgid "read-only"
@@ -23016,7 +23249,7 @@ msgstr "只读预览——复刻后可编辑"
 msgid "Read-only shared conversation"
 msgstr "只读共享对话"
 
-#: src/features/chat/thread/composer-input.tsx:241
+#: src/features/chat/thread/composer-input.tsx:244
 msgid "Reading \"{attachmentName}\"…"
 msgstr "正在读取“{attachmentName}”…"
 
@@ -23243,11 +23476,15 @@ msgstr "重新连接"
 msgid "Reconnect {0}"
 msgstr "重新连接 {0}"
 
+#: src/features/devices/components/devices-settings.tsx:174
+msgid "Reconnecting"
+msgstr ""
+
 #: src/features/connection/components/connection-banner.tsx:25
 msgid "Reconnecting to the server…"
 msgstr "正在重新连接服务器…"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:537
+#: src/features/chat/thread/streaming-placeholder.tsx:539
 msgid "Reconnecting…"
 msgstr "正在重新连接…"
 
@@ -23431,7 +23668,7 @@ msgid "Refresh installed models"
 msgstr "刷新已安装的模型"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:198
-#: src/features/chat/thread/message-item.tsx:385
+#: src/features/chat/thread/message-item.tsx:387
 msgid "Regenerate"
 msgstr "重新生成"
 
@@ -23584,10 +23821,10 @@ msgstr "记住我"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:313
-#: src/features/chat/thread/composer-input.tsx:375
-#: src/features/devices/components/devices-settings.tsx:122
-#: src/features/devices/components/devices-settings.tsx:126
+#: src/features/chat/thread/composer-input.tsx:316
+#: src/features/chat/thread/composer-input.tsx:378
+#: src/features/devices/components/devices-settings.tsx:190
+#: src/features/devices/components/devices-settings.tsx:195
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
@@ -23604,7 +23841,7 @@ msgid "Remove \"{0}\"?"
 msgstr "移除“{0}”？"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:143
+#: src/features/devices/components/devices-settings.tsx:212
 msgid "Remove “{0}”?"
 msgstr "移除“{0}”？"
 
@@ -23803,7 +24040,7 @@ msgstr "移除用户"
 msgid "Remove variable {0}"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:35
+#: src/features/develop/components/files-tab.tsx:67
 msgid "Removed"
 msgstr ""
 
@@ -23815,10 +24052,11 @@ msgstr "已从收藏中移除"
 msgid "Removed:"
 msgstr "移除："
 
-#: src/features/develop/components/files-tab.tsx:36
+#: src/features/develop/components/files-tab.tsx:68
 msgid "Renamed"
 msgstr ""
 
+#: src/features/develop/components/review-thread.tsx:104
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Reopen"
 msgstr "重新打开"
@@ -23901,6 +24139,9 @@ msgstr "回复将不再被朗读"
 msgid "Replies, tokens and spend per skill or agent for the selected period"
 msgstr "所选期间内每个技能或智能体的回复、token 和支出"
 
+#: src/features/develop/components/review-thread.tsx:61
+#: src/features/develop/components/review-thread.tsx:74
+#: src/features/develop/components/review-thread.tsx:82
 #: src/features/pages/components/page-comments-panel.tsx:204
 #: src/features/pages/components/page-comments-panel.tsx:208
 msgid "Reply"
@@ -23910,7 +24151,7 @@ msgstr "回复"
 msgid "Reply complete"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:618
+#: src/features/chat/core/context/chat-context.tsx:621
 msgid "Reply ready"
 msgstr "回复已就绪"
 
@@ -23921,6 +24162,10 @@ msgstr "仓库、Issue、PR 和代码搜索"
 #: src/features/tasks/components/task-form-dialog.tsx:263
 msgid "Repository"
 msgstr "代码仓库"
+
+#: src/features/develop/components/review-panel.tsx:64
+msgid "Request changes"
+msgstr ""
 
 #: src/features/settings/components/chat/usage-settings.tsx:92
 msgid "Request count"
@@ -23998,7 +24243,7 @@ msgstr "研究"
 msgid "Research a topic"
 msgstr "研究一个主题"
 
-#: src/features/chat/thread/composer.tsx:263
+#: src/features/chat/thread/composer.tsx:264
 msgid "Research a topic in depth..."
 msgstr "深入研究一个主题..."
 
@@ -24081,9 +24326,14 @@ msgstr "调整 {label} 列宽"
 msgid "Resolution"
 msgstr "分辨率"
 
+#: src/features/develop/components/review-thread.tsx:104
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Resolve"
 msgstr "解决"
+
+#: src/features/develop/components/review-thread.tsx:43
+msgid "Resolved"
+msgstr ""
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:85
 msgid "Resource"
@@ -24209,6 +24459,7 @@ msgstr ""
 
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/translation/message-translation.tsx:88
+#: src/features/devices/components/devices-settings.tsx:129
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -24267,6 +24518,10 @@ msgstr "查看我们的隐私政策和数据处理做法"
 msgid "Review requested on a pull request"
 msgstr ""
 
+#: src/features/develop/components/review-panel.tsx:284
+msgid "Review submitted"
+msgstr ""
+
 #. placeholder {0}: task.title
 #: src/features/home/components/home-page.tsx:163
 msgid "Review task: {0}"
@@ -24275,6 +24530,10 @@ msgstr "审阅任务：{0}"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:134
 msgid "Review the optimized prompt below. You can apply it to update your prompt or reject it to try again."
 msgstr "请审阅下方优化后的提示词。你可以应用它来更新提示词，或拒绝后重试。"
+
+#: src/features/develop/components/develop-page.tsx:43
+msgid "Review what needs you: the description, commits, files, diff and checks of each change, and your own review of it."
+msgstr ""
 
 #: src/features/skills/components/skill-form-dialog.tsx:354
 msgid "review, security"
@@ -24653,6 +24912,7 @@ msgstr "沙特阿拉伯"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:154
+#: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:640
@@ -24846,7 +25106,7 @@ msgstr "得分"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "根据预期答案或评分标准为每个答案打 0–100% 的分。每个用例会额外调用一次小模型。"
 
-#: src/features/chat/thread/composer-input.tsx:921
+#: src/features/chat/thread/composer-input.tsx:931
 msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
@@ -25408,6 +25668,7 @@ msgstr "提示词遵循度高的半写实模型"
 msgid "Semi-realistic visual style"
 msgstr "半写实视觉风格"
 
+#: src/features/chat/host/host-composer.tsx:221
 #: src/features/sub-agents/components/worker-composer.tsx:104
 msgid "Send"
 msgstr ""
@@ -25450,8 +25711,8 @@ msgid "Send Magic Link"
 msgstr "发送魔法链接"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
-#: src/features/chat/thread/composer-input-area.tsx:366
-#: src/features/chat/thread/composer-input-area.tsx:380
+#: src/features/chat/thread/composer-input-area.tsx:378
+#: src/features/chat/thread/composer-input-area.tsx:392
 msgid "Send message"
 msgstr "发送消息"
 
@@ -25467,6 +25728,10 @@ msgstr "通过 Telegram 向 AI 机器人发送消息。对话会显示在你的�
 #: src/features/chat/thread/composer-prompt-queue.tsx:438
 msgid "Send next"
 msgstr "发送下一条"
+
+#: src/features/develop/components/review-thread.tsx:74
+msgid "Send reply now"
+msgstr ""
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:180
 msgid "Send the secret as <0>X-Gitlab-Token</0>, in plain text, as GitLab's secret token works. GitLab does not sign the body and sends no timestamp, so the secret is a bearer token: whoever holds it can send any request. Every delivery must also carry <1>X-Gitlab-Event-UUID</1>, which GitLab sends itself. Each accepted delivery is remembered by that UUID and its body, and a resend of it is answered as a duplicate. Requests carrying other signature headers are rejected."
@@ -25488,7 +25753,11 @@ msgstr "发送验证码"
 msgid "Sending your message and waiting for the reply"
 msgstr "正在发送你的消息并等待回复"
 
-#: src/features/devices/components/devices-settings.tsx:173
+#: src/features/chat/thread/streaming-placeholder.tsx:587
+msgid "Sending…"
+msgstr ""
+
+#: src/features/devices/components/devices-settings.tsx:242
 msgid "Sent"
 msgstr "已发送"
 
@@ -25540,7 +25809,7 @@ msgstr "塞尔维亚语（塞尔维亚）"
 msgid "Serif"
 msgstr "衬线"
 
-#: src/features/devices/components/devices-settings.tsx:245
+#: src/features/devices/components/devices-settings.tsx:314
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr ""
 
@@ -25556,7 +25825,7 @@ msgstr "服务器错误，请稍后重试。"
 msgid "Server name is required"
 msgstr "请输入服务器名称"
 
-#: src/features/devices/components/devices-settings.tsx:100
+#: src/features/devices/components/devices-settings.tsx:171
 msgid "Server over SSH"
 msgstr ""
 
@@ -25580,7 +25849,7 @@ msgstr "支持分支的 Serverless Postgres 数据库"
 msgid "servers"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:414
+#: src/features/devices/components/devices-settings.tsx:489
 msgid "Servers over SSH"
 msgstr ""
 
@@ -25717,7 +25986,7 @@ msgstr "已共享"
 msgid "Shared conversation"
 msgstr "共享的对话"
 
-#: src/features/devices/components/devices-settings.tsx:389
+#: src/features/devices/components/devices-settings.tsx:463
 msgid "Shared folders and local servers…"
 msgstr "共享文件夹和本地服务器…"
 
@@ -25816,8 +26085,8 @@ msgstr "显示所有任务"
 msgid "Show attached content"
 msgstr "显示附加内容"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:239
-#: src/features/chat/thread/composer-followup-suggestions.tsx:255
+#: src/features/chat/thread/composer-followup-suggestions.tsx:240
+#: src/features/chat/thread/composer-followup-suggestions.tsx:256
 msgid "Show follow-up suggestions"
 msgstr "显示后续建议"
 
@@ -25966,6 +26235,10 @@ msgstr "登录"
 #: src/lib/toast.ts:250
 msgid "Sign In Again"
 msgstr "重新登录"
+
+#: src/features/chat/host/host-composer.tsx:92
+msgid "Sign in again to send."
+msgstr ""
 
 #: src/features/settings/components/chat/mcp-settings.tsx:485
 msgid "Sign in on another site?"
@@ -26805,6 +27078,12 @@ msgstr "星标"
 msgid "Start"
 msgstr "开始"
 
+#. placeholder {0}: offer.agentLabel
+#. placeholder {1}: offer.folderLabel
+#: src/features/devices/components/devices-settings.tsx:98
+msgid "Start {0} in {1}"
+msgstr ""
+
 #: ../../packages/chat-ui/src/chat/message-list.tsx:63
 msgid "Start a conversation"
 msgstr "开始对话"
@@ -26963,6 +27242,10 @@ msgstr "正在开始导入..."
 msgid "Starting test drive…"
 msgstr "正在开始试运行…"
 
+#: src/features/chat/host/host-composer.tsx:173
+msgid "Starting the agent on your computer. A message you send now goes out once it is up."
+msgstr ""
+
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:34
 msgid "Starting the coding agent…"
 msgstr "正在启动编程智能体…"
@@ -27014,11 +27297,11 @@ msgstr "状态"
 msgid "Status Page"
 msgstr "状态页"
 
-#: src/features/chat/thread/composer-input-area.tsx:305
+#: src/features/chat/thread/composer-input-area.tsx:316
 msgid "Steer — the current reply reads this at its next step"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:291
+#: src/features/chat/thread/composer-input-area.tsx:299
 msgid "Steer the reply"
 msgstr ""
 
@@ -27069,6 +27352,7 @@ msgstr "股票"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/group/group-participant-bar.tsx:234
+#: src/features/chat/host/host-composer.tsx:210
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
@@ -27091,8 +27375,8 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:522
 #: src/features/chat/thread-list/thread-node.tsx:544
-#: src/features/chat/thread/composer-input-area.tsx:340
-#: src/features/chat/thread/composer-input-area.tsx:353
+#: src/features/chat/thread/composer-input-area.tsx:352
+#: src/features/chat/thread/composer-input-area.tsx:365
 msgid "Stop generating"
 msgstr "停止生成"
 
@@ -27534,6 +27818,14 @@ msgstr "副标题"
 msgid "submit"
 msgstr ""
 
+#: src/features/develop/components/review-panel.tsx:239
+msgid "Submit review"
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:239
+msgid "Submitting…"
+msgstr ""
+
 #: src/components/model-picker/model-picker.tsx:983
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "以 $8/月订阅，解锁所有模型。"
@@ -27602,7 +27894,7 @@ msgstr "适合复杂任务：Role / Background / Attention / Skills / Goals / Co
 msgid "Summarise my notes in three bullets."
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:260
+#: src/features/chat/thread/composer.tsx:261
 msgid "Summarize a document or URL..."
 msgstr "总结一篇文档或一个 URL..."
 
@@ -27621,6 +27913,10 @@ msgstr "总结我的收件箱并突出紧急事项。使用 {PAYLOAD_TOKEN} 获�
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:86
 msgid "Summarize the history of the internet"
 msgstr "总结互联网的发展史"
+
+#: src/features/develop/components/review-panel.tsx:218
+msgid "Summary"
+msgstr ""
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:151
 msgid "Summary is only available for text models."
@@ -27734,6 +28030,10 @@ msgstr "切换模型"
 msgid "Switch to {label}"
 msgstr "切换到 {label}"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:52
+msgid "Switch to {name}?"
+msgstr ""
+
 #: src/features/knowledge/components/collection-dialog.tsx:84
 msgid "Switch to an organization to share a collection with it."
 msgstr "切换到某个组织后才能与其共享集合。"
@@ -27745,6 +28045,12 @@ msgstr "切换到某个组织后即可与其共享。"
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:170
 msgid "Switch workspace: currently {triggerLabel}"
 msgstr "切换工作区：当前为 {triggerLabel}"
+
+#. placeholder {0}: nameOf(part.from.model)
+#. placeholder {1}: nameOf(part.to.model)
+#: src/features/chat/thread/agent-switch-divider.tsx:14
+msgid "Switched from {0} to {1}"
+msgstr ""
 
 #: src/features/auth/components/team/team-switcher.tsx:73
 msgid "Switched to organization view"
@@ -27783,7 +28089,7 @@ msgstr "汇总者（权衡双方）"
 msgid "System default"
 msgstr "系统默认"
 
-#: src/features/chat/thread/message-item.tsx:230
+#: src/features/chat/thread/message-item.tsx:232
 msgid "System message:"
 msgstr "系统消息："
 
@@ -28220,7 +28526,7 @@ msgstr "文本"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1080
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:117
+#: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:44
@@ -28271,7 +28577,7 @@ msgstr "文字方向已设为 LTR"
 msgid "Text direction set to RTL"
 msgstr "文字方向已设为 RTL"
 
-#: src/features/chat/thread/composer-input.tsx:277
+#: src/features/chat/thread/composer-input.tsx:280
 msgid "Text document"
 msgstr "文本文档"
 
@@ -28373,6 +28679,10 @@ msgstr "泰国"
 msgid "Thanks for rating"
 msgstr "感谢你的评分"
 
+#: src/features/develop/lib/use-review-messages.ts:14
+msgid "That comment is already gone."
+msgstr ""
+
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:168
 msgid "That key combination cannot be used as a shortcut"
 msgstr ""
@@ -28385,17 +28695,29 @@ msgstr ""
 msgid "That message could not be found in this conversation."
 msgstr "在此对话中找不到该消息。"
 
+#: src/features/chat/host/host-composer.tsx:97
+msgid "That message is too long to send from here."
+msgstr ""
+
 #: src/features/chat/lock/thread-lock-dialog.tsx:60
 msgid "That passcode is not right."
+msgstr ""
+
+#: src/features/chat/host/host-composer.tsx:149
+msgid "That request is no longer waiting."
 msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:260
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "43 位的 EncodingAESKey（消息加解密方式必须设为安全模式）"
 
-#: src/features/devices/components/devices-settings.tsx:127
+#: src/features/devices/components/devices-settings.tsx:196
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "智能体将无法再向此设备请求任何操作。其活动日志会保留到过期为止。"
+
+#: src/features/chat/host/host-composer.tsx:98
+msgid "The agent is still working on the last message."
+msgstr ""
 
 #: src/features/settings/components/chat/agent-settings.tsx:56
 msgid "The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the AI's capabilities for specific task types."
@@ -28430,7 +28752,7 @@ msgstr "助手有一个问题"
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:86
+#: src/features/chat/thread/composer-model-selector.tsx:90
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -28441,6 +28763,10 @@ msgstr "浏览器无法读取此视频，因此无法截取帧"
 #: src/features/skills/components/skill-builder-dialog.tsx:108
 msgid "The builder could not answer. Try again."
 msgstr "构建器无法回答，请重试。"
+
+#: src/features/develop/lib/use-review-messages.ts:13
+msgid "The change has new commits since you started this review. Submit or discard the review first, then comment on the new version."
+msgstr ""
 
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:215
 msgid "The change is too large to show in full."
@@ -28482,7 +28808,7 @@ msgstr "费用上限必须是正数（美元）。"
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "数据集、其用例及所有运行记录都将被删除。"
 
-#: src/features/develop/components/pull-request-view.tsx:118
+#: src/features/develop/components/pull-request-view.tsx:120
 msgid "The description is cut short."
 msgstr ""
 
@@ -28580,11 +28906,11 @@ msgstr ""
 msgid "The host lists at most {commitLimit, plural, one {# commit} other {# commits}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:131
+#: src/features/develop/components/files-tab.tsx:258
 msgid "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:41
+#: src/features/develop/components/files-tab.tsx:73
 msgid "The host sent no diff for this file (binary, or too large for it)."
 msgstr ""
 
@@ -28603,6 +28929,10 @@ msgstr "上次删除请求失败。你可以再次请求。"
 #: src/features/auth/components/auth/last-signin-message.tsx:87
 msgid "the last time"
 msgstr "登录"
+
+#: src/features/chat/host/host-composer.tsx:183
+msgid "The last turn stopped before it finished."
+msgstr ""
 
 #: src/features/chat/sharing/shared-thread-page.tsx:77
 msgid "The link may be wrong, or its owner has made the conversation private or deleted it."
@@ -28786,7 +29116,7 @@ msgstr ""
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "面向现代 AI 应用的统一 LLM 网关。"
 
-#: src/features/chat/thread/composer-input.tsx:506
+#: src/features/chat/thread/composer-input.tsx:509
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "“{fileName}”的上传已过期。请重新附加该文件。"
 
@@ -28845,6 +29175,10 @@ msgstr "然后下载一个模型并使用此基础 URL："
 #: ../../packages/ui/src/components/image-gallery.tsx:488
 msgid "There are no items to display."
 msgstr "没有可显示的项目。"
+
+#: src/features/develop/components/review-panel.tsx:134
+msgid "There is nothing to submit."
+msgstr ""
 
 #: src/components/error-boundaries/route-error-boundary.tsx:64
 msgid "There's a problem with your internet connection or our servers."
@@ -28923,7 +29257,7 @@ msgstr "支持思考的视觉语言模型"
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1036
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
-#: src/features/chat/thread/streaming-placeholder.tsx:727
+#: src/features/chat/thread/streaming-placeholder.tsx:764
 msgid "Thinking..."
 msgstr "正在思考..."
 
@@ -28945,6 +29279,10 @@ msgstr "此操作无法撤销。这将永久删除该组织及所有相关数据
 msgid "This browser cannot receive push notifications here."
 msgstr "此浏览器无法在此处接收推送通知。"
 
+#: src/features/chat/host/host-composer.tsx:93
+msgid "This chat could not be found."
+msgstr ""
+
 #: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
 msgstr ""
@@ -28957,25 +29295,25 @@ msgstr "此集合由你组织中的成员共享给你。你可以将其附加到
 msgid "This command name is reserved"
 msgstr "此命令名称已被保留"
 
-#: src/features/devices/components/devices-settings.tsx:99
+#: src/features/devices/components/devices-settings.tsx:170
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "此电脑"
 
-#: src/features/devices/components/devices-settings.tsx:366
+#: src/features/devices/components/devices-settings.tsx:440
 msgid "This computer is not paired yet."
 msgstr "此计算机尚未配对。"
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:382
+#: src/features/devices/components/devices-settings.tsx:456
 msgid "This computer is paired as “{0}”."
 msgstr "此计算机已配对为“{0}”。"
 
-#: src/features/devices/components/devices-settings.tsx:366
+#: src/features/devices/components/devices-settings.tsx:440
 msgid "This computer is paired with another account."
 msgstr "此计算机已与另一个账户配对。"
 
-#: src/features/devices/components/devices-settings.tsx:344
+#: src/features/devices/components/devices-settings.tsx:418
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "此计算机已配对。请在桌面应用中选择要共享的文件夹。"
 
@@ -29003,6 +29341,10 @@ msgstr "此对话还没有消息。"
 msgid "This conversation is long, so only its most recent messages are shown."
 msgstr "此对话较长，因此只显示最近的消息。"
 
+#: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:54
+msgid "This conversation is long. {name} has not seen it, so its next reply reads it without the cache and costs more than usual."
+msgstr ""
+
 #: src/features/chat/sharing/shared-thread-page.tsx:71
 msgid "This conversation is not available"
 msgstr "此对话不可用"
@@ -29011,7 +29353,7 @@ msgstr "此对话不可用"
 msgid "This CSV file appears to be empty or invalid."
 msgstr "此 CSV 文件似乎为空或无效。"
 
-#: src/features/develop/components/files-tab.tsx:43
+#: src/features/develop/components/files-tab.tsx:75
 msgid "This diff is cut short."
 msgstr ""
 
@@ -29055,7 +29397,7 @@ msgstr "此文件过大（约 {0} 个 token），超出了模型的上下文窗�
 msgid "This host does not offer an inbox yet."
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:103
+#: src/features/develop/components/pull-request-view.tsx:105
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
@@ -29166,6 +29508,18 @@ msgstr "此提示词将配置："
 msgid "This removes the model files from your computer. You can pull it again later."
 msgstr "这会从你的电脑中删除模型文件。你以后可以重新拉取。"
 
+#: src/features/chat/host/host-composer.tsx:57
+msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:119
+msgid "This review is already being submitted, maybe from another device."
+msgstr ""
+
+#: src/features/develop/lib/use-review-messages.ts:16
+msgid "This review is too long to keep: it holds at most 100 comments and about 1 MB of text. Submit it first, or shorten it."
+msgstr ""
+
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:43
 msgid "This run is no longer available."
 msgstr "此运行已不可用。"
@@ -29181,6 +29535,11 @@ msgstr "此服务器需要登录。请先保存，然后选择“登录”。"
 #: src/features/settings/components/chat/mcp/server-form.tsx:178
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "此服务器的注册表条目要求填写以下值，它们将填入 URL 和请求头。"
+
+#: src/features/chat/host/host-composer.tsx:96
+#: src/features/chat/host/host-composer.tsx:178
+msgid "This session has ended. Start a new one from the desktop app."
+msgstr ""
 
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:509
 msgid "This sheet appears to be empty."
@@ -29802,7 +30161,7 @@ msgstr "转换后的图像"
 msgid "Translate"
 msgstr "翻译"
 
-#: src/features/chat/thread/composer.tsx:266
+#: src/features/chat/thread/composer.tsx:267
 msgid "Translate text to another language..."
 msgstr "将文本翻译成其他语言..."
 
@@ -30114,7 +30473,7 @@ msgstr "输入以搜索"
 msgid "Type your answer…"
 msgstr "输入你的回答…"
 
-#: src/features/chat/thread/composer-input.tsx:1261
+#: src/features/chat/thread/composer-input.tsx:1272
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:166
 msgid "Type your message..."
 msgstr "输入你的消息..."
@@ -30254,7 +30613,7 @@ msgstr "未分类（{0}）"
 msgid "Uncategorized"
 msgstr "未分类"
 
-#: src/features/develop/components/files-tab.tsx:37
+#: src/features/develop/components/files-tab.tsx:69
 #: src/features/evals/components/run-comparison.tsx:56
 msgid "Unchanged"
 msgstr "不变"
@@ -30475,7 +30834,7 @@ msgstr "任意库或框架的最新文档"
 msgid "Update Duration"
 msgstr "更新时长"
 
-#: src/features/chat/thread/composer-input.tsx:1127
+#: src/features/chat/thread/composer-input.tsx:1137
 msgid "Update failed"
 msgstr "更新失败"
 
@@ -30659,11 +31018,11 @@ msgstr "上传 CSV、运行 Python 分析并导出图表——无需配置 Jupyt
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "将文档上传到知识库并分组为集合。AI 会从中搜索相关上下文，并引用所用的段落。"
 
-#: src/features/chat/thread/composer-input.tsx:551
+#: src/features/chat/thread/composer-input.tsx:554
 msgid "Upload failed"
 msgstr "上传失败"
 
-#: src/features/chat/thread/composer-input-area.tsx:198
+#: src/features/chat/thread/composer-input-area.tsx:206
 msgid "Upload file"
 msgstr "上传文件"
 
@@ -30709,7 +31068,7 @@ msgstr "已上传"
 msgid "Uploaded {fileName}"
 msgstr "已上传 {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:319
+#: src/features/chat/thread/composer-input.tsx:322
 msgid "Uploading {attachmentName}"
 msgstr "正在上传 {attachmentName}"
 
@@ -30892,7 +31251,7 @@ msgstr "使用组织允许的模型"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "使用这些键盘快捷键更高效地浏览和操作数据表格。"
 
-#: src/features/devices/components/devices-settings.tsx:376
+#: src/features/devices/components/devices-settings.tsx:450
 msgid "Use this computer for agent tools"
 msgstr "将此计算机用于智能体工具"
 
@@ -30932,7 +31291,7 @@ msgstr "用户"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:273
+#: src/features/devices/components/devices-settings.tsx:342
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:194
@@ -31342,7 +31701,7 @@ msgstr "视频"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
 #: src/components/model-picker/model-picker.tsx:1106
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:119
+#: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -31519,6 +31878,10 @@ msgstr "查看完整文档"
 msgid "View History"
 msgstr "查看历史"
 
+#: src/features/develop/components/review-panel.tsx:289
+msgid "View it"
+msgstr ""
+
 #. placeholder {0}: latestUnread.title
 #: src/features/changelog/components/changelog-card.tsx:51
 msgid "View latest update: {0}"
@@ -31539,6 +31902,19 @@ msgstr "查看拉取请求"
 #: src/features/admin/components/user-cell.tsx:122
 msgid "View Sessions"
 msgstr "查看会话"
+
+#: src/features/develop/components/files-tab.tsx:117
+msgid "Viewed"
+msgstr ""
+
+#: src/features/develop/components/files-tab.tsx:117
+msgid "Viewed (changed since)"
+msgstr ""
+
+#. placeholder {0}: listed.length
+#: src/features/develop/components/files-tab.tsx:261
+msgid "Viewed {viewedCount} of {0} files"
+msgstr ""
 
 #: src/features/workflow/components/collab/collaborator-facepile.tsx:73
 msgid "Viewing: {selectedNodeId}"
@@ -31564,6 +31940,10 @@ msgstr "复古独立电影，粗颗粒"
 #: src/features/chat/tags/thread-tag-color-picker.tsx:23
 msgid "Violet"
 msgstr "紫罗兰色"
+
+#: src/routes/admin/gateway/keys.tsx:421
+#~ msgid "Virtual API Keys"
+#~ msgstr "虚拟 API 密钥"
 
 #: src/features/skills/components/skill-form-dialog.tsx:459
 msgid "Visibility"
@@ -31762,7 +32142,7 @@ msgstr "宽"
 msgid "Waiting for {device} to pick this up…"
 msgstr "等待 {device} 接收…"
 
-#: src/features/devices/components/devices-settings.tsx:168
+#: src/features/devices/components/devices-settings.tsx:237
 msgid "Waiting for approval"
 msgstr "等待批准"
 
@@ -31774,6 +32154,10 @@ msgstr "等待在 {device} 上批准"
 msgid "Waiting for output…"
 msgstr "正在等待输出…"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:594
+msgid "Waiting for the agent…"
+msgstr ""
+
 #: src/features/chat/thread/ask-user-prompt.tsx:124
 msgid "Waiting for the owner to answer"
 msgstr "正在等待所有者回答"
@@ -31782,10 +32166,10 @@ msgstr "正在等待所有者回答"
 msgid "Waiting for the owner to approve"
 msgstr "正在等待所有者批准"
 
-#: src/features/chat/thread/composer-input-area.tsx:313
-#: src/features/chat/thread/composer-input-area.tsx:332
-#: src/features/chat/thread/composer-input-area.tsx:366
-#: src/features/chat/thread/composer-input-area.tsx:380
+#: src/features/chat/thread/composer-input-area.tsx:325
+#: src/features/chat/thread/composer-input-area.tsx:344
+#: src/features/chat/thread/composer-input-area.tsx:378
+#: src/features/chat/thread/composer-input-area.tsx:392
 msgid "Waiting for uploads to complete…"
 msgstr "正在等待上传完成…"
 
@@ -31811,7 +32195,7 @@ msgstr "等待：{0}"
 msgid "Want to continue from here?"
 msgstr "想从这里继续吗？"
 
-#: src/features/chat/core/context/chat-context.tsx:688
+#: src/features/chat/core/context/chat-context.tsx:691
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "我们未能及时确认你的会话。你的消息仍在输入框中，请重新发送。"
 
@@ -32036,7 +32420,7 @@ msgstr "智能体应该做什么？"
 msgid "What should the AI call you?"
 msgstr "AI 应该怎么称呼你？"
 
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:496
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "过去 30 天内智能体请求你的设备执行的操作。"
 
@@ -32174,7 +32558,7 @@ msgstr "拥有管理员权限"
 msgid "With email/password"
 msgstr "使用邮箱/密码"
 
-#: src/features/devices/components/devices-settings.tsx:283
+#: src/features/devices/components/devices-settings.tsx:352
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr ""
 
@@ -32233,6 +32617,7 @@ msgstr "工作流"
 msgid "Working"
 msgstr "进行中"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:601
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"
@@ -32250,6 +32635,10 @@ msgstr "写入"
 msgid "Write a compelling product description for an e-commerce site"
 msgstr "为电商网站写一段有吸引力的产品描述"
 
+#: src/features/develop/components/review-panel.tsx:124
+msgid "Write a summary, or add a comment, before you submit this review."
+msgstr ""
+
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:106
 msgid "Write a video description for a product launch"
 msgstr "为产品发布写一段视频描述"
@@ -32266,7 +32655,7 @@ msgstr "在聊天旁撰写长篇内容"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "在并排的画布编辑器中撰写长篇内容。从聊天到成稿，无需切换工具。"
 
-#: src/features/chat/thread/composer.tsx:259
+#: src/features/chat/thread/composer.tsx:260
 msgid "Write some code for me..."
 msgstr "帮我写点代码..."
 
@@ -32442,6 +32831,10 @@ msgstr "你已离线。"
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "你已离线。网络恢复后，Neore 将重新连接。"
 
+#: src/features/chat/host/host-composer.tsx:95
+msgid "You are sending too fast. Wait a moment."
+msgstr ""
+
 #: src/features/pages/components/page-view.tsx:482
 msgid "You can comment on this page but not edit it."
 msgstr "你可以评论此页面，但不能编辑。"
@@ -32575,6 +32968,10 @@ msgstr "你已成功加入对话，正在跳转..."
 msgid "Your {label} sign-in has expired. Connect it again to keep reading."
 msgstr ""
 
+#: src/features/develop/lib/use-review-messages.ts:21
+msgid "Your {label} sign-in has expired. Connect it again."
+msgstr ""
+
 #: src/features/auth/components/settings/account/delete-account-card.tsx:56
 msgid "Your account and all associated data are being deleted. This cannot be cancelled."
 msgstr "你的账号及所有相关数据正在被删除，此操作无法取消。"
@@ -32587,7 +32984,7 @@ msgstr "你的 AI 工作区<0>从这里开始。</0>"
 msgid "Your answer"
 msgstr "你的回答"
 
-#: src/features/chat/core/context/chat-context.tsx:618
+#: src/features/chat/core/context/chat-context.tsx:621
 msgid "Your answer in Neore has finished."
 msgstr "你在 Neore 中的回复已生成完毕。"
 
@@ -32623,9 +33020,26 @@ msgstr "你的浏览器无法识别处理器类型，请从下方选择对应的
 msgid "Your browser talks to the server on this computer directly — the prompt and reply never pass through our AI servers, and nothing is billed."
 msgstr "你的浏览器直接与此电脑上的服务器通信——提示词和回复绝不会经过我们的 AI 服务器，也不会产生费用。"
 
+#: src/features/develop/components/review-diff.tsx:177
+msgid "Your comments on lines this diff does not show"
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:199
+msgid "Your comments were written on an earlier version of this change. They are posted against that version, and the lines shown below may have moved."
+msgstr ""
+
 #: src/features/devices/components/device-tool-call.tsx:40
 msgid "your computer"
 msgstr "你的电脑"
+
+#: src/features/chat/host/host-composer.tsx:91
+#: src/features/chat/host/host-composer.tsx:149
+msgid "Your computer is busy. Try again in a moment."
+msgstr ""
+
+#: src/features/chat/host/host-composer.tsx:94
+msgid "Your computer is offline. Open Neore on it and try again."
+msgstr ""
 
 #: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:19
 msgid "Your connectors and MCP tools set to \"Auto\""
@@ -32660,12 +33074,12 @@ msgid "Your First Chat"
 msgstr "你的第一次聊天"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:597
+#: src/features/chat/thread/composer-input.tsx:600
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "你的输入较大（约 {0} 个 token），将占用模型上下文窗口的很大一部分。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:590
+#: src/features/chat/thread/composer-input.tsx:593
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "你的输入过大（约 {0} 个 token），超出了模型的上下文窗口。请缩短消息或移除附件后再提交。"
 
@@ -32694,11 +33108,11 @@ msgstr "你的本地服务器有响应，但拒绝了此网站（CORS）。请�
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 
-#: src/features/chat/core/context/chat-context.tsx:685
+#: src/features/chat/core/context/chat-context.tsx:688
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "你的消息包含不当内容，无法发送。"
 
-#: src/features/chat/thread/message-item.tsx:175
+#: src/features/chat/thread/message-item.tsx:177
 msgid "Your message:"
 msgstr "你的消息："
 
@@ -32738,9 +33152,19 @@ msgstr "你的方案和额度取决于你的订阅。"
 msgid "Your rating"
 msgstr "你的评分"
 
+#: src/features/develop/components/review-panel.tsx:188
 #: src/features/tasks/components/task-detail-dialog.tsx:88
 msgid "Your review"
 msgstr "你的审核"
+
+#: src/features/develop/lib/use-review-messages.ts:15
+msgid "Your review is being submitted. Wait for it to finish."
+msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:147
+#: src/features/develop/components/review-panel.tsx:153
+msgid "Your review is kept."
+msgstr ""
 
 #: src/lib/toast.ts:248
 msgid "Your session has expired"
@@ -32899,222 +33323,3 @@ msgstr "苏黎世"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ 分数"
-
-#. placeholder {0}: review.draftComments.length
-#: src/features/develop/components/files-tab.tsx:95
-msgid "{0, plural, one {# pending comment} other {# pending comments}}"
-msgstr ""
-
-#. placeholder {0}: review.threads.length
-#: src/features/develop/components/files-tab.tsx:90
-msgid "{0, plural, one {# thread} other {# threads}}"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:130
-msgid "{commentCount, plural, one {# comment is waiting to be submitted} other {# comments are waiting to be submitted}}"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:168
-msgid "{hostLabel} has no batched review: your comments are posted one after another when you submit."
-msgstr ""
-
-#. placeholder {0}: result.reason
-#: src/features/develop/lib/use-review-messages.ts:37
-msgid "{label} did not accept this: {0}"
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:37
-msgid "{label} did not accept this."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:25
-msgid "{label} did not answer, so it may have taken this. Check on {label} before trying again."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:22
-msgid "{label} is not connected."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:19
-msgid "{label} refused this. Your account may lack access."
-msgstr ""
-
-#: src/features/develop/components/review-thread.tsx:76
-msgid "A reply is posted straight away, not with the rest of your review."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:16
-msgid "A review holds at most 100 comments. Submit this one first."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:132
-msgid "Add comments on a line of the diff, then submit."
-msgstr ""
-
-#: src/features/develop/components/review-diff.tsx:162
-msgid "Add to review"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:98
-msgid "Choose how you review this before you submit it."
-msgstr ""
-
-#. placeholder {0}: target.line
-#: src/features/develop/components/review-diff.tsx:130
-#: src/features/develop/components/review-diff.tsx:151
-msgid "Comment on line {0}"
-msgstr ""
-
-#: src/features/develop/components/review-diff.tsx:179
-msgid "Conversations on lines this diff no longer shows"
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:34
-msgid "Could not do this. Try again."
-msgstr ""
-
-#: src/features/develop/components/comment-composer.tsx:42
-#: src/features/develop/lib/use-review-messages.ts:30
-msgid "Could not save this. Try again."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:117
-msgid "Could not submit the review. Your review is kept."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:186
-msgid "Discard the review"
-msgstr ""
-
-#: src/features/develop/components/draft-comment-card.tsx:32
-msgid "Edit comment"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:136
-msgid "How you review this"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:205
-msgid "It is on {hostLabel} now."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:189
-msgid "Keep it"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:218
-msgid "Not submitted"
-msgstr ""
-
-#: src/features/develop/components/review-thread.tsx:44
-msgid "Outdated"
-msgstr ""
-
-#: src/features/develop/components/draft-comment-card.tsx:28
-msgid "Pending: posted when you submit the review"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:59
-msgid "Request changes"
-msgstr ""
-
-#: src/features/develop/components/review-thread.tsx:43
-msgid "Resolved"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:203
-msgid "Review submitted"
-msgstr ""
-
-#: src/features/develop/components/develop-page.tsx:43
-msgid "Review what needs you: the description, commits, files, diff and checks of each change, and your own review of it."
-msgstr ""
-
-#: src/features/develop/components/review-thread.tsx:74
-msgid "Send reply now"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:172
-msgid "Submit review"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:172
-msgid "Submitting…"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:151
-msgid "Summary"
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:14
-msgid "That comment is already gone."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:13
-msgid "The change has new commits since you started this review. Submit or discard the review first, then comment on the new version."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:103
-msgid "There is nothing to submit."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:88
-msgid "This review is already being submitted, maybe from another device."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:208
-msgid "View it"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:111
-msgid "Viewed"
-msgstr ""
-
-#: src/features/develop/components/files-tab.tsx:111
-msgid "Viewed (changed since)"
-msgstr ""
-
-#. placeholder {0}: listed.length
-#: src/features/develop/components/files-tab.tsx:242
-msgid "Viewed {viewedCount} of {0} files"
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:93
-msgid "Write a summary, or add a comment, before you submit this review."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:21
-msgid "Your {label} sign-in has expired. Connect it again."
-msgstr ""
-
-#: src/features/develop/components/review-diff.tsx:173
-msgid "Your comments on lines this diff does not show"
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:15
-msgid "Your review is being submitted. Wait for it to finish."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:113
-msgid "Your review is kept."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:127
-msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:143
-msgid "Could not save the summary, so nothing was submitted. Try again."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:116
-msgid "If it kept the review as pending, submit or delete it there first."
-msgstr ""
-
-#: src/features/develop/lib/use-review-messages.ts:16
-msgid "This review is too long to keep: it holds at most 100 comments and about 1 MB of text. Submit it first, or shorten it."
-msgstr ""
-
-#: src/features/develop/components/review-panel.tsx:196
-msgid "Your comments were written on an earlier version of this change. They are posted against that version, and the lines shown below may have moved."
-msgstr ""
