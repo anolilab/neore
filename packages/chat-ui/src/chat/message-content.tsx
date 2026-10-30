@@ -804,7 +804,12 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                     const isReasoningStreaming = isAnimating && i === message.parts.length - 1;
 
                     renderedParts.push(
-                        <ReasoningRenderer isStreaming={isReasoningStreaming} key={key} literalImages={isHostRunText(reasoningPart) || message.parts.some((other) => isHostRunText(other))} text={reasoningPart.text} />,
+                        <ReasoningRenderer
+                            isStreaming={isReasoningStreaming}
+                            key={key}
+                            literalImages={isHostRunText(reasoningPart) || message.parts.some((other) => isHostRunText(other))}
+                            text={reasoningPart.text}
+                        />,
                     );
                 }
 

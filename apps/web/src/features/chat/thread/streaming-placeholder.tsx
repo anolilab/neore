@@ -675,7 +675,9 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
             // still streaming only while it is the LAST part, so the panel collapses as
             // soon as answer text arrives.
             parts: [
-                ...(displayReasoning ? [{ text: displayReasoning, type: "reasoning", ...(hostState !== undefined && { providerMetadata: HOST_RUN_METADATA }) }] : []),
+                ...(displayReasoning
+                    ? [{ text: displayReasoning, type: "reasoning", ...(hostState !== undefined && { providerMetadata: HOST_RUN_METADATA }) }]
+                    : []),
                 // A coding agent's text is untrusted: its Markdown images are not loaded (`chat-ui/utils/host-run-text.ts`).
                 ...(displayText ? [{ text: displayText, type: "text", ...(hostState !== undefined && { providerMetadata: HOST_RUN_METADATA }) }] : []),
             ] as UIMessage["parts"],
