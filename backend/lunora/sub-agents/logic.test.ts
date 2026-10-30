@@ -205,7 +205,7 @@ describe("a worker's line of messages", () => {
         expect(workerCurrentRun(newestFirst("succeeded"))).toBeUndefined();
     });
 
-    it("reports a failed post of the newest run the lead asked for, until a later one of them posts", () => {
+    it("reports a failed post only while it is the newest run the lead asked for", () => {
         const asked = { mode: "worker", toolCallId: "call" } as const;
         const typed = { mode: "worker" } as const;
 
@@ -235,6 +235,8 @@ describe("a worker's line of messages", () => {
             ]),
         ).toBe("gone");
         expect(workerPostFailure([asked, typed])).toBeNull();
+        // A newer result still on its way may yet be delivered, so an older failure does not show.
+        expect(workerPostFailure([asked, { ...asked, postFailed: "gone" }])).toBeNull();
     });
 
     it("queues a follow-up for a cloud worker and offers no steer", () => {

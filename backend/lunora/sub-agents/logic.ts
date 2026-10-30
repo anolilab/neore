@@ -253,27 +253,12 @@ export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFir
 
 /**
  * Why the lead never got the worker's latest result, from its runs newest first: the newest run the
- * lead asked for that gave up posting, unless a later one of them posted. Null when none did.
+ * lead asked for decides, so a failure shows only while that run gave up posting. Null when it posted,
+ * is still on its way, or the lead asked for none.
  */
 export const workerPostFailure = (
     newestFirst: ReadonlyArray<{ mode?: "run" | "worker"; postFailed?: string; resultPostedAt?: number; toolCallId?: string }>,
-): string | null => {
-    for (const run of newestFirst) {
-        if (!postsBack(run)) {
-            continue;
-        }
-
-        if (run.postFailed !== undefined) {
-            return run.postFailed;
-        }
-
-        if (run.resultPostedAt !== undefined) {
-            return null;
-        }
-    }
-
-    return null;
-};
+): string | null => newestFirst.find((run) => postsBack(run))?.postFailed ?? null;
 
 /**
  * How a message sent to a busy worker is handled, read from what its runner can do. Cloud headless
