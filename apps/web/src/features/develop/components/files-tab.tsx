@@ -185,12 +185,13 @@ const FilesTab = ({
     }, [threads.data]);
 
     // The host's pages are bounded by its own ceilings, so reading them to the end is bounded too.
+    // A page that failed stays failed: asking again at once would only spend the read budget.
     useEffect(() => {
-        if (threads.hasNextPage && !threads.isFetchingNextPage) {
+        if (threads.hasNextPage && !threads.isFetchingNextPage && !threads.isError) {
             threads.fetchNextPage();
         }
 
-        if (viewed.hasNextPage && !viewed.isFetchingNextPage) {
+        if (viewed.hasNextPage && !viewed.isFetchingNextPage && !viewed.isError) {
             viewed.fetchNextPage();
         }
     }, [threads, viewed]);

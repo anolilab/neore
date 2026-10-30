@@ -175,6 +175,13 @@ describe("a draft lives on the server", () => {
         expect(await save(A, { line: 500 })).toEqual({ status: "too_many" });
     });
 
+    it("lets a draft with no comments follow the head, so a verdict is posted on the commit now shown", async () => {
+        await as(A).mutation(setDraftReview as never, { ...PULL, body: "ok", commitId: HEAD, verdict: "approve" } as never);
+        await as(A).mutation(setDraftReview as never, { ...PULL, body: "ok", commitId: NEWER, verdict: "approve" } as never);
+
+        expect(await read(A)).toMatchObject({ commitId: NEWER });
+    });
+
     it("counts bytes, not characters: CJK text past the row budget is refused as too long", async () => {
         // 10,000 characters (the cap on one comment) is 30,000 bytes in UTF-8: 100 of them would be 3 MB.
         const wide = "字".repeat(10_000);

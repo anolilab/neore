@@ -16,7 +16,7 @@ import { vDraftComment, vReviewVerdict } from "./validators";
 
 const BATCH = 100;
 
-/** Drafts one user can have open at once is not capped by the product; the export reads this many at most. */
+/** A draft is one per pull request; the export reads this many at most, like the other collectors' ceilings. */
 const EXPORT_MAX = 1000;
 
 export const collectReviewDraftsForExport = internalQuery

@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@neore/ui/components/alert"
 import { Button } from "@neore/ui/components/button";
 import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
 import { Textarea } from "@neore/ui/components/textarea";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { safeExternalUrl } from "../lib/format";
 import { VERDICT_CAPABILITIES } from "../lib/review";
@@ -46,6 +46,9 @@ const ReviewPanel = ({
     const [confirmingDiscard, setConfirmingDiscard] = useState(false);
     // Set before the summary is saved, so a second click cannot start another submit while the first is still saving.
     const [submitting, setSubmitting] = useState(false);
+    const saveQueue = useRef<Promise<boolean>>(Promise.resolve(true));
+    const pendingSaves = useRef(0);
+    const chosenVerdict = useRef<ReviewVerdict | null | undefined>(undefined);
     const stored = draft.data;
     const verdicts = (Object.keys(VERDICT_CAPABILITIES) as ReviewVerdict[]).filter((verdict) =>
         isHostCapabilityAvailable(capabilities, VERDICT_CAPABILITIES[verdict]),
@@ -63,20 +66,48 @@ const ReviewPanel = ({
     const dirty = typed !== null;
     const summary = typed ?? stored?.body ?? "";
 
-    /** Whether the summary and verdict are stored now. */
-    const saveReview = async (next: { body: string; verdict: ReviewVerdict | null }): Promise<boolean> => {
-        const outcome = await mutations.setReview.mutateAsync({ ...address, ...next, commitId: headSha });
-
-        if (outcome.status === "ok") {
-            setTyped(null);
-            setFeedback(null);
-
-            return true;
+    /**
+     * Stores the summary and, when given, the verdict. Saves run one after another, and a save that names no verdict
+     * carries the one chosen last, so a blur save cannot put back the verdict a click just replaced.
+     * Resolves to whether they are stored now.
+     */
+    const saveReview = async (next: { body: string; verdict?: ReviewVerdict | null }): Promise<boolean> => {
+        if (next.verdict !== undefined) {
+            chosenVerdict.current = next.verdict;
         }
 
-        setFeedback({ kind: "error", text: messages.edit(outcome.status) });
+        const verdict = next.verdict ?? chosenVerdict.current ?? stored?.verdict ?? null;
+        const run = async (): Promise<boolean> => {
+            const outcome = await mutations.setReview.mutateAsync({ ...address, body: next.body, commitId: headSha, verdict });
 
-        return false;
+            if (outcome.status === "ok") {
+                // Text typed while this save ran stays, and is saved by its own blur.
+                setTyped((current) => (current === next.body ? null : current));
+                setFeedback(null);
+
+                return true;
+            }
+
+            setFeedback({ kind: "error", text: messages.edit(outcome.status) });
+
+            return false;
+        };
+
+        pendingSaves.current += 1;
+
+        const saved = saveQueue.current.then(run);
+
+        saveQueue.current = saved.catch(() => false);
+
+        try {
+            return await saved;
+        } finally {
+            pendingSaves.current -= 1;
+
+            if (pendingSaves.current === 0) {
+                chosenVerdict.current = undefined;
+            }
+        }
     };
 
     const post = async () => {
@@ -134,7 +165,7 @@ const ReviewPanel = ({
 
         try {
             // The summary typed last goes with the review even if the box never lost focus; if it is not stored, nothing is posted.
-            if (dirty && !(await saveReview({ body: summary, verdict: stored?.verdict ?? null }))) {
+            if (dirty && !(await saveReview({ body: summary }))) {
                 return;
             }
 
@@ -160,6 +191,11 @@ const ReviewPanel = ({
                     t`Add comments on a line of the diff, then submit.`
                 )}
             </p>
+            {commentCount > 0 && stored && stored.commitId !== headSha && (
+                <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
+                    {t`Your comments were written on an earlier version of this change. They are posted against that version, and the lines shown below may have moved.`}
+                </p>
+            )}
             <RadioGroup
                 aria-label={t`How you review this`}
                 className="flex flex-wrap gap-4"
@@ -183,7 +219,7 @@ const ReviewPanel = ({
                     id={summaryId}
                     onBlur={async () => {
                         if (dirty) {
-                            await saveReview({ body: summary, verdict: stored?.verdict ?? null });
+                            await saveReview({ body: summary });
                         }
                     }}
                     onChange={(event) => {
@@ -204,7 +240,14 @@ const ReviewPanel = ({
                         <Button
                             disabled={locked}
                             onClick={async () => {
-                                await mutations.discard.mutateAsync(address);
+                                const outcome = await mutations.discard.mutateAsync(address);
+
+                                if (outcome.status !== "ok") {
+                                    setFeedback({ kind: "error", text: messages.edit(outcome.status) });
+
+                                    return;
+                                }
+
                                 setConfirmingDiscard(false);
                                 setTyped(null);
                                 setFeedback(null);
