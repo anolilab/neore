@@ -13,7 +13,9 @@ Worker is **private** (`workers_dev: false`, no route; Alchemy deploys it with
 way in. The caller is `backend/lunora/agent/nsfw-check.ts`: after a chat file or
 a vault file is stored, the scheduler runs an action that reads the bytes and
 posts them through `@neore/service-sdk/nsfw-checker`. Where the binding is absent
-the check is skipped with a warning, so a file never waits on it.
+the check is skipped with a warning, so a file never waits on it: a chat file
+is then marked `failed` (whatever its type), a vault file is only logged and
+left as it is.
 
 ## API
 

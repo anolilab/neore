@@ -41,11 +41,12 @@ LAN address.
 
 The app redirects to `neore-mobile://auth/callback` (`src/lib/auth-config.ts`).
 The backend admits it only when it is listed, and drops it with a warning
-otherwise, so sign-in fails:
+otherwise, so sign-in fails. A set list replaces the Firefox extension
+default rather than adding to it, so keep that entry if you use it:
 
 ```dotenv
 # backend/.dev.vars
-TRUSTED_EXTENSION_REDIRECT_URIS=neore-mobile://auth/callback
+TRUSTED_EXTENSION_REDIRECT_URIS=https://c64d88ed4645bb5915bc267506fbc3dcd4a1da90.extensions.allizom.org/,neore-mobile://auth/callback
 ```
 
 The URI must match `MOBILE_REDIRECT_URI` in

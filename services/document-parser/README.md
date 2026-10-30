@@ -71,7 +71,7 @@ deploy start from different directories.
 ## Run it
 
 **Starting the backend needs the toolchain above**, unless
-`services/document-parser/build/` already exists. In the full stack `lunora dev`
+`services/document-parser/build/` is newer than its inputs. In the full stack `lunora dev`
 (started by the backend's dev target) runs this Worker inside the backend's own
 `wrangler dev` session and has no port of its own.
 

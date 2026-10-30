@@ -35,7 +35,8 @@ needs). A new launch is started with `keepAlive` of 60 s, and the response
 carries a `sessionId`; passing it on the next call reconnects, so
 `navigate`, `click` and `extract` can be separate tool calls. An expired
 session falls back to a fresh launch. The Worker never closes a kept-alive
-browser itself. Page operations time out at 30 s and navigation at 60 s.
+browser itself. Most page operations time out at 30 s and navigation at 60 s; `extract`
+without a selector and `scroll` use `page.evaluate`, which takes no timeout.
 
 The Browser Rendering binding is `BROWSER`; there are no secrets. There is no
 Browserbase or `playwright-core` path any more, and `BROWSERBASE_API_KEY` does
