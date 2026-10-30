@@ -29,12 +29,16 @@ pull every provider SDK.
 | `@neore/ai/provenance`                                                             | `markAiGeneratedImage`, `sniffImageMediaType`, `withPngOutput`                                                                                                                                                                                                          |
 | `@neore/ai/utils`                                                                  | `getRegionFromHeaders`, `isEURegion`, `isEURequest`                                                                                                                                                                                                                     |
 
+<!-- eslint-skip -->
+
 ```ts
 // backend/lunora/chat/lib/agent-run.ts
 import { MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 
 const definition = MODEL_LOOKUP.get(modelId); // O(1) by model id
 ```
+
+<!-- eslint-skip -->
 
 ```ts
 // backend/lunora/chat/functions.ts — the optimizer wraps user input as JSON evidence

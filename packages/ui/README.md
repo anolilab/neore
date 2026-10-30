@@ -28,6 +28,8 @@ The `components` pattern ends in `.tsx`: a new component file must use that
 extension even if it contains no JSX. A file in `src/lib/` is internal and has
 no export path.
 
+<!-- eslint-skip -->
+
 ```tsx
 import { Button } from "@neore/ui/components/button";
 import { cn } from "@neore/ui/utils/cn";

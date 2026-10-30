@@ -24,6 +24,7 @@ ingest, and the gateway and NSFW-checker clients).
 ```ts
 // backend/lunora/agent/extraction.ts (in an action)
 import { createDocumentParserClient, extractDocument } from "@neore/service-sdk/document-parser";
+
 import { serviceFetch } from "../lib/services"; // backend/lunora/lib/services.ts
 
 const client = createDocumentParserClient({ fetch: serviceFetch(ctx, "documentParser") });

@@ -35,8 +35,14 @@ From `package.json#exports`:
 // apps/web/src/features/chat/sharing/shared-thread-page.tsx
 import MessageItem from "@neore/chat-ui/chat/message-item";
 
+export const SharedMessage = ({ message }: { message: UIMessage }) => <MessageItem message={message} />;
+```
+
+```ts
 // apps/web/src/features/devices/components/device-tool-call.tsx
 import { resolveDeviceToolName } from "@neore/chat-ui/utils/device-tool-name";
+
+const names = resolveDeviceToolName(part); // null unless `part` is a device tool call
 ```
 
 `resolveDeviceToolName` recognises the `device_<tag>__<tool>` runtime name of a
