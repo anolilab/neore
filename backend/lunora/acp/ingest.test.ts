@@ -440,6 +440,16 @@ describe("capability reports", () => {
             await expect(reportOf(threadId, await insertUser())).resolves.toBeNull();
         });
 
+        it("answers a live grantee of a host thread with nothing, and the owner with its report", async () => {
+            const device = await pair(ownerId);
+            const threadId = await openWith(device, REPORT);
+            const grantee = await insertUser();
+
+            await grant(threadId, grantee);
+            await expect(reportOf(threadId, grantee)).resolves.toBeNull();
+            await expect(reportOf(threadId)).resolves.toEqual(REPORT);
+        });
+
         it("answers nobody, the owner included, for a locked thread", async () => {
             const threadId = await insertThread({ lockedAt: Date.now() });
             const grantee = await insertUser();
