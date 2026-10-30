@@ -251,6 +251,7 @@ export const runStreamingAgent = internalAction
                           deviceThreadId: threadId,
                           mcpServerNames: streamingConfig.mcpServerNames,
                           model,
+                          ...(origin === "outside_agent" && { origin }),
                           searchMode: effectiveSearchMode,
                           skillTools: invokedSkill?.config
                               ? { additionalTools: invokedSkill.config.additionalTools, disabledTools: invokedSkill.config.disabledTools }

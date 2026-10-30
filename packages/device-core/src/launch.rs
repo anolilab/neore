@@ -311,20 +311,30 @@ fn command_line(pid: i64) -> Option<Vec<String>> {
         .ok()?;
 
     (output.status.success() && !output.stdout.is_empty())
-        .then(|| split_ps_args(String::from_utf8_lossy(&output.stdout).trim()))
+        .then(|| split_ps_args(&String::from_utf8_lossy(&output.stdout)))
 }
 
-/// `ps` prints one joined line. The program is everything before the first ` --` (its path may hold spaces); the
-/// flags after it carry no spaces of their own.
+/// Splits the `args=` column of `ps`, which prints the program path unquoted: a home directory with a space in it
+/// must not cut the path of `neore-host` short.
 #[cfg(unix)]
 fn split_ps_args(line: &str) -> Vec<String> {
-    let Some((program, flags)) = line.split_once(" --") else {
-        return vec![line.to_owned()];
-    };
+    const PROGRAM: &str = "neore-host";
 
-    std::iter::once(program.to_owned())
-        .chain(format!("--{flags}").split_whitespace().map(str::to_owned))
-        .collect()
+    let line = line.trim();
+    let end = line.match_indices(PROGRAM).find_map(|(at, _)| {
+        let end = at + PROGRAM.len();
+        let starts = at == 0 || line[..at].ends_with('/');
+        let ends = line[end..].chars().next().is_none_or(char::is_whitespace);
+
+        (starts && ends).then_some(end)
+    });
+
+    match end {
+        Some(end) => std::iter::once(line[..end].to_owned())
+            .chain(line[end..].split_whitespace().map(str::to_owned))
+            .collect(),
+        None => line.split_whitespace().map(str::to_owned).collect(),
+    }
 }
 
 /// Whether `pid` is a `neore-host` started as launch `id`: its program is `neore-host` and `--launch <id>` is among
@@ -453,7 +463,21 @@ mod tests {
         assert!(args
             .windows(2)
             .any(|pair| pair[0] == "--launch" && pair[1] == "abc"));
-        assert_eq!(split_ps_args("sleep 5"), vec!["sleep 5".to_owned()]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn ps_output_keeps_a_program_path_with_spaces() {
+        assert_eq!(
+            split_ps_args("/Users/Jane Doe/.neore/host/1/neore-host --stdio --launch abc\n"),
+            [
+                "/Users/Jane Doe/.neore/host/1/neore-host",
+                "--stdio",
+                "--launch",
+                "abc"
+            ]
+        );
+        assert_eq!(split_ps_args("sleep 5"), ["sleep", "5"]);
     }
 
     fn dir(name: &str) -> PathBuf {

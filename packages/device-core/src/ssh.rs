@@ -1750,6 +1750,30 @@ mod tests {
     }
 
     #[test]
+    fn every_authentication_failure_stops_the_reconnecting() {
+        for said in [
+            "Permission denied (publickey).",
+            "Received disconnect from 10.0.0.1 port 22:2: Too many authentication failures",
+            "No supported authentication methods available (server sent: publickey)",
+        ] {
+            let message = explain(&target(), "", &Mutex::new(said.to_owned()));
+
+            assert!(
+                !SshError::from_connect_failure(message).retryable(),
+                "{said}"
+            );
+        }
+
+        let down = explain(
+            &target(),
+            "",
+            &Mutex::new("Connection timed out".to_owned()),
+        );
+
+        assert!(SshError::from_connect_failure(down).retryable());
+    }
+
+    #[test]
     fn a_remote_command_keeps_only_the_start_of_what_it_prints() {
         let long = vec![b'x'; EXEC_OUTPUT_LIMIT as usize + 4096];
         let kept = drain(io::Cursor::new(long)).join().unwrap();

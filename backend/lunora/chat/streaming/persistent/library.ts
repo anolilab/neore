@@ -12,10 +12,12 @@ import { parentOf } from "../../../agent/branch-rows";
 import { patchThread } from "../../../agent/table-writes";
 import { internal } from "../../../_generated/internal";
 import type { Doc, Id } from "../../../_generated/dataModel";
-import { internalMutation, internalQuery, type MutationCtx } from "../../../_generated/server";
+import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../../../_generated/server";
 import { stopHostTurn } from "../../../acp/lib/finish";
 import { patchRow } from "../../../lib/patch";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
+import { findPendingRequestOnLatestTurn } from "../../lib/tool-approval-claim";
+import { ASK_USER_TOOL_NAME } from "../../tools/ask-user-constants";
 import { MAX_LENGTH } from "../../../lib/validators";
 import { latestSteerMessageId, latestSteerPendingId, type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
 import type { StreamStatus } from "./schema";
@@ -461,6 +463,38 @@ export const getStreamText = internalQuery
 /** Statuses after which a stream writes no more chunks (`http-api.ts` stops polling on them too). */
 const SETTLED_STREAM_STATUSES: ReadonlySet<string> = new Set(["done", "error", "timeout"]);
 
+/** Newest approval rows of a thread read to find the stream's own. */
+const PENDING_REQUEST_ROWS = 20;
+
+/**
+ * The first request this stream's run paused on that nobody has answered. A run records its
+ * `toolApprovalRuns` rows before its stream closes, so one created since the stream began is this
+ * run's; an older pending row belongs to an earlier turn.
+ */
+const pendingRequestOfStream = async (
+    ctx: Pick<QueryCtx, "db">,
+    stream: Doc<"persistentStreams">,
+): Promise<{ question?: string; toolCallId: string; toolName: string | null } | undefined> => {
+    const rows = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_threadId", (q) => q.eq("threadId", stream.threadId))
+        .order("desc")
+        .take(PENDING_REQUEST_ROWS);
+    const mine = rows.filter((row) => row.status === "pending" && row.createdAt >= stream._creationTime).toSorted((a, b) => a.createdAt - b.createdAt);
+
+    for (const row of mine) {
+        const request = await findPendingRequestOnLatestTurn(ctx, stream.threadId as Id<"threads">, row.approvalId);
+
+        if (request?.toolCallId) {
+            const question = request.toolName === ASK_USER_TOOL_NAME ? (request.input as { question?: unknown } | undefined)?.question : undefined;
+
+            return { ...(typeof question === "string" && { question }), toolCallId: request.toolCallId, toolName: request.toolName };
+        }
+    }
+
+    return undefined;
+};
+
 export const getChunksAfter = internalQuery
     .input({
         afterIndex: v.number(),
@@ -478,6 +512,11 @@ export const getChunksAfter = internalQuery
          */
         threadId: v.optional(v.string().max(MAX_LENGTH.id)),
         userId: v.optional(v.string().max(MAX_LENGTH.id)),
+        /**
+         * Say what a run that ended `done` is waiting for: the public API's blocking read and relay
+         * ask, because their caller has no composer to show a pending question in.
+         */
+        withPendingRequest: v.optional(v.boolean()),
     })
     .output(
         v.object({
@@ -496,6 +535,12 @@ export const getChunksAfter = internalQuery
              */
             locked: v.boolean(),
             /**
+             * Set only when asked (`withPendingRequest`) and the stream ended `done` with a tool-approval
+             * request or question its run paused on, still unanswered: the reply is not finished, a person
+             * has to answer first. `question` is an `askUser` call's text.
+             */
+            pendingRequest: v.optional(v.object({ question: v.optional(v.string()), toolCallId: v.string(), toolName: v.union(v.string(), v.null()) })),
+            /**
              * Read in the SAME query as the chunks, so the two agree: a stream
              * seen `done` has its final chunk in `chunks`. Two separate queries
              * could see the final chunk's mutation land between them and report
@@ -506,7 +551,7 @@ export const getChunksAfter = internalQuery
             totalChunks: v.number(),
         }),
     )
-    .query(async ({ args: { afterIndex, checkLock = true, streamId, threadId, userId }, ctx }) => {
+    .query(async ({ args: { afterIndex, checkLock = true, streamId, threadId, userId, withPendingRequest }, ctx }) => {
         // One indexed row, not an un-hinted `db.get` (which probes every table).
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } });
 
@@ -542,5 +587,13 @@ export const getChunksAfter = internalQuery
             return lockedAnswer;
         }
 
-        return { chunks: page.map((chunk) => toChunk(chunk)), locked: false, status, totalChunks: lastChunk ? lastChunk.seq + 1 : afterIndex };
+        const pendingRequest = withPendingRequest && status === "done" ? await pendingRequestOfStream(ctx, stream) : undefined;
+
+        return {
+            chunks: page.map((chunk) => toChunk(chunk)),
+            locked: false,
+            ...(pendingRequest && { pendingRequest }),
+            status,
+            totalChunks: lastChunk ? lastChunk.seq + 1 : afterIndex,
+        };
     });

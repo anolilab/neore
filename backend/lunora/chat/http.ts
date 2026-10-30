@@ -860,7 +860,15 @@ const runChatStartOnShard = async (
     // Titles and categories last: they are LLM calls on the one-at-a-time
     // scheduler, and the reply must not queue behind them. Scheduled together —
     // neither waits on the other, and the response waits on both.
-    await Promise.all(titleJobs.map(async (scheduleTitleJob) => await scheduleTitleJob()));
+    // The turn is already saved, charged and queued: a title job that cannot be scheduled must not fail the
+    // request, or a retry (and an idempotency key) would run the turn a second time.
+    const titled = await Promise.allSettled(titleJobs.map(async (scheduleTitleJob) => await scheduleTitleJob()));
+
+    for (const outcome of titled) {
+        if (outcome.status === "rejected") {
+            chatLogger.warn("Failed to schedule a title job after the turn was queued:", outcome.reason);
+        }
+    }
 
     return Response.json(
         {
