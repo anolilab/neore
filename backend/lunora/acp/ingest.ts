@@ -200,7 +200,7 @@ const chunkFor = (event: Event): Pick<Doc<"persistentChunks">, "event" | "reason
     // The prompt is the user's saved message; the chunk only claims the slot. A turn's summary lives on the saved
     // reply, so its patch is not kept a second time for every reader of the stream.
     if (event.kind === "turn_end") {
-        return { event: { kind: "turn_end", reason: event.reason, ...event.error !== undefined && { error: event.error } }, text: "" };
+        return { event: { kind: "turn_end", reason: event.reason, ...(event.error !== undefined && { error: event.error }) }, text: "" };
     }
 
     return { event: event.kind === "turn_start" ? { kind: "turn_start", text: "" } : event, text: "" };

@@ -17,7 +17,7 @@ import {
 import type { Infer } from "lunorash/server";
 
 import type { HostChanges } from "../acp/lib/changes";
-import { readHostChanges } from "../acp/lib/changes";
+import { readHostChanges, withoutHostChanges } from "../acp/lib/changes";
 import { omit, pick } from "../lib/collections";
 import { agentSwitchOf } from "./agent-switch-logic";
 import type { MessageBranch } from "./branch-tree";
@@ -316,7 +316,7 @@ const createSystemUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataType
         // `unknown` is not assignable to `JSONValue`. This is the storage/SDK
         // boundary; the cast belongs here rather than at each of the eight part
         // constructors below.
-        ...(message.providerMetadata && { providerMetadata: message.providerMetadata as ProviderMetadata }),
+        ...(message.providerMetadata && { providerMetadata: withoutHostChanges(message.providerMetadata) as ProviderMetadata }),
     };
 
     // An agent switch is a system row whose part is the divider, not text (`agent-switch-logic.ts`).
@@ -362,7 +362,7 @@ const createUserUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataTypes 
         // `unknown` is not assignable to `JSONValue`. This is the storage/SDK
         // boundary; the cast belongs here rather than at each of the eight part
         // constructors below.
-        ...(message.providerMetadata && { providerMetadata: message.providerMetadata as ProviderMetadata }),
+        ...(message.providerMetadata && { providerMetadata: withoutHostChanges(message.providerMetadata) as ProviderMetadata }),
     };
 
     const parts: UIMessage<METADATA, DATA_PARTS, TOOLS>["parts"] = [];
@@ -516,7 +516,7 @@ const createAssistantUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataT
         const partCommon = {
             state: message.streaming ? ("streaming" as const) : ("done" as const),
             // See the note on the other two `partCommon` blocks — storage/SDK boundary.
-            ...(message.providerMetadata && { providerMetadata: message.providerMetadata as ProviderMetadata }),
+            ...(message.providerMetadata && { providerMetadata: withoutHostChanges(message.providerMetadata) as ProviderMetadata }),
         };
 
         // Add reasoning parts

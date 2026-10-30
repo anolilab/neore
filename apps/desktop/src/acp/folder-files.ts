@@ -25,6 +25,9 @@ export interface FileIo {
     realpath: (file: string) => Promise<string>;
 }
 
+/** Invalid UTF-8 is not text: decoded loosely, two different binary files could read the same and an edit vanish. */
+const STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true });
+
 const readRegular = async (file: string, maxBytes: number): Promise<Buffer | undefined> => {
     const handle = await open(file, constants.O_RDONLY + (constants.O_NOFOLLOW ?? 0));
 
@@ -138,7 +141,7 @@ export class FolderFiles {
 
             const bytes = await this.io.readRegular(real, MAX_FILE_BYTES);
 
-            return bytes === undefined || bytes.includes(0) ? undefined : bytes.toString("utf8");
+            return bytes === undefined || bytes.includes(0) ? undefined : STRICT_UTF8.decode(bytes);
         } catch {
             return undefined;
         }
