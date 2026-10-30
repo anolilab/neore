@@ -34,6 +34,11 @@ const outcomeOfFailure = (error: HostApiError): WriteOutcome<never> => {
         return { reason: error.detail?.slice(0, REASON_MAX_CHARS) ?? null, status: "rejected" };
     }
 
+    // A gateway timeout or a 5xx can come after the host acted: a retry may post the same thing twice.
+    if (error.status >= 500) {
+        return { status: "unconfirmed" };
+    }
+
     return { status: failureOf(error) };
 };
 

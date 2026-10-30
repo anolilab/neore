@@ -33131,3 +33131,7 @@ msgstr ""
 #: src/features/develop/lib/use-review-messages.ts:16
 msgid "This review is too long to keep: it holds at most 100 comments and about 1 MB of text. Submit it first, or shorten it."
 msgstr ""
+
+#: src/features/develop/components/review-panel.tsx:196
+msgid "Your comments were written on an earlier version of this change. They are posted against that version, and the lines shown below may have moved."
+msgstr ""

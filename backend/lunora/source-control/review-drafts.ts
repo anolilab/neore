@@ -272,7 +272,16 @@ export const setDraftReview = authMutation
             return { commentId: null, revision: draft.revision + 1, status: "ok" as const };
         }
 
-        await ctx.db.patch(draft._id, { body: args.body, revision: draft.revision + 1, updatedAt: now, verdict: args.verdict });
+        // A draft with no comments follows the head, so a verdict set earlier goes out on the commit the reviewer now sees.
+        const commitId = commitFor(draft, args.commitId);
+
+        await ctx.db.patch(draft._id, {
+            body: args.body,
+            commitId: commitId === "head_moved" ? draft.commitId : commitId,
+            revision: draft.revision + 1,
+            updatedAt: now,
+            verdict: args.verdict,
+        });
 
         return { commentId: null, revision: draft.revision + 1, status: "ok" as const };
     });

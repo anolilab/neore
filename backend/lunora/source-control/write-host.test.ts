@@ -135,10 +135,13 @@ describe("writeToHost", () => {
         [new HostApiError("x", 403, true), "rate_limited"],
         [new HostApiError("x", 422, true), "rate_limited"],
         [new HostApiError("x", 404), "not_found"],
-        [new HostApiError("x", 500), "host_error"],
         [new HostApiError("x", 0), "host_error"],
     ])("maps %o to %s", async (error, status) => {
         expect(await writeToHost(githubDriver, token, failing(error))).toEqual({ status });
+    });
+
+    it.each([500, 502, 504])("reports a %i as unconfirmed: the host may have acted before it failed", async (status) => {
+        expect(await writeToHost(githubDriver, token, failing(new HostApiError("x", status)))).toEqual({ status: "unconfirmed" });
     });
 
     it("lets an unexpected error through", async () => {
