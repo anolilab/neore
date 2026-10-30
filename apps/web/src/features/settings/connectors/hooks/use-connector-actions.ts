@@ -11,6 +11,7 @@ import type { Id } from "@neore/backend/dataModel";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { DEVELOP_QUERY_ROOT } from "@/features/develop/lib/use-develop";
 import { useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 const useConnectorActions = () => {
@@ -37,6 +38,8 @@ const useConnectorActions = () => {
         try {
             const { revoked } = await disconnectMutation.mutateAsync({ connectorId: connectorId as Id<"userConnectors"> });
 
+            // Develop caches the host's pulls per account for minutes; they must not outlive the grant.
+            queryClient.removeQueries({ queryKey: [DEVELOP_QUERY_ROOT] });
             await queryClient.invalidateQueries({ queryKey: crpc.connectors.user_connectors.listConnectorCatalog.queryKey({}) });
 
             if (revoked) {
