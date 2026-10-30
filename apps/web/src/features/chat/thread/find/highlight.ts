@@ -8,9 +8,13 @@ const SKIPPED_PARENTS = "script, style, textarea, input";
 /** The CSS Custom Highlight API: absent in older engines, where the bar still scrolls and counts. */
 export const supportsHighlights = (): boolean => typeof CSS !== "undefined" && "highlights" in CSS && typeof Highlight !== "undefined";
 
+/** Marks the container of one rendered text part (`message-content.tsx`): tool labels and output stay outside it. */
+export const FIND_TEXT_SELECTOR = "[data-find-text]";
+
 /**
- * A range per occurrence of `query` inside one text node of `root`. A match split across elements
- * (`foo **bar**`) is not highlighted; the bar still counts and scrolls to it.
+ * A range per occurrence of `query` inside one text node of a text part under `root`, in part order, which is
+ * the order `findMatches` counts them in. A match split across elements (`foo **bar**`) is not highlighted;
+ * the bar still counts and scrolls to it.
  */
 export const collectRanges = (root: Node, query: string): Range[] => {
     const ranges: Range[] = [];
@@ -19,21 +23,25 @@ export const collectRanges = (root: Node, query: string): Range[] => {
         return ranges;
     }
 
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const containers = root instanceof Element ? root.querySelectorAll(FIND_TEXT_SELECTOR) : [];
 
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        if (node.parentElement?.closest(SKIPPED_PARENTS)) {
-            continue;
-        }
+    for (const container of containers) {
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
 
-        const text = node.textContent ?? "";
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            if (node.parentElement?.closest(SKIPPED_PARENTS)) {
+                continue;
+            }
 
-        for (const start of occurrenceOffsets(text, query)) {
-            const range = document.createRange();
+            const text = node.textContent ?? "";
 
-            range.setStart(node, start);
-            range.setEnd(node, Math.min(start + query.length, text.length));
-            ranges.push(range);
+            for (const start of occurrenceOffsets(text, query)) {
+                const range = document.createRange();
+
+                range.setStart(node, start);
+                range.setEnd(node, Math.min(start + query.length, text.length));
+                ranges.push(range);
+            }
         }
     }
 

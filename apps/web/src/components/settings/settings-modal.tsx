@@ -185,9 +185,16 @@ export const SettingsModal: FC = () => {
     // Sync from URL on first mount so deep-linked ?settings=true still works.
     // `currentTab` already seeds itself from `search.settingsTab` above.
     const openIfDeepLinked = useEffectEvent(() => {
-        if (search.settings === true) {
-            open();
+        if (search.settings !== true) {
+            return;
         }
+
+        // A link to a section shows that section on a phone, not the list; the closed-modal reset below runs first.
+        if (search.settingsTab) {
+            setMobileView("detail");
+        }
+
+        open();
     });
 
     useEffect(() => {

@@ -19,9 +19,12 @@ import useFindHighlights from "./use-find-highlights";
  * (`match.ts`), so messages the list has not mounted count; the hit is scrolled to through the list's own
  * jump and painted by `use-find-highlights.ts`. Opened by the `findInThread` shortcut.
  */
+/** Rows asked for per page while the search pulls in older messages. */
+const FIND_PAGE_SIZE = 50;
+
 const ThreadFindBar: FC = () => {
     const { t } = useLingui();
-    const { messages } = useChatMessages();
+    const { loadMore, messages, messagesStatus } = useChatMessages();
     const { threadId } = useChatThread();
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState("");
@@ -39,6 +42,13 @@ const ThreadFindBar: FC = () => {
     const currentMessageId = current?.messageId;
 
     useFindHighlights(isOpen, deferredQuery, current, revealKey);
+
+    // Matches come from loaded messages only, so a search reads the older pages in until the thread is exhausted.
+    useEffect(() => {
+        if (isOpen && deferredQuery.trim() !== "" && messagesStatus === "CanLoadMore") {
+            loadMore(FIND_PAGE_SIZE);
+        }
+    }, [isOpen, deferredQuery, messagesStatus, loadMore]);
 
     useEffect(() => {
         const open = () => {
@@ -140,7 +150,13 @@ const ThreadFindBar: FC = () => {
     let status = "";
 
     if (hasQuery) {
-        status = matches.length === 0 ? t`No matches` : t`${activeIndex + 1} of ${matches.length}`;
+        const isReadingOlder = messagesStatus === "CanLoadMore" || messagesStatus === "LoadingMore";
+
+        if (matches.length > 0) {
+            status = t`${activeIndex + 1} of ${matches.length}`;
+        } else {
+            status = isReadingOlder ? t`Searching…` : t`No matches`;
+        }
     }
 
     return (

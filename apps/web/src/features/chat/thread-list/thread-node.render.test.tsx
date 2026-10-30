@@ -137,6 +137,8 @@ vi.mock("./stores/thread-list-ui-store", () => {
 
 const { default: ThreadNode } = await import("./thread-node");
 
+const SNOOZE_BUTTON = /^Snooze thread/u;
+
 const child = { branchPoint: 0, branchType: "branch", children: [], createdAt: 0, depth: 1, status: "idle", threadId: "c1", title: "Child" };
 
 const baseProps = {
@@ -189,6 +191,17 @@ describe("ThreadNode", () => {
         render(<ThreadNode {...baseProps} />);
 
         expect(screen.getByRole("button", { name: `${action}: Quarterly plan` })).toBeTruthy();
+    });
+
+    it("offers a snooze on a root thread that has a reply, and none on a child", () => {
+        const replied = { ...baseProps.node, lastReplyAt: 1 };
+        const { rerender } = render(<ThreadNode {...baseProps} node={replied} />);
+
+        expect(screen.getByRole("button", { name: "Snooze thread: Quarterly plan" })).toBeTruthy();
+
+        rerender(<ThreadNode {...baseProps} node={{ ...child, lastReplyAt: 1 }} />);
+
+        expect(screen.queryByRole("button", { name: SNOOZE_BUTTON })).toBeNull();
     });
 
     it("flips the expand label and state when the branches are open", () => {

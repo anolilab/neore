@@ -41,5 +41,8 @@ describe("workspace memory", () => {
     it("survives corrupt storage", () => {
         expect(workspaceTarget(memoryStore("{nope"), "chat")).toBe("/chat");
         expect(workspaceTarget(memoryStore('{"chat":"/code/x"}'), "chat")).toBe("/chat");
+        // Valid JSON whose value is not a path must not throw at `startsWith`.
+        expect(workspaceTarget(memoryStore('{"chat":123}'), "chat")).toBe("/chat");
+        expect(workspaceTarget(memoryStore('{"chat":{"a":1}}'), "chat")).toBe("/chat");
     });
 });

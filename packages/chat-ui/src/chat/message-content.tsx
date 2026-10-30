@@ -854,7 +854,12 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                     const isReasoningStreaming = isAnimating && i === message.parts.length - 1;
 
                     renderedParts.push(
-                        <ReasoningRenderer isStreaming={isReasoningStreaming} key={key} literalImages={isHostRunText(reasoningPart) || message.parts.some((other) => isHostRunText(other))} text={reasoningPart.text} />,
+                        <ReasoningRenderer
+                            isStreaming={isReasoningStreaming}
+                            key={key}
+                            literalImages={isHostRunText(reasoningPart) || message.parts.some((other) => isHostRunText(other))}
+                            text={reasoningPart.text}
+                        />,
                     );
                 }
 
@@ -903,7 +908,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                         }
                         default: {
                             renderedParts.push(
-                                <div data-markdown-part={isAnimating ? undefined : textPart.text} key={key}>
+                                <div data-find-text="" data-markdown-part={isAnimating ? undefined : textPart.text} key={key}>
                                     <Text isAnimating={isAnimating} literalImages={isHostRunText(textPart)} text={textPart.text} />
                                 </div>,
                             );

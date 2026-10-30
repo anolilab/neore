@@ -791,7 +791,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         )}
                     </DropdownMenuContent>
                 </DropdownMenu>
-                {(node.lastReplyAt !== undefined || snoozedUntil !== undefined) && (
+                {/* Only roots are sorted into the Snoozed section, so a child has no snooze to set. */}
+                {isRootThread && (node.lastReplyAt !== undefined || snoozedUntil !== undefined) && (
                     <DropdownMenu
                         onOpenChange={(open) => {
                             if (open) {

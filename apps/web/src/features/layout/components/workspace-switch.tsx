@@ -14,7 +14,14 @@ const ITEM =
 
 const ROOT_LINKS = { chat: "/chat", code: "/code" } as const satisfies Record<WorkspaceMode, string>;
 
-const store = (): Storage | undefined => (typeof sessionStorage === "undefined" ? undefined : sessionStorage);
+// Reading the `sessionStorage` getter itself throws when the browser blocks storage.
+const store = (): Storage | undefined => {
+    try {
+        return typeof sessionStorage === "undefined" ? undefined : sessionStorage;
+    } catch {
+        return undefined;
+    }
+};
 
 /** Chat | Code: route navigation, so two links with `aria-current`, not a tablist. Makes no backend query. */
 const WorkspaceSwitch: FC = () => {

@@ -48,5 +48,5 @@ export const rememberWorkspaceRoute = (store: Store, pathname: string): void => 
 export const workspaceTarget = (store: Store | undefined, mode: WorkspaceMode): string => {
     const remembered = store ? read(store)[mode] : undefined;
 
-    return remembered && workspaceOf(remembered) === mode ? remembered : ROOTS[mode];
+    return typeof remembered === "string" && workspaceOf(remembered) === mode ? remembered : ROOTS[mode];
 };

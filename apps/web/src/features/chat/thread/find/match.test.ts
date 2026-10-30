@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { FindableMessage } from "./match";
-import { clampIndex, findMatches, messageText, occurrenceOffsets, stepIndex } from "./match";
+import { clampIndex, findMatches, messageTexts, occurrenceOffsets, stepIndex, visibleText } from "./match";
 
 const message = (id: string, role: string, ...texts: string[]): FindableMessage => {
     return {
@@ -38,11 +38,23 @@ describe("occurrenceOffsets", () => {
     });
 });
 
-describe("messageText", () => {
-    it("joins text parts and skips reasoning and tools", () => {
+describe("messageTexts", () => {
+    it("lists the text parts, one entry each, and skips reasoning and tools", () => {
         const parts = [{ text: "one", type: "text" }, { text: "hidden", type: "reasoning" }, { type: "tool-search" }, { text: "two", type: "text" }];
 
-        expect(messageText({ id: "m", parts, role: "assistant" })).toBe("one\ntwo");
+        expect(messageTexts({ id: "m", parts, role: "assistant" })).toEqual(["one", "two"]);
+    });
+});
+
+describe("visibleText", () => {
+    it("drops markdown syntax and keeps what is rendered", () => {
+        expect(visibleText("# Title\n**bold** and _it_ and `code`\n- item\n> quote")).toBe("Title\nbold and it and code\nitem\nquote");
+        expect(visibleText("see [the docs](https://example.com/x) now")).toBe("see the docs now");
+        expect(visibleText("```ts\nconst a = 1;\n```")).toBe("\nconst a = 1;\n");
+    });
+
+    it("leaves identifiers with underscores alone", () => {
+        expect(visibleText("call snake_case_name here")).toBe("call snake_case_name here");
     });
 });
 
@@ -63,6 +75,24 @@ describe("findMatches", () => {
 
     it("finds nothing for an empty query", () => {
         expect(findMatches([message("a", "user", "cat")], "")).toEqual([]);
+    });
+
+    it("counts only what is rendered: not markdown syntax, link targets, or a match across two parts", () => {
+        const messages = [message("a", "assistant", "**bold** [docs](https://example.com)", "cat", "dog")];
+
+        expect(findMatches(messages, "**")).toEqual([]);
+        expect(findMatches(messages, "https")).toEqual([]);
+        expect(findMatches(messages, "docs")).toHaveLength(1);
+        expect(findMatches(messages, "cat\ndog")).toEqual([]);
+        expect(findMatches(messages, "catdog")).toEqual([]);
+    });
+
+    it("skips the last reply while it is still streaming, because the list shows a placeholder for it", () => {
+        const streaming = { ...message("b", "assistant", "cat"), status: "streaming" };
+
+        expect(findMatches([message("a", "user", "cat"), streaming], "cat")).toEqual([{ messageId: "a", occurrence: 0 }]);
+        expect(findMatches([streaming, message("c", "user", "cat")], "cat")).toHaveLength(2);
+        expect(findMatches([message("a", "user", "cat"), { ...streaming, status: "success" }], "cat")).toHaveLength(2);
     });
 });
 

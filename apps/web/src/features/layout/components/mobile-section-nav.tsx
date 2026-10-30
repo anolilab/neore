@@ -37,6 +37,7 @@ const MobileSectionNav: FC = () => {
                             <Link
                                 aria-current={isActive ? "page" : undefined}
                                 className={cn(ROW, isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/50")}
+                                onClick={closeSheet}
                                 to={to}
                             >
                                 <Icon aria-hidden="true" className="size-5 shrink-0" strokeWidth={1.5} />

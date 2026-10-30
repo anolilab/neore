@@ -10,6 +10,7 @@ export interface FindableMessage {
     id: string;
     parts: ReadonlyArray<{ text?: string; type: string }>;
     role: string;
+    status?: string;
 }
 
 export interface FindMatch {
@@ -18,12 +19,32 @@ export interface FindMatch {
     occurrence: number;
 }
 
-/** What a reader sees of a message: its text parts, in order. Reasoning, tools and files are not searched. */
-export const messageText = (message: FindableMessage): string =>
-    message.parts
-        .filter((part) => part.type === "text" && typeof part.text === "string")
-        .map((part) => part.text)
-        .join("\n");
+const isFenceLine = (line: string): boolean => line.trimStart().startsWith("```") || line.trimStart().startsWith("~~~");
+
+/**
+ * The text a reader sees of one markdown part: link targets, code fences, emphasis marks and line prefixes
+ * are syntax, not text, so a query is not counted against them.
+ */
+export const visibleText = (markdown: string): string =>
+    markdown
+        .split("\n")
+        .map((line) => (isFenceLine(line) ? "" : line))
+        .join("\n")
+        .replaceAll("![", "[")
+        .replaceAll(/\[([^[\]]*)\]\([^()]*\)/gu, "$1")
+        .replaceAll(/<((?:https?|mailto):[^>\s]+)>/gu, "$1")
+        .replaceAll(/`([^`\n]+)`/gu, "$1")
+        .replaceAll(/^ {0,3}#{1,6}[ \t]+/gmu, "")
+        .replaceAll(/^[ \t]*>[ \t]?/gmu, "")
+        .replaceAll(/^[ \t]*(?:[-*+]|\d+[).])[ \t]+/gmu, "")
+        .replaceAll(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/gu, "$2")
+        .replaceAll(/\*(?=\S)([^*]+)(?<=\S)\*/gu, "$1")
+        .replaceAll(/\b_(?=\S)([^_]+)(?<=\S)_\b/gu, "$1")
+        .replaceAll(/~~(.+?)~~/gu, "$1");
+
+/** What a reader sees of a message, one entry per text part: reasoning, tools and files are not searched. */
+export const messageTexts = (message: FindableMessage): string[] =>
+    message.parts.flatMap((part) => (part.type === "text" && typeof part.text === "string" ? [visibleText(part.text)] : []));
 
 const REGEXP_SPECIALS = /[$()*+.?[\\\]^{|}]/g;
 
@@ -44,13 +65,25 @@ export const occurrenceOffsets = (text: string, query: string): number[] => {
 /** Every match in the user and assistant messages, in thread order. */
 export const findMatches = (messages: ReadonlyArray<FindableMessage>, query: string): FindMatch[] => {
     const matches: FindMatch[] = [];
+    const needle = query.slice(0, MAX_FIND_QUERY_LENGTH);
+    const last = messages.at(-1);
 
     for (const message of messages) {
         if (message.role !== "user" && message.role !== "assistant") {
             continue;
         }
 
-        const { length } = occurrenceOffsets(messageText(message), query.slice(0, MAX_FIND_QUERY_LENGTH));
+        // The list shows the streaming placeholder instead of the unfinished reply, so it has no row to find.
+        if (message === last && message.role === "assistant" && message.status !== undefined && message.status !== "success") {
+            continue;
+        }
+
+        // Each part is a block of its own on screen, so a match never spans two of them.
+        let length = 0;
+
+        for (const text of messageTexts(message)) {
+            length += occurrenceOffsets(text, needle).length;
+        }
 
         for (let occurrence = 0; occurrence < length; occurrence += 1) {
             matches.push({ messageId: message.id, occurrence });

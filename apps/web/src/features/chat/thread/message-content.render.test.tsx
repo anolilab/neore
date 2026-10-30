@@ -54,6 +54,18 @@ describe("message content tool call rows", () => {
     });
 });
 
+describe("message content text parts", () => {
+    it("marks each text part for in-thread find, and nothing else", () => {
+        const { container } = render(<MessageContentUI message={message("the answer")} />);
+
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the assertion is about DOM structure
+        const marked = container.querySelectorAll("[data-find-text]");
+
+        expect(marked).toHaveLength(1);
+        expect(marked[0]?.textContent).toContain("the answer");
+    });
+});
+
 describe("message content file previews", () => {
     it("wraps an embedded file in .message-text-fixed, so the chat text size does not resize its controls", () => {
         const withFile = {
