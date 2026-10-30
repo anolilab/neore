@@ -73,7 +73,7 @@ describe("required checks", () => {
             ...checksRoutes([run(1, "build"), run(2, "ci/unit"), run(3, "coverage-report", "failure")]),
             [`${REPO}/branches/main`]: { protected: false },
             [`${REPO}/rules/branches/main`]: [
-                { type: "pull_request" },
+                { parameters: { dismiss_stale_reviews_on_push: false, required_approving_review_count: 1 }, type: "pull_request" },
                 { parameters: { required_status_checks: [{ context: "build" }, { context: "ci/*" }] }, type: "required_status_checks" },
             ],
         });

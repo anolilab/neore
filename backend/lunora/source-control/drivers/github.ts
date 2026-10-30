@@ -747,7 +747,11 @@ const readable = async <T>(read: () => Promise<T>): Promise<T | undefined> => {
 };
 
 const rulesSchema = z.array(
-    z.object({ parameters: z.object({ required_status_checks: z.array(z.object({ context: z.string() })) }).optional(), type: z.string() }),
+    z.object({
+        // Other rules (`pull_request`, `merge_queue`...) carry parameters of their own, without this key.
+        parameters: z.object({ required_status_checks: z.array(z.object({ context: z.string() })).optional() }).optional(),
+        type: z.string(),
+    }),
 );
 
 const protectionSchema = z.object({ checks: z.array(z.object({ context: z.string() })).optional(), contexts: z.array(z.string()) });
