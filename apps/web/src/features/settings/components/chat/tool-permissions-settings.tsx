@@ -81,7 +81,8 @@ const ToolRow: FC<ToolRowProps> = ({ hasGrant, isSaving, onChange, override, too
                         const next = value?.[0] ?? (hasGrant ? effective : undefined);
 
                         if (isMode(next) && (next !== effective || hasGrant)) {
-                            onChange(tool.key, next);
+                            // Choosing the default again resets rather than pinning it as a custom setting.
+                            onChange(tool.key, override === undefined && next === tool.defaultMode ? null : next);
                         }
                     }}
                     size="sm"
