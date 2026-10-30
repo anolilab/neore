@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 
+import { useThreadListUIStore } from "@/features/chat/thread-list/stores/thread-list-ui-store";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
 import { FIND_IN_THREAD_EVENT, hasFindInThreadTarget } from "../lib/find-in-thread-target";
@@ -85,15 +86,8 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                     break;
                 }
                 case "help": {
-                    // Open help modal or navigate to help page
-                    const helpButton = document.querySelector<HTMLButtonElement>('[data-testid="help-button"]');
-
-                    if (helpButton) {
-                        helpButton.click();
-                    } else {
-                        // Fallback to help page if no help button found
-                        navigate({ from: "/chat/$threadId" as "/chat/$threadId" | "/dashboard", to: "/help" });
-                    }
+                    // The shortcuts sheet (`keyboard-shortcuts-sheet.tsx`) shares its open state with the thread list.
+                    useThreadListUIStore.getState().toggleShowKeyboardHelp();
 
                     break;
                 }

@@ -14,6 +14,11 @@ import { KeyboardShortcutsManager } from "@/features/keyboard/components/keyboar
 import useKeyboardShortcutHandler from "./use-keyboard-shortcut-handler";
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
+// The sheet uses the lingui macro, which these tests do not compile; it has its own coverage.
+vi.mock("../components/keyboard-shortcuts-sheet", () => {
+    return { default: () => null };
+});
+
 vi.mock("@lingui/react/macro", () => {
     return {
         Trans: ({ children }: { children: ReactNode }) => children,

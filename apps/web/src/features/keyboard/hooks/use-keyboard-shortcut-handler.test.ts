@@ -1,6 +1,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useThreadListUIStore } from "@/features/chat/thread-list/stores/thread-list-ui-store";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
 import useKeyboardShortcutHandler from "./use-keyboard-shortcut-handler";
@@ -14,7 +15,6 @@ vi.mock("@tanstack/react-router", () => {
 
 // Mock document methods
 const mockQuerySelector = vi.fn();
-const mockClick = vi.fn();
 const mockBlur = vi.fn();
 const mockDispatchEvent = vi.fn();
 
@@ -48,20 +48,15 @@ describe("useKeyboardShortcutHandler", () => {
         expect(handleShortcut).toBeDefined();
     });
 
-    it("should handle help action with help button", () => {
-        const mockHelpButton = { click: mockClick };
-
-        mockQuerySelector.mockReturnValueOnce(mockHelpButton);
-
+    it("should toggle the shortcuts sheet on the help action", () => {
         const { result } = renderHook(() => useKeyboardShortcutHandler());
-        const handleShortcut = result.current;
 
-        const mockEvent = new KeyboardEvent("keydown", { key: "?" });
+        useThreadListUIStore.getState().setShowKeyboardHelp(false);
+        result.current("help", new KeyboardEvent("keydown", { key: "/" }));
+        expect(useThreadListUIStore.getState().showKeyboardHelp).toBe(true);
 
-        handleShortcut("help", mockEvent);
-
-        expect(mockQuerySelector).toHaveBeenCalledWith('[data-testid="help-button"]');
-        expect(mockClick).toHaveBeenCalled();
+        result.current("help", new KeyboardEvent("keydown", { key: "/" }));
+        expect(useThreadListUIStore.getState().showKeyboardHelp).toBe(false);
     });
 
     it("should handle escape action with active input element", () => {
