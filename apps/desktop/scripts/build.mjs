@@ -21,6 +21,11 @@ if (release && !process.env.NEORE_BACKEND_URL) {
     throw new Error("NEORE_BACKEND_URL is required for a release build");
 }
 
+// Prompts, output and tool data ride to the backend: a release posts them over https only.
+if (release && new URL(process.env.NEORE_BACKEND_URL).protocol !== "https:") {
+    throw new Error("NEORE_BACKEND_URL must be https for a release build");
+}
+
 const root = fileURLToPath(new URL("..", import.meta.url));
 const dist = path.join(root, "dist");
 
