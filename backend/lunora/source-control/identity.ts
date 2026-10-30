@@ -131,6 +131,8 @@ const isPlainHost = (host: string): boolean => {
 
 const locate = (host: string, webOrigin: string | undefined, segments: string[], declared: DeclaredHost[]): Located => {
     let best: (DeclaredHost & { base: string }) | undefined;
+    // An SSH path never carries the web mount prefix: a declaration for the host still names its kind.
+    let sshFallback: (DeclaredHost & { origin: string }) | undefined;
 
     for (const candidate of declared) {
         let candidateUrl: URL;
@@ -148,10 +150,18 @@ const locate = (host: string, webOrigin: string | undefined, segments: string[],
         if (matches && underBase && (best === undefined || base.length > best.base.length)) {
             best = { ...candidate, base, origin: candidateUrl.origin };
         }
+
+        if (matches && webOrigin === undefined && sshFallback === undefined) {
+            sshFallback = { ...candidate, origin: candidateUrl.origin };
+        }
     }
 
     if (best) {
         return { basePath: best.base, hostKind: best.hostKind, origin: best.origin };
+    }
+
+    if (sshFallback) {
+        return { basePath: "", hostKind: sshFallback.hostKind, origin: sshFallback.origin };
     }
 
     const webHost = SSH_ALIASES[host] ?? (AZURE_LEGACY_SSH_HOST.test(host) ? "dev.azure.com" : host);

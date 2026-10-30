@@ -11,8 +11,11 @@ const MINUTE_MS = 60_000;
 /** Every Develop query key starts with this, so disconnecting a host can drop what it left in the cache in one call. */
 export const DEVELOP_QUERY_ROOT = "develop";
 
-/** Reads from the host cost API budget and never change under a subscription: cache a little, never go live. */
-const READ = { meta: { [LIVE_META_KEY]: false }, retry: false };
+/**
+ * Reads from the host cost API budget and never change under a subscription: cache a little, never go live, and
+ * do not refetch on window focus, which would re-read every loaded page of a long list one after another.
+ */
+const READ = { meta: { [LIVE_META_KEY]: false }, refetchOnWindowFocus: false, retry: false };
 
 export interface PullRequestAddress {
     number: number;

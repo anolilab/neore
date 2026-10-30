@@ -138,6 +138,12 @@ describe("parseRepoRemote", () => {
             expect(parseRepoRemote("https://example.com/team/app", declared)?.hostKind).toBe("forgejo");
         });
 
+        it("keeps a subpath host's declared kind for its SSH remotes, whose paths carry no mount prefix", () => {
+            const declared: DeclaredHost[] = [{ basePath: "git", hostKind: "gitlab", origin: "https://example.com" }];
+
+            expect(parseRepoRemote("git@example.com:team/app.git", declared)).toEqual(identity("gitlab", "https://example.com", "team/app"));
+        });
+
         it("ignores a declaration whose origin is not a URL", () => {
             expect(parseRepoRemote("https://github.com/octo/hello", [{ hostKind: "gitlab", origin: "not a url" }])?.hostKind).toBe("github");
         });
