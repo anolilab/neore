@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { CLOUD_HEADLESS_CAPABILITIES, CLOUD_INTERACTIVE_CAPABILITIES, LOCAL_BROWSER_CAPABILITIES } from "./declarations";
 import type { CapabilityKey } from "./rules";
-import { capabilityOf, followUpControl, isAvailable, selectableModels, UNKNOWN_CAPABILITY, visibleModes } from "./rules";
+import { capabilityIn, capabilityOf, followUpControl, isAvailable, selectableModels, UNKNOWN_CAPABILITY, visibleModes } from "./rules";
 import type { Capability, CapabilityGroups, CapabilityReport } from "./types";
 
 /** `Record<CapabilityKey, …>` makes this list exhaustive: a member added to the type fails the type check here. */
@@ -184,5 +184,22 @@ describe("static declarations", () => {
         for (const key of ["tools.call", "tools.approvalRequest", "tools.declinePath"] as const) {
             expect(isAvailable(capabilityOf(CLOUD_INTERACTIVE_CAPABILITIES, key))).toBe(true);
         }
+    });
+});
+
+describe("capabilityIn", () => {
+    const groups = { inbox: { mine: { degradation: "none", supported: true }, stale: { supported: true }, wrong: "yes" } };
+
+    it("reads a member of any group map", () => {
+        expect(capabilityIn(groups, "inbox.mine")).toEqual({ degradation: "none", supported: true });
+    });
+
+    it.each(["inbox.absent", "elsewhere.mine", "inbox.stale", "inbox.wrong"])("reads %s as unknown", (key) => {
+        expect(capabilityIn(groups, key)).toEqual(UNKNOWN_CAPABILITY);
+    });
+
+    it("reads a missing map as unknown", () => {
+        expect(capabilityIn(undefined, "inbox.mine")).toEqual(UNKNOWN_CAPABILITY);
+        expect(capabilityIn(null, "inbox.mine")).toEqual(UNKNOWN_CAPABILITY);
     });
 });

@@ -570,6 +570,12 @@ for a schema table that is neither policed nor listed:
 | `skills_marketplace.rateSkill` | mutation | authMutation + RL | skillRatings, skillStats, skills | skill access | ok |
 | `skills_marketplace.searchSkills` | query | authQuery | — | public skills only, projected | ok |
 | `skills_marketplace.uninstallSkill` | mutation | authMutation + RL | skills | caller-scoped (ctx.user) | ok |
+| `source_control_functions.getDevelopHost` | action | authAction + RL | — | caller-scoped (ctx.user), no host call | ok |
+| `source_control_functions.getInbox` | action | authAction + RL | — | caller-scoped (ctx.user): the GitHub connector grant of ctx.user; the host's own access rules decide the rest | ok |
+| `source_control_functions.getPullRequest` | action | authAction + RL | — | caller-scoped (ctx.user): the GitHub connector grant of ctx.user; the host's own access rules decide the rest | ok |
+| `source_control_functions.getPullRequestChecks` | action | authAction + RL | — | caller-scoped (ctx.user): the GitHub connector grant of ctx.user; the host's own access rules decide the rest | ok |
+| `source_control_functions.getPullRequestCommits` | action | authAction + RL | — | caller-scoped (ctx.user): the GitHub connector grant of ctx.user; the host's own access rules decide the rest | ok |
+| `source_control_functions.getPullRequestFiles` | action | authAction + RL | — | caller-scoped (ctx.user): the GitHub connector grant of ctx.user; the host's own access rules decide the rest | ok |
 | `sub_agents_functions.createWorker` | mutation | authMutation | subAgentRuns, threads, threadRelationships, idempotencyClaims | lead thread owner == caller (else a refusal, nothing created); `clientId` claimed under `worker-dispatch` before the rate limit; admission charges nothing | ok — new |
 | `sub_agents_functions.cancelRun` | mutation | authMutation + RL | subAgentRuns, threads, notifications | run.userId == caller AND parent thread owner == caller (else NOT_FOUND); ended run is a no-op | ok — new |
 | `sub_agents_functions.dispatchToWorker` | mutation | authMutation | subAgentRuns, idempotencyClaims | worker's first run `userId` == caller (else NOT_FOUND, as a missing id); lead owned by caller; `clientId` claimed under `worker-dispatch` before the rate limit; archived, locked or busy worker refused | ok — new |

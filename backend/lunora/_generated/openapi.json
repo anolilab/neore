@@ -41674,6 +41674,1195 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#source_control_functions:getDevelopHost": {
+      "post": {
+        "description": "Invoke the `action` `source_control_functions:getDevelopHost` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_functions:getDevelopHost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_functions:getDevelopHost",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "host": {
+                      "properties": {
+                        "capabilities": {
+                          "properties": {
+                            "groups": {
+                              "additionalProperties": {
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "properties": {
+                                        "degradation": {
+                                          "const": "none",
+                                          "type": "string"
+                                        },
+                                        "supported": {
+                                          "const": true
+                                        }
+                                      },
+                                      "required": [
+                                        "degradation",
+                                        "supported"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    {
+                                      "properties": {
+                                        "degradation": {
+                                          "anyOf": [
+                                            {
+                                              "const": "restart",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "synthetic",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "divergent",
+                                              "type": "string"
+                                            }
+                                          ]
+                                        },
+                                        "note": {
+                                          "type": "string"
+                                        },
+                                        "supported": {
+                                          "const": true
+                                        }
+                                      },
+                                      "required": [
+                                        "degradation",
+                                        "note",
+                                        "supported"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    {
+                                      "properties": {
+                                        "reason": {
+                                          "anyOf": [
+                                            {
+                                              "const": "not_offered",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "not_enforced",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "unknown",
+                                              "type": "string"
+                                            }
+                                          ]
+                                        },
+                                        "supported": {
+                                          "const": false
+                                        }
+                                      },
+                                      "required": [
+                                        "reason",
+                                        "supported"
+                                      ],
+                                      "type": "object"
+                                    }
+                                  ]
+                                },
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "type": "object"
+                              },
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "type": "object"
+                            },
+                            "reportedAt": {
+                              "type": "number"
+                            },
+                            "version": {
+                              "const": 1
+                            }
+                          },
+                          "required": [
+                            "groups",
+                            "reportedAt",
+                            "version"
+                          ],
+                          "type": "object"
+                        },
+                        "connectorSlug": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "limits": {
+                          "properties": {
+                            "commits": {
+                              "type": "number"
+                            },
+                            "files": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "commits",
+                            "files"
+                          ],
+                          "type": "object"
+                        },
+                        "requestNoun": {
+                          "anyOf": [
+                            {
+                              "const": "merge request",
+                              "type": "string"
+                            },
+                            {
+                              "const": "pull request",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "capabilities",
+                        "connectorSlug",
+                        "label",
+                        "limits",
+                        "requestNoun"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "host"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_functions:getDevelopHost",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_functions:getInbox": {
+      "post": {
+        "description": "Invoke the `action` `source_control_functions:getInbox` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_functions:getInbox",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "page": {
+                        "type": "number"
+                      },
+                      "section": {
+                        "anyOf": [
+                          {
+                            "const": "needsMyReview",
+                            "type": "string"
+                          },
+                          {
+                            "const": "mine",
+                            "type": "string"
+                          },
+                          {
+                            "const": "readyToMerge",
+                            "type": "string"
+                          },
+                          {
+                            "const": "drafts",
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_functions:getInbox",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "hasMore": {
+                          "type": "boolean"
+                        },
+                        "items": {
+                          "items": {
+                            "properties": {
+                              "authorLogin": {
+                                "type": "string"
+                              },
+                              "commentCount": {
+                                "type": "number"
+                              },
+                              "createdAt": {
+                                "type": "number"
+                              },
+                              "draft": {
+                                "type": "boolean"
+                              },
+                              "labels": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "number": {
+                                "type": "number"
+                              },
+                              "repository": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "updatedAt": {
+                                "type": "number"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "authorLogin",
+                              "commentCount",
+                              "createdAt",
+                              "draft",
+                              "labels",
+                              "number",
+                              "repository",
+                              "title",
+                              "updatedAt",
+                              "url"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "page": {
+                          "type": "number"
+                        },
+                        "status": {
+                          "const": "ok",
+                          "type": "string"
+                        },
+                        "total": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "hasMore",
+                        "items",
+                        "page",
+                        "status",
+                        "total"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "forbidden",
+                              "type": "string"
+                            },
+                            {
+                              "const": "host_error",
+                              "type": "string"
+                            },
+                            {
+                              "const": "needs_reconnect",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_connected",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            {
+                              "const": "rate_limited",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_functions:getInbox",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_functions:getPullRequest": {
+      "post": {
+        "description": "Invoke the `action` `source_control_functions:getPullRequest` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_functions:getPullRequest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "repository"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_functions:getPullRequest",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "detail": {
+                          "properties": {
+                            "additions": {
+                              "type": "number"
+                            },
+                            "authorLogin": {
+                              "type": "string"
+                            },
+                            "baseBranch": {
+                              "type": "string"
+                            },
+                            "body": {
+                              "type": "string"
+                            },
+                            "bodyTruncated": {
+                              "type": "boolean"
+                            },
+                            "changedFiles": {
+                              "type": "number"
+                            },
+                            "commitCount": {
+                              "type": "number"
+                            },
+                            "createdAt": {
+                              "type": "number"
+                            },
+                            "deletions": {
+                              "type": "number"
+                            },
+                            "draft": {
+                              "type": "boolean"
+                            },
+                            "headBranch": {
+                              "type": "string"
+                            },
+                            "headSha": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "number"
+                            },
+                            "repository": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "anyOf": [
+                                {
+                                  "const": "closed",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "merged",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "open",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "updatedAt": {
+                              "type": "number"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "additions",
+                            "authorLogin",
+                            "baseBranch",
+                            "body",
+                            "bodyTruncated",
+                            "changedFiles",
+                            "commitCount",
+                            "createdAt",
+                            "deletions",
+                            "draft",
+                            "headBranch",
+                            "headSha",
+                            "number",
+                            "repository",
+                            "state",
+                            "title",
+                            "updatedAt",
+                            "url"
+                          ],
+                          "type": "object"
+                        },
+                        "leftOut": {
+                          "properties": {
+                            "commits": {
+                              "type": "number"
+                            },
+                            "files": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "commits",
+                            "files"
+                          ],
+                          "type": "object"
+                        },
+                        "status": {
+                          "const": "ok",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "detail",
+                        "leftOut",
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "forbidden",
+                              "type": "string"
+                            },
+                            {
+                              "const": "host_error",
+                              "type": "string"
+                            },
+                            {
+                              "const": "needs_reconnect",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_connected",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            {
+                              "const": "rate_limited",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_functions:getPullRequest",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_functions:getPullRequestChecks": {
+      "post": {
+        "description": "Invoke the `action` `source_control_functions:getPullRequestChecks` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_functions:getPullRequestChecks",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      },
+                      "headSha": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "repository",
+                      "headSha"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_functions:getPullRequestChecks",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "checks": {
+                          "items": {
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "state": {
+                                "anyOf": [
+                                  {
+                                    "const": "cancelled",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "failure",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "neutral",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "pending",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "skipped",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "success",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "url": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "state",
+                              "url"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "status": {
+                          "const": "ok",
+                          "type": "string"
+                        },
+                        "total": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "checks",
+                        "status",
+                        "total"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "forbidden",
+                              "type": "string"
+                            },
+                            {
+                              "const": "host_error",
+                              "type": "string"
+                            },
+                            {
+                              "const": "needs_reconnect",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_connected",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            {
+                              "const": "rate_limited",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_functions:getPullRequestChecks",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_functions:getPullRequestCommits": {
+      "post": {
+        "description": "Invoke the `action` `source_control_functions:getPullRequestCommits` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_functions:getPullRequestCommits",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      },
+                      "page": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "repository"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_functions:getPullRequestCommits",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "commits": {
+                          "items": {
+                            "properties": {
+                              "authorName": {
+                                "type": "string"
+                              },
+                              "committedAt": {
+                                "type": "number"
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "sha": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "authorName",
+                              "committedAt",
+                              "message",
+                              "sha"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "hasMore": {
+                          "type": "boolean"
+                        },
+                        "page": {
+                          "type": "number"
+                        },
+                        "status": {
+                          "const": "ok",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "commits",
+                        "hasMore",
+                        "page",
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "forbidden",
+                              "type": "string"
+                            },
+                            {
+                              "const": "host_error",
+                              "type": "string"
+                            },
+                            {
+                              "const": "needs_reconnect",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_connected",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            {
+                              "const": "rate_limited",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_functions:getPullRequestCommits",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_functions:getPullRequestFiles": {
+      "post": {
+        "description": "Invoke the `action` `source_control_functions:getPullRequestFiles` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_functions:getPullRequestFiles",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      },
+                      "page": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "repository"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_functions:getPullRequestFiles",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "files": {
+                          "items": {
+                            "properties": {
+                              "additions": {
+                                "type": "number"
+                              },
+                              "deletions": {
+                                "type": "number"
+                              },
+                              "patch": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "patchState": {
+                                "anyOf": [
+                                  {
+                                    "const": "full",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "host_omitted",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "over_budget",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "truncated",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "path": {
+                                "type": "string"
+                              },
+                              "previousPath": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "status": {
+                                "anyOf": [
+                                  {
+                                    "const": "added",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "changed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "copied",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "modified",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "removed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "renamed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "unchanged",
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "additions",
+                              "deletions",
+                              "patch",
+                              "patchState",
+                              "path",
+                              "previousPath",
+                              "status"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "hasMore": {
+                          "type": "boolean"
+                        },
+                        "page": {
+                          "type": "number"
+                        },
+                        "status": {
+                          "const": "ok",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "files",
+                        "hasMore",
+                        "page",
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "forbidden",
+                              "type": "string"
+                            },
+                            {
+                              "const": "host_error",
+                              "type": "string"
+                            },
+                            {
+                              "const": "needs_reconnect",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_connected",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            {
+                              "const": "rate_limited",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_functions:getPullRequestFiles",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#sub_agents_functions:cancelRun": {
       "post": {
         "description": "Invoke the `mutation` `sub_agents_functions:cancelRun` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -48998,6 +50187,10 @@
     {
       "description": "Skills: authoring, the marketplace, ratings, invocation and the JIT tool loader.",
       "name": "skills"
+    },
+    {
+      "description": "Develop mode: pull requests across Git hosts, read through one host adapter. Holds no table yet; the client caches what it reads.",
+      "name": "source-control"
     },
     {
       "description": "Sub-agent runs delegated from a chat: admission limits, the child thread run and the result post-back.",
