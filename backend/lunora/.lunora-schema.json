@@ -12556,6 +12556,49 @@
           "optional": false,
           "unique": false
         },
+        "dispatchedBy": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"lead\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"messenger\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"outside_agent\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"trigger\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"user\""
+            }
+          ]
+        },
         "error": {
           "kind": "string",
           "nullable": false,
@@ -14785,6 +14828,76 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "workerPolicy": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "allowedSources": {
+              "kind": "array",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "of": {
+                "kind": "union",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "members": [
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"lead\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"messenger\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"outside_agent\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"trigger\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"user\""
+                  }
+                ]
+              }
+            },
+            "hostDispatch": {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"ask\""
+            },
+            "maxDispatchesPerHour": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
         }
       },
       "indexes": {
@@ -14947,6 +15060,13 @@
               "nullable": false,
               "optional": false,
               "unique": false
+            },
+            "dispatchOrigin": {
+              "kind": "literal",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "literal": "\"outside_agent\""
             },
             "group": {
               "kind": "object",
@@ -16515,6 +16635,12 @@
         },
         "autoReadReplies": {
           "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "backupModel": {
+          "kind": "string",
           "nullable": false,
           "optional": true,
           "unique": false

@@ -1459,6 +1459,7 @@ export interface Doc_subAgentRuns {
     completedAt?: number;
     createdAt: number;
     depth: number;
+    dispatchedBy?: "lead" | "user" | "trigger" | "messenger" | "outside_agent";
     error?: string;
     loopExitedAt?: number;
     mode?: "run" | "worker";
@@ -1693,6 +1694,7 @@ export interface Doc_threads {
     title?: string;
     updatedAt?: number;
     userId?: string;
+    workerPolicy?: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; hostDispatch: "ask"; maxDispatchesPerHour?: number };
 }
 
 export interface Doc_threadTags {
@@ -1719,7 +1721,7 @@ export interface Doc_toolApprovalRuns {
     _id: Id<"toolApprovalRuns">;
     _creationTime: number;
     approvalId: string;
-    config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> };
+    config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> };
     createdAt: number;
     resolvedAt?: number;
     resolvedBy?: string;
@@ -4204,6 +4206,7 @@ export interface Insert_subAgentRuns {
     completedAt?: number;
     createdAt: number;
     depth: number;
+    dispatchedBy?: "lead" | "user" | "trigger" | "messenger" | "outside_agent";
     error?: string;
     loopExitedAt?: number;
     mode?: "run" | "worker";
@@ -4438,6 +4441,7 @@ export interface Insert_threads {
     title?: string;
     updatedAt?: number;
     userId?: string;
+    workerPolicy?: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; hostDispatch: "ask"; maxDispatchesPerHour?: number };
 }
 
 export interface Insert_threadTags {
@@ -4464,7 +4468,7 @@ export interface Insert_toolApprovalRuns {
     _id?: Id<"toolApprovalRuns">;
     _creationTime?: number;
     approvalId: string;
-    config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> };
+    config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> };
     createdAt: number;
     resolvedAt?: number;
     resolvedBy?: string;

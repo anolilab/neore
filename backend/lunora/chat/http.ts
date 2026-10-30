@@ -398,7 +398,13 @@ const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED
  * runs the SAME path — same limits, same thread creation, same stream — with
  * an API-key identity instead of the gateway's HMAC plus forwarded JWT.
  */
-export const runChatStart = async (context: HttpActionCtx, body: ChatStartBody, signingSecret: string): Promise<Response> => {
+export const runChatStart = async (
+    context: HttpActionCtx,
+    body: ChatStartBody,
+    signingSecret: string,
+    /** `outside_agent` for the public API's key callers; the user's own chat when unset. */
+    origin?: "outside_agent",
+): Promise<Response> => {
     // The gateway forwards this field without looking at it, so this is the
     // only place its shape and size are checked.
     const pageContext = parsePageContext(body.pageContext);
@@ -431,14 +437,28 @@ export const runChatStart = async (context: HttpActionCtx, body: ChatStartBody, 
     // Everything below runs there.
     const shardKey = await threadShardFor(context, userId, body.threadId);
 
-    return await inShard(context, shardKey, async (shardCtx) => await runChatStartOnShard(shardCtx, body, signingSecret, { pageContext, user, userId }));
+    return await inShard(
+        context,
+        shardKey,
+        async (shardCtx) => await runChatStartOnShard(shardCtx, body, signingSecret, { origin, pageContext, user, userId }),
+    );
 };
 
 const runChatStartOnShard = async (
     context: HttpActionCtx,
     body: ChatStartBody,
     signingSecret: string,
-    { pageContext, user, userId }: { pageContext: ReturnType<typeof parsePageContext>; user: BetterAuthUser; userId: NonNullable<BetterAuthUser["_id"]> },
+    {
+        origin,
+        pageContext,
+        user,
+        userId,
+    }: {
+        origin: "outside_agent" | undefined;
+        pageContext: ReturnType<typeof parsePageContext>;
+        user: BetterAuthUser;
+        userId: NonNullable<BetterAuthUser["_id"]>;
+    },
 ): Promise<Response> => {
     // Force anonymous users onto free model
     const isAnonymous = user.isAnonymous === true;
@@ -781,6 +801,7 @@ const runChatStartOnShard = async (
             isAnonymous,
             messageId,
             ...(activeOrganizationId && { organizationId: activeOrganizationId }),
+            ...(origin && { origin }),
             // The typed text, for skill-command detection. Not on regenerate: that
             // replies to an existing prompt, which the run reads from the message.
             ...(!body.regenerate && body.prompt && { userPrompt: body.prompt }),

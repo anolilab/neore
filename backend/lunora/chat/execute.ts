@@ -38,6 +38,7 @@ import {
     resolveBackupModelId,
     resolveRunModel,
     resumeApprovedRun,
+    setDispatchOrigin,
     setResearchDepth,
     setThreadStatus,
 } from "./lib/agent-run";
@@ -60,6 +61,8 @@ export const runStreamingAgent = internalAction
         messageId: v.string(),
         /** The caller's active organization, verified by `/chat/start` — scopes organization-shared skills. */
         organizationId: v.optional(v.string()),
+        /** What started the turn: the user's own chat, or the public API's key (an outside agent). Unset reads as the user's. */
+        origin: v.optional(v.union(v.literal("lead"), v.literal("outside_agent"))),
         streamId: v.string(),
         streamingConfig: v.object({
             contentType: v.string(),
@@ -79,7 +82,7 @@ export const runStreamingAgent = internalAction
         /** The raw composer text, when the start payload had it — where a `/<slug>` command is detected. */
         userPrompt: v.optional(v.string()),
     })
-    .action(async ({ args: { isAnonymous, messageId, organizationId, streamId, streamingConfig, threadId, userId, userPrompt }, ctx }) => {
+    .action(async ({ args: { isAnonymous, messageId, organizationId, origin, streamId, streamingConfig, threadId, userId, userPrompt }, ctx }) => {
         // Everything before the first token is on the user's wait, so the reads
         // that need nothing but the job's own arguments start together, WITH
         // the claim. They are queries: a redelivery that loses the claim reads
@@ -136,7 +139,7 @@ export const runStreamingAgent = internalAction
             if (groupConfig) {
                 await runGroupTurn(
                     ctx,
-                    { isAnonymous: isAnonymous === true, messageId, organizationId, streamId, streamingConfig, threadId, userId, userPrompt },
+                    { isAnonymous: isAnonymous === true, messageId, organizationId, origin, streamId, streamingConfig, threadId, userId, userPrompt },
                     groupConfig,
                 );
 
@@ -264,6 +267,7 @@ export const runStreamingAgent = internalAction
             const { contextParts, prefs, researchDepth: effectiveResearchDepth, threadSettings: appThread } = runContext;
 
             setResearchDepth(ctx, effectiveResearchDepth);
+            setDispatchOrigin(ctx, origin ?? "lead");
 
             // Build agent
             const isAutoContinue = streamingConfig.shouldAutoContinue === true;
@@ -418,6 +422,7 @@ export const runStreamingAgent = internalAction
                     savedMessages: result.savedMessages,
                     snapshot: {
                         autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
+                        ...(origin === "outside_agent" && { dispatchOrigin: origin }),
                         instructions: streamTextArgs.system ?? agent.options.instructions,
                         mcpServerNames: toolResult.mcpServerNames,
                         // A run that pauses extracts at the pause; its continuation extracts only the steers it takes.

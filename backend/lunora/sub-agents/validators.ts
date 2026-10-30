@@ -12,3 +12,16 @@ export const vSubAgentRunMode = v.union(v.literal("run"), v.literal("worker"));
 
 /** Where a worker's runs execute. Fixed by the worker's first run; unset reads as the cloud headless runner. */
 export const vSubAgentRunner = v.union(v.object({ kind: v.literal("headless") }), v.object({ deviceId: v.id("devices"), kind: v.literal("host") }));
+
+/** Who a dispatch to a worker came from: the lead agent, the user typing, or an unattended run's cause. */
+export const vDispatchSource = v.union(v.literal("lead"), v.literal("user"), v.literal("trigger"), v.literal("messenger"), v.literal("outside_agent"));
+
+/**
+ * A lead thread's dispatch policy. `hostDispatch` has one value: a dispatch to a host worker always asks a
+ * person, whatever else this says. `allowedSources` unset reads as the lead and the user.
+ */
+export const vWorkerPolicy = v.object({
+    allowedSources: v.array(vDispatchSource),
+    hostDispatch: v.literal("ask"),
+    maxDispatchesPerHour: v.optional(v.number()),
+});

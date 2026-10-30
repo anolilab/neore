@@ -56,6 +56,14 @@ const DAILY_LIMIT = /daily limit/u;
 const runs = async () => (await harness.run(async (ctx: any) => await ctx.db.query("subAgentRuns").collect())) as any[];
 const rateLimitKeys = async () =>
     ((await harness.run(async (ctx: any) => await ctx.db.query("rateLimits").collect())) as { key: string }[]).map((row) => decodeURIComponent(row.key));
+const messagesIn = async (id: string) =>
+    await harness.run(
+        async (ctx: any) =>
+            await ctx.db
+                .query("messages")
+                .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", id))
+                .collect(),
+    );
 const claim = async (runId: string) => await harness.run(async (ctx: any) => await claimQueuedRun(ctx, runId as never));
 const finish = async (runId: string) => await harness.run(async (ctx: any) => await finishRun(ctx, runId as never, { kind: "succeeded", result: "done" }));
 
@@ -450,5 +458,71 @@ describe("a Stop in a worker's thread", () => {
         const all = await runs();
 
         expect(all.find((run) => run._id === second.run._id)).toMatchObject({ status: "cancelled" });
+    });
+});
+
+describe("the dispatch policy", () => {
+    const setPolicy = async (policy: Record<string, unknown> | undefined) =>
+        await harness.run(async (ctx: any) => await ctx.db.patch(leadId, { workerPolicy: policy }));
+
+    it("refuses a source the lead does not allow at admission, before any limit or charge, and lets an allowed one through afterwards", async () => {
+        const keysBefore = await rateLimitKeys();
+        const refused = await dispatch({ dispatchedBy: "trigger", name: "Researcher", toolCallId: "call-create" });
+
+        expect(refused).toMatchObject({ kind: "forbidden" });
+        expect(await runs()).toHaveLength(0);
+        // Not even the `subAgents/run` limit was touched, and the claim was given back.
+        expect(await rateLimitKeys()).toStrictEqual(keysBefore);
+
+        expect(await dispatch({ dispatchedBy: "lead", name: "Researcher", toolCallId: "call-create" })).toMatchObject({ created: true });
+    });
+
+    it("allows an unattended source once the lead's policy lists it, and records who sent every run", async () => {
+        await setPolicy({ allowedSources: ["lead", "trigger"], hostDispatch: "ask" });
+
+        const first = await create({ dispatchedBy: "trigger" });
+
+        expect(first.run).toMatchObject({ dispatchedBy: "trigger" });
+
+        await claim(first.run._id);
+        await finish(first.run._id);
+
+        // A message the lead sends carries its own source, and a refused one beside it leaves nothing behind.
+        const second = await dispatch({ childThreadId: first.run.childThreadId, dispatchedBy: "lead", toolCallId: "call-2" });
+
+        expect(second).toMatchObject({ created: true, run: { dispatchedBy: "lead" } });
+        expect(await dispatch({ childThreadId: first.run.childThreadId, dispatchedBy: "messenger", toolCallId: "call-3" })).toMatchObject({
+            kind: "forbidden",
+        });
+        expect(await runs()).toHaveLength(2);
+    });
+
+    it("refuses an outside agent by default, and a person typing by an explicit policy that leaves them out", async () => {
+        expect(await dispatch({ dispatchedBy: "outside_agent", name: "W", toolCallId: "call-a" })).toMatchObject({ kind: "forbidden" });
+
+        await setPolicy({ allowedSources: ["lead"], hostDispatch: "ask" });
+        expect(await dispatch({ clientId: "client-1", dispatchedBy: "user", name: "W" })).toMatchObject({ kind: "forbidden" });
+    });
+
+    it("names the source in the result posted to the lead", async () => {
+        await setPolicy({ allowedSources: ["lead", "messenger"], hostDispatch: "ask" });
+
+        const { run } = await create({ dispatchedBy: "messenger" });
+
+        await claim(run._id);
+        await finish(run._id);
+
+        const posted = await messagesIn(leadId);
+
+        expect(JSON.stringify(posted.map((row: any) => row.message.content))).toContain("Sent by: a messenger reply");
+    });
+
+    it("enforces the hourly limit the policy sets, counting only that lead's worker runs", async () => {
+        await setPolicy({ allowedSources: ["lead", "user"], hostDispatch: "ask", maxDispatchesPerHour: 2 });
+
+        await create({ name: "A", toolCallId: "call-a" });
+        await create({ name: "B", toolCallId: "call-b" });
+
+        expect(await dispatch({ name: "C", toolCallId: "call-c" })).toMatchObject({ kind: "limit" });
     });
 });

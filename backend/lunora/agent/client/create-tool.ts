@@ -3,6 +3,7 @@ import type { Context as AiContext, FlexibleSchema, ToolExecutionOptions, ToolRe
 import type { ModelMessage, Tool, ToolSet } from "ai";
 import { tool } from "ai";
 
+import type { DispatchOrigin } from "../../sub-agents/logic";
 import type { ProviderOptions } from "../validators";
 import type { Agent } from "./index";
 import type { ActionCtx as ActionContext } from "./types";
@@ -11,6 +12,8 @@ export type ResearchDepth = "speed" | "balanced" | "thorough";
 
 export type ToolCtx = ActionContext & {
     agent?: Agent;
+    /** What started this run, for a dispatch to a worker to carry as `dispatchedBy`; unset when the run never said, which refuses one. */
+    dispatchOrigin?: DispatchOrigin;
     messageId?: string;
     /** Controls search depth/thoroughness for web search and deep research tools */
     researchDepth?: ResearchDepth;

@@ -11846,6 +11846,49 @@
                         },
                         "type": "array"
                       },
+                      "workerPolicy": {
+                        "properties": {
+                          "allowedSources": {
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "const": "lead",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "user",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "trigger",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "messenger",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "outside_agent",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "type": "array"
+                          },
+                          "hostDispatch": {
+                            "const": "ask",
+                            "type": "string"
+                          },
+                          "maxDispatchesPerHour": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "allowedSources",
+                          "hostDispatch"
+                        ],
+                        "type": "object"
+                      },
                       "branchPoint": {
                         "type": "number"
                       },
@@ -38285,6 +38328,16 @@
                             }
                           ]
                         },
+                        "lastActivityAt": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "lastRunAt": {
                           "type": "number"
                         },
@@ -38328,6 +38381,114 @@
                             }
                           ]
                         },
+                        "queuedRuns": {
+                          "type": "number"
+                        },
+                        "quietAfterMs": {
+                          "type": "number"
+                        },
+                        "runs": {
+                          "items": {
+                            "properties": {
+                              "createdAt": {
+                                "type": "number"
+                              },
+                              "delivery": {
+                                "anyOf": [
+                                  {
+                                    "const": "failed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "none",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "pending",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "posted",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "dispatchedBy": {
+                                "anyOf": [
+                                  {
+                                    "anyOf": [
+                                      {
+                                        "const": "lead",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "user",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "trigger",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "messenger",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "outside_agent",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "runId": {
+                                "description": "Id<\"subAgentRuns\">",
+                                "type": "string",
+                                "x-lunora-table": "subAgentRuns"
+                              },
+                              "state": {
+                                "anyOf": [
+                                  {
+                                    "const": "queued",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "running",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "succeeded",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "failed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "cancelled",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "task": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "createdAt",
+                              "delivery",
+                              "dispatchedBy",
+                              "runId",
+                              "state",
+                              "task"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
                         "state": {
                           "anyOf": [
                             {
@@ -38344,6 +38505,9 @@
                             }
                           ]
                         },
+                        "stopping": {
+                          "type": "boolean"
+                        },
                         "workerId": {
                           "type": "string"
                         }
@@ -38352,12 +38516,17 @@
                         "activeRunId",
                         "archived",
                         "followUp",
+                        "lastActivityAt",
                         "lastRunAt",
                         "lastRunStatus",
                         "leadThreadId",
                         "name",
                         "postFailed",
+                        "queuedRuns",
+                        "quietAfterMs",
+                        "runs",
                         "state",
+                        "stopping",
                         "workerId"
                       ],
                       "type": "object"
@@ -38576,6 +38745,16 @@
                           }
                         ]
                       },
+                      "lastActivityAt": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "lastRunAt": {
                         "type": "number"
                       },
@@ -38619,6 +38798,114 @@
                           }
                         ]
                       },
+                      "queuedRuns": {
+                        "type": "number"
+                      },
+                      "quietAfterMs": {
+                        "type": "number"
+                      },
+                      "runs": {
+                        "items": {
+                          "properties": {
+                            "createdAt": {
+                              "type": "number"
+                            },
+                            "delivery": {
+                              "anyOf": [
+                                {
+                                  "const": "failed",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "none",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pending",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "posted",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "dispatchedBy": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "const": "lead",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "user",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "trigger",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "messenger",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "outside_agent",
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "runId": {
+                              "description": "Id<\"subAgentRuns\">",
+                              "type": "string",
+                              "x-lunora-table": "subAgentRuns"
+                            },
+                            "state": {
+                              "anyOf": [
+                                {
+                                  "const": "queued",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "running",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "succeeded",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "failed",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "cancelled",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "task": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "createdAt",
+                            "delivery",
+                            "dispatchedBy",
+                            "runId",
+                            "state",
+                            "task"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
                       "state": {
                         "anyOf": [
                           {
@@ -38635,6 +38922,9 @@
                           }
                         ]
                       },
+                      "stopping": {
+                        "type": "boolean"
+                      },
                       "workerId": {
                         "type": "string"
                       }
@@ -38643,12 +38933,17 @@
                       "activeRunId",
                       "archived",
                       "followUp",
+                      "lastActivityAt",
                       "lastRunAt",
                       "lastRunStatus",
                       "leadThreadId",
                       "name",
                       "postFailed",
+                      "queuedRuns",
+                      "quietAfterMs",
+                      "runs",
                       "state",
+                      "stopping",
                       "workerId"
                     ],
                     "type": "object"
@@ -38668,6 +38963,196 @@
           "sub-agents"
         ],
         "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#sub_agents_functions:setWorkerPolicy": {
+      "post": {
+        "description": "Invoke the `mutation` `sub_agents_functions:setWorkerPolicy` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "sub_agents_functions:setWorkerPolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "allowedSources": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "const": "lead",
+                              "type": "string"
+                            },
+                            {
+                              "const": "user",
+                              "type": "string"
+                            },
+                            {
+                              "const": "trigger",
+                              "type": "string"
+                            },
+                            {
+                              "const": "messenger",
+                              "type": "string"
+                            },
+                            {
+                              "const": "outside_agent",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "leadThreadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "maxDispatchesPerHour": {
+                        "type": "number"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "allowedSources",
+                      "leadThreadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "sub_agents_functions:setWorkerPolicy",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: sub_agents_functions:setWorkerPolicy",
+        "tags": [
+          "sub-agents"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#sub_agents_functions:stopWorker": {
+      "post": {
+        "description": "Invoke the `mutation` `sub_agents_functions:stopWorker` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "sub_agents_functions:stopWorker",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "clientId": {
+                        "type": "string"
+                      },
+                      "runId": {
+                        "description": "Id<\"subAgentRuns\">",
+                        "type": "string",
+                        "x-lunora-table": "subAgentRuns"
+                      },
+                      "scope": {
+                        "anyOf": [
+                          {
+                            "const": "current",
+                            "type": "string"
+                          },
+                          {
+                            "const": "all_queued",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "workerId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "clientId",
+                      "scope",
+                      "workerId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "sub_agents_functions:stopWorker",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "cancelled": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "cancelled"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: sub_agents_functions:stopWorker",
+        "tags": [
+          "sub-agents"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#system_prompts_functions:createPreset": {

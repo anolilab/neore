@@ -2,6 +2,7 @@ import type { Infer, Validator } from "lunorash/server";
 import { v } from "lunorash/server";
 
 import { vGroupChat } from "../chat/group/validators";
+import { vWorkerPolicy } from "../sub-agents/validators";
 import { vVectorDimension } from "./vector/tables";
 
 export const vProviderOptions = v.record(v.string(), v.record(v.string(), v.any()));
@@ -686,6 +687,8 @@ export const vThreadDocFields = {
     // Written only by `chat/tags/functions.ts`, which checks the ids belong to
     // the caller — so it is deliberately not a create field.
     tagIds: v.optional(v.array(v.string())),
+    // Written only by `sub-agents/functions.ts#setWorkerPolicy`, which checks the caller owns the thread.
+    workerPolicy: v.optional(vWorkerPolicy),
 };
 
 export const vThreadDoc = v.object(vThreadDocFields);

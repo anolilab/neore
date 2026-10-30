@@ -251,6 +251,7 @@ const evaluateCase = async (ctx: ActionCtx, claim: Claim, onThread: (threadId: s
         memory: false,
         model,
         onThread,
+        origin: "trigger",
         personalization: "none",
         prompt: claim.input,
         skill: skill as Parameters<typeof runHeadlessAgent>[1]["skill"],

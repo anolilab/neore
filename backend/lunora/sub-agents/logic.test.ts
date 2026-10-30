@@ -4,23 +4,31 @@ import {
     applyToolAllowlist,
     buildResultMessage,
     canNest,
+    dispatchSourceProblem,
+    originOfRun,
     nextQueuedWorkerRun,
     normalizeToolAllowlist,
     postsBack,
     resolveSubAgentModel,
+    runDelivery,
     SUB_AGENT_MAX_CONCURRENT,
     SUB_AGENT_MAX_DEPTH,
     SUB_AGENT_MAX_PER_RUN,
     SUB_AGENT_MAX_TOOLS,
     SUB_AGENT_RESULT_MAX,
+    SUB_AGENT_STALE_MS,
+    SUB_WORKER_QUIET_MS,
     stopWhenRequested,
     subAgentCapProblem,
     truncateResult,
     workerCurrentRun,
     workerFollowUp,
     workerPostFailure,
+    workerReapDecision,
 } from "./logic";
 
+const NOT_ACCEPTED = /does not accept/u;
+const HOST_WORKER = /host worker/u;
 const DEPTH_CAP = /at most 2 levels/u;
 const FAN_OUT_CAP = /At most 3 sub-agents/u;
 const PER_RUN_CAP = /at most 5 sub-agents of its own/u;
@@ -251,5 +259,88 @@ describe(postsBack, () => {
         expect(postsBack({ mode: "run" })).toBe(true);
         expect(postsBack({ mode: "worker", toolCallId: "call-1" })).toBe(true);
         expect(postsBack({ mode: "worker" })).toBe(false);
+    });
+});
+
+describe(workerReapDecision, () => {
+    const startedAt = 1_000_000;
+    const running = { startedAt, status: "running" } as const;
+
+    it("keeps the quiet notice window inside the reaper's", () => {
+        expect(SUB_WORKER_QUIET_MS).toBeLessThan(SUB_AGENT_STALE_MS);
+    });
+
+    it("leaves a run that is still writing past the old deadline and checks again when its window would end", () => {
+        const lastActivityAt = startedAt + SUB_AGENT_STALE_MS;
+        const now = lastActivityAt + 60_000;
+
+        expect(workerReapDecision({ lastActivityAt, now, run: running })).toStrictEqual({ delayMs: SUB_AGENT_STALE_MS - 60_000, kind: "later" });
+    });
+
+    it("fails a run quiet for the whole window, measured from its claim when it never wrote", () => {
+        expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt + SUB_AGENT_STALE_MS, run: running })).toStrictEqual({ kind: "fail" });
+        expect(workerReapDecision({ lastActivityAt: startedAt + 1, now: startedAt + SUB_AGENT_STALE_MS, run: running })).toMatchObject({ kind: "later" });
+    });
+
+    it("never reaps a queued run, or one that ended", () => {
+        expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt * 100, run: { status: "queued" } })).toStrictEqual({ kind: "skip" });
+        expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt * 100, run: { startedAt, status: "succeeded" } })).toStrictEqual({
+            kind: "skip",
+        });
+        // Cancelled while queued: no loop ever ran.
+        expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt * 100, run: { status: "cancelled" } })).toStrictEqual({ kind: "skip" });
+    });
+
+    it("judges a stopped run whose loop has not exited like a running one, and skips it once it has", () => {
+        expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt + SUB_AGENT_STALE_MS, run: { startedAt, status: "cancelled" } })).toStrictEqual({
+            kind: "fail",
+        });
+        expect(
+            workerReapDecision({
+                lastActivityAt: undefined,
+                now: startedAt + SUB_AGENT_STALE_MS,
+                run: { loopExitedAt: startedAt + 1, startedAt, status: "cancelled" },
+            }),
+        ).toStrictEqual({ kind: "skip" });
+    });
+});
+
+describe(runDelivery, () => {
+    it("reads the receipt, a post that gave up, a post still waiting, and a result nobody asked for", () => {
+        const asked = { mode: "worker", toolCallId: "call" } as const;
+
+        expect(runDelivery({ ...asked, resultPostedAt: 1, status: "succeeded" })).toBe("posted");
+        expect(runDelivery({ ...asked, postFailed: "gone", status: "succeeded" })).toBe("failed");
+        expect(runDelivery({ ...asked, status: "failed" })).toBe("pending");
+        expect(runDelivery({ ...asked, status: "running" })).toBe("none");
+        expect(runDelivery({ mode: "worker", status: "succeeded" })).toBe("none");
+    });
+});
+
+describe(dispatchSourceProblem, () => {
+    it("admits the lead and the user by default and refuses every unattended source", () => {
+        expect(dispatchSourceProblem({ source: "lead" })).toBeUndefined();
+        expect(dispatchSourceProblem({ source: "user" })).toBeUndefined();
+
+        for (const source of ["trigger", "messenger", "outside_agent"] as const) {
+            expect(dispatchSourceProblem({ source })).toMatch(NOT_ACCEPTED);
+        }
+    });
+
+    it("follows the policy, and never lets an outside agent reach a host worker", () => {
+        const policy = { allowedSources: ["lead", "outside_agent"] } as const;
+
+        expect(dispatchSourceProblem({ policy, runner: { kind: "headless" }, source: "outside_agent" })).toBeUndefined();
+        expect(dispatchSourceProblem({ policy, runner: { kind: "host" }, source: "outside_agent" })).toMatch(HOST_WORKER);
+        expect(dispatchSourceProblem({ policy, source: "user" })).toMatch(NOT_ACCEPTED);
+    });
+});
+
+describe(originOfRun, () => {
+    it("carries an unattended source down, and reads a person typing or an unrecorded one as the worker's own agent", () => {
+        expect(originOfRun("trigger")).toBe("trigger");
+        expect(originOfRun("outside_agent")).toBe("outside_agent");
+        expect(originOfRun("user")).toBe("lead");
+        expect(originOfRun(undefined)).toBe("lead");
     });
 });

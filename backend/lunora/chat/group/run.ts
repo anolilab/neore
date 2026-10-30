@@ -51,6 +51,7 @@ import {
     loadRunContext,
     resolveRunModel,
     resumeApprovedRun,
+    setDispatchOrigin,
     setResearchDepth,
     setThreadStatus,
     toResearchDepth,
@@ -78,6 +79,7 @@ import {
     planTurn,
     remainingSpeakerBudget,
 } from "./logic";
+import type { DispatchOrigin } from "../../sub-agents/logic";
 import type { GroupChatMode, GroupRunSnapshot, GroupStep } from "./validators";
 
 /** The routing call is small; past this the turn falls back rather than stalls. */
@@ -123,6 +125,8 @@ export interface GroupTurnInput {
     isAnonymous: boolean;
     messageId: string;
     organizationId?: string;
+    /** What started the turn; unset reads as the user's own chat. */
+    origin?: DispatchOrigin;
     streamId: string;
     streamingConfig: {
         customSystemPrompt?: string;
@@ -147,6 +151,8 @@ interface TurnContext {
     isAnonymous: boolean;
     mcpServerNames: string[] | undefined;
     organizationId: string | undefined;
+    /** What started the turn, for a speaker's dispatch to a worker to carry. */
+    origin: DispatchOrigin;
     participants: GroupParticipantRun[];
     prefs: RunContext["prefs"];
     /** The user message the turn answers. */
@@ -246,6 +252,7 @@ const runSpeaker = async (
         mcpClients = toolResult.mcpClients;
 
         setResearchDepth(ctx, turn.researchDepth);
+        setDispatchOrigin(ctx, turn.origin);
 
         const modelFilterRules = await loadModelFilterRules(ctx, turn.userId);
         const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
@@ -397,6 +404,7 @@ const runSpeaker = async (
 
         const snapshot: ToolRunConfig = {
             autoMediaEnrichment: turn.agentPrefs.autoMediaEnrichment ?? false,
+            ...(turn.origin === "outside_agent" && { dispatchOrigin: turn.origin }),
             group: groupSnapshot(turn, speaker.skillId, position),
             instructions: system,
             mcpServerNames: toolResult.mcpServerNames,
@@ -571,6 +579,7 @@ const loadTurnContext = async (
         mcpServerNames?: string[];
         messageReasoningEffort?: number;
         organizationId?: string;
+        origin: DispatchOrigin;
         promptMessageId: string;
         /** The user's message, for memory and knowledge-base retrieval — absent on a resumed turn. */
         promptText?: string;
@@ -605,6 +614,7 @@ const loadTurnContext = async (
         isAnonymous: args.isAnonymous,
         mcpServerNames: args.mcpServerNames,
         organizationId: args.organizationId,
+        origin: args.origin,
         participants: args.config.participants,
         prefs: runContext.prefs,
         promptMessageId: args.promptMessageId,
@@ -646,6 +656,7 @@ export const runGroupTurn = async (ctx: ActionCtx, input: GroupTurnInput, config
         mcpServerNames: streamingConfig.mcpServerNames,
         messageReasoningEffort: streamingConfig.reasoningEffort,
         organizationId: input.organizationId,
+        origin: input.origin ?? "lead",
         promptMessageId: messageId,
         promptText,
         researchDepth: toResearchDepth(streamingConfig.researchDepth),
@@ -785,6 +796,8 @@ export const continueGroupAfterToolApproval = async (
         isAnonymous: group.isAnonymous,
         mcpServerNames: config.mcpServerNames,
         organizationId: group.organizationId,
+        // The approval snapshot kept what started the turn: a person answering it does not make it the lead's.
+        origin: config.dispatchOrigin ?? "lead",
         promptMessageId: resumed.lastMessageId ?? approvalId,
         researchDepth: config.researchDepth,
         searchMode: config.searchMode,

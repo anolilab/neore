@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { buildAgentTools } from "./agent-tools";
+import getAgent from "./get-agent";
 import { resumeApprovedRun } from "./agent-run";
 
 // The rebuilt tools and the agent are not what this checks: the run stops at the approval lookup.
@@ -51,5 +52,37 @@ describe(resumeApprovedRun, () => {
         const [, args] = vi.mocked(buildAgentTools).mock.calls[0] as unknown as [unknown, Record<string, unknown>];
 
         expect(args).not.toHaveProperty("admittedRun");
+    });
+});
+
+describe("the dispatch origin of a resumed run", () => {
+    /** Runs a resume far enough to set the origin its tools will dispatch with. */
+    const originAfterResume = async (config: Record<string, unknown>) => {
+        const resumeCtx: { dispatchOrigin?: string; runQuery: (...args: unknown[]) => Promise<unknown> } = {
+            runQuery: vi.fn(async () => {
+                return { toolName: null };
+            }),
+        };
+
+        vi.mocked(getAgent).mockResolvedValue({ options: {} } as never);
+
+        await resumeApprovedRun(resumeCtx as never, {
+            approvalId: "approval-1",
+            approved: true,
+            config: { ...(CONFIG as object), ...config } as never,
+            streamId: "stream-1",
+            threadId: "thread-1",
+            userId: "owner-1",
+        }).catch(() => undefined);
+
+        return resumeCtx.dispatchOrigin;
+    };
+
+    it("is the lead's when the snapshot names none", async () => {
+        expect(await originAfterResume({})).toBe("lead");
+    });
+
+    it("stays an outside agent's when the run that paused was one, so its workers' policy still applies", async () => {
+        expect(await originAfterResume({ dispatchOrigin: "outside_agent" })).toBe("outside_agent");
     });
 });

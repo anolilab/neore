@@ -29,7 +29,7 @@ type NewRow<T extends "messages" | "threadRelationships" | "threads"> = Omit<Doc
 
 /** The `threads` columns other modules set. */
 export type ThreadPatch = Partial<
-    Pick<Doc<"threads">, "activeLeafMessageId" | "groupChat" | "lastCompressionStartedAt" | "model" | "status" | "tagIds" | "updatedAt">
+    Pick<Doc<"threads">, "activeLeafMessageId" | "groupChat" | "lastCompressionStartedAt" | "model" | "status" | "tagIds" | "updatedAt" | "workerPolicy">
 >;
 
 /** The `messages` columns other modules set. */

@@ -336,17 +336,48 @@ quiet notice.
   lead as an error; a worker run that is active across the old fixed deadline is not
   failed, a queued run that waits longer than the deadline is not failed, and a run quiet
   for the full window is.
+- Built (cloud): a cloud worker's activity is its thread's newest message row (the loop writes one
+  per step). The reaper of a worker run is scheduled at the claim and judged by
+  `workerReapDecision`; a queued run has no reaper and a lost job leaves it queued until a stop or
+  the queue reaches it. `SUB_WORKER_QUIET_MS` (20 min) is provisional: it is not measured against real
+  quiet gaps yet. `getWorker` and `listWorkers` return `lastActivityAt` (running run only) and
+  `quietAfterMs`; the client counts the minutes, since a live query does not re-run with the clock.
+- Left for S5: a host run's activity is its host events, read where `workerActivityAt` reads the
+  thread; the quiet notice and the stale clock both pause while a host run waits on a person, which
+  a headless run cannot do (it drops `ask` tools); a host run whose host goes away fails at once with
+  "host did not answer" and posts to the lead as a failure.
 
 **S7 — Receipts.** Receipt fields on dispatch; per-run post-back isolation.
 - Acceptance: `messageWorker` returns `runId` and `state`; when one run's post
   fails permanently, another run's post still lands; a host run whose host goes
   away posts "host did not answer" to the lead.
+- Built (cloud): the receipt is `{ runId, state, workerId }`; a redelivery returns the first run's.
+  The worker views list the latest runs, each with its own `state` and `delivery` (`posted`,
+  `pending`, `failed`, or `none` when the lead never asked), and the worker thread shows them.
+  `finishRun` posts inline and `postRunResult` answers a refusal rather than throwing, so a result
+  that cannot land ends in its own `postFailed` and never holds the line.
+- Left for S5: a host run whose host goes away fails with "host did not answer" and posts to the
+  lead as a failure, through the same `finishRun` and per-run post.
 
 **S8 — Dispatch policy and attribution.** `workerPolicy`, `dispatchedBy`, the
 "sent by" label.
 - Acceptance: a dispatch from a disallowed source fails at admission and charges
   nothing; a host dispatch asks for approval even when the policy would allow it;
   the attribution shows on the run row and in the post-back.
+- Built (cloud): `dispatchedBy` is on every run row (one-shot too) and in each post-back as a
+  "Sent by" line. A lead's tool call carries its run's **origin** (`ToolCtx.dispatchOrigin`,
+  required: a tool refuses without it): the user's own chat turn and a resumed (approved) run are
+  `lead`; the public API's key callers are `outside_agent`; triggers, tasks and evals are `trigger`
+  (the more restrictive reading of unattended); messenger replies are `messenger`. A sub-agent run
+  carries what reached it down (`originOfRun`), so an unattended chain stays unattended one hop
+  later. `workerPolicy` is checked at admission, after the claim and before the caps and the rate
+  limit, so a refused source consumes nothing; `setWorkerPolicy` writes it, `maxDispatchesPerHour`
+  (at most 60) is counted from the lead's runs in the last hour. The "sent by" label is per run in
+  the worker thread; per-message labels need metadata on the saved prompt row and are a follow-up.
+  There is no UI to edit the policy yet.
+- Left for S5: a dispatch to a host worker asks for approval even when the policy would allow it
+  (`hostDispatch` is the literal `ask`; the tool's forced `ask` for a host runner is S5's), and
+  `outside_agent` is already refused for a host runner in `dispatchSourceProblem`.
 
 **S9 — Cheap-first worker models with escalation (optional, measure first).** A
 `workerPolicy.models` field: `"own"` (default, open question 3) or `"escalate"`.

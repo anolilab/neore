@@ -188,6 +188,7 @@ const generateReply = async (ctx: ActionCtx, threadId: Id<"threads">, userId: st
         maxSteps: replyTools ? MESSENGER_TOOL_REPLY_MAX_STEPS : MESSENGER_TEXT_REPLY_MAX_STEPS,
         memory: false,
         model: chooseReplyModel({ hasMedia, tools: replyTools !== null }),
+        origin: "messenger",
         personalization: "none",
         thread: { threadId },
         ...(replyTools

@@ -58,6 +58,13 @@ export const SUB_AGENT_RESULT_MAX = 12_000;
 export const SUB_AGENT_STALE_MS = 75 * 60_000;
 
 /**
+ * How long a running worker may go without a new message in its thread before the thread shows
+ * "No progress" with a Stop control. It must stay below {@link SUB_AGENT_STALE_MS}. Provisional: set
+ * from the longest quiet gaps a real run shows, which are not measured yet.
+ */
+export const SUB_WORKER_QUIET_MS = 20 * 60_000;
+
+/**
  * While the parent thread is still streaming, the result post waits — a row
  * inserted mid-run would land between the parent's own steps. It re-checks
  * with a growing delay and posts regardless once the waits add up past the
@@ -247,6 +254,33 @@ export const nextQueuedWorkerRun = <T extends { loopExitedAt?: number; startedAt
     newestFirst: ReadonlyArray<T>,
 ): T | undefined => (newestFirst.some((run) => isWorkerLoopLive(run)) ? undefined : newestFirst.findLast((run) => run.status === "queued"));
 
+/**
+ * What the reaper does when it fires on a worker run. The clock is activity, not admission: a run
+ * that is still writing is left alone and checked again when its quiet window would end, a run quiet
+ * for the whole window is failed, and a queued one is never reaped, since its clock has not started
+ * (a stop, or the queue reaching it, ends it). A run stopped while running is judged the same way:
+ * its loop is gone only once it has been quiet for the window.
+ * `lastActivityAt` is the newest message in the worker's thread; `startedAt` floors it.
+ */
+export const workerReapDecision = (input: {
+    lastActivityAt: number | undefined;
+    now: number;
+    run: { loopExitedAt?: number; startedAt?: number; status: SubAgentStatus };
+}): { kind: "fail" } | { delayMs: number; kind: "later" } | { kind: "skip" } => {
+    const { run } = input;
+
+    if (!isWorkerLoopLive(run) || run.startedAt === undefined) {
+        return { kind: "skip" };
+    }
+
+    const quietFor = input.now - Math.max(run.startedAt, input.lastActivityAt ?? 0);
+
+    return quietFor >= SUB_AGENT_STALE_MS ? { kind: "fail" } : { delayMs: SUB_AGENT_STALE_MS - quietFor, kind: "later" };
+};
+
+/** The error a worker run quiet for the whole window ends with; it reaches the lead as a failed run. */
+export const WORKER_STALE_MESSAGE = `The worker made no progress for ${String(SUB_AGENT_STALE_MS / 60_000)} minutes and was stopped.`;
+
 /** The run a worker is on, from its runs newest first: the one going, else the next in line. A Stop in its thread means this one. */
 export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>
     newestFirst.find((run) => run.status === "running") ?? newestFirst.findLast((run) => run.status === "queued");
@@ -259,6 +293,82 @@ export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFir
 export const workerPostFailure = (
     newestFirst: ReadonlyArray<{ mode?: "run" | "worker"; postFailed?: string; resultPostedAt?: number; toolCallId?: string }>,
 ): string | null => newestFirst.find((run) => postsBack(run))?.postFailed ?? null;
+
+/** Who may send a dispatch: the lead agent, the user typing in a worker's thread, or what drove an unattended lead run. */
+export const DISPATCH_SOURCES = ["lead", "user", "trigger", "messenger", "outside_agent"] as const;
+
+export type DispatchSource = (typeof DISPATCH_SOURCES)[number];
+
+/**
+ * What a lead run was started by, as its tools see it: the user's own chat turn (`lead`), or an unattended
+ * cause. A dispatch the lead sends carries it as `dispatchedBy`; `user` is only a person typing in a
+ * worker's thread, never a lead run.
+ */
+export type DispatchOrigin = Exclude<DispatchSource, "user">;
+
+/** A policy that is not set: the lead and the user. Unattended sources are opted into, never defaulted. */
+export const DEFAULT_ALLOWED_SOURCES: ReadonlyArray<DispatchSource> = ["lead", "user"];
+
+/** What a run's nested dispatches carry: the source that reached it, except that a person typing is the worker's own agent acting. */
+export const originOfRun = (dispatchedBy: DispatchSource | undefined): DispatchOrigin =>
+    dispatchedBy === undefined || dispatchedBy === "user" ? "lead" : dispatchedBy;
+
+const SOURCE_LABELS: Record<DispatchSource, string> = {
+    lead: "the lead agent",
+    messenger: "a messenger reply",
+    outside_agent: "an outside agent",
+    trigger: "an unattended run",
+    user: "you",
+};
+
+export const dispatchSourceLabel = (source: DispatchSource): string => SOURCE_LABELS[source];
+
+/**
+ * Why a dispatch from `source` may not reach a lead whose policy is `policy`, or `undefined` when it may.
+ * `outside_agent` is for cloud workers only: a host worker never takes it, whatever the policy lists.
+ */
+export const dispatchSourceProblem = (input: {
+    policy?: { allowedSources: ReadonlyArray<DispatchSource> };
+    runner?: { kind: "headless" | "host" };
+    source: DispatchSource;
+}): string | undefined => {
+    if (input.source === "outside_agent" && input.runner?.kind === "host") {
+        return "A host worker takes no dispatch from an outside agent.";
+    }
+
+    const allowed = input.policy?.allowedSources ?? DEFAULT_ALLOWED_SOURCES;
+
+    return allowed.includes(input.source) ? undefined : `This conversation does not accept worker messages from ${dispatchSourceLabel(input.source)}.`;
+};
+
+/** The most dispatches a lead's policy may allow per hour: the premium tier's rate limit (the free tier's own is lower and still applies). */
+export const WORKER_POLICY_MAX_PER_HOUR = 60;
+
+/** Whether the result of a run reached the lead: `none` when the lead never asked for one (or the run has not ended). */
+export type RunDelivery = "failed" | "none" | "pending" | "posted";
+
+/**
+ * Where a run's result stands with the lead. `posted` is the receipt (`resultPostedAt`, written with the
+ * message); `failed` is a post that gave up; `pending` is an ended run still waiting for the lead's stream
+ * or a lock to lift. A run the lead did not ask for owes nothing.
+ */
+export const runDelivery = (run: {
+    mode?: "run" | "worker";
+    postFailed?: string;
+    resultPostedAt?: number;
+    status: SubAgentStatus;
+    toolCallId?: string;
+}): RunDelivery => {
+    if (isActiveSubAgentStatus(run.status) || !postsBack(run)) {
+        return "none";
+    }
+
+    if (run.resultPostedAt !== undefined) {
+        return "posted";
+    }
+
+    return run.postFailed === undefined ? "pending" : "failed";
+};
 
 /**
  * How a message sent to a busy worker is handled, read from what its runner can do. Cloud headless
@@ -278,6 +388,8 @@ export const distinctChildCount = (runs: ReadonlyArray<{ _id: string; childThrea
 /** The follow-up message posted to the parent thread when a run ends. */
 export const buildResultMessage = (input: {
     childThreadId?: string;
+    /** Who sent the dispatch; named in the message so the lead reads where it came from. */
+    dispatchedBy?: DispatchSource;
     error?: string;
     result?: string;
     /** Whether the run had been claimed — a cancelled one that had not ran nothing. */
@@ -304,6 +416,7 @@ export const buildResultMessage = (input: {
     }
 
     const link = input.childThreadId ? `\n\n[Open the sub-agent's thread](/chat/${input.childThreadId})` : "";
+    const sentBy = input.dispatchedBy ? `\n\nSent by: ${dispatchSourceLabel(input.dispatchedBy)}` : "";
 
-    return `${heading}\n\n${body}${link}`;
+    return `${heading}\n\n${body}${link}${sentBy}`;
 };

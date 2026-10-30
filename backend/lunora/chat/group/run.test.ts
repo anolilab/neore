@@ -247,7 +247,7 @@ const groupConfig = async () =>
         return await ctx.runQuery(getGroupRunConfig, { threadId, userId: OWNER });
     });
 
-const runTurn = async (userPrompt = "Draft a tagline") => {
+const runTurn = async (userPrompt = "Draft a tagline", origin?: "outside_agent") => {
     const config = await groupConfig();
 
     if (!config) {
@@ -258,7 +258,16 @@ const runTurn = async (userPrompt = "Draft a tagline") => {
         async (ctx: any) =>
             await runGroupTurn(
                 ctx,
-                { isAnonymous: false, messageId: promptId, streamId, streamingConfig: { model: "test-model" }, threadId, userId: OWNER, userPrompt },
+                {
+                    isAnonymous: false,
+                    messageId: promptId,
+                    ...(origin && { origin }),
+                    streamId,
+                    streamingConfig: { model: "test-model" },
+                    threadId,
+                    userId: OWNER,
+                    userPrompt,
+                },
                 config as never,
             ),
     );
@@ -614,6 +623,24 @@ describe("runGroupTurn — tool approval inside a group turn", () => {
         expect((speakerModels.get("INSTR:checker") as ScriptedModel).doStreamCalls).toHaveLength(0);
         // The pause closes the stream; the continuation opens its own.
         expect(await streamStatus()).toBe("done");
+    });
+
+    it("keeps what started the turn in the snapshot, so a person's answer does not turn an outside agent's turn into the lead's", async () => {
+        await setUpPausingWriter();
+        await runTurn("Draft a tagline", "outside_agent");
+
+        const row = await approvalRow();
+
+        expect(row.config.dispatchOrigin).toBe("outside_agent");
+    });
+
+    it("records no origin for the user's own turn", async () => {
+        await setUpPausingWriter();
+        await runTurn();
+
+        const row = await approvalRow();
+
+        expect(row.config).not.toHaveProperty("dispatchOrigin");
     });
 
     it("resumes the paused participant, then runs the rest of the queue without re-routing", async () => {
