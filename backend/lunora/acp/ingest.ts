@@ -108,9 +108,13 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         }
 
         // The agent can report more once it has been used; the thread and session stay as they are. A delayed or
-        // replayed open carries an older report and must not roll the stored one back.
-        if (open.capabilities && existing.status !== "ended" && open.capabilities.reportedAt >= (existing.capabilities?.reportedAt ?? 0)) {
-            await ctx.db.patch(existing._id, { capabilities: open.capabilities, updatedAt: now });
+        // replayed open carries an older report and must not roll the stored one back: only a strictly newer one
+        // replaces it (an equal time keeps what is stored), and a time ahead of this clock is taken as now, so one
+        // future-dated report cannot shut out every later one.
+        const reportedAt = open.capabilities ? Math.min(open.capabilities.reportedAt, now) : 0;
+
+        if (open.capabilities && existing.status !== "ended" && reportedAt > (existing.capabilities?.reportedAt ?? 0)) {
+            await ctx.db.patch(existing._id, { capabilities: { ...open.capabilities, reportedAt }, updatedAt: now });
         }
 
         return { ended: existing.status === "ended", next: 0, outcome: "applied", threadId: existing.threadId as string };

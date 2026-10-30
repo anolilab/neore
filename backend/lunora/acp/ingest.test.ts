@@ -342,6 +342,21 @@ describe("capability reports", () => {
         await expect(reportOf(threadId)).resolves.toEqual(CHANGED);
     });
 
+    it("keeps the stored report when another one carries the same time, and cannot be shut out by a future-dated one", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, REPORT);
+
+        // Same time, different content: the stored one stays.
+        await openWith(device, { ...CHANGED, reportedAt: REPORT.reportedAt });
+        await expect(reportOf(threadId)).resolves.toEqual(REPORT);
+
+        // A report dated far ahead of this clock is stored as of now, so the next real one still replaces it.
+        await openWith(device, { ...CHANGED, reportedAt: Date.now() + 10 * 365 * 24 * 60 * 60 * 1000 });
+        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: CHANGED.groups });
+        await openWith(device, { ...REPORT, reportedAt: Date.now() + 1000 });
+        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: REPORT.groups });
+    });
+
     it("keeps a valid stored report when a later open's report is invalid, and lets the next valid one replace the fallback", async () => {
         const device = await pair(ownerId);
         const threadId = await openWith(device, REPORT);
@@ -427,8 +442,8 @@ describe("capability reports", () => {
 
         it("answers the owner of a thread on a local-browser endpoint with the local declaration, by endpoint type", async () => {
             const providers = {
-                laptop: { enabled: true, models: [{ id: "shared-name" }], type: "local-browser" },
                 hosted: { enabled: true, models: [{ id: "shared-name" }], type: "openai-compatible" },
+                laptop: { enabled: true, models: [{ id: "shared-name" }], type: "local-browser" },
             };
 
             await harness.run(async (ctx: any) => await ctx.db.insert("aiUserPreferences", { customAIProviders: providers, userId: ownerId }));
