@@ -155,7 +155,10 @@ const ReviewPanel = ({
             }
         } catch {
             // The action may have run to the host before the answer was lost: say so rather than invite a second review.
-            setFeedback({ kind: "error", text: t`Could not confirm that the review was submitted. Check on ${hostLabel} before you try again. Your review is kept here.` });
+            setFeedback({
+                kind: "error",
+                text: t`Could not confirm that the review was submitted. Check on ${hostLabel} before you try again. Your review is kept here.`,
+            });
         }
     };
 
@@ -240,17 +243,24 @@ const ReviewPanel = ({
                         <Button
                             disabled={locked}
                             onClick={async () => {
-                                const outcome = await mutations.discard.mutateAsync(address);
+                                try {
+                                    // A summary or verdict still being saved would otherwise put the draft back after it is gone.
+                                    await saveQueue.current;
 
-                                if (outcome.status !== "ok") {
-                                    setFeedback({ kind: "error", text: messages.edit(outcome.status) });
+                                    const outcome = await mutations.discard.mutateAsync(address);
 
-                                    return;
+                                    if (outcome.status !== "ok") {
+                                        setFeedback({ kind: "error", text: messages.edit(outcome.status) });
+
+                                        return;
+                                    }
+
+                                    setConfirmingDiscard(false);
+                                    setTyped(null);
+                                    setFeedback(null);
+                                } catch {
+                                    setFeedback({ kind: "error", text: messages.edit("failed") });
                                 }
-
-                                setConfirmingDiscard(false);
-                                setTyped(null);
-                                setFeedback(null);
                             }}
                             variant="destructive"
                         >

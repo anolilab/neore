@@ -5,7 +5,7 @@ import { skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } fr
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import type { PullRequestAddress } from "./use-develop";
-import { useDevelopUser } from "./use-develop";
+import { DEVELOP_QUERY_ROOT, useDevelopUser } from "./use-develop";
 
 const MINUTE_MS = 60_000;
 
@@ -40,7 +40,7 @@ export const useReviewThreads = (address: PullRequestAddress | undefined, enable
         queryFn: async ({ pageParam }) => await getThreads({ ...(address as PullRequestAddress), ...(pageParam !== null && { after: pageParam }) }),
         initialPageParam: null as string | null,
         getNextPageParam: (last: Awaited<ReturnType<typeof getThreads>>) => (last.status === "ok" && last.hasMore ? last.endCursor : undefined),
-        queryKey: ["develop", userId, "threads", address],
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "threads", address],
         staleTime: MINUTE_MS,
     });
 };
@@ -56,7 +56,7 @@ export const useViewedFiles = (address: PullRequestAddress | undefined, enabled:
         queryFn: async ({ pageParam }) => await getViewed({ ...(address as PullRequestAddress), ...(pageParam !== null && { after: pageParam }) }),
         initialPageParam: null as string | null,
         getNextPageParam: (last: Awaited<ReturnType<typeof getViewed>>) => (last.status === "ok" && last.hasMore ? last.endCursor : undefined),
-        queryKey: ["develop", userId, "viewed", address],
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "viewed", address],
         staleTime: MINUTE_MS,
     });
 };
@@ -68,8 +68,8 @@ export const useReviewActions = (address: PullRequestAddress) => {
     const resolve = useAction(api.source_control.review_functions.setReviewThreadResolved);
     const setViewed = useAction(api.source_control.review_functions.setFileViewed);
     const submit = useAction(api.source_control.review_functions.submitReview);
-    const refreshThreads = async () => await queryClient.invalidateQueries({ queryKey: ["develop", userId, "threads", address] });
-    const refreshViewed = async () => await queryClient.invalidateQueries({ queryKey: ["develop", userId, "viewed", address] });
+    const refreshThreads = async () => await queryClient.invalidateQueries({ queryKey: [DEVELOP_QUERY_ROOT, userId, "threads", address] });
+    const refreshViewed = async () => await queryClient.invalidateQueries({ queryKey: [DEVELOP_QUERY_ROOT, userId, "viewed", address] });
 
     return {
         reply: useMutation({

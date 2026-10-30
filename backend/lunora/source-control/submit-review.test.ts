@@ -102,7 +102,22 @@ describe("submitDraft", () => {
 
         expect(await submitDraft(value)).toEqual({ reviewUrl: "https://github.com/o/r/pull/1#pullrequestreview-9", status: "ok" });
         // The claim is not released: the lease keeps the draft locked instead of inviting a resubmit at once.
-        expect(calls).toEqual(["claim", "post", "finish"]);
+        // Clearing is tried three times first, because once the lease runs out another submit could post it again.
+        expect(calls).toEqual(["claim", "post", "finish", "finish", "finish"]);
+    });
+
+    it("stops clearing the draft at the first attempt that lands", async () => {
+        let failures = 1;
+        const { calls, value } = ports(claimed(), accepted, async () => {
+            failures -= 1;
+
+            if (failures >= 0) {
+                throw new Error("database unavailable");
+            }
+        });
+
+        expect(await submitDraft(value)).toMatchObject({ status: "ok" });
+        expect(calls).toEqual(["claim", "post", "finish", "finish"]);
     });
 
     it("releases the claim and rethrows when the post fails unexpectedly", async () => {

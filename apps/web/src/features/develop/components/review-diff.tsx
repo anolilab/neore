@@ -105,9 +105,13 @@ const ReviewDiff = ({
             key={comment.id}
             locked={locked}
             onDelete={async () => {
-                const outcome = await mutations.deleteComment.mutateAsync({ ...address, commentId: comment.id });
+                try {
+                    const outcome = await mutations.deleteComment.mutateAsync({ ...address, commentId: comment.id });
 
-                return outcome.status === "ok" ? null : messages.edit(outcome.status);
+                    return outcome.status === "ok" ? null : messages.edit(outcome.status);
+                } catch {
+                    return messages.edit("failed");
+                }
             }}
             onEdit={async (body) => await save({ body, commentId: comment.id, line: comment.line, side: comment.side })}
         />

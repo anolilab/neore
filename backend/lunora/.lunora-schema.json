@@ -18641,6 +18641,13 @@
           ],
           "unique": false
         },
+        "by_childThreadId_and_status": {
+          "fields": [
+            "childThreadId",
+            "status"
+          ],
+          "unique": false
+        },
         "by_createdAt": {
           "fields": [
             "createdAt"
