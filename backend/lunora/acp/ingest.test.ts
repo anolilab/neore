@@ -357,6 +357,15 @@ describe("capability reports", () => {
         await expect(reportOf(threadId)).resolves.toMatchObject({ groups: REPORT.groups });
     });
 
+    it("stores a new session's future-dated report as of now, so the next real one replaces it", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, { ...CHANGED, reportedAt: Date.now() + 10 * 365 * 24 * 60 * 60 * 1000 });
+
+        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: CHANGED.groups });
+        await openWith(device, { ...REPORT, reportedAt: Date.now() + 1000 });
+        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: REPORT.groups });
+    });
+
     it("keeps a valid stored report when a later open's report is invalid, and lets the next valid one replace the fallback", async () => {
         const device = await pair(ownerId);
         const threadId = await openWith(device, REPORT);

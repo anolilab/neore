@@ -145,7 +145,7 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         threadId,
         updatedAt: now,
         userId: device.userId,
-        ...(open.capabilities && { capabilities: open.capabilities }),
+        ...(open.capabilities && { capabilities: { ...open.capabilities, reportedAt: Math.min(open.capabilities.reportedAt, now) } }),
         ...(open.nativeSessionId !== undefined && { nativeSessionId: open.nativeSessionId }),
     });
 
