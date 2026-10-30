@@ -5,7 +5,7 @@ Status: the Rust Worker is shipped (2026-10). The Container is the follow-up.
 ## Current design
 
 `services/document-parser` is a Cloudflare Worker written in Rust: workers-rs
-`0.8.7` plus the [xberg](https://crates.io/crates/xberg) crate `=1.3.2`
+`0.8.7` plus the [xberg](https://crates.io/crates/xberg) crate `=1.3.10`
 (default features off; `pdf` — xberg's pure-Rust `pdf-native` backend, no
 pdfium — `office`, `excel-wasm`, `html`, `xml`, `archives`). It replaced the
 TypeScript/Hono service on `@kreuzberg/wasm`.
