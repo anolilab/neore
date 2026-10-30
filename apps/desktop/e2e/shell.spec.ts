@@ -96,7 +96,8 @@ const findPage = async (app: ElectronApplication, isMatch: (url: string) => bool
         return pages.filter((page) => isMatch(page.url()));
     };
 
-    await expect.poll(pagesNow).not.toHaveLength(0);
+    // A cold app on a CI runner (Windows especially) can take longer than the 5 s default to open its first window.
+    await expect.poll(pagesNow, { timeout: 30_000 }).not.toHaveLength(0);
 
     const pages = await pagesNow();
     const [page] = pages;
