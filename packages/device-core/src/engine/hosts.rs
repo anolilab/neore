@@ -519,7 +519,18 @@ impl DeviceState {
     /// install runs over that same master, and exits it itself.
     pub(super) fn retire(&self, link: &Arc<dyn HostLink>) {
         link.close();
+        self.forget_launch(link);
         self.release_master(link);
+    }
+
+    /// A session closed on purpose leaves its host finishing the commands in flight under their own timeouts; the
+    /// next session must not reap it. Only a session the connection lost ([`Self::retire_lost`]) stays remembered.
+    fn forget_launch(&self, link: &Arc<dyn HostLink>) {
+        let Some(id) = link.launch_id() else { return };
+
+        for known in self.ssh.launches.lock().unwrap().values_mut() {
+            known.retain(|launch| launch != id);
+        }
     }
 
     /// Ends a session that the connection dropped. Its master goes only when ssh gave the connection up (the
@@ -1203,6 +1214,7 @@ impl DeviceState {
 
         if let Some(link) = link {
             link.close();
+            self.forget_launch(&link);
             link.exit_master();
             self.emit(Event::Changed);
         }
@@ -3053,6 +3065,32 @@ mod tests {
             state.ssh.launches.lock().unwrap()[&id],
             ["22222222222222222222222222222222"],
             "a reaped launch stays on the list"
+        );
+
+        let _ = stdfs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_session_closed_on_purpose_is_not_reaped_by_the_next_one() {
+        let old = FakeLink::launched(true, Some("11111111111111111111111111111111"));
+        let new = FakeLink::launched(true, Some("22222222222222222222222222222222"));
+        let (state, dir, _) = engine("closed", &old);
+        let id = host_id("closed");
+
+        state.note_connected(&id, &(Arc::clone(&old) as Arc<dyn HostLink>), true);
+        state
+            .ssh
+            .connections
+            .lock()
+            .unwrap()
+            .insert(id.clone(), Arc::clone(&old) as Arc<dyn HostLink>);
+        state.host_disconnect(&id);
+
+        state.note_connected(&id, &(Arc::clone(&new) as Arc<dyn HostLink>), true);
+
+        assert!(
+            new.reaped.lock().unwrap().is_empty(),
+            "a deliberately closed session was reaped"
         );
 
         let _ = stdfs::remove_dir_all(dir);
