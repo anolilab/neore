@@ -18,8 +18,8 @@ export type WriteFailure = ReadFailure | "rejected" | "unconfirmed";
 export type WriteOutcome<T extends object> =
     (T & { status: "ok" }) | { reason: string | null; status: "rejected" } | { status: Exclude<WriteFailure, "rejected"> };
 
-/** The statuses a host answers a request it understood and will not carry out. */
-const REFUSAL_STATUSES = new Set([400, 409, 422]);
+/** The statuses a host answers a request it understood and will not carry out (405: a merge its rules refuse). */
+const REFUSAL_STATUSES = new Set([400, 405, 409, 422]);
 
 /** Longest reason from the host that is passed on to a person. */
 const REASON_MAX_CHARS = 300;

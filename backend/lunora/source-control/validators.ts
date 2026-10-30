@@ -40,3 +40,5 @@ export const vWriteFailed = v.union(
     v.object({ reason: v.union(v.string(), v.null()), status: v.literal("rejected") }),
     v.object({ status: v.literal("unconfirmed") }),
 );
+
+export const vMergeMethod = v.union(v.literal("merge"), v.literal("rebase"), v.literal("squash"));

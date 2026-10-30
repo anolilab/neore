@@ -19,6 +19,7 @@ import CommitsTab from "./commits-tab";
 import FailureNotice from "./failure-notice";
 import FilesTab from "./files-tab";
 import type { HostInfo } from "./host-info";
+import MergePanel from "./merge-panel";
 import ReviewPanel from "./review-panel";
 
 const TAB_CAPABILITY: Record<DevelopTab, HostCapabilityKey> = {
@@ -100,6 +101,9 @@ const PullRequestView = ({
                     <span className="text-muted-foreground">{t`in ${plural(detail.changedFiles, { one: "# file", other: "# files" })}`}</span>
                 </p>
             </header>
+            {detail.state === "open" && !detail.draft && (
+                <MergePanel address={address} capabilities={host.capabilities} headSha={detail.headSha} hostLabel={host.label} requestNoun={requestNoun} />
+            )}
             <ReviewPanel address={address} capabilities={host.capabilities} headSha={detail.headSha} hostLabel={host.label} />
             {current === undefined ? (
                 <p className="text-muted-foreground text-sm">{t`This host does not offer any view of a ${requestNoun} yet.`}</p>
@@ -139,7 +143,9 @@ const PullRequestView = ({
                         )}
                     </TabsContent>
                     <TabsContent className="pt-3" value="checks">
-                        {current === "checks" && <ChecksTab address={address} headSha={detail.headSha} hostLabel={host.label} />}
+                        {current === "checks" && (
+                            <ChecksTab address={address} capabilities={host.capabilities} headSha={detail.headSha} hostLabel={host.label} />
+                        )}
                     </TabsContent>
                 </Tabs>
             )}

@@ -14465,6 +14465,34 @@
       "module": "source-control"
     },
     {
+      "detail": "action",
+      "id": "function:source_control_merge_functions:getMergeStatus",
+      "kind": "function",
+      "name": "source_control.merge_functions.getMergeStatus",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_merge_functions:mergePullRequest",
+      "kind": "function",
+      "name": "source_control.merge_functions.mergePullRequest",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_merge_functions:rerunCheck",
+      "kind": "function",
+      "name": "source_control.merge_functions.rerunCheck",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_merge_functions:setAutoMerge",
+      "kind": "function",
+      "name": "source_control.merge_functions.setAutoMerge",
+      "module": "source-control"
+    },
+    {
       "detail": "mutation",
       "id": "function:source_control_review_drafts:deleteDraftComment",
       "kind": "function",

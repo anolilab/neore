@@ -44297,8 +44297,28 @@
                         "checks": {
                           "items": {
                             "properties": {
+                              "id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "name": {
                                 "type": "string"
+                              },
+                              "required": {
+                                "anyOf": [
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               },
                               "state": {
                                 "anyOf": [
@@ -44340,13 +44360,59 @@
                               }
                             },
                             "required": [
+                              "id",
                               "name",
+                              "required",
                               "state",
                               "url"
                             ],
                             "type": "object"
                           },
                           "type": "array"
+                        },
+                        "rollup": {
+                          "properties": {
+                            "complete": {
+                              "type": "boolean"
+                            },
+                            "failing": {
+                              "type": "number"
+                            },
+                            "optionalFailing": {
+                              "type": "number"
+                            },
+                            "pending": {
+                              "type": "number"
+                            },
+                            "state": {
+                              "anyOf": [
+                                {
+                                  "const": "failing",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "none",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "passing",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pending",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "complete",
+                            "failing",
+                            "optionalFailing",
+                            "pending",
+                            "state"
+                          ],
+                          "type": "object"
                         },
                         "status": {
                           "const": "ok",
@@ -44358,6 +44424,7 @@
                       },
                       "required": [
                         "checks",
+                        "rollup",
                         "status",
                         "total"
                       ],
@@ -44786,6 +44853,697 @@
           }
         },
         "summary": "action: source_control_functions:getPullRequestFiles",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_merge_functions:getMergeStatus": {
+      "post": {
+        "description": "Invoke the `action` `source_control_merge_functions:getMergeStatus` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_merge_functions:getMergeStatus",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "repository"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_merge_functions:getMergeStatus",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "autoMergeAllowed": {
+                          "type": "boolean"
+                        },
+                        "autoMergeEnabled": {
+                          "type": "boolean"
+                        },
+                        "methods": {
+                          "items": {
+                            "anyOf": [
+                              {
+                                "const": "merge",
+                                "type": "string"
+                              },
+                              {
+                                "const": "rebase",
+                                "type": "string"
+                              },
+                              {
+                                "const": "squash",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "type": "array"
+                        },
+                        "state": {
+                          "anyOf": [
+                            {
+                              "const": "behind",
+                              "type": "string"
+                            },
+                            {
+                              "const": "blocked",
+                              "type": "string"
+                            },
+                            {
+                              "const": "clean",
+                              "type": "string"
+                            },
+                            {
+                              "const": "conflicting",
+                              "type": "string"
+                            },
+                            {
+                              "const": "draft",
+                              "type": "string"
+                            },
+                            {
+                              "const": "unknown",
+                              "type": "string"
+                            },
+                            {
+                              "const": "unstable",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "const": "ok",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "autoMergeAllowed",
+                        "autoMergeEnabled",
+                        "methods",
+                        "state",
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "forbidden",
+                              "type": "string"
+                            },
+                            {
+                              "const": "host_error",
+                              "type": "string"
+                            },
+                            {
+                              "const": "needs_reconnect",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_connected",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            {
+                              "const": "rate_limited",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_merge_functions:getMergeStatus",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_merge_functions:mergePullRequest": {
+      "post": {
+        "description": "Invoke the `action` `source_control_merge_functions:mergePullRequest` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_merge_functions:mergePullRequest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      },
+                      "headSha": {
+                        "type": "string"
+                      },
+                      "method": {
+                        "anyOf": [
+                          {
+                            "const": "merge",
+                            "type": "string"
+                          },
+                          {
+                            "const": "rebase",
+                            "type": "string"
+                          },
+                          {
+                            "const": "squash",
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "repository",
+                      "headSha",
+                      "method"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_merge_functions:mergePullRequest",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "sha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "const": "ok",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "sha",
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "anyOf": [
+                        {
+                          "properties": {
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "const": "forbidden",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "host_error",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "needs_reconnect",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "not_connected",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "not_found",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "rate_limited",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "reason": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "status": {
+                              "const": "rejected",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "reason",
+                            "status"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "status": {
+                              "const": "unconfirmed",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ],
+                          "type": "object"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_merge_functions:mergePullRequest",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_merge_functions:rerunCheck": {
+      "post": {
+        "description": "Invoke the `action` `source_control_merge_functions:rerunCheck` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_merge_functions:rerunCheck",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      },
+                      "checkId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "repository",
+                      "checkId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_merge_functions:rerunCheck",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "status": {
+                          "const": "ok",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "anyOf": [
+                        {
+                          "properties": {
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "const": "forbidden",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "host_error",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "needs_reconnect",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "not_connected",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "not_found",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "rate_limited",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "reason": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "status": {
+                              "const": "rejected",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "reason",
+                            "status"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "status": {
+                              "const": "unconfirmed",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ],
+                          "type": "object"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_merge_functions:rerunCheck",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_merge_functions:setAutoMerge": {
+      "post": {
+        "description": "Invoke the `action` `source_control_merge_functions:setAutoMerge` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_merge_functions:setAutoMerge",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      },
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "method": {
+                        "anyOf": [
+                          {
+                            "const": "merge",
+                            "type": "string"
+                          },
+                          {
+                            "const": "rebase",
+                            "type": "string"
+                          },
+                          {
+                            "const": "squash",
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "repository",
+                      "enabled",
+                      "method"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_merge_functions:setAutoMerge",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "status": {
+                          "const": "ok",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "anyOf": [
+                        {
+                          "properties": {
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "const": "forbidden",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "host_error",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "needs_reconnect",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "not_connected",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "not_found",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "rate_limited",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "reason": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "status": {
+                              "const": "rejected",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "reason",
+                            "status"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "status": {
+                              "const": "unconfirmed",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ],
+                          "type": "object"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_merge_functions:setAutoMerge",
         "tags": [
           "source-control"
         ],

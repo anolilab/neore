@@ -17,6 +17,10 @@ import type {
     HostView,
     InboxPage,
     InboxSection,
+    MergedPullRequest,
+    MergeMethod,
+    MergeRequest,
+    MergeStatus,
     PullRequestDetail,
     PullRequestRef,
     ReviewSubmission,
@@ -28,6 +32,7 @@ import type {
 export interface HostDriver {
     /** The host's API origin: the only place a token for this driver is sent. */
     readonly apiOrigin: string;
+    getMergeStatus: (request: HostRequest, ref: PullRequestRef) => Promise<MergeStatus>;
     getPullRequest: (request: HostRequest, ref: PullRequestRef) => Promise<PullRequestDetail>;
     /** The request headers the host's API wants, besides the token. */
     readonly headers: Record<string, string>;
@@ -40,8 +45,14 @@ export interface HostDriver {
     listThreads: (request: HostRequest, ref: PullRequestRef, after: string | null) => Promise<CursorPage<ReviewThread>>;
     /** Which files the reviewer has marked viewed on the host. */
     listViewed: (request: HostRequest, ref: PullRequestRef, after: string | null) => Promise<CursorPage<ViewedFile>>;
+    /** Merges now, in ONE host call that names the head the person saw; the host's rules may refuse it. */
+    mergePullRequest: (request: HostRequest, ref: PullRequestRef, merge: MergeRequest) => Promise<MergedPullRequest>;
     /** Posts a reply to the thread `commentId` belongs to, at once. */
     replyToThread: (request: HostRequest, ref: PullRequestRef, commentId: string, body: string) => Promise<{ id: string }>;
+    /** Re-runs the narrowest scope the host offers for one check: a single job, not its whole workflow. */
+    rerunCheck: (request: HostRequest, ref: PullRequestRef, checkId: string) => Promise<void>;
+    /** Turns auto-merge on (merging with `method` once the host's rules are met) or off. */
+    setAutoMerge: (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod) => Promise<void>;
     setThreadResolved: (request: HostRequest, threadId: string, resolved: boolean) => Promise<void>;
     setViewed: (request: HostRequest, ref: PullRequestRef, path: string, viewed: boolean) => Promise<void>;
     /** Posts the whole review in ONE host call, and returns it only when the host confirmed it. */
