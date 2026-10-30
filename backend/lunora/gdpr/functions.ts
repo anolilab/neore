@@ -6,6 +6,7 @@ import type { Doc } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { getSession } from "../auth/session";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { toEpochMs } from "../lib/epoch-ms";
 import { EXPORT_EXPIRY_MS } from "./constants";
 import { assertAccountDeletionAllowed } from "./deletion-guard";
 import { withoutUndefined } from "../lib/patch";
@@ -155,7 +156,8 @@ export const getDataAccessSummary = authQuery
                 prompts: promptsCount,
             },
             profile: {
-                createdAt: account.createdAt,
+                // better-auth stores this as an ISO string; the output declares epoch milliseconds.
+                createdAt: toEpochMs(account.createdAt),
                 email: userEmail ?? "",
                 emailVerified: !!userEmail,
                 name: username ?? "",

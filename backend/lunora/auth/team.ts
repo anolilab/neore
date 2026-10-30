@@ -3,28 +3,13 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { MutationCtx } from "../_generated/server";
 import { DEFAULT_LIST_LIMIT } from "../lib/constants";
+import { toEpochMs } from "../lib/epoch-ms";
 import { asyncMap } from "../lib/collections";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { getUser } from "./lib/better-auth-queries";
 import { canEditTeamSettings, canManageTeamMembers } from "./lib/team-helpers";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
-
-/**
- * Team timestamps as epoch milliseconds. Our own writes store `Date.now()`, but
- * the default team better-auth creates with an organization stores an ISO
- * string — and the outputs declare a number, so returning that raw failed
- * `listTeams` for every organization with a default team.
- */
-const toEpochMs = (value: unknown): number => {
-    if (typeof value === "number") {
-        return value;
-    }
-
-    const parsed = value instanceof Date ? value.getTime() : Date.parse(String(value));
-
-    return Number.isNaN(parsed) ? 0 : parsed;
-};
 
 /** The optional `updatedAt` twin of {@link toEpochMs}: absent stays absent. */
 const toOptionalEpochMs = (value: unknown): number | null | undefined => (value === undefined || value === null ? value : toEpochMs(value));
