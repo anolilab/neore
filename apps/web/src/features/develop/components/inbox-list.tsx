@@ -61,7 +61,10 @@ const InboxList = ({
     const note = approximated ? approximations[section] : undefined;
     const pages = inbox.data?.pages ?? [];
     const failure = pages.find((page) => page.status !== "ok");
-    const items = pages.flatMap((page) => (page.status === "ok" ? page.items : []));
+    // Search is sorted by update time, so a request touched between two page loads shows on both: keep its first place.
+    const items = [
+        ...new Map(pages.flatMap((page) => (page.status === "ok" ? page.items : [])).map((item) => [`${item.repository}#${item.number}`, item])).values(),
+    ];
 
     return (
         <div className="space-y-3">
