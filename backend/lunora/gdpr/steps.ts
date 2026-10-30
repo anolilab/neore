@@ -489,6 +489,9 @@ export const generateExportFile = internalAction
         // row that produced it — otherwise a stray object in the bucket is
         // unattributable, which is a poor property for a GDPR artefact.
         requestId: v.id("gdprRequests"),
+        // Review drafts on pull requests (`source-control/gdpr.ts`). Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        reviewDrafts: v.optional(v.any()),
         settings: v.any(),
         // Goals and tasks with their run history (`tasks/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
@@ -527,6 +530,7 @@ export const generateExportFile = internalAction
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
             profile: args.profile,
             prompts: args.prompts,
+            reviewDrafts: args.reviewDrafts ?? { drafts: [] },
             settings: args.settings,
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },

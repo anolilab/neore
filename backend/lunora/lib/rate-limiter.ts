@@ -489,8 +489,15 @@ export const RATE_LIMIT_CONFIGS = {
     "skills/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Develop mode (`source-control/`): every read is an outbound call to the Git host with
     // the user's own token, and opening one pull request fans out to a few (files page by page).
+    // Edits to a review draft: no host call, but a person typing saves often.
+    "sourceControl/draft:free": Ratelimit.fixedWindow(240, MINUTE),
+    "sourceControl/draft:premium": Ratelimit.fixedWindow(600, MINUTE),
     "sourceControl/read:free": Ratelimit.fixedWindow(240, MINUTE),
     "sourceControl/read:premium": Ratelimit.fixedWindow(600, MINUTE),
+    // A write to the Git host (a reply, a resolve, a viewed mark, a submitted review) is a user action
+    // that the host rate-limits too; GitHub's content-creation limit is the tighter one.
+    "sourceControl/write:free": Ratelimit.fixedWindow(60, MINUTE),
+    "sourceControl/write:premium": Ratelimit.fixedWindow(120, MINUTE),
     // Sub-agent starts (`sub-agents/functions.ts`), on top of the task quotas
     // each start is charged (`tasks/account.ts:chargeRound`) and the fan-out cap.
     "subAgents/run:free": Ratelimit.fixedWindow(10, HOUR),

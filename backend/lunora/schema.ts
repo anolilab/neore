@@ -43,6 +43,7 @@ import {
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
 import { vCapabilityReport } from "./lib/capability-report";
 import { notificationInputFields } from "./notifications/validators";
+import { vDraftComment, vReviewVerdict } from "./source-control/validators";
 import { vSkillConfig } from "./skills/validators";
 import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
 import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./tasks/validators";
@@ -2025,6 +2026,29 @@ export const schema = defineSchema({
     })
         .externallyManaged()
         .index("by_key", ["key"]),
+
+    // Develop mode (`source-control/`): the review a user is writing on a pull request, kept on the
+    // server so it follows them across devices. One row per (user, host origin, repository, number);
+    // `commitId` is the head the comment lines refer to. A submit claims the row (`submittingAt` > 0,
+    // a lease) and the row goes only once the host has confirmed the review.
+    reviewDrafts: defineTable({
+        body: v.string(),
+        comments: v.array(vDraftComment),
+        commitId: v.string(),
+        createdAt: v.number(),
+        hostOrigin: v.string(),
+        number: v.number(),
+        repository: v.string(),
+        // Moves on every edit: a finished submit tells an edited draft from the one it sent.
+        revision: v.number(),
+        // When a submit claimed the draft; 0 when none is running.
+        submittingAt: v.number(),
+        updatedAt: v.number(),
+        userId: v.string(),
+        verdict: v.union(vReviewVerdict, v.null()),
+    })
+        .shardBy("userId")
+        .index("by_user_and_pull", ["userId", "hostOrigin", "repository", "number"]),
 
     sandboxActions: defineTable({
         action: v.string(),

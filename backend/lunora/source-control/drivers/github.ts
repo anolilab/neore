@@ -9,13 +9,17 @@ import z from "zod/v4";
 
 import type { HostCapabilityReport } from "../capabilities";
 import type { HostDriver } from "../driver";
+import { graphqlRequest } from "../graphql";
 import { HostApiError } from "../origin-fetch";
 import type { HostRequest } from "../origin-fetch";
+import { discard, parse, readJson } from "../response";
 import type {
     CheckRun,
     CheckState,
     CheckSummary,
     CommitPage,
+    CursorPage,
+    DiffSide,
     FilePage,
     FileStatus,
     InboxPage,
@@ -24,6 +28,11 @@ import type {
     PullRequestFile,
     PullRequestRef,
     PullRequestSummary,
+    ReviewSubmission,
+    ReviewThread,
+    SubmittedReview,
+    ViewedFile,
+    ViewedState,
 } from "../types";
 
 export const GITHUB_API_ORIGIN = "https://api.github.com";
@@ -48,7 +57,6 @@ const MAX_COMMIT_PAGE = Math.ceil(GITHUB_COMMIT_LIMIT / GITHUB_PAGE_SIZE);
 export const PATCH_MAX_CHARS = 60_000;
 export const PAGE_PATCH_BUDGET_CHARS = 600_000;
 const BODY_MAX_CHARS = 60_000;
-const RESPONSE_MAX_BYTES = 12_000_000;
 
 const NATIVE = { degradation: "none", supported: true } as const;
 
@@ -63,6 +71,17 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
             readyToMerge: { degradation: "synthetic", note: "Approved and not a draft. Branch protection is not checked.", supported: true },
         },
         pullRequest: { checks: NATIVE, commits: NATIVE, description: NATIVE, diff: NATIVE, files: NATIVE },
+        review: {
+            batchedSubmit: NATIVE,
+            lineComments: NATIVE,
+            // The review call takes no reply, so a reply is posted the moment it is sent, not with the review.
+            replies: { degradation: "divergent", note: "A reply is posted at once, not with the rest of the review.", supported: true },
+            resolveThreads: NATIVE,
+            verdictApprove: NATIVE,
+            verdictComment: NATIVE,
+            verdictRequestChanges: NATIVE,
+            viewedMarks: NATIVE,
+        },
     },
     reportedAt: 0,
     version: 1,
@@ -88,78 +107,6 @@ const repoPath = (ref: PullRequestRef): string => {
     }
 
     return `/repos/${parts.owner}/${parts.name}`;
-};
-
-/** Cancels a response body nobody will read; a failure to cancel is not worth reporting. */
-const discard = async (response: Response): Promise<void> => {
-    await response.body?.cancel().catch(() => undefined);
-};
-
-/** The body as text, read up to `RESPONSE_MAX_BYTES`: the cap bounds memory, not just what is kept. */
-const readText = async (response: Response): Promise<string> => {
-    const tooLarge = new HostApiError("The host's response is larger than this reads", 0);
-    const declared = Number(response.headers.get("content-length"));
-
-    if (Number.isFinite(declared) && declared > RESPONSE_MAX_BYTES) {
-        await discard(response);
-
-        throw tooLarge;
-    }
-
-    const reader = response.body?.getReader();
-    const chunks: Uint8Array[] = [];
-    let received = 0;
-
-    while (reader) {
-        // The request's deadline also covers the body: a slow or cut-off read is a host failure.
-        const { done, value } = await reader.read().catch(() => {
-            throw new HostApiError("The host's response could not be read", 0);
-        });
-
-        if (done) {
-            break;
-        }
-
-        received += value.byteLength;
-
-        if (received > RESPONSE_MAX_BYTES) {
-            await reader.cancel();
-
-            throw tooLarge;
-        }
-
-        chunks.push(value);
-    }
-
-    const bytes = new Uint8Array(received);
-    let offset = 0;
-
-    for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.byteLength;
-    }
-
-    return new TextDecoder().decode(bytes);
-};
-
-const readJson = async (response: Response): Promise<unknown> => {
-    const text = await readText(response);
-
-    try {
-        return JSON.parse(text) as unknown;
-    } catch {
-        throw new HostApiError("The host's response was not JSON", 0);
-    }
-};
-
-const parse = <T>(schema: z.ZodType<T>, value: unknown): T => {
-    const result = schema.safeParse(value);
-
-    if (!result.success) {
-        throw new HostApiError("The host's response did not have the expected shape", 0);
-    }
-
-    return result.data;
 };
 
 const toMs = (iso: string | null | undefined): number => {
@@ -428,6 +375,270 @@ const listFiles = async (request: HostRequest, ref: PullRequestRef, page: number
     return { files: fitPatches(files), hasMore: items.length === perPage && current < MAX_FILE_PAGE, page: current };
 };
 
+// ─── Review ─────────────────────────────────────────────────────────────────
+
+/** Cursor pages the review reads ask for: 100 files, 50 threads with their first 30 comments. */
+const VIEWED_PAGE_SIZE = 100;
+const THREAD_PAGE_SIZE = 50;
+const THREAD_COMMENTS = 30;
+const COMMENT_MAX_CHARS = 20_000;
+const COMMENT_ID = /^\d{1,20}$/u;
+const NODE_ID = /^[\w=-]{1,200}$/u;
+
+const EVENTS = { approve: "APPROVE", comment: "COMMENT", request_changes: "REQUEST_CHANGES" } as const;
+
+const HOST_SIDES = { new: "RIGHT", old: "LEFT" } as const satisfies Record<DiffSide, string>;
+
+const pageInfoSchema = z.object({ endCursor: z.string().nullable(), hasNextPage: z.boolean() });
+
+const sideOf = (side: string): DiffSide => (side === "LEFT" ? "old" : "new");
+
+const repoParts = (ref: PullRequestRef): { name: string; number: number; owner: string } => {
+    const parts = splitGithubRepo(ref.repository);
+
+    if (!parts || !Number.isSafeInteger(ref.number) || ref.number < 1) {
+        throw new HostApiError("Not a GitHub pull request address", 404);
+    }
+
+    return { ...parts, number: ref.number };
+};
+
+const pullRequestOf = <T>(repo: { pullRequest: T | null } | null): T => {
+    if (repo?.pullRequest == null) {
+        throw new HostApiError("The pull request was not found", 404);
+    }
+
+    return repo.pullRequest;
+};
+
+const THREADS_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: ${THREAD_PAGE_SIZE}, after: $after) {
+        pageInfo { endCursor hasNextPage }
+        nodes {
+          id isResolved isOutdated path line startLine diffSide viewerCanResolve viewerCanUnresolve
+          comments(first: ${THREAD_COMMENTS}) { nodes { fullDatabaseId author { login } body createdAt } }
+        }
+      }
+    }
+  }
+}`;
+
+const threadCommentSchema = z.object({
+    author: z.object({ login: z.string() }).nullable(),
+    body: z.string(),
+    createdAt: z.string(),
+    fullDatabaseId: z.union([z.string(), z.number()]),
+});
+
+const threadSchema = z.object({
+    comments: z.object({ nodes: z.array(z.unknown()) }),
+    diffSide: z.string(),
+    id: z.string(),
+    isOutdated: z.boolean(),
+    isResolved: z.boolean(),
+    line: z.number().nullable(),
+    path: z.string(),
+    startLine: z.number().nullable(),
+    viewerCanResolve: z.boolean(),
+    viewerCanUnresolve: z.boolean(),
+});
+
+const threadsDataSchema = z.object({
+    repository: z
+        .object({ pullRequest: z.object({ reviewThreads: z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema }) }).nullable() })
+        .nullable(),
+});
+
+const toThread = (value: unknown): ReviewThread | undefined => {
+    const thread = threadSchema.safeParse(value);
+
+    if (!thread.success) {
+        return undefined;
+    }
+
+    const comments = thread.data.comments.nodes.flatMap((node) => {
+        const comment = threadCommentSchema.safeParse(node);
+        const id = comment.success ? String(comment.data.fullDatabaseId) : "";
+
+        return comment.success && COMMENT_ID.test(id)
+            ? [
+                  {
+                      authorLogin: comment.data.author?.login ?? "ghost",
+                      body: comment.data.body.slice(0, COMMENT_MAX_CHARS),
+                      createdAt: toMs(comment.data.createdAt),
+                      id,
+                  },
+              ]
+            : [];
+    });
+
+    return {
+        canResolve: thread.data.viewerCanResolve,
+        canUnresolve: thread.data.viewerCanUnresolve,
+        comments,
+        id: thread.data.id,
+        isOutdated: thread.data.isOutdated,
+        isResolved: thread.data.isResolved,
+        line: thread.data.line,
+        path: thread.data.path,
+        side: sideOf(thread.data.diffSide),
+        startLine: thread.data.startLine,
+    };
+};
+
+const listThreads = async (request: HostRequest, ref: PullRequestRef, after: string | null): Promise<CursorPage<ReviewThread>> => {
+    const data = await graphqlRequest(request, THREADS_QUERY, { ...repoParts(ref), after }, threadsDataSchema);
+    const { reviewThreads } = pullRequestOf(data.repository);
+
+    return {
+        endCursor: reviewThreads.pageInfo.endCursor,
+        hasMore: reviewThreads.pageInfo.hasNextPage,
+        items: reviewThreads.nodes.map((node) => toThread(node)).filter((thread): thread is ReviewThread => thread !== undefined),
+    };
+};
+
+const replySchema = z.object({ id: z.number() });
+
+const replyToThread = async (request: HostRequest, ref: PullRequestRef, commentId: string, body: string): Promise<{ id: string }> => {
+    if (!COMMENT_ID.test(commentId)) {
+        throw new HostApiError("Not a comment id", 404);
+    }
+
+    const reply = parse(
+        replySchema,
+        await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}/comments/${commentId}/replies`, { json: { body }, method: "POST" })),
+    );
+
+    return { id: String(reply.id) };
+};
+
+const RESOLVE_MUTATION = `mutation ($threadId: ID!) { resolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`;
+const UNRESOLVE_MUTATION = `mutation ($threadId: ID!) { unresolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`;
+
+const resolvedSchema = z.object({ thread: z.object({ isResolved: z.boolean() }) });
+
+const setThreadResolved = async (request: HostRequest, threadId: string, resolved: boolean): Promise<void> => {
+    if (!NODE_ID.test(threadId)) {
+        throw new HostApiError("Not a thread id", 404);
+    }
+
+    const data = await graphqlRequest(
+        request,
+        resolved ? RESOLVE_MUTATION : UNRESOLVE_MUTATION,
+        { threadId },
+        z.object({ resolveReviewThread: resolvedSchema.optional(), unresolveReviewThread: resolvedSchema.optional() }),
+    );
+    const confirmed = (resolved ? data.resolveReviewThread : data.unresolveReviewThread)?.thread.isResolved;
+
+    // A mutation that answers without the state asked for did not do it.
+    if (confirmed !== resolved) {
+        throw new HostApiError("The host did not confirm the thread change", 0);
+    }
+};
+
+const VIEWED_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      files(first: ${VIEWED_PAGE_SIZE}, after: $after) {
+        pageInfo { endCursor hasNextPage }
+        nodes { path viewerViewedState }
+      }
+    }
+  }
+}`;
+
+const VIEWED_STATES: Record<string, ViewedState> = { DISMISSED: "changed", VIEWED: "viewed" };
+
+const viewedDataSchema = z.object({
+    repository: z
+        .object({
+            pullRequest: z
+                .object({
+                    files: z.object({
+                        nodes: z.array(z.object({ path: z.string(), viewerViewedState: z.string() })),
+                        pageInfo: pageInfoSchema,
+                    }),
+                })
+                .nullable(),
+        })
+        .nullable(),
+});
+
+const listViewed = async (request: HostRequest, ref: PullRequestRef, after: string | null): Promise<CursorPage<ViewedFile>> => {
+    const data = await graphqlRequest(request, VIEWED_QUERY, { ...repoParts(ref), after }, viewedDataSchema);
+    const { files } = pullRequestOf(data.repository);
+
+    return {
+        endCursor: files.pageInfo.endCursor,
+        hasMore: files.pageInfo.hasNextPage,
+        items: files.nodes.map((node) => {
+            return { path: node.path, state: VIEWED_STATES[node.viewerViewedState] ?? "unviewed" };
+        }),
+    };
+};
+
+const PULL_ID_QUERY = `query ($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) { pullRequest(number: $number) { id } }
+}`;
+const MARK_VIEWED_MUTATION = `mutation ($pullRequestId: ID!, $path: String!) { markFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) { clientMutationId } }`;
+const UNMARK_VIEWED_MUTATION = `mutation ($pullRequestId: ID!, $path: String!) { unmarkFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) { clientMutationId } }`;
+
+const setViewed = async (request: HostRequest, ref: PullRequestRef, path: string, viewed: boolean): Promise<void> => {
+    const data = await graphqlRequest(
+        request,
+        PULL_ID_QUERY,
+        repoParts(ref),
+        z.object({ repository: z.object({ pullRequest: z.object({ id: z.string() }).nullable() }).nullable() }),
+    );
+    const { id } = pullRequestOf(data.repository);
+
+    await graphqlRequest(request, viewed ? MARK_VIEWED_MUTATION : UNMARK_VIEWED_MUTATION, { path, pullRequestId: id }, z.object({}).passthrough());
+};
+
+const reviewSchema = z.object({ html_url: z.string().optional(), id: z.number(), state: z.string() });
+
+/** One `POST .../reviews`: every comment, the verdict and the commit in the same call. */
+const submitReview = async (request: HostRequest, ref: PullRequestRef, submission: ReviewSubmission): Promise<SubmittedReview> => {
+    if (!SHA.test(submission.commitId)) {
+        throw new HostApiError("Not a commit id", 404);
+    }
+
+    const response = await request(`${repoPath(ref)}/pulls/${ref.number}/reviews`, {
+        json: {
+            body: submission.body,
+            comments: submission.comments.map((comment) => {
+                return {
+                    body: comment.body,
+                    line: comment.line,
+                    path: comment.path,
+                    side: HOST_SIDES[comment.side],
+                    ...(comment.startLine !== null && { start_line: comment.startLine, start_side: HOST_SIDES[comment.side] }),
+                };
+            }),
+            commit_id: submission.commitId,
+            event: EVENTS[submission.verdict],
+        },
+        method: "POST",
+    });
+    let review: z.infer<typeof reviewSchema>;
+
+    try {
+        review = parse(reviewSchema, await readJson(response));
+    } catch {
+        // The host answered 2xx, so it took the review; we just cannot say which one it is.
+        throw new HostApiError("The host's answer to the review could not be read", 0, false, { unconfirmed: true });
+    }
+
+    // With an event the review is submitted; a pending one is not a review anybody can see yet.
+    if (review.state === "PENDING") {
+        throw new HostApiError("The host kept the review as a draft", 0, false, { unconfirmed: true });
+    }
+
+    return { id: String(review.id), url: webUrl(review.html_url) };
+};
+
 // ─── Checks ─────────────────────────────────────────────────────────────────
 
 const checkRunsSchema = z.object({
@@ -530,6 +741,12 @@ export const githubDriver: HostDriver = {
     listCommits,
     listFiles,
     listInbox,
+    listThreads,
+    listViewed,
+    replyToThread,
+    setThreadResolved,
+    setViewed,
+    submitReview,
     view: {
         capabilities: GITHUB_CAPABILITIES,
         connectorSlug: "github",

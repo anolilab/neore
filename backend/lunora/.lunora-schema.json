@@ -19543,6 +19543,214 @@
       "relations": {},
       "shardMode": "root"
     },
+    "reviewDrafts": {
+      "commitOrdered": false,
+      "fields": {
+        "body": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "comments": {
+          "kind": "array",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "body": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "createdAt": {
+                "kind": "number",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "id": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "line": {
+                "kind": "number",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "path": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "side": {
+                "kind": "union",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "members": [
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"new\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"old\""
+                  }
+                ]
+              },
+              "startLine": {
+                "kind": "union",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "members": [
+                  {
+                    "kind": "null",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false
+                  },
+                  {
+                    "kind": "number",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "commitId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "hostOrigin": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "number": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "repository": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "revision": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "submittingAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "verdict": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "null",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            {
+              "kind": "union",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"approve\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"comment\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"request_changes\""
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "indexes": {
+        "by_user_and_pull": {
+          "fields": [
+            "userId",
+            "hostOrigin",
+            "repository",
+            "number"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "sandboxActions": {
       "commitOrdered": false,
       "fields": {
