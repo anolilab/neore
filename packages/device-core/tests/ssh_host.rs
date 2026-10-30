@@ -2044,5 +2044,5 @@ fn another_request_is_answered_while_a_download_waits_on_a_slow_disk() {
     );
 
     let _ = fs::remove_dir_all(&dir);
-    finish(&connection);
+    finish(&connection, &target, &paths);
 }
