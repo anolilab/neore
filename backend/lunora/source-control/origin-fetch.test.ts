@@ -36,6 +36,15 @@ describe("createBoundRequester", () => {
         expect(seen).toEqual([{ authorization: "Bearer tkn", url: "https://api.github.com/repos/o/r/pulls?page=2" }]);
     });
 
+    it("keeps the host error contract when a redirect body fails to cancel", async () => {
+        const body = new ReadableStream({
+            cancel: () => Promise.reject(new Error("stream broke")),
+        });
+        const via = async () => new Response(body, { headers: { location: "https://evil.example/x" }, status: 302 });
+
+        await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/repos/o/r")).rejects.toMatchObject({ name: "HostApiError", status: 0 });
+    });
+
     it("never sends the token to a plain-http origin", async () => {
         const { seen, via } = transport(() => Response.json({}));
 
