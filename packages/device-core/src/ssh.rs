@@ -1504,7 +1504,14 @@ fn explain(target: &Target, reason: &str, stderr: &Mutex<String>) -> String {
         said
     };
 
-    if said.contains("Permission denied") {
+    if [
+        "Permission denied",
+        "Too many authentication failures",
+        "No supported authentication methods available",
+    ]
+    .iter()
+    .any(|phrase| said.contains(phrase))
+    {
         return format!(
             "{} refused the login ({said}). Passwords and one-time codes are not supported yet: use a key or an SSH agent.",
             target.label()
@@ -1576,6 +1583,30 @@ mod tests {
         );
 
         assert!(login.contains("refused the login"), "{login}");
+    }
+
+    #[test]
+    fn every_authentication_failure_stops_the_reconnecting() {
+        for said in [
+            "Permission denied (publickey).",
+            "Received disconnect from 10.0.0.1 port 22:2: Too many authentication failures",
+            "No supported authentication methods available (server sent: publickey)",
+        ] {
+            let message = explain(&target(), "", &Mutex::new(said.to_owned()));
+
+            assert!(
+                !SshError::from_connect_failure(message).retryable(),
+                "{said}"
+            );
+        }
+
+        let down = explain(
+            &target(),
+            "",
+            &Mutex::new("Connection timed out".to_owned()),
+        );
+
+        assert!(SshError::from_connect_failure(down).retryable());
     }
 
     #[test]

@@ -310,12 +310,31 @@ fn command_line(pid: i64) -> Option<Vec<String>> {
         .output()
         .ok()?;
 
-    (output.status.success() && !output.stdout.is_empty()).then(|| {
-        String::from_utf8_lossy(&output.stdout)
-            .split_whitespace()
-            .map(str::to_owned)
-            .collect()
-    })
+    (output.status.success() && !output.stdout.is_empty())
+        .then(|| split_ps_args(&String::from_utf8_lossy(&output.stdout)))
+}
+
+/// Splits the `args=` column of `ps`, which prints the program path unquoted: a home directory with a space in it
+/// must not cut the path of `neore-host` short.
+#[cfg(unix)]
+fn split_ps_args(line: &str) -> Vec<String> {
+    const PROGRAM: &str = "neore-host";
+
+    let line = line.trim();
+    let end = line.match_indices(PROGRAM).find_map(|(at, _)| {
+        let end = at + PROGRAM.len();
+        let starts = at == 0 || line[..at].ends_with('/');
+        let ends = line[end..].chars().next().is_none_or(char::is_whitespace);
+
+        (starts && ends).then_some(end)
+    });
+
+    match end {
+        Some(end) => std::iter::once(line[..end].to_owned())
+            .chain(line[end..].split_whitespace().map(str::to_owned))
+            .collect(),
+        None => line.split_whitespace().map(str::to_owned).collect(),
+    }
 }
 
 /// Whether `pid` is a `neore-host` started as launch `id`: its program is `neore-host` and `--launch <id>` is among
@@ -433,6 +452,22 @@ pub fn reap(_dir: &Path, _ids: &[String], _own: Option<&str>) -> Reaped {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    #[test]
+    fn ps_output_keeps_a_program_path_with_spaces() {
+        use super::split_ps_args;
+
+        assert_eq!(
+            split_ps_args("/Users/Jane Doe/.neore/host/1/neore-host --stdio --launch abc\n"),
+            [
+                "/Users/Jane Doe/.neore/host/1/neore-host",
+                "--stdio",
+                "--launch",
+                "abc"
+            ]
+        );
+        assert_eq!(split_ps_args("sleep 5"), ["sleep", "5"]);
+    }
     use super::*;
 
     fn dir(name: &str) -> PathBuf {
