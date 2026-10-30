@@ -6,6 +6,7 @@
  * The first check only records a baseline.
  */
 import { sha256Hex } from "../../lib/crypto";
+import { EventCheckError } from "./check-failure";
 import { pageComparableText, parsePageSelector } from "./page-extract";
 import type { EventSource } from "./types";
 
@@ -18,13 +19,13 @@ export const pageSource: EventSource<{ contains?: string; kind: "page"; selector
         const selector = config.selector ? parsePageSelector(config.selector) : undefined;
 
         if (config.selector && !selector) {
-            throw new Error("The selector is not one this watcher understands. Use a tag, #id, .class, tag.class or tag#id.");
+            throw new EventCheckError("The selector is not one this watcher understands. Use a tag, #id, .class, tag.class or tag#id.");
         }
 
         const text = pageComparableText(html, selector);
 
         if (text === undefined) {
-            throw new Error(`Nothing on the page matches "${config.selector}".`);
+            throw new EventCheckError(`Nothing on the page matches "${config.selector}".`);
         }
 
         const hash = await sha256Hex(text);

@@ -1785,7 +1785,7 @@ export interface Doc_triggers {
     eventFilter?: string;
     eventProvider?: string;
     eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string };
-    eventState?: { checkedAt?: number; checkFailures?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean };
+    eventState?: { checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean };
     eventType?: string;
     failureStreak?: number;
     filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;
@@ -4566,7 +4566,7 @@ export interface Insert_triggers {
     eventFilter?: string;
     eventProvider?: string;
     eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string };
-    eventState?: { checkedAt?: number; checkFailures?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean };
+    eventState?: { checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean };
     eventType?: string;
     failureStreak?: number;
     filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;

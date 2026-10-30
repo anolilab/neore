@@ -3,8 +3,9 @@
  * unsafe address and does not follow redirects by itself: they are followed here, one hop at a time, so every
  * hop's target is checked again. The body is read to a byte cap and then cancelled.
  */
-import { fetchWithTimeout } from "../../chat/tools/utilities";
+import { fetchWithTimeout, isSafeUrl } from "../../chat/tools/utilities";
 import { assertOk } from "../../lib/fetch-timeout";
+import { EventCheckError } from "./check-failure";
 import type { FetchedPage } from "./types";
 
 export const PAGE_MAX_BYTES = 1024 * 1024;
@@ -47,6 +48,10 @@ export const fetchWatchedPage = async (url: string): Promise<FetchedPage> => {
     let target = url;
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+        if (!isSafeUrl(target)) {
+            throw new EventCheckError("That address cannot be watched: it is not a public http or https URL.");
+        }
+
         const response = await fetchWithTimeout(
             target,
             {
@@ -62,7 +67,7 @@ export const fetchWatchedPage = async (url: string): Promise<FetchedPage> => {
             await response.body?.cancel();
 
             if (!location) {
-                throw new Error("The page redirects without saying where.");
+                throw new EventCheckError("The page redirects without saying where.");
             }
 
             // `fetchWithTimeout` checks this target on the next turn.
@@ -76,11 +81,11 @@ export const fetchWatchedPage = async (url: string): Promise<FetchedPage> => {
         if (!TEXT_TYPE_RE.test(response.headers.get("content-type") ?? "text/html")) {
             await response.body?.cancel();
 
-            throw new Error("The address is not a web page or text file.");
+            throw new EventCheckError("The address is not a web page or text file.");
         }
 
         return await readCapped(response);
     }
 
-    throw new Error("The page redirects too many times.");
+    throw new EventCheckError("The page redirects too many times.");
 };

@@ -6531,6 +6531,11 @@
       "to": "table:triggerExecutions"
     },
     {
+      "from": "function:triggers_functions:admitTriggerRun",
+      "kind": "write",
+      "to": "table:triggers"
+    },
+    {
       "from": "function:triggers_functions:createExecution",
       "kind": "write",
       "to": "table:triggerExecutions"
@@ -6594,6 +6599,11 @@
       "from": "function:triggers_functions:recordFilteredExecution",
       "kind": "write",
       "to": "table:triggerExecutions"
+    },
+    {
+      "from": "function:triggers_functions:recordFilteredExecution",
+      "kind": "write",
+      "to": "table:triggers"
     },
     {
       "from": "function:triggers_functions:setTriggerEnabled",
@@ -20801,19 +20811,19 @@
     {
       "file": "triggers/events",
       "kind": "read",
-      "line": 78,
+      "line": 82,
       "reason": "\"assertWatcherCapacity\" is not a registered function"
     },
     {
       "file": "triggers/events",
       "kind": "call",
-      "line": 262,
+      "line": 286,
       "reason": "\"performEventCheck\" is not a registered function"
     },
     {
       "file": "triggers/events",
       "kind": "call",
-      "line": 270,
+      "line": 294,
       "reason": "\"performEventCheck\" is not a registered function"
     },
     {

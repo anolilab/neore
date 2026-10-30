@@ -960,13 +960,28 @@ export const releaseQuietWindow = internalMutation
         return null;
     });
 
+/**
+ * A moment in time fires once, so whatever consumes its firing is its last act: switch it off. It is called when
+ * the run it started settles, and when that run is skipped instead (a quiet-run skip, a filtered delivery), which
+ * leaves no run to settle. Not before: the run still has to be admitted, and admission needs the trigger enabled.
+ */
+const switchOffFiredMoment = async (ctx: MutationCtx, trigger: Doc<"triggers">): Promise<void> => {
+    if (trigger.enabled === true && trigger.eventSource?.kind === "time" && trigger.eventState?.firedAt !== undefined) {
+        await ctx.db.patch(trigger._id, { enabled: false, updatedAt: ctx.now });
+    }
+};
+
 /** The write behind {@link recordFilteredExecution}: the trigger's ONE filtered (skipped) row, created or moved to the front. */
 const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reason: string): Promise<void> => {
     // The trigger may have been deleted after the run read it. Its
     // deletion cleared the history, so a row written now would outlive it.
-    if (!(await ctx.db.get(triggerId))) {
+    const trigger = await ctx.db.get(triggerId);
+
+    if (!trigger) {
         return;
     }
+
+    await switchOffFiredMoment(ctx, trigger);
 
     const latest = await ctx.db
         .query("triggerExecutions")
@@ -1235,9 +1250,9 @@ export const updateExecution = internalMutation
             }
         }
 
-        // A moment in time fires once, so the run it started is its last: switch it off, now that it no longer needs to be admitted.
-        if (settling && trigger.enabled === true && trigger.eventSource?.kind === "time" && trigger.eventState?.firedAt !== undefined) {
-            await ctx.db.patch(trigger._id, { enabled: false, updatedAt: ctx.now });
+        // The run it started is its last: switch it off, now that it no longer needs to be admitted.
+        if (settling) {
+            await switchOffFiredMoment(ctx, trigger);
         }
 
         // Sent again on a redelivery: `notify` is idempotent on the key, so this only restores a notice that was lost.

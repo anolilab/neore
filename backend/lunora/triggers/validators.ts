@@ -45,8 +45,10 @@ export type EventSourceConfig = Infer<typeof vEventSource>;
  */
 export const vEventState = v.object({
     checkedAt: v.optional(v.number()),
-    // Consecutive failed checks; at `EVENT_PAUSE_AFTER_FAILURES` the watcher pauses.
+    // Consecutive failed checks whose cause the owner can fix; at `TRIGGER_PAUSE_AFTER_FAILURES` the watcher pauses.
     checkFailures: v.optional(v.number()),
+    // Consecutive failed checks that heal on their own (a timeout, an outage): they never pause the watcher, they only push the next check out.
+    checkRetries: v.optional(v.number()),
     firedAt: v.optional(v.number()),
     hash: v.optional(v.string()),
     lastOrder: v.optional(v.number()),

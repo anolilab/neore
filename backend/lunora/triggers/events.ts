@@ -18,10 +18,11 @@ import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
-import type { ActionCtx, MutationCtx } from "../_generated/server";
+import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { grantOwnerForThread } from "../agent/sharing";
 import { resolveThreadReadAccess } from "../agent/thread-read-access";
+import { STREAM_TTL_MS } from "../chat/streaming/persistent/library";
 import { claimOnce } from "../lib/claim-once";
 import { callOnShard } from "../lib/cross-shard";
 import { enqueueJob } from "../lib/job-queue";
@@ -32,6 +33,7 @@ import { notifyQuietly } from "../notifications/notify";
 import { advanceStreak } from "./failure-streak";
 import { buildEventPayload, checkEvent, checkIntervalMs, cooldownMs, firstCheckAt, watchesSomethingElse } from "./event-sources";
 import { fetchWatchedPage } from "./event-sources/fetch-page";
+import { isOwnerFixableCheckFailure, EventCheckError } from "./event-sources/check-failure";
 import { scanThreadRows } from "./event-sources/thread-scan";
 import type { ScanRow } from "./event-sources/thread-scan";
 import type { EventCheckContext, ThreadScan } from "./event-sources/types";
@@ -49,8 +51,10 @@ export const EVENT_FIRE_CLAIM_TTL_MS = 4 * MINUTE_MS;
 /** A dispatched check that never reports back is retried after this long. */
 export const EVENT_CHECK_LEASE_MS = 5 * MINUTE_MS;
 const EVENT_DISPATCH_BATCH = 25;
-/** Rows read per scan of a thread. */
+/** Rows read per scan of a thread. A longer stretch is read over several checks: the baseline moves to the last row read. */
 const THREAD_SCAN_ROWS = 60;
+/** The longest a transient failure delays the next check. */
+const EVENT_MAX_BACKOFF_MS = 6 * 60 * MINUTE_MS;
 
 /** Consecutive failed checks are counted with the same streak rule as failed runs. */
 const pausedWatcherNoticeBody = (error: string): string =>
@@ -98,6 +102,16 @@ export const assertThreadWatchable = async (ctx: Pick<MutationCtx, "db">, thread
     }
 
     throw new LunoraError("NOT_FOUND", "Thread not found");
+};
+
+/** The baseline without the counters of failed checks. */
+const withoutCounters = (state: EventState | undefined): EventState => {
+    const kept = { ...state };
+
+    delete kept.checkFailures;
+    delete kept.checkRetries;
+
+    return kept;
 };
 
 /** When a watcher is looked at next after a check that worked; `undefined` for a moment that has come. */
@@ -177,6 +191,8 @@ export const dispatchDueEventTriggers = internalMutation
 export const latestThreadReply = internalQuery
     .input({
         after: v.optional(v.object({ order: v.number(), stepOrder: v.number() })),
+        // The time of the check (a query has no clock of its own): a reply pending since before the stream timeout is abandoned.
+        now: v.number(),
         threadId: v.string().max(MAX_LENGTH.id),
         userId: v.string().max(MAX_LENGTH.id),
     })
@@ -187,7 +203,7 @@ export const latestThreadReply = internalQuery
             reply: v.optional(v.object({ id: v.string(), text: v.string() })),
         }),
     )
-    .query(async ({ args: { after, threadId, userId }, ctx }): Promise<ThreadScan & { accessible: boolean }> => {
+    .query(async ({ args: { after, now, threadId, userId }, ctx }): Promise<ThreadScan & { accessible: boolean }> => {
         const access = await resolveThreadReadAccess(ctx, threadId as Id<"threads">, userId);
 
         if (access?.kind !== "full" || access.thread.deleted === true) {
@@ -204,18 +220,13 @@ export const latestThreadReply = internalQuery
                       .order("desc")
                       .take(20)
                 : [];
-        const rows =
-            after === undefined
-                ? newest.toReversed()
-                : await ctx.db
-                      .query("messages")
-                      .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", id).gte("order", after.order))
-                      .take(THREAD_SCAN_ROWS);
+        const rows = after === undefined ? newest.toReversed() : await rowsAfter(ctx, id, after);
         const scanRows: ScanRow[] = rows.map((row) => {
             const message = row.message as { content?: unknown; role?: string } | undefined;
 
             return {
                 _id: row._id as string,
+                createdAt: row._creationTime,
                 order: row.order,
                 role: message?.role,
                 status: row.status,
@@ -226,8 +237,31 @@ export const latestThreadReply = internalQuery
             };
         });
 
-        return { accessible: true, ...scanThreadRows(scanRows, after, userId) };
+        return { accessible: true, ...scanThreadRows(scanRows, after, userId, now - STREAM_TTL_MS) };
     });
+
+/**
+ * The rows past a baseline, oldest first: the rest of the baseline's own order by `stepOrder` (one reply can be
+ * many rows long), then the later orders. A single read of everything from that order on would hand back the
+ * same first rows on every check once a reply has more than {@link THREAD_SCAN_ROWS} of them, and never see past.
+ */
+const rowsAfter = async (ctx: Pick<QueryCtx, "db">, id: Id<"threads">, after: { order: number; stepOrder: number }): Promise<Doc<"messages">[]> => {
+    const sameOrder = await ctx.db
+        .query("messages")
+        .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", id).eq("order", after.order).gt("stepOrder", after.stepOrder))
+        .take(THREAD_SCAN_ROWS);
+
+    if (sameOrder.length >= THREAD_SCAN_ROWS) {
+        return sameOrder;
+    }
+
+    const later = await ctx.db
+        .query("messages")
+        .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", id).gt("order", after.order))
+        .take(THREAD_SCAN_ROWS - sameOrder.length);
+
+    return [...sameOrder, ...later];
+};
 
 const textOf = (content: unknown): string | undefined => {
     if (typeof content === "string") {
@@ -270,6 +304,8 @@ export const performEventCheck = async (
         await ctx.runMutation(internal.triggers.events.recordEventCheck, {
             error: (error instanceof Error ? error.message : "The check failed.").slice(0, 300),
             read,
+            // Only a cause the owner can fix counts toward pausing; the rest is tried again later.
+            transient: !isOwnerFixableCheckFailure(error),
             triggerId,
         });
     }
@@ -287,11 +323,12 @@ export const runEventCheck = internalAction
         }
 
         const { userId } = trigger;
+        const now = Date.now();
         const checkContext: EventCheckContext = {
             fetchPage: fetchWatchedPage,
-            now: Date.now(),
+            now,
             scanThread: async (threadId, after) => {
-                const args = { after, threadId, userId };
+                const args = { after, now, threadId, userId };
                 // A thread somebody shared with the owner lives on that person's shard.
                 const owner = await ctx.runQuery(internal.agent.sharing.getGrantOwner, { threadId, userId });
                 const scan =
@@ -300,7 +337,7 @@ export const runEventCheck = internalAction
                         : await ctx.runQuery(internal.triggers.events.latestThreadReply, args);
 
                 if (!scan.accessible) {
-                    throw new Error("You can no longer read the thread this trigger watches.");
+                    throw new EventCheckError("You can no longer read the thread this trigger watches.");
                 }
 
                 return scan;
@@ -316,7 +353,7 @@ export const runEventCheck = internalAction
  * Stores what a check found. A condition that fired starts one run, once: the occurrence is claimed
  * (`claimOnce` on the trigger and the source's key), so a duplicate tick or a retried check that saw the same
  * thing starts nothing; the run itself rides the jobs queue under its own claim (`enqueueJob({ once })`).
- * A failed check counts toward pausing the watcher.
+ * A failed check counts toward pausing the watcher only if its cause is the owner's to fix; an outage backs it off instead.
  */
 export const recordEventCheck = internalMutation
     .input({
@@ -331,10 +368,12 @@ export const recordEventCheck = internalMutation
         // What the check read: the condition and the time of the check before it. An answer is kept only if both still hold.
         read: v.object({ checkedAt: v.optional(v.number()), source: vEventSource }),
         state: v.optional(vEventState),
+        // The failure heals on its own (a timeout, an outage): it backs the watcher off and never pauses it.
+        transient: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
     })
     .output(v.object({ fired: v.boolean() }))
-    .mutation(async ({ args: { error, fire, read, state, triggerId }, ctx }) => {
+    .mutation(async ({ args: { error, fire, read, state, transient, triggerId }, ctx }) => {
         const trigger = await ctx.db.get(triggerId);
 
         // Switched off, edited, deleted or overtaken by another check while this one ran: its answer is about something else now.
@@ -353,12 +392,17 @@ export const recordEventCheck = internalMutation
         const interval = Math.max(checkIntervalMs(config), EVENT_CHECK_LEASE_MS);
 
         if (error !== undefined) {
-            const { pause, streak } = advanceStreak(trigger.eventState?.checkFailures ?? 0, "user-fixable");
+            const retries = transient === true ? (trigger.eventState?.checkRetries ?? 0) + 1 : 0;
+            const { pause, streak } = advanceStreak(trigger.eventState?.checkFailures ?? 0, transient === true ? "transient" : "user-fixable");
+            // An outage waits twice as long after each check it spoils, up to a cap; a failure the owner must fix keeps the usual pace until the pause.
+            const wait = retries > 0 ? Math.min(interval * 2 ** (retries - 1), Math.max(EVENT_MAX_BACKOFF_MS, interval)) : interval;
+
+            const counters = { ...(streak > 0 && { checkFailures: streak }), ...(retries > 0 && { checkRetries: retries }) };
 
             await patchRow(ctx.db, trigger, {
-                eventState: { ...trigger.eventState, checkedAt: now, checkFailures: streak },
+                eventState: { ...withoutCounters(trigger.eventState), checkedAt: now, ...counters },
                 lastError: error,
-                nextTriggerAt: pause ? undefined : now + interval,
+                nextTriggerAt: pause ? undefined : now + wait,
                 updatedAt: now,
                 ...(pause && { enabled: false }),
             });
@@ -375,7 +419,7 @@ export const recordEventCheck = internalMutation
                     userId: trigger.userId,
                 });
             } else {
-                await noteShardDue(ctx, now + interval, trigger.userId);
+                await noteShardDue(ctx, now + wait, trigger.userId);
             }
 
             return { fired: false };
@@ -383,10 +427,11 @@ export const recordEventCheck = internalMutation
 
         const fireKey = fire ? `${trigger._id}:${fire.key}` : undefined;
         const claimed = fireKey !== undefined && (await claimOnce(ctx, EVENT_FIRE_SCOPE, fireKey, EVENT_FIRE_CLAIM_TTL_MS, trigger.userId));
-        const { checkFailures, ...kept } = state ?? trigger.eventState ?? {};
+        const { checkFailures, checkRetries } = state ?? trigger.eventState ?? {};
+        const kept = withoutCounters(state ?? trigger.eventState);
         // A moment in time fires once and is done; the others keep watching, after a cooldown.
         const nextTriggerAt = nextCheckAfterSuccess(config, { fired: fire !== undefined, interval, now, started: claimed });
-        const recovered = (checkFailures ?? 0) > 0;
+        const recovered = (checkFailures ?? 0) > 0 || (checkRetries ?? 0) > 0;
 
         await patchRow(ctx.db, trigger, {
             eventState: { ...kept, checkedAt: now, ...(claimed && { firedAt: now }) },

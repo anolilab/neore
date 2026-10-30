@@ -9369,8 +9369,8 @@ export interface Caller {
     triggers: {
         events: {
             dispatchDueEventTriggers: (args?: {}) => Promise<{ dispatched: number }>;
-            latestThreadReply: (args: { after?: { order: number; stepOrder: number }; threadId: string; userId: string }) => Promise<{ accessible: boolean; baseline?: { order: number; stepOrder: number }; reply?: { id: string; text: string } }>;
-            recordEventCheck: (args: { error?: string; fire?: { excerpt?: string; key: string; summary: string }; read: { checkedAt?: number; source: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string } }; state?: { checkedAt?: number; checkFailures?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean }; triggerId: Id<"triggers"> }) => Promise<{ fired: boolean }>;
+            latestThreadReply: (args: { after?: { order: number; stepOrder: number }; now: number; threadId: string; userId: string }) => Promise<{ accessible: boolean; baseline?: { order: number; stepOrder: number }; reply?: { id: string; text: string } }>;
+            recordEventCheck: (args: { error?: string; fire?: { excerpt?: string; key: string; summary: string }; read: { checkedAt?: number; source: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string } }; state?: { checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean }; transient?: boolean; triggerId: Id<"triggers"> }) => Promise<{ fired: boolean }>;
             runEventCheck: (args: { triggerId: Id<"triggers"> }) => Promise<null>;
         };
         execute: {

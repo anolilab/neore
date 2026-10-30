@@ -1545,7 +1545,7 @@ export const triggers = sqliteTable("triggers", {
     eventFilter: text("eventFilter"),
     eventProvider: text("eventProvider"),
     eventSource: text("eventSource", { mode: "json" }).$type<{ contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string }>(),
-    eventState: text("eventState", { mode: "json" }).$type<{ checkedAt?: number; checkFailures?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean }>(),
+    eventState: text("eventState", { mode: "json" }).$type<{ checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean }>(),
     eventType: text("eventType"),
     failureStreak: real("failureStreak"),
     filters: text("filters", { mode: "json" }).$type<Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>>(),

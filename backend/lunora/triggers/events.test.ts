@@ -7,8 +7,9 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { HttpError } from "../lib/fetch-timeout";
 import schema from "../schema";
-import { createExecution, updateExecution } from "./functions";
+import { createExecution, recordFilteredExecution, updateExecution } from "./functions";
 import { EVENT_CHECK_LEASE_MS, EVENT_FIRE_CLAIM_TTL_MS, dispatchDueEventTriggers, latestThreadReply, performEventCheck, recordEventCheck } from "./events";
 import type { EventCheckContext } from "./event-sources/types";
 import { MAX_ACTIVE_EVENT_WATCHERS } from "./event-sources/types";
@@ -73,8 +74,17 @@ const check = async (triggerId: string, html: string, now = NOW): Promise<void> 
     const trigger = await readTrigger(triggerId);
     const checkContext: EventCheckContext = {
         fetchPage: async () => {
+            // "FAIL": the address answers 404, which only its owner can fix. The others heal on their own.
             if (html === "FAIL") {
-                throw new Error("The page could not be read: 503 Service Unavailable");
+                throw new HttpError("The page could not be read", 404, "Not Found");
+            }
+
+            if (html === "FAIL503") {
+                throw new HttpError("The page could not be read", 503, "Service Unavailable");
+            }
+
+            if (html === "TIMEOUT") {
+                throw new Error("Request timeout after 15000ms");
             }
 
             return { text: html, truncated: false };
@@ -251,6 +261,28 @@ describe("a time watcher", () => {
         expect(afterSettle.enabled).toBe(false);
     });
 
+    it("switches itself off when a quiet-run skip consumes its firing", async () => {
+        const id = await insertWatcher({ eventSource: { at: AT, kind: "time" }, nextTriggerAt: AT });
+
+        vi.setSystemTime(AT);
+        await check(id, "", AT);
+        await harness.run(async (ctx: any) => await ctx.runMutation(recordFilteredExecution, { reason: "Nothing to report", triggerId: id }));
+
+        const row = await readTrigger(id);
+
+        expect(row.enabled).toBe(false);
+    });
+
+    it("is not switched off by a filtered row before it has fired", async () => {
+        const id = await insertWatcher({ eventSource: { at: AT, kind: "time" }, nextTriggerAt: AT });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(recordFilteredExecution, { reason: "Nothing to report", triggerId: id }));
+
+        const row = await readTrigger(id);
+
+        expect(row.enabled).toBe(true);
+    });
+
     it("is not switched off by a test run before it has fired", async () => {
         const id = await insertWatcher({ eventSource: { at: AT, kind: "time" }, nextTriggerAt: AT });
         const executionId = await harness.run(async (ctx: any) => await ctx.runMutation(createExecution, { triggerId: id }));
@@ -323,7 +355,7 @@ describe("failed checks", () => {
         expect(await readTrigger(id)).toMatchObject({
             enabled: true,
             eventState: { checkFailures: TRIGGER_PAUSE_AFTER_FAILURES - 1 },
-            lastError: "The page could not be read: 503 Service Unavailable",
+            lastError: "The page could not be read: 404 Not Found",
         });
         expect(await harness.run(async (ctx: any) => await ctx.db.query("notifications").collect())).toHaveLength(0);
 
@@ -336,7 +368,60 @@ describe("failed checks", () => {
         expect(row.nextTriggerAt).toBeUndefined();
         expect(notices).toHaveLength(1);
         expect(notices[0]).toMatchObject({ outcome: "failure", title: "Watcher", type: "trigger", userId: USER });
-        expect(notices[0].body).toContain("503");
+        expect(notices[0].body).toContain("404");
+    });
+
+    it("never pauses the watcher for an outage, a timeout or a network error, and waits longer after each", async () => {
+        const id = await insertWatcher();
+        const waits: number[] = [];
+
+        for (const failure of ["FAIL503", "TIMEOUT", "FAIL503", "TIMEOUT", "FAIL503"]) {
+            await check(id, failure);
+            const waiting = await readTrigger(id);
+
+            waits.push(waiting.nextTriggerAt - NOW);
+        }
+
+        const row = await readTrigger(id);
+
+        expect(row.enabled).toBe(true);
+        expect(row.eventState.checkFailures).toBeUndefined();
+        expect(row.lastError).toBeDefined();
+        expect(waits[0]).toBe(PAGE.intervalMinutes * 60_000);
+        expect(waits.slice(1).every((wait, index) => wait > waits[index]!)).toBe(true);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("notifications").collect())).toHaveLength(0);
+    });
+
+    it("keeps the cause-fixable streak across an outage in between", async () => {
+        const id = await insertWatcher();
+
+        await check(id, "FAIL");
+        await check(id, "FAIL503");
+        await check(id, "FAIL");
+
+        const stillOn = await readTrigger(id);
+
+        expect(stillOn.enabled).toBe(true);
+
+        await check(id, "FAIL");
+
+        const paused = await readTrigger(id);
+
+        expect(paused.enabled).toBe(false);
+    });
+
+    it("forgets the outages, and the error, after a check that works", async () => {
+        const id = await insertWatcher();
+
+        await check(id, "FAIL503");
+        await check(id, "FAIL503");
+        await check(id, "<p>ok</p>");
+
+        const row = await readTrigger(id);
+
+        expect(row.lastError).toBeUndefined();
+        expect(row.eventState.checkRetries).toBeUndefined();
+        expect(row.nextTriggerAt - NOW).toBe(PAGE.intervalMinutes * 60_000);
     });
 
     it("starts the streak over after a check that works", async () => {
@@ -427,7 +512,7 @@ describe("the thread scan", () => {
                 }),
         );
     const scan = async (threadId: string, after?: { order: number; stepOrder: number }, userId = USER): Promise<any> =>
-        await harness.run(async (ctx: any) => await ctx.runQuery(latestThreadReply, { after, threadId, userId }));
+        await harness.run(async (ctx: any) => await ctx.runQuery(latestThreadReply, { after, now: NOW, threadId, userId }));
 
     it("takes the tip as the baseline, then reports a reply that landed after it", async () => {
         const threadId = await insertThread();
@@ -447,6 +532,48 @@ describe("the thread scan", () => {
         const later = await scan(threadId, second.baseline);
 
         expect(later.reply).toBeUndefined();
+    });
+
+    it("sees a reply past the sixtieth row of the order the baseline is in, then the later orders", async () => {
+        const threadId = await insertThread();
+
+        await insertRow(threadId, 0, "user", { userId: USER });
+
+        let replyId = "";
+
+        for (let step = 1; step <= 69; step += 1) {
+            const id = await insertRow(threadId, 0, "assistant", { stepOrder: step, tool: step !== 65 });
+
+            if (step === 65) {
+                replyId = id;
+            }
+        }
+
+        await insertRow(threadId, 1, "assistant", { stepOrder: 0, tool: true });
+
+        const first = await scan(threadId, { order: 0, stepOrder: 0 });
+
+        expect(first.reply).toBeUndefined();
+        expect(first.baseline).toEqual({ order: 0, stepOrder: 60 });
+
+        const second = await scan(threadId, first.baseline);
+
+        expect(second.reply).toMatchObject({ id: replyId });
+        expect(second.baseline).toEqual({ order: 1, stepOrder: 0 });
+    });
+
+    it("is not blocked by a reply stuck in pending since before the stream timeout", async () => {
+        const threadId = await insertThread();
+
+        await insertRow(threadId, 0, "user", { userId: USER });
+        await insertRow(threadId, 1, "assistant", { status: "pending" });
+        await insertRow(threadId, 2, "assistant");
+
+        const result = await harness.run(
+            async (ctx: any) => await ctx.runQuery(latestThreadReply, { after: { order: 0, stepOrder: 0 }, now: NOW + 60 * 60_000, threadId, userId: USER }),
+        );
+
+        expect(result.reply).toMatchObject({ text: "assistant 2" });
     });
 
     it("refuses a thread the watcher cannot read", async () => {
