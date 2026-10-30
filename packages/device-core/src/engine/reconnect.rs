@@ -314,8 +314,8 @@ impl DeviceState {
     }
 
     /// The person disconnected, removed or unpaired a server: it is no longer kept.
-    pub(super) fn keep_forget(&self, device_id: &str) {
-        self.ssh.keeps.lock().unwrap().remove(device_id);
+    pub(super) fn keep_forget(&self, device_id: &str) -> bool {
+        self.ssh.keeps.lock().unwrap().remove(device_id).is_some()
     }
 
     pub(super) fn keep_forget_all(&self) {

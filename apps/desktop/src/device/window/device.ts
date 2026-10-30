@@ -433,14 +433,26 @@ const hostCard = (host: HostView): HTMLElement => {
     const stop = (text: string): HTMLElement =>
         button(text, () => hostAction(() => globalThis.neoreDevice.hostDisconnect(host.deviceId), "Disconnected."), host.name);
     const reconnecting = phase === "waiting" || phase === "connecting";
-    let link: HTMLElement[] = [connect(phase === "gaveUp" ? "Retry" : "Connect")];
+    let link: HTMLElement[] = [connect("Connect")];
 
     if (host.connected) {
         link = [stop("Disconnect")];
-    } else if (phase === "waiting") {
-        link = [connect("Retry now"), stop("Stop reconnecting")];
-    } else if (phase === "connecting") {
-        link = [stop("Stop reconnecting")];
+    } else {
+        switch (phase) {
+            case "connecting": {
+                link = [stop("Stop reconnecting")];
+                break;
+            }
+            case "gaveUp": {
+                link = [connect("Retry"), stop("Dismiss")];
+                break;
+            }
+            case "waiting": {
+                link = [connect("Retry now"), stop("Stop reconnecting")];
+                break;
+            }
+            default:
+        }
     }
 
     actions.className = "row";
@@ -797,8 +809,20 @@ $("server-form").addEventListener("submit", async (event) => {
 });
 
 // A link that drops or comes back while this window stays open: show the Retry / Stop reconnecting it now needs.
+const refresh = { latest: 0 };
+
 globalThis.neoreDevice.onChanged(async () => {
-    state.settings = await globalThis.neoreDevice.settingsGet();
+    refresh.latest += 1;
+
+    const mine = refresh.latest;
+    const settings = await globalThis.neoreDevice.settingsGet();
+
+    // Overlapping notices can answer out of order; only the newest read may redraw.
+    if (mine !== refresh.latest) {
+        return;
+    }
+
+    state.settings = settings;
 
     // The redraw rebuilds every server card; carry over a folder path that is half typed there, and the caret in it.
     const values = [...document.querySelectorAll<HTMLInputElement>("input[id^='host-root-']")]
