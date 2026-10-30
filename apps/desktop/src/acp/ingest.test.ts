@@ -105,11 +105,11 @@ let logs: string[];
 
 const hosts: HostPoster[] = [];
 
-const poster = () => {
+const poster = (fetchImpl: typeof fetch = backend.fetch as typeof fetch) => {
     const host = new HostPoster({
         deviceId: () => paired,
         endpoint: new URL("https://backend.test/hosts/ingest"),
-        fetch: backend.fetch as typeof fetch,
+        fetch: fetchImpl,
         log: (message) => {
             logs.push(message);
         },
@@ -541,10 +541,6 @@ describe("the signed post", () => {
     });
 
     it("keeps the batch and tries it again when fetch rejects a redirect", async () => {
-        const host = poster();
-
-        await open(host);
-
         const original = backend.fetch;
         let rejected = 0;
 
@@ -557,25 +553,34 @@ describe("the signed post", () => {
             return await original(url, init);
         };
 
-        const retrying = new HostPoster({
-            deviceId: () => paired,
-            endpoint: new URL("https://backend.test/hosts/ingest"),
-            fetch: flaky as typeof fetch,
-            log: () => {},
-            now: () => clock,
-            random: () => 0.5,
-            sign: (payload) => `sig:${String(payload.length)}`,
-            stateFile: path.join(scratch, "acp-host-turns-2.json"),
-        });
+        const retrying = poster(flaky as typeof fetch);
 
-        hosts.push(retrying);
-        retrying.sessionOpened("s2", INFO);
-        await settle();
-        retrying.turnStarted("s2", "t2", "go");
+        await open(retrying);
+        retrying.turnStarted("s1", "t2", "go");
         await settle(60_000);
 
         expect(rejected).toBe(1);
         expect(backend.chunks.get("t2")?.[0]).toMatchObject({ kind: "turn_start" });
+    });
+});
+
+describe("a turn that begins while the earlier one is still ending", () => {
+    it("keeps the batch and sends it again unchanged on a 409 that names no next", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext = [409, 409];
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "hello");
+        await settleInSteps(60_000);
+
+        const turnPosts = backend.posts.filter(({ post }) => post.turnId === "t1");
+
+        expect(turnPosts.length).toBeGreaterThanOrEqual(3);
+        expect(turnPosts[1]?.post.events).toEqual(turnPosts[0]?.post.events);
+        expect(turnPosts[2]?.post.firstSeq).toBe(0);
+        expect(backend.texts("t1")).toBe("hello");
+        expect(logs).toEqual([]);
     });
 });
 

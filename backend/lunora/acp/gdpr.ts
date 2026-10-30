@@ -72,7 +72,7 @@ export const collectAcpSessionsForExport = internalQuery
 
             return {
                 events: [],
-                next: isDone ? ({ phase: "events" } satisfies ExportCursor) : { page: continueCursor ?? undefined, phase: "sessions" as const },
+                next: isDone ? { phase: "events" as const } : { page: continueCursor ?? undefined, phase: "sessions" as const },
                 // Labels and times only: no device id, no path ever reaches the backend.
                 sessions: page.map(({ agentKey, agentLabel, capabilities, createdAt, folderLabel, lastEventAt, status, threadId }) => {
                     return {
