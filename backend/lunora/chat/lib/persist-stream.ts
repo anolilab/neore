@@ -33,7 +33,7 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { stepCountIs } from "ai";
 import type { ActionCtx } from "../../_generated/server";
-import { createToolProgressWriter } from "./mcp-progress";
+import { createToolProgressWriter, ProgressStreamClosedError } from "./mcp-progress";
 import type { ToolProgressSink } from "./mcp-progress";
 
 /** Sentence delimiter check — same as persistent/client.ts:30. */
@@ -130,12 +130,24 @@ export const stopWhenStopped = (ctx: Partial<Pick<ActionCtx, "runQuery">>, strea
  */
 export const toolProgressSink = (ctx: Pick<ActionCtx, "runMutation">, streamId: string): ToolProgressSink =>
     createToolProgressWriter(async (toolProgress) => {
-        await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
-            final: false,
-            streamId: streamId as Id<"persistentStreams">,
-            text: "",
-            toolProgress,
-        });
+        try {
+            await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
+                final: false,
+                streamId: streamId as Id<"persistentStreams">,
+                text: "",
+                toolProgress,
+            });
+        } catch (error) {
+            // `addChunk` answers CONFLICT once the stream is no longer streaming; that one is final.
+            if (
+                (error as { code?: string; data?: { code?: string } }).code === "CONFLICT" ||
+                (error as { data?: { code?: string } }).data?.code === "CONFLICT"
+            ) {
+                throw new ProgressStreamClosedError();
+            }
+
+            throw error;
+        }
     });
 
 export interface PipedStream {

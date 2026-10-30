@@ -10,6 +10,7 @@ import {
     createLatestThrottle,
     createProgressCall,
     createToolProgressWriter,
+    ProgressStreamClosedError,
     readProgressParams,
     runWithProgressCall,
     sanitizeProgressMessage,
@@ -298,10 +299,10 @@ describe(createToolProgressWriter, () => {
         await expect(call.finish()).resolves.toBeUndefined();
     });
 
-    it("stops writing once the stream refuses a write, the ended marker included", async () => {
+    it("stops writing once the stream is over, the ended marker included", async () => {
         const clock = fakeClock();
         const write = vi.fn(async (_chunk: ToolProgressChunk) => {
-            throw new Error("Stream write refused");
+            throw new ProgressStreamClosedError();
         });
         const call = createToolProgressWriter(write, clock)(tool);
 
@@ -314,6 +315,24 @@ describe(createToolProgressWriter, () => {
         await call.finish();
 
         expect(write).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps reporting after a write that failed for another reason", async () => {
+        const clock = fakeClock();
+        const write = vi.fn(async (_chunk: ToolProgressChunk) => {}).mockRejectedValueOnce(new Error("network"));
+        const call = createToolProgressWriter(write, clock)(tool);
+
+        call.push({ progress: 1 });
+        await clock.advance(600);
+        call.push({ progress: 2 });
+        await clock.advance(600);
+        await call.finish();
+
+        expect(write.mock.calls.map(([chunk]) => chunk)).toStrictEqual([
+            { ...tool, progress: 1 },
+            { ...tool, progress: 2 },
+            { ...tool, ended: true },
+        ]);
     });
 
     it("skips a write that repeats the last one for the call", async () => {

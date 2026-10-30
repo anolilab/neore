@@ -242,6 +242,14 @@ export interface ToolCallProgress {
 
 export type ToolProgressSink = (tool: ToolProgressTool) => ToolCallProgress;
 
+/** What a write throws when the stream is over (the reply was stopped or ended): every later write would be refused too. */
+export class ProgressStreamClosedError extends Error {
+    public constructor() {
+        super("The stream no longer takes progress");
+        this.name = "ProgressStreamClosedError";
+    }
+}
+
 /**
  * The sink for one run: `write` puts a chunk on the stream. Each call gets its own
  * throttle, so two tools running side by side each report at their own pace.
@@ -259,7 +267,8 @@ export const createToolProgressWriter = (write: (chunk: ToolProgressChunk) => Pr
         const startedAt = now();
         let reported = false;
         let written = 0;
-        // Once the stream refuses a write (the reply was stopped), it refuses every later one: stop trying.
+        // Once the stream is over (the reply was stopped), it refuses every later write: stop trying. Any other
+        // failure is one write lost; the next report may still land.
         let refused = false;
         let last: McpProgress | undefined;
         const throttle = createLatestThrottle(
@@ -275,9 +284,9 @@ export const createToolProgressWriter = (write: (chunk: ToolProgressChunk) => Pr
 
                 try {
                     await write({ ...tool, ...progress });
-                } catch {
-                    // Best effort: a stopped stream refuses the write, and the tool carries on.
-                    refused = true;
+                } catch (error) {
+                    // Best effort: the tool carries on whatever happens to its progress.
+                    refused = error instanceof ProgressStreamClosedError;
                 }
             },
             clock,
