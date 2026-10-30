@@ -20,22 +20,20 @@ files:
     # The terminal's PTY library (`node-pty`) runs from the host process. Its C++ sources, vendored deps and
     # build files are not needed at runtime; the prebuilt binaries (or the Linux build output) are.
     - "!node_modules/node-pty/{src,deps,third_party,scripts,binding.gyp}{,/**/*}"
-# The on-device speech recogniser (`scripts/build-dictation-helper.mjs`) and its licence texts. Outside the
-# asar: a process cannot be spawned from inside the archive. Built per OS and arch; where none was built the
-# folder is absent, and dictation refuses cleanly (`src/dictation/index.ts`).
+# Outside the asar: a process cannot be spawned from inside the archive, and the Rust side reads plain files.
 extraResources:
+    # The on-device speech recogniser (`scripts/build-dictation-helper.mjs`) and its licence texts. Built per OS
+    # and arch; where none was built the folder is absent, and dictation refuses cleanly (`src/dictation/index.ts`).
     - from: "helper/${os}-${arch}"
       to: dictation
-asar: true
-# The `neore-host` binaries the app uploads to a server over SSH, with the checksums they are verified against
-# (scripts/host-bundle.mjs). Plain files in `resources/`, outside the asar: the Rust side reads them with the
-# filesystem API, and the checksums must not be reachable by a page.
-extraResources:
+    # The `neore-host` binaries the app uploads to a server over SSH, with the checksums they are verified against
+    # (scripts/host-bundle.mjs). The checksums must not be reachable by a page.
     - from: host-bundle
       to: neore-host
       filter:
           - manifest.json
           - neore-host-*
+asar: true
 # node-pty ships N-API binaries for macOS (both archs) and Windows, and builds on Linux at install time. They are
 # valid for Electron as they are, and a rebuild here would produce the runner's arch only (a mac x64 build on an
 # arm64 runner would get an arm64 binary, which node-pty prefers over the right prebuild). The other native
