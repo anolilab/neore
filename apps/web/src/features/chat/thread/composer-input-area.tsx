@@ -194,7 +194,7 @@ const ComposerInputArea = ({
                                                         disabled={disabled}
                                                         type="button"
                                                     >
-                                                        <PlusIcon className="text-foreground size-4 dark:text-white" />
+                                                        <PlusIcon aria-hidden="true" className="text-foreground size-4 dark:text-white" />
                                                     </button>
                                                 }
                                             />
@@ -226,6 +226,7 @@ const ComposerInputArea = ({
                                 <TooltipTrigger
                                     render={
                                         <button
+                                            aria-label={t`Add attachment`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "ghost" }),
                                                 "my-2 size-[34px]",
@@ -235,7 +236,7 @@ const ComposerInputArea = ({
                                             onClick={onAddAttachment}
                                             type="button"
                                         >
-                                            <PlusIcon className="text-foreground size-4 dark:text-white" />
+                                            <PlusIcon aria-hidden="true" className="text-foreground size-4 dark:text-white" />
                                         </button>
                                     }
                                 />

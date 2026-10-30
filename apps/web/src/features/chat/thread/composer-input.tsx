@@ -87,6 +87,10 @@ const fetchVaultFile = async (url: string, fileName: string, fileType: string): 
     return new File([await response.blob()], fileName, { type: fileType });
 };
 
+/** Messages already toasted (no second announcement), and those a retry cannot fix (too large, unsupported, content mismatch). */
+const toastedMessages = new Set<string>();
+const permanentMessages = new Set<string>();
+
 /**
  * Also outside the component: a conditional inside a `catch` makes the React Compiler skip it.
  * An upload failure the adapter recognised (too large, unsupported, expired,
@@ -96,6 +100,12 @@ const fetchVaultFile = async (url: string, fileName: string, fileType: string): 
 const errorMessage = (error: unknown, fallback: string, describe?: (error: AttachmentTooLargeError | AttachmentUploadError) => string): string => {
     if ((error instanceof AttachmentTooLargeError || error instanceof AttachmentUploadError) && describe) {
         const message = describe(error);
+
+        toastedMessages.add(message);
+
+        if (error instanceof AttachmentTooLargeError || error.reason === "unsupported" || error.reason === "content-mismatch") {
+            permanentMessages.add(message);
+        }
 
         showError(message);
 
@@ -214,13 +224,16 @@ const AttachmentPreviewInner: FC<{
     attachment: PendingAttachment;
     onEdit?: () => void;
     onRemove: () => void;
-}> = ({ attachment, onEdit, onRemove }) => {
+    onRetry?: () => void;
+}> = ({ attachment, onEdit, onRemove, onRetry }) => {
     const { t } = useLingui();
     const isImage = attachment.type === "image";
     const canEdit = attachment.file && isEditable(attachment.file);
     const isText = canEdit;
     const isUploading = attachment.status === "uploading";
     const isError = attachment.status === "error";
+    // An empty file is a placeholder whose fetch failed, and some failures repeat identically.
+    const canRetry = attachment.file.size > 0 && !permanentMessages.has(attachment.error ?? "");
     // Documents only: an image goes to the model as itself.
     const extraction = useAttachmentExtraction(attachment.fileId, !isImage && attachment.status === "complete");
     const isReading = extraction === "pending" || extraction === "processing";
@@ -284,6 +297,7 @@ const AttachmentPreviewInner: FC<{
                                 <TooltipTrigger
                                     render={
                                         <button
+                                            aria-label={t`Edit content`}
                                             className="shrink-0 rounded-md p-1.5 text-blue-600 hover:bg-blue-200 dark:text-blue-400 dark:hover:bg-blue-900/50"
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -291,7 +305,7 @@ const AttachmentPreviewInner: FC<{
                                             }}
                                             type="button"
                                         >
-                                            <EditIcon className="size-3.5" />
+                                            <EditIcon aria-hidden="true" className="size-3.5" />
                                         </button>
                                     }
                                 />
@@ -302,6 +316,7 @@ const AttachmentPreviewInner: FC<{
                             <TooltipTrigger
                                 render={
                                     <button
+                                        aria-label={t`Remove`}
                                         className="shrink-0 rounded-full p-1 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30"
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -309,7 +324,7 @@ const AttachmentPreviewInner: FC<{
                                         }}
                                         type="button"
                                     >
-                                        <XIcon className="size-3.5" />
+                                        <XIcon aria-hidden="true" className="size-3.5" />
                                     </button>
                                 }
                             />
@@ -367,16 +382,32 @@ const AttachmentPreviewInner: FC<{
                         <TooltipTrigger
                             render={
                                 <button
+                                    aria-label={t`Remove`}
                                     className="absolute -top-1 -right-1 rounded-full bg-white p-0.5 shadow-sm hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
                                     onClick={onRemove}
                                     type="button"
                                 >
-                                    <XIcon className="size-3" />
+                                    <XIcon aria-hidden="true" className="size-3" />
                                 </button>
                             }
                         />
                         <TooltipContent>{t`Remove`}</TooltipContent>
                     </Tooltip>
+                </div>
+            )}
+            {isError && (
+                <div className="mt-1 flex max-w-md items-center gap-1.5 text-xs text-red-700 dark:text-red-300">
+                    <span>{t`Upload failed`}</span>
+                    {onRetry && canRetry && (
+                        <button
+                            aria-label={t`Retry upload of ${attachmentName}`}
+                            className="rounded-sm font-medium underline underline-offset-2 hover:no-underline focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
+                            onClick={onRetry}
+                            type="button"
+                        >
+                            {t`Retry upload`}
+                        </button>
+                    )}
                 </div>
             )}
         </div>
@@ -395,13 +426,15 @@ AttachmentPreview.displayName = "AttachmentPreview";
 const AttachmentItem = memo<{
     attachment: PendingAttachment;
     removeAttachment: (id: string) => void;
+    retryAttachment: (attachment: PendingAttachment) => void;
     setEditingAttachmentId: (id: string) => void;
-}>(({ attachment, removeAttachment, setEditingAttachmentId }) => {
+}>(({ attachment, removeAttachment, retryAttachment, setEditingAttachmentId }) => {
     const handleRemove = useCallback(() => removeAttachment(attachment.id), [removeAttachment, attachment.id]);
     const handleEdit = useCallback(() => setEditingAttachmentId(attachment.id), [setEditingAttachmentId, attachment.id]);
+    const handleRetry = useCallback(() => retryAttachment(attachment), [retryAttachment, attachment]);
     const canEdit = attachment.file && isEditable(attachment.file);
 
-    return <AttachmentPreview attachment={attachment} onEdit={canEdit ? handleEdit : undefined} onRemove={handleRemove} />;
+    return <AttachmentPreview attachment={attachment} onEdit={canEdit ? handleEdit : undefined} onRemove={handleRemove} onRetry={handleRetry} />;
 });
 
 AttachmentItem.displayName = "AttachmentItem";
@@ -427,6 +460,8 @@ const ComposerInput = ({
     const mentionFileInputRef = useRef<HTMLInputElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [editingAttachmentId, setEditingAttachmentId] = useState<string | null>(null);
+    const announcedFailures = useRef(new Set<string>());
+    const [failureAnnouncement, setFailureAnnouncement] = useState("");
 
     // Context
     const { cancelStream, jwtToken, sendMessage } = useChatActions();
@@ -1060,6 +1095,36 @@ const ComposerInput = ({
         [attachmentAdapter, updateAttachment, describeUploadError],
     );
 
+    // Announce a newly failed upload once, unless its toast already did.
+    useEffect(() => {
+        const seen = announcedFailures.current;
+        const failed = attachments.filter((a) => a.status === "error");
+
+        for (const id of seen) {
+            if (failed.every((a) => a.id !== id)) {
+                seen.delete(id);
+            }
+        }
+
+        const fresh = failed.find((a) => !seen.has(a.id));
+
+        for (const a of failed) {
+            seen.add(a.id);
+        }
+
+        if (fresh && !toastedMessages.has(fresh.error ?? "")) {
+            setFailureAnnouncement(t`Upload failed: ${fresh.name}`);
+        }
+    }, [attachments, t]);
+
+    // Re-run a failed upload from the file the attachment kept.
+    const retryAttachment = useCallback(
+        (attachment: PendingAttachment) => {
+            void uploadGeneratedFile(attachment.id, attachment.file, t`Upload failed`);
+        },
+        [uploadGeneratedFile, t],
+    );
+
     const attachGeneratedFile = useCallback(
         async (file: File, failureLabel: string): Promise<boolean> => await uploadGeneratedFile(addAttachment(file), file, failureLabel),
         [addAttachment, uploadGeneratedFile],
@@ -1179,6 +1244,9 @@ const ComposerInput = ({
                 />
             )}
 
+            <span className="sr-only" role="status">
+                {failureAnnouncement}
+            </span>
             {isThreadComposer && <PromptHistorySource onEntries={promptHistory.setEntries} />}
             {isThreadComposer && <ComposerPromptQueue />}
             {isThreadComposer && <AutoReadReplies />}
@@ -1241,6 +1309,7 @@ const ComposerInput = ({
                                             attachment={attachment}
                                             key={attachment.id}
                                             removeAttachment={removeAttachment}
+                                            retryAttachment={retryAttachment}
                                             setEditingAttachmentId={setEditingAttachmentId}
                                         />
                                     ))}
