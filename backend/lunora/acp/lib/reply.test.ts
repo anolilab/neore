@@ -24,7 +24,9 @@ describe("buildHostReply with changes", () => {
     });
 
     it("adds nothing to a reply that changed nothing", () => {
-        expect(buildHostReply({ agentKey: "claude", reason: "finished", transcript: transcript("Done.") })?.providerMetadata.neore).not.toHaveProperty("hostChanges");
+        expect(buildHostReply({ agentKey: "claude", reason: "finished", transcript: transcript("Done.") })?.providerMetadata.neore).not.toHaveProperty(
+            "hostChanges",
+        );
     });
 });
 

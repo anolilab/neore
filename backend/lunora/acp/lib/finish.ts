@@ -98,7 +98,13 @@ export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId:
  * prompt first and fails the earlier pending step, which makes the new reply the prompt's SIBLING
  * (the rule `saveLocalTurnHandler` follows). Returns the saved row, or undefined when there was nothing to save.
  */
-const saveHostReply = async (ctx: MutationCtx, stream: Stream, reason: HostReplyReason, error: string | undefined, changes: HostChanges | undefined): Promise<Id<"messages"> | undefined> => {
+const saveHostReply = async (
+    ctx: MutationCtx,
+    stream: Stream,
+    reason: HostReplyReason,
+    error: string | undefined,
+    changes: HostChanges | undefined,
+): Promise<Id<"messages"> | undefined> => {
     const threadId = stream.threadId as Id<"threads">;
     const thread = await ctx.db.get(threadId);
 
@@ -152,7 +158,12 @@ const STATUS_OF: Record<HostReplyReason, "done" | "error" | "timeout"> = {
  * Saves the reply and ends the stream, whoever ends it. A stream that already ended is left alone (false). The
  * session is not touched: the caller knows whether it goes idle (a turn's end) or is already ended (a revoke).
  */
-export const endHostTurn = async (ctx: MutationCtx, stream: Stream, end: { changes?: HostChanges; error?: string; reason: HostReplyReason }, now: number): Promise<boolean> => {
+export const endHostTurn = async (
+    ctx: MutationCtx,
+    stream: Stream,
+    end: { changes?: HostChanges; error?: string; reason: HostReplyReason },
+    now: number,
+): Promise<boolean> => {
     if (!isLiveStream(stream)) {
         return false;
     }
@@ -163,7 +174,12 @@ export const endHostTurn = async (ctx: MutationCtx, stream: Stream, end: { chang
 };
 
 /** The host's `turn_end` or Stop: {@link endHostTurn}, then the session is free again. */
-export const finishHostTurn = async (ctx: MutationCtx, stream: Stream, end: { changes?: HostChanges; error?: string; reason: HostReplyReason }, now: number): Promise<boolean> => {
+export const finishHostTurn = async (
+    ctx: MutationCtx,
+    stream: Stream,
+    end: { changes?: HostChanges; error?: string; reason: HostReplyReason },
+    now: number,
+): Promise<boolean> => {
     const ended = await endHostTurn(ctx, stream, end, now);
 
     if (ended) {

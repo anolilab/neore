@@ -963,7 +963,10 @@ describe("what a turn changed", () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
 
-        await turn(device, threadId, "t1", 0, [START("edit"), { kind: "turn_end", reason: "cancelled", summary: { files: SUMMARY.files, patch: SUMMARY.patch } }]);
+        await turn(device, threadId, "t1", 0, [
+            START("edit"),
+            { kind: "turn_end", reason: "cancelled", summary: { files: SUMMARY.files, patch: SUMMARY.patch } },
+        ]);
 
         const replies = await assistantRepliesOf(threadId);
 
@@ -975,7 +978,11 @@ describe("what a turn changed", () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
 
-        await turn(device, threadId, "t1", 0, [START("edit"), TEXT("ok"), { kind: "turn_end", reason: "finished", summary: { files: SUMMARY.files, patch: { tooLarge: true } } }]);
+        await turn(device, threadId, "t1", 0, [
+            START("edit"),
+            TEXT("ok"),
+            { kind: "turn_end", reason: "finished", summary: { files: SUMMARY.files, patch: { tooLarge: true } } },
+        ]);
 
         const reply = await replyFor(threadId);
 
@@ -1050,7 +1057,11 @@ describe("what a turn changed", () => {
             { files: [{ added: -1, path: "a.ts", removed: 0 }] },
             { files: [{ added: 1.5, path: "a.ts", removed: 0 }] },
             { files: [{ added: 1, path: "x".repeat(1025), removed: 0 }] },
-            { files: Array.from({ length: 201 }, (_, index) => {return { added: 1, path: `f${String(index)}.ts`, removed: 0 }}) },
+            {
+                files: Array.from({ length: 201 }, (_, index) => {
+                    return { added: 1, path: `f${String(index)}.ts`, removed: 0 };
+                }),
+            },
             { files: SUMMARY.files, patch: "x".repeat(256 * 1024 + 1) },
             { files: SUMMARY.files, patch: { tooLarge: false } },
         ];
@@ -1058,7 +1069,6 @@ describe("what a turn changed", () => {
         await turn(device, threadId, "t1", 0, [START("edit")]);
 
         for (const summary of bad) {
-             
             const result = await turn(device, threadId, "t1", 1, [{ kind: "turn_end", reason: "finished", summary }]);
 
             // A patch past the post's body cap is refused by the route itself (413) before the validator sees it.
@@ -1067,7 +1077,12 @@ describe("what a turn changed", () => {
 
         expect(await assistantRepliesOf(threadId)).toHaveLength(0);
         // The accepted bounds themselves are not refused.
-        const edge = { files: Array.from({ length: 200 }, (_, index) => {return { added: 0, path: `${"d/".repeat(5)}f${String(index)}.ts`, removed: 0 }}), patch: "x".repeat(100 * 1024) };
+        const edge = {
+            files: Array.from({ length: 200 }, (_, index) => {
+                return { added: 0, path: `${"d/".repeat(5)}f${String(index)}.ts`, removed: 0 };
+            }),
+            patch: "x".repeat(100 * 1024),
+        };
 
         await expect(turn(device, threadId, "t1", 1, [{ kind: "turn_end", reason: "finished", summary: edge }])).resolves.toMatchObject({ status: 200 });
     });

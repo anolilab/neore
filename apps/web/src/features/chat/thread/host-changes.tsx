@@ -56,7 +56,8 @@ const HostChanges: FC<HostChangesProps> = ({ changes }) => {
                     <li className="flex items-center justify-between gap-2 px-3 py-1" key={file.path}>
                         <span className="min-w-0 truncate font-mono text-xs">{file.path}</span>
                         <span className="shrink-0 font-mono text-xs">
-                            <span className="text-green-700 dark:text-green-400">+{file.added}</span> <span className="text-red-700 dark:text-red-400">−{file.removed}</span>
+                            <span className="text-green-700 dark:text-green-400">+{file.added}</span>{" "}
+                            <span className="text-red-700 dark:text-red-400">−{file.removed}</span>
                         </span>
                     </li>
                 ))}
