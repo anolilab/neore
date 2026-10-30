@@ -1177,6 +1177,12 @@ can outlast a `timeout`, and `timeout … tsc | grep -c "error TS"` then prints
 reports were exactly that. Run it to completion (`pnpm lint:types`) and read
 `$?`.
 
+**A call in `.input()` registers an EMPTY argument shape.** `v.object(partial(pick(...)))`
+or `v.object(someConst)` generated `patch: {  }`, and the runtime silently stripped every key
+(thread status stuck on `running`, dropped title and project patches). Harness tests validate
+with the SOURCE validators and stay green; `lib/argument-shapes.guard.test.ts` reads
+`_generated/{api,internal}.ts` and is the catch. Spell the patch as a literal (`vThreadPatchFields`).
+
 **Declare `.output()` on every procedure.** It is authoritative — a declared
 `.output()` shapes the generated type. A procedure without one falls back to
 inference, which drags in the rule below.

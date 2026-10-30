@@ -14,9 +14,8 @@ import { omit } from "../lib/collections";
  *
  * NOTE: fileIds reference 'chatFiles' table (renamed from 'files')
  */
-import { pick } from "../lib/collections";
 import { assert } from "../lib/error-helpers";
-import { MAX_LENGTH, paginationOptionsValidator, partial } from "../lib/validators";
+import { MAX_LENGTH, paginationOptionsValidator } from "../lib/validators";
 import { throwThreadLocked, isThreadLocked } from "../lib/thread-lock";
 import { systemDb } from "../lib/rls/scope";
 import { mergedStream, stream } from "../lib/streams";
@@ -29,7 +28,7 @@ import {
     type MessageDoc,
     type MessageStatus,
     vMessageDoc as vMessageDocument,
-    vMessageDocFields,
+    vMessagePatchFields,
     vMessageEmbeddingsWithDimension,
     vMessageStatus,
     vMessageWithMetadataInternal,
@@ -561,7 +560,7 @@ export const finalizeMessage = internalMutation
 export const updateMessage = internalMutation
     .input({
         messageId: v.id("messages"),
-        patch: v.object(partial(pick(vMessageDocFields, ["message", "fileIds", "status", "error", "model", "provider", "providerOptions", "finishReason"]))),
+        patch: v.object({ ...vMessagePatchFields }),
     })
     .output(v.from(vMessageDocument))
     .mutation(async ({ args, ctx }) => {
@@ -573,14 +572,9 @@ export const updateMessage = internalMutation
             await changeMessageFiles(ctx, message.threadId, message.fileIds ?? [], args.patch.fileIds as unknown as Id<"chatFiles">[]); // fileIds may be typed as string[] from validator
         }
 
-        // `omit(args.patch, ["_id", "_creationTime"])`: the patch validator is
-        // derived from the full message doc, so it carries the system fields, and
-        // its `_id` is a plain `string` where the Doc wants `Id<"messages">`. They
-        // are not patchable anyway — spreading them in was writing the row's own
-        // id back over itself.
         // Absent keys stay as they are; `embeddingId: undefined` below REMOVES
         // the field, which `patchRow` does by replacing the row.
-        const patch: Partial<Doc<"messages">> = withoutUndefined(omit(args.patch, ["_id", "_creationTime"])) as Partial<Doc<"messages">>;
+        const patch: Partial<Doc<"messages">> = withoutUndefined(args.patch) as Partial<Doc<"messages">>;
 
         if (args.patch.message !== undefined) {
             patch.message = args.patch.message;

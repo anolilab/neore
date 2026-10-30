@@ -16352,13 +16352,13 @@
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 208,
+      "line": 219,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
       "file": "acp/http",
       "kind": "call",
-      "line": 225,
+      "line": 287,
       "reason": "\"hostIngestHttpAction\" is not a registered function"
     },
     {
@@ -16382,7 +16382,7 @@
     {
       "file": "acp/lib/thread-removed",
       "kind": "write",
-      "line": 69,
+      "line": 71,
       "reason": "\"restoreHostThread\" is not a registered function"
     },
     {
@@ -16904,61 +16904,61 @@
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 57,
+      "line": 56,
       "reason": "\"deleteMessage\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 60,
+      "line": 59,
       "reason": "\"deleteMessage\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 220,
+      "line": 219,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 232,
+      "line": 231,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 371,
+      "line": 370,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 388,
+      "line": 387,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 405,
+      "line": 404,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 447,
+      "line": 446,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 457,
+      "line": 456,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 463,
+      "line": 462,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
@@ -17984,7 +17984,7 @@
     {
       "file": "chat/lib/gateway-usage",
       "kind": "call",
-      "line": 48,
+      "line": 51,
       "reason": "\"gatewayUsageReportHttpAction\" is not a registered function"
     },
     {
@@ -18236,7 +18236,7 @@
     {
       "file": "chat/streaming/persistent/http-api",
       "kind": "call",
-      "line": 134,
+      "line": 153,
       "reason": "\"getChunksHttpAction\" is not a registered function"
     },
     {
@@ -19580,13 +19580,19 @@
     {
       "file": "lib/http-shard",
       "kind": "call",
-      "line": 41,
+      "line": 55,
       "reason": "\"inShard\" is not a registered function"
     },
     {
       "file": "lib/http-shard",
       "kind": "call",
-      "line": 112,
+      "line": 55,
+      "reason": "\"inSystemShard\" is not a registered function"
+    },
+    {
+      "file": "lib/http-shard",
+      "kind": "call",
+      "line": 159,
       "reason": "\"onRoutedShard\" is not a registered function"
     },
     {
