@@ -229,6 +229,169 @@ describe("getDeviceToolContext", () => {
     });
 });
 
+const insertProject = async (owner: string, fields: Record<string, unknown> = {}) =>
+    (await harness.run(async (ctx: any) => await ctx.db.insert("projects", { createdAt: 0, title: "Project", userId: owner, ...fields }))) as string;
+
+const setScope = async (userId: string, deviceId: string, projectIds?: string[]) =>
+    await as(userId).mutation(
+        functions.setDeviceProjectScope as never,
+        { deviceId, scope: projectIds === undefined ? { kind: "any" } : { kind: "projects", projectIds } } as never,
+    );
+
+const deviceRows = async (userId = ownerId) =>
+    (await as(userId).query(functions.listDevices as never, {} as never)) as { _id: string; projectIds?: string[]; transport?: string }[];
+
+const scopeOf = async () => {
+    const [first] = await deviceRows();
+
+    return first?.projectIds;
+};
+
+describe("a device's project scope", () => {
+    const offered = async (threadId: string) =>
+        (
+            (await harness.run(async (ctx: any) => await ctx.runQuery(internals.getDeviceToolContext, { now: Date.now(), threadId, userId: ownerId }))) as {
+                devices: { deviceId: string }[];
+            } | null
+        )?.devices.map((device) => device.deviceId);
+
+    it("offers an unscoped device in any chat, with or without a project", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const project = await insertProject(ownerId);
+
+        expect(await offered(await insertThread(ownerId, { projectId: project }))).toEqual([deviceId]);
+        expect(await offered(await insertThread(ownerId))).toEqual([deviceId]);
+    });
+
+    it("offers a scoped device only in threads of the chosen projects", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const chosen = await insertProject(ownerId);
+        const other = await insertProject(ownerId);
+
+        await setScope(ownerId, deviceId, [chosen]);
+
+        expect(await offered(await insertThread(ownerId, { projectId: chosen }))).toEqual([deviceId]);
+        expect(await offered(await insertThread(ownerId, { projectId: other }))).toEqual([]);
+        expect(await offered(await insertThread(ownerId))).toEqual([]);
+    });
+
+    it("scopes each device on its own", async () => {
+        const scoped = await pairedDevice(ownerId);
+        const open = await pairedDevice(ownerId);
+        const project = await insertProject(ownerId);
+
+        await setScope(ownerId, scoped.deviceId, [project]);
+
+        expect(await offered(await insertThread(ownerId))).toEqual([open.deviceId]);
+    });
+
+    it("offers a device with an empty project list nowhere, and tells the list so", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const project = await insertProject(ownerId);
+
+        await setScope(ownerId, deviceId, []);
+
+        expect(await offered(await insertThread(ownerId, { projectId: project }))).toEqual([]);
+        expect(await scopeOf()).toEqual([]);
+    });
+
+    it("applies a change to the next turn, and goes back to any chat", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const threadId = await insertThread(ownerId);
+
+        await setScope(ownerId, deviceId, []);
+        expect(await offered(threadId)).toEqual([]);
+
+        await setScope(ownerId, deviceId);
+        expect(await offered(threadId)).toEqual([deviceId]);
+        expect(await scopeOf()).toBeUndefined();
+    });
+
+    it("refuses to create a call for a thread outside the scope, even after tools were built", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const chosen = await insertProject(ownerId);
+        const other = await insertProject(ownerId);
+        const inside = await insertThread(ownerId, { projectId: chosen });
+        const outside = await insertThread(ownerId, { projectId: other });
+        const bare = await insertThread(ownerId);
+
+        expect("callId" in (await createCall({ deviceId, threadId: inside, userId: ownerId }))).toBe(true);
+
+        await setScope(ownerId, deviceId, [chosen]);
+
+        expect("callId" in (await createCall({ deviceId, threadId: inside, userId: ownerId }))).toBe(true);
+        expect(await createCall({ deviceId, threadId: outside, userId: ownerId })).toEqual({ error: "ineligible" });
+        expect(await createCall({ deviceId, threadId: bare, userId: ownerId })).toEqual({ error: "ineligible" });
+
+        await setScope(ownerId, deviceId, []);
+
+        expect(await createCall({ deviceId, threadId: inside, userId: ownerId })).toEqual({ error: "ineligible" });
+    });
+
+    it("follows the thread's current project when it moves", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const chosen = await insertProject(ownerId);
+        const other = await insertProject(ownerId);
+        const threadId = await insertThread(ownerId, { projectId: chosen });
+
+        await setScope(ownerId, deviceId, [chosen]);
+        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { projectId: other }));
+
+        expect(await offered(threadId)).toEqual([]);
+        expect(await createCall({ deviceId, threadId, userId: ownerId })).toEqual({ error: "ineligible" });
+    });
+
+    it("drops a deleted project from the list and from what it offers", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const kept = await insertProject(ownerId);
+        const doomed = await insertProject(ownerId);
+        // A thread that still names the project it lost.
+        const stale = await insertThread(ownerId, { projectId: doomed });
+
+        await setScope(ownerId, deviceId, [kept, doomed]);
+        await harness.run(async (ctx: any) => await ctx.db.delete(doomed));
+
+        expect(await scopeOf()).toEqual([kept]);
+        expect(await offered(stale)).toEqual([]);
+        expect(await createCall({ deviceId, threadId: stale, userId: ownerId })).toEqual({ error: "ineligible" });
+
+        await harness.run(async (ctx: any) => await ctx.db.delete(kept));
+
+        expect(await scopeOf()).toEqual([]);
+    });
+
+    it("refuses a project that is not the caller's, and a device that is not", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const theirs = await insertProject(STRANGER);
+        const mine = await insertProject(ownerId);
+
+        await expect(setScope(ownerId, deviceId, [theirs])).rejects.toThrow(NOT_FOUND_ERROR);
+        await expect(setScope(STRANGER, deviceId, [theirs])).rejects.toThrow(NOT_FOUND_ERROR);
+        await expect(setScope(STRANGER, deviceId, [await insertProject(STRANGER)])).rejects.toThrow(NOT_FOUND_ERROR);
+        expect(await scopeOf()).toBeUndefined();
+
+        await setScope(ownerId, deviceId, [mine, mine]);
+
+        expect(await scopeOf()).toEqual([mine]);
+    });
+
+    it("scopes a server a desktop holds the same way", async () => {
+        const desktop = await register(ownerId);
+        const server = (await as(ownerId).mutation(
+            functions.registerDevice as never,
+            { name: "Box", platform: "linux", viaDeviceId: desktop.deviceId } as never,
+        )) as { deviceId: string };
+        const project = await insertProject(ownerId);
+
+        await setScope(ownerId, server.deviceId, [project]);
+
+        const rows = await deviceRows();
+
+        expect(rows.find((row) => row._id === server.deviceId)).toMatchObject({ projectIds: [project], transport: "ssh" });
+        expect(rows.find((row) => row._id === desktop.deviceId)?.projectIds).toBeUndefined();
+    });
+});
+
 describe("isDeviceEligibleThread", () => {
     it("refuses a group chat and a deleted thread, whoever owns them", () => {
         const base = { deleted: undefined, externalThreadId: undefined, groupChat: undefined, isPublic: undefined, userId: "u" };
