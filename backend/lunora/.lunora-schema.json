@@ -5130,6 +5130,12 @@
     "deviceCalls": {
       "commitOrdered": false,
       "fields": {
+        "claimId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "claimedAt": {
           "kind": "number",
           "nullable": false,
@@ -5411,6 +5417,48 @@
     "devices": {
       "commitOrdered": false,
       "fields": {
+        "acpOffers": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "agentKey": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "agentLabel": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "folderId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "folderLabel": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              }
+            }
+          }
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,
@@ -5543,11 +5591,25 @@
           "optional": true,
           "unique": false
         },
+        "transport": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "\"ssh\""
+        },
         "userId": {
           "kind": "string",
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "viaDeviceId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "devices"
         }
       },
       "indexes": {
@@ -14861,6 +14923,12 @@
                   "unique": false,
                   "refined": true
                 },
+                "complete": {
+                  "kind": "boolean",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
                 "folder": {
                   "kind": "string",
                   "nullable": false,
@@ -18416,6 +18484,13 @@
         "by_childThreadId": {
           "fields": [
             "childThreadId"
+          ],
+          "unique": false
+        },
+        "by_childThreadId_and_status": {
+          "fields": [
+            "childThreadId",
+            "status"
           ],
           "unique": false
         },

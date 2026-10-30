@@ -16447,7 +16447,7 @@
     {
       "file": "acp/send",
       "kind": "call",
-      "line": 187,
+      "line": 192,
       "reason": "\"hostSendHttpAction\" is not a registered function"
     },
     {
@@ -18781,19 +18781,19 @@
     {
       "file": "devices/lib/acp-call",
       "kind": "write",
-      "line": 68,
+      "line": 76,
       "reason": "\"createAcpCall\" is not a registered function"
     },
     {
       "file": "devices/lib/acp-call",
       "kind": "write",
-      "line": 98,
+      "line": 106,
       "reason": "\"createAcpCall\" is not a registered function"
     },
     {
       "file": "devices/lib/acp-call",
       "kind": "schedule",
-      "line": 100,
+      "line": 108,
       "reason": "\"createAcpCall\" is not a registered function"
     },
     {
@@ -18805,7 +18805,7 @@
     {
       "file": "devices/lib/state",
       "kind": "write",
-      "line": 35,
+      "line": 38,
       "reason": "\"expireOpenCalls\" is not a registered function"
     },
     {

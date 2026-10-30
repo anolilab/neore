@@ -23,6 +23,7 @@ import { createAcpCall } from "../devices/lib/acp-call";
 import { claimOnce, hasClaim } from "../lib/claim-once";
 import { checkRateLimit, getUserTier } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
+import { readCappedBody } from "./http";
 import { liveHostStream } from "./remote";
 import { isHostRunThread } from "./lib/host-thread";
 import { sessionOfThread, touchSession } from "./lib/sessions";
@@ -30,6 +31,8 @@ import { sessionOfThread, touchSession } from "./lib/sessions";
 const SEND_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 /** The prompt on the wire. The signed call carries it whole and caps its input at 32 KiB, which is what refuses a longer one. */
 const MAX_SEND_CHARS = 30_000;
+/** A prompt of that many characters is at most four bytes each; the rest of the body is three short fields. */
+const MAX_SEND_BODY_BYTES = 130_000;
 
 const vSendResult = v.union(
     v.object({ messageId: v.string(), outcome: v.literal("sent"), streamId: v.string() }),
@@ -110,7 +113,12 @@ export const sendToHost = internalMutation
             return { outcome: outcomes[call.error] };
         }
 
-        const { messages } = await addMessagesHandler(ctx, { fromUser: true, messages: [{ message: { content: args.text, role: "user" }, status: "success" }], threadId, userId });
+        const { messages } = await addMessagesHandler(ctx, {
+            fromUser: true,
+            messages: [{ message: { content: args.text, role: "user" }, status: "success" }],
+            threadId,
+            userId,
+        });
         const prompt = messages[0];
 
         if (!prompt) {
@@ -145,10 +153,17 @@ export const hostSendHttpAction = async (context: HttpActionCtx, request: Reques
         return json({ error: "not_configured" }, 500);
     }
 
+    // Capped before it is parsed: the prompt limit is characters, the body a few times that in bytes.
+    const raw = await readCappedBody(request, MAX_SEND_BODY_BYTES);
+
+    if (raw === null) {
+        return json({ error: "too_large" }, 413);
+    }
+
     let body: unknown;
 
     try {
-        body = await request.json();
+        body = JSON.parse(raw);
     } catch {
         return json({ error: "malformed" }, 400);
     }
@@ -193,7 +208,14 @@ export const hostSendHttpAction = async (context: HttpActionCtx, request: Reques
     }
 
     if (result.outcome === "duplicate") {
-        return json({ duplicate: true, ...(result.messageId !== undefined && { messageId: result.messageId }), ...(result.streamId !== undefined && { streamId: result.streamId }) }, 200);
+        return json(
+            {
+                duplicate: true,
+                ...(result.messageId !== undefined && { messageId: result.messageId }),
+                ...(result.streamId !== undefined && { streamId: result.streamId }),
+            },
+            200,
+        );
     }
 
     return json({ error: result.outcome }, STATUS[result.outcome] ?? 400);

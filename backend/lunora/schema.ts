@@ -18,7 +18,15 @@ import { vGroupChat } from "./chat/group/validators";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
 import { vCodingAgentAssignment, vCodingAgentId, vCodingAgentRunStatus } from "./coding-agents/validators";
 import { vOAuthClientRecord, vOAuthFlow, vOAuthTarget } from "./connectors/lib/validators";
-import { vAcpOffer, vDeviceCallPhase, vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource, vDeviceTransport } from "./devices/validators";
+import {
+    vAcpOffer,
+    vDeviceCallPhase,
+    vDeviceCallStatus,
+    vDeviceManifestTool,
+    vDevicePlatform,
+    vDeviceTaintSource,
+    vDeviceTransport,
+} from "./devices/validators";
 import { embed } from "./embed";
 import {
     vEvalCheck,

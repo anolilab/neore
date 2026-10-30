@@ -110,7 +110,11 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         const opened = existing.status === "starting";
 
         if (existing.status !== "ended" && (opened || open.capabilities)) {
-            await ctx.db.patch(existing._id, { updatedAt: now, ...(open.capabilities && { capabilities: open.capabilities }), ...(opened && { lastEventAt: now, status: "idle" as const }) });
+            await ctx.db.patch(existing._id, {
+                updatedAt: now,
+                ...(open.capabilities && { capabilities: open.capabilities }),
+                ...(opened && { lastEventAt: now, status: "idle" as const }),
+            });
         }
 
         return { ended: existing.status === "ended", next: 0, outcome: "applied", threadId: existing.threadId as string };

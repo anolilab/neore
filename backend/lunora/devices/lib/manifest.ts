@@ -91,11 +91,17 @@ export const parseAcpOffers = (value: unknown): AcpOffer[] | null => {
         for (const [field, limit] of Object.entries(OFFER_FIELD_LIMITS)) {
             const text = entry[field];
 
-            if (typeof text !== "string" || text.length === 0 || text.length > limit) {
+            if (typeof text !== "string" || text.length === 0) {
                 return null;
             }
 
-            offer[field as keyof typeof OFFER_FIELD_LIMITS] = text;
+            // An id is refused when too long (the pair could not be matched); a label is only shown, so a long folder
+            // name is cut instead of costing the computer every later manifest.
+            if (text.length > limit && !field.endsWith("Label")) {
+                return null;
+            }
+
+            offer[field as keyof typeof OFFER_FIELD_LIMITS] = text.slice(0, limit);
         }
 
         const key = `${offer.agentKey}\n${offer.folderId}`;

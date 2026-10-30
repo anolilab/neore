@@ -51,7 +51,13 @@ vi.mock("@/lib/lunora/crpc", async () => {
 
                     if (key === "queryOptions") {
                         return (args: unknown) => {
-                            return { queryFn: args === skipToken ? skipToken : async () => harness.data[path.join(".")] ?? (path.at(-1) === "getHostPendingPermissions" ? [] : null), queryKey: [path.join("."), args] };
+                            return {
+                                queryFn:
+                                    args === skipToken
+                                        ? skipToken
+                                        : async () => harness.data[path.join(".")] ?? (path.at(-1) === "getHostPendingPermissions" ? [] : null),
+                                queryKey: [path.join("."), args],
+                            };
                         };
                     }
 
@@ -186,7 +192,9 @@ describe("the coding-agent composer", () => {
 
         fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
 
-        await waitFor(() => expect(harness.calls[0]).toEqual(["send", { requestId: expect.any(String), text: "Continue where you left off.", threadId: "thread-1" }]));
+        await waitFor(() =>
+            expect(harness.calls[0]).toEqual(["send", { requestId: expect.any(String), text: "Continue where you left off.", threadId: "thread-1" }]),
+        );
     });
 
     it("offers no Continue after a turn that finished or was stopped", async () => {
@@ -233,7 +241,9 @@ describe("a permission request from the agent", () => {
 
         fireEvent.click(await screen.findByRole("button", { name: "Allow once" }));
 
-        await waitFor(() => expect(harness.calls).toContainEqual(["acp.remote.answerHostPermission", { optionId: "r1-allow", requestId: "r1", threadId: "thread-1" }]));
+        await waitFor(() =>
+            expect(harness.calls).toContainEqual(["acp.remote.answerHostPermission", { optionId: "r1-allow", requestId: "r1", threadId: "thread-1" }]),
+        );
     });
 
     it("declines with the agent's reject option", async () => {
@@ -241,6 +251,8 @@ describe("a permission request from the agent", () => {
 
         fireEvent.click(await screen.findByRole("button", { name: "Decline" }));
 
-        await waitFor(() => expect(harness.calls).toContainEqual(["acp.remote.answerHostPermission", { optionId: "r1-reject", requestId: "r1", threadId: "thread-1" }]));
+        await waitFor(() =>
+            expect(harness.calls).toContainEqual(["acp.remote.answerHostPermission", { optionId: "r1-reject", requestId: "r1", threadId: "thread-1" }]),
+        );
     });
 });

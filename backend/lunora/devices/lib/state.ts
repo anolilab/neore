@@ -32,6 +32,16 @@ export const expireOpenCalls = async (ctx: Pick<MutationCtx, "db">, deviceId: Id
     for (const status of OPEN_CALL_STATUSES) {
         const { page } = await ctx.db.deviceCalls.findMany({ limit: 50, where: { deviceId, status } });
 
-        await Promise.all(page.map(async (call) => await ctx.db.patch(call._id, { completedAt: now, error: reason, status: "expired", ...(isAcpTool(call.toolName) && { envelope: "", input: "" }) })));
+        await Promise.all(
+            page.map(
+                async (call) =>
+                    await ctx.db.patch(call._id, {
+                        completedAt: now,
+                        error: reason,
+                        status: "expired",
+                        ...(isAcpTool(call.toolName) && { envelope: "", input: "" }),
+                    }),
+            ),
+        );
     }
 };

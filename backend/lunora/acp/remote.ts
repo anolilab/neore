@@ -61,7 +61,7 @@ const waitingRequests = async (ctx: Pick<QueryCtx, "db">, stream: Doc<"persisten
     const found = new Map<string, Pending>();
 
     for (const chunk of page) {
-        const {event} = chunk;
+        const { event } = chunk;
 
         if (event?.kind !== "permission_request" || !waiting.has(event.requestId) || found.has(event.requestId)) {
             continue;
@@ -117,7 +117,10 @@ export const startHostSession = authMutation
             const { page } = await ctx.db.acpSessions.findMany({ limit: 10, where: { status: "starting", userId } });
             const first = page.find(
                 (session) =>
-                    session.deviceId === device._id && session.agentKey === offer.agentKey && session.folderId === offer.folderId && ctx.now - session.createdAt <= RECENT_START_MS,
+                    session.deviceId === device._id &&
+                    session.agentKey === offer.agentKey &&
+                    session.folderId === offer.folderId &&
+                    ctx.now - session.createdAt <= RECENT_START_MS,
             );
 
             return { started: false, ...(first && { threadId: first.threadId as string }) };
@@ -152,13 +155,22 @@ export const startHostSession = authMutation
 
         const call = await createAcpCall(
             ctx,
-            { deviceId: device._id, input: { agentKey: offer.agentKey, folderId: offer.folderId, sessionId: hostSessionId, threadId: threadId as string }, kind: "acp_start", threadId, userId },
+            {
+                deviceId: device._id,
+                input: { agentKey: offer.agentKey, folderId: offer.folderId, sessionId: hostSessionId, threadId: threadId as string },
+                kind: "acp_start",
+                threadId,
+                userId,
+            },
             ctx.now,
         );
 
         if ("error" in call) {
             // Throwing rolls the thread and the session back with the claim.
-            throw new LunoraError("BAD_REQUEST", call.error === "busy" ? "That computer is busy. Try again in a moment." : "That computer cannot start an agent right now.");
+            throw new LunoraError(
+                "BAD_REQUEST",
+                call.error === "busy" ? "That computer is busy. Try again in a moment." : "That computer cannot start an agent right now.",
+            );
         }
 
         ctx.log.event("acp.start_host_session", { started: true });
@@ -240,7 +252,13 @@ export const answerHostPermission = authMutation
 
         const call = await createAcpCall(
             ctx,
-            { deviceId: session.deviceId, input: { optionId: args.optionId, requestId: args.requestId, sessionId: session.hostSessionId }, kind: "acp_permission_answer", threadId: args.threadId, userId },
+            {
+                deviceId: session.deviceId,
+                input: { optionId: args.optionId, requestId: args.requestId, sessionId: session.hostSessionId },
+                kind: "acp_permission_answer",
+                threadId: args.threadId,
+                userId,
+            },
             ctx.now,
         );
 

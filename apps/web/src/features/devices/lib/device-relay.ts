@@ -106,7 +106,6 @@ const untilDeadline = async <T>(step: () => Promise<T>, deadline: number, clock:
 
             const remaining = Math.max(0, deadline - clock.now());
 
-             
             await clock.sleep(Math.min(wait, remaining));
         }
     }
