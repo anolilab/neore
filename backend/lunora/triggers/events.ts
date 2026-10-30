@@ -32,8 +32,8 @@ import { MAX_LENGTH } from "../lib/validators";
 import { notifyQuietly } from "../notifications/notify";
 import { advanceStreak } from "./failure-streak";
 import { buildEventPayload, checkEvent, checkIntervalMs, cooldownMs, firstCheckAt, watchesSomethingElse } from "./event-sources";
+import { EventCheckError, isOwnerFixableCheckFailure } from "./event-sources/check-failure";
 import { fetchWatchedPage } from "./event-sources/fetch-page";
-import { isOwnerFixableCheckFailure, EventCheckError } from "./event-sources/check-failure";
 import { scanThreadRows } from "./event-sources/thread-scan";
 import type { ScanRow } from "./event-sources/thread-scan";
 import type { EventCheckContext, ThreadScan } from "./event-sources/types";
@@ -56,7 +56,7 @@ const THREAD_SCAN_ROWS = 60;
 /** The longest a transient failure delays the next check. */
 const EVENT_MAX_BACKOFF_MS = 6 * 60 * MINUTE_MS;
 
-/** Consecutive failed checks are counted with the same streak rule as failed runs. */
+/** What the owner is told when repeated failed checks switch the watcher off. */
 const pausedWatcherNoticeBody = (error: string): string =>
     `Stopped watching after repeated failed checks. Fix the cause and turn the trigger back on. Last error: ${error}`;
 
