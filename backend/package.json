@@ -39,6 +39,7 @@
         "./skills/markdown": "./lunora/skills/markdown.ts",
         "./source-control/capabilities": "./lunora/source-control/capabilities.ts",
         "./source-control/types": "./lunora/source-control/types.ts",
+        "./triggers/event-limits": "./lunora/triggers/event-sources/types.ts",
         "./triggers/presets": "./lunora/triggers/presets.ts",
         "./workflow/mentions": "./lunora/workflow/mentions.ts"
     },

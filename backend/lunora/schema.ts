@@ -37,7 +37,7 @@ import { notificationInputFields } from "./notifications/validators";
 import { vSkillConfig } from "./skills/validators";
 import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
 import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./tasks/validators";
-import { vWebhookSignatureScheme } from "./triggers/validators";
+import { vEventSource, vEventState, vWebhookSignatureScheme } from "./triggers/validators";
 
 /** Hoisted so `streamDeltasFields` is readable as a value, not just a type. */
 export const streamDeltasFields = {
@@ -2805,6 +2805,9 @@ export const schema = defineSchema({
         eventConnectionId: v.optional(v.string()),
         eventFilter: v.optional(v.string()),
         eventProvider: v.optional(v.string()),
+        // Event triggers: the condition that is watched, and what the last check left behind (`triggers/events.ts`).
+        eventSource: v.optional(vEventSource),
+        eventState: v.optional(vEventState),
         eventType: v.optional(v.string()),
         // Consecutive runs that failed for a reason the owner can fix; absent = 0. Enough of them pause the trigger (`triggers/failure-streak.ts`).
         failureStreak: v.optional(v.number()),

@@ -984,6 +984,12 @@ export interface InternalApiTypes {
         };
     };
     triggers: {
+        events: {
+            dispatchDueEventTriggers: FunctionReference<"mutation", {}, { dispatched: number }>;
+            latestThreadReply: FunctionReference<"query", { after?: { order: number; stepOrder: number }; threadId: string; userId: string }, { accessible: boolean; baseline?: { order: number; stepOrder: number }; reply?: { id: string; text: string } }>;
+            recordEventCheck: FunctionReference<"mutation", { error?: string; fire?: { excerpt?: string; key: string; summary: string }; state?: { checkedAt?: number; checkFailures?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean }; triggerId: Id<"triggers"> }, { fired: boolean }>;
+            runEventCheck: FunctionReference<"action", { triggerId: Id<"triggers"> }, null>;
+        };
         execute: {
             default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, void>;
             executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, void>;
@@ -2027,6 +2033,12 @@ export const internal: InternalApiTypes = {
         },
     },
     triggers: {
+        events: {
+            dispatchDueEventTriggers: { __lunoraRef: "triggers_events:dispatchDueEventTriggers" },
+            latestThreadReply: { __lunoraRef: "triggers_events:latestThreadReply" },
+            recordEventCheck: { __lunoraRef: "triggers_events:recordEventCheck" },
+            runEventCheck: { __lunoraRef: "triggers_events:runEventCheck" },
+        },
         execute: {
             default: { __lunoraRef: "triggers_execute:default" },
             executeTrigger: { __lunoraRef: "triggers_execute:executeTrigger" },

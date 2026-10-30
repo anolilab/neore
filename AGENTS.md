@@ -400,9 +400,22 @@ written here is what is not.
   via `chargeRound` only when there is something to report.
 
 - **Triggers** — schedule (cron, 1-min polling), webhook (HMAC-SHA256 at
-  `/triggers/webhook/{triggerId}`), event (not built). Execution uses headless
+  `/triggers/webhook/{triggerId}`), event (watchers, below). Execution uses headless
   `generateText` with auto-continue; each run creates a new thread tagged with
   trigger metadata.
+  **Event triggers** (`triggers/events.ts`, sources in `triggers/event-sources/`) are a `triggers` row with
+  `eventSource` (the condition: page, time or thread) and `eventState` (the baseline); `nextTriggerAt` is the
+  NEXT CHECK, so the shard tick finds a watcher exactly as it finds a schedule. `dispatchDueEventTriggers`
+  (tick, and `shardSweeps()` as backstop) leases a due watcher (moves `nextTriggerAt` out by 5 min) and
+  schedules `runEventCheck`, an action because a page and a shared thread are outbound calls; no model is
+  involved. `recordEventCheck` claims the occurrence (`claimOnce` on trigger + the source's fire key, TTL below the
+  5-min minimum interval) and only then enqueues `executeTrigger` (`once`); a one-shot (`time`) disarms by clearing
+  `nextTriggerAt`, NOT by `enabled: false`, because `admitTriggerRun` refuses a disabled trigger. Check failures
+  use their own counter (`eventState.checkFailures`, same `advanceStreak` rule), not the run `failureStreak`.
+  A page is fetched only through the SSRF-guarded `fetchWithTimeout` (redirects followed by hand, each hop
+  re-checked), compared as visible text (never raw HTML), and its selector is a small subset (`page-extract.ts`:
+  there is no DOM parser in the Worker). A thread on another user's shard is scanned with `callOnShard` and access
+  is re-read on every check. The excerpt reaches the run as `<event-data>` data, never as instructions.
 
 - **Evals** (`backend/lunora/evals/`, `/evals`) — datasets of cases run against
   a skill, a model + system prompt, or knowledge retrieval, one case at a time

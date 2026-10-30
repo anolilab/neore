@@ -19,6 +19,7 @@ import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { isModelUnavailableRefusal, USER_FIXABLE_RUN_ERRORS } from "./failure-streak";
 import { releaseRetryDelayMs } from "../lib/claim-once";
 import { filterTextOf } from "./filters";
+import { eventInputMessage } from "./event-sources";
 import { canBeQuiet, isQuietRunSkipped, TRIGGER_THREAD_TAG } from "./quiet";
 
 const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds.";
@@ -259,6 +260,9 @@ export const executeTrigger = internalAction
             if (triggerType === "schedule") {
                 // A cron run passes its template as the payload, so the same text arrives either way; a manual test run may pass its own input.
                 inputMessage = sanitizedPayload || trigger.inputTemplate || "You have been triggered on schedule. Please perform your configured task.";
+            } else if (triggerType === "event") {
+                // The watcher's own text saying what fired (`buildEventPayload`), then the owner's instruction.
+                inputMessage = eventInputMessage(sanitizedPayload, trigger.inputTemplate);
             } else if (triggerType === "webhook" && sanitizedPayload) {
                 const { payloadTemplate } = trigger;
 

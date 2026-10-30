@@ -35,8 +35,10 @@ import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } 
 import { isTaskModelAllowed } from "../tasks/logic";
 import { advanceStreak, modelUnavailableMessage, pausedNoticeBody, runOutcome } from "./failure-streak";
 import type { RunOutcome } from "./failure-streak";
-import type { WebhookSignatureScheme } from "./validators";
-import { vWebhookSignatureScheme } from "./validators";
+import { armEventTrigger, assertThreadWatchable, assertWatcherCapacity } from "./events";
+import { normalizeEventSource, watchesSomethingElse } from "./event-sources";
+import type { EventSourceConfig, WebhookSignatureScheme } from "./validators";
+import { vEventSource, vWebhookSignatureScheme } from "./validators";
 
 // "event" stays in the union because existing rows carry it; removing a member is a breaking schema change.
 const triggerTypeSchema = v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event"));
@@ -69,6 +71,32 @@ const presetValidatorMatchesTable: Equal<Infer<typeof vWebhookPreset>, WebhookPr
 // eslint-disable-next-line sonarjs/void-use -- type-level assertion; `void` only marks the binding as used.
 void presetValidatorMatchesTable;
 
+/** What an event trigger watches, as a client sends it. Written out because every string input is capped inline. */
+const vEventSourceInput = v.union(
+    v.object({
+        contains: v.optional(v.string().max(MAX_LENGTH.short)),
+        cooldownMinutes: v.optional(v.number()),
+        intervalMinutes: v.optional(v.number()),
+        kind: v.literal("page"),
+        selector: v.optional(v.string().max(MAX_LENGTH.short)),
+        url: v.string().max(MAX_LENGTH.url),
+    }),
+    v.object({ at: v.number(), kind: v.literal("time") }),
+    v.object({
+        cooldownMinutes: v.optional(v.number()),
+        intervalMinutes: v.optional(v.number()),
+        kind: v.literal("thread"),
+        threadId: v.string().max(MAX_LENGTH.id),
+    }),
+);
+
+type EventSourceInputMatchesTable = Equal<Infer<typeof vEventSourceInput>, Infer<typeof vEventSource>>;
+
+const eventSourceInputMatchesTable: EventSourceInputMatchesTable = true;
+
+// eslint-disable-next-line sonarjs/void-use -- type-level assertion; `void` only marks the binding as used.
+void eventSourceInputMatchesTable;
+
 /** A `custom:<provider>/<model>` names one of the caller's own endpoints; a missing, disabled or browser-only one would fail every run. */
 const assertCustomModelRunnable = async (context: Pick<MutationCtx, "runQuery">, model: string, userId: string): Promise<void> => {
     const custom = parseCustomModelId(model);
@@ -78,11 +106,36 @@ const assertCustomModelRunnable = async (context: Pick<MutationCtx, "runQuery">,
     }
 };
 
-/** Nothing dispatches an event trigger, so one can be neither created nor edited. Existing rows stay readable and deletable. */
-const assertTriggerTypeSupported = (type: "event" | "schedule" | "webhook"): void => {
-    if (type === "event") {
-        throw new LunoraError("BAD_REQUEST", "Event triggers are not supported yet. Use a schedule or a webhook trigger.");
+/**
+ * The event condition a trigger is saved with. Only an event trigger has one, and it must: the shape is checked
+ * and normalised (`normalizeEventSource`), and a thread must be one the caller may read.
+ */
+const checkedEventSource = async (
+    context: Pick<MutationCtx, "db">,
+    source: EventSourceConfig | undefined,
+    type: Doc<"triggers">["type"],
+    userId: string,
+    now: number,
+): Promise<EventSourceConfig | undefined> => {
+    if (type !== "event") {
+        if (source !== undefined) {
+            throw new LunoraError("INVALID_ARGUMENT", "Only an event trigger has an event source.");
+        }
+
+        return undefined;
     }
+
+    if (source === undefined) {
+        throw new LunoraError("INVALID_ARGUMENT", "An event trigger needs something to watch: a page, a time or a thread.");
+    }
+
+    const normalized = normalizeEventSource(source, now);
+
+    if (normalized.kind === "thread") {
+        await assertThreadWatchable(context, normalized.threadId, userId);
+    }
+
+    return normalized;
 };
 
 /**
@@ -216,6 +269,12 @@ const vGetTriggersOutput = v.array(
         cronExpression: v.union(v.string(), v.null()),
         description: v.union(v.string(), v.null()),
         enabled: v.boolean(),
+        eventSource: v.union(vEventSource, v.null()),
+        // How the watcher is doing, for the list: when it last looked, when it last fired, how many checks in a row failed.
+        eventStatus: v.union(
+            v.object({ checkedAt: v.union(v.number(), v.null()), checkFailures: v.number(), firedAt: v.union(v.number(), v.null()) }),
+            v.null(),
+        ),
         filters: v.array(
             v.object({
                 op: v.union(
@@ -265,6 +324,11 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
             cronExpression: t.cronExpression ?? null,
             description: t.description ?? null,
             enabled: t.enabled === true,
+            eventSource: t.eventSource ?? null,
+            eventStatus:
+                t.type === "event"
+                    ? { checkedAt: t.eventState?.checkedAt ?? null, checkFailures: t.eventState?.checkFailures ?? 0, firedAt: t.eventState?.firedAt ?? null }
+                    : null,
             filters: (t.filters ?? []).map((filter) => {
                 return { op: filter.op, path: filter.path, value: filter.value ?? null };
             }),
@@ -294,6 +358,8 @@ export const createTrigger = authMutation
         botId: v.optional(v.string().max(MAX_LENGTH.id)),
         cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
         description: v.optional(v.string().max(MAX_LENGTH.long)),
+        // Event triggers only: what to watch (a page, a moment, a thread). Required for an event trigger.
+        eventSource: v.optional(vEventSourceInput),
         // Webhook triggers only. The whole set replaces the stored one; an empty array clears it.
         // At most MAX_FILTERS entries; `assertValidFilters` checks the rest of the grammar.
         filters: v.optional(
@@ -338,8 +404,6 @@ export const createTrigger = authMutation
         // `triggers` table declares.
         const triggerType = triggerTypeSchema.parse(args.type);
 
-        assertTriggerTypeSupported(triggerType);
-
         await assertCustomModelRunnable(context, args.model, userId);
 
         const timezone = args.timezone?.trim() || undefined;
@@ -368,6 +432,7 @@ export const createTrigger = authMutation
         assertBotRoutineOptions({ botComputer: args.botComputer === true, botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true, type: triggerType });
 
         const { filters, webhookSignatureScheme } = webhookSetup(args, triggerType);
+        const eventSource = await checkedEventSource(context, args.eventSource, triggerType, userId, now);
 
         const inserted = await context.db.insert("triggers", {
             botComputer: args.botComputer === true ? true : undefined,
@@ -376,6 +441,7 @@ export const createTrigger = authMutation
             cronExpression: args.cronExpression,
             description: args.description,
             enabled: false, // Start disabled — user must explicitly enable
+            eventSource,
             filters,
             inputTemplate: args.inputTemplate,
             model: args.model,
@@ -421,6 +487,8 @@ export const updateTrigger = authMutation
         cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
         // `null` clears the description; `undefined` leaves it as it is.
         description: v.optional(v.union(v.string().max(MAX_LENGTH.long), v.null())),
+        // Event triggers only. Watching something else starts over: the next check records a new baseline.
+        eventSource: v.optional(vEventSourceInput),
         // Webhook triggers only. The whole set replaces the stored one; an empty array clears it.
         // At most MAX_FILTERS entries; `assertValidFilters` checks the rest of the grammar.
         filters: v.optional(
@@ -459,8 +527,6 @@ export const updateTrigger = authMutation
         if (!trigger || trigger.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Trigger not found");
         }
-
-        assertTriggerTypeSupported(trigger.type);
 
         if (args.requireDisabled === true && trigger.enabled === true) {
             throw new LunoraError("CONFLICT", "The trigger is enabled. Disable it in the app before changing it.");
@@ -519,6 +585,18 @@ export const updateTrigger = authMutation
             nextTriggerAt = !touched || kept || (!cronChanged && recomputed === undefined) ? trigger.nextTriggerAt : recomputed;
         }
 
+        // An event trigger's next check is its own: editing the condition re-arms a switched-on watcher, anything else leaves it.
+        const isEvent = trigger.type === "event";
+        const eventSource =
+            isEvent && args.eventSource !== undefined ? await checkedEventSource(context, args.eventSource, trigger.type, userId, context.now) : undefined;
+
+        if (!isEvent && args.eventSource !== undefined) {
+            throw new LunoraError("INVALID_ARGUMENT", "Only an event trigger has an event source.");
+        }
+
+        const sourceChanged = isEvent && eventSource !== undefined && watchesSomethingElse(trigger.eventSource, eventSource);
+        const eventRearm = sourceChanged && trigger.enabled === true ? armEventTrigger({ ...trigger, eventSource }, context.now) : undefined;
+
         if (args.cronExpression !== undefined) {
             assertCronExpression(args.cronExpression);
             patch.cronExpression = args.cronExpression;
@@ -568,7 +646,11 @@ export const updateTrigger = authMutation
             ...(args.description === null && { description: undefined }),
             // `undefined` removes a stale time; enabling recomputes it (`firstRunOf`).
             // Also clears a time a non-schedule trigger stored before this check existed.
-            ...((args.cronExpression !== undefined || zoneChanged || !isSchedule) && { nextTriggerAt }),
+            ...((args.cronExpression !== undefined || zoneChanged || (!isSchedule && !isEvent)) && { nextTriggerAt }),
+            ...(eventSource !== undefined && { eventSource }),
+            // A new condition forgets the baseline of the old one; a switched-on watcher looks again at once.
+            ...(sourceChanged && { eventState: eventRearm?.eventState ?? {} }),
+            ...(eventRearm && { nextTriggerAt: eventRearm.nextTriggerAt }),
             ...(args.botId !== undefined && { botId: nextBotId }),
             // An empty array removes the filters; leaving the argument out leaves them as they are.
             ...(args.filters !== undefined && { filters }),
@@ -581,6 +663,10 @@ export const updateTrigger = authMutation
         if (trigger.enabled === true && nextTriggerAt !== undefined) {
             // The root tick only visits shards with timed work due (`lib/shard-housekeeping.ts`).
             await noteShardDue(context, nextTriggerAt, userId);
+        }
+
+        if (eventRearm) {
+            await noteShardDue(context, eventRearm.nextTriggerAt, userId);
         }
 
         context.log.event("triggers.update_trigger", { enabled: trigger.enabled === true });
@@ -608,6 +694,13 @@ export const setTriggerEnabled = authMutation
         }
 
         const firstRun = args.enabled ? firstRunOf(trigger, context.now) : undefined;
+        // Switching a watcher on records a fresh baseline and takes its first look at once (a moment waits for its time).
+        const switchingEventOn = args.enabled && trigger.type === "event" && trigger.enabled !== true;
+        const eventArm = switchingEventOn ? armEventTrigger(trigger, context.now) : undefined;
+
+        if (switchingEventOn) {
+            await assertWatcherCapacity(context, userId);
+        }
 
         if (args.enabled && trigger.type === "schedule" && trigger.nextTriggerAt === undefined && firstRun === undefined) {
             throw new LunoraError("BAD_REQUEST", "This schedule never fires within the next 28 years. Check its day and month.");
@@ -619,11 +712,12 @@ export const setTriggerEnabled = authMutation
             // Turning a disabled trigger back on is the owner saying the cause is fixed: the streak starts over. Enabling one that is already on changes nothing.
             ...(args.enabled && trigger.enabled !== true && { enabledAt: context.now, failureStreak: 0 }),
             ...(firstRun !== undefined && { nextTriggerAt: firstRun }),
+            ...eventArm,
         });
 
         if (args.enabled) {
             // The root tick only visits shards with timed work due (`lib/shard-housekeeping.ts`).
-            await noteShardDue(context, firstRun ?? trigger.nextTriggerAt ?? context.now, userId);
+            await noteShardDue(context, eventArm?.nextTriggerAt ?? firstRun ?? trigger.nextTriggerAt ?? context.now, userId);
         }
 
         context.log.event("triggers.set_trigger_enabled", { enabled: args.enabled });
@@ -748,8 +842,11 @@ export const testRunTrigger = authAction
         }
 
         const wasEnabled = trigger.enabled === true;
-        // A schedule's input is its template, so only a payload the user typed overrides it (`executeTrigger`).
-        const payload = trigger.type === "schedule" ? args.testPayload : args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
+        // A schedule's or a watcher's input is its template, so only a payload the user typed overrides it (`executeTrigger`).
+        const payload =
+            trigger.type === "schedule" || trigger.type === "event"
+                ? args.testPayload
+                : args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
 
         // The run reads the trigger only when it starts, after this action has returned, so it is told to run a disabled one.
         // `manual`: a quiet routine posts a run the user asked for, whatever the workspace holds.
@@ -1164,16 +1261,18 @@ export const setTriggerEnabledInternal = internalMutation
     .mutation(async ({ args: { enabled, triggerId }, ctx }) => {
         const trigger = await ctx.db.get(triggerId);
         const firstRun = enabled && trigger ? firstRunOf(trigger, ctx.now) : undefined;
+        const eventArm = enabled && trigger?.type === "event" && trigger.enabled !== true ? armEventTrigger(trigger, ctx.now) : undefined;
 
         await ctx.db.patch(triggerId, {
             enabled,
             updatedAt: ctx.now,
             ...(enabled && trigger && trigger.enabled !== true && { enabledAt: ctx.now, failureStreak: 0 }),
             ...(firstRun !== undefined && { nextTriggerAt: firstRun }),
+            ...eventArm,
         });
 
         if (enabled && trigger) {
-            await noteShardDue(ctx, firstRun ?? trigger.nextTriggerAt ?? ctx.now, trigger.userId);
+            await noteShardDue(ctx, eventArm?.nextTriggerAt ?? firstRun ?? trigger.nextTriggerAt ?? ctx.now, trigger.userId);
         }
 
         return null;

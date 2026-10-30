@@ -1,6 +1,6 @@
 ---
 title: Triggers
-description: Automate agent execution on schedules or via webhooks
+description: Automate agent execution on schedules, via webhooks, or when a page, a time or a thread fires an event
 ---
 
 # Triggers
@@ -11,7 +11,7 @@ Triggers let you automate AI agent execution without manually starting a convers
 
 1. Open `/dashboard/settings/chat/triggers`
 2. Click **New Trigger**
-3. Choose a trigger type (Schedule or Webhook)
+3. Choose a trigger type (Schedule, Webhook or Event)
 4. Configure the trigger settings and optionally set a system prompt
 5. Click **Create Trigger**, then enable it with the toggle
 
@@ -83,9 +83,25 @@ GitLab does not sign the request body. It sends the secret you configured, as pl
 
 Every GitLab delivery also carries an `X-Gitlab-Event-UUID` header. A delivery without one is refused with `401`. Neore remembers each accepted delivery, by that identifier and the body, for as long as the trigger exists. A delivery that repeats one it already accepted, however long ago, is answered `200` with `{"duplicate": true}` and does not run again, so a captured request cannot be sent again. Deliveries that differ in either the identifier or the body both run. A delivery that did not run (it missed the trigger's filters, or was refused for the daily limit or an unavailable model) is not remembered, so GitLab's retry of it can still run. The identifier is not signed, so this does not stop someone who holds the secret, who can send any request under a new identifier. Treat the secret like a password, and rotate it by creating a new trigger if it leaks. Deleting the trigger deletes these records.
 
-### Event (not available)
+### Event
 
-Event triggers are not supported: nothing dispatches them automatically, so they cannot be created, and an existing one cannot be edited (it can still be enabled, disabled or test-run by hand). Use a schedule or a webhook trigger instead. Triggers of this type created earlier stay visible and can be deleted.
+An event trigger watches something and runs your agent only when it happens. The watching costs nothing: the condition is checked every few minutes without asking a model, and the agent runs once, when the condition comes true. Pick what to watch:
+
+| Watch | Fires when | Keeps watching |
+| --- | --- | --- |
+| **A page changes** | The page's text changes. Add a CSS-style selector (`#price`, `.stock`, `main`) to watch one part of the page, and a phrase to fire only when the text starts to contain it. | Yes, after a cooldown |
+| **A moment arrives** | The time you picked passes. | No, it runs once |
+| **A thread gets a reply** | A message lands in a thread you can read, from a sub-agent, a model or another person. Your own messages do not count. | Yes, after a cooldown |
+
+A few details:
+
+- **The first check only records a baseline.** A page that already looks a certain way does not fire the moment you switch the trigger on; a phrase that was already on the page does not count as arriving.
+- **A page is checked at most every 5 minutes** (15 by default) and must be a public `http` or `https` address. Addresses that point at private or internal networks are refused. Only the page's visible text is compared, so changing scripts, ids or markup do not fire it.
+- **After it fires, a page or thread watcher waits** for the cooldown you set (an hour by default) before it can fire again.
+- **You can have 10 event triggers switched on at a time.**
+- **A watcher that cannot check three times in a row switches itself off and tells you.** A page that is gone, a selector that matches nothing and a thread you can no longer read all count. Fix the cause and switch it back on; it starts again from a fresh baseline.
+- **The run says what fired.** Its first message names the event ("The page changed: https://example.com/pricing") and quotes a short excerpt as data. Your input template says what to do about it.
+
 ## Creating a Trigger
 
 1. Open `/dashboard/settings/chat/triggers`

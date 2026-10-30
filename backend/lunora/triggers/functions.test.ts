@@ -17,6 +17,7 @@ import {
     createTrigger,
     deleteTrigger,
     getTriggerExecutions,
+    getTriggers,
     releaseQuietWindow,
     reserveQuietWindow,
     setTriggerEnabled,
@@ -24,6 +25,7 @@ import {
     updateTrigger,
     updateTriggerStats,
 } from "./functions";
+import { MAX_ACTIVE_EVENT_WATCHERS } from "./event-sources/types";
 import { compileWebhookPreset } from "./presets";
 import { findNextCronTime } from "./schedule";
 
@@ -443,13 +445,138 @@ describe("a routine's quiet flag", () => {
 });
 
 describe("event triggers", () => {
-    it("are refused on create, and an existing one cannot be edited", async () => {
-        const as = harness.withIdentity({ userId: "user-a" } as never);
+    const NOW = 1_800_000_000_000;
+    const PAGE = { kind: "page", url: "https://example.com/pricing" } as const;
+    const as = () => harness.withIdentity({ userId: "user-a" } as never);
+    const create = async (eventSource: unknown): Promise<string> => {
+        const created = (await as().mutation(createTrigger as never, { eventSource, model: "m", name: "Watch", type: "event" } as never)) as { triggerId: string };
 
-        await expect(as.mutation(createTrigger as never, { model: "m", name: "Ev", type: "event" } as never)).rejects.toThrow(
-            "Event triggers are not supported",
-        );
+        return created.triggerId;
+    };
 
+    beforeEach(() => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("are created switched off, with the condition normalised", async () => {
+        const triggerId = await create({ ...PAGE, selector: " #price " });
+
+        expect(await readTrigger(triggerId)).toMatchObject({
+            enabled: false,
+            eventSource: { cooldownMinutes: 60, intervalMinutes: 15, kind: "page", selector: "#price", url: "https://example.com/pricing" },
+            type: "event",
+        });
+    });
+
+    it("refuse an address the server will not fetch", async () => {
+        for (const url of ["http://localhost:8788/admin", "http://10.0.0.5/", "http://169.254.169.254/latest/meta-data", "file:///etc/passwd"]) {
+            await expect(create({ kind: "page", url })).rejects.toThrow("cannot be watched");
+        }
+    });
+
+    it("refuse a check more often than every five minutes, a moment in the past and a missing condition", async () => {
+        await expect(create({ ...PAGE, intervalMinutes: 2 })).rejects.toThrow("between 5");
+        await expect(create({ at: NOW - 1, kind: "time" })).rejects.toThrow("future");
+        await expect(as().mutation(createTrigger as never, { model: "m", name: "x", type: "event" } as never)).rejects.toThrow("needs something to watch");
+    });
+
+    it("keep the condition to event triggers", async () => {
+        await expect(
+            as().mutation(createTrigger as never, { cronExpression: "0 9 * * 1", eventSource: PAGE, model: "m", name: "x", type: "schedule" } as never),
+        ).rejects.toThrow("Only an event trigger");
+    });
+
+    it("refuse a thread the caller cannot read, and accept one they own", async () => {
+        await expect(create({ kind: "thread", threadId: "no-such-thread" })).rejects.toThrow("Thread not found");
+
+        const threadId = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "T", userId: "user-a" }))) as string;
+
+        expect(await readTrigger(await create({ kind: "thread", threadId }))).toMatchObject({ eventSource: { kind: "thread", threadId } });
+
+        const strangers = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "T", userId: "user-b" }))) as string;
+
+        await expect(create({ kind: "thread", threadId: strangers })).rejects.toThrow("Thread not found");
+    });
+
+    it("are armed with a fresh baseline when switched on, and a page is checked at once", async () => {
+        const triggerId = await create(PAGE);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { eventState: { hash: "stale" } }));
+        await as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
+
+        expect(await readTrigger(triggerId)).toMatchObject({ enabled: true, eventState: {}, nextTriggerAt: NOW });
+    });
+
+    it("wait for their moment when a time, and refuse one that has passed since", async () => {
+        const at = NOW + 60_000;
+        const triggerId = await create({ at, kind: "time" });
+
+        await as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
+
+        expect(await readTrigger(triggerId)).toMatchObject({ nextTriggerAt: at });
+
+        await as().mutation(setTriggerEnabled as never, { enabled: false, triggerId } as never);
+        vi.setSystemTime(at + 1);
+
+        await expect(as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never)).rejects.toThrow("already passed");
+    });
+
+    it("cannot be switched on past the per-user cap", async () => {
+        const ids: string[] = [];
+
+        for (let index = 0; index < MAX_ACTIVE_EVENT_WATCHERS + 1; index += 1) {
+            ids.push(await create(PAGE));
+        }
+
+        for (const triggerId of ids.slice(0, MAX_ACTIVE_EVENT_WATCHERS)) {
+            await as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
+        }
+
+        await expect(as().mutation(setTriggerEnabled as never, { enabled: true, triggerId: ids.at(-1) } as never)).rejects.toThrow("switched on at a time");
+    });
+
+    it("keep their schedule when edited, and start over only when they watch something else", async () => {
+        const triggerId = await create(PAGE);
+
+        await as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { eventState: { hash: "baseline" }, nextTriggerAt: NOW + 900_000 }));
+
+        await as().mutation(updateTrigger as never, { name: "Renamed", triggerId } as never);
+        await as().mutation(updateTrigger as never, { eventSource: { ...PAGE, intervalMinutes: 30 }, triggerId } as never);
+
+        expect(await readTrigger(triggerId)).toMatchObject({ eventState: { hash: "baseline" }, name: "Renamed", nextTriggerAt: NOW + 900_000 });
+
+        await as().mutation(updateTrigger as never, { eventSource: { ...PAGE, url: "https://example.com/other" }, triggerId } as never);
+
+        const after = await readTrigger(triggerId);
+
+        expect(after.eventState).toEqual({});
+        expect(after.nextTriggerAt).toBe(NOW);
+        expect(after.eventSource.url).toBe("https://example.com/other");
+    });
+
+    it("are listed with their condition and how the watching is going", async () => {
+        const triggerId = await create(PAGE);
+        const listing = (await as().query(getTriggers as never, {} as never)) as Record<string, unknown>[];
+        const [listed] = listing;
+
+        expect(listed).toMatchObject({ _id: triggerId, eventSource: { kind: "page" }, eventStatus: { checkedAt: null, checkFailures: 0, firedAt: null } });
+    });
+
+    it("start a manual test run on their own instruction, whatever was typed as the schedule input", async () => {
+        const triggerId = await create(PAGE);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { inputTemplate: "Summarise it" }));
+        await as().action(testRunTrigger as never, { triggerId } as never);
+
+        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ ignoreDisabled: true, manual: true, payload: undefined, triggerId }]);
+    });
+
+    it("keep a legacy event row without a condition from being switched on", async () => {
         const triggerId = (await harness.run(
             async (ctx: any) =>
                 await ctx.db.insert("triggers", {
@@ -464,10 +591,8 @@ describe("event triggers", () => {
                 }),
         )) as string;
 
-        await expect(as.mutation(updateTrigger as never, { name: "Renamed", triggerId } as never)).rejects.toThrow("Event triggers are not supported");
-
-        // Still readable.
-        expect(await readTrigger(triggerId)).toMatchObject({ name: "Old event", type: "event" });
+        await expect(as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never)).rejects.toThrow("no condition");
+        expect(await readTrigger(triggerId)).toMatchObject({ enabled: false, name: "Old event", type: "event" });
     });
 });
 

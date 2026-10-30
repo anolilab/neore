@@ -45077,6 +45077,76 @@
                       "description": {
                         "type": "string"
                       },
+                      "eventSource": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "contains": {
+                                "type": "string"
+                              },
+                              "cooldownMinutes": {
+                                "type": "number"
+                              },
+                              "intervalMinutes": {
+                                "type": "number"
+                              },
+                              "kind": {
+                                "const": "page",
+                                "type": "string"
+                              },
+                              "selector": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "url"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "at": {
+                                "type": "number"
+                              },
+                              "kind": {
+                                "const": "time",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "at",
+                              "kind"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "cooldownMinutes": {
+                                "type": "number"
+                              },
+                              "intervalMinutes": {
+                                "type": "number"
+                              },
+                              "kind": {
+                                "const": "thread",
+                                "type": "string"
+                              },
+                              "threadId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "threadId"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
                       "filters": {
                         "items": {
                           "properties": {
@@ -45630,6 +45700,76 @@
                           },
                           {
                             "type": "null"
+                          }
+                        ]
+                      },
+                      "eventSource": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "contains": {
+                                "type": "string"
+                              },
+                              "cooldownMinutes": {
+                                "type": "number"
+                              },
+                              "intervalMinutes": {
+                                "type": "number"
+                              },
+                              "kind": {
+                                "const": "page",
+                                "type": "string"
+                              },
+                              "selector": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "url"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "at": {
+                                "type": "number"
+                              },
+                              "kind": {
+                                "const": "time",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "at",
+                              "kind"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "cooldownMinutes": {
+                                "type": "number"
+                              },
+                              "intervalMinutes": {
+                                "type": "number"
+                              },
+                              "kind": {
+                                "const": "thread",
+                                "type": "string"
+                              },
+                              "threadId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "threadId"
+                            ],
+                            "type": "object"
                           }
                         ]
                       },

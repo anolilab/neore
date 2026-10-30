@@ -4658,6 +4658,11 @@
     {
       "from": "function:lib_shard_housekeeping:runShardTick",
       "kind": "call",
+      "to": "function:triggers_events:dispatchDueEventTriggers"
+    },
+    {
+      "from": "function:lib_shard_housekeeping:runShardTick",
+      "kind": "call",
       "to": "function:triggers_schedule:checkDueTriggers"
     },
     {
@@ -6414,6 +6419,41 @@
       "from": "function:tasks_internal:completeRound",
       "kind": "write",
       "to": "table:tasks"
+    },
+    {
+      "from": "function:triggers_events:dispatchDueEventTriggers",
+      "kind": "read",
+      "to": "table:triggers"
+    },
+    {
+      "from": "function:triggers_events:dispatchDueEventTriggers",
+      "kind": "schedule",
+      "to": "function:triggers_events:runEventCheck"
+    },
+    {
+      "from": "function:triggers_events:dispatchDueEventTriggers",
+      "kind": "write",
+      "to": "table:triggers"
+    },
+    {
+      "from": "function:triggers_events:latestThreadReply",
+      "kind": "read",
+      "to": "table:messages"
+    },
+    {
+      "from": "function:triggers_events:runEventCheck",
+      "kind": "call",
+      "to": "function:agent_sharing:getGrantOwner"
+    },
+    {
+      "from": "function:triggers_events:runEventCheck",
+      "kind": "call",
+      "to": "function:triggers_events:latestThreadReply"
+    },
+    {
+      "from": "function:triggers_events:runEventCheck",
+      "kind": "call",
+      "to": "function:triggers_functions:getTriggerInternal"
     },
     {
       "from": "function:triggers_execute:default",
@@ -14568,6 +14608,34 @@
       "module": "tasks"
     },
     {
+      "detail": "mutation",
+      "id": "function:triggers_events:dispatchDueEventTriggers",
+      "kind": "function",
+      "name": "triggers.events.dispatchDueEventTriggers",
+      "module": "triggers"
+    },
+    {
+      "detail": "query",
+      "id": "function:triggers_events:latestThreadReply",
+      "kind": "function",
+      "name": "triggers.events.latestThreadReply",
+      "module": "triggers"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:triggers_events:recordEventCheck",
+      "kind": "function",
+      "name": "triggers.events.recordEventCheck",
+      "module": "triggers"
+    },
+    {
+      "detail": "action",
+      "id": "function:triggers_events:runEventCheck",
+      "kind": "function",
+      "name": "triggers.events.runEventCheck",
+      "module": "triggers"
+    },
+    {
       "detail": "action",
       "id": "function:triggers_execute:default",
       "kind": "function",
@@ -19690,31 +19758,31 @@
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 126,
-      "reason": "\"noteShardActivity\" is not a registered function"
-    },
-    {
-      "file": "lib/shard-housekeeping",
-      "kind": "write",
       "line": 128,
       "reason": "\"noteShardActivity\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 146,
+      "line": 130,
+      "reason": "\"noteShardActivity\" is not a registered function"
+    },
+    {
+      "file": "lib/shard-housekeeping",
+      "kind": "write",
+      "line": 148,
       "reason": "\"noteShardDue\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 152,
+      "line": 154,
       "reason": "\"noteShardDue\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "call",
-      "line": 261,
+      "line": 265,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -20724,6 +20792,24 @@
       "kind": "read",
       "line": 75,
       "reason": "\"loadUserTasks\" is not a registered function"
+    },
+    {
+      "file": "triggers/events",
+      "kind": "read",
+      "line": 78,
+      "reason": "\"assertWatcherCapacity\" is not a registered function"
+    },
+    {
+      "file": "triggers/events",
+      "kind": "call",
+      "line": 240,
+      "reason": "\"performEventCheck\" is not a registered function"
+    },
+    {
+      "file": "triggers/events",
+      "kind": "call",
+      "line": 247,
+      "reason": "\"performEventCheck\" is not a registered function"
     },
     {
       "file": "triggers/gdpr",
