@@ -106,7 +106,9 @@ describe("the files a turn wrote", () => {
         changes.note({ id: "1", kind: "edit", status: "in_progress" }, diffCall("1", "a.ts", "one\n", "two\n", "in_progress"));
         changes.note({ id: "1", kind: "edit", status: "completed" }, diffCall("1", "a.ts", "one\n", huge));
 
-        expect((await changes.summary())?.files ?? []).toEqual([]);
+        const summary = await changes.summary();
+
+        expect(summary?.files ?? []).toEqual([]);
     });
 
     it("joins two calls on one file: the first earlier text, the last later text", async () => {
