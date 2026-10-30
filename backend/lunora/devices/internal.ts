@@ -11,15 +11,9 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
-import {
-    DEVICE_CALL_DEADLINE_MS,
-    DEVICE_CALL_RETENTION_MS,
-    MAX_DEVICE_INPUT_BYTES,
-    MAX_OPEN_ACP_CALLS_PER_DEVICE,
-    MAX_OPEN_CALLS_PER_DEVICE,
-} from "./lib/constants";
+import { DEVICE_CALL_DEADLINE_MS, DEVICE_CALL_RETENTION_MS, MAX_DEVICE_INPUT_BYTES, MAX_OPEN_CALLS_PER_DEVICE } from "./lib/constants";
 import { signDevicePayload, utf8Length } from "./lib/signing";
-import { isAcpTool, isDeviceOnline, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
+import { countOpenCalls, isAcpTool, isDeviceOnline, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDeviceTaintSource } from "./validators";
 
 type ThreadRow = Pick<Doc<"threads">, "deleted" | "externalThreadId" | "groupChat" | "isPublic" | "userId">;
@@ -122,17 +116,8 @@ export const createDeviceCall = internalMutation
             return { error: "offline" as const };
         }
 
-        let open = 0;
-
-        for (const status of OPEN_CALL_STATUSES) {
-            const { page } = await ctx.db.deviceCalls.findMany({
-                limit: MAX_OPEN_CALLS_PER_DEVICE + MAX_OPEN_ACP_CALLS_PER_DEVICE,
-                where: { deviceId, status },
-            });
-
-            // Coding-agent calls have a budget of their own (`lib/acp-call.ts`).
-            open += page.filter((call) => !isAcpTool(call.toolName)).length;
-        }
+        // Coding-agent calls have a budget of their own (`lib/acp-call.ts`).
+        const open = await countOpenCalls(ctx, deviceId, (call) => !isAcpTool(call.toolName), MAX_OPEN_CALLS_PER_DEVICE);
 
         if (open >= MAX_OPEN_CALLS_PER_DEVICE) {
             return { error: "busy" as const };
