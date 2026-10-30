@@ -131,28 +131,6 @@ mod unix {
         Ok(unsafe { OwnedFd::from_raw_fd(fd) })
     }
 
-    /// The thread's `errno`, which `readdir` leaves alone at the end of a folder and sets on an error.
-    fn errno() -> *mut libc::c_int {
-        // SAFETY: each of these returns the address of the calling thread's `errno`.
-        #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
-        unsafe {
-            libc::__errno_location()
-        }
-        #[cfg(any(
-            target_os = "macos",
-            target_os = "ios",
-            target_os = "freebsd",
-            target_os = "dragonfly"
-        ))]
-        unsafe {
-            libc::__error()
-        }
-        #[cfg(any(target_os = "netbsd", target_os = "openbsd"))]
-        unsafe {
-            libc::__errno()
-        }
-    }
-
     /// The names in a folder, sorted, read through a duplicate of its descriptor. A folder with more than
     /// [`MAX_ENTRIES`] names is an error: the archive could not hold them, and they are not all read into memory
     /// first.
@@ -182,7 +160,7 @@ mod unix {
             // SAFETY: `errno` is the calling thread's own; `stream` is live until `closedir`, and the entry is only
             // read before the next call.
             let entry = unsafe {
-                *errno() = 0;
+                *crate::fs::errno() = 0;
 
                 libc::readdir(stream)
             };
