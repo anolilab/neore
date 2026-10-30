@@ -48,6 +48,8 @@ export type KeyboardShortcuts = {
     /** Steps the composer's reasoning effort down (`composer.decreaseEffort`). Unbound until the user sets it. */
     decreaseEffort?: string;
     escape: string;
+    /** Opens the find bar over the open thread's messages. Absent in settings saved before it existed. */
+    findInThread: string;
     firstItem: string;
     focusSearch: string;
     help: string;
@@ -87,8 +89,9 @@ export const defaultKeyboardShortcuts: KeyboardShortcuts = {
     commandPalette: `${platformModifier}+k`,
     copyLastCodeBlock: `${platformModifier}+shift+x`,
     escape: "escape",
+    findInThread: `${platformModifier}+f`,
     firstItem: "home",
-    focusSearch: `${platformModifier}+f`,
+    focusSearch: `${platformModifier}+shift+f`,
     help: `${platformModifier}+/`,
     lastItem: "end",
     newChat: `${platformModifier}+n`,
@@ -98,6 +101,26 @@ export const defaultKeyboardShortcuts: KeyboardShortcuts = {
     prevItem: "arrowup",
     sidebarLeft: `${platformModifier}+b`,
     sidebarRight: `${platformModifier}+shift+b`,
+};
+
+/**
+ * Saved bindings merged over the defaults. `findInThread` took Mod+F from Focus Search, so a user who
+ * never changed Focus Search (still the old default) and has no Find saved moves to the new default;
+ * a custom Focus Search is theirs and stays.
+ */
+export const mergeKeyboardShortcuts = (saved: Partial<KeyboardShortcuts> | undefined): KeyboardShortcuts => {
+    const merged = { ...defaultKeyboardShortcuts, ...saved };
+
+    if (saved?.findInThread === undefined && saved?.focusSearch === `${platformModifier}+f`) {
+        merged.focusSearch = defaultKeyboardShortcuts.focusSearch;
+    }
+
+    // Focus Search left unbound kept the browser's find; the chord Find now takes stays unbound too.
+    if (saved?.findInThread === undefined && saved?.focusSearch === "") {
+        merged.findInThread = "";
+    }
+
+    return merged;
 };
 
 const RIGHT_SIDEBAR_DEFAULT_WIDTH = 280;
@@ -339,7 +362,7 @@ export const useUIStateStore = create<UIStateStore>()(
                     ...current,
                     ...saved,
                     appearance: { ...current.appearance, ...saved.appearance },
-                    keyboardShortcuts: { ...current.keyboardShortcuts, ...saved.keyboardShortcuts },
+                    keyboardShortcuts: mergeKeyboardShortcuts(saved.keyboardShortcuts),
                 };
             },
             partialize: (state) => {

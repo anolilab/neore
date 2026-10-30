@@ -44,6 +44,7 @@ import Composer from "./composer";
 import ComposerEffortShortcuts from "./composer-effort-shortcuts";
 import CopyLastCodeBlockListener from "./copy-last-code-block";
 import EditComposer from "./edit-composer";
+import ThreadFindBar from "./find/thread-find-bar";
 import MediaGalleryView from "./media-gallery-view";
 import MessageList, { scrollToMessage } from "./message-list";
 import { lastPromptId } from "./minimap-items";
@@ -262,7 +263,12 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
             <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
             <ComposerEffortShortcuts />
             <CopyLastCodeBlockListener />
-            <div className={cn("h-[calc(100%-40px)]", className)} style={{ "--thread-max-width": maxWidth } as React.CSSProperties}>
+            <div
+                className={cn("relative h-[calc(100%-40px)]", className)}
+                data-find-in-thread-host={composerMode === "text" && !isNewThread ? "" : undefined}
+                style={{ "--thread-max-width": maxWidth } as React.CSSProperties}
+            >
+                {composerMode === "text" && !isNewThread && <ThreadFindBar key={threadId} />}
                 <ThreadViewport className="flex h-full flex-col items-center bg-inherit px-4 pt-2" ref={viewportRef}>
                     {!isNewThread && <SubAgentParentBreadcrumb className="w-full max-w-(--thread-max-width)" threadId={threadId} />}
                     <div

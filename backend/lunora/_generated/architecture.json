@@ -16382,7 +16382,7 @@
     {
       "file": "acp/lib/thread-removed",
       "kind": "write",
-      "line": 69,
+      "line": 71,
       "reason": "\"restoreHostThread\" is not a registered function"
     },
     {
