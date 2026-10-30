@@ -8,6 +8,7 @@
 import { v } from "lunorash/server";
 
 import { internalMutation, internalQuery } from "../_generated/server";
+import { deleteShardRoute } from "../lib/shard-routes";
 import { MAX_DEVICES_PER_USER } from "./lib/constants";
 
 const BATCH = 200;
@@ -45,6 +46,11 @@ export const deleteUserDevices = internalMutation
         ]);
 
         await Promise.all([...devices.page, ...calls.page].map(async (row) => await ctx.db.delete(row._id)));
+
+        // The host ingest finds a device's owner through its route (`registerDevice`); it must not outlive the device.
+        for (const device of devices.page) {
+            await deleteShardRoute(ctx, "device", device._id as string);
+        }
 
         return { hasMore: devices.page.length >= BATCH || calls.page.length >= BATCH };
     });
