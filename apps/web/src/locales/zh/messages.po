@@ -415,7 +415,7 @@ msgid "{0} deleted"
 msgstr "{0} 已删除"
 
 #. placeholder {0}: formatDuration(elapsedMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:555
+#: src/features/chat/thread/streaming-placeholder.tsx:558
 msgid "{0} elapsed"
 msgstr "已用 {0}"
 
@@ -575,7 +575,7 @@ msgid "{0} tok/s"
 msgstr ""
 
 #. placeholder {0}: tokPerSec.toFixed(1)
-#: src/features/chat/thread/streaming-placeholder.tsx:545
+#: src/features/chat/thread/streaming-placeholder.tsx:548
 msgid "{0} tokens/s"
 msgstr "{0} 个 token/秒"
 
@@ -945,7 +945,7 @@ msgid "{name} is installed"
 msgstr "{name} 已安装"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:241
-#: src/features/chat/thread/streaming-placeholder.tsx:473
+#: src/features/chat/thread/streaming-placeholder.tsx:476
 msgid "{name} is responding"
 msgstr "{name} 正在回复"
 
@@ -1169,7 +1169,7 @@ msgstr "<0>定时</0>——按 cron 计划运行（例如每天早上 8 点）�
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0>——接收来自外部服务（Stripe、GitHub、Zapier）的 HTTP POST 请求。请求使用带时间戳的 HMAC 签名，重放请求会被拒绝。"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:546
+#: src/features/chat/thread/streaming-placeholder.tsx:549
 msgid "~{approxTokenCount} tokens"
 msgstr "约 {approxTokenCount} 个 token"
 
@@ -2466,7 +2466,7 @@ msgstr "AI 视频生成"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "借助完整录制上下文进行 AI 辅助的缺陷分诊"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:350
+#: ../../packages/chat-ui/src/chat/message-content.tsx:351
 msgid "AI-generated"
 msgstr "AI生成"
 
@@ -2860,7 +2860,7 @@ msgstr "发生错误"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap 登录时出错"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1040
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1041
 msgid "An error occurred while generating the response."
 msgstr "生成回复时发生错误。"
 
@@ -3466,8 +3466,8 @@ msgid "Assistant replied:"
 msgstr "助手回复："
 
 #: src/features/chat/thread/message-item.tsx:203
-#: src/features/chat/thread/streaming-placeholder.tsx:687
-#: src/features/chat/thread/streaming-placeholder.tsx:723
+#: src/features/chat/thread/streaming-placeholder.tsx:725
+#: src/features/chat/thread/streaming-placeholder.tsx:762
 msgid "Assistant Reply:"
 msgstr "助手回复："
 
@@ -4404,11 +4404,11 @@ msgstr "浏览并恢复工作流的历史版本。"
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:691
+#: ../../packages/chat-ui/src/chat/message-content.tsx:692
 msgid "Browser"
 msgstr "浏览器"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:713
+#: ../../packages/chat-ui/src/chat/message-content.tsx:714
 msgid "Browser action failed"
 msgstr "浏览器操作失败"
 
@@ -4416,7 +4416,7 @@ msgstr "浏览器操作失败"
 msgid "Browser Automation"
 msgstr "浏览器自动化"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:711
+#: ../../packages/chat-ui/src/chat/message-content.tsx:712
 msgid "Browser error"
 msgstr "浏览器错误"
 
@@ -4425,7 +4425,7 @@ msgid "Browser notes"
 msgstr "浏览器说明"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:259
-#: ../../packages/chat-ui/src/chat/message-content.tsx:674
+#: ../../packages/chat-ui/src/chat/message-content.tsx:675
 msgid "Browser screenshot"
 msgstr "浏览器截图"
 
@@ -4433,7 +4433,7 @@ msgstr "浏览器截图"
 msgid "Browser Session"
 msgstr "浏览器会话"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:632
+#: ../../packages/chat-ui/src/chat/message-content.tsx:633
 msgid "Browser working..."
 msgstr "浏览器运行中..."
 
@@ -5232,7 +5232,7 @@ msgstr "复选框"
 msgid "Checked integrations are offered for setup after you save. Nothing connects until you confirm it there."
 msgstr "勾选的集成会在保存后提供设置。在你确认之前不会建立任何连接。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:367
+#: ../../packages/chat-ui/src/chat/message-content.tsx:368
 msgid "Checking image safety..."
 msgstr "正在检查图片安全性..."
 
@@ -5610,7 +5610,7 @@ msgstr "点击编辑"
 msgid "Click to edit..."
 msgstr "点击编辑..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:624
+#: ../../packages/chat-ui/src/chat/message-content.tsx:625
 msgid "Clicking element..."
 msgstr "正在点击元素..."
 
@@ -5724,7 +5724,7 @@ msgstr "代码执行"
 msgid "Code execution and sandbox files"
 msgstr "代码执行和沙盒文件"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:603
+#: ../../packages/chat-ui/src/chat/message-content.tsx:604
 msgid "Code execution failed"
 msgstr "代码执行失败"
 
@@ -5748,7 +5748,7 @@ msgstr "代码高亮主题已更新"
 msgid "Code is required"
 msgstr "代码为必填项"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:562
+#: ../../packages/chat-ui/src/chat/message-content.tsx:563
 msgid "Code output"
 msgstr "代码输出"
 
@@ -7663,7 +7663,7 @@ msgstr "创建一个一次性链接，有效期 7 天。任何已登录的人打
 msgid "Creating branch..."
 msgstr "正在创建分支..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:291
+#: ../../packages/chat-ui/src/chat/message-content.tsx:292
 msgid "Creating slides..."
 msgstr "正在创建幻灯片..."
 
@@ -9209,7 +9209,7 @@ msgid "Do you want to add more rows?"
 msgstr "要添加更多行吗？"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:266
+#: ../../packages/chat-ui/src/chat/message-content.tsx:267
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 msgid "Document"
 msgstr "文档"
@@ -9357,7 +9357,7 @@ msgstr "下载文档"
 msgid "Download Export"
 msgstr "下载导出"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:429
+#: ../../packages/chat-ui/src/chat/message-content.tsx:430
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "下载文件"
@@ -10676,7 +10676,7 @@ msgstr "错误率"
 msgid "Error trace:"
 msgstr "错误追踪："
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:227
+#: ../../packages/chat-ui/src/chat/message-content.tsx:228
 msgid "Error:"
 msgstr "错误："
 
@@ -10942,7 +10942,7 @@ msgstr "正在执行工具..."
 msgid "Execution"
 msgstr "执行"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:593
+#: ../../packages/chat-ui/src/chat/message-content.tsx:594
 msgid "Execution failed"
 msgstr "执行失败"
 
@@ -11279,11 +11279,11 @@ msgstr "提取页面"
 msgid "Extract subject"
 msgstr "提取主体"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:682
+#: ../../packages/chat-ui/src/chat/message-content.tsx:683
 msgid "Extracted"
 msgstr "已提取"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:625
+#: ../../packages/chat-ui/src/chat/message-content.tsx:626
 msgid "Extracting content..."
 msgstr "正在提取内容..."
 
@@ -12759,7 +12759,7 @@ msgid "First slide"
 msgstr "第一张幻灯片"
 
 #. placeholder {0}: formatDuration(ttftMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:547
+#: src/features/chat/thread/streaming-placeholder.tsx:550
 msgid "First token {0}"
 msgstr "首个 token {0}"
 
@@ -13550,7 +13550,7 @@ msgstr "生成的视频"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的视频将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:444
+#: ../../packages/chat-ui/src/chat/message-content.tsx:445
 msgid "Generating audio..."
 msgstr "正在生成音频..."
 
@@ -13558,12 +13558,12 @@ msgstr "正在生成音频..."
 msgid "Generating draft…"
 msgstr "正在生成草稿…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:445
+#: ../../packages/chat-ui/src/chat/message-content.tsx:446
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating image..."
 msgstr "正在生成图像..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:288
+#: ../../packages/chat-ui/src/chat/message-content.tsx:289
 msgid "Generating presentation..."
 msgstr "正在生成演示文稿..."
 
@@ -13571,7 +13571,7 @@ msgstr "正在生成演示文稿..."
 msgid "Generating response"
 msgstr "正在生成回复"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:446
+#: ../../packages/chat-ui/src/chat/message-content.tsx:447
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating video..."
 msgstr "正在生成视频..."
@@ -14773,7 +14773,7 @@ msgid "illustration"
 msgstr "插画"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:396
+#: ../../packages/chat-ui/src/chat/message-content.tsx:397
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:641
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -15337,7 +15337,7 @@ msgstr "输入模板"
 msgid "Input tokens"
 msgstr "输入 token"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:211
+#: ../../packages/chat-ui/src/chat/message-content.tsx:212
 msgid "Input:"
 msgstr "输入："
 
@@ -15682,7 +15682,7 @@ msgstr "它可能已被删除，或者你已无权访问。"
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "它可能已过期、被撤销或已被使用。请索取新的链接。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:373
+#: ../../packages/chat-ui/src/chat/message-content.tsx:374
 msgid "It will be visible once approved by a moderator"
 msgstr "经审核员批准后即可显示"
 
@@ -16748,7 +16748,7 @@ msgstr "正在加载编辑器..."
 msgid "Loading editor…"
 msgstr "正在加载编辑器…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:310
+#: ../../packages/chat-ui/src/chat/message-content.tsx:311
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "正在加载文件…"
@@ -16887,7 +16887,7 @@ msgstr "正在加载概览…"
 msgid "Loading..."
 msgstr "正在加载..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:313
+#: ../../packages/chat-ui/src/chat/message-content.tsx:314
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
@@ -18759,11 +18759,11 @@ msgstr "浏览对话"
 msgid "navigate within each column"
 msgstr "在每列中导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:683
+#: ../../packages/chat-ui/src/chat/message-content.tsx:684
 msgid "Navigated"
 msgstr "已导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:632
+#: ../../packages/chat-ui/src/chat/message-content.tsx:633
 msgid "Navigating to {target}..."
 msgstr "正在导航到 {target}..."
 
@@ -18813,7 +18813,7 @@ msgstr "Neore - AI 文本、视频、音频、图像和文档生成平台"
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:643
+#: src/features/chat/thread/composer.tsx:655
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore 可能会出错。请核实重要信息。"
 
@@ -20369,7 +20369,7 @@ msgstr "哎呀！出错了"
 msgid "Opacity"
 msgstr "不透明度"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:669
+#: ../../packages/chat-ui/src/chat/message-content.tsx:670
 #: src/components/command-palette.tsx:618
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/tasks/hooks/use-task-notifications.ts:30
@@ -21140,7 +21140,7 @@ msgstr "每个模型每个用例的结果"
 msgid "Outpaint"
 msgstr "扩图"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:540
+#: ../../packages/chat-ui/src/chat/message-content.tsx:541
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/components/model-picker/model-picker.tsx:204
 #: src/features/devices/components/device-tool-call.tsx:95
@@ -21179,7 +21179,7 @@ msgstr "输出类型"
 msgid "Output-format focused"
 msgstr "侧重输出格式"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:219
+#: ../../packages/chat-ui/src/chat/message-content.tsx:220
 msgid "Output:"
 msgstr "输出："
 
@@ -21219,7 +21219,7 @@ msgstr "所有者"
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋时间（美国和加拿大）"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:631
+#: ../../packages/chat-ui/src/chat/message-content.tsx:632
 msgid "page"
 msgstr "页面"
 
@@ -23426,7 +23426,7 @@ msgstr "重新连接 {0}"
 msgid "Reconnecting to the server…"
 msgstr "正在重新连接服务器…"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:537
+#: src/features/chat/thread/streaming-placeholder.tsx:540
 msgid "Reconnecting…"
 msgstr "正在重新连接…"
 
@@ -24743,7 +24743,7 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 msgid "Running"
 msgstr "运行中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:501
+#: ../../packages/chat-ui/src/chat/message-content.tsx:502
 msgid "Running code..."
 msgstr "正在运行代码..."
 
@@ -24755,7 +24755,7 @@ msgstr "正在 {device} 上运行…"
 #~ msgid "Running threads"
 #~ msgstr "运行中的对话"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:188
+#: ../../packages/chat-ui/src/chat/message-content.tsx:189
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -25066,7 +25066,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:665
+#: ../../packages/chat-ui/src/chat/message-content.tsx:666
 msgid "Screenshot"
 msgstr "截图"
 
@@ -25710,6 +25710,10 @@ msgstr "发送验证码"
 #: src/features/chat/voice-mode/voice-mode-button.tsx:88
 msgid "Sending your message and waiting for the reply"
 msgstr "正在发送你的消息并等待回复"
+
+#: src/features/chat/thread/streaming-placeholder.tsx:588
+msgid "Sending…"
+msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:173
 msgid "Sent"
@@ -26508,7 +26512,7 @@ msgstr "幻灯片 {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "幻灯片标题"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:982
+#: ../../packages/chat-ui/src/chat/message-content.tsx:983
 msgid "Slide updated"
 msgstr "幻灯片已更新"
 
@@ -26717,7 +26721,7 @@ msgstr "已开启音效"
 msgid "Source"
 msgstr "来源"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1110
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1111
 #: src/features/chat/thread/message-content.tsx:125
 msgid "Source {index}"
 msgstr "来源 {index}"
@@ -28116,7 +28120,7 @@ msgstr "输入一张图像，移除背景，然后应用风格迁移"
 msgid "Take turns"
 msgstr "轮流发言"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:626
+#: ../../packages/chat-ui/src/chat/message-content.tsx:627
 msgid "Taking screenshot..."
 msgstr "正在截图..."
 
@@ -29150,9 +29154,9 @@ msgid "Thinking-enabled vision-language model"
 msgstr "支持思考的视觉语言模型"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1036
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1037
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
-#: src/features/chat/thread/streaming-placeholder.tsx:727
+#: src/features/chat/thread/streaming-placeholder.tsx:766
 msgid "Thinking..."
 msgstr "正在思考..."
 
@@ -29176,6 +29180,10 @@ msgstr "此浏览器无法在此处接收推送通知。"
 
 #: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
+msgstr ""
+
+#: src/features/chat/thread/composer.tsx:584
+msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 msgstr ""
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:294
@@ -29276,7 +29284,7 @@ msgstr "此文件过大（{0} KB），无法在浏览器中预览或编辑。为
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "此文件过大（约 {0} 个 token），超出了模型的上下文窗口。模型可能无法有效处理此文件。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:372
+#: ../../packages/chat-ui/src/chat/message-content.tsx:373
 msgid "This image has been flagged for review"
 msgstr "此图像已被标记待审核"
 
@@ -30344,7 +30352,7 @@ msgstr "输入你的消息..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:627
+#: ../../packages/chat-ui/src/chat/message-content.tsx:628
 msgid "Typing text..."
 msgstr "正在输入文本..."
 
@@ -30796,11 +30804,11 @@ msgstr "更新的 OpenAI 前沿性能"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "相比原版 R1 推理能力更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:980
+#: ../../packages/chat-ui/src/chat/message-content.tsx:981
 msgid "Updated slide"
 msgstr "已更新幻灯片"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:980
+#: ../../packages/chat-ui/src/chat/message-content.tsx:981
 msgid "Updated slide {slideNumber}"
 msgstr "已更新第 {slideNumber} 张幻灯片"
 
@@ -32022,6 +32030,10 @@ msgstr "等待在 {device} 上批准"
 msgid "Waiting for output…"
 msgstr "正在等待输出…"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:595
+msgid "Waiting for the agent…"
+msgstr ""
+
 #: src/features/chat/thread/ask-user-prompt.tsx:124
 msgid "Waiting for the owner to answer"
 msgstr "正在等待所有者回答"
@@ -32481,6 +32493,7 @@ msgstr "工作流"
 msgid "Working"
 msgstr "进行中"
 
+#: src/features/chat/thread/streaming-placeholder.tsx:602
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"

@@ -5543,11 +5543,25 @@
           "optional": true,
           "unique": false
         },
+        "transport": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "\"ssh\""
+        },
         "userId": {
           "kind": "string",
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "viaDeviceId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "devices"
         }
       },
       "indexes": {
@@ -18479,6 +18493,13 @@
         "by_childThreadId": {
           "fields": [
             "childThreadId"
+          ],
+          "unique": false
+        },
+        "by_childThreadId_and_status": {
+          "fields": [
+            "childThreadId",
+            "status"
           ],
           "unique": false
         },
