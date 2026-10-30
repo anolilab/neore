@@ -27,7 +27,7 @@ import type { UIMessage } from "../agent/ui-messages";
 import { listMessagesByThreadIdHandler, toUIMessages } from "../agent/client";
 import { type StepUsage, sumStepUsage } from "../agent/message-cost";
 import { type RedactedThread, redactThreadForPublicViewer, resolveThreadReadAccess, type ThreadPermission } from "../agent/thread-read-access";
-import { getThreadListDataBatchHandler, publicThread } from "../agent/threads";
+import { getThreadListDataBatchHandler, threadForViewer } from "../agent/threads";
 import { liteAuthQuery } from "../lib/crpc";
 import { throwThreadLocked } from "../lib/thread-lock";
 import { loadNsfwStatuses, type RedactedUIMessage, redactUIMessagesForPublicViewer } from "./lib/public-thread";
@@ -155,7 +155,7 @@ export const getThreadWithData = liteAuthQuery
             : { suggestions: [] };
 
         // publicThread = omit(thread, ["parentThreadIds"]) + projectId cast
-        const threadDocument = publicThread(thread);
+        const threadDocument = threadForViewer(thread, userId);
 
         if (access.kind === "redacted") {
             // No usage or suggestions: token counts and follow-ups are the owner's.

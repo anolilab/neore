@@ -2621,6 +2621,10 @@ export const schema = defineSchema({
         // Unset = the thread never branched, and reads stay on the linear fast
         // path. The displayed path descends from here by latest child.
         activeLeafMessageId: v.optional(v.string()),
+        // The last run paused for the owner (a tool approval, or an askUser question). Set in the
+        // same patch that ends the run (`chat/lib/agent-run.ts#setThreadStatus`); removed by any
+        // write that puts the thread back to `running` (`agent/table-writes.ts#patchThread`).
+        awaitingInput: v.optional(v.union(v.literal("approval"), v.literal("question"))),
         // The bot this chat was started with. Set once at creation; its
         // instructions are read live on each run (`chat/lib/agent-run.ts`).
         botId: v.optional(v.id("bots")),
@@ -2642,9 +2646,13 @@ export const schema = defineSchema({
         isTemporary: v.optional(v.boolean()),
         language: v.optional(v.string()),
         lastCompressionStartedAt: v.optional(v.number()),
+        // When the last run finished successfully; written with the status write that ends it.
+        lastReplyAt: v.optional(v.number()),
         // When the user last saved a reply in the thread (not the prompt a routine run opens it with).
         // Written by `agent/messages.ts#addMessagesHandler`; the routines' quiet check reads it.
         lastUserMessageAt: v.optional(v.number()),
+        // When the OWNER last viewed the latest reply; written only by `chat/thread-state.ts#markThreadViewed`.
+        lastViewedAt: v.optional(v.number()),
         // Set while the thread has a passcode (locked). Content is refused
         // without a proof; `lib/thread-lock.ts`. The hash lives in `threadPasscodes`.
         lockedAt: v.optional(v.number()),
@@ -2662,6 +2670,8 @@ export const schema = defineSchema({
         // Where this thread's turns run (`acp/lib/host-thread.ts`): "host" = a coding agent on a paired
         // device. Unset = the cloud. Set at creation, never changed.
         runner: v.optional(v.literal("host")),
+        // Hidden from the owner's active list until then; written only by `chat/thread-state.ts`.
+        snoozedUntil: v.optional(v.number()),
         source: v.optional(v.string()),
         statelessMode: v.optional(v.boolean()),
         status: v.string(),

@@ -101,6 +101,8 @@ export interface HeadlessRunOptions {
     shouldStop?: () => Promise<boolean>;
     /** Instructions and run config, as a `/<slug>` invocation would contribute them. */
     skill?: { config?: SkillConfig; instructions: string };
+    /** Do not stamp `lastReplyAt`: the thread is a delegated run's, not a conversation the user is waiting on. */
+    skipUnread?: boolean;
     /** Appended to the agent's own instructions. */
     system?: string;
     /** A new thread, or an existing one to continue. */
@@ -248,9 +250,15 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
         const result = await thread.generateText(generateArgs as never);
         const text = result.text ?? "";
 
+        const finishedAt = Date.now();
+
         await ctx.runMutation(internal.agent.threads.updateThread, {
             // A worker archived mid-run stays archived; every other run brings its thread back to active.
-            patch: { ...(!options.keepThreadStatus && { status: "active" as const }), updatedAt: Date.now() },
+            patch: {
+                ...(!options.keepThreadStatus && { status: "active" as const }),
+                ...(!options.skipUnread && { lastReplyAt: finishedAt }),
+                updatedAt: finishedAt,
+            },
             threadId: threadId as Id<"threads">,
         });
 

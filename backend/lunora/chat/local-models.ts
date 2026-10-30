@@ -120,11 +120,13 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
         }
 
         threadId = args.threadId;
-        await patchThread(ctx.db, threadId, { model: args.model, updatedAt: now });
+        // `lastReplyAt` also ends any pause the thread was waiting on (`patchThread`).
+        await patchThread(ctx.db, threadId, { lastReplyAt: now, model: args.model, updatedAt: now });
     } else {
         threadId = (await insertThread(ctx.db, {
             createdBy: userId,
             ...(args.language && { language: args.language }),
+            lastReplyAt: now,
             mode: "text",
             model: args.model,
             status: "active",

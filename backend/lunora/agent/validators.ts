@@ -672,20 +672,29 @@ export const vThreadDocFields = {
     // Written only by `agent/branches.ts` (the switcher, regenerate, edit), so
     // deliberately not a create field.
     activeLeafMessageId: v.optional(v.string()),
+    // Set when a run pauses for the owner, in the status write that ends the run
+    // (`chat/lib/agent-run.ts#setThreadStatus`); removed when the thread runs again.
+    awaitingInput: v.optional(v.union(v.literal("approval"), v.literal("question"))),
     // Written once by `chat/functions.ts#createThread`, which checks the bot belongs to the caller.
     botId: v.optional(v.string()),
     createdAt: v.optional(v.number()),
     // Written only by `chat/group/functions.ts`, which checks every participant
     // is a skill the owner may use — so it is deliberately not a create field.
     groupChat: v.optional(vGroupChat),
+    // Written with the status write that ends a successful run, never by a client.
+    lastReplyAt: v.optional(v.number()),
     // Written only by `agent/messages.ts#addMessagesHandler`, never by a client.
     lastUserMessageAt: v.optional(v.number()),
+    // Written only by `chat/thread-state.ts#markThreadViewed`, which checks the caller owns the thread.
+    lastViewedAt: v.optional(v.number()),
     // Written only by `agent/thread-passcode.ts` (set on lock, cleared on removal).
     lockedAt: v.optional(v.number()),
     order: v.optional(v.number()),
     // Written once by `acp/ingest.ts` when a host session opens, so deliberately not a create field: a client
     // that could set it could mint a host thread, or turn a cloud thread into one.
     runner: v.optional(v.literal("host")),
+    // Written only by `chat/thread-state.ts` (snooze / unsnooze), which checks the caller owns the thread.
+    snoozedUntil: v.optional(v.number()),
     status: vThreadStatus,
     // Written only by `chat/tags/functions.ts`, which checks the ids belong to
     // the caller — so it is deliberately not a create field.

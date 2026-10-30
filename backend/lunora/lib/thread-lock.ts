@@ -144,11 +144,25 @@ export const verifyUnlockProof = async (proof: string | null | undefined, scope:
 
 /**
  * The fields a locked thread keeps when it is shown to its owner in a list.
- * Everything that carries content or a credential is dropped: the title,
+ * The owner's unread/snooze state is metadata and stays. Everything that carries content or a credential is dropped: the title,
  * summary, tags, category, system prompt, project/org/team ids, the public
  * share token and the group settings.
  */
-const LOCKED_STUB_KEYS = ["_creationTime", "_id", "createdAt", "deleted", "deletedAt", "lockedAt", "pinnedAt", "status", "updatedAt"] as const;
+const LOCKED_STUB_KEYS = [
+    "_creationTime",
+    "_id",
+    "awaitingInput",
+    "createdAt",
+    "deleted",
+    "deletedAt",
+    "lastReplyAt",
+    "lastViewedAt",
+    "lockedAt",
+    "pinnedAt",
+    "snoozedUntil",
+    "status",
+    "updatedAt",
+] as const;
 
 export type LockedThreadStub = Partial<Record<(typeof LOCKED_STUB_KEYS)[number], unknown>> & { _creationTime: number; _id: string; status: string };
 

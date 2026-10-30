@@ -5543,11 +5543,25 @@
           "optional": true,
           "unique": false
         },
+        "transport": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "\"ssh\""
+        },
         "userId": {
           "kind": "string",
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "viaDeviceId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "devices"
         }
       },
       "indexes": {
@@ -18419,6 +18433,13 @@
           ],
           "unique": false
         },
+        "by_childThreadId_and_status": {
+          "fields": [
+            "childThreadId",
+            "status"
+          ],
+          "unique": false
+        },
         "by_createdAt": {
           "fields": [
             "createdAt"
@@ -20091,6 +20112,28 @@
           "optional": true,
           "unique": false
         },
+        "awaitingInput": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"approval\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"question\""
+            }
+          ]
+        },
         "botId": {
           "kind": "id",
           "nullable": false,
@@ -20277,7 +20320,19 @@
           "optional": true,
           "unique": false
         },
+        "lastReplyAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "lastUserMessageAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "lastViewedAt": {
           "kind": "number",
           "nullable": false,
           "optional": true,
@@ -20369,6 +20424,12 @@
           "optional": true,
           "unique": false,
           "literal": "\"host\""
+        },
+        "snoozedUntil": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         },
         "source": {
           "kind": "string",

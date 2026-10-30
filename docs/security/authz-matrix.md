@@ -15,8 +15,8 @@ Row-level security (next section) sits underneath it as defence in depth: it
 refuses a caller with no connection to a row at all, but does not know which
 permission a grant carries — read vs. write vs. admin stays the procedure's job.
 
-Audit: 2026-09-23 · 423 public procedures (+ HTTP routes below) ·
-335 ok · 70 fixed · 18 accepted · 0 open.
+Audit: 2026-09-23 · 426 public procedures (+ HTTP routes below) ·
+338 ok · 70 fixed · 18 accepted · 0 open.
 
 ## How to read and maintain it
 
@@ -361,6 +361,9 @@ for a schema table that is neither policed nor listed:
 | `chat_tags_functions.reorderThreadTags` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_tags_functions.setThreadTagAssigned` | mutation | authMutation + RL | threadTags, threads | owner helper; row.userId == caller | ok |
 | `chat_tags_functions.updateThreadTag` | mutation | authMutation + RL | threadTags | owner helper | ok |
+| `chat_thread_state.markThreadViewed` | mutation | authMutation + RL | threads | owner helper (`requireOwnedThreadIgnoringLock`) | ok |
+| `chat_thread_state.snoozeThread` | mutation | authMutation + RL | threads | owner helper (`requireOwnedThreadIgnoringLock`) | ok |
+| `chat_thread_state.unsnoozeThread` | mutation | authMutation + RL | threads | owner helper (`requireOwnedThreadIgnoringLock`) | ok |
 | `chat_tool_permissions.getToolPermissionSettings` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_tool_permissions.listMcpToolPermissions` | action | authAction + RL | aiUserPreferences | caller-scoped (ctx.user) | **fixed** (medium) — SSRF guard on saved server URLs |
 | `chat_tool_permissions.respondToToolApproval` | mutation | authMutation + RL | threads | thread access (owner/grant) | ok |

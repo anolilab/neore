@@ -21,7 +21,7 @@
  */
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { withoutUndefined } from "../lib/patch";
+import { patchRow, withoutUndefined } from "../lib/patch";
 import type { VectorTableName } from "./vector/tables";
 
 type Database = MutationCtx["db"];
@@ -29,7 +29,19 @@ type NewRow<T extends "messages" | "threadRelationships" | "threads"> = Omit<Doc
 
 /** The `threads` columns other modules set. */
 export type ThreadPatch = Partial<
-    Pick<Doc<"threads">, "activeLeafMessageId" | "groupChat" | "lastCompressionStartedAt" | "model" | "status" | "tagIds" | "updatedAt" | "workerPolicy">
+    Pick<
+        Doc<"threads">,
+        | "activeLeafMessageId"
+        | "awaitingInput"
+        | "groupChat"
+        | "lastCompressionStartedAt"
+        | "lastReplyAt"
+        | "model"
+        | "status"
+        | "tagIds"
+        | "updatedAt"
+        | "workerPolicy"
+    >
 >;
 
 /** The `messages` columns other modules set. */
@@ -44,8 +56,64 @@ export type TemporaryThreadPatch = Partial<Pick<Doc<"temporaryThreads">, "skillD
 export const insertThread = async (db: Database, row: NewRow<"threads">): Promise<Id<"threads">> =>
     await db.insert("threads", { ...row, createdAt: row.createdAt ?? Date.now() });
 
+/**
+ * The row a write that puts a thread back to `running`, or records a finished reply (`lastReplyAt`), must leave:
+ * `awaitingInput` belongs to the pause that just ended. Every such write funnels through here or `agent/threads.ts#updateThread`, so no call site has to
+ * remember to clear it.
+ */
+export const patchesWithoutAwaitingInput = (
+    row: Pick<Doc<"threads">, "awaitingInput"> | null,
+    fields: Pick<ThreadPatch, "awaitingInput" | "lastReplyAt" | "status">,
+): boolean => (fields.status === "running" || fields.lastReplyAt !== undefined) && fields.awaitingInput === undefined && row?.awaitingInput !== undefined;
+
 export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch): Promise<void> => {
+    if (fields.status === "running" || fields.lastReplyAt !== undefined) {
+        const row = await db.get(threadId);
+
+        if (row && patchesWithoutAwaitingInput(row, fields)) {
+            await patchRow(db, row, { ...withoutUndefined(fields), awaitingInput: undefined });
+
+            return;
+        }
+    }
+
     await db.patch(threadId, withoutUndefined(fields));
+};
+
+/** Removes `awaitingInput` from a thread whose pause can no longer be answered (its approval snapshot expired). */
+export const clearAwaitingInput = async (db: Database, threadId: Id<"threads">): Promise<void> => {
+    const row = await db.get(threadId);
+
+    if (row?.awaitingInput !== undefined) {
+        await patchRow(db, row, { awaitingInput: undefined });
+    }
+};
+
+/**
+ * Records that the OWNER has seen the thread's latest reply. Leaves `updatedAt` alone (the lists sort by it) and
+ * writes nothing when there is no reply newer than the last view. Returns whether it wrote.
+ */
+export const markThreadViewedAt = async (db: Database, thread: Doc<"threads">, now: number): Promise<boolean> => {
+    if (thread.lastReplyAt === undefined || (thread.lastViewedAt !== undefined && thread.lastViewedAt >= thread.lastReplyAt)) {
+        return false;
+    }
+
+    await db.patch(thread._id, { lastViewedAt: now });
+
+    return true;
+};
+
+/** Snoozes the thread until `until`; `undefined` removes the column. Leaves `updatedAt` alone. */
+export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined): Promise<void> => {
+    if (until === undefined) {
+        if (thread.snoozedUntil !== undefined) {
+            await patchRow(db, thread, { snoozedUntil: undefined });
+        }
+
+        return;
+    }
+
+    await db.patch(thread._id, { snoozedUntil: until });
 };
 
 /**

@@ -1682,6 +1682,7 @@ export interface Doc_threads {
     _id: Id<"threads">;
     _creationTime: number;
     activeLeafMessageId?: string;
+    awaitingInput?: "approval" | "question";
     botId?: Id<"bots">;
     category?: string;
     createdAt?: number;
@@ -1697,7 +1698,9 @@ export interface Doc_threads {
     isTemporary?: boolean;
     language?: string;
     lastCompressionStartedAt?: number;
+    lastReplyAt?: number;
     lastUserMessageAt?: number;
+    lastViewedAt?: number;
     lockedAt?: number;
     messengerConnectionId?: Id<"messengerConnections">;
     mode?: string;
@@ -1711,6 +1714,7 @@ export interface Doc_threads {
     publicAccessToken?: string;
     reasoningEffort?: number;
     runner?: "host";
+    snoozedUntil?: number;
     source?: string;
     statelessMode?: boolean;
     status: string;
@@ -4461,6 +4465,7 @@ export interface Insert_threads {
     _id?: Id<"threads">;
     _creationTime?: number;
     activeLeafMessageId?: string;
+    awaitingInput?: "approval" | "question";
     botId?: Id<"bots">;
     category?: string;
     createdAt?: number;
@@ -4476,7 +4481,9 @@ export interface Insert_threads {
     isTemporary?: boolean;
     language?: string;
     lastCompressionStartedAt?: number;
+    lastReplyAt?: number;
     lastUserMessageAt?: number;
+    lastViewedAt?: number;
     lockedAt?: number;
     messengerConnectionId?: Id<"messengerConnections">;
     mode?: string;
@@ -4490,6 +4497,7 @@ export interface Insert_threads {
     publicAccessToken?: string;
     reasoningEffort?: number;
     runner?: "host";
+    snoozedUntil?: number;
     source?: string;
     statelessMode?: boolean;
     status: string;

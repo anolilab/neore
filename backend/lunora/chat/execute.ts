@@ -415,8 +415,10 @@ export const runStreamingAgent = internalAction
             // A locked chat's content is never mined into memory.
             const extractMemory = runContext.memoryEnabled && !isThreadLocked(thread);
 
+            let finished: Awaited<ReturnType<typeof finishRun>>;
+
             try {
-                await finishRun(ctx, {
+                finished = await finishRun(ctx, {
                     mcpLabels: toolResult.mcpLabels,
                     pending,
                     savedMessages: result.savedMessages,
@@ -460,7 +462,7 @@ export const runStreamingAgent = internalAction
                 userId,
             });
 
-            await setThreadStatus(ctx, threadId, "active");
+            await setThreadStatus(ctx, threadId, "active", { awaitingInput: finished.awaitingInput, replied: !finished.paused });
 
             streamLogger.debug(`[BgAgent] Execution complete`, {
                 elapsedMs: Date.now() - startTime,
@@ -549,13 +551,13 @@ export const continueAfterToolApproval = internalAction
             }
 
             // The gate above admitted this continuation, so its knowledge search may read the chat's own files.
-            await resumeApprovedRun(
+            const resumed = await resumeApprovedRun(
                 ctx,
                 { answer, approvalId, approved, config, denyReason, streamId, threadId, userId },
                 { admittedRun: true, steerable: true },
             );
 
-            await setThreadStatus(ctx, threadId, "active");
+            await setThreadStatus(ctx, threadId, "active", { awaitingInput: resumed.awaitingInput, replied: !resumed.paused && !resumed.stopped });
         } catch (error) {
             streamLogger.error(`[ToolApproval] Continuation failed:`, error);
 

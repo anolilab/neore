@@ -26,6 +26,7 @@ import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread,
 import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadDocFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
+import { patchesWithoutAwaitingInput } from "./table-writes";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
     const result = omit(thread, ["parentThreadIds"]);
@@ -41,6 +42,18 @@ export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
     }
 
     return result as unknown as ThreadDoc;
+};
+
+/**
+ * Unread, snooze and "needs you" belong to the thread's OWNER; the row is shared with grantees, who must not see
+ * (or act on) them. Reads that can reach a grantee return the row through here.
+ */
+const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozedUntil"] as const;
+
+export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
+    const isOwner = thread.userId !== undefined && thread.userId === viewerId;
+
+    return publicThread(isOwner ? thread : (omit(thread, [...OWNER_STATE_KEYS]) as Doc<"threads">));
 };
 
 /**
@@ -89,7 +102,7 @@ export const getThread = query
             return toLockedThreadStub(publicThread(access.thread)) as unknown as ThreadDoc;
         }
 
-        return access.kind === "full" ? publicThread(access.thread) : redactThreadForPublicViewer(publicThread(access.thread));
+        return access.kind === "full" ? threadForViewer(access.thread, identity?.userId) : redactThreadForPublicViewer(publicThread(access.thread));
     });
 
 const listThreadsByUserIdArgs = {
@@ -214,6 +227,8 @@ export const threadFieldsSupportingPatch = [
     "title" as const,
     "summary" as const,
     "status" as const,
+    "awaitingInput" as const,
+    "lastReplyAt" as const,
     "userId" as const,
     "model" as const,
     "tags" as const,
@@ -252,7 +267,14 @@ export const updateThread = internalMutation
         const oldThread = await ctx.db.get(args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
-        await ctx.db.patch(args.threadId, withoutUndefined(args.patch));
+
+        // Back to `running` ends a pause: awaitingInput goes in the same write (see `patchThread`).
+        if (patchesWithoutAwaitingInput(oldThread, args.patch)) {
+            await patchRow(ctx.db, oldThread, { ...withoutUndefined(args.patch), awaitingInput: undefined });
+        } else {
+            await ctx.db.patch(args.threadId, withoutUndefined(args.patch));
+        }
+
         const newThread = (await ctx.db.get(args.threadId))!;
 
         // Update aggregates

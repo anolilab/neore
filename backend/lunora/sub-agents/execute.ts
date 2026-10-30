@@ -123,6 +123,7 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
                     return false;
                 }),
             skill,
+            skipUnread: true,
             system: worker ? WORKER_SYSTEM : SUB_AGENT_SYSTEM,
             thread: worker ? { threadId: worker } : { tags: ["sub-agent"], title: `Sub-agent: ${claim.task}`.split("\n", 1)[0]!.slice(0, 120) },
             toolAllowlist: claim.toolAllowlist,
