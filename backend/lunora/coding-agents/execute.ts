@@ -12,8 +12,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
-import type { ConnectorGrant } from "../connectors/lib/grant-runtime";
-import { obtainAccessToken } from "../connectors/lib/grant-runtime";
+import { resolveGithubToken } from "../connectors/lib/github-token";
 import { E2B_API_KEY } from "../env";
 import { authAction, rateLimit } from "../lib/crpc";
 import { fetchOk, FETCH_TIMEOUT_MS, HttpError } from "../lib/fetch-timeout";
@@ -30,16 +29,9 @@ const NOT_CONFIGURED = "Coding agents are not available on this server (no sandb
 
 /** A usable GitHub connector token, or `undefined` when GitHub is not connected (or the grant is dead). */
 const getGithubToken = async (ctx: Pick<ActionCtx, "runMutation" | "runQuery">, userId: string): Promise<string | undefined> => {
-    const grants = (await ctx.runQuery(internal.connectors.store.listConnectorGrants, { userId })) as ConnectorGrant[];
-    const grant = grants.find((candidate) => candidate.slug === "github");
+    const outcome = await resolveGithubToken(ctx, userId);
 
-    if (!grant) {
-        return undefined;
-    }
-
-    const outcome = await obtainAccessToken(ctx, grant);
-
-    return "error" in outcome ? undefined : outcome.accessToken;
+    return "accessToken" in outcome ? outcome.accessToken : undefined;
 };
 
 /** The GitHub REST call that opens the PR — from the backend, never from a sandbox. */
