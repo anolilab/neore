@@ -1348,7 +1348,7 @@ impl Desktop {
         // The first sight of a server asks the person; the key is pinned here so nothing is asked later.
         let first = connect(server, &target, &paths, &trusting()).unwrap();
 
-        finish(&first);
+        finish(&first, &target, &paths);
         drop(first);
 
         fs::create_dir_all(&data_dir).unwrap();
@@ -1590,7 +1590,7 @@ fn a_host_this_computer_did_not_start_survives_a_reap_and_a_disconnect() {
     let _ = earlier.wait();
 
     // Disconnecting ends this computer's own session and host, and nothing else.
-    finish(&connection);
+    finish(&connection, &target, &paths);
     drop(connection);
     wait_for(
         "the session's own host kept running",
@@ -1651,7 +1651,7 @@ fn a_forwarded_agent_is_linked_from_a_stable_path_in_the_run_folder() {
     assert_ne!(Path::new(&session), stable);
     assert_eq!(fs::read_link(&stable).unwrap(), Path::new(&session));
 
-    finish(&connection);
+    finish(&connection, &target, &paths);
 
     // Without forwarding the host links nothing.
     let plain = Server::start(&sshd, "no-agent");
@@ -1673,7 +1673,7 @@ fn a_forwarded_agent_is_linked_from_a_stable_path_in_the_run_folder() {
     );
     assert!(!plain.remote_env().contains("SSH_AUTH_SOCK"));
 
-    finish(&connection);
+    finish(&connection, &plain.target("client"), &plain.paths("a"));
 
     let _ = agent.kill();
     let _ = agent.wait();
@@ -1811,7 +1811,7 @@ fn reaping_a_host_ends_the_commands_it_was_running() {
 
     let _ = stale.wait();
 
-    finish(&connection);
+    finish(&connection, &target, &paths);
 }
 
 /// A host that refuses how it is started (an old binary under the same version) is not a network problem.
