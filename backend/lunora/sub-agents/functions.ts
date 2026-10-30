@@ -783,11 +783,16 @@ export const attachChildThread = internalMutation
  * and answers why when the thread is gone, no longer the run's owner's (`retry: false`, it
  * will not come back), or locked (`retry: true`, it may be unlocked); `undefined` means it wrote.
  */
+const GONE_PARENT_REASON = "The conversation that started this run is gone.";
+
+/** A deleted parent, or one no longer the run owner's, can never take the post. */
+const isGoneParent = (thread: Doc<"threads"> | null, run: RunDoc): boolean => !thread || thread.deleted === true || thread.userId !== run.userId;
+
 const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promise<{ reason: string; retry: boolean } | undefined> => {
     const thread = await ctx.db.get(run.parentThreadId as Id<"threads">);
 
-    if (!thread || thread.deleted || thread.userId !== run.userId) {
-        return { reason: "The conversation that started this run is gone.", retry: false };
+    if (!thread || isGoneParent(thread, run)) {
+        return { reason: GONE_PARENT_REASON, retry: false };
     }
 
     // A locked parent takes no background post: the result stays with the run, unread.
@@ -872,6 +877,13 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
     const run = await ctx.db.get(runId);
 
     if (!run || isActiveSubAgentStatus(run.status) || run.resultPostedAt !== undefined || run.postFailed !== undefined || !postsBack(run)) {
+        return false;
+    }
+
+    // A parent that is gone cannot take the post, whatever stream it left behind.
+    if (isGoneParent(await ctx.db.get(run.parentThreadId as Id<"threads">), run)) {
+        await patchById(ctx.db, run._id, { postFailed: GONE_PARENT_REASON });
+
         return false;
     }
 

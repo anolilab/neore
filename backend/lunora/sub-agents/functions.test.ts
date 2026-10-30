@@ -468,6 +468,20 @@ describe("finishRun", () => {
                     }),
             );
 
+        it("records a gone parent at once instead of waiting out a stream it left behind", async () => {
+            await admit();
+
+            const [run] = await runs();
+
+            await insertStream("streaming");
+            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true }));
+            await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "succeeded", result: "Lost." }));
+
+            expect(await messagesIn(threadId)).toHaveLength(0);
+            expect(await firstRun()).toMatchObject({ postFailed: expect.stringMatching(GONE_PARENT), status: "succeeded" });
+            expect(harness.scheduler.list().filter((job) => job.functionPath?.includes("postResult") === true)).toHaveLength(0);
+        });
+
         it("ends the run at once but holds the post until the stream is done, then posts once", async () => {
             await admit();
 
