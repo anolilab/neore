@@ -17,12 +17,20 @@ type Stream = Doc<"persistentStreams">;
 
 const CHUNK_PAGE = 200;
 
-/** What the host wrote to a stream, in order, up to the reply cap. Pages through the chunks and stops once the text is full (reasoning after that point is not kept). */
+/**
+ * The most chunk pages one finish reads. Reasoning and tool events do not fill the text cap, so without a bound a
+ * long turn would page through its whole history inside the mutation that must save the reply and end the stream.
+ */
+export const MAX_TRANSCRIPT_PAGES = 25;
+
+/** What the host wrote to a stream, in order, up to the reply cap. Pages through the chunks and stops once the text is full (reasoning after that point is not kept) or the page budget is spent. */
 export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId: Id<"persistentStreams">) => {
     const transcript = emptyTranscript();
     let cursor: string | undefined;
+    let pages = 0;
 
     do {
+        pages += 1;
         const page = await ctx.db.persistentChunks.findMany({ cursor, limit: CHUNK_PAGE, orderBy: [{ seq: "asc" }], where: { streamId } });
 
         for (const chunk of page.page) {
@@ -32,7 +40,7 @@ export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId:
             }
         }
 
-        cursor = page.isDone || isTranscriptFull(transcript) ? undefined : (page.continueCursor ?? undefined);
+        cursor = page.isDone || isTranscriptFull(transcript) || pages >= MAX_TRANSCRIPT_PAGES ? undefined : (page.continueCursor ?? undefined);
     } while (cursor);
 
     return transcript;
