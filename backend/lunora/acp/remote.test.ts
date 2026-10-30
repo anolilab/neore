@@ -416,7 +416,10 @@ describe("a message sent while the session is still starting", () => {
 
         const [session] = await rows("acpSessions");
 
-        await run(async (ctx) => await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }));
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }),
+        );
         expect(await sessionStatus()).toBe("busy");
     });
 
@@ -427,7 +430,10 @@ describe("a message sent while the session is still starting", () => {
 
         const [session] = await rows("acpSessions");
 
-        await run(async (ctx) => await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }));
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }),
+        );
         expect(await sessionStatus()).toBe("idle");
     });
 
@@ -466,7 +472,9 @@ describe("a message sent while the session is still starting", () => {
 
         const [session] = await rows("acpSessions");
 
-        await run(async (ctx) => await ctx.runMutation(calls.endUnopenedSession, { deviceId: device.deviceId, hostSessionId: session?.hostSessionId as string }));
+        await run(
+            async (ctx) => await ctx.runMutation(calls.endUnopenedSession, { deviceId: device.deviceId, hostSessionId: session?.hostSessionId as string }),
+        );
 
         expect(await sessionStatus()).toBe("ended");
         expect(await streamOf(threadId)).toMatchObject({ hostEndReason: "failed", hostState: "ended", status: "error" });

@@ -13,16 +13,7 @@ export type HostSendError =
 
 export type HostSendResult = { ok: true } | { error: HostSendError; ok: false };
 
-const KNOWN: ReadonlySet<string> = new Set([
-    "busy",
-    "not_authenticated",
-    "not_found",
-    "offline",
-    "rate_limited",
-    "session_ended",
-    "too_large",
-    "turn_running",
-]);
+const KNOWN: ReadonlySet<string> = new Set(["busy", "not_authenticated", "not_found", "offline", "rate_limited", "session_ended", "too_large", "turn_running"]);
 
 /** The longest prompt `/hosts/send` takes (`MAX_SEND_CHARS` in `backend/lunora/acp/send.ts`). */
 export const MAX_HOST_PROMPT_CHARS = 30_000;

@@ -172,11 +172,13 @@ export const submitReview = authAction
             claim: async () => await ctx.runMutation(internal.source_control.review_internal.claimDraftForSubmit, address),
             finish: async (revision, sentIds, lease) => {
                 // The host has the review; a draft left behind is for the lease to hold, but ops should see it.
-                await ctx.runMutation(internal.source_control.review_internal.finishDraftSubmit, { ...address, lease, revision, sentIds }).catch((error: unknown) => {
-                    ctx.log.event("source_control.submit_review_finish_failed", { message: error instanceof Error ? error.message : "unknown" });
+                await ctx
+                    .runMutation(internal.source_control.review_internal.finishDraftSubmit, { ...address, lease, revision, sentIds })
+                    .catch((error: unknown) => {
+                        ctx.log.event("source_control.submit_review_finish_failed", { message: error instanceof Error ? error.message : "unknown" });
 
-                    throw error;
-                });
+                        throw error;
+                    });
             },
             post: async (submission) =>
                 await writeToHost(DEVELOP_DRIVER, token, async (request) => {

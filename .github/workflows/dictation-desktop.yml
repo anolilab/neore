@@ -248,6 +248,12 @@ jobs:
                   } >> "$GITHUB_ENV"
                   echo "$RUNNER_LABEL" > "$RUNNER_TEMP/runner-label.txt"
 
+            # The shell bundles `@neore/ai/capabilities` (plain data, read through its built `dist/`), and nothing
+            # else builds that package on this job.
+            - name: "Build the shared capability rules"
+              if: "always()"
+              run: "pnpm --filter @neore/ai run build"
+
             # Not tied to the helper: these use a stand-in, and must run (and pass) wherever the helper could not be built.
             - name: "Unit and integration tests"
               if: "always()"

@@ -100,7 +100,10 @@ export const appendChildEvent = (transcript: HostTranscript, event: ChildEvent):
     if (event.kind === "child_text") {
         const field = event.field === "text" ? "text" : "reasoning";
 
-        child[field] += event.text.slice(0, Math.max(0, Math.min(MAX_CHILD_CHARS - child[field].length, MAX_CHILDREN_TOTAL_CHARS - charsOf(transcript.children))));
+        child[field] += event.text.slice(
+            0,
+            Math.max(0, Math.min(MAX_CHILD_CHARS - child[field].length, MAX_CHILDREN_TOTAL_CHARS - charsOf(transcript.children))),
+        );
     } else if (event.kind === "child_tool") {
         const known = child.tools.find((tool) => tool.id === event.id);
         const next = { id: event.id, status: event.status, title: event.title, toolKind: event.toolKind };
