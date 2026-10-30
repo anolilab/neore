@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyUrl, isArtifactPreview, isLocalPage, isTrustedUrl } from "./trust";
+import { classifyUrl, isArtifactPreview, isDraftTarget, isLocalPage, isTrustedUrl } from "./trust";
 
 const SITE = new URL("https://app.example.com/");
 const COMPOSER = new URL("file:///Applications/Neore.app/Contents/Resources/app.asar/dist/quick-composer/index.html");
@@ -17,6 +17,27 @@ describe("isTrustedUrl", () => {
         expect(isTrustedUrl(SITE, "https://app.example.com/artifact-preview#abc")).toBe(false);
         expect(isArtifactPreview(new URL("https://app.example.com/artifact-preview?x=1"))).toBe(true);
         expect(isArtifactPreview(new URL("https://app.example.com/chat"))).toBe(false);
+    });
+});
+
+describe("isDraftTarget", () => {
+    it("accepts the pages that have a composer behind them", () => {
+        expect(isDraftTarget(SITE, "https://app.example.com/chat")).toBe(true);
+        expect(isDraftTarget(SITE, "https://app.example.com/chat/abc123")).toBe(true);
+        expect(isDraftTarget(SITE, "https://app.example.com/dashboard")).toBe(true);
+        expect(isDraftTarget(SITE, "https://app.example.com/authors")).toBe(true);
+    });
+
+    it("refuses the sign-in screens, other origins, the artifact preview and no page at all", () => {
+        expect(isDraftTarget(SITE, "https://app.example.com/auth/sign-in")).toBe(false);
+        expect(isDraftTarget(SITE, "https://app.example.com/auth")).toBe(false);
+        expect(isDraftTarget(SITE, "https://app.example.com/de/auth/sign-in")).toBe(false);
+        expect(isDraftTarget(SITE, "https://app.example.com/fr/auth")).toBe(false);
+        expect(isDraftTarget(SITE, "https://app.example.com/de/chat")).toBe(true);
+        expect(isDraftTarget(SITE, "https://other.example.com/chat")).toBe(false);
+        expect(isDraftTarget(SITE, "https://app.example.com/artifact-preview")).toBe(false);
+        expect(isDraftTarget(SITE, "")).toBe(false);
+        expect(isDraftTarget(SITE, undefined)).toBe(false);
     });
 });
 

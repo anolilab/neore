@@ -19,9 +19,15 @@ export interface ComposerRestoreFile {
 }
 
 export interface ComposerRestorePayload {
+    /** Add to what is typed instead of replacing it: text that arrives from outside (dictation) must not cost the user their unsent message. */
+    append?: boolean;
     files: ComposerRestoreFile[];
     text: string;
 }
+
+/** The composer text after a restore request: the request's text, or the typed text with it added on a new line. */
+export const textAfterRestore = (current: string, { append, text }: ComposerRestorePayload): string =>
+    append === true && current.trim() !== "" ? `${current.trimEnd()}\n${text}` : text;
 
 interface RestorableMessage {
     parts: ReadonlyArray<{ filename?: string; mediaType?: string; providerMetadata?: unknown; text?: string; type: string; url?: string }>;

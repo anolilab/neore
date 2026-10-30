@@ -36,8 +36,8 @@ interface Fake {
     ipc: Map<string, (event: unknown, payload?: unknown) => unknown>;
     notifications: { body?: string; title: string }[];
     opened: string[];
-    permissionCheck?: (wc: unknown, permission: string, requestingOrigin: string) => boolean;
-    permissionRequest?: (wc: unknown, permission: string, callback: (isAllowed: boolean) => void, details: { requestingUrl: string }) => void;
+    permissionCheck?: (wc: unknown, permission: string, requestingOrigin: string, details?: unknown) => boolean;
+    permissionRequest?: (wc: unknown, permission: string, callback: (isAllowed: boolean) => void, details: { mediaTypes?: string[]; requestingUrl: string }) => void;
     shortcuts: Map<string, () => void>;
     trays: number;
     windows: FakeWindow[];
@@ -387,6 +387,37 @@ describe("permissions", () => {
         expect(decide("geolocation", `${SITE}/chat`)).toBe(false);
         expect(fake().permissionCheck?.({}, "media", SITE)).toBe(true);
         expect(fake().permissionCheck?.({}, "media", "https://example.org")).toBe(false);
+    });
+});
+
+describe("the microphone", () => {
+    const askForAudio = (webContents: unknown, requestingUrl: string) => {
+        let isAllowed: boolean | undefined;
+
+        fake().permissionRequest?.(webContents, "media", (value) => {
+            isAllowed = value;
+        }, { mediaTypes: ["audio"], requestingUrl });
+
+        return isAllowed;
+    };
+
+    it.each([
+        ["the dictation window's page", "file:///app/dist/dictation-window/dictation.html"],
+        ["the Quick Composer", "file:///app/dist/quick-composer/index.html"],
+        ["the device window", "file:///app/dist/device-window/device.html"],
+        ["a foreign origin", "https://example.org/"],
+    ])("is refused to %s in the default session", (_name, url) => {
+        expect(askForAudio({ id: 99 }, url)).toBe(false);
+        expect(fake().permissionCheck?.({ id: 99 }, "media", "file:///", { mediaType: "audio", requestingUrl: url })).toBe(false);
+    });
+
+    it("is still granted to the site", () => {
+        expect(askForAudio({ id: 99 }, `${SITE}/chat`)).toBe(true);
+    });
+
+    it("starts no dictation window or shortcut while the internal flag is off", () => {
+        expect(fake().shortcuts.has("CommandOrControl+Shift+D")).toBe(false);
+        expect(fake().windows.every((win) => win.loaded.every((url) => !url.includes("dictation")))).toBe(true);
     });
 });
 

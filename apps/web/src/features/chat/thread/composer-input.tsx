@@ -42,7 +42,7 @@ import { MIN_COMPARISON_MODELS, useModelStore } from "@/features/chat/core/store
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { captureScreenFrame, isScreenCaptureSupported } from "@/features/chat/core/utils/capture-screen";
 import type { ComposerRestoreFile } from "@/features/chat/core/utils/composer-restore";
-import { loadRestoreFile, onComposerRestore } from "@/features/chat/core/utils/composer-restore";
+import { loadRestoreFile, onComposerRestore, textAfterRestore } from "@/features/chat/core/utils/composer-restore";
 import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/chat/core/utils/composer-submit";
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
@@ -1001,13 +1001,13 @@ const ComposerInput = ({
 
     useEffect(
         () =>
-            onComposerRestore(({ files, text: restoredText }) => {
+            onComposerRestore((payload) => {
                 promptHistory.reset();
-                setText(restoredText);
-                void Promise.all(files.map((file, index) => restoreFile(file, index)));
+                setText(textAfterRestore(getComposerText(), payload));
+                void Promise.all(payload.files.map((file, index) => restoreFile(file, index)));
                 inputAreaRef.current?.focus();
             }),
-        [promptHistory, restoreFile, setText],
+        [getComposerText, promptHistory, restoreFile, setText],
     );
 
     // Handle "Upload new file" from @ popup — open file dialog

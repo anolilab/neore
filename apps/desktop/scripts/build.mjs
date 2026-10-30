@@ -22,6 +22,7 @@ rmSync(dist, { force: true, recursive: true });
 mkdirSync(path.join(dist, "quick-composer"), { recursive: true });
 mkdirSync(path.join(dist, "device-window"), { recursive: true });
 mkdirSync(path.join(dist, "terminal-window"), { recursive: true });
+mkdirSync(path.join(dist, "dictation-window"), { recursive: true });
 
 const common = {
     bundle: true,
@@ -30,7 +31,11 @@ const common = {
     format: "cjs",
     // electron-updater is a runtime dependency: electron-builder packs it, esbuild does not inline it.
     external: ["electron", "electron-updater"],
-    define: { "process.env.NEORE_SITE_URL": JSON.stringify(process.env.NEORE_SITE_URL ?? DEFAULT_SITE_URL) },
+    define: {
+        // Dictation is behind a temporary internal flag until its settings switch exists (plans/desktop-dictation.md, S3).
+        "process.env.NEORE_DICTATION": JSON.stringify(process.env.NEORE_DICTATION === "1" ? "1" : "0"),
+        "process.env.NEORE_SITE_URL": JSON.stringify(process.env.NEORE_SITE_URL ?? DEFAULT_SITE_URL),
+    },
     sourcemap: !release,
     logLevel: "info",
 };
@@ -55,6 +60,7 @@ const preloadEntries = [
     ["Quick Composer preload", path.join(root, "src/quick-composer/preload.ts"), path.join(dist, "quick-composer", "preload.cjs")],
     ["device window preload", path.join(root, "src/device/window/preload.ts"), path.join(dist, "device-window", "preload.cjs")],
     ["terminal window preload", path.join(root, "src/terminal/window/preload.ts"), path.join(dist, "terminal-window", "preload.cjs")],
+    ["dictation window preload", path.join(root, "src/dictation/window/preload.ts"), path.join(dist, "dictation-window", "preload.cjs")],
 ];
 
 await esbuild.build({ ...common, entryPoints: [path.join(root, "src/main.ts")], outfile: path.join(dist, "main.cjs") });
@@ -114,5 +120,21 @@ copyFileSync(
     path.join(path.dirname(createRequire(import.meta.url).resolve("@xterm/xterm/package.json")), "css", "xterm.css"),
     path.join(dist, "terminal-window", "xterm.css"),
 );
+
+// The dictation window's page: a classic script too, bundled the same way.
+await esbuild.build({
+    bundle: true,
+    format: "iife",
+    platform: "browser",
+    target: "es2022",
+    entryPoints: [path.join(root, "src/dictation/window/dictation.ts")],
+    outfile: path.join(dist, "dictation-window", "dictation.js"),
+    sourcemap: !release,
+    logLevel: "info",
+});
+
+for (const file of ["dictation.html", "dictation.css"]) {
+    copyFileSync(path.join(root, "src/dictation/window", file), path.join(dist, "dictation-window", file));
+}
 
 copyFileSync(path.join(root, "assets/icon.png"), path.join(dist, "icon.png"));

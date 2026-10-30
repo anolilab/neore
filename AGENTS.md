@@ -629,6 +629,24 @@ written here is what is not.
   subscribes to `getDeviceCallByToolCall` ONLY while the tool part is in
   flight; a finished call reads its outcome from the tool output's `status`.
 
+- **Desktop dictation** (`apps/desktop/src/dictation/`, plans/desktop-dictation.md S2) is behind the build-time
+  flag `NEORE_DICTATION=1` until the settings switch (S3) exists; unset, no shortcut, window or channel is created.
+  Hold `CommandOrControl+Shift+D`: a `dictation` window opens in its OWN in-memory session (`webRequest` cancels
+  everything but its own files, so it has no network), captures 16 kHz mono in the page and sends chunks to the main
+  process, which keeps them in memory and writes a WAV to the stdin of a pinned `whisper-cli` (whisper.cpp v1.9.5,
+  `scripts/build-dictation-helper.mjs`; static, Metal embedded; macOS arm64 only so far). Audio never touches disk.
+  Non-obvious: `-f -` prints NOTHING without `-otxt` (upstream turns the output name into stdout and drops the segment
+  callback), and the default language is `en`, so pass `-l auto`. **`globalShortcut` reports presses only**, so the
+  release is the key-up the focused dictation window sees (`before-input-event`), with blur, a second press (ignored while
+  the OS is repeating a held key), Escape and a 60 s cap as the other ends. The microphone policy is ONE function
+  (`dictation/permissions.ts`) installed on the default session and on the window's: Chromium asks the check handler
+  first WITHOUT a `mediaType`, so a check names no kind and only the request (`mediaTypes` exactly `["audio"]`) is the
+  audio gate. The model (574 MB on Apple Silicon, else 488 MB) downloads in the main process after a confirm dialog,
+  hashed while streaming, renamed into place only on a match. **`getUserMedia` with `--use-fake-device-for-media-stream`
+  hangs in a sandboxed shell and on a Mac without a usable audio service**, so the e2e feeds audio through the page's own
+  preload bridge; `NEORE_E2E_MICROPHONE=1` uses the (fake) microphone, and `NEORE_WHISPER_CLI` / `_MODEL` / `_CLIP` run
+  a real recogniser.
+
 - **Public v1 API + `neore` CLI** (`backend/lunora/public-api/`, `apps/cli`) —
   one route table (`routes.ts`) feeds both the hono router and
   `/api/v1/openapi.json`; every handler calls an EXISTING public procedure

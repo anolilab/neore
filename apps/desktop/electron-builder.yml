@@ -20,6 +20,12 @@ files:
     # The terminal's PTY library (`node-pty`) runs from the host process. Its C++ sources, vendored deps and
     # build files are not needed at runtime; the prebuilt binaries (or the Linux build output) are.
     - "!node_modules/node-pty/{src,deps,third_party,scripts,binding.gyp}{,/**/*}"
+# The on-device speech recogniser (`scripts/build-dictation-helper.mjs`) and its licence texts. Outside the
+# asar: a process cannot be spawned from inside the archive. Built per OS and arch; where none was built the
+# folder is absent, and dictation refuses cleanly (`src/dictation/index.ts`).
+extraResources:
+    - from: "helper/${os}-${arch}"
+      to: dictation
 asar: true
 # node-pty ships N-API binaries for macOS (both archs) and Windows, and builds on Linux at install time. They are
 # valid for Electron as they are, and a rebuild here would produce the runner's arch only (a mac x64 build on an

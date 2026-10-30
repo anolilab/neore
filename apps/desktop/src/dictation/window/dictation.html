@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <!-- Strict: only the page's own script and stylesheet, and no connection of any kind. -->
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Neore dictation</title>
+        <link rel="stylesheet" href="dictation.css" />
+        <script src="dictation.js" defer></script>
+    </head>
+    <body>
+        <main>
+            <div class="meter" aria-hidden="true"><div id="level"></div></div>
+            <p id="status" role="status" aria-live="polite">Starting the microphone…</p>
+            <p class="hint">Release to insert · Esc to cancel</p>
+        </main>
+    </body>
+</html>
