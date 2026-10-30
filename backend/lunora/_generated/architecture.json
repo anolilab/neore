@@ -16340,7 +16340,7 @@
     {
       "file": "acp/lib/revoke",
       "kind": "write",
-      "line": 17,
+      "line": 20,
       "reason": "\"endHostSessionsOfDevice\" is not a registered function"
     },
     {
@@ -17714,25 +17714,25 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1033,
+      "line": 1038,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1041,
+      "line": 1046,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1182,
+      "line": 1187,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1208,
+      "line": 1213,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
@@ -19580,19 +19580,19 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 794,
+      "line": 795,
       "reason": "\"rateLimitGuard\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 890,
+      "line": 891,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 932,
+      "line": 933,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {
