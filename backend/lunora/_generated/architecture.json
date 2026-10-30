@@ -18524,13 +18524,13 @@
     {
       "file": "connectors/lib/github-token",
       "kind": "call",
-      "line": 17,
+      "line": 16,
       "reason": "\"resolveGithubToken\" is not a registered function"
     },
     {
       "file": "connectors/lib/github-token",
       "kind": "call",
-      "line": 38,
+      "line": 50,
       "reason": "\"hasGithubGrant\" is not a registered function"
     },
     {
