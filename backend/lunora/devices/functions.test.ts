@@ -247,6 +247,21 @@ const scopeOf = async () => {
     return first?.projectIds;
 };
 
+describe("a device's project scope in the GDPR export", () => {
+    it("is part of the exported device", async () => {
+        const { deviceId } = await register(ownerId);
+        const project = await insertProject(ownerId);
+
+        await setScope(ownerId, deviceId, [project]);
+
+        const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(gdpr.collectDevicesForExport, { userId: ownerId }))) as {
+            devices: { projectIds?: string[] }[];
+        };
+
+        expect(exported.devices.map((device) => device.projectIds)).toEqual([[project]]);
+    });
+});
+
 describe("a device's project scope", () => {
     const offered = async (threadId: string) =>
         (

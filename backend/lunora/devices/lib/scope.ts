@@ -10,12 +10,17 @@ import type { QueryCtx } from "../../_generated/server";
 export const isDeviceInScope = (device: Pick<Doc<"devices">, "projectIds">, threadProjectId: Id<"projects"> | undefined): boolean =>
     device.projectIds === undefined || (threadProjectId !== undefined && device.projectIds.includes(threadProjectId));
 
-/** Which of `ids` are projects of `userId` that still exist (`projects` is `.global()`, so one read per id through its facade). */
+/** Which of `ids` are projects of `userId` that still exist: one read through the `.global()` facade, however many ids. */
 export const filterOwnProjectIds = async (ctx: Pick<QueryCtx, "db">, userId: string, ids: Iterable<Id<"projects">>): Promise<Set<Id<"projects">>> => {
     const unique = [...new Set(ids)];
-    const found = await Promise.all(unique.map(async (id) => await ctx.db.projects.findFirst({ where: { _id: id, userId } })));
 
-    return new Set(found.flatMap((project) => (project ? [project._id] : [])));
+    if (unique.length === 0) {
+        return new Set();
+    }
+
+    const { page } = await ctx.db.projects.findMany({ where: { _id: { in: unique }, userId } });
+
+    return new Set(page.map((project) => project._id));
 };
 
 /**
