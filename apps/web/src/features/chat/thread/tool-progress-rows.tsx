@@ -20,13 +20,10 @@ const ANNOUNCE_EVERY_MS = 3000;
 
 /** `message`, but changing at most every {@link ANNOUNCE_EVERY_MS}: the newest one waits for the window to pass. */
 const useAnnouncedMessage = (message: string | undefined): string | undefined => {
-    const [announced, setAnnounced] = useState(message);
+    // Empty at mount, so the first message is a change to a live region already on the page: screen readers
+    // announce changes, not what a region holds when it appears.
+    const [announced, setAnnounced] = useState<string | undefined>(undefined);
     const announcedAt = useRef(0);
-
-    // The first message is announced as the row mounts: the window starts there.
-    useEffect(() => {
-        announcedAt.current = Date.now();
-    }, []);
 
     useEffect(() => {
         if (message === announced) {

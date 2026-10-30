@@ -42,13 +42,22 @@ describe("tool progress rows", () => {
         expect(bar.dataset["indeterminate"]).toBeDefined();
     });
 
-    it("announces the latest message politely", () => {
+    it("announces the first message as a change to a polite region that was already on the page", async () => {
         render(<ToolProgressRows state={[{ ...entry, message: "Reading page 3", total: 100 }]} />);
 
         const status = screen.getByRole("status");
 
-        expect(status.textContent).toBe("Reading page 3");
+        // Empty as it mounts: a screen reader announces what changes in a live region, not what it starts with.
+        expect(status.textContent).toBe("");
         expect(status.getAttribute("aria-live")).toBe("polite");
+
+        await act(async () => {
+            await new Promise((resolve) => {
+                setTimeout(resolve, 0);
+            });
+        });
+
+        expect(status.textContent).toBe("Reading page 3");
     });
 
     it("lists calls running side by side", () => {
@@ -77,6 +86,10 @@ describe("tool progress rows", () => {
 
         it("announces a changed message at most every 3 seconds, and the latest one", () => {
             const { rerender } = render(row("Page 1"));
+
+            act(() => {
+                vi.advanceTimersByTime(0);
+            });
 
             expect(screen.getByRole("status").textContent).toBe("Page 1");
 

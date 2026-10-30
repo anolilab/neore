@@ -298,6 +298,24 @@ describe(createToolProgressWriter, () => {
         await expect(call.finish()).resolves.toBeUndefined();
     });
 
+    it("stops writing once the stream refuses a write, the ended marker included", async () => {
+        const clock = fakeClock();
+        const write = vi.fn(async (_chunk: ToolProgressChunk) => {
+            throw new Error("Stream write refused");
+        });
+        const call = createToolProgressWriter(write, clock)(tool);
+
+        call.push({ progress: 1 });
+        await clock.advance(600);
+        call.push({ progress: 2 });
+        await clock.advance(600);
+        call.push({ progress: 3 });
+        await clock.advance(600);
+        await call.finish();
+
+        expect(write).toHaveBeenCalledTimes(1);
+    });
+
     it("skips a write that repeats the last one for the call", async () => {
         const clock = fakeClock();
         const write = vi.fn(async (_chunk: ToolProgressChunk) => {});
@@ -349,7 +367,7 @@ describe(createToolProgressWriter, () => {
         expect(write.mock.calls.at(-1)?.[0].progress).toBe(4);
     });
 
-    it("caps a call at 300 reports, then writes only the ended marker", async () => {
+    it("past 300 reports slows a call to one every 30 s instead of freezing its bar", async () => {
         const clock = fakeClock();
         const write = vi.fn(async (_chunk: ToolProgressChunk) => {});
         const call = createToolProgressWriter(write, clock)(tool);
@@ -359,13 +377,22 @@ describe(createToolProgressWriter, () => {
             await clock.advance(2000);
         }
 
+        const atCap = write.mock.calls.length;
+
+        // A further minute of reports adds about two rows, not thirty.
+        for (let i = 321; i <= 350; i += 1) {
+            call.push({ progress: i });
+            await clock.advance(2000);
+        }
+
         await call.finish();
 
-        const chunks = write.mock.calls.map(([chunk]) => chunk);
+        const reports = write.mock.calls.map(([chunk]) => chunk).filter((chunk) => chunk.progress !== undefined);
 
-        expect(chunks).toHaveLength(301);
-        expect(chunks.filter((chunk) => chunk.progress !== undefined)).toHaveLength(300);
-        expect(chunks.at(-1)).toStrictEqual({ ...tool, ended: true });
+        expect(atCap).toBeGreaterThanOrEqual(300);
+        expect(reports.length - atCap).toBeLessThanOrEqual(4);
+        expect(reports.at(-1)?.progress).toBeGreaterThan(320);
+        expect(write.mock.calls.at(-1)?.[0]).toStrictEqual({ ...tool, ended: true });
     });
 
     it("keeps names within the column cap", async () => {

@@ -23,8 +23,11 @@ export const PROGRESS_SLOW_INTERVAL_MS = 2000;
 /** How long a call runs before its reports back off to {@link PROGRESS_SLOW_INTERVAL_MS}. */
 export const PROGRESS_SLOW_AFTER_MS = 60_000;
 
-/** The most reports one call writes; after that only the `ended` marker, so a chatty server cannot grow the stream without bound. */
+/** Reports one call writes at the normal pace; past this it slows to {@link PROGRESS_CAPPED_INTERVAL_MS}, so a chatty server cannot grow the stream fast. */
 export const MAX_PROGRESS_REPORTS = 300;
+
+/** The interval once a call has written {@link MAX_PROGRESS_REPORTS}: the bar still moves, a row every half minute. */
+export const PROGRESS_CAPPED_INTERVAL_MS = 30_000;
 
 /** The longest status message that is relayed; the server's text is untrusted. */
 export const MAX_PROGRESS_MESSAGE_LENGTH = 200;
@@ -256,14 +259,13 @@ export const createToolProgressWriter = (write: (chunk: ToolProgressChunk) => Pr
         const startedAt = now();
         let reported = false;
         let written = 0;
+        // Once the stream refuses a write (the reply was stopped), it refuses every later one: stop trying.
+        let refused = false;
         let last: McpProgress | undefined;
         const throttle = createLatestThrottle(
             async (progress: McpProgress) => {
-                // A repeat tells the viewer nothing, and a report past the cap is dropped: only `ended` follows.
-                if (
-                    written >= MAX_PROGRESS_REPORTS ||
-                    (last && last.progress === progress.progress && last.total === progress.total && last.message === progress.message)
-                ) {
+                // A repeat tells the viewer nothing.
+                if (refused || (last && last.progress === progress.progress && last.total === progress.total && last.message === progress.message)) {
                     return;
                 }
 
@@ -275,17 +277,24 @@ export const createToolProgressWriter = (write: (chunk: ToolProgressChunk) => Pr
                     await write({ ...tool, ...progress });
                 } catch {
                     // Best effort: a stopped stream refuses the write, and the tool carries on.
+                    refused = true;
                 }
             },
             clock,
-            () => (now() - startedAt >= PROGRESS_SLOW_AFTER_MS ? PROGRESS_SLOW_INTERVAL_MS : PROGRESS_INTERVAL_MS),
+            () => {
+                if (written >= MAX_PROGRESS_REPORTS) {
+                    return PROGRESS_CAPPED_INTERVAL_MS;
+                }
+
+                return now() - startedAt >= PROGRESS_SLOW_AFTER_MS ? PROGRESS_SLOW_INTERVAL_MS : PROGRESS_INTERVAL_MS;
+            },
         );
 
         return {
             finish: async () => {
                 await throttle.close();
 
-                if (!reported) {
+                if (!reported || refused) {
                     return;
                 }
 
