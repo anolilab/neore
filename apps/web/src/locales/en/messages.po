@@ -193,8 +193,8 @@ msgstr "{0, plural, one {# check is still running} other {# checks are still run
 #. placeholder {0}: files.length
 #. placeholder {0}: listed.length
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:707
-#: src/features/develop/components/files-tab.tsx:245
-#: src/features/develop/components/files-tab.tsx:253
+#: src/features/develop/components/files-tab.tsx:256
+#: src/features/develop/components/files-tab.tsx:264
 msgid "{0, plural, one {# file} other {# files}}"
 msgstr "{0, plural, one {# file} other {# files}}"
 
@@ -16704,7 +16704,7 @@ msgstr "Load more"
 msgid "Load more commits"
 msgstr "Load more commits"
 
-#: src/features/develop/components/files-tab.tsx:301
+#: src/features/develop/components/files-tab.tsx:317
 msgid "Load more files"
 msgstr "Load more files"
 
@@ -16718,7 +16718,7 @@ msgstr "Load preset"
 
 #. placeholder {0}: listed.length
 #. placeholder {1}: Math.min(fileCount, fileLimit)
-#: src/features/develop/components/files-tab.tsx:249
+#: src/features/develop/components/files-tab.tsx:260
 msgid "Loaded {0} of {1, plural, one {# file} other {# files}}…"
 msgstr "Loaded {0} of {1, plural, one {# file} other {# files}}…"
 
@@ -16791,7 +16791,7 @@ msgstr "Loading file…"
 msgid "Loading files"
 msgstr "Loading files"
 
-#: src/features/develop/components/files-tab.tsx:245
+#: src/features/develop/components/files-tab.tsx:256
 msgid "Loading files…"
 msgstr "Loading files…"
 
@@ -28914,7 +28914,7 @@ msgstr "The host"
 msgid "The host lists at most {commitLimit, plural, one {# commit} other {# commits}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr "The host lists at most {commitLimit, plural, one {# commit} other {# commits}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 
-#: src/features/develop/components/files-tab.tsx:258
+#: src/features/develop/components/files-tab.tsx:269
 msgid "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 
@@ -30327,6 +30327,7 @@ msgstr "Try adjusting your search terms."
 
 #: src/components/error-component.tsx:40
 #: src/features/connection/components/offline-screen.tsx:59
+#: src/features/develop/components/files-tab.tsx:232
 #: src/features/home/components/home-page.tsx:144
 msgid "Try again"
 msgstr "Try again"
@@ -31933,7 +31934,7 @@ msgid "Viewed (changed since)"
 msgstr "Viewed (changed since)"
 
 #. placeholder {0}: listed.length
-#: src/features/develop/components/files-tab.tsx:261
+#: src/features/develop/components/files-tab.tsx:272
 msgid "Viewed {viewedCount} of {0} files"
 msgstr "Viewed {viewedCount} of {0} files"
 
