@@ -19,6 +19,7 @@ import CommitsTab from "./commits-tab";
 import FailureNotice from "./failure-notice";
 import FilesTab from "./files-tab";
 import type { HostInfo } from "./host-info";
+import ReviewPanel from "./review-panel";
 
 const TAB_CAPABILITY: Record<DevelopTab, HostCapabilityKey> = {
     checks: "pullRequest.checks",
@@ -99,6 +100,7 @@ const PullRequestView = ({
                     <span className="text-muted-foreground">{t`in ${plural(detail.changedFiles, { one: "# file", other: "# files" })}`}</span>
                 </p>
             </header>
+            <ReviewPanel address={address} capabilities={host.capabilities} headSha={detail.headSha} hostLabel={host.label} />
             {current === undefined ? (
                 <p className="text-muted-foreground text-sm">{t`This host does not offer any view of a ${requestNoun} yet.`}</p>
             ) : (
@@ -126,8 +128,10 @@ const PullRequestView = ({
                         {current === "files" && (
                             <FilesTab
                                 address={address}
+                                capabilities={host.capabilities}
                                 fileCount={detail.changedFiles}
                                 fileLimit={host.limits.files}
+                                headSha={detail.headSha}
                                 hostLabel={host.label}
                                 leftOut={leftOut.files}
                                 showDiff={isHostCapabilityAvailable(host.capabilities, "pullRequest.diff")}

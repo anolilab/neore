@@ -399,6 +399,16 @@ written here is what is not.
   `afterRun` → `noteDailyBriefActivity` → `runAt` local 07:xx — and charged
   via `chargeRound` only when there is something to report.
 
+- **Develop review** (`backend/lunora/source-control/`, plans/develop-mode.md) — the draft is the
+  `reviewDrafts` row, server-side so a reload or second device sees it. `submitReview` claims it
+  first (`submittingAt`, a 60 s lease; edits are refused meanwhile), posts ONE host call, and
+  clears the draft only on a confirmed review (`submit-review.ts` fixes the order). A refusal
+  keeps it (`rejected`, the host's reason is untrusted text); an answer that never came is
+  `unconfirmed` — the host may hold the review, so the UI says to look there before resubmitting.
+  Comment lines mean something only on the commit the reviewer saw, so a draft with comments
+  refuses edits on a newer head (`head_moved`). A reply and a resolve are written at once (the
+  review call has no place for a reply). Viewed marks are the host's, read and written through
+  GraphQL; a write is never redirected or replayed by the requester.
 - **Triggers** — schedule (cron, 1-min polling), webhook (HMAC-SHA256 at
   `/triggers/webhook/{triggerId}`), event (not built). Execution uses headless
   `generateText` with auto-continue; each run creates a new thread tagged with

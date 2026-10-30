@@ -109,6 +109,74 @@ export interface CheckSummary {
     total: number;
 }
 
+// ─── Review ─────────────────────────────────────────────────────────────────
+
+/** Which side of the diff a line number counts: the file before the change, or after it. */
+export type DiffSide = "new" | "old";
+
+export const REVIEW_VERDICTS = ["approve", "comment", "request_changes"] as const;
+
+export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
+
+/** `changed`: viewed once, and the file has new changes since. */
+export type ViewedState = "changed" | "unviewed" | "viewed";
+
+/** A comment on one line (or a range ending on it) of a file in the diff. */
+export interface LineComment {
+    body: string;
+    line: number;
+    path: string;
+    side: DiffSide;
+    /** The first line of a range; `null` for a comment on a single line. */
+    startLine: number | null;
+}
+
+/** One review as the host takes it: every comment, the verdict and the commit the lines refer to. */
+export interface ReviewSubmission {
+    body: string;
+    comments: LineComment[];
+    commitId: string;
+    verdict: ReviewVerdict;
+}
+
+export interface SubmittedReview {
+    id: string;
+    url: string | null;
+}
+
+export interface ThreadComment {
+    authorLogin: string;
+    body: string;
+    createdAt: number;
+    /** The host's id for the comment: the one a reply addresses. */
+    id: string;
+}
+
+export interface ReviewThread {
+    canResolve: boolean;
+    canUnresolve: boolean;
+    comments: ThreadComment[];
+    id: string;
+    isOutdated: boolean;
+    isResolved: boolean;
+    line: number | null;
+    path: string;
+    side: DiffSide;
+    startLine: number | null;
+}
+
+/** A page of a list that pages by cursor; `endCursor` is the host's opaque token for the next one. */
+export interface CursorPage<T> {
+    endCursor: string | null;
+    hasMore: boolean;
+    items: T[];
+}
+
+export interface ViewedFile {
+    path: string;
+    state: ViewedState;
+}
+
 /** What a UI needs to word and gate a host without naming it. */
 export interface HostView {
     capabilities: HostCapabilityReport;

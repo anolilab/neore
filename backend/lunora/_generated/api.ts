@@ -654,6 +654,21 @@ export interface ApiTypes {
             getPullRequestCommits: FunctionReference<"action", { number: number; repository: string; page?: number }, { commits: Array<{ authorName: string; committedAt: number; message: string; sha: string }>; hasMore: boolean; page: number; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
             getPullRequestFiles: FunctionReference<"action", { number: number; repository: string; page?: number }, { files: Array<{ additions: number; deletions: number; patch: string | null; patchState: "full" | "host_omitted" | "over_budget" | "truncated"; path: string; previousPath: string | null; status: "added" | "changed" | "copied" | "modified" | "removed" | "renamed" | "unchanged" }>; hasMore: boolean; page: number; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
         };
+        review_drafts: {
+            deleteDraftComment: FunctionReference<"mutation", { commentId: string; number: number; repository: string }, ({} & { commentId: string | null; revision: number; status: "ok"; }) | ({} & { status: "not_found" | "submitting" | "head_moved" | "too_many"; })>;
+            discardReviewDraft: FunctionReference<"mutation", { number: number; repository: string }, { status: "ok" } | { status: "submitting" }>;
+            getReviewDraft: FunctionReference<"query", { number: number; repository: string }, {} & { body: string; comments: ({} & { body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null; })[]; commitId: string; revision: number; submitting: boolean; updatedAt: number; verdict: "comment" | "approve" | "request_changes" | null; } | null>;
+            saveDraftComment: FunctionReference<"mutation", { body: string; commentId?: string; commitId: string; line: number; number: number; path: string; repository: string; side: "new" | "old"; startLine: number | null }, ({} & { commentId: string | null; revision: number; status: "ok"; }) | ({} & { status: "not_found" | "submitting" | "head_moved" | "too_many"; })>;
+            setDraftReview: FunctionReference<"mutation", { body: string; commitId: string; number: number; repository: string; verdict: "approve" | "comment" | "request_changes" | null }, ({} & { commentId: string | null; revision: number; status: "ok"; }) | ({} & { status: "not_found" | "submitting" | "head_moved" | "too_many"; })>;
+        };
+        review_functions: {
+            getReviewThreads: FunctionReference<"action", { number: number; repository: string; after?: string }, { endCursor: string | null; hasMore: boolean; status: "ok"; threads: Array<{ canResolve: boolean; canUnresolve: boolean; comments: Array<{ authorLogin: string; body: string; createdAt: number; id: string }>; id: string; isOutdated: boolean; isResolved: boolean; line: number | null; path: string; side: "new" | "old"; startLine: number | null }> } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
+            getViewedFiles: FunctionReference<"action", { number: number; repository: string; after?: string }, { endCursor: string | null; files: Array<{ path: string; state: "changed" | "unviewed" | "viewed" }>; hasMore: boolean; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
+            replyToReviewThread: FunctionReference<"action", { number: number; repository: string; body: string; commentId: string }, { commentId: string; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
+            setFileViewed: FunctionReference<"action", { number: number; repository: string; path: string; viewed: boolean }, { status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
+            setReviewThreadResolved: FunctionReference<"action", { resolved: boolean; threadId: string }, { status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
+            submitReview: FunctionReference<"action", { number: number; repository: string }, { reviewUrl: string | null; status: "ok" } | { status: "in_progress" | "needs_text" | "needs_verdict" | "no_draft" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
+        };
     };
     sub_agents: {
         functions: {
@@ -1426,6 +1441,21 @@ export const api: ApiTypes = {
             getPullRequestChecks: { __lunoraRef: "source_control_functions:getPullRequestChecks" },
             getPullRequestCommits: { __lunoraRef: "source_control_functions:getPullRequestCommits" },
             getPullRequestFiles: { __lunoraRef: "source_control_functions:getPullRequestFiles" },
+        },
+        review_drafts: {
+            deleteDraftComment: { __lunoraRef: "source_control_review_drafts:deleteDraftComment" },
+            discardReviewDraft: { __lunoraRef: "source_control_review_drafts:discardReviewDraft" },
+            getReviewDraft: { __lunoraRef: "source_control_review_drafts:getReviewDraft" },
+            saveDraftComment: { __lunoraRef: "source_control_review_drafts:saveDraftComment" },
+            setDraftReview: { __lunoraRef: "source_control_review_drafts:setDraftReview" },
+        },
+        review_functions: {
+            getReviewThreads: { __lunoraRef: "source_control_review_functions:getReviewThreads" },
+            getViewedFiles: { __lunoraRef: "source_control_review_functions:getViewedFiles" },
+            replyToReviewThread: { __lunoraRef: "source_control_review_functions:replyToReviewThread" },
+            setFileViewed: { __lunoraRef: "source_control_review_functions:setFileViewed" },
+            setReviewThreadResolved: { __lunoraRef: "source_control_review_functions:setReviewThreadResolved" },
+            submitReview: { __lunoraRef: "source_control_review_functions:submitReview" },
         },
     },
     sub_agents: {

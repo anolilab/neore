@@ -2,13 +2,14 @@
  * Develop mode, read side: the signed-in user's pull requests on their Git host.
  *
  * Every procedure is an ACTION: it calls the host with the user's own connector
- * token, and an external call never belongs in a query or mutation. Nothing is
- * stored, so there is no table, policy or erasure step here; the page caches
- * what it reads. The token is decrypted inside the action, used for the call and
- * never returned. A failure a person can act on is a `status`, not a throw.
+ * token, and an external call never belongs in a query or mutation. Nothing here
+ * is stored; the page caches what it reads. The review half (drafts, threads,
+ * viewed marks) is in `review-*.ts`. The token is decrypted inside the action,
+ * used for the call and never returned. A failure a person can act on is a
+ * `status`, not a throw.
  *
- * S1 serves GitHub only. The driver is picked in one place (`DEVELOP_DRIVER`),
- * and the page reads what the host can do from the capability report.
+ * The driver is picked in one place (`DEVELOP_DRIVER`), and the page reads what
+ * the host can do from the capability report.
  */
 import { v } from "lunorash/server";
 
@@ -16,12 +17,9 @@ import { hasGithubGrant, resolveGithubToken } from "../connectors/lib/github-tok
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { leftOutPast } from "./coverage";
-import type { HostDriver } from "./driver";
-import { githubDriver } from "./drivers/github";
+import { DEVELOP_DRIVER } from "./develop-driver";
 import { readFromHost } from "./read-host";
-
-/** The one host Develop reads in S1. */
-const DEVELOP_DRIVER: HostDriver = githubDriver;
+import { vFailed } from "./validators";
 
 const vCapability = v.union(
     v.object({ degradation: v.literal("none"), supported: v.literal(true) }),
@@ -32,17 +30,6 @@ const vCapability = v.union(
     }),
     v.object({ reason: v.union(v.literal("not_offered"), v.literal("not_enforced"), v.literal("unknown")), supported: v.literal(false) }),
 );
-
-const vFailed = v.object({
-    status: v.union(
-        v.literal("forbidden"),
-        v.literal("host_error"),
-        v.literal("needs_reconnect"),
-        v.literal("not_connected"),
-        v.literal("not_found"),
-        v.literal("rate_limited"),
-    ),
-});
 
 const vSummary = v.object({
     authorLogin: v.string(),

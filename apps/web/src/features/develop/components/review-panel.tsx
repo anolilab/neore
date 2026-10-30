@@ -1,0 +1,226 @@
+"use client";
+
+import { Plural, useLingui } from "@lingui/react/macro";
+import type { HostCapabilityReportInput } from "@neore/backend/source-control/capabilities";
+import { hostCapabilityOf, isHostCapabilityAvailable } from "@neore/backend/source-control/capabilities";
+import type { ReviewVerdict } from "@neore/backend/source-control/types";
+import { Alert, AlertDescription, AlertTitle } from "@neore/ui/components/alert";
+import { Button } from "@neore/ui/components/button";
+import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
+import { Textarea } from "@neore/ui/components/textarea";
+import { useId, useState } from "react";
+
+import { safeExternalUrl } from "../lib/format";
+import { VERDICT_CAPABILITIES } from "../lib/review";
+import type { PullRequestAddress } from "../lib/use-develop";
+import { useDraftMutations, useReviewActions, useReviewDraft } from "../lib/use-review";
+import { useReviewMessages } from "../lib/use-review-messages";
+
+type Feedback = { kind: "error"; text: string } | { kind: "success"; url: string | undefined } | { kind: "info"; text: string };
+
+/**
+ * The review being written: the verdict, a summary and the comments added on the diff. It lives on
+ * the server, so it is here after a reload and on another device. Submitting posts it as ONE
+ * review; the draft is kept unless the host confirmed it. Every control follows the capability report.
+ */
+const ReviewPanel = ({
+    address,
+    capabilities,
+    headSha,
+    hostLabel,
+}: {
+    address: PullRequestAddress;
+    capabilities: HostCapabilityReportInput;
+    headSha: string;
+    hostLabel: string;
+}) => {
+    const { t } = useLingui();
+    const messages = useReviewMessages(hostLabel);
+    const summaryId = useId();
+    const draft = useReviewDraft(address);
+    const mutations = useDraftMutations();
+    const actions = useReviewActions(address);
+    // What is being typed, or `null` while the box just shows the stored summary (and so follows another device's edits).
+    const [typed, setTyped] = useState<string | null>(null);
+    const [feedback, setFeedback] = useState<Feedback | null>(null);
+    const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+    const stored = draft.data;
+    const verdicts = (Object.keys(VERDICT_CAPABILITIES) as ReviewVerdict[]).filter((verdict) =>
+        isHostCapabilityAvailable(capabilities, VERDICT_CAPABILITIES[verdict]),
+    );
+
+    if (verdicts.length === 0) {
+        return null;
+    }
+
+    const locked = stored?.submitting === true || actions.submit.isPending;
+    const batched = hostCapabilityOf(capabilities, "review.batchedSubmit");
+    const emulated = !batched.supported || batched.degradation !== "none";
+    const verdictLabels: Record<ReviewVerdict, string> = { approve: t`Approve`, comment: t`Comment`, request_changes: t`Request changes` };
+
+    const dirty = typed !== null;
+    const summary = typed ?? stored?.body ?? "";
+
+    const saveReview = async (next: { body: string; verdict: ReviewVerdict | null }) => {
+        const outcome = await mutations.setReview.mutateAsync({ ...address, ...next, commitId: headSha });
+
+        if (outcome.status === "ok") {
+            setTyped(null);
+            setFeedback(null);
+        } else {
+            setFeedback({ kind: "error", text: messages.edit(outcome.status) });
+        }
+    };
+
+    const submit = async () => {
+        setFeedback(null);
+
+        // The summary typed last goes with the review even if the box never lost focus.
+        if (dirty) {
+            await saveReview({ body: summary, verdict: stored?.verdict ?? null });
+        }
+
+        try {
+            const outcome = await actions.submit.mutateAsync();
+
+            switch (outcome.status) {
+                case "in_progress": {
+                    setFeedback({ kind: "info", text: t`This review is already being submitted, maybe from another device.` });
+
+                    break;
+                }
+                case "needs_text": {
+                    setFeedback({ kind: "error", text: t`Write a summary, or add a comment, before you submit this review.` });
+
+                    break;
+                }
+                case "needs_verdict": {
+                    setFeedback({ kind: "error", text: t`Choose how you review this before you submit it.` });
+
+                    break;
+                }
+                case "no_draft": {
+                    setFeedback({ kind: "info", text: t`There is nothing to submit.` });
+
+                    break;
+                }
+                case "ok": {
+                    setFeedback({ kind: "success", url: safeExternalUrl(outcome.reviewUrl) });
+
+                    break;
+                }
+                default: {
+                    setFeedback({ kind: "error", text: `${messages.write(outcome)} ${t`Your review is kept.`}` });
+                }
+            }
+        } catch {
+            setFeedback({ kind: "error", text: t`Could not submit the review. Your review is kept.` });
+        }
+    };
+
+    const commentCount = stored?.comments.length ?? 0;
+
+    return (
+        <section aria-labelledby={`${summaryId}-title`} className="space-y-3 rounded-md border p-3">
+            <h3 className="text-sm font-semibold" id={`${summaryId}-title`}>
+                {t`Your review`}
+            </h3>
+            <p className="text-muted-foreground text-xs">
+                {commentCount > 0 ? (
+                    <Plural one="# comment is waiting to be submitted" other="# comments are waiting to be submitted" value={commentCount} />
+                ) : (
+                    t`Add comments on a line of the diff, then submit.`
+                )}
+            </p>
+            <RadioGroup
+                aria-label={t`How you review this`}
+                className="flex flex-wrap gap-4"
+                disabled={locked}
+                onValueChange={async (value) => await saveReview({ body: summary, verdict: value as ReviewVerdict })}
+                value={stored?.verdict ?? ""}
+            >
+                {verdicts.map((verdict) => (
+                    <div className="flex items-center gap-2 text-sm" key={verdict}>
+                        <RadioGroupItem id={`${summaryId}-${verdict}`} value={verdict} />
+                        <label htmlFor={`${summaryId}-${verdict}`}>{verdictLabels[verdict]}</label>
+                    </div>
+                ))}
+            </RadioGroup>
+            <div className="space-y-1">
+                <label className="text-sm" htmlFor={summaryId}>
+                    {t`Summary`}
+                </label>
+                <Textarea
+                    disabled={locked}
+                    id={summaryId}
+                    onBlur={async () => {
+                        if (dirty) {
+                            await saveReview({ body: summary, verdict: stored?.verdict ?? null });
+                        }
+                    }}
+                    onChange={(event) => {
+                        setTyped(event.target.value);
+                    }}
+                    value={summary}
+                />
+            </div>
+            {emulated && (
+                <p className="text-muted-foreground text-xs">{t`${hostLabel} has no batched review: your comments are posted one after another when you submit.`}</p>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+                <Button disabled={locked || ((stored === null || stored === undefined) && !dirty)} onClick={submit}>
+                    {actions.submit.isPending ? t`Submitting…` : t`Submit review`}
+                </Button>
+                {confirmingDiscard ? (
+                    <>
+                        <Button
+                            disabled={locked}
+                            onClick={async () => {
+                                await mutations.discard.mutateAsync(address);
+                                setConfirmingDiscard(false);
+                                setTyped(null);
+                                setFeedback(null);
+                            }}
+                            variant="destructive"
+                        >
+                            {t`Discard the review`}
+                        </Button>
+                        <Button onClick={() => setConfirmingDiscard(false)} variant="ghost">
+                            {t`Keep it`}
+                        </Button>
+                    </>
+                ) : (
+                    stored && (
+                        <Button disabled={locked} onClick={() => setConfirmingDiscard(true)} variant="ghost">
+                            {t`Discard`}
+                        </Button>
+                    )
+                )}
+            </div>
+            <div aria-live="polite" role="status">
+                {feedback?.kind === "success" && (
+                    <Alert>
+                        <AlertTitle>{t`Review submitted`}</AlertTitle>
+                        <AlertDescription>
+                            {t`It is on ${hostLabel} now.`}{" "}
+                            {feedback.url && (
+                                <a className="text-primary font-medium underline" href={feedback.url} rel="noopener noreferrer" target="_blank">
+                                    {t`View it`}
+                                </a>
+                            )}
+                        </AlertDescription>
+                    </Alert>
+                )}
+                {feedback?.kind === "info" && <p className="text-muted-foreground text-sm">{feedback.text}</p>}
+            </div>
+            {feedback?.kind === "error" && (
+                <Alert role="alert" variant="destructive">
+                    <AlertTitle>{t`Not submitted`}</AlertTitle>
+                    <AlertDescription>{feedback.text}</AlertDescription>
+                </Alert>
+            )}
+        </section>
+    );
+};
+
+export default ReviewPanel;

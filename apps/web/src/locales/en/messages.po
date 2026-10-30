@@ -432,10 +432,9 @@ msgstr "{0} eligible · {1} deleted · {2}ms"
 msgid "{0} failed"
 msgstr "{0} failed"
 
-#. placeholder {0}: listed.length
-#: src/features/develop/components/files-tab.tsx:105
-#~ msgid "{0} files"
-#~ msgstr "{0} files"
+#: src/routes/admin/gateway/keys.tsx:421
+#~ msgid "Virtual API Keys"
+#~ msgstr "Virtual API Keys"
 
 #. placeholder {0}: modeLabels[mode]
 #. placeholder {1}: tool.name
@@ -609,14 +608,6 @@ msgstr "{0} uses"
 #: src/features/develop/components/pull-request-view.tsx:94
 msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
 msgstr "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
-
-#. placeholder {0}: detail.authorLogin
-#. placeholder {1}: detail.commitCount
-#. placeholder {2}: detail.baseBranch
-#. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:87
-#~ msgid "{0} wants to merge {1} commits into {2} from {3}"
-#~ msgstr "{0} wants to merge {1} commits into {2} from {3}"
 
 #. placeholder {0}: String(percent)
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:106
@@ -6299,10 +6290,6 @@ msgstr "Connect {0}"
 #: src/features/develop/components/connect-host-card.tsx:24
 msgid "Connect {label}"
 msgstr "Connect {label}"
-
-#: src/features/develop/components/failure-notice.tsx:19
-#~ msgid "Connect {label} to read your pull requests here."
-#~ msgstr "Connect {label} to read your pull requests here."
 
 #: src/features/develop/components/failure-notice.tsx:19
 msgid "Connect {label} to see what needs your review here."
@@ -15005,11 +14992,6 @@ msgstr "Improving..."
 msgid "in {0, plural, one {# file} other {# files}}"
 msgstr "in {0, plural, one {# file} other {# files}}"
 
-#. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:92
-#~ msgid "in {0} files"
-#~ msgstr "in {0} files"
-
 #. placeholder {0}: info.latencyMs
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:31
 msgid "in {0}ms"
@@ -16536,12 +16518,6 @@ msgstr "Load preset"
 #: src/features/develop/components/files-tab.tsx:122
 msgid "Loaded {0} of {1, plural, one {# file} other {# files}}…"
 msgstr "Loaded {0} of {1, plural, one {# file} other {# files}}…"
-
-#. placeholder {0}: listed.length
-#. placeholder {1}: Math.min(fileCount, fileLimit)
-#: src/features/develop/components/files-tab.tsx:105
-#~ msgid "Loaded {0} of {1} files…"
-#~ msgstr "Loaded {0} of {1} files…"
 
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:26
@@ -25399,11 +25375,6 @@ msgstr "Select which AI models organization members can use. Leave empty for ent
 msgid "Select your message"
 msgstr "Select your message"
 
-#. placeholder {0}: info.requestNoun
-#: src/features/develop/components/develop-page.tsx:54
-#~ msgid "Selected {0}"
-#~ msgstr "Selected {0}"
-
 #: src/features/develop/components/develop-page.tsx:56
 msgid "Selected {requestNoun}"
 msgstr "Selected {requestNoun}"
@@ -25946,11 +25917,6 @@ msgstr "Show/hide help"
 #: src/features/develop/components/checks-tab.tsx:59
 msgid "Showing {0} of {total, plural, one {# check} other {# checks}}."
 msgstr "Showing {0} of {total, plural, one {# check} other {# checks}}."
-
-#. placeholder {0}: list.length
-#: src/features/develop/components/checks-tab.tsx:58
-#~ msgid "Showing {0} of {total} checks."
-#~ msgstr "Showing {0} of {total} checks."
 
 #. placeholder {0}: data.page.length
 #: src/features/admin/components/users-management-card.tsx:167
@@ -28621,17 +28587,9 @@ msgstr "The host"
 msgid "The host lists at most {commitLimit, plural, one {# commit} other {# commits}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr "The host lists at most {commitLimit, plural, one {# commit} other {# commits}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 
-#: src/features/develop/components/commits-tab.tsx:37
-#~ msgid "The host lists at most {commitLimit} commits for one change. {leftOut} more are not shown here."
-#~ msgstr "The host lists at most {commitLimit} commits for one change. {leftOut} more are not shown here."
-
 #: src/features/develop/components/files-tab.tsx:131
 msgid "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
-
-#: src/features/develop/components/files-tab.tsx:109
-#~ msgid "The host lists at most {fileLimit} files for one change. {leftOut} more are not shown here."
-#~ msgstr "The host lists at most {fileLimit} files for one change. {leftOut} more are not shown here."
 
 #: src/features/develop/components/files-tab.tsx:41
 msgid "The host sent no diff for this file (binary, or too large for it)."
@@ -29107,11 +29065,6 @@ msgstr "This file is too large (~{0} tokens) and exceeds the model's context win
 #: src/features/develop/components/inbox-list.tsx:45
 msgid "This host does not offer an inbox yet."
 msgstr "This host does not offer an inbox yet."
-
-#. placeholder {0}: host.requestNoun
-#: src/features/develop/components/pull-request-view.tsx:96
-#~ msgid "This host does not offer any view of a {0} yet."
-#~ msgstr "This host does not offer any view of a {0} yet."
 
 #: src/features/develop/components/pull-request-view.tsx:103
 msgid "This host does not offer any view of a {requestNoun} yet."
@@ -31623,10 +31576,6 @@ msgstr "Vintage indie, chunky grain"
 msgid "Violet"
 msgstr "Violet"
 
-#: src/routes/admin/gateway/keys.tsx:421
-#~ msgid "Virtual API Keys"
-#~ msgstr "Virtual API Keys"
-
 #: src/features/skills/components/skill-form-dialog.tsx:459
 msgid "Visibility"
 msgstr "Visibility"
@@ -32966,3 +32915,202 @@ msgstr "Zurich"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ points"
+
+#. placeholder {0}: review.draftComments.length
+#: src/features/develop/components/files-tab.tsx:95
+msgid "{0, plural, one {# pending comment} other {# pending comments}}"
+msgstr "{0, plural, one {# pending comment} other {# pending comments}}"
+
+#. placeholder {0}: review.threads.length
+#: src/features/develop/components/files-tab.tsx:90
+msgid "{0, plural, one {# thread} other {# threads}}"
+msgstr "{0, plural, one {# thread} other {# threads}}"
+
+#: src/features/develop/components/review-panel.tsx:130
+msgid "{commentCount, plural, one {# comment is waiting to be submitted} other {# comments are waiting to be submitted}}"
+msgstr "{commentCount, plural, one {# comment is waiting to be submitted} other {# comments are waiting to be submitted}}"
+
+#: src/features/develop/components/review-panel.tsx:168
+msgid "{hostLabel} has no batched review: your comments are posted one after another when you submit."
+msgstr "{hostLabel} has no batched review: your comments are posted one after another when you submit."
+
+#. placeholder {0}: result.reason
+#: src/features/develop/lib/use-review-messages.ts:37
+msgid "{label} did not accept this: {0}"
+msgstr "{label} did not accept this: {0}"
+
+#: src/features/develop/lib/use-review-messages.ts:37
+msgid "{label} did not accept this."
+msgstr "{label} did not accept this."
+
+#: src/features/develop/lib/use-review-messages.ts:25
+msgid "{label} did not answer, so it may have taken this. Check on {label} before trying again."
+msgstr "{label} did not answer, so it may have taken this. Check on {label} before trying again."
+
+#: src/features/develop/lib/use-review-messages.ts:22
+msgid "{label} is not connected."
+msgstr "{label} is not connected."
+
+#: src/features/develop/lib/use-review-messages.ts:19
+msgid "{label} refused this. Your account may lack access."
+msgstr "{label} refused this. Your account may lack access."
+
+#: src/features/develop/components/review-thread.tsx:76
+msgid "A reply is posted straight away, not with the rest of your review."
+msgstr "A reply is posted straight away, not with the rest of your review."
+
+#: src/features/develop/lib/use-review-messages.ts:16
+msgid "A review holds at most 100 comments. Submit this one first."
+msgstr "A review holds at most 100 comments. Submit this one first."
+
+#: src/features/develop/components/review-panel.tsx:132
+msgid "Add comments on a line of the diff, then submit."
+msgstr "Add comments on a line of the diff, then submit."
+
+#: src/features/develop/components/review-diff.tsx:162
+msgid "Add to review"
+msgstr "Add to review"
+
+#: src/features/develop/components/review-panel.tsx:98
+msgid "Choose how you review this before you submit it."
+msgstr "Choose how you review this before you submit it."
+
+#. placeholder {0}: target.line
+#: src/features/develop/components/review-diff.tsx:130
+#: src/features/develop/components/review-diff.tsx:151
+msgid "Comment on line {0}"
+msgstr "Comment on line {0}"
+
+#: src/features/develop/components/review-diff.tsx:179
+msgid "Conversations on lines this diff no longer shows"
+msgstr "Conversations on lines this diff no longer shows"
+
+#: src/features/develop/lib/use-review-messages.ts:34
+msgid "Could not do this. Try again."
+msgstr "Could not do this. Try again."
+
+#: src/features/develop/components/comment-composer.tsx:42
+#: src/features/develop/lib/use-review-messages.ts:30
+msgid "Could not save this. Try again."
+msgstr "Could not save this. Try again."
+
+#: src/features/develop/components/review-panel.tsx:117
+msgid "Could not submit the review. Your review is kept."
+msgstr "Could not submit the review. Your review is kept."
+
+#: src/features/develop/components/review-panel.tsx:186
+msgid "Discard the review"
+msgstr "Discard the review"
+
+#: src/features/develop/components/draft-comment-card.tsx:32
+msgid "Edit comment"
+msgstr "Edit comment"
+
+#: src/features/develop/components/review-panel.tsx:136
+msgid "How you review this"
+msgstr "How you review this"
+
+#: src/features/develop/components/review-panel.tsx:205
+msgid "It is on {hostLabel} now."
+msgstr "It is on {hostLabel} now."
+
+#: src/features/develop/components/review-panel.tsx:189
+msgid "Keep it"
+msgstr "Keep it"
+
+#: src/features/develop/components/review-panel.tsx:218
+msgid "Not submitted"
+msgstr "Not submitted"
+
+#: src/features/develop/components/review-thread.tsx:44
+msgid "Outdated"
+msgstr "Outdated"
+
+#: src/features/develop/components/draft-comment-card.tsx:28
+msgid "Pending: posted when you submit the review"
+msgstr "Pending: posted when you submit the review"
+
+#: src/features/develop/components/review-panel.tsx:59
+msgid "Request changes"
+msgstr "Request changes"
+
+#: src/features/develop/components/review-thread.tsx:43
+msgid "Resolved"
+msgstr "Resolved"
+
+#: src/features/develop/components/review-panel.tsx:203
+msgid "Review submitted"
+msgstr "Review submitted"
+
+#: src/features/develop/components/develop-page.tsx:43
+msgid "Review what needs you: the description, commits, files, diff and checks of each change, and your own review of it."
+msgstr "Review what needs you: the description, commits, files, diff and checks of each change, and your own review of it."
+
+#: src/features/develop/components/review-thread.tsx:74
+msgid "Send reply now"
+msgstr "Send reply now"
+
+#: src/features/develop/components/review-panel.tsx:172
+msgid "Submit review"
+msgstr "Submit review"
+
+#: src/features/develop/components/review-panel.tsx:172
+msgid "Submitting…"
+msgstr "Submitting…"
+
+#: src/features/develop/components/review-panel.tsx:151
+msgid "Summary"
+msgstr "Summary"
+
+#: src/features/develop/lib/use-review-messages.ts:14
+msgid "That comment is already gone."
+msgstr "That comment is already gone."
+
+#: src/features/develop/lib/use-review-messages.ts:13
+msgid "The change has new commits since you started this review. Submit or discard the review first, then comment on the new version."
+msgstr "The change has new commits since you started this review. Submit or discard the review first, then comment on the new version."
+
+#: src/features/develop/components/review-panel.tsx:103
+msgid "There is nothing to submit."
+msgstr "There is nothing to submit."
+
+#: src/features/develop/components/review-panel.tsx:88
+msgid "This review is already being submitted, maybe from another device."
+msgstr "This review is already being submitted, maybe from another device."
+
+#: src/features/develop/components/review-panel.tsx:208
+msgid "View it"
+msgstr "View it"
+
+#: src/features/develop/components/files-tab.tsx:111
+msgid "Viewed"
+msgstr "Viewed"
+
+#: src/features/develop/components/files-tab.tsx:111
+msgid "Viewed (changed since)"
+msgstr "Viewed (changed since)"
+
+#. placeholder {0}: listed.length
+#: src/features/develop/components/files-tab.tsx:242
+msgid "Viewed {viewedCount} of {0} files"
+msgstr "Viewed {viewedCount} of {0} files"
+
+#: src/features/develop/components/review-panel.tsx:93
+msgid "Write a summary, or add a comment, before you submit this review."
+msgstr "Write a summary, or add a comment, before you submit this review."
+
+#: src/features/develop/lib/use-review-messages.ts:21
+msgid "Your {label} sign-in has expired. Connect it again."
+msgstr "Your {label} sign-in has expired. Connect it again."
+
+#: src/features/develop/components/review-diff.tsx:173
+msgid "Your comments on lines this diff does not show"
+msgstr "Your comments on lines this diff does not show"
+
+#: src/features/develop/lib/use-review-messages.ts:15
+msgid "Your review is being submitted. Wait for it to finish."
+msgstr "Your review is being submitted. Wait for it to finish."
+
+#: src/features/develop/components/review-panel.tsx:113
+msgid "Your review is kept."
+msgstr "Your review is kept."

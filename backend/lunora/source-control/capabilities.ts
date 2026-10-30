@@ -21,6 +21,17 @@ export type HostCapabilityGroups = {
         diff?: Capability;
         files?: Capability;
     };
+    review?: {
+        batchedSubmit?: Capability;
+        lineComments?: Capability;
+        replies?: Capability;
+        resolveThreads?: Capability;
+        verdictApprove?: Capability;
+        verdictComment?: Capability;
+        verdictRequestChanges?: Capability;
+        /** Viewed marks the host keeps, so they follow the user to the host's own page. */
+        viewedMarks?: Capability;
+    };
 };
 
 export interface HostCapabilityReport {
