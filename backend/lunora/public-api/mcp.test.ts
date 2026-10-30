@@ -554,6 +554,13 @@ describe("MCP write tools", () => {
         expect(chatStart).not.toHaveBeenCalled();
     });
 
+    it("answers invalid_request, not a server error, for an idempotencyKey the header would refuse", async () => {
+        const { result } = await send({}, { idempotencyKey: "two\nlines", prompt: "hello", threadId: "t1" });
+
+        expect(result?.structuredContent).toMatchObject({ error: { code: "invalid_request" } });
+        expect(chatStart).not.toHaveBeenCalled();
+    });
+
     it("treats the same key on another API key as a different request", async () => {
         const one = setup({ scopes: WRITE_SCOPES });
         const two = setup({ identity: { apiKeyId: "key2", apiKeyScopes: WRITE_SCOPES, authMethod: "api_key" } });

@@ -16,7 +16,7 @@
  */
 import { PublicApiError } from "./errors";
 import { PUBLIC_API_PREFIX } from "./identity";
-import { IDEMPOTENCY_HEADER } from "./idempotency";
+import { IDEMPOTENCY_HEADER, parseIdempotencyKey } from "./idempotency";
 import { bodyJsonSchema, pathParameters, PUBLIC_API_VERSION, queryParameters } from "./openapi";
 import type { McpToolEntry, RouteDefinition } from "./routes";
 
@@ -201,7 +201,8 @@ export const toolRequest = (tool: McpTool, args: Record<string, unknown>, base: 
     }
 
     if (idempotencyKey !== undefined) {
-        headers.set(IDEMPOTENCY_HEADER, idempotencyKey);
+        // The REST route validates the same header: a key with a newline is an invalid request, not a server error.
+        headers.set(IDEMPOTENCY_HEADER, parseIdempotencyKey(idempotencyKey) as string);
     }
 
     return { params, request: new Request(url, { body, headers, method: tool.route.method.toUpperCase(), signal: base.signal }) };
