@@ -13,16 +13,12 @@ import type { EventState } from "../validators";
 
 const NOW = 1_800_000_000_000;
 
-const contextFor = (pages: string[], scans: ThreadScan[] = []): EventCheckContext & { fetched: string[] } => {
-    const fetched: string[] = [];
+const contextFor = (pages: string[], scans: ThreadScan[] = []): EventCheckContext => {
     let page = 0;
     let scan = 0;
 
     return {
-        fetched,
-        fetchPage: async (url) => {
-            fetched.push(url);
-
+        fetchPage: async () => {
             const text = pages[Math.min(page, pages.length - 1)]!;
 
             page += 1;

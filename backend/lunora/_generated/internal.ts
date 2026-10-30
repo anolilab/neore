@@ -987,7 +987,7 @@ export interface InternalApiTypes {
         events: {
             dispatchDueEventTriggers: FunctionReference<"mutation", {}, { dispatched: number }>;
             latestThreadReply: FunctionReference<"query", { after?: { order: number; stepOrder: number }; threadId: string; userId: string }, { accessible: boolean; baseline?: { order: number; stepOrder: number }; reply?: { id: string; text: string } }>;
-            recordEventCheck: FunctionReference<"mutation", { error?: string; fire?: { excerpt?: string; key: string; summary: string }; state?: { checkedAt?: number; checkFailures?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean }; triggerId: Id<"triggers"> }, { fired: boolean }>;
+            recordEventCheck: FunctionReference<"mutation", { error?: string; fire?: { excerpt?: string; key: string; summary: string }; read: { checkedAt?: number; source: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string } }; state?: { checkedAt?: number; checkFailures?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean }; triggerId: Id<"triggers"> }, { fired: boolean }>;
             runEventCheck: FunctionReference<"action", { triggerId: Id<"triggers"> }, null>;
         };
         execute: {

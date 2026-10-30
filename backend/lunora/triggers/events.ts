@@ -30,14 +30,14 @@ import { noteShardDue } from "../lib/shard-housekeeping";
 import { MAX_LENGTH } from "../lib/validators";
 import { notifyQuietly } from "../notifications/notify";
 import { advanceStreak } from "./failure-streak";
-import { buildEventPayload, checkEvent, checkIntervalMs, cooldownMs, firstCheckAt } from "./event-sources";
+import { buildEventPayload, checkEvent, checkIntervalMs, cooldownMs, firstCheckAt, watchesSomethingElse } from "./event-sources";
 import { fetchWatchedPage } from "./event-sources/fetch-page";
 import { scanThreadRows } from "./event-sources/thread-scan";
 import type { ScanRow } from "./event-sources/thread-scan";
 import type { EventCheckContext, ThreadScan } from "./event-sources/types";
 import { MAX_ACTIVE_EVENT_WATCHERS, MINUTE_MS } from "./event-sources/types";
 import type { EventState } from "./validators";
-import { vEventState } from "./validators";
+import { vEventSource, vEventState } from "./validators";
 
 /** Claim scope for "this occurrence already started a run" (`claimOnce`). */
 export const EVENT_FIRE_SCOPE = "event-fire";
@@ -253,11 +253,15 @@ export const performEventCheck = async (
 ): Promise<void> => {
     const triggerId = trigger._id;
 
+    // What the check was asked about: an answer for anything else is dropped (`recordEventCheck`).
+    const read = { checkedAt: trigger.eventState?.checkedAt, source: trigger.eventSource! };
+
     try {
         const result = await checkEvent(checkContext, trigger.eventSource!, trigger.eventState ?? {});
 
         await ctx.runMutation(internal.triggers.events.recordEventCheck, {
             ...(result.fired && { fire: { key: result.fireKey, summary: result.summary, ...(result.excerpt !== undefined && { excerpt: result.excerpt }) } }),
+            read,
             state: result.state,
             triggerId,
         });
@@ -265,6 +269,7 @@ export const performEventCheck = async (
         console.warn(`[Triggers] Check of trigger ${triggerId} failed:`, error);
         await ctx.runMutation(internal.triggers.events.recordEventCheck, {
             error: (error instanceof Error ? error.message : "The check failed.").slice(0, 300),
+            read,
             triggerId,
         });
     }
@@ -323,15 +328,23 @@ export const recordEventCheck = internalMutation
                 summary: v.string().max(MAX_LENGTH.long),
             }),
         ),
+        // What the check read: the condition and the time of the check before it. An answer is kept only if both still hold.
+        read: v.object({ checkedAt: v.optional(v.number()), source: vEventSource }),
         state: v.optional(vEventState),
         triggerId: v.id("triggers"),
     })
     .output(v.object({ fired: v.boolean() }))
-    .mutation(async ({ args: { error, fire, state, triggerId }, ctx }) => {
+    .mutation(async ({ args: { error, fire, read, state, triggerId }, ctx }) => {
         const trigger = await ctx.db.get(triggerId);
 
-        // Switched off, edited or deleted while the check ran: its answer is about something else now.
-        if (trigger?.type !== "event" || trigger.enabled !== true || !trigger.eventSource) {
+        // Switched off, edited, deleted or overtaken by another check while this one ran: its answer is about something else now.
+        if (
+            trigger?.type !== "event" ||
+            trigger.enabled !== true ||
+            !trigger.eventSource ||
+            watchesSomethingElse(trigger.eventSource, read.source) ||
+            trigger.eventState?.checkedAt !== read.checkedAt
+        ) {
             return { fired: false };
         }
 

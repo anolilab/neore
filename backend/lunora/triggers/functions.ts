@@ -1235,6 +1235,11 @@ export const updateExecution = internalMutation
             }
         }
 
+        // A moment in time fires once, so the run it started is its last: switch it off, now that it no longer needs to be admitted.
+        if (settling && trigger.enabled === true && trigger.eventSource?.kind === "time" && trigger.eventState?.firedAt !== undefined) {
+            await ctx.db.patch(trigger._id, { enabled: false, updatedAt: ctx.now });
+        }
+
         // Sent again on a redelivery: `notify` is idempotent on the key, so this only restores a notice that was lost.
         await notifyQuietly(ctx, {
             // One pause per streak: the execution that tipped it names the episode, so a later run of the same

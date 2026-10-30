@@ -449,7 +449,9 @@ describe("event triggers", () => {
     const PAGE = { kind: "page", url: "https://example.com/pricing" } as const;
     const as = () => harness.withIdentity({ userId: "user-a" } as never);
     const create = async (eventSource: unknown): Promise<string> => {
-        const created = (await as().mutation(createTrigger as never, { eventSource, model: "m", name: "Watch", type: "event" } as never)) as { triggerId: string };
+        const created = (await as().mutation(createTrigger as never, { eventSource, model: "m", name: "Watch", type: "event" } as never)) as {
+            triggerId: string;
+        };
 
         return created.triggerId;
     };

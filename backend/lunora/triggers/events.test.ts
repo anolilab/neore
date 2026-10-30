@@ -8,6 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
+import { createExecution, updateExecution } from "./functions";
 import { EVENT_CHECK_LEASE_MS, EVENT_FIRE_CLAIM_TTL_MS, dispatchDueEventTriggers, latestThreadReply, performEventCheck, recordEventCheck } from "./events";
 import type { EventCheckContext } from "./event-sources/types";
 import { MAX_ACTIVE_EVENT_WATCHERS } from "./event-sources/types";
@@ -15,7 +16,11 @@ import { assertWatcherCapacity } from "./events";
 import { TRIGGER_PAUSE_AFTER_FAILURES } from "./failure-streak";
 
 const { enqueueJob, noteShardDue, registry } = vi.hoisted(() => {
-    return { enqueueJob: vi.fn(async (..._arguments: unknown[]) => undefined), noteShardDue: vi.fn(async () => undefined), registry: new Map<string, unknown>() };
+    return {
+        enqueueJob: vi.fn(async (..._arguments: unknown[]) => undefined),
+        noteShardDue: vi.fn(async () => undefined),
+        registry: new Map<string, unknown>(),
+    };
 });
 
 // `performEventCheck` reaches `recordEventCheck` through `ctx.runMutation(internal.…)`.
@@ -102,9 +107,9 @@ describe("a page watcher", () => {
         await check(id, "<p>v1</p>");
 
         expect(enqueueJob).not.toHaveBeenCalled();
-        const settled1 = await readTrigger(id);
+        const row = await readTrigger(id);
 
-        expect(settled1.eventState.hash).toMatch(HEX_SHA256_RE);
+        expect(row.eventState.hash).toMatch(HEX_SHA256_RE);
     });
 
     it("starts exactly one run when the page changes, and none while it stays the same", async () => {
@@ -151,6 +156,7 @@ describe("a page watcher", () => {
                 async (ctx: any) =>
                     await ctx.runMutation(recordEventCheck, {
                         fire: { key: "page:abc", summary: "The page changed: x" },
+                        read: { checkedAt: trigger.eventState.checkedAt, source: PAGE },
                         state: { ...trigger.eventState, hash: "abc" },
                         triggerId: id,
                     }),
@@ -163,27 +169,38 @@ describe("a page watcher", () => {
 
     it("lets the same occurrence fire again once the claim has expired", async () => {
         const id = await insertWatcher();
-        const record = async (): Promise<{ fired: boolean }> =>
-            await harness.run(
-                async (ctx: any) => await ctx.runMutation(recordEventCheck, { fire: { key: "page:abc", summary: "x" }, state: {}, triggerId: id }),
+        const record = async (): Promise<{ fired: boolean }> => {
+            const { eventState } = await readTrigger(id);
+
+            return await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(recordEventCheck, {
+                        fire: { key: "page:abc", summary: "x" },
+                        read: { checkedAt: eventState.checkedAt, source: PAGE },
+                        state: {},
+                        triggerId: id,
+                    }),
             );
+        };
 
-        const settled2 = await record();
+        const first = await record();
 
-        expect(settled2.fired).toBe(true);
+        expect(first.fired).toBe(true);
 
         vi.setSystemTime(NOW + EVENT_FIRE_CLAIM_TTL_MS + 1);
 
-        const settled3 = await record();
+        const again = await record();
 
-        expect(settled3.fired).toBe(true);
+        expect(again.fired).toBe(true);
     });
 
     it("drops the answer of a check that finished after the watcher was switched off", async () => {
         const id = await insertWatcher();
 
         await harness.run(async (ctx: any) => await ctx.db.patch(id, { enabled: false }));
-        await harness.run(async (ctx: any) => await ctx.runMutation(recordEventCheck, { fire: { key: "k", summary: "x" }, state: {}, triggerId: id }));
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(recordEventCheck, { fire: { key: "k", summary: "x" }, read: { source: PAGE }, state: {}, triggerId: id }),
+        );
 
         expect(enqueueJob).not.toHaveBeenCalled();
     });
@@ -199,9 +216,9 @@ describe("a time watcher", () => {
 
         expect(enqueueJob).not.toHaveBeenCalled();
         // Dispatched early: it looks again at its moment, but never sooner than a minute from now.
-        const settled4 = await readTrigger(id);
+        const early = await readTrigger(id);
 
-        expect(settled4.nextTriggerAt).toBe(NOW + 60_000);
+        expect(early.nextTriggerAt).toBe(NOW + 60_000);
 
         vi.setSystemTime(AT);
         await check(id, "", AT);
@@ -213,6 +230,85 @@ describe("a time watcher", () => {
         expect(enqueueJob.mock.calls[0]?.[1]).toMatchObject({ payload: expect.stringContaining("The time has come") });
         expect(row.enabled).toBe(true);
         expect(row.nextTriggerAt).toBeUndefined();
+    });
+
+    it("switches itself off when the run it started settles, and not before", async () => {
+        const id = await insertWatcher({ eventSource: { at: AT, kind: "time" }, nextTriggerAt: AT });
+
+        vi.setSystemTime(AT);
+        await check(id, "", AT);
+
+        const executionId = await harness.run(async (ctx: any) => await ctx.runMutation(createExecution, { triggerId: id }));
+
+        const beforeSettle = await readTrigger(id);
+
+        expect(beforeSettle.enabled).toBe(true);
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(updateExecution, { executionId, status: "completed" }));
+
+        const afterSettle = await readTrigger(id);
+
+        expect(afterSettle.enabled).toBe(false);
+    });
+
+    it("is not switched off by a test run before it has fired", async () => {
+        const id = await insertWatcher({ eventSource: { at: AT, kind: "time" }, nextTriggerAt: AT });
+        const executionId = await harness.run(async (ctx: any) => await ctx.runMutation(createExecution, { triggerId: id }));
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(updateExecution, { executionId, status: "completed" }));
+
+        const row = await readTrigger(id);
+
+        expect(row.enabled).toBe(true);
+    });
+});
+
+describe("a check that finishes after the watcher was edited", () => {
+    it("is dropped, so the old page never becomes the new page's baseline", async () => {
+        const id = await insertWatcher();
+        const stale = await readTrigger(id);
+
+        // The owner points the watcher at another page while the check of the first one is in flight.
+        await harness.run(async (ctx: any) => await ctx.db.patch(id, { eventSource: { ...PAGE, url: "https://example.com/other" }, eventState: {} }));
+
+        const checkContext: EventCheckContext = {
+            fetchPage: async () => {
+                return { text: "<p>old page</p>", truncated: false };
+            },
+            now: NOW,
+            scanThread: async () => {
+                return {};
+            },
+        };
+
+        await harness.run(async (ctx: any) => await performEventCheck(ctx, stale, checkContext));
+
+        expect(await readTrigger(id)).toMatchObject({ eventSource: { url: "https://example.com/other" }, eventState: {} });
+        expect(enqueueJob).not.toHaveBeenCalled();
+    });
+
+    it("is dropped when another check finished first", async () => {
+        const id = await insertWatcher();
+        const stale = await readTrigger(id);
+
+        await check(id, "<p>v1</p>");
+
+        const checkContext: EventCheckContext = {
+            fetchPage: async () => {
+                return { text: "<p>v2</p>", truncated: false };
+            },
+            now: NOW,
+            scanThread: async () => {
+                return {};
+            },
+        };
+
+        await harness.run(async (ctx: any) => await performEventCheck(ctx, stale, checkContext));
+
+        const row = await readTrigger(id);
+
+        expect(row.eventState.checkFailures).toBeUndefined();
+        expect(enqueueJob).not.toHaveBeenCalled();
     });
 });
 
@@ -257,9 +353,9 @@ describe("failed checks", () => {
 
         await check(id, "FAIL");
 
-        const settled5 = await readTrigger(id);
+        const stillOn = await readTrigger(id);
 
-        expect(settled5.enabled).toBe(true);
+        expect(stillOn.enabled).toBe(true);
     });
 });
 
@@ -271,9 +367,9 @@ describe("dispatching due watchers", () => {
         await harness.run(async (ctx: any) => await ctx.runMutation(dispatchDueEventTriggers, {}));
 
         expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ triggerId: id }]);
-        const settled6 = await readTrigger(id);
+        const row = await readTrigger(id);
 
-        expect(settled6.nextTriggerAt).toBe(NOW + EVENT_CHECK_LEASE_MS);
+        expect(row.nextTriggerAt).toBe(NOW + EVENT_CHECK_LEASE_MS);
     });
 
     it("leaves a watcher that is not due, a disabled one and a schedule alone", async () => {
@@ -348,9 +444,9 @@ describe("the thread scan", () => {
 
         expect(second.reply).toMatchObject({ text: "assistant 1" });
         expect(second.baseline).toEqual({ order: 1, stepOrder: 0 });
-        const settled7 = await scan(threadId, second.baseline);
+        const later = await scan(threadId, second.baseline);
 
-        expect(settled7.reply).toBeUndefined();
+        expect(later.reply).toBeUndefined();
     });
 
     it("refuses a thread the watcher cannot read", async () => {
