@@ -247,6 +247,21 @@ const scopeOf = async () => {
     return first?.projectIds;
 };
 
+describe("a device's project scope past one page of reads", () => {
+    it("keeps every chosen project when the scope holds more than 25", async () => {
+        const { deviceId } = await register(ownerId);
+        const projects: string[] = [];
+
+        for (let index = 0; index < 40; index += 1) {
+            projects.push(await insertProject(ownerId, { title: `Project ${index}` }));
+        }
+
+        await setScope(ownerId, deviceId, projects);
+
+        expect(new Set(await scopeOf())).toStrictEqual(new Set(projects));
+    });
+});
+
 describe("a device's project scope in the GDPR export", () => {
     it("is part of the exported device", async () => {
         const { deviceId } = await register(ownerId);
