@@ -147,4 +147,25 @@ describe("writeToHost", () => {
     it("lets an unexpected error through", async () => {
         await expect(writeToHost(githubDriver, token, failing(new RangeError("bug")))).rejects.toBeInstanceOf(RangeError);
     });
+
+    it("answers rate_limited, not a refusal or no access, for a throttled write, bare 403 included", async () => {
+        const answers: Response[] = [
+            new Response("{}", { headers: { "retry-after": "60" }, status: 403 }),
+            new Response("{}", { status: 429 }),
+            Response.json({ message: "You have exceeded a secondary rate limit." }, { status: 403 }),
+        ];
+
+        for (const answer of answers) {
+            expect(
+                await writeToHost(
+                    githubDriver,
+                    token,
+                    async (request) => await request("/x", { json: {}, method: "POST" }),
+                    async () => answer,
+                ),
+            ).toEqual({
+                status: "rate_limited",
+            });
+        }
+    });
 });

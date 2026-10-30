@@ -66,8 +66,13 @@ export interface BoundRequesterConfig {
 
 const REDIRECT_STATUSES = new Set([301, 302, 307, 308]);
 
-const isRateLimited = (response: Response): boolean =>
-    response.status === 429 || (response.status === 403 && (response.headers.get("x-ratelimit-remaining") === "0" || response.headers.has("retry-after")));
+const isRateLimited = (response: Response, body: string | undefined): boolean =>
+    response.status === 429 ||
+    (response.status === 403 &&
+        (response.headers.get("x-ratelimit-remaining") === "0" ||
+            response.headers.has("retry-after") ||
+            // A secondary limit can answer a bare 403 whose only signal is its message. A plain substring test: linear, no pattern.
+            (body?.toLowerCase().includes("rate limit") ?? false)));
 
 export const createBoundRequester = ({
     headers = {},
@@ -119,10 +124,11 @@ export const createBoundRequester = ({
 
             if (!REDIRECT_STATUSES.has(response.status)) {
                 try {
-                    return await assertOk(response, "Host API error", { includeBody: method !== "GET" });
+                    // A 403 is the one status that is a refusal or a rate limit: its message tells which, so it is read on a GET too.
+                    return await assertOk(response, "Host API error", { includeBody: method !== "GET" || response.status === 403 });
                 } catch (error) {
                     throw error instanceof HttpError
-                        ? new HostApiError(error.message, error.status, isRateLimited(response), { detail: messageOf(error.body) })
+                        ? new HostApiError(error.message, error.status, isRateLimited(response, error.body), { detail: messageOf(error.body) })
                         : error;
                 }
             }

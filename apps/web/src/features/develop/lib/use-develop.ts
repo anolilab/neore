@@ -15,7 +15,7 @@ export const DEVELOP_QUERY_ROOT = "develop";
  * Reads from the host cost API budget and never change under a subscription: cache a little, never go live, and
  * do not refetch on window focus, which would re-read every loaded page of a long list one after another.
  */
-const READ = { meta: { [LIVE_META_KEY]: false }, refetchOnWindowFocus: false, retry: false };
+export const READ = { meta: { [LIVE_META_KEY]: false }, refetchOnWindowFocus: false, retry: false };
 
 export interface PullRequestAddress {
     number: number;

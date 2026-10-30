@@ -6,10 +6,14 @@ import { GITHUB_CAPABILITIES } from "./drivers/github";
 
 /** `Record<HostCapabilityKey, …>` makes this exhaustive: a member added to the type fails the type check here. */
 const KEYS: Record<HostCapabilityKey, true> = {
+    "checks.requiredState": true,
+    "checks.rerun": true,
     "inbox.drafts": true,
     "inbox.mine": true,
     "inbox.needsMyReview": true,
     "inbox.readyToMerge": true,
+    "merge.auto": true,
+    "merge.now": true,
     "pullRequest.checks": true,
     "pullRequest.commits": true,
     "pullRequest.description": true,

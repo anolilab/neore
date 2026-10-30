@@ -8,6 +8,8 @@
 import z from "zod/v4";
 
 import type { HostCapabilityReport } from "../capabilities";
+import type { RequiredChecks } from "../checks-logic";
+import { requirementOf } from "../checks-logic";
 import type { HostDriver } from "../driver";
 import { graphqlRequest } from "../graphql";
 import { HostApiError } from "../origin-fetch";
@@ -24,6 +26,11 @@ import type {
     FileStatus,
     InboxPage,
     InboxSection,
+    MergedPullRequest,
+    MergeMethod,
+    MergeRequest,
+    MergeState,
+    MergeStatus,
     PullRequestDetail,
     PullRequestFile,
     PullRequestRef,
@@ -62,6 +69,16 @@ const NATIVE = { degradation: "none", supported: true } as const;
 
 export const GITHUB_CAPABILITIES: HostCapabilityReport = {
     groups: {
+        checks: {
+            // Rulesets are readable by anyone; legacy branch protection only with admin rights, else every failing check counts.
+            requiredState: {
+                degradation: "divergent",
+                note: "Required checks come from rulesets and, for admins, branch protection. Otherwise every failing check counts.",
+                supported: true,
+            },
+            // A check run is re-run through its Actions job where it has one, else by a re-request of the check run.
+            rerun: NATIVE,
+        },
         inbox: {
             // Search `author:` with `draft:true`.
             drafts: NATIVE,
@@ -70,6 +87,7 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
             // Branch protection and required checks are not evaluated: this is "approved and not a draft".
             readyToMerge: { degradation: "synthetic", note: "Approved and not a draft. Branch protection is not checked.", supported: true },
         },
+        merge: { auto: NATIVE, now: NATIVE },
         pullRequest: { checks: NATIVE, commits: NATIVE, description: NATIVE, diff: NATIVE, files: NATIVE },
         review: {
             batchedSubmit: NATIVE,
@@ -590,16 +608,22 @@ const PULL_ID_QUERY = `query ($owner: String!, $name: String!, $number: Int!) {
 const MARK_VIEWED_MUTATION = `mutation ($pullRequestId: ID!, $path: String!) { markFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) { clientMutationId } }`;
 const UNMARK_VIEWED_MUTATION = `mutation ($pullRequestId: ID!, $path: String!) { unmarkFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) { clientMutationId } }`;
 
-const setViewed = async (request: HostRequest, ref: PullRequestRef, path: string, viewed: boolean): Promise<void> => {
+/** The GraphQL node id of a pull request, which the host's mutations address it by. */
+const pullNodeId = async (request: HostRequest, ref: PullRequestRef): Promise<string> => {
     const data = await graphqlRequest(
         request,
         PULL_ID_QUERY,
         repoParts(ref),
         z.object({ repository: z.object({ pullRequest: z.object({ id: z.string() }).nullable() }).nullable() }),
     );
-    const { id } = pullRequestOf(data.repository);
 
-    await graphqlRequest(request, viewed ? MARK_VIEWED_MUTATION : UNMARK_VIEWED_MUTATION, { path, pullRequestId: id }, z.object({}).passthrough());
+    return pullRequestOf(data.repository).id;
+};
+
+const setViewed = async (request: HostRequest, ref: PullRequestRef, path: string, viewed: boolean): Promise<void> => {
+    const pullRequestId = await pullNodeId(request, ref);
+
+    await graphqlRequest(request, viewed ? MARK_VIEWED_MUTATION : UNMARK_VIEWED_MUTATION, { path, pullRequestId }, z.object({}).passthrough());
 };
 
 const reviewSchema = z.object({ html_url: z.string().optional(), id: z.number(), state: z.string() });
@@ -655,6 +679,7 @@ const checkRunsSchema = z.object({
 const checkRunSchema = z.object({
     conclusion: z.string().nullable(),
     html_url: z.string().nullable().optional(),
+    id: z.number().optional(),
     name: z.string(),
     status: z.string(),
 });
@@ -684,6 +709,103 @@ const runState = (status: string, conclusion: string | null): CheckState =>
 const STATUS_STATES: Record<string, CheckState> = { error: "failure", failure: "failure", success: "success" };
 
 const statusState = (state: string): CheckState => STATUS_STATES[state] ?? "pending";
+
+/** A branch name that is safe to put in a URL path, one encoded segment at a time. */
+const BRANCH = /^(?!.*\.\.)[\w./@+-]{1,250}$/u;
+
+const branchPath = (branch: string): string => {
+    if (!BRANCH.test(branch)) {
+        throw new HostApiError("Not a branch name", 404);
+    }
+
+    return branch
+        .split("/")
+        .map((segment) => encodeURIComponent(segment))
+        .join("/");
+};
+
+/** Reads a source of required-check rules, which may be withheld: only a sign-in or rate-limit problem is the caller's. */
+const readable = async <T>(read: () => Promise<T>): Promise<T | undefined> => {
+    try {
+        return await read();
+    } catch (error) {
+        if (!(error instanceof HostApiError) || error.status === 401 || error.rateLimited) {
+            throw error;
+        }
+
+        return undefined;
+    }
+};
+
+const rulesSchema = z.array(
+    z.object({ parameters: z.object({ required_status_checks: z.array(z.object({ context: z.string() })) }).optional(), type: z.string() }),
+);
+
+const protectionSchema = z.object({ checks: z.array(z.object({ context: z.string() })).optional(), contexts: z.array(z.string()) });
+
+/** The required-check patterns of the rulesets that apply to `branch`; anyone who can read the repository can read these. */
+const rulesetPatterns = async (request: HostRequest, ref: PullRequestRef, branch: string): Promise<string[]> => {
+    const rules = parse(rulesSchema, await readJson(await request(`${repoPath(ref)}/rules/branches/${branch}`, { query: { per_page: GITHUB_PAGE_SIZE } })));
+
+    return rules.flatMap((rule) =>
+        rule.type === "required_status_checks" ? (rule.parameters?.required_status_checks ?? []).map((check) => check.context) : [],
+    );
+};
+
+const branchSchema = z.object({
+    protected: z.boolean(),
+    protection: z.object({ required_status_checks: protectionSchema.partial().nullable().optional() }).optional(),
+});
+
+const contextsOf = (protection: { checks?: { context: string }[]; contexts?: string[] }): string[] => [
+    ...(protection.contexts ?? []),
+    ...(protection.checks ?? []).map((check) => check.context),
+];
+
+/**
+ * The patterns of legacy branch protection, or `undefined` when they cannot be told. The host answers 404 both for a branch
+ * with no protection and for a reader it will not show the settings to, so a 404 means "none" only when the branch itself
+ * says it is not protected; otherwise the branch's own summary is used, and failing that the answer stays unknown.
+ */
+const protectionPatterns = async (request: HostRequest, ref: PullRequestRef, branch: string): Promise<string[] | undefined> => {
+    const repo = repoPath(ref);
+    const info = parse(branchSchema, await readJson(await request(`${repo}/branches/${branch}`)));
+
+    if (!info.protected) {
+        return [];
+    }
+
+    try {
+        return contextsOf(parse(protectionSchema, await readJson(await request(`${repo}/branches/${branch}/protection/required_status_checks`))));
+    } catch (error) {
+        if (!(error instanceof HostApiError) || error.status !== 404) {
+            throw error;
+        }
+    }
+
+    const summary = info.protection?.required_status_checks;
+
+    return summary ? contextsOf(summary) : undefined;
+};
+
+const baseSchema = z.object({ base: z.object({ ref: z.string() }) });
+
+/** What the base branch's rules require; a source that cannot be read leaves `complete` false. */
+const requiredChecksOf = async (request: HostRequest, ref: PullRequestRef): Promise<RequiredChecks> => {
+    const pull = await readable(async () => parse(baseSchema, await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}`))));
+
+    if (pull === undefined) {
+        return { complete: false, patterns: [] };
+    }
+
+    const branch = branchPath(pull.base.ref);
+    const [rulesets, protection] = [
+        await readable(async () => await rulesetPatterns(request, ref, branch)),
+        await readable(async () => await protectionPatterns(request, ref, branch)),
+    ];
+
+    return { complete: rulesets !== undefined && protection !== undefined, patterns: [...(rulesets ?? []), ...(protection ?? [])] };
+};
 
 const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: string): Promise<CheckSummary> => {
     if (!SHA.test(headSha)) {
@@ -721,25 +843,158 @@ const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: st
     }
 
     const statuses = parse(commitStatusSchema, await readJson(statusResponse));
+    const required = await requiredChecksOf(request, ref);
     const checks: CheckRun[] = [
         ...runs.check_runs.flatMap((value) => {
             const run = checkRunSchema.safeParse(value);
 
-            return run.success ? [{ name: run.data.name, state: runState(run.data.status, run.data.conclusion), url: webUrl(run.data.html_url) }] : [];
+            return run.success
+                ? [
+                      {
+                          id: run.data.id !== undefined && Number.isSafeInteger(run.data.id) ? String(run.data.id) : null,
+                          name: run.data.name,
+                          required: requirementOf(run.data.name, required),
+                          state: runState(run.data.status, run.data.conclusion),
+                          url: webUrl(run.data.html_url),
+                      },
+                  ]
+                : [];
         }),
         ...statuses.statuses.flatMap((value) => {
             const status = statusSchema.safeParse(value);
 
-            // A status's link is the CI system's own, not a GitHub address: it is not kept.
-            return status.success ? [{ name: status.data.context, state: statusState(status.data.state), url: null }] : [];
+            // A status's link is the CI system's own, not a GitHub address: it is not kept. A status cannot be re-run.
+            return status.success
+                ? [
+                      {
+                          id: null,
+                          name: status.data.context,
+                          required: requirementOf(status.data.context, required),
+                          state: statusState(status.data.state),
+                          url: null,
+                      },
+                  ]
+                : [];
         }),
     ];
 
     return { checks, total: runs.total_count + (statuses.total_count ?? statuses.statuses.length) };
 };
 
+const runAppSchema = z.object({ app: z.object({ slug: z.string() }).nullable().optional() });
+
+/** Actions runs a check run as a job, which can be re-run alone; any other app's check is asked to run again. */
+const ACTIONS_APP = "github-actions";
+
+const rerunCheck = async (request: HostRequest, ref: PullRequestRef, checkId: string): Promise<void> => {
+    if (!COMMENT_ID.test(checkId)) {
+        throw new HostApiError("Not a check id", 404);
+    }
+
+    const repo = repoPath(ref);
+    const run = parse(runAppSchema, await readJson(await request(`${repo}/check-runs/${checkId}`)));
+    const path = run.app?.slug === ACTIONS_APP ? `${repo}/actions/jobs/${checkId}/rerun` : `${repo}/check-runs/${checkId}/rerequest`;
+
+    await discard(await request(path, { json: {}, method: "POST" }));
+};
+
+// ─── Merge ──────────────────────────────────────────────────────────────────
+
+const mergeSettingsSchema = z.object({
+    allow_auto_merge: z.boolean().optional(),
+    allow_merge_commit: z.boolean().optional(),
+    allow_rebase_merge: z.boolean().optional(),
+    allow_squash_merge: z.boolean().optional(),
+});
+
+const mergeabilitySchema = z.object({
+    auto_merge: z.unknown().nullable().optional(),
+    mergeable_state: z.string().optional(),
+});
+
+const MERGE_STATES: Record<string, MergeState> = {
+    behind: "behind",
+    blocked: "blocked",
+    clean: "clean",
+    dirty: "conflicting",
+    draft: "draft",
+    has_hooks: "clean",
+    unstable: "unstable",
+};
+
+const getMergeStatus = async (request: HostRequest, ref: PullRequestRef): Promise<MergeStatus> => {
+    const repo = repoPath(ref);
+    const settings = parse(mergeSettingsSchema, await readJson(await request(repo)));
+    const pull = parse(mergeabilitySchema, await readJson(await request(`${repo}/pulls/${ref.number}`)));
+    const allowed: [MergeMethod, boolean | undefined][] = [
+        ["merge", settings.allow_merge_commit],
+        ["squash", settings.allow_squash_merge],
+        ["rebase", settings.allow_rebase_merge],
+    ];
+
+    return {
+        autoMergeAllowed: settings.allow_auto_merge === true,
+        autoMergeEnabled: pull.auto_merge != null,
+        methods: allowed.flatMap(([method, on]) => (on === true ? [method] : [])),
+        state: MERGE_STATES[pull.mergeable_state ?? ""] ?? "unknown",
+    };
+};
+
+const mergedSchema = z.object({ merged: z.boolean(), message: z.string().optional(), sha: z.string().optional() });
+
+/** One `PUT .../merge` naming the head the person saw: the host merges that commit or refuses, with its reason. */
+const mergePullRequest = async (request: HostRequest, ref: PullRequestRef, merge: MergeRequest): Promise<MergedPullRequest> => {
+    if (!SHA.test(merge.headSha)) {
+        throw new HostApiError("Not a commit id", 404);
+    }
+
+    const response = await request(`${repoPath(ref)}/pulls/${ref.number}/merge`, { json: { merge_method: merge.method, sha: merge.headSha }, method: "PUT" });
+    let result: z.infer<typeof mergedSchema>;
+
+    try {
+        result = parse(mergedSchema, await readJson(response));
+    } catch {
+        // The host answered 2xx, so it merged; we just cannot say which commit.
+        throw new HostApiError("The host's answer to the merge could not be read", 0, false, { unconfirmed: true });
+    }
+
+    if (!result.merged) {
+        throw new HostApiError("The host did not merge", 405, false, { detail: result.message });
+    }
+
+    return { sha: result.sha ?? null };
+};
+
+const AUTO_MERGE_METHODS = { merge: "MERGE", rebase: "REBASE", squash: "SQUASH" } as const satisfies Record<MergeMethod, string>;
+
+const ENABLE_AUTO_MERGE = `mutation ($pullRequestId: ID!, $method: PullRequestMergeMethod!) {
+  enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: $method }) { pullRequest { autoMergeRequest { enabledAt } } }
+}`;
+const DISABLE_AUTO_MERGE = `mutation ($pullRequestId: ID!) {
+  disablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId }) { pullRequest { autoMergeRequest { enabledAt } } }
+}`;
+
+const autoMergeResultSchema = z.object({ pullRequest: z.object({ autoMergeRequest: z.unknown().nullable() }) });
+
+const setAutoMerge = async (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod): Promise<void> => {
+    const pullRequestId = await pullNodeId(request, ref);
+    const data = await graphqlRequest(
+        request,
+        enabled ? ENABLE_AUTO_MERGE : DISABLE_AUTO_MERGE,
+        enabled ? { method: AUTO_MERGE_METHODS[method], pullRequestId } : { pullRequestId },
+        z.object({ disablePullRequestAutoMerge: autoMergeResultSchema.optional(), enablePullRequestAutoMerge: autoMergeResultSchema.optional() }),
+    );
+    const result = enabled ? data.enablePullRequestAutoMerge : data.disablePullRequestAutoMerge;
+
+    // A mutation that answers without the state asked for did not do it.
+    if (result === undefined || (result.pullRequest.autoMergeRequest != null) !== enabled) {
+        throw new HostApiError("The host did not confirm the auto-merge change", 0);
+    }
+};
+
 export const githubDriver: HostDriver = {
     apiOrigin: GITHUB_API_ORIGIN,
+    getMergeStatus,
     getPullRequest,
     headers: { Accept: "application/vnd.github+json", "User-Agent": "neore-chat", "X-GitHub-Api-Version": "2022-11-28" },
     kind: "github",
@@ -749,7 +1004,10 @@ export const githubDriver: HostDriver = {
     listInbox,
     listThreads,
     listViewed,
+    mergePullRequest,
     replyToThread,
+    rerunCheck,
+    setAutoMerge,
     setThreadResolved,
     setViewed,
     submitReview,

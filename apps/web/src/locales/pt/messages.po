@@ -181,6 +181,16 @@ msgstr "{0, plural, one {# byte} other {# bytes}}"
 msgid "{0, plural, one {# char} other {# chars}}"
 msgstr "{0, plural, one {# caractere} other {# caracteres}}"
 
+#. placeholder {0}: rollup.failing
+#: src/features/develop/components/checks-tab.tsx:91
+msgid "{0, plural, one {# check is failing} other {# checks are failing}}"
+msgstr ""
+
+#. placeholder {0}: rollup.pending
+#: src/features/develop/components/checks-tab.tsx:94
+msgid "{0, plural, one {# check is still running} other {# checks are still running}}"
+msgstr ""
+
 #. placeholder {0}: files.length
 #. placeholder {0}: listed.length
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:707
@@ -239,6 +249,11 @@ msgstr "{0, plural, one {# outro destino não é mostrado.} other {# outros dest
 msgid "{0, plural, one {# node} other {# nodes}}"
 msgstr "{0, plural, one {# nó} other {# nós}}"
 
+#. placeholder {0}: rollup.optionalFailing
+#: src/features/develop/components/checks-tab.tsx:126
+msgid "{0, plural, one {# optional check failed.} other {# optional checks failed.}}"
+msgstr ""
+
 #. placeholder {0}: review.draftComments.length
 #: src/features/develop/components/files-tab.tsx:101
 msgid "{0, plural, one {# pending comment} other {# pending comments}}"
@@ -260,6 +275,16 @@ msgstr ""
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:103
 msgid "{0, plural, one {# reply} other {# replies}}"
 msgstr "{0, plural, one {# resposta} other {# respostas}}"
+
+#. placeholder {0}: rollup.failing
+#: src/features/develop/components/checks-tab.tsx:85
+msgid "{0, plural, one {# required check is failing} other {# required checks are failing}}"
+msgstr ""
+
+#. placeholder {0}: rollup.pending
+#: src/features/develop/components/checks-tab.tsx:88
+msgid "{0, plural, one {# required check is still running} other {# required checks are still running}}"
+msgstr ""
 
 #. placeholder {0}: executions.length
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:217
@@ -612,8 +637,13 @@ msgstr "{0} usos"
 #. placeholder {1}: detail.commitCount
 #. placeholder {2}: detail.baseBranch
 #. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:95
+#: src/features/develop/components/pull-request-view.tsx:96
 msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
+msgstr ""
+
+#. placeholder {0}: target.name
+#: src/features/develop/components/checks-tab.tsx:110
+msgid "{0} was started again."
 msgstr ""
 
 #. placeholder {0}: String(percent)
@@ -821,8 +851,25 @@ msgstr "{fps} fps"
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr ""
 
+#: src/features/develop/components/merge-panel.tsx:69
+msgid "{hostLabel} does not show which ways of merging this repository allows to your account."
+msgstr ""
+
 #: src/features/develop/components/review-panel.tsx:235
 msgid "{hostLabel} has no batched review: your comments are posted one after another when you submit."
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:75
+msgid "{hostLabel} has rules this {requestNoun} does not meet yet. You can still try: {hostLabel} will say what is missing."
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:76
+msgid "{hostLabel} says this is ready to merge."
+msgstr ""
+
+#. placeholder {0}: methodLabels[method]
+#: src/features/develop/components/merge-panel.tsx:119
+msgid "{hostLabel} will merge this {requestNoun} with “{0}” once its rules are met. You can turn this off until then."
 msgstr ""
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:84
@@ -2676,6 +2723,10 @@ msgstr "Todas as alterações salvas"
 msgid "All chats"
 msgstr "Todos os chats"
 
+#: src/features/develop/components/checks-tab.tsx:93
+msgid "All checks passed."
+msgstr ""
+
 #: src/features/workflow/components/nodes/outpaint-node.tsx:24
 msgid "All Directions"
 msgstr "Todas as direções"
@@ -2756,6 +2807,10 @@ msgstr "Todos os provedores"
 #: src/features/marketing/components/gateway-landing-page.tsx:121
 msgid "All providers + BYOK"
 msgstr "Todos os provedores + BYOK"
+
+#: src/features/develop/components/checks-tab.tsx:87
+msgid "All required checks passed."
+msgstr ""
 
 #: src/features/marketing/components/gateway-footer.tsx:135
 #: src/features/marketing/components/landing-footer.tsx:269
@@ -3623,6 +3678,18 @@ msgstr "Layout automático"
 #: src/features/workflow/components/canvas/workflow-controls.tsx:364
 msgid "Auto-layout (L)"
 msgstr "Layout automático (L)"
+
+#: src/features/develop/components/merge-panel.tsx:110
+msgid "Auto-merge is off."
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:172
+msgid "Auto-merge is on: it merges once {hostLabel}'s rules are met."
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:110
+msgid "Auto-merge is on."
+msgstr ""
 
 #: src/features/settings/components/account/account-settings.tsx:334
 msgid "Auto-read replies"
@@ -4811,7 +4878,7 @@ msgstr "Cancelar/sair"
 
 #: src/features/chat/thread/widgets/flight-widget.tsx:56
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:164
-#: src/features/develop/components/checks-tab.tsx:47
+#: src/features/develop/components/checks-tab.tsx:76
 #: src/features/evals/components/run-status.tsx:12
 #: src/features/tasks/components/task-detail-dialog.tsx:132
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:62
@@ -5220,7 +5287,7 @@ msgstr "Verificando..."
 msgid "Checking…"
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 #: src/features/evals/components/case-fields.tsx:150
 #: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
@@ -5231,6 +5298,10 @@ msgstr "Verificações"
 #: src/features/evals/components/run-comparison.tsx:64
 msgid "Checks passed"
 msgstr "Verificações aprovadas"
+
+#: src/features/develop/components/merge-panel.tsx:80
+msgid "Checks that are not required are failing."
+msgstr ""
 
 #: src/features/chat/core/utils/language-utilities.ts:339
 msgid "Chile"
@@ -5676,7 +5747,7 @@ msgstr "Fechar tradução"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread/widgets/places-widget.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:66
+#: src/features/develop/components/pull-request-view.tsx:67
 msgid "Closed"
 msgstr "Fechado"
 
@@ -5986,7 +6057,7 @@ msgstr "design comercial"
 msgid "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 msgstr "Projetos comerciais que exigem a melhor qualidade de imagem possível da Black Forest Labs"
 
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 msgid "Commits"
 msgstr ""
 
@@ -7114,8 +7185,21 @@ msgstr "Não foi possível cancelar a execução."
 msgid "Could not change push notifications. Try again."
 msgstr "Não foi possível alterar as notificações push. Tente novamente."
 
+#. placeholder {0}: target.name
+#: src/features/develop/components/checks-tab.tsx:108
+msgid "Could not confirm that {0} was started again. Check on {hostLabel} before you try again."
+msgstr ""
+
 #: src/features/develop/components/review-panel.tsx:160
 msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:94
+msgid "Could not confirm that this was merged. Check on {hostLabel} before you try again."
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:108
+msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:109
@@ -8829,7 +8913,7 @@ msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it,
 msgstr "Descreva seu fluxo de trabalho... ex.: “Gerar uma imagem a partir de texto, aumentar a resolução e depois remover o fundo”"
 
 #: src/components/model-picker/model-picker.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:213
@@ -9418,7 +9502,7 @@ msgstr "Os downloads abrem a página de versões do GitHub. Se nenhum instalador
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/inbox-list.tsx:118
-#: src/features/develop/components/pull-request-view.tsx:74
+#: src/features/develop/components/pull-request-view.tsx:75
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
 msgstr "Rascunho"
@@ -11309,7 +11393,7 @@ msgstr "falhou"
 
 #: src/features/chat/thread-list/thread-node.tsx:503
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
-#: src/features/develop/components/checks-tab.tsx:48
+#: src/features/develop/components/checks-tab.tsx:77
 #: src/features/devices/components/devices-settings.tsx:172
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
@@ -12528,7 +12612,7 @@ msgstr "Envio de arquivo recusado."
 msgid "Filename cannot be empty"
 msgstr "O nome do arquivo não pode ficar vazio"
 
-#: src/features/develop/components/pull-request-view.tsx:65
+#: src/features/develop/components/pull-request-view.tsx:66
 msgid "Files"
 msgstr ""
 
@@ -14588,6 +14672,10 @@ msgstr "Quantas vezes o agente tenta novamente com o feedback do verificador ant
 msgid "How should titles be written?"
 msgstr ""
 
+#: src/features/develop/components/merge-panel.tsx:143
+msgid "How to merge"
+msgstr ""
+
 #: src/features/settings/components/chat/trigger-settings.tsx:978
 msgid "How Triggers Work"
 msgstr "Como os gatilhos funcionam"
@@ -15099,7 +15187,7 @@ msgid "Improving..."
 msgstr "Melhorando..."
 
 #. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:100
+#: src/features/develop/components/pull-request-view.tsx:101
 msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
@@ -16642,7 +16730,7 @@ msgstr ""
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:26
 #: src/features/develop/components/inbox-list.tsx:86
-#: src/features/develop/components/pull-request-view.tsx:50
+#: src/features/develop/components/pull-request-view.tsx:51
 msgid "Loading"
 msgstr "Carregando"
 
@@ -16650,7 +16738,7 @@ msgstr "Carregando"
 msgid "Loading canvas editor..."
 msgstr "Carregando o editor de canvas..."
 
-#: src/features/develop/components/checks-tab.tsx:29
+#: src/features/develop/components/checks-tab.tsx:56
 msgid "Loading checks"
 msgstr ""
 
@@ -17646,6 +17734,15 @@ msgstr "Apenas menções"
 msgid "Menu"
 msgstr "Menu"
 
+#: src/features/develop/components/merge-panel.tsx:128
+#: src/features/develop/components/merge-panel.tsx:138
+msgid "Merge"
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:72
+msgid "Merge commit"
+msgstr ""
+
 #: src/features/develop/lib/use-request-noun.ts:8
 msgid "merge request"
 msgstr ""
@@ -17658,10 +17755,31 @@ msgstr ""
 msgid "Merge request opened"
 msgstr ""
 
+#: src/features/develop/components/merge-panel.tsx:130
+msgid "Merge this {requestNoun}?"
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:118
+#: src/features/develop/components/merge-panel.tsx:163
+msgid "Merge when ready"
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:120
+msgid "Merge when ready?"
+msgstr ""
+
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:66
+#: src/features/develop/components/pull-request-view.tsx:67
 msgid "Merged"
 msgstr "Mesclado"
+
+#: src/features/develop/components/merge-panel.tsx:96
+msgid "Merged on {hostLabel}."
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:159
+msgid "Merging…"
+msgstr ""
 
 #: src/features/marketing/components/landing-page.tsx:289
 msgid "Message Branching"
@@ -18825,7 +18943,7 @@ msgid "Netherlands"
 msgstr "Países Baixos"
 
 #: src/features/appearance/components/appearance-controls.tsx:166
-#: src/features/develop/components/checks-tab.tsx:49
+#: src/features/develop/components/checks-tab.tsx:78
 msgid "Neutral"
 msgstr "Neutro"
 
@@ -19197,7 +19315,7 @@ msgstr "Ainda não há casos. Adicione um manualmente, importe um arquivo CSV ou
 msgid "No chats yet. Start one above."
 msgstr "Nenhum chat ainda. Comece um acima."
 
-#: src/features/develop/components/checks-tab.tsx:43
+#: src/features/develop/components/checks-tab.tsx:70
 msgid "No checks have run for this commit."
 msgstr ""
 
@@ -19288,7 +19406,7 @@ msgstr "Nenhum dataset ainda"
 msgid "No description"
 msgstr "Sem descrição"
 
-#: src/features/develop/components/pull-request-view.tsx:118
+#: src/features/develop/components/pull-request-view.tsx:122
 msgid "No description provided."
 msgstr ""
 
@@ -19867,6 +19985,10 @@ msgstr ""
 msgid "not measured"
 msgstr "não medido"
 
+#: src/features/develop/components/merge-panel.tsx:178
+msgid "Not merged"
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:190
 msgid "Not paired — the bot answers nobody yet"
 msgstr "Não pareado — o bot ainda não responde a ninguém"
@@ -19874,6 +19996,10 @@ msgstr "Não pareado — o bot ainda não responde a ninguém"
 #: src/features/skills/components/skill-marketplace.tsx:86
 msgid "Not rated"
 msgstr "Sem avaliação"
+
+#: src/features/develop/components/checks-tab.tsx:175
+msgid "Not re-run"
+msgstr ""
 
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:301
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:306
@@ -20286,6 +20412,10 @@ msgstr "Apenas as execuções mais recentes foram analisadas, então um modelo m
 msgid "Only the owner can change who sees this skill."
 msgstr "Só o proprietário pode alterar quem vê esta habilidade."
 
+#: src/features/develop/components/checks-tab.tsx:181
+msgid "Only this check is started again on {hostLabel}, not the rest of its workflow."
+msgstr ""
+
 #: src/features/settings/components/chat/model-filter-settings.tsx:372
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "Use apenas provedores que garantem retenção zero de dados — seus prompts nunca são armazenados."
@@ -20314,7 +20444,7 @@ msgstr "Opacidade"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:669
 #: src/components/command-palette.tsx:618
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:66
+#: src/features/develop/components/pull-request-view.tsx:67
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
 msgstr "Abrir"
@@ -20421,7 +20551,7 @@ msgid "Open new chat"
 msgstr "Abrir novo chat"
 
 #. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-view.tsx:86
+#: src/features/develop/components/pull-request-view.tsx:87
 msgid "Open on {0}"
 msgstr ""
 
@@ -20891,6 +21021,10 @@ msgstr "Otimizando..."
 msgid "optional"
 msgstr "opcional"
 
+#: src/features/develop/components/checks-tab.tsx:154
+msgid "Optional"
+msgstr ""
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:211
 msgid "Optional: \"lark\" for Lark (open.larksuite.com); leave unset for Feishu (open.feishu.cn)"
 msgstr "Opcional: \"lark\" para o Lark (open.larksuite.com); deixe em branco para o Feishu (open.feishu.cn)"
@@ -21331,7 +21465,7 @@ msgstr ""
 msgid "passed"
 msgstr "aprovado"
 
-#: src/features/develop/components/checks-tab.tsx:52
+#: src/features/develop/components/checks-tab.tsx:81
 #: src/features/evals/components/model-comparison.tsx:111
 #: src/features/tasks/components/task-detail-dialog.tsx:135
 msgid "Passed"
@@ -21523,7 +21657,7 @@ msgstr "Executável PE"
 msgid "Pen"
 msgstr "Caneta"
 
-#: src/features/develop/components/checks-tab.tsx:50
+#: src/features/develop/components/checks-tab.tsx:79
 #: src/features/settings/components/chat/trigger-settings.tsx:166
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:59
 #: src/features/workflow/components/canvas/workflow-controls.tsx:53
@@ -23105,6 +23239,21 @@ msgstr "Otimizar novamente"
 msgid "Re-pair with a new code"
 msgstr "Parear novamente com um novo código"
 
+#: src/features/develop/components/checks-tab.tsx:163
+#: src/features/develop/components/checks-tab.tsx:180
+msgid "Re-run"
+msgstr ""
+
+#. placeholder {0}: check.name
+#: src/features/develop/components/checks-tab.tsx:157
+msgid "Re-run {0}"
+msgstr ""
+
+#. placeholder {0}: target?.name ?? ""
+#: src/features/develop/components/checks-tab.tsx:189
+msgid "Re-run {0}?"
+msgstr ""
+
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:38
 msgid "Read"
 msgstr "Leitura"
@@ -23340,6 +23489,10 @@ msgstr "Raciocínio: {effortLabel}"
 #: src/features/marketing/data/models-data.ts:290
 msgid "Reasons through the prompt before generating"
 msgstr "Raciocina sobre o prompt antes de gerar"
+
+#: src/features/develop/components/merge-panel.tsx:72
+msgid "Rebase and merge"
+msgstr ""
 
 #: src/features/prompts/components/prompt-list.tsx:526
 msgid "Recent"
@@ -24105,6 +24258,7 @@ msgstr "Requisições"
 msgid "required"
 msgstr "obrigatório"
 
+#: src/features/develop/components/checks-tab.tsx:153
 #: src/features/prompts/components/variable-definitions.tsx:94
 #: src/features/prompts/components/variable-fill-dialog.tsx:154
 msgid "Required"
@@ -26072,7 +26226,7 @@ msgid "Show/hide help"
 msgstr "Mostrar/ocultar ajuda"
 
 #. placeholder {0}: list.length
-#: src/features/develop/components/checks-tab.tsx:59
+#: src/features/develop/components/checks-tab.tsx:132
 msgid "Showing {0} of {total, plural, one {# check} other {# checks}}."
 msgstr ""
 
@@ -26391,7 +26545,7 @@ msgstr "Pular para o conteúdo"
 msgid "Skip tour"
 msgstr "Pular tour"
 
-#: src/features/develop/components/checks-tab.tsx:51
+#: src/features/develop/components/checks-tab.tsx:80
 #: src/features/evals/components/run-detail.tsx:36
 #: src/features/settings/components/chat/trigger-settings.tsx:165
 msgid "Skipped"
@@ -26885,6 +27039,10 @@ msgstr "Quadrado"
 #: src/features/canvas/components/design-preset-selector.tsx:41
 msgid "Square post"
 msgstr "Post quadrado"
+
+#: src/features/develop/components/merge-panel.tsx:72
+msgid "Squash and merge"
+msgstr ""
 
 #: src/features/chat/core/utils/language-utilities.ts:376
 msgid "Sri Lanka"
@@ -28667,7 +28825,7 @@ msgstr "O limite de custo deve ser um valor positivo em dólares."
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "O dataset, seus casos e todas as execuções dele serão removidos."
 
-#: src/features/develop/components/pull-request-view.tsx:120
+#: src/features/develop/components/pull-request-view.tsx:124
 msgid "The description is cut short."
 msgstr ""
 
@@ -29122,6 +29280,14 @@ msgstr "Pensando..."
 msgid "Thinking…"
 msgstr "Pensando…"
 
+#: src/features/develop/components/merge-panel.tsx:78
+msgid "This {requestNoun} is still a draft."
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:124
+msgid "This {requestNoun} will no longer merge by itself."
+msgstr ""
+
 #: src/features/auth/components/team/delete-team-dialog.tsx:70
 msgid "This action cannot be undone. All team members will be removed."
 msgstr "Essa ação não pode ser desfeita. Todos os membros da equipe serão removidos."
@@ -29129,6 +29295,14 @@ msgstr "Essa ação não pode ser desfeita. Todos os membros da equipe serão re
 #: src/features/auth/components/organization/delete-organization-dialog.tsx:93
 msgid "This action cannot be undone. This will permanently delete the organization and all associated data."
 msgstr "Essa ação não pode ser desfeita. A organização e todos os dados associados serão excluídos permanentemente."
+
+#: src/features/develop/components/merge-panel.tsx:77
+msgid "This branch has conflicts with its base branch."
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:74
+msgid "This branch is behind its base branch."
+msgstr ""
 
 #: src/features/notifications/components/notification-settings.tsx:190
 msgid "This browser cannot receive push notifications here."
@@ -29248,7 +29422,7 @@ msgstr "Este arquivo é grande demais (~{0} tokens) e excede a janela de context
 msgid "This host does not offer an inbox yet."
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:105
+#: src/features/develop/components/pull-request-view.tsx:109
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
@@ -29285,6 +29459,12 @@ msgstr "Este link está incompleto."
 #: src/features/chat/thread/memory-usage-action.tsx:63
 msgid "This memory has since been deleted."
 msgstr "Esta memória foi excluída desde então."
+
+#. placeholder {0}: headSha.slice(0, 7)
+#. placeholder {1}: methodLabels[method]
+#: src/features/develop/components/merge-panel.tsx:129
+msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
+msgstr ""
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
 msgid "This model has no reasoning effort"
@@ -30228,6 +30408,18 @@ msgstr "Turco (Turquia)"
 #: src/features/settings/components/chat/mcp/popular-servers.ts:233
 msgid "Turn any GitHub repository into a remote MCP endpoint"
 msgstr "Transforme qualquer repositório do GitHub em um endpoint MCP remoto"
+
+#: src/features/develop/components/merge-panel.tsx:123
+msgid "Turn off"
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:168
+msgid "Turn off auto-merge"
+msgstr ""
+
+#: src/features/develop/components/merge-panel.tsx:125
+msgid "Turn off auto-merge?"
+msgstr ""
 
 #: src/features/home/components/home-page.tsx:236
 msgid "Turn on Daily Brief"

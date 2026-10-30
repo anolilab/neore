@@ -98,7 +98,11 @@ export interface FilePage {
 export type CheckState = "cancelled" | "failure" | "neutral" | "pending" | "skipped" | "success";
 
 export interface CheckRun {
+    /** The host's id for a check that can be re-run on its own; `null` for one that cannot (a commit status). */
+    id: string | null;
     name: string;
+    /** Whether the base branch's rules require it: `null` when they could not be read, which counts as required. */
+    required: boolean | null;
     state: CheckState;
     url: string | null;
 }
@@ -107,6 +111,33 @@ export interface CheckSummary {
     checks: CheckRun[];
     /** How many the host reports; `checks` holds at most one bounded page of them. */
     total: number;
+}
+
+// ─── Merge ──────────────────────────────────────────────────────────────────
+
+export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
+
+export type MergeMethod = (typeof MERGE_METHODS)[number];
+
+/** What the host says of the change's mergeability; the host's rules, not ours, decide at merge time. */
+export type MergeState = "behind" | "blocked" | "clean" | "conflicting" | "draft" | "unknown" | "unstable";
+
+export interface MergeStatus {
+    autoMergeAllowed: boolean;
+    autoMergeEnabled: boolean;
+    /** The methods the repository's settings allow. */
+    methods: MergeMethod[];
+    state: MergeState;
+}
+
+export interface MergeRequest {
+    /** The commit the person looked at: the host refuses the merge when the head has moved since. */
+    headSha: string;
+    method: MergeMethod;
+}
+
+export interface MergedPullRequest {
+    sha: string | null;
 }
 
 // ─── Review ─────────────────────────────────────────────────────────────────

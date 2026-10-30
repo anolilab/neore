@@ -16,6 +16,7 @@ import { v } from "lunorash/server";
 import { hasGithubGrant, resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
+import { rollupOf } from "./checks-logic";
 import { leftOutPast } from "./coverage";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { readFromHost } from "./read-host";
@@ -86,9 +87,19 @@ const vFile = v.object({
 });
 
 const vCheck = v.object({
+    id: v.union(v.string(), v.null()),
     name: v.string(),
+    required: v.union(v.boolean(), v.null()),
     state: v.union(v.literal("cancelled"), v.literal("failure"), v.literal("neutral"), v.literal("pending"), v.literal("skipped"), v.literal("success")),
     url: v.union(v.string(), v.null()),
+});
+
+const vRollup = v.object({
+    complete: v.boolean(),
+    failing: v.number(),
+    optionalFailing: v.number(),
+    pending: v.number(),
+    state: v.union(v.literal("failing"), v.literal("none"), v.literal("passing"), v.literal("pending")),
 });
 
 const vRef = {
@@ -195,10 +206,14 @@ export const getPullRequestFiles = authAction
 export const getPullRequestChecks = authAction
     .use(rateLimit("sourceControl/read"))
     .input({ ...vRef, headSha: v.string().max(MAX_LENGTH.short) })
-    .output(v.union(v.object({ checks: v.array(vCheck), status: v.literal("ok"), total: v.number() }), vFailed))
+    .output(v.union(v.object({ checks: v.array(vCheck), rollup: vRollup, status: v.literal("ok"), total: v.number() }), vFailed))
     .action(async ({ args, ctx }) => {
         const token = await resolveGithubToken(ctx, ctx.user.userId);
-        const outcome = await readFromHost(DEVELOP_DRIVER, token, (request) => DEVELOP_DRIVER.listChecks(request, args, args.headSha));
+        const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => {
+            const summary = await DEVELOP_DRIVER.listChecks(request, args, args.headSha);
+
+            return { ...summary, rollup: rollupOf(summary.checks, summary.total) };
+        });
 
         ctx.log.event("source_control.get_checks", { status: outcome.status });
 
