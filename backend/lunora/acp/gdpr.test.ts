@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { erasePersistentStreamsForUser } from "../chat/gdpr";
 import schema from "../schema";
-import { collectAcpSessionsForExport, deleteUserAcpSessions } from "./gdpr";
+import { collectAcpSessionPages, collectAcpSessionsForExport, deleteUserAcpSessions } from "./gdpr";
 
 const A = "user-a";
 const B = "user-b";
@@ -143,18 +143,20 @@ describe("the export of coding-agent sessions and events", () => {
 
         expect(pages.filter((page) => page.events.length > 0).length).toBeGreaterThan(1);
 
-        // 699 chunks after the prompt, every second one an event.
+        // 699 chunks after the prompt: tool events and text.
         for (const turnId of ["t1", "t2", "t3"]) {
             const seqs = perTurn(turnId).map((entry) => entry.seq);
 
-            expect(seqs).toHaveLength(349);
+            expect(seqs).toHaveLength(699);
             expect(seqs).toEqual(seqs.toSorted((left, right) => left - right));
             expect(new Set(seqs).size).toBe(seqs.length);
         }
 
         expect(perTurn("other")).toHaveLength(0);
-        // Text chunks are the saved reply's; the prompt is the user's message. Neither is repeated here.
-        expect(events.every((entry) => entry.event.kind === "tool")).toBe(true);
+        // The agent's text is exported as streamed; the prompt is the user's message and is not repeated here.
+        expect(events.filter((entry) => entry.turnId === "t1").map((entry) => entry.event.kind)).toEqual(
+            Array.from({ length: 699 }, (_, index) => ((index + 1) % 2 === 0 ? "tool" : "text")),
+        );
         expect(perTurn("t1")[0]?.threadId).toBe(threadA);
         expect(perTurn("t3")[0]?.threadId).toBe(threadB);
     });
@@ -196,6 +198,37 @@ describe("the export of coding-agent sessions and events", () => {
         }
     });
 
+    it("keeps the agent's text and reasoning, which a cut or missing saved reply no longer holds, and skips empty chunks", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const streamId = await ctx.db.insert("persistentStreams", {
+                expiresAt: 0,
+                hostTurnId: "cut",
+                messageId: "m",
+                producer: "host",
+                status: "done",
+                streamingConfig: { contentType: "text", model: "host" },
+                threadId,
+                userId: A,
+            });
+
+            await ctx.db.insert("persistentChunks", { event: { kind: "turn_start", text: "" }, seq: 0, streamId, text: "" });
+            await ctx.db.insert("persistentChunks", { reasoning: "thinking", seq: 1, streamId, text: "" });
+            await ctx.db.insert("persistentChunks", { seq: 2, streamId, text: "" });
+            await ctx.db.insert("persistentChunks", { seq: 3, streamId, text: "the answer" });
+        });
+
+        const pages = await collectAll(A);
+        const seen = pages.flatMap((page) => page.events).map(({ event, seq }) => [seq, event.kind, event.text]);
+
+        expect(seen).toEqual([
+            [1, "reasoning", "thinking"],
+            [3, "text", "the answer"],
+        ]);
+    });
+
     it("is one empty page for a user with no agent history", async () => {
         const pages = await collectAll(A);
 
@@ -235,5 +268,42 @@ describe("erasing a user's coding-agent data", () => {
         expect(await count("persistentStreams", { userId: B })).toBe(1);
         expect(await count("persistentChunks", { streamId: streamB })).toBe(5);
         expect(await count("acpSessions", { userId: B })).toBe(1);
+    });
+});
+
+describe("reading the whole export page by page", () => {
+    it("asks for each page with the cursor the last one named, and returns them as one history", async () => {
+        const asked: unknown[] = [];
+        const pages: Page[] = [
+            { events: [], next: { phase: "events" }, sessions: [{ threadId: "t1" }] },
+            {
+                events: [{ event: { kind: "text", text: "a" }, seq: 1, threadId: "t1", turnId: "x" }],
+                next: { page: "p", phase: "events", seq: 1 },
+                sessions: [],
+            },
+            { events: [{ event: { kind: "text", text: "b" }, seq: 2, threadId: "t1", turnId: "x" }], sessions: [] },
+        ];
+
+        const all = await collectAcpSessionPages(async (cursor) => {
+            asked.push(cursor);
+
+            return pages.shift() as Page;
+        }, 1_000_000);
+
+        expect(asked).toEqual([undefined, { phase: "events" }, { page: "p", phase: "events", seq: 1 }]);
+        expect(all.sessions).toEqual([{ threadId: "t1" }]);
+        expect((all.events as { seq: number }[]).map((entry) => entry.seq)).toEqual([1, 2]);
+    });
+
+    it("fails with PAYLOAD_TOO_LARGE once the pages outgrow the export's limit", async () => {
+        const page = (): Page => {
+            return {
+                events: [{ event: { kind: "text", text: "x".repeat(500) }, seq: 1, threadId: "t", turnId: "x" }],
+                next: { phase: "events" },
+                sessions: [],
+            };
+        };
+
+        await expect(collectAcpSessionPages(async () => page(), 1000)).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
     });
 });

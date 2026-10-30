@@ -21,7 +21,13 @@ export class SessionLink {
     /** The poster is going away: nothing more is sent. */
     private halted = false;
 
+    /** The `session_open` request being made, so a close can wait for the backend's answer to it. */
+    private inflight: Promise<void> | undefined;
+
     private opening = false;
+
+    /** A `session_open` was sent and the backend may have created the session (its answer was lost, or not yet known). */
+    private posted = false;
 
     private timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -57,12 +63,16 @@ export class SessionLink {
 
     /**
      * The local session is over and its turns are delivered: the backend ends the session now instead of leaving it
-     * `idle` until someone reads it as stale. A session the backend never heard of has nothing to close.
+     * `idle` until someone reads it as stale. A session the backend never heard of has nothing to close. A close
+     * waits for an open still in flight: sent first, it would be answered "unknown" and the open would then create
+     * a session nobody closes.
      */
     public async announceClose(): Promise<void> {
+        await this.inflight;
+
         const deviceId = this.poster.deviceId();
 
-        if (deviceId === undefined || this.halted || typeof this.threadId !== "string") {
+        if (deviceId === undefined || this.halted || !this.posted) {
             return;
         }
 
@@ -103,7 +113,11 @@ export class SessionLink {
         }
 
         this.opening = true;
+        this.inflight = this.attempt();
+        await this.inflight;
+    }
 
+    private async attempt(): Promise<void> {
         try {
             const deviceId = this.poster.deviceId();
 
@@ -114,7 +128,14 @@ export class SessionLink {
             }
 
             const payload = JSON.stringify({ deviceId, events: [{ ...this.info, kind: "session_open" }], issuedAt: this.poster.now(), kind: "turn", sessionId: this.sessionId, v: 1 });
+
+            this.posted = true;
+
             const result = await this.poster.request(payload);
+
+            if (result.kind === "refused" || (result.kind === "ok" && result.ended)) {
+                this.posted = false;
+            }
 
             if (this.closed) {
                 return;

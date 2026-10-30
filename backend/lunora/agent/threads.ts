@@ -17,7 +17,7 @@ import { omit, pick } from "../lib/collections";
 import { assert } from "../lib/error-helpers";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { paginationOptionsValidator, partial, MAX_LENGTH } from "../lib/validators";
-import { endHostThread } from "../acp/lib/thread-removed";
+import { endHostThread, restoreHostThread } from "../acp/lib/thread-removed";
 import { deleteMessage } from "./messages";
 import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
@@ -714,6 +714,12 @@ export const restoreThread = internalMutation
             deletedAt: undefined,
             updatedAt: ctx.now,
         });
+
+        // The session the delete ended, if this is a coding agent's thread, can take turns again.
+        if (oldThread.deleted) {
+            await restoreHostThread(ctx, oldThread, ctx.now);
+        }
+
         const newThread = (await ctx.db.get(args.threadId))!;
 
         // Re-add to aggregates when restored

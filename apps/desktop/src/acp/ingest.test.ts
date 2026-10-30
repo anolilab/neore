@@ -253,7 +253,9 @@ describe("a session that never gets a thread", () => {
         host.sessionEnded("s1");
         await settle(60_000);
 
-        expect(backend.posts).toHaveLength(1);
+        // One open, then a close: the failed open may have reached the backend before the answer was lost.
+        expect(backend.posts.filter(({ post }) => post.close !== true)).toHaveLength(1);
+        expect(backend.posts.filter(({ post }) => post.close === true)).toHaveLength(1);
         expect(host.busy).toBe(false);
     });
 });
@@ -618,6 +620,26 @@ describe("a computer the backend no longer knows", () => {
         expect(await runningTurns()).toEqual({ turns: [] });
     });
 
+    it("starts the count again after a long gap, so one later 401 does not drop the turn", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext = [401, 401, 401, 401];
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "hello");
+        await settleInSteps(15_000);
+
+        expect(backend.posts.filter(({ post }) => post.turnId === "t1")).toHaveLength(4);
+
+        // The computer slept: the clock moved on, the pending retry did not.
+        clock += 3_600_000;
+        backend.failNext = [401];
+        await settleInSteps(60_000);
+
+        expect(backend.texts("t1")).toBe("hello");
+        expect(logs).toEqual([]);
+    });
+
     it("does not count 401s across an answer in between", async () => {
         const host = poster();
 
@@ -698,6 +720,49 @@ describe("a session that ends locally", () => {
 
         expect(closes().length).toBeGreaterThan(1);
         expect(closes().length).toBeLessThanOrEqual(7);
+    });
+
+    it("closes a session that ended while its session_open was still in flight, once the backend has answered it", async () => {
+        let release = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const host = poster(async (url, init) => {
+            const { payload } = JSON.parse(String(init?.body)) as { payload: string };
+            const post = JSON.parse(payload) as Post;
+
+            if (post.close !== true && post.threadId === undefined) {
+                await gate;
+            }
+
+            return await backend.fetch(String(url), init);
+        });
+
+        host.sessionOpened("s1", INFO);
+        await settle();
+        host.sessionEnded("s1");
+        await settle(POST_INTERVAL_MS);
+
+        // The open has not been answered: a close sent now would be answered "unknown" and the open would then create a session.
+        expect(closes()).toHaveLength(0);
+
+        release();
+        await settle(POST_INTERVAL_MS);
+
+        expect(closes()).toHaveLength(1);
+        expect(backend.posts.findIndex(({ post }) => post.close === true)).toBeGreaterThan(0);
+    });
+
+    it("sends no close for a session the backend refused to open", async () => {
+        const host = poster();
+
+        backend.respond = (post) => post.close === true ? undefined : Response.json({ error: "no" }, { status: 403 });
+        await open(host);
+        host.sessionEnded("s1");
+        await settle(60_000);
+
+        expect(closes()).toHaveLength(0);
     });
 
     it("has nothing to close for a session that stayed local", async () => {

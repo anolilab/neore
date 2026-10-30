@@ -15,6 +15,8 @@ import { sessionOfThread } from "./sessions";
  * one), and then the session is ended. The row stays as the tombstone `session_open` reads to tell the desktop the
  * session is over: with it gone, a redelivered open would make a new thread. Idempotent, so every delete path and a
  * paged hard delete may call it again.
+ *
+ * A soft delete can be undone (`restoreHostThread`); a hard delete cannot.
  */
 export const endHostThread = async (ctx: MutationCtx, thread: Pick<Doc<"threads">, "_id" | "runner">, now: number): Promise<void> => {
     if (!isHostRunThread(thread)) {
@@ -46,5 +48,26 @@ export const endHostThread = async (ctx: MutationCtx, thread: Pick<Doc<"threads"
 
     if (session && session.status !== "ended") {
         await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+    }
+};
+
+/**
+ * A soft-deleted host thread was restored (undo). The session the delete ended comes back `offline`: not live, but no
+ * longer a tombstone, so a desktop that still holds the session posts its next turn into the thread again (a post
+ * moves the status on) and a redelivered `session_open` is no longer told the session is over. Whether the host is
+ * still there is not known here; a session the desktop had closed itself stays `offline` too, and nothing posts to
+ * it. The turn the delete cut short stays ended. Idempotent.
+ * A session of a device that was removed since stays ended.
+ */
+export const restoreHostThread = async (ctx: MutationCtx, thread: Pick<Doc<"threads">, "_id" | "runner">, now: number): Promise<void> => {
+    if (!isHostRunThread(thread)) {
+        return;
+    }
+
+    const session = await sessionOfThread(ctx, thread._id);
+
+    // A revoked device is deleted, and its sessions stay ended: nothing is left to post.
+    if (session?.status === "ended" && (await ctx.db.get(session.deviceId))) {
+        await ctx.db.patch(session._id, { status: "offline", updatedAt: now });
     }
 };

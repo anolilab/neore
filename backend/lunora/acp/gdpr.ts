@@ -1,6 +1,6 @@
 /**
  * Coding-agent sessions and host events in the GDPR export and account deletion. Wired into
- * `gdpr/workflows/export-workflow.ts` ("collect-acp-sessions", paged) and `gdpr/workflows/deletion-workflow.ts`
+ * `gdpr/steps.ts#generateExportFile` (paged) and `gdpr/workflows/deletion-workflow.ts`
  * ("delete-user-acp-sessions"). The threads, messages, streams and chunks of a host-run thread are the ordinary rows
  * the other steps already erase (a host stream carries its user's id, so `erasePersistentStreamsForUser` reaches it
  * and every chunk).
@@ -8,8 +8,9 @@
  * on retry.
  */
 import type { Infer } from "lunorash/server";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
+import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { vCapabilityReport } from "../lib/capability-report";
@@ -52,10 +53,10 @@ type ExportCursor = Infer<typeof vExportCursor>;
 
 /**
  * One page of a user's coding-agent export: sessions first, then the tool, permission and turn-end events of their
- * host turns (the prompt and the saved reply are ordinary messages, exported with the conversations; text and
- * reasoning chunks only duplicate that reply). `next` is absent on the last page. The export workflow
- * (`gdpr/workflows/export-workflow.ts`) asks again with `next` until it is, so a long history is complete and no
- * single step holds more than a page.
+ * host turns (the prompt and the saved reply are ordinary messages, exported with the conversations), and the text
+ * and reasoning the agent streamed (the saved reply can be cut short, or missing for a deleted thread). `next` is
+ * absent on the last page. `generateExportFile` asks again with `next` until it is, so a long history is complete
+ * and no single call or query result holds more than a page.
  */
 export const collectAcpSessionsForExport = internalQuery
     .input({ cursor: v.optional(vExportCursor), userId: v.string() })
@@ -96,6 +97,23 @@ export const collectAcpSessionsForExport = internalQuery
 
 type EventRecord = { event: Infer<typeof vHostEvent>; seq: number; threadId: string; turnId: string };
 
+/**
+ * A chunk as the event the desktop posted. Text and reasoning are the chunk's own fields, not an `event`: exported
+ * all the same, because the saved reply is cut when a turn is long and there is none when the thread was deleted
+ * mid-turn, so the chunks are the only full record of what the agent said.
+ */
+const eventOf = (chunk: Pick<Doc<"persistentChunks">, "event" | "reasoning" | "text">): EventRecord["event"] | undefined => {
+    if (chunk.event !== undefined) {
+        return chunk.event;
+    }
+
+    if (chunk.reasoning) {
+        return { kind: "reasoning", text: chunk.reasoning };
+    }
+
+    return chunk.text ? { kind: "text", text: chunk.text } : undefined;
+};
+
 /** Walks the user's host streams from `cursor`, one chunk page at a time, until the page's budget is spent. */
 const collectHostEvents = async (ctx: QueryCtx, userId: string, cursor: ExportCursor): Promise<{ events: EventRecord[]; next?: ExportCursor }> => {
     const events: EventRecord[] = [];
@@ -122,7 +140,7 @@ const collectHostEvents = async (ctx: QueryCtx, userId: string, cursor: ExportCu
             });
 
             for (const chunk of page) {
-                const { event } = chunk;
+                const event = eventOf(chunk);
 
                 // The turn's prompt is its first chunk's placeholder (the text is the user's message).
                 if (event === undefined || event.kind === "turn_start") {
@@ -163,6 +181,35 @@ const collectHostEvents = async (ctx: QueryCtx, userId: string, cursor: ExportCu
             return { events, next: { page: streamCursor, phase: "events" } };
         }
     }
+};
+
+/**
+ * Every page of the export, asked one after the other with the cursor each answer names, held to `maxBytes` in
+ * total. The caller reads them while it writes the file, so the history is never an argument or a stored step result.
+ */
+export const collectAcpSessionPages = async (
+    readPage: (cursor: ExportCursor | undefined) => Promise<{ events: unknown[]; next?: ExportCursor; sessions: unknown[] }>,
+    maxBytes: number,
+): Promise<{ events: unknown[]; sessions: unknown[] }> => {
+    const collected: { events: unknown[]; sessions: unknown[] } = { events: [], sessions: [] };
+    let cursor: ExportCursor | undefined;
+    let bytes = 0;
+
+    do {
+        const page = await readPage(cursor);
+
+        bytes += JSON.stringify(page).length;
+
+        if (bytes > maxBytes) {
+            throw new LunoraError("PAYLOAD_TOO_LARGE", "The coding-agent history is larger than the export limit");
+        }
+
+        collected.sessions.push(...page.sessions);
+        collected.events.push(...page.events);
+        cursor = page.next;
+    } while (cursor !== undefined);
+
+    return collected;
 };
 
 export const deleteUserAcpSessions = internalMutation

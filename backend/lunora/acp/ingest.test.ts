@@ -1087,6 +1087,36 @@ describe("deleting a host thread", () => {
         await expect(ingest(device, { events: [SESSION_OPEN] })).resolves.toMatchObject({ json: { ended: true, threadId } });
     });
 
+    it("undoing a soft delete lets the desktop that still holds the session post into the thread again", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("half")]);
+        await softDelete(threadId);
+        await expect(turn(device, threadId, "t2", 0, [START("again")])).resolves.toMatchObject({ status: 403 });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(agentThreads.restoreThread, { threadId }));
+
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "offline" });
+        // A redelivered open is no longer told the session is over, and the next turn is taken.
+        await expect(ingest(device, { events: [SESSION_OPEN] })).resolves.toMatchObject({ json: { ended: false, threadId } });
+        await expect(turn(device, threadId, "t2", 0, [START("again")])).resolves.toMatchObject({ json: { ended: false }, status: 200 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "busy" });
+        // The turn the delete cut short stays ended.
+        expect(await streamFor("t1")).toMatchObject({ hostEndReason: "stopped", hostState: "ended" });
+    });
+
+    it("undoing a soft delete leaves the session ended when its device was removed meanwhile", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await softDelete(threadId);
+        await as(ownerId).mutation(devices.revokeDevice as never, { deviceId: device.deviceId } as never);
+        await harness.run(async (ctx: any) => await ctx.runMutation(agentThreads.restoreThread, { threadId }));
+
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "ended" });
+    });
+
     it("a hard delete removes the thread and leaves no live stream behind", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);

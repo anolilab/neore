@@ -22,9 +22,6 @@ interface Call {
 let calls: Call[];
 let generate: () => unknown;
 let stepNames: string[];
-/** What the coding-agent collector answers, a page per call; empty = the stub's `[]`. */
-let acpPages: unknown[];
-
 const refOf = (reference: unknown): string => (reference as { __lunoraRef: string }).__lunoraRef;
 
 const execute = async (): Promise<void> => {
@@ -34,10 +31,6 @@ const execute = async (): Promise<void> => {
             const ref = refOf(reference);
 
             calls.push({ args, ref });
-
-            if (ref === "acp_gdpr:collectAcpSessionsForExport" && acpPages.length > 0) {
-                return acpPages.shift();
-            }
 
             return ref === "gdpr_steps:generateExportFile" ? generate() : [];
         },
@@ -60,44 +53,15 @@ beforeEach(() => {
     calls = [];
     generate = () => "storage-1";
     stepNames = [];
-    acpPages = [];
 });
 
-describe("data export workflow: coding-agent pages", () => {
-    it("asks again with the cursor until there is none, and exports every page", async () => {
-        acpPages = [
-            { events: [], next: { phase: "events" }, sessions: [{ threadId: "t1" }] },
-            { events: [{ seq: 1 }], next: { page: "p", phase: "events", seq: 1 }, sessions: [] },
-            { events: [{ seq: 2 }], sessions: [] },
-        ];
-
+describe("data export workflow: coding-agent history", () => {
+    it("leaves the coding-agent history to the export step, so no step result or call argument carries it", async () => {
         await execute();
 
-        const collects = ran("acp_gdpr:collectAcpSessionsForExport");
-
-        expect(collects.map((call) => call.args["cursor"])).toEqual([undefined, { phase: "events" }, { page: "p", phase: "events", seq: 1 }]);
-        // The first keeps the name an export already in flight resumes at.
-        expect(stepNames.filter((name) => name.startsWith("collect-acp-sessions"))).toEqual([
-            "collect-acp-sessions",
-            "collect-acp-sessions-1",
-            "collect-acp-sessions-2",
-        ]);
-        expect(ran("gdpr_steps:generateExportFile")[0]?.args["acpSessions"]).toEqual({ events: [{ seq: 1 }, { seq: 2 }], sessions: [{ threadId: "t1" }] });
-    });
-
-    it("ends after one step on a stored result from before paging (sessions only, no cursor)", async () => {
-        acpPages = [{ sessions: [{ threadId: "old" }] }];
-
-        await execute();
-
-        expect(ran("acp_gdpr:collectAcpSessionsForExport")).toHaveLength(1);
-        expect(ran("gdpr_steps:generateExportFile")[0]?.args["acpSessions"]).toEqual({ events: [], sessions: [{ threadId: "old" }] });
-    });
-
-    it("does not loop on a result that is not a page", async () => {
-        await execute();
-
-        expect(ran("acp_gdpr:collectAcpSessionsForExport")).toHaveLength(1);
+        expect(ran("acp_gdpr:collectAcpSessionsForExport")).toHaveLength(0);
+        expect(stepNames.filter((name) => name.startsWith("collect-acp-sessions"))).toEqual([]);
+        expect(ran("gdpr_steps:generateExportFile")[0]?.args).not.toHaveProperty("acpSessions");
     });
 });
 

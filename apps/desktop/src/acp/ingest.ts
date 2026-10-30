@@ -19,7 +19,7 @@
  * - **A 401 is retried for a while, then it ends the posting.** The backend answers 401 alike for a skewed clock
  * and for a device that was removed, so one blip must not drop a turn; but a streak of them that has lasted a
  * minute is a revoked computer, and posting for ever would only keep its turns in memory and in the running-turns
- * file. The streak ends with any other answer.
+ * file. The streak ends with any other answer, and with a gap of a minute between two 401s.
  * - **A keepalive** (a post with no events) while a turn runs, so a long tool call is not mistaken for a dead host.
  * - **A turn cut off by a restart** is recorded on disk while it runs. On the next start each such turn is ended
  * with the reason `interrupted`, at the `seq` the backend says is next.
@@ -77,8 +77,8 @@ export class HostPoster implements SessionObserver {
 
     private stopped = false;
 
-    /** The run of consecutive 401s, if any: its length and when it began. */
-    private unauthorized: { count: number; reported: boolean; since: number } | undefined;
+    /** The run of consecutive 401s, if any: its length, when it began and when the latest came. */
+    private unauthorized: { count: number; last: number; reported: boolean; since: number } | undefined;
 
     /** Serialises writes of the state file; a write never overtakes the one before it. */
     private writing: Promise<void> = Promise.resolve();
@@ -336,7 +336,12 @@ export class HostPoster implements SessionObserver {
     /** A 401: another try, until the streak is long enough to be a device the backend removed. */
     private unauthorizedResult(): PostResult {
         const now = this.now();
-        const streak = this.unauthorized === undefined ? { count: 1, reported: false, since: now } : { ...this.unauthorized, count: this.unauthorized.count + 1 };
+        // Retries come at most ~50 s apart (a request timeout plus the longest backoff), so a longer gap (the computer
+        // slept, the network was down, a close gave up) ends the streak: only 401s that keep arriving count.
+        const streak
+            = this.unauthorized === undefined || now - this.unauthorized.last > REVOKED_AFTER_MS
+                ? { count: 1, last: now, reported: false, since: now }
+                : { ...this.unauthorized, count: this.unauthorized.count + 1, last: now };
 
         this.unauthorized = streak;
 
