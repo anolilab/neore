@@ -16,13 +16,14 @@ import { vDraftComment, vReviewVerdict } from "./validators";
 
 const BATCH = 100;
 
-/** A draft is one per pull request; the export reads this many at most, like the other collectors' ceilings. */
-const EXPORT_MAX = 1000;
+/** Drafts per export step: the workflow persists each step's result, so a page stays small and a long history takes more steps. */
+const EXPORT_PAGE = 50;
 
 export const collectReviewDraftsForExport = internalQuery
-    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .input({ cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())), userId: v.string().max(MAX_LENGTH.id) })
     .output(
         v.object({
+            cursor: v.union(v.string(), v.null()),
             drafts: v.array(
                 v.object({
                     body: v.string(),
@@ -38,14 +39,15 @@ export const collectReviewDraftsForExport = internalQuery
             ),
         }),
     )
-    .query(async ({ args: { userId }, ctx }) => {
-        const drafts = await ctx.db
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const page = await ctx.db
             .query("reviewDrafts")
             .withIndex("by_user_and_pull", (q) => q.eq("userId", userId))
-            .take(EXPORT_MAX);
+            .paginate({ cursor: cursor ?? null, numItems: EXPORT_PAGE });
 
         return {
-            drafts: drafts.map((draft) => {
+            cursor: page.isDone ? null : page.continueCursor,
+            drafts: page.page.map((draft) => {
                 return {
                     body: draft.body,
                     comments: draft.comments,

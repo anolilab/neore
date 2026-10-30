@@ -62,13 +62,16 @@ const MergePanel = ({
     }
 
     const { autoMergeAllowed, autoMergeEnabled, methods, state } = status.data;
-    const method = methodToUse(methods, chosen);
+    const allowedMethod = methodToUse(methods, chosen);
+    const autoMergeActive = canAutoMerge && autoMergeEnabled;
 
-    if (method === null) {
+    if (allowedMethod === null && !autoMergeActive) {
         // The repository's settings come back only to some accounts: say so rather than show no merge at all.
         return <p className="text-muted-foreground text-sm">{t`${hostLabel} does not show which ways of merging this repository allows to your account.`}</p>;
     }
 
+    // Turning auto-merge off names no method the host reads, so a panel with none allowed still offers it.
+    const method = allowedMethod ?? "merge";
     const methodLabels: Record<MergeMethod, string> = { merge: t`Merge commit`, rebase: t`Rebase and merge`, squash: t`Squash and merge` };
     const stateHints: Record<MergeState, string> = {
         behind: t`This branch is behind its base branch.`,
@@ -138,6 +141,9 @@ const MergePanel = ({
                 {t`Merge`}
             </h3>
             {stateHints[state] !== "" && <p className="text-muted-foreground text-xs">{stateHints[state]}</p>}
+            {allowedMethod === null && (
+                <p className="text-muted-foreground text-xs">{t`${hostLabel} does not show which ways of merging this repository allows to your account.`}</p>
+            )}
             {methods.length > 1 && (
                 <RadioGroup
                     aria-label={t`How to merge`}
@@ -155,12 +161,12 @@ const MergePanel = ({
                 </RadioGroup>
             )}
             <div className="flex flex-wrap items-center gap-2">
-                {canMerge && (
+                {canMerge && allowedMethod !== null && (
                     <Button disabled={busy} onClick={() => setPending("merge")}>
                         {actions.merge.isPending ? t`Merging…` : methodLabels[method]}
                     </Button>
                 )}
-                {canAutoMerge && autoMergeAllowed && !autoMergeEnabled && (
+                {canAutoMerge && allowedMethod !== null && autoMergeAllowed && !autoMergeEnabled && (
                     <Button disabled={busy} onClick={() => setPending("auto")} variant="outline">
                         {t`Merge when ready`}
                     </Button>

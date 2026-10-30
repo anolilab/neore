@@ -951,7 +951,7 @@ export interface InternalApiTypes {
     };
     source_control: {
         gdpr: {
-            collectReviewDraftsForExport: FunctionReference<"query", { userId: string }, { drafts: Array<{ body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; createdAt: number; hostOrigin: string; number: number; repository: string; updatedAt: number; verdict: "approve" | "comment" | "request_changes" | null }> }>;
+            collectReviewDraftsForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; drafts: Array<{ body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; createdAt: number; hostOrigin: string; number: number; repository: string; updatedAt: number; verdict: "approve" | "comment" | "request_changes" | null }> }>;
             deleteUserReviewDrafts: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
         };
         review_internal: {

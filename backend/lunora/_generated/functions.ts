@@ -9309,7 +9309,7 @@ export interface Caller {
             getPullRequestFiles: (args: { number: number; repository: string; page?: number }) => Promise<{ files: Array<{ additions: number; deletions: number; patch: string | null; patchState: "full" | "host_omitted" | "over_budget" | "truncated"; path: string; previousPath: string | null; status: "added" | "changed" | "copied" | "modified" | "removed" | "renamed" | "unchanged" }>; hasMore: boolean; page: number; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
         };
         gdpr: {
-            collectReviewDraftsForExport: (args: { userId: string }) => Promise<{ drafts: Array<{ body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; createdAt: number; hostOrigin: string; number: number; repository: string; updatedAt: number; verdict: "approve" | "comment" | "request_changes" | null }> }>;
+            collectReviewDraftsForExport: (args: { cursor?: string | null; userId: string }) => Promise<{ cursor: string | null; drafts: Array<{ body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; createdAt: number; hostOrigin: string; number: number; repository: string; updatedAt: number; verdict: "approve" | "comment" | "request_changes" | null }> }>;
             deleteUserReviewDrafts: (args: { userId: string }) => Promise<{ hasMore: boolean }>;
         };
         review_drafts: {

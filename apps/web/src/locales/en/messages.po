@@ -860,7 +860,8 @@ msgstr "{fps} fps"
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 
-#: src/features/develop/components/merge-panel.tsx:69
+#: src/features/develop/components/merge-panel.tsx:70
+#: src/features/develop/components/merge-panel.tsx:145
 msgid "{hostLabel} does not show which ways of merging this repository allows to your account."
 msgstr "{hostLabel} does not show which ways of merging this repository allows to your account."
 
@@ -868,11 +869,11 @@ msgstr "{hostLabel} does not show which ways of merging this repository allows t
 msgid "{hostLabel} has no batched review: your comments are posted one after another when you submit."
 msgstr "{hostLabel} has no batched review: your comments are posted one after another when you submit."
 
-#: src/features/develop/components/merge-panel.tsx:75
+#: src/features/develop/components/merge-panel.tsx:78
 msgid "{hostLabel} has rules this {requestNoun} does not meet yet. You can still try: {hostLabel} will say what is missing."
 msgstr "{hostLabel} has rules this {requestNoun} does not meet yet. You can still try: {hostLabel} will say what is missing."
 
-#: src/features/develop/components/merge-panel.tsx:76
+#: src/features/develop/components/merge-panel.tsx:79
 msgid "{hostLabel} says this is ready to merge."
 msgstr "{hostLabel} says this is ready to merge."
 
@@ -884,7 +885,7 @@ msgstr "{hostLabel} says this is ready to merge."
 
 #. placeholder {0}: methodLabels[method]
 #. placeholder {1}: headSha.slice(0, 7)
-#: src/features/develop/components/merge-panel.tsx:119
+#: src/features/develop/components/merge-panel.tsx:122
 msgid "{hostLabel} will merge this {requestNoun} with “{0}” once its rules are met. It is turned on for the commit {1}: if the branch has changed since you opened this page, {hostLabel} refuses. You can turn this off until then."
 msgstr "{hostLabel} will merge this {requestNoun} with “{0}” once its rules are met. It is turned on for the commit {1}: if the branch has changed since you opened this page, {hostLabel} refuses. You can turn this off until then."
 
@@ -3704,15 +3705,15 @@ msgstr "Auto-layout"
 msgid "Auto-layout (L)"
 msgstr "Auto-layout (L)"
 
-#: src/features/develop/components/merge-panel.tsx:110
+#: src/features/develop/components/merge-panel.tsx:113
 msgid "Auto-merge is off."
 msgstr "Auto-merge is off."
 
-#: src/features/develop/components/merge-panel.tsx:175
+#: src/features/develop/components/merge-panel.tsx:181
 msgid "Auto-merge is on: it merges once {hostLabel}'s rules are met."
 msgstr "Auto-merge is on: it merges once {hostLabel}'s rules are met."
 
-#: src/features/develop/components/merge-panel.tsx:110
+#: src/features/develop/components/merge-panel.tsx:113
 msgid "Auto-merge is on."
 msgstr "Auto-merge is on."
 
@@ -5324,7 +5325,7 @@ msgstr "Checks"
 msgid "Checks passed"
 msgstr "Checks passed"
 
-#: src/features/develop/components/merge-panel.tsx:80
+#: src/features/develop/components/merge-panel.tsx:83
 msgid "Checks that are not required are failing."
 msgstr "Checks that are not required are failing."
 
@@ -7219,11 +7220,11 @@ msgstr "Could not confirm that {0} was started again. Check on {hostLabel} befor
 msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
 msgstr "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
 
-#: src/features/develop/components/merge-panel.tsx:94
+#: src/features/develop/components/merge-panel.tsx:97
 msgid "Could not confirm that this was merged. Check on {hostLabel} before you try again."
 msgstr "Could not confirm that this was merged. Check on {hostLabel} before you try again."
 
-#: src/features/develop/components/merge-panel.tsx:108
+#: src/features/develop/components/merge-panel.tsx:111
 msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 
@@ -14697,7 +14698,7 @@ msgstr "How often the agent retries with the verifier's feedback before asking y
 msgid "How should titles be written?"
 msgstr "How should titles be written?"
 
-#: src/features/develop/components/merge-panel.tsx:143
+#: src/features/develop/components/merge-panel.tsx:149
 msgid "How to merge"
 msgstr "How to merge"
 
@@ -17759,12 +17760,12 @@ msgstr "Mentions only"
 msgid "Menu"
 msgstr "Menu"
 
-#: src/features/develop/components/merge-panel.tsx:128
-#: src/features/develop/components/merge-panel.tsx:138
+#: src/features/develop/components/merge-panel.tsx:131
+#: src/features/develop/components/merge-panel.tsx:141
 msgid "Merge"
 msgstr "Merge"
 
-#: src/features/develop/components/merge-panel.tsx:72
+#: src/features/develop/components/merge-panel.tsx:75
 msgid "Merge commit"
 msgstr "Merge commit"
 
@@ -17780,16 +17781,16 @@ msgstr "Merge request merged"
 msgid "Merge request opened"
 msgstr "Merge request opened"
 
-#: src/features/develop/components/merge-panel.tsx:130
+#: src/features/develop/components/merge-panel.tsx:133
 msgid "Merge this {requestNoun}?"
 msgstr "Merge this {requestNoun}?"
 
-#: src/features/develop/components/merge-panel.tsx:118
-#: src/features/develop/components/merge-panel.tsx:165
+#: src/features/develop/components/merge-panel.tsx:121
+#: src/features/develop/components/merge-panel.tsx:171
 msgid "Merge when ready"
 msgstr "Merge when ready"
 
-#: src/features/develop/components/merge-panel.tsx:120
+#: src/features/develop/components/merge-panel.tsx:123
 msgid "Merge when ready?"
 msgstr "Merge when ready?"
 
@@ -17798,11 +17799,11 @@ msgstr "Merge when ready?"
 msgid "Merged"
 msgstr "Merged"
 
-#: src/features/develop/components/merge-panel.tsx:96
+#: src/features/develop/components/merge-panel.tsx:99
 msgid "Merged on {hostLabel}."
 msgstr "Merged on {hostLabel}."
 
-#: src/features/develop/components/merge-panel.tsx:160
+#: src/features/develop/components/merge-panel.tsx:166
 msgid "Merging…"
 msgstr "Merging…"
 
@@ -20010,7 +20011,7 @@ msgstr "Not loaded: the diffs on this page were already large."
 msgid "not measured"
 msgstr "not measured"
 
-#: src/features/develop/components/merge-panel.tsx:182
+#: src/features/develop/components/merge-panel.tsx:188
 msgid "Not merged"
 msgstr "Not merged"
 
@@ -23515,7 +23516,7 @@ msgstr "Reasoning: {effortLabel}"
 msgid "Reasons through the prompt before generating"
 msgstr "Reasons through the prompt before generating"
 
-#: src/features/develop/components/merge-panel.tsx:72
+#: src/features/develop/components/merge-panel.tsx:75
 msgid "Rebase and merge"
 msgstr "Rebase and merge"
 
@@ -27065,7 +27066,7 @@ msgstr "Square"
 msgid "Square post"
 msgstr "Square post"
 
-#: src/features/develop/components/merge-panel.tsx:72
+#: src/features/develop/components/merge-panel.tsx:75
 msgid "Squash and merge"
 msgstr "Squash and merge"
 
@@ -29305,11 +29306,11 @@ msgstr "Thinking..."
 msgid "Thinking…"
 msgstr "Thinking…"
 
-#: src/features/develop/components/merge-panel.tsx:78
+#: src/features/develop/components/merge-panel.tsx:81
 msgid "This {requestNoun} is still a draft."
 msgstr "This {requestNoun} is still a draft."
 
-#: src/features/develop/components/merge-panel.tsx:124
+#: src/features/develop/components/merge-panel.tsx:127
 msgid "This {requestNoun} will no longer merge by itself."
 msgstr "This {requestNoun} will no longer merge by itself."
 
@@ -29321,11 +29322,11 @@ msgstr "This action cannot be undone. All team members will be removed."
 msgid "This action cannot be undone. This will permanently delete the organization and all associated data."
 msgstr "This action cannot be undone. This will permanently delete the organization and all associated data."
 
-#: src/features/develop/components/merge-panel.tsx:77
+#: src/features/develop/components/merge-panel.tsx:80
 msgid "This branch has conflicts with its base branch."
 msgstr "This branch has conflicts with its base branch."
 
-#: src/features/develop/components/merge-panel.tsx:74
+#: src/features/develop/components/merge-panel.tsx:77
 msgid "This branch is behind its base branch."
 msgstr "This branch is behind its base branch."
 
@@ -29487,7 +29488,7 @@ msgstr "This memory has since been deleted."
 
 #. placeholder {0}: headSha.slice(0, 7)
 #. placeholder {1}: methodLabels[method]
-#: src/features/develop/components/merge-panel.tsx:129
+#: src/features/develop/components/merge-panel.tsx:132
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 
@@ -30435,15 +30436,15 @@ msgstr "Turkish (Turkey)"
 msgid "Turn any GitHub repository into a remote MCP endpoint"
 msgstr "Turn any GitHub repository into a remote MCP endpoint"
 
-#: src/features/develop/components/merge-panel.tsx:123
+#: src/features/develop/components/merge-panel.tsx:126
 msgid "Turn off"
 msgstr "Turn off"
 
-#: src/features/develop/components/merge-panel.tsx:170
+#: src/features/develop/components/merge-panel.tsx:176
 msgid "Turn off auto-merge"
 msgstr "Turn off auto-merge"
 
-#: src/features/develop/components/merge-panel.tsx:125
+#: src/features/develop/components/merge-panel.tsx:128
 msgid "Turn off auto-merge?"
 msgstr "Turn off auto-merge?"
 
