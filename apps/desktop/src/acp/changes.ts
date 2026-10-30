@@ -83,6 +83,10 @@ const settled = async (promise: Promise<unknown>): Promise<void> => {
 
 const sizeOf = (text: string | null | undefined): number => text === null || text === undefined ? 0 : Buffer.byteLength(text);
 
+/** What a diff costs to hold, or Infinity when either side is over the file limit. Characters are never more than bytes, so a text with too many of them is too big without measuring it. */
+const diffSizeOf = (newText: string, oldText: string | null): number =>
+    newText.length > MAX_FILE_BYTES || (oldText?.length ?? 0) > MAX_FILE_BYTES ? Infinity : sizeOf(newText) + sizeOf(oldText);
+
 interface ToolSeen {
     id: string;
     kind: string;
@@ -264,23 +268,13 @@ export class TurnChanges {
             }
 
             const oldText = typeof item.oldText === "string" ? item.oldText : null;
+            const size = diffSizeOf(item.newText, oldText);
 
-            // A newer diff of the file replaces the earlier one even when this one is too big to keep: the old text is stale.
+            // The latest update wins: an earlier, smaller diff of this path is not what the call ended with.
             this.held -= call.diffs.get(relative)?.size ?? 0;
             call.diffs.delete(relative);
 
-            // Characters are never more than bytes, so a text with too many of them is too big without measuring it.
-            if (item.newText.length > MAX_FILE_BYTES || (oldText?.length ?? 0) > MAX_FILE_BYTES) {
-                continue;
-            }
-
-            const size = sizeOf(item.newText) + sizeOf(oldText);
-
-            if (size > 2 * MAX_FILE_BYTES || !this.admit(call, relative)) {
-                continue;
-            }
-
-            if (this.reserve(size)) {
+            if (size <= 2 * MAX_FILE_BYTES && this.admit(call, relative) && this.reserve(size)) {
                 call.diffs.set(relative, { newText: item.newText, oldText, size });
             }
         }
