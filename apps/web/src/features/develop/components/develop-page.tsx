@@ -6,6 +6,7 @@ import { Skeleton } from "@neore/ui/components/skeleton";
 
 import type { DevelopSearch, DevelopTab } from "../lib/search";
 import { useDevelopHost } from "../lib/use-develop";
+import { useRequestNoun } from "../lib/use-request-noun";
 import ConnectHostCard from "./connect-host-card";
 import FailureNotice from "./failure-notice";
 import type { HostInfo } from "./host-info";
@@ -19,6 +20,7 @@ import PullRequestView from "./pull-request-view";
 const DevelopPage = ({ onSearchChange, search }: { onSearchChange: (next: DevelopSearch) => void; search: DevelopSearch }) => {
     const { t } = useLingui();
     const hostQuery = useDevelopHost();
+    const requestNoun = useRequestNoun(hostQuery.data?.host.requestNoun ?? "pull request");
 
     if (hostQuery.isPending) {
         return <Skeleton aria-label={t`Loading`} className="mx-auto h-40 max-w-7xl" role="status" />;
@@ -51,7 +53,7 @@ const DevelopPage = ({ onSearchChange, search }: { onSearchChange: (next: Develo
                             selected={selected}
                         />
                     </section>
-                    <section aria-label={t`Selected ${info.requestNoun}`} className="min-w-0 flex-1">
+                    <section aria-label={t`Selected ${requestNoun}`} className="min-w-0 flex-1">
                         {selected ? (
                             <PullRequestView
                                 host={info}

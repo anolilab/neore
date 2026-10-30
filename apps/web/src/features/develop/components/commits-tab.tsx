@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Skeleton } from "@neore/ui/components/skeleton";
@@ -14,7 +15,7 @@ const CommitsTab = ({ address, commitLimit, hostLabel, leftOut }: { address: Pul
     const commits = usePullRequestCommits(address, true);
 
     if (commits.isPending) {
-        return <Skeleton className="h-24 w-full" />;
+        return <Skeleton aria-label={t`Loading commits`} className="h-24 w-full" role="status" />;
     }
 
     if (commits.isError) {
@@ -34,7 +35,7 @@ const CommitsTab = ({ address, commitLimit, hostLabel, leftOut }: { address: Pul
         <div className="space-y-3">
             {leftOut > 0 && (
                 <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
-                    {t`The host lists at most ${commitLimit} commits for one change. ${leftOut} more are not shown here.`}
+                    {t`The host lists at most ${plural(commitLimit, { one: "# commit", other: "# commits" })} for one change. ${plural(leftOut, { one: "# more is not shown here.", other: "# more are not shown here." })}`}
                 </p>
             )}
             <ol className="rounded-md border">

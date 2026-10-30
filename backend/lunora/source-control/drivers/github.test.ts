@@ -433,3 +433,118 @@ describe("github capability report", () => {
         expect(GITHUB_CAPABILITIES.groups.inbox?.readyToMerge).toMatchObject({ degradation: "synthetic", supported: true });
     });
 });
+
+/** A response whose body records being cancelled. */
+const tracked = (chunks: string[], init: ResponseInit = {}): { cancelled: () => boolean; response: Response } => {
+    let cancelled = false;
+    const encoder = new TextEncoder();
+    let index = 0;
+    const response = new Response(
+        new ReadableStream<Uint8Array>({
+            cancel() {
+                cancelled = true;
+            },
+            pull(controller) {
+                const chunk = chunks[index];
+
+                index += 1;
+
+                if (chunk === undefined) {
+                    controller.close();
+                } else {
+                    controller.enqueue(encoder.encode(chunk));
+                }
+            },
+        }),
+        init,
+    );
+
+    return { cancelled: () => cancelled, response };
+};
+
+describe("github driver: responses that are never read", () => {
+    const RUNS = `/repos/octo/hello/commits/${SHA}/check-runs`;
+    const STATUS = `/repos/octo/hello/commits/${SHA}/status`;
+    const answering =
+        (answers: Record<string, () => Response | Promise<never>>): HostRequest =>
+        async (path) =>
+            await (answers[path] as () => Promise<Response>)();
+
+    it("cancels the status body when the check runs are refused", async () => {
+        const status = tracked(['{"statuses":[],"total_count":0}']);
+        const request = answering({
+            [RUNS]: async () => {
+                throw new HostApiError("Host API error: 403 Forbidden", 403);
+            },
+            [STATUS]: () => status.response,
+        });
+
+        await expect(githubDriver.listChecks(request, REF, SHA)).rejects.toMatchObject({ status: 403 });
+        expect(status.cancelled()).toBe(true);
+    });
+
+    it("cancels the check-runs body when the status is refused", async () => {
+        const runs = tracked(['{"check_runs":[],"total_count":0}']);
+        const request = answering({
+            [RUNS]: () => runs.response,
+            [STATUS]: async () => {
+                throw new HostApiError("Host API error: 404 Not Found", 404);
+            },
+        });
+
+        await expect(githubDriver.listChecks(request, REF, SHA)).rejects.toMatchObject({ status: 404 });
+        expect(runs.cancelled()).toBe(true);
+    });
+
+    it("cancels the status body when the check runs cannot be read", async () => {
+        const status = tracked(['{"statuses":[]}']);
+        const request = answering({ [RUNS]: () => tracked(["not json"]).response, [STATUS]: () => status.response });
+
+        await expect(githubDriver.listChecks(request, REF, SHA)).rejects.toBeInstanceOf(HostApiError);
+        expect(status.cancelled()).toBe(true);
+    });
+
+    it("refuses a body that declares more than the cap, without reading it", async () => {
+        const big = tracked(["{}"], { headers: { "content-length": "99999999" } });
+        const request = answering({ "/repos/octo/hello/pulls/7": () => big.response });
+
+        await expect(githubDriver.getPullRequest(request, REF)).rejects.toMatchObject({ status: 0 });
+        expect(big.cancelled()).toBe(true);
+    });
+
+    it("stops reading a body that grows past the cap with no length declared", async () => {
+        const chunk = "x".repeat(5_000_000);
+        const big = tracked([chunk, chunk, chunk, chunk]);
+        const request = answering({ "/repos/octo/hello/pulls/7": () => big.response });
+
+        await expect(githubDriver.getPullRequest(request, REF)).rejects.toMatchObject({ status: 0 });
+        expect(big.cancelled()).toBe(true);
+    });
+});
+
+describe("github driver: bounds", () => {
+    it("never asks for a commits page past the host's ceiling", async () => {
+        const { calls, request } = fakeHost({ "/repos/octo/hello/pulls/7/commits": () => [] });
+
+        await githubDriver.listCommits(request, REF, 9999);
+
+        expect(calls.map((call) => call.query.page)).toEqual([3]);
+    });
+
+    it("reads the signed-in login once for one requester", async () => {
+        const { calls, request } = fakeHost({
+            "/search/issues": () => {
+                return { items: [], total_count: 0 };
+            },
+            "/user": () => {
+                return { login: "me" };
+            },
+        });
+
+        await githubDriver.listInbox(request, "mine", 1);
+        await githubDriver.listInbox(request, "drafts", 1);
+
+        expect(calls.filter((call) => call.path === "/user")).toHaveLength(1);
+        expect(calls.filter((call) => call.path === "/search/issues")).toHaveLength(2);
+    });
+});

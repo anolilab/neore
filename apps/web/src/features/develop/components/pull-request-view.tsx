@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { HostCapabilityKey } from "@neore/backend/source-control/capabilities";
 import { isHostCapabilityAvailable } from "@neore/backend/source-control/capabilities";
@@ -11,6 +12,7 @@ import { ExternalLink } from "lucide-react";
 import { safeExternalUrl } from "../lib/format";
 import type { DevelopTab } from "../lib/search";
 import { usePullRequest } from "../lib/use-develop";
+import { useRequestNoun } from "../lib/use-request-noun";
 import ChecksTab from "./checks-tab";
 import CommitsTab from "./commits-tab";
 import FailureNotice from "./failure-notice";
@@ -38,6 +40,7 @@ const PullRequestView = ({
     tab: DevelopTab | undefined;
 }) => {
     const { t } = useLingui();
+    const requestNoun = useRequestNoun(host.requestNoun);
     const address = { number, repository };
     const pull = usePullRequest(address);
 
@@ -84,16 +87,16 @@ const PullRequestView = ({
                     {detail.title}
                 </h2>
                 <p className="text-muted-foreground text-sm">
-                    {t`${detail.authorLogin} wants to merge ${detail.commitCount} commits into ${detail.baseBranch} from ${detail.headBranch}`}
+                    {t`${detail.authorLogin} wants to merge ${plural(detail.commitCount, { one: "# commit", other: "# commits" })} into ${detail.baseBranch} from ${detail.headBranch}`}
                 </p>
                 <p className="text-sm">
                     <span className="font-mono text-emerald-600 dark:text-emerald-400">+{detail.additions}</span>{" "}
                     <span className="font-mono text-red-600 dark:text-red-400">−{detail.deletions}</span>{" "}
-                    <span className="text-muted-foreground">{t`in ${detail.changedFiles} files`}</span>
+                    <span className="text-muted-foreground">{t`in ${plural(detail.changedFiles, { one: "# file", other: "# files" })}`}</span>
                 </p>
             </header>
             {current === undefined ? (
-                <p className="text-muted-foreground text-sm">{t`This host does not offer any view of a ${host.requestNoun} yet.`}</p>
+                <p className="text-muted-foreground text-sm">{t`This host does not offer any view of a ${requestNoun} yet.`}</p>
             ) : (
                 <Tabs onValueChange={(value) => onTabChange(value as DevelopTab)} value={current}>
                     <TabsList>

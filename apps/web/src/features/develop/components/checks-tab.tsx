@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
 import { Skeleton } from "@neore/ui/components/skeleton";
@@ -25,7 +26,7 @@ const ChecksTab = ({ address, headSha, hostLabel }: { address: PullRequestAddres
     const checks = usePullRequestChecks(address, headSha, true);
 
     if (checks.isPending) {
-        return <Skeleton className="h-24 w-full" />;
+        return <Skeleton aria-label={t`Loading checks`} className="h-24 w-full" role="status" />;
     }
 
     if (checks.isError) {
@@ -55,7 +56,7 @@ const ChecksTab = ({ address, headSha, hostLabel }: { address: PullRequestAddres
         <div className="space-y-3">
             {total > list.length && (
                 <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
-                    {t`Showing ${list.length} of ${total} checks.`}
+                    {t`Showing ${list.length} of ${plural(total, { one: "# check", other: "# checks" })}.`}
                 </p>
             )}
             <ul className="rounded-md border">

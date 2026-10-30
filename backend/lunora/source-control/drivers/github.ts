@@ -38,13 +38,14 @@ const INBOX_PAGE_SIZE = 30;
 
 /** GitHub search stops at 1000 results; ten pages of 30 stay inside that. */
 export const GITHUB_INBOX_MAX_PAGE = 10;
-const MAX_PAGE = Math.ceil(GITHUB_FILE_LIMIT / GITHUB_PAGE_SIZE);
+const MAX_FILE_PAGE = Math.ceil(GITHUB_FILE_LIMIT / GITHUB_PAGE_SIZE);
+const MAX_COMMIT_PAGE = Math.ceil(GITHUB_COMMIT_LIMIT / GITHUB_PAGE_SIZE);
 
 /** Longest patch kept for one file, and for all the files of one page. */
 export const PATCH_MAX_CHARS = 60_000;
 export const PAGE_PATCH_BUDGET_CHARS = 600_000;
 const BODY_MAX_CHARS = 60_000;
-const RESPONSE_MAX_CHARS = 12_000_000;
+const RESPONSE_MAX_BYTES = 12_000_000;
 
 const NATIVE = { degradation: "none", supported: true } as const;
 
@@ -85,12 +86,57 @@ const repoPath = (ref: PullRequestRef): string => {
     return `/repos/${parts.owner}/${parts.name}`;
 };
 
-const readJson = async (response: Response): Promise<unknown> => {
-    const text = await response.text();
+/** Cancels a response body nobody will read; a failure to cancel is not worth reporting. */
+const discard = async (response: Response): Promise<void> => {
+    await response.body?.cancel().catch(() => undefined);
+};
 
-    if (text.length > RESPONSE_MAX_CHARS) {
-        throw new HostApiError("The host's response is larger than this reads", 0);
+/** The body as text, read up to `RESPONSE_MAX_BYTES`: the cap bounds memory, not just what is kept. */
+const readText = async (response: Response): Promise<string> => {
+    const tooLarge = new HostApiError("The host's response is larger than this reads", 0);
+    const declared = Number(response.headers.get("content-length"));
+
+    if (Number.isFinite(declared) && declared > RESPONSE_MAX_BYTES) {
+        await discard(response);
+
+        throw tooLarge;
     }
+
+    const reader = response.body?.getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+
+    while (reader) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+            break;
+        }
+
+        received += value.byteLength;
+
+        if (received > RESPONSE_MAX_BYTES) {
+            await reader.cancel();
+
+            throw tooLarge;
+        }
+
+        chunks.push(value);
+    }
+
+    const bytes = new Uint8Array(received);
+    let offset = 0;
+
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+
+    return new TextDecoder().decode(bytes);
+};
+
+const readJson = async (response: Response): Promise<unknown> => {
+    const text = await readText(response);
 
     try {
         return JSON.parse(text) as unknown;
@@ -120,8 +166,8 @@ const webUrl = (url: string | null | undefined): string | null => (url?.startsWi
 /** A page number from a client: a whole number from 1 to `max`, whatever it sent. */
 const clampPage = (page: number, max: number): number => (Number.isFinite(page) ? Math.min(Math.max(Math.trunc(page), 1), max) : 1);
 
-const pageQuery = (page: number): { page: number; per_page: number } => {
-    return { page: clampPage(page, MAX_PAGE), per_page: GITHUB_PAGE_SIZE };
+const pageQuery = (page: number, maxPage: number): { page: number; per_page: number } => {
+    return { page: clampPage(page, maxPage), per_page: GITHUB_PAGE_SIZE };
 };
 
 // ─── Inbox ──────────────────────────────────────────────────────────────────
@@ -176,10 +222,34 @@ const SECTION_FILTERS: Record<InboxSection, (login: string) => string> = {
 /** The search qualifiers of one section, for the signed-in `login`. */
 export const inboxQuery = (section: InboxSection, login: string): string => `is:pr is:open archived:false ${SECTION_FILTERS[section](login)}`;
 
+const logins = new WeakMap<HostRequest, Promise<string>>();
+
+/**
+ * The signed-in login, read once per requester (one per action), since `@me` is not
+ * documented for the REST search. A failed read is not kept, so a retry asks again.
+ */
+const signedInLogin = (request: HostRequest): Promise<string> => {
+    const known = logins.get(request);
+
+    if (known) {
+        return known;
+    }
+
+    const read = (async () => {
+        const user = parse(z.object({ login: z.string() }), await readJson(await request("/user")));
+
+        return user.login;
+    })();
+
+    logins.set(request, read);
+    read.catch(() => logins.delete(request));
+
+    return read;
+};
+
 const listInbox = async (request: HostRequest, section: InboxSection, page: number): Promise<InboxPage> => {
     const current = clampPage(page, GITHUB_INBOX_MAX_PAGE);
-    // `@me` is not documented for the REST search, so the login is read once per list.
-    const { login } = parse(z.object({ login: z.string() }), await readJson(await request("/user")));
+    const login = await signedInLogin(request);
     const search = parse(
         searchSchema,
         await readJson(
@@ -259,7 +329,7 @@ const commitSchema = z.object({
 });
 
 const listCommits = async (request: HostRequest, ref: PullRequestRef, page: number): Promise<CommitPage> => {
-    const { page: current, per_page: perPage } = pageQuery(page);
+    const { page: current, per_page: perPage } = pageQuery(page, MAX_COMMIT_PAGE);
     const items = parse(
         z.array(z.unknown()),
         await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}/commits`, { query: { page: current, per_page: perPage } })),
@@ -279,7 +349,7 @@ const listCommits = async (request: HostRequest, ref: PullRequestRef, page: numb
             : [];
     });
 
-    return { commits, hasMore: items.length === perPage && current * perPage < GITHUB_COMMIT_LIMIT, page: current };
+    return { commits, hasMore: items.length === perPage && current < MAX_COMMIT_PAGE, page: current };
 };
 
 const FILE_STATUSES = new Set<string>(["added", "changed", "copied", "modified", "removed", "renamed", "unchanged"]);
@@ -341,14 +411,14 @@ const toFile = (value: unknown): PullRequestFile | undefined => {
 };
 
 const listFiles = async (request: HostRequest, ref: PullRequestRef, page: number): Promise<FilePage> => {
-    const { page: current, per_page: perPage } = pageQuery(page);
+    const { page: current, per_page: perPage } = pageQuery(page, MAX_FILE_PAGE);
     const items = parse(
         z.array(z.unknown()),
         await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}/files`, { query: { page: current, per_page: perPage } })),
     );
     const files = items.map((item) => toFile(item)).filter((file): file is PullRequestFile => file !== undefined);
 
-    return { files: fitPatches(files), hasMore: items.length === perPage && current < MAX_PAGE, page: current };
+    return { files: fitPatches(files), hasMore: items.length === perPage && current < MAX_FILE_PAGE, page: current };
 };
 
 // ─── Checks ─────────────────────────────────────────────────────────────────
@@ -397,11 +467,35 @@ const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: st
     }
 
     const base = `${repoPath(ref)}/commits/${headSha}`;
-    const [runsResponse, statusResponse] = await Promise.all([
+    const settled = await Promise.allSettled([
         request(`${base}/check-runs`, { query: { per_page: GITHUB_PAGE_SIZE } }),
         request(`${base}/status`, { query: { per_page: GITHUB_PAGE_SIZE } }),
     ]);
-    const runs = parse(checkRunsSchema, await readJson(runsResponse));
+    const rejected = settled.find((outcome) => outcome.status === "rejected");
+
+    if (rejected) {
+        // The other request may have succeeded: its body is still open and nobody will read it.
+        await Promise.all(settled.map(async (outcome) => (outcome.status === "fulfilled" ? await discard(outcome.value) : undefined)));
+
+        throw rejected.reason;
+    }
+
+    const [runsResponse, statusResponse] = settled.flatMap((outcome) => (outcome.status === "fulfilled" ? [outcome.value] : []));
+
+    if (!runsResponse || !statusResponse) {
+        throw new HostApiError("The host did not answer", 0);
+    }
+
+    let runs: z.infer<typeof checkRunsSchema>;
+
+    try {
+        runs = parse(checkRunsSchema, await readJson(runsResponse));
+    } catch (error) {
+        await discard(statusResponse);
+
+        throw error;
+    }
+
     const statuses = parse(commitStatusSchema, await readJson(statusResponse));
     const checks: CheckRun[] = [
         ...runs.check_runs.flatMap((value) => {
