@@ -174,7 +174,7 @@ const optionalString = (value: unknown): string | undefined | null => {
  * unknown" (every control hidden) and the failure is logged, instead of the whole post being refused. Its
  * `reportedAt` is 0, so it never outranks a real report: the next valid one replaces it.
  */
-const withValidReport = (raw: unknown, deviceId: string): unknown => {
+const withValidReport = (raw: unknown, deviceId: string, logged: { done: boolean }): unknown => {
     if (!isRecord(raw) || raw.kind !== "session_open" || raw.capabilities === undefined) {
         return raw;
     }
@@ -185,9 +185,13 @@ const withValidReport = (raw: unknown, deviceId: string): unknown => {
         return raw;
     }
 
-    console.warn(
-        `[acp] device ${deviceId} sent a capability report that does not validate at ${parsed.error.path.join(".") || "<root>"}; stored as all unknown`,
-    );
+    // One line per post: a post may carry hundreds of events, and this runs before the per-device limit does.
+    if (!logged.done) {
+        logged.done = true;
+        console.warn(
+            `[acp] device ${deviceId} sent a capability report that does not validate at ${parsed.error.path.join(".") || "<root>"}; stored as all unknown`,
+        );
+    }
 
     return { ...raw, capabilities: unknownCapabilityReport(0) };
 };
@@ -229,9 +233,10 @@ const readPost = (payload: Record<string, unknown>, deviceId: string): Post | nu
     }
 
     const events: Post["events"] = [];
+    const logged = { done: false };
 
     for (const raw of payload.events) {
-        const parsed = vHostEvent.safeParse(withValidReport(raw, deviceId));
+        const parsed = vHostEvent.safeParse(withValidReport(raw, deviceId, logged));
 
         if (!parsed.ok) {
             return null;
