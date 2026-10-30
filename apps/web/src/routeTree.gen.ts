@@ -59,6 +59,7 @@ import { Route as publicModelsModelSlugRouteImport } from './routes/(public)/mod
 import { Route as publicPTokenRouteImport } from './routes/(public)/p/$token'
 import { Route as publicThreadTokenRouteImport } from './routes/(public)/thread/$token'
 import { Route as publicTutorialsIndexRouteImport } from './routes/(public)/tutorials/index'
+import { Route as ShortcutCodeIndexRouteImport } from './routes/_shortcut/code/index'
 import { Route as ShortcutPagesIndexRouteImport } from './routes/_shortcut/pages/index'
 import { Route as ShortcutPagesPageIdRouteImport } from './routes/_shortcut/pages/$pageId'
 import { Route as AdminGatewayIndexRouteImport } from './routes/admin/gateway/index'
@@ -340,6 +341,11 @@ const publicTutorialsIndexRoute = publicTutorialsIndexRouteImport.update({
   path: '/tutorials/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShortcutCodeIndexRoute = ShortcutCodeIndexRouteImport.update({
+  id: '/code/',
+  path: '/code/',
+  getParentRoute: () => ShortcutRoute,
+} as any)
 const ShortcutPagesIndexRoute = ShortcutPagesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -579,6 +585,7 @@ export interface FileRoutesByFullPath {
   '/gateway/': typeof publicGatewayIndexRoute
   '/models/': typeof publicModelsIndexRoute
   '/tutorials/': typeof publicTutorialsIndexRoute
+  '/code/': typeof ShortcutCodeIndexRoute
   '/pages/': typeof ShortcutPagesIndexRoute
   '/admin/gateway/': typeof AdminGatewayIndexRoute
   '/auth/two-factor/': typeof AuthTwoFactorIndexRoute
@@ -655,6 +662,7 @@ export interface FileRoutesByTo {
   '/gateway': typeof publicGatewayIndexRoute
   '/models': typeof publicModelsIndexRoute
   '/tutorials': typeof publicTutorialsIndexRoute
+  '/code': typeof ShortcutCodeIndexRoute
   '/pages': typeof ShortcutPagesIndexRoute
   '/admin/gateway': typeof AdminGatewayIndexRoute
   '/auth/two-factor': typeof AuthTwoFactorIndexRoute
@@ -740,6 +748,7 @@ export interface FileRoutesById {
   '/(public)/gateway/': typeof publicGatewayIndexRoute
   '/(public)/models/': typeof publicModelsIndexRoute
   '/(public)/tutorials/': typeof publicTutorialsIndexRoute
+  '/_shortcut/code/': typeof ShortcutCodeIndexRoute
   '/_shortcut/pages/': typeof ShortcutPagesIndexRoute
   '/admin/gateway/': typeof AdminGatewayIndexRoute
   '/auth/two-factor/': typeof AuthTwoFactorIndexRoute
@@ -824,6 +833,7 @@ export interface FileRouteTypes {
     | '/gateway/'
     | '/models/'
     | '/tutorials/'
+    | '/code/'
     | '/pages/'
     | '/admin/gateway/'
     | '/auth/two-factor/'
@@ -900,6 +910,7 @@ export interface FileRouteTypes {
     | '/gateway'
     | '/models'
     | '/tutorials'
+    | '/code'
     | '/pages'
     | '/admin/gateway'
     | '/auth/two-factor'
@@ -984,6 +995,7 @@ export interface FileRouteTypes {
     | '/(public)/gateway/'
     | '/(public)/models/'
     | '/(public)/tutorials/'
+    | '/_shortcut/code/'
     | '/_shortcut/pages/'
     | '/admin/gateway/'
     | '/auth/two-factor/'
@@ -1389,6 +1401,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/tutorials/'
       preLoaderRoute: typeof publicTutorialsIndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_shortcut/code/': {
+      id: '/_shortcut/code/'
+      path: '/code'
+      fullPath: '/code/'
+      preLoaderRoute: typeof ShortcutCodeIndexRouteImport
+      parentRoute: typeof ShortcutRoute
     }
     '/_shortcut/pages/': {
       id: '/_shortcut/pages/'
@@ -1822,6 +1841,7 @@ interface ShortcutRouteChildren {
   ShortcutSkillsRoute: typeof ShortcutSkillsRoute
   ShortcutTasksRoute: typeof ShortcutTasksRoute
   ShortcutVaultRoute: typeof ShortcutVaultRoute
+  ShortcutCodeIndexRoute: typeof ShortcutCodeIndexRoute
 }
 
 const ShortcutRouteChildren: ShortcutRouteChildren = {
@@ -1831,6 +1851,7 @@ const ShortcutRouteChildren: ShortcutRouteChildren = {
   ShortcutSkillsRoute: ShortcutSkillsRoute,
   ShortcutTasksRoute: ShortcutTasksRoute,
   ShortcutVaultRoute: ShortcutVaultRoute,
+  ShortcutCodeIndexRoute: ShortcutCodeIndexRoute,
 }
 
 const ShortcutRouteWithChildren = ShortcutRoute._addFileChildren(
