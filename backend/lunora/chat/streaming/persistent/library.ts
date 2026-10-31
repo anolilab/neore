@@ -671,7 +671,29 @@ const isSuperseded = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, 
 
     const { page } = await ctx.db.persistentStreams.findMany({ limit: 3, orderBy: [{ _creationTime: "desc" }], where: { threadId: stream.threadId } });
 
-    return page.some((other) => other._id !== stream._id && other._creationTime >= stream._creationTime);
+    if (page.some((other) => other._id !== stream._id && other._creationTime >= stream._creationTime)) {
+        return true;
+    }
+
+    // An edit streams through `streamingMessages` (`streamAsync`), not a persistent stream, and leaves this run's anchor in
+    // place. A resumed run never writes `streamingMessages` rows itself, so any row born after the pause stream is an edit's.
+    const { page: edits } = await ctx.db.streamingMessages.findMany({
+        limit: 3,
+        orderBy: [{ _creationTime: "desc" }],
+        where: { threadId: stream.threadId as Id<"threads"> },
+    });
+
+    return edits.some((edit) => edit._creationTime >= stream._creationTime);
+};
+
+/** An edit is generating on the thread: it holds the thread's `running` status the way a live persistent stream does. */
+const hasLiveEdit = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
+    const live = await ctx.db
+        .query("streamingMessages")
+        .withIndex("threadId_state_order_stepOrder", (q) => q.eq("threadId", threadId).eq("stateKind", "streaming"))
+        .take(1);
+
+    return live.length > 0;
 };
 
 /** Ends a paused run that will not resume: records what it did, closes its stream, and frees the thread unless another reply is live on it. */
@@ -687,7 +709,7 @@ const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">):
         where: { status: { in: ["pending", "streaming"] }, threadId: stream.threadId },
     });
 
-    if (page.every((other) => other._id === stream._id)) {
+    if (page.every((other) => other._id === stream._id) && !(await hasLiveEdit(ctx, stream.threadId as Id<"threads">))) {
         await patchThread(ctx.db, stream.threadId as Id<"threads">, { status: "active", updatedAt: ctx.now });
     }
 };

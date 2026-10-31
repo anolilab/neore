@@ -918,6 +918,59 @@ describe("a pause that never resumes", () => {
         expect(scheduleReplyUsage).toHaveBeenCalledOnce();
     });
 
+    it("an edit that streamed during the pause supersedes it: the old reply does not resume beside the edit's", async () => {
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        const paused = await readState();
+
+        // An edit streams through `streamingMessages`, not a persistent stream, and leaves the paused run's anchor row in place.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("streamingMessages", {
+                order: 1,
+                state: { endedAt: Date.now(), kind: "finished" },
+                stateKind: "finished",
+                stepOrder: 0,
+                threadId: ids.threadId,
+                userId: OWNER,
+            });
+        });
+        await run({ resume: paused.pause!.id });
+
+        const state = await readState();
+
+        expect(modelState.builtAgents).toBe(1);
+        expect(state.streamStatus).toBe("done");
+        expect(state.chunkText).not.toContain("Hello there.");
+    });
+
+    it("keeps the thread running when the edit that superseded the pause is still streaming", async () => {
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        const paused = await readState();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("streamingMessages", {
+                order: 1,
+                state: { kind: "streaming", lastHeartbeat: Date.now() },
+                stateKind: "streaming",
+                stepOrder: 0,
+                threadId: ids.threadId,
+                userId: OWNER,
+            });
+        });
+        await run({ resume: paused.pause!.id });
+
+        const state = await readState();
+
+        expect(modelState.builtAgents).toBe(1);
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("running");
+    });
+
     it("leaves the thread to the newer run that is still live", async () => {
         modelState.model = planned([rateLimited(), textStep("Hello there.")]);
 
