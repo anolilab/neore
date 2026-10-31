@@ -31022,6 +31022,10 @@ msgstr ""
 msgid "This change, or your instructions, are too large for that computer to take in one message."
 msgstr ""
 
+#: src/features/chat/host/host-send-errors.ts:22
+msgid "This chat belongs to a worker. Send it messages from its own message box."
+msgstr ""
+
 #: src/features/chat/host/host-send-errors.ts:15
 msgid "This chat could not be found."
 msgstr ""
