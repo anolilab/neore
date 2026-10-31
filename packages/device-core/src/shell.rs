@@ -295,11 +295,11 @@ struct Running {
 
 /// Notes a run's group while it lives and forgets it however the run ends.
 #[cfg(unix)]
-struct Tracked(u32);
+pub struct Tracked(u32);
 
 #[cfg(unix)]
 impl Tracked {
-    fn new(pid: u32) -> Self {
+    pub fn new(pid: u32) -> Self {
         let mut running = RUNNING.lock().unwrap();
 
         running.pids.push(pid);

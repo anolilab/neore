@@ -4903,6 +4903,11 @@
     {
       "from": "function:lib_shard_housekeeping:runShardTick",
       "kind": "call",
+      "to": "function:source_control_freshness_internal:dispatchDueRepoPolls"
+    },
+    {
+      "from": "function:lib_shard_housekeeping:runShardTick",
+      "kind": "call",
       "to": "function:triggers_events:dispatchDueEventTriggers"
     },
     {
@@ -4919,6 +4924,11 @@
       "from": "function:lib_shard_housekeeping:runShardTick",
       "kind": "read",
       "to": "table:triggers"
+    },
+    {
+      "from": "function:lib_shard_housekeeping:runShardTick",
+      "kind": "read",
+      "to": "table:watchedRepositories"
     },
     {
       "from": "function:media_functions:listUserImages",
@@ -6371,9 +6381,114 @@
       "to": "table:userSkills"
     },
     {
+      "from": "function:source_control_freshness_internal:acceptWatchDelivery",
+      "kind": "write",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness_internal:dispatchDueRepoPolls",
+      "kind": "read",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness_internal:dispatchDueRepoPolls",
+      "kind": "schedule",
+      "to": "function:source_control_freshness_poll:pollWatchedRepo"
+    },
+    {
+      "from": "function:source_control_freshness_internal:dispatchDueRepoPolls",
+      "kind": "write",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness_internal:leaseWatchedRepositoriesForRefresh",
+      "kind": "read",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness_internal:leaseWatchedRepositoriesForRefresh",
+      "kind": "write",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness_internal:recordRepoPoll",
+      "kind": "write",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness_poll:pollWatchedRepo",
+      "kind": "call",
+      "to": "function:source_control_freshness_internal:getWatchForPoll"
+    },
+    {
+      "from": "function:source_control_freshness_poll:pollWatchedRepo",
+      "kind": "call",
+      "to": "function:source_control_freshness_internal:recordRepoPoll"
+    },
+    {
+      "from": "function:source_control_freshness:disableWatchWebhook",
+      "kind": "read",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness:enableWatchWebhook",
+      "kind": "read",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness:enableWatchWebhook",
+      "kind": "write",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness:listWatchedRepositories",
+      "kind": "read",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness:refreshWatchedRepositories",
+      "kind": "call",
+      "to": "function:source_control_freshness_internal:getWatchForPoll"
+    },
+    {
+      "from": "function:source_control_freshness:refreshWatchedRepositories",
+      "kind": "call",
+      "to": "function:source_control_freshness_internal:leaseWatchedRepositoriesForRefresh"
+    },
+    {
+      "from": "function:source_control_freshness:refreshWatchedRepositories",
+      "kind": "call",
+      "to": "function:source_control_freshness_internal:recordRepoPoll"
+    },
+    {
+      "from": "function:source_control_freshness:unwatchRepo",
+      "kind": "read",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness:unwatchRepo",
+      "kind": "write",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness:watchRepo",
+      "kind": "read",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_freshness:watchRepo",
+      "kind": "write",
+      "to": "table:watchedRepositories"
+    },
+    {
       "from": "function:source_control_gdpr:collectReviewDraftsForExport",
       "kind": "read",
       "to": "table:reviewDrafts"
+    },
+    {
+      "from": "function:source_control_gdpr:collectWatchedRepositoriesForExport",
+      "kind": "read",
+      "to": "table:watchedRepositories"
     },
     {
       "from": "function:source_control_gdpr:deleteUserReviewDrafts",
@@ -6384,6 +6499,16 @@
       "from": "function:source_control_gdpr:deleteUserReviewDrafts",
       "kind": "write",
       "to": "table:reviewDrafts"
+    },
+    {
+      "from": "function:source_control_gdpr:deleteUserWatchedRepositories",
+      "kind": "read",
+      "to": "table:watchedRepositories"
+    },
+    {
+      "from": "function:source_control_gdpr:deleteUserWatchedRepositories",
+      "kind": "write",
+      "to": "table:watchedRepositories"
     },
     {
       "from": "function:source_control_review_drafts:deleteDraftComment",
@@ -15044,6 +15169,97 @@
       "module": "skills"
     },
     {
+      "detail": "mutation",
+      "id": "function:source_control_freshness_internal:acceptWatchDelivery",
+      "kind": "function",
+      "name": "source_control.freshness_internal.acceptWatchDelivery",
+      "module": "source-control"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:source_control_freshness_internal:dispatchDueRepoPolls",
+      "kind": "function",
+      "name": "source_control.freshness_internal.dispatchDueRepoPolls",
+      "module": "source-control"
+    },
+    {
+      "detail": "query",
+      "id": "function:source_control_freshness_internal:getWatchForPoll",
+      "kind": "function",
+      "name": "source_control.freshness_internal.getWatchForPoll",
+      "module": "source-control"
+    },
+    {
+      "detail": "query",
+      "id": "function:source_control_freshness_internal:getWatchForWebhook",
+      "kind": "function",
+      "name": "source_control.freshness_internal.getWatchForWebhook",
+      "module": "source-control"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:source_control_freshness_internal:leaseWatchedRepositoriesForRefresh",
+      "kind": "function",
+      "name": "source_control.freshness_internal.leaseWatchedRepositoriesForRefresh",
+      "module": "source-control"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:source_control_freshness_internal:recordRepoPoll",
+      "kind": "function",
+      "name": "source_control.freshness_internal.recordRepoPoll",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_freshness_poll:pollWatchedRepo",
+      "kind": "function",
+      "name": "source_control.freshness_poll.pollWatchedRepo",
+      "module": "source-control"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:source_control_freshness:disableWatchWebhook",
+      "kind": "function",
+      "name": "source_control.freshness.disableWatchWebhook",
+      "module": "source-control"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:source_control_freshness:enableWatchWebhook",
+      "kind": "function",
+      "name": "source_control.freshness.enableWatchWebhook",
+      "module": "source-control"
+    },
+    {
+      "detail": "query",
+      "id": "function:source_control_freshness:listWatchedRepositories",
+      "kind": "function",
+      "name": "source_control.freshness.listWatchedRepositories",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_freshness:refreshWatchedRepositories",
+      "kind": "function",
+      "name": "source_control.freshness.refreshWatchedRepositories",
+      "module": "source-control"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:source_control_freshness:unwatchRepo",
+      "kind": "function",
+      "name": "source_control.freshness.unwatchRepo",
+      "module": "source-control"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:source_control_freshness:watchRepo",
+      "kind": "function",
+      "name": "source_control.freshness.watchRepo",
+      "module": "source-control"
+    },
+    {
       "detail": "action",
       "id": "function:source_control_functions:getDevelopHost",
       "kind": "function",
@@ -15093,10 +15309,24 @@
       "module": "source-control"
     },
     {
+      "detail": "query",
+      "id": "function:source_control_gdpr:collectWatchedRepositoriesForExport",
+      "kind": "function",
+      "name": "source_control.gdpr.collectWatchedRepositoriesForExport",
+      "module": "source-control"
+    },
+    {
       "detail": "mutation",
       "id": "function:source_control_gdpr:deleteUserReviewDrafts",
       "kind": "function",
       "name": "source_control.gdpr.deleteUserReviewDrafts",
+      "module": "source-control"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:source_control_gdpr:deleteUserWatchedRepositories",
+      "kind": "function",
+      "name": "source_control.gdpr.deleteUserWatchedRepositories",
       "module": "source-control"
     },
     {
@@ -17039,6 +17269,12 @@
       "module": "auth"
     },
     {
+      "id": "table:watchedRepositories",
+      "kind": "table",
+      "name": "watchedRepositories",
+      "module": "source-control"
+    },
+    {
       "id": "table:workflowExecutions",
       "kind": "table",
       "name": "workflowExecutions",
@@ -17364,10 +17600,11 @@
       ]
     },
     {
-      "description": "Develop mode: pull requests across Git hosts, read and reviewed through one host adapter. Owns the review drafts; the client caches what it reads.",
+      "description": "Develop mode: pull requests across Git hosts, read and reviewed through one host adapter. Owns the review drafts and the watched repositories (their cached review-request lists, poll schedule and webhook secrets).",
       "name": "source-control",
       "tables": [
-        "reviewDrafts"
+        "reviewDrafts",
+        "watchedRepositories"
       ]
     },
     {
@@ -20574,37 +20811,31 @@
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 250,
+      "line": 252,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 253,
+      "line": 261,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 262,
+      "line": 264,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 267,
+      "line": 273,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 276,
-      "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
-    },
-    {
-      "file": "gdpr/workflows/deletion-workflow",
-      "kind": "call",
-      "line": 281,
+      "line": 278,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
@@ -20616,43 +20847,49 @@
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 289,
+      "line": 292,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 295,
+      "line": 298,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 297,
+      "line": 300,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 309,
+      "line": 306,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 314,
+      "line": 308,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 323,
+      "line": 320,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 328,
+      "line": 325,
+      "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/deletion-workflow",
+      "kind": "call",
+      "line": 334,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
@@ -20664,67 +20901,73 @@
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 346,
+      "line": 350,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 355,
+      "line": 357,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 375,
+      "line": 366,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 387,
+      "line": 386,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 401,
+      "line": 398,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 435,
+      "line": 412,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 459,
+      "line": 446,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 478,
+      "line": 470,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 493,
+      "line": 489,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 515,
+      "line": 504,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
       "line": 526,
+      "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/deletion-workflow",
+      "kind": "call",
+      "line": 537,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
@@ -20796,19 +21039,7 @@
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 85,
-      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
-    },
-    {
-      "file": "gdpr/workflows/export-workflow",
-      "kind": "call",
-      "line": 88,
-      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
-    },
-    {
-      "file": "gdpr/workflows/export-workflow",
-      "kind": "call",
-      "line": 93,
+      "line": 89,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
@@ -20820,43 +21051,61 @@
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 96,
+      "line": 98,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 97,
+      "line": 103,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 110,
+      "line": 105,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 128,
+      "line": 106,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 169,
+      "line": 107,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 178,
+      "line": 120,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 183,
+      "line": 138,
+      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/export-workflow",
+      "kind": "call",
+      "line": 180,
+      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/export-workflow",
+      "kind": "call",
+      "line": 189,
+      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/export-workflow",
+      "kind": "call",
+      "line": 194,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
@@ -21096,67 +21345,67 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 133,
+      "line": 134,
       "reason": "\"claimedAtOf\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 133,
+      "line": 134,
       "reason": "\"claimFence\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 133,
+      "line": 134,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 133,
+      "line": 134,
       "reason": "\"hasClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 133,
+      "line": 134,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 152,
+      "line": 153,
       "reason": "\"claimFence\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 155,
+      "line": 156,
       "reason": "\"claimFence\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 216,
+      "line": 217,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 239,
+      "line": 240,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 244,
+      "line": 245,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 361,
+      "line": 362,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -21198,19 +21447,19 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 825,
+      "line": 835,
       "reason": "\"rateLimitGuard\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 921,
+      "line": 931,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 963,
+      "line": 973,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {
@@ -21234,55 +21483,55 @@
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 132,
-      "reason": "\"noteShardActivity\" is not a registered function"
-    },
-    {
-      "file": "lib/shard-housekeeping",
-      "kind": "write",
       "line": 134,
       "reason": "\"noteShardActivity\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 152,
+      "line": 136,
+      "reason": "\"noteShardActivity\" is not a registered function"
+    },
+    {
+      "file": "lib/shard-housekeeping",
+      "kind": "write",
+      "line": 154,
       "reason": "\"noteShardDue\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 158,
+      "line": 160,
       "reason": "\"noteShardDue\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "call",
-      "line": 272,
+      "line": 283,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "lib/shard-routes",
       "kind": "write",
-      "line": 40,
+      "line": 42,
       "reason": "\"setShardRoute\" is not a registered function"
     },
     {
       "file": "lib/shard-routes",
       "kind": "write",
-      "line": 46,
+      "line": 48,
       "reason": "\"setShardRoute\" is not a registered function"
     },
     {
       "file": "lib/shard-routes",
       "kind": "write",
-      "line": 54,
+      "line": 56,
       "reason": "\"deleteShardRoute\" is not a registered function"
     },
     {
       "file": "lib/shard-routes",
       "kind": "write",
-      "line": 92,
+      "line": 94,
       "reason": "\"deleteShardRoutesOf\" is not a registered function"
     },
     {
@@ -22016,6 +22265,18 @@
       "kind": "read",
       "line": 39,
       "reason": "\"draftFor\" is not a registered function"
+    },
+    {
+      "file": "source-control/webhook",
+      "kind": "call",
+      "line": 64,
+      "reason": "\"handleWatchWebhook\" is not a registered function"
+    },
+    {
+      "file": "source-control/webhook",
+      "kind": "call",
+      "line": 108,
+      "reason": "\"handleWatchWebhook\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",

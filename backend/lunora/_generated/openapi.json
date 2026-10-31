@@ -31298,6 +31298,10 @@
                               {
                                 "const": "usage_alert",
                                 "type": "string"
+                              },
+                              {
+                                "const": "review_request",
+                                "type": "string"
                               }
                             ]
                           }
@@ -34987,6 +34991,10 @@
                               },
                               {
                                 "const": "usage_alert",
+                                "type": "string"
+                              },
+                              {
+                                "const": "review_request",
                                 "type": "string"
                               }
                             ]
@@ -44641,6 +44649,566 @@
         "summary": "mutation: skills_marketplace:uninstallSkill",
         "tags": [
           "skills"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#source_control_freshness:disableWatchWebhook": {
+      "post": {
+        "description": "Invoke the `mutation` `source_control_freshness:disableWatchWebhook` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_freshness:disableWatchWebhook",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "repository": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repository"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_freshness:disableWatchWebhook",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "disabled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "disabled"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: source_control_freshness:disableWatchWebhook",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#source_control_freshness:enableWatchWebhook": {
+      "post": {
+        "description": "Invoke the `mutation` `source_control_freshness:enableWatchWebhook` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_freshness:enableWatchWebhook",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "repository": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repository"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_freshness:enableWatchWebhook",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "secret": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "const": "ok",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "secret",
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            {
+                              "const": "unsupported",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: source_control_freshness:enableWatchWebhook",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#source_control_freshness:listWatchedRepositories": {
+      "post": {
+        "description": "Invoke the `query` `source_control_freshness:listWatchedRepositories` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_freshness:listWatchedRepositories",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_freshness:listWatchedRepositories",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "limit": {
+                      "type": "number"
+                    },
+                    "watched": {
+                      "items": {
+                        "properties": {
+                          "checkedAt": {
+                            "type": "number"
+                          },
+                          "dirty": {
+                            "type": "boolean"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "lastStatus": {
+                            "anyOf": [
+                              {
+                                "const": "ok",
+                                "type": "string"
+                              },
+                              {
+                                "const": "forbidden",
+                                "type": "string"
+                              },
+                              {
+                                "const": "host_error",
+                                "type": "string"
+                              },
+                              {
+                                "const": "needs_reconnect",
+                                "type": "string"
+                              },
+                              {
+                                "const": "not_connected",
+                                "type": "string"
+                              },
+                              {
+                                "const": "not_found",
+                                "type": "string"
+                              },
+                              {
+                                "const": "rate_limited",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "repository": {
+                            "type": "string"
+                          },
+                          "requested": {
+                            "items": {
+                              "properties": {
+                                "authorLogin": {
+                                  "type": "string"
+                                },
+                                "number": {
+                                  "type": "number"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "updatedAt": {
+                                  "type": "number"
+                                },
+                                "url": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "authorLogin",
+                                "number",
+                                "title",
+                                "updatedAt",
+                                "url"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "webhook": {
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "seenAt": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "enabled",
+                              "seenAt"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "checkedAt",
+                          "dirty",
+                          "id",
+                          "lastStatus",
+                          "repository",
+                          "requested",
+                          "webhook"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "limit",
+                    "watched"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: source_control_freshness:listWatchedRepositories",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#source_control_freshness:refreshWatchedRepositories": {
+      "post": {
+        "description": "Invoke the `action` `source_control_freshness:refreshWatchedRepositories` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_freshness:refreshWatchedRepositories",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_freshness:refreshWatchedRepositories",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "polled": {
+                      "type": "number"
+                    },
+                    "status": {
+                      "const": "ok",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "polled",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_freshness:refreshWatchedRepositories",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_freshness:unwatchRepo": {
+      "post": {
+        "description": "Invoke the `mutation` `source_control_freshness:unwatchRepo` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_freshness:unwatchRepo",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "repository": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repository"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_freshness:unwatchRepo",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "removed"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: source_control_freshness:unwatchRepo",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#source_control_freshness:watchRepo": {
+      "post": {
+        "description": "Invoke the `mutation` `source_control_freshness:watchRepo` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_freshness:watchRepo",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "repository": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repository"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_freshness:watchRepo",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "const": "invalid",
+                          "type": "string"
+                        },
+                        {
+                          "const": "limit",
+                          "type": "string"
+                        },
+                        {
+                          "const": "ok",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: source_control_freshness:watchRepo",
+        "tags": [
+          "source-control"
         ],
         "x-lunora-function-kind": "mutation"
       }
@@ -55561,7 +56129,7 @@
       "name": "skills"
     },
     {
-      "description": "Develop mode: pull requests across Git hosts, read and reviewed through one host adapter. Owns the review drafts; the client caches what it reads.",
+      "description": "Develop mode: pull requests across Git hosts, read and reviewed through one host adapter. Owns the review drafts and the watched repositories (their cached review-request lists, poll schedule and webhook secrets).",
       "name": "source-control"
     },
     {

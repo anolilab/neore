@@ -9,6 +9,7 @@
 import { describeLink, multiplexingNote } from "../link-status";
 import type { FileEntry, HostView, McpServer, McpServerStatus, NetworkTier, Prompt, SettingsView } from "../types";
 import { initAcp } from "./acp-page";
+import { serverAgentsSection } from "./server-agents";
 import { defaultServerTier, networkUnrestricted, serverNeedsAttention, serverSandboxText, tierAvailable } from "./server-network";
 
 /** Buttons stay disabled this long after a prompt appears, so a click meant for another window cannot land on "Allow". */
@@ -627,7 +628,7 @@ const hostCard = (host: HostView): HTMLElement => {
     sharingNote.textContent = sharing ?? "";
     sharingNote.hidden = sharing === null;
 
-    card.append(heading, where, sharingNote, actions, folders, row, sandbox, network, forward);
+    card.append(heading, where, sharingNote, actions, folders, row, sandbox, network, forward, serverAgentsSection(host, { button, listItem, run: hostAction, status }));
 
     if (state.terminalAvailable && state.terminalServerReason !== null) {
         const why = document.createElement("p");

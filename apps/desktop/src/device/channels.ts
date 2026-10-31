@@ -47,6 +47,7 @@ export const LOCAL_CHANNEL = {
     acpView: "neore:device-local:acp-view",
     auditTail: "neore:device-local:audit-tail",
     confirm: "neore:device-local:confirm",
+    hostAcpUpdate: "neore:device-local:host-acp-update",
     hostConnect: "neore:device-local:host-connect",
     hostDisconnect: "neore:device-local:host-disconnect",
     hostDownload: "neore:device-local:host-download",

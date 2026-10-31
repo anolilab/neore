@@ -18,6 +18,7 @@ export const vNotificationType = v.union(
     v.literal("data_export"),
     v.literal("daily_brief"),
     v.literal("usage_alert"),
+    v.literal("review_request"),
 );
 
 export const vNotificationOutcome = v.union(v.literal("success"), v.literal("failure"));

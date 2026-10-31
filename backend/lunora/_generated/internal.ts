@@ -655,7 +655,7 @@ export interface InternalApiTypes {
             collectPrompts: FunctionReference<"query", { userId: string }, { promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
             collectSettings: FunctionReference<"query", { userId: string }, { aiUserPreferences?: unknown | null; userSettings?: unknown | null }>;
             collectThreadTags: FunctionReference<"query", { userId: string }, Array<{ _id: string; color: string; createdAt: number; name: string; order: number; updatedAt: number }>>;
-            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string }, string>;
+            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string; watchedRepositories?: unknown }, string>;
             sendExportReadyEmail: FunctionReference<"action", { requestId: Id<"gdprRequests">; userEmail: string }, null>;
             deletion_steps: {
                 deleteAuthRecords: FunctionReference<"mutation", { userId: string }, null>;
@@ -809,7 +809,7 @@ export interface InternalApiTypes {
             runShardTick: FunctionReference<"mutation", {}, null>;
         };
         shard_routes: {
-            getRouteOwner: FunctionReference<"query", { kind: "device" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger"; value: string }, string | null>;
+            getRouteOwner: FunctionReference<"query", { kind: "device" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger" | "watch"; value: string }, string | null>;
         };
         storage_cleanup: {
             deleteObjects: FunctionReference<"action", { keys: Array<string> }, void>;
@@ -895,8 +895,8 @@ export interface InternalApiTypes {
             writeDailyBrief: FunctionReference<"mutation", { localDay: string; summary: string; userId: string }, null>;
         };
         functions: {
-            createNotification: FunctionReference<"mutation", { body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert"; userId: string }, null>;
-            createNotifications: FunctionReference<"mutation", { notifications: Array<{ body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert"; userId: string }> }, null>;
+            createNotification: FunctionReference<"mutation", { body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }, null>;
+            createNotifications: FunctionReference<"mutation", { notifications: Array<{ body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }> }, null>;
             pruneOldNotifications: FunctionReference<"mutation", {}, null>;
         };
         gdpr: {
@@ -1021,9 +1021,22 @@ export interface InternalApiTypes {
         };
     };
     source_control: {
+        freshness_internal: {
+            acceptWatchDelivery: FunctionReference<"mutation", { signature: string; watchId: Id<"watchedRepositories"> }, "accepted" | "duplicate" | "not_found">;
+            dispatchDueRepoPolls: FunctionReference<"mutation", {}, { dispatched: number }>;
+            getWatchForPoll: FunctionReference<"query", { watchId: Id<"watchedRepositories"> }, null | { etag: string | null; leasedAt: number; login: string | null; repository: string; userId: string }>;
+            getWatchForWebhook: FunctionReference<"query", { watchId: Id<"watchedRepositories"> }, null | { webhookSecret: string }>;
+            leaseWatchedRepositoriesForRefresh: FunctionReference<"mutation", { userId: string }, Array<{ lease: number; watchId: Id<"watchedRepositories"> }>>;
+            recordRepoPoll: FunctionReference<"mutation", { lease: number; outcome: { kind: "not_modified" } | { etag: string | null; kind: "changed"; login: string; requested: Array<{ authorLogin: string; number: number; title: string; updatedAt: number; url: string }> } | { kind: "failed"; status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }; watchId: Id<"watchedRepositories"> }, { applied: boolean; notified: number }>;
+        };
+        freshness_poll: {
+            pollWatchedRepo: FunctionReference<"action", { lease: number; watchId: Id<"watchedRepositories"> }, { fetched: boolean }>;
+        };
         gdpr: {
             collectReviewDraftsForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; drafts: Array<{ body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; createdAt: number; hostOrigin: string; number: number; repository: string; updatedAt: number; verdict: "approve" | "comment" | "request_changes" | null }> }>;
+            collectWatchedRepositoriesForExport: FunctionReference<"query", { userId: string }, { watched: Array<{ createdAt: number; hostOrigin: string; lastStatus: "ok" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited"; repository: string; requested: Array<{ authorLogin: string; number: number; title: string; updatedAt: number; url: string }>; webhookEnabled: boolean }> }>;
             deleteUserReviewDrafts: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
+            deleteUserWatchedRepositories: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
         };
         review_internal: {
             claimDraftForSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string }, { draft: { body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; revision: number; verdict: "approve" | "comment" | "request_changes" | null }; lease: number; status: "claimed" } | { status: "in_progress" | "no_draft" }>;
@@ -2156,9 +2169,22 @@ export const internal: InternalApiTypes = {
         },
     },
     source_control: {
+        freshness_internal: {
+            acceptWatchDelivery: { __lunoraRef: "source_control_freshness_internal:acceptWatchDelivery" },
+            dispatchDueRepoPolls: { __lunoraRef: "source_control_freshness_internal:dispatchDueRepoPolls" },
+            getWatchForPoll: { __lunoraRef: "source_control_freshness_internal:getWatchForPoll" },
+            getWatchForWebhook: { __lunoraRef: "source_control_freshness_internal:getWatchForWebhook" },
+            leaseWatchedRepositoriesForRefresh: { __lunoraRef: "source_control_freshness_internal:leaseWatchedRepositoriesForRefresh" },
+            recordRepoPoll: { __lunoraRef: "source_control_freshness_internal:recordRepoPoll" },
+        },
+        freshness_poll: {
+            pollWatchedRepo: { __lunoraRef: "source_control_freshness_poll:pollWatchedRepo" },
+        },
         gdpr: {
             collectReviewDraftsForExport: { __lunoraRef: "source_control_gdpr:collectReviewDraftsForExport" },
+            collectWatchedRepositoriesForExport: { __lunoraRef: "source_control_gdpr:collectWatchedRepositoriesForExport" },
             deleteUserReviewDrafts: { __lunoraRef: "source_control_gdpr:deleteUserReviewDrafts" },
+            deleteUserWatchedRepositories: { __lunoraRef: "source_control_gdpr:deleteUserWatchedRepositories" },
         },
         review_internal: {
             claimDraftForSubmit: { __lunoraRef: "source_control_review_internal:claimDraftForSubmit" },

@@ -57,6 +57,8 @@ interface Sweep {
 const shardSweeps = (): ReadonlyArray<Sweep> => [
     // Backstop for the minute tick: an event watcher whose shard lost its due row is still visited.
     { name: "dispatchDueEventTriggers", ref: internal.triggers.events.dispatchDueEventTriggers },
+    // Same backstop for the watched repositories: a repository whose shard lost its due row is still polled.
+    { name: "dispatchDueRepoPolls", ref: internal.source_control.freshness_internal.dispatchDueRepoPolls },
     { name: "cleanupExpiredPersistentStreams", ref: internal.chat.streaming.persistent.crons.cleanupExpiredStreams },
     { name: "purgeFinishedStreams", ref: internal.chat.streaming.persistent.purge.purgeFinishedStreams },
     { name: "failStaleMediaRows", ref: internal.chat.media_stale.failStaleMediaRows },
@@ -227,13 +229,17 @@ export const runShardTick = internalMutation
         await bestEffort("dispatchDueEventTriggers", async () => {
             await ctx.runMutation(internal.triggers.events.dispatchDueEventTriggers, {});
         });
+        // Watched repositories whose poll is due (Develop); a failure here must not stall the re-arming below either.
+        await bestEffort("dispatchDueRepoPolls", async () => {
+            await ctx.runMutation(internal.source_control.freshness_internal.dispatchDueRepoPolls, {});
+        });
         // Coding-agent turns that went silent; re-arms this shard for the next one to expire.
         const reaped = await bestEffort("reapHostStreams", async () => {
             await ctx.runMutation(internal.acp.ingest.reapHostStreams, {});
         });
 
         const { now } = ctx;
-        const [trigger, task] = await Promise.all([
+        const [trigger, task, repoPoll] = await Promise.all([
             // Only triggers with a next run armed: a schedule's first run or an event watcher's next check.
             // A webhook trigger has no `nextTriggerAt`, and `.first()` on the enabled prefix could return
             // one, which then armed the shard to tick every minute for nothing.
@@ -245,8 +251,13 @@ export const runShardTick = internalMutation
                 .query("tasks")
                 .withIndex("by_recurring_and_nextRunAt", (q) => q.eq("recurring", true))
                 .first(),
+            // The earliest armed poll of a watched repository (Develop): `gt(0)` leaves out a row nothing armed.
+            ctx.db
+                .query("watchedRepositories")
+                .withIndex("by_nextPollAt", (q) => q.gt("nextPollAt", 0))
+                .first(),
         ]);
-        const candidates = [trigger?.nextTriggerAt, task?.nextRunAt].filter((at): at is number => at !== undefined);
+        const candidates = [trigger?.nextTriggerAt, task?.nextRunAt, repoPoll?.nextPollAt].filter((at): at is number => at !== undefined);
 
         // The dispatch cleared this shard's due time; a reap that failed never recorded the next expiry, so try again.
         if (!reaped) {

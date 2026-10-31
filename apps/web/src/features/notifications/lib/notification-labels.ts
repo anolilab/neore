@@ -8,6 +8,7 @@ export type NotificationType =
     | "daily_brief"
     | "data_export"
     | "eval"
+    | "review_request"
     | "secret_request"
     | "sub_agent"
     | "task"
@@ -51,6 +52,9 @@ const useNotificationHeadline = (): ((notification: NotificationLike) => string)
                 }
                 case "eval": {
                     return failed ? t`Eval run failed` : t`Eval run finished`;
+                }
+                case "review_request": {
+                    return t`Your review was requested`;
                 }
                 case "secret_request": {
                     return t`The assistant is asking for a secret`;

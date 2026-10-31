@@ -11,6 +11,7 @@ const HEADLINES: Record<string, { failure?: string; success: string }> = {
     daily_brief: { success: "Your daily brief" },
     data_export: { failure: "Data export failed", success: "Your data export is ready" },
     eval: { failure: "Eval run failed", success: "Eval run finished" },
+    review_request: { success: "Your review was requested" },
     secret_request: { success: "The assistant is asking for a secret" },
     sub_agent: { failure: "Sub-agent failed", success: "Sub-agent finished" },
     task: { failure: "Task failed", success: "Task finished" },
