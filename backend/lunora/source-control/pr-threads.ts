@@ -65,7 +65,8 @@ const requireAddress = (repo: string, number: number): { number: number; reposit
         throw new LunoraError("BAD_REQUEST", "Not a pull request number");
     }
 
-    return { number, repository: repo };
+    // The host does not tell `Octo/Hello` from `octo/hello`, so neither do the links.
+    return { number, repository: repo.toLowerCase() };
 };
 
 const requireBranch = (branch: string | undefined): string | undefined => {
@@ -89,6 +90,20 @@ const linksFor = async (ctx: QueryCtx | MutationCtx, userId: string, repo: strin
         .withIndex("by_user_and_repository_number", (q) => q.eq("userId", userId).eq("repository", repo).eq("number", number))
         .take(MAX_THREADS_PER_PULL_REQUEST);
 
+/** The links whose thread is still there and not deleted; a link to one that is not is dead. */
+const partitionLinks = async (ctx: QueryCtx | MutationCtx, rows: PullRequestThread[]): Promise<{ dead: PullRequestThread[]; live: PullRequestThread[] }> => {
+    const dead: PullRequestThread[] = [];
+    const live: PullRequestThread[] = [];
+
+    for (const row of rows) {
+        const thread = await ctx.db.get(row.threadId);
+
+        (thread && thread.deleted !== true ? live : dead).push(row);
+    }
+
+    return { dead, live };
+};
+
 /**
  * "Work on this PR": a thread of yours with the pull request attached, as its first turn. The second click attaches
  * nothing and opens nothing — it names the thread already working on it, so a double click cannot make two.
@@ -107,8 +122,15 @@ export const startWorkOnPullRequest = authMutation
         const baseBranch = requireBranch(args.baseBranch);
         const headBranch = requireBranch(args.headBranch);
         const { userId } = ctx.user;
-        const links = await linksFor(ctx, userId, address.repository, address.number);
-        const attached = links.find((row) => row.kind === "attached");
+        const { dead, live } = await partitionLinks(ctx, await linksFor(ctx, userId, address.repository, address.number));
+        const attached = live.find((row) => row.kind === "attached");
+
+        // A thread that was deleted leaves its link behind (a soft delete does); clear it and start fresh.
+        const deadAttached = dead.filter((row) => row.kind === "attached");
+
+        for (const link of deadAttached) {
+            await ctx.db.delete(link._id);
+        }
 
         if (attached) {
             return { created: false, threadId: attached.threadId };
@@ -157,7 +179,7 @@ export const listForPullRequest = authQuery
     .output(v.array(vPullRequestThread))
     .query(async ({ args, ctx }) => {
         const address = requireAddress(args.repository, args.number);
-        const rows = await linksFor(ctx, ctx.user.userId, address.repository, address.number);
+        const { live: rows } = await partitionLinks(ctx, await linksFor(ctx, ctx.user.userId, address.repository, address.number));
 
         // Newest first; the id breaks a tie so two rows saved in the same millisecond still read in one order.
         return rows.toSorted((left, right) => right.createdAt - left.createdAt || right._id.localeCompare(left._id)).map((row) => toOutput(row));
@@ -168,12 +190,20 @@ export const getForThread = authQuery
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(vPullRequestThread, v.null()))
     .query(async ({ args, ctx }) => {
-        const row = await ctx.db
+        const rows = await ctx.db
             .query("pullRequestThreads")
             .withIndex("by_user_and_threadId", (q) => q.eq("userId", ctx.user.userId).eq("threadId", args.threadId as Id<"threads">))
-            .first();
+            .take(MAX_THREADS_PER_PULL_REQUEST);
+        // A thread can hold a few links (it attached one pull request and opened another): the newest speaks for it.
+        const row = rows.toSorted((left, right) => right.createdAt - left.createdAt || right._id.localeCompare(left._id))[0] ?? null;
 
-        return row === null ? null : toOutput(row);
+        if (row === null) {
+            return null;
+        }
+
+        const { live } = await partitionLinks(ctx, [row]);
+
+        return live.length === 0 ? null : toOutput(row);
     });
 
 /** `https://<host>/<owner>/<name>/pull/<number>`, and nothing else. */
@@ -216,7 +246,8 @@ export const recordOpenedPullRequest = internalMutation
         }
 
         const openedLinks = await linksFor(ctx, args.userId, address.repository, address.number);
-        const opened = openedLinks.find((row) => row.kind === "opened");
+        const { live: openedLive } = await partitionLinks(ctx, openedLinks);
+        const opened = openedLive.find((row) => row.kind === "opened");
 
         if (opened) {
             return { created: false, threadId: opened.threadId };

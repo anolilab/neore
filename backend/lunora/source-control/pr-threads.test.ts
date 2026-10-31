@@ -8,6 +8,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { addMessagesHandler } from "../agent/messages";
+import { deleteAllForThreadIdAsync } from "../agent/threads";
 import { insertThread } from "../agent/table-writes";
 
 import schema from "../schema";
@@ -216,5 +217,79 @@ describe("both sides of the link", () => {
 
         expect(await as(B).query(getForThread as never, { threadId } as never)).toBeNull();
         expect(await listing(B)).toEqual([]);
+    });
+});
+
+describe("a thread that is gone", () => {
+    const softDelete = async (threadId: string): Promise<void> => {
+        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true, deletedAt: 1 }));
+    };
+
+    it("is not returned by another click on 'Work on this PR': the dead link is cleared and a new thread opens", async () => {
+        const first = await start(A);
+
+        await softDelete(first.threadId);
+
+        const second = await start(A);
+
+        expect(second.created).toBe(true);
+        expect(second.threadId).not.toBe(first.threadId);
+        expect(await links()).toEqual([expect.objectContaining({ kind: "attached", threadId: second.threadId })]);
+    });
+
+    it("is not listed, and a thread that is gone names no pull request", async () => {
+        const first = await start(A);
+        const other = (await plainThread(A)) as string;
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(recordOpenedPullRequest as never, { prUrl: URL, threadId: other, userId: A } as never));
+        await softDelete(first.threadId);
+
+        expect(await listing(A)).toEqual([expect.objectContaining({ kind: "opened", threadId: other })]);
+        expect(await as(A).query(getForThread as never, { threadId: first.threadId } as never)).toBeNull();
+    });
+
+    it("loses its links with a hard delete, attached and opened alike", async () => {
+        const first = await start(A);
+        const other = (await plainThread(A)) as string;
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(recordOpenedPullRequest as never, { prUrl: URL, threadId: other, userId: A } as never));
+        await harness.run(async (ctx: any) => await ctx.runMutation(deleteAllForThreadIdAsync as never, { threadId: first.threadId } as never));
+        await harness.run(async (ctx: any) => await ctx.runMutation(deleteAllForThreadIdAsync as never, { threadId: other } as never));
+
+        expect(await links()).toEqual([]);
+    });
+});
+
+describe("a thread with two links", () => {
+    it("names the newest pull request", async () => {
+        const first = await start(A);
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: Date.now() + 10_000,
+                kind: "opened",
+                number: 9,
+                repository: "octo/hello",
+                threadId: first.threadId,
+                title: "x",
+                url: `${GITHUB_WEB_ORIGIN}/octo/hello/pull/9`,
+                userId: A,
+            });
+        });
+
+        expect(await as(A).query(getForThread as never, { threadId: first.threadId } as never)).toMatchObject({ kind: "opened", number: 9 });
+    });
+});
+
+describe("the repository's casing", () => {
+    it("names one pull request however it is spelled", async () => {
+        const first = await start(A);
+        const second = await start(A, { repository: "Octo/Hello" });
+
+        expect(second).toEqual({ created: false, threadId: first.threadId });
+        expect(await listing(A, { repository: "OCTO/hello" })).toHaveLength(1);
+        const [row] = await links();
+
+        expect(row.repository).toBe("octo/hello");
     });
 });

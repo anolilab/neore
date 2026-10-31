@@ -52,9 +52,16 @@ const WorkOnPullRequest = ({ address, requestNoun }: { address: PullRequestAddre
             <div aria-live="polite" role="status">
                 {error !== null && <p className="text-destructive text-sm">{error}</p>}
             </div>
-            {rows.length === 0 ? (
+            {threads.isPending && <p className="text-muted-foreground text-xs">{t`Loading threads…`}</p>}
+            {threads.isError && (
+                <p className="text-destructive text-sm" role="alert">
+                    {t`Could not load the threads for this ${requestNoun}.`}
+                </p>
+            )}
+            {!threads.isPending && !threads.isError && rows.length === 0 && (
                 <p className="text-muted-foreground text-xs">{t`No thread has worked on this ${requestNoun} yet.`}</p>
-            ) : (
+            )}
+            {rows.length > 0 && (
                 <ul className="space-y-1">
                     {rows.map((row) => (
                         <li className="flex flex-wrap items-baseline gap-2 text-sm" key={`${row.kind}-${row.threadId}`}>

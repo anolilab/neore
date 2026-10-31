@@ -11,7 +11,8 @@
  * and the repository webhook secret (encrypted) does not. Deletion wipes both; the webhook's shard route goes with
  * the owner's other routes (`deleteShardRoutesOf`), and its replay claims are tagged with the user.
  *
- * Both are wired the same way; watched repositories at most `MAX_WATCHED_REPOSITORIES` rows, so one export step.
+ * The pull-request/thread links (`collectPullRequestThreadsForExport`, `deleteUserPullRequestThreads`) are paged in the export and
+ * erased in batches. Both are wired the same way; watched repositories at most `MAX_WATCHED_REPOSITORIES` rows, so one export step.
  */
 import { v } from "lunorash/server";
 
@@ -201,10 +202,58 @@ export const deleteUserGuides = internalMutation
         return { hasMore: guides.length >= BATCH };
     });
 
+/** Links per export step: each row is small, so a page is generous and a long history still takes few steps. */
+const PULL_REQUEST_LINKS_EXPORT_PAGE = 100;
+
 /**
- * The links between a user's threads and the pull requests they work on. Nothing here is content of theirs — a
- * repository address, a number, a title the server built — so it is erased, not exported.
+ * The user's links between threads and the pull requests they work on. `title` is a copy of the thread's title when
+ * the link was made (the user's own words, and it outlives a rename or a deletion), so the links travel with the export.
  */
+export const collectPullRequestThreadsForExport = internalQuery
+    .input({ cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())), userId: v.string().max(MAX_LENGTH.id) })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            links: v.array(
+                v.object({
+                    baseBranch: v.optional(v.string()),
+                    createdAt: v.number(),
+                    headBranch: v.optional(v.string()),
+                    kind: v.union(v.literal("attached"), v.literal("opened")),
+                    number: v.number(),
+                    repository: v.string(),
+                    threadId: v.string(),
+                    title: v.string(),
+                    url: v.string(),
+                }),
+            ),
+        }),
+    )
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const page = await ctx.db
+            .query("pullRequestThreads")
+            .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId))
+            .paginate({ cursor: cursor ?? null, numItems: PULL_REQUEST_LINKS_EXPORT_PAGE });
+
+        return {
+            cursor: page.isDone ? null : page.continueCursor,
+            links: page.page.map((link) => {
+                return {
+                    ...(link.baseBranch !== undefined && { baseBranch: link.baseBranch }),
+                    createdAt: link.createdAt,
+                    ...(link.headBranch !== undefined && { headBranch: link.headBranch }),
+                    kind: link.kind,
+                    number: link.number,
+                    repository: link.repository,
+                    threadId: link.threadId,
+                    title: link.title,
+                    url: link.url,
+                };
+            }),
+        };
+    });
+
+/** Erased on account deletion, batch by batch. */
 export const deleteUserPullRequestThreads = internalMutation
     .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(v.object({ hasMore: v.boolean() }))
