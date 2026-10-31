@@ -29,6 +29,7 @@
         "./auth/shortcut": "./lunora/auth/lib/shortcut.ts",
         "./chat-upload-codes": "./lunora/lib/chat-upload-codes.ts",
         "./chat/fields": "./lunora/chat/fields.ts",
+        "./chat/goals": "./lunora/chat/goals/shared.ts",
         "./chat/tags": "./lunora/chat/tags/logic.ts",
         "./dataModel": "./lunora/_generated/dataModel.ts",
         "./document-limits": "./lunora/lib/document-limits.ts",

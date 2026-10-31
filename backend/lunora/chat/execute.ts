@@ -21,8 +21,11 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
 import { streamLogger } from "../lib/logger";
+import { MAX_LENGTH } from "../lib/validators";
 import { isThreadLocked } from "../lib/thread-lock";
 import { findSkillCommand, parseSkillCommand, resolveReasoningEffort, resolveSkillModel } from "../skills/slash-command";
+import { handOffToGoalReview, noteGoalPaused, otherGoalHoldsThread } from "./goals/execute";
+import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 import { continueGroupAfterToolApproval, runGroupTurn } from "./group/run";
 import {
     afterRun,
@@ -63,6 +66,8 @@ export const runStreamingAgent = internalAction
         organizationId: v.optional(v.string()),
         /** What started the turn: the user's own chat, or the public API's key (an outside agent). Unset reads as the user's. */
         origin: v.optional(v.union(v.literal("lead"), v.literal("outside_agent"))),
+        /** The skill a goal's first round invoked, so every later round runs it too (the round's own text no longer starts with `/<slug>`). */
+        skill: v.optional(v.object({ rawArgs: v.string().max(MAX_LENGTH.text), slug: v.string().max(MAX_LENGTH.short) })),
         streamId: v.string(),
         streamingConfig: v.object({
             contentType: v.string(),
@@ -82,12 +87,12 @@ export const runStreamingAgent = internalAction
         /** The raw composer text, when the start payload had it — where a `/<slug>` command is detected. */
         userPrompt: v.optional(v.string()),
     })
-    .action(async ({ args: { isAnonymous, messageId, organizationId, origin, streamId, streamingConfig, threadId, userId, userPrompt }, ctx }) => {
+    .action(async ({ args: { isAnonymous, messageId, organizationId, origin, skill, streamId, streamingConfig, threadId, userId, userPrompt }, ctx }) => {
         // Everything before the first token is on the user's wait, so the reads
         // that need nothing but the job's own arguments start together, WITH
         // the claim. They are queries: a redelivery that loses the claim reads
         // and discards, and generates nothing.
-        const isSkillCommand = userPrompt !== undefined && Boolean(parseSkillCommand(userPrompt));
+        const isSkillCommand = skill !== undefined || (userPrompt !== undefined && Boolean(parseSkillCommand(userPrompt)));
         const reads = Promise.all([
             // Full access, or a locked chat the stream was started under (`streamRunThread`).
             ctx.runQuery(internal.chat.streaming.streamRunThread, { streamId: streamId as Id<"persistentStreams">, userId }),
@@ -136,7 +141,24 @@ export const runStreamingAgent = internalAction
                 return;
             }
 
+            // A goal's later round was queued with the verdict; one that ended since (a new message, Stop) closes its stream and never runs.
+            if (
+                sseMessages?.[0]?.agentName === GOAL_CONTINUATION_AGENT &&
+                !(await ctx.runMutation(internal.chat.goals.internal.closeStaleGoalRound, { messageId, streamId: streamId as Id<"persistentStreams"> }))
+            ) {
+                streamLogger.warn(`[BgAgent] Stream ${streamId} belongs to a goal that ended — not run`);
+
+                return;
+            }
+
             if (groupConfig) {
+                // A goal reviews one agent's turns; a group turn has several speakers.
+                // Only the goal this run's own message started: a newer goal (a skill in the same group chat) is not this run's.
+                await ctx.runMutation(internal.chat.goals.internal.endGoalsForThread, {
+                    reason: "unsupported",
+                    streamId: streamId as Id<"persistentStreams">,
+                    threadId: threadId as Id<"threads">,
+                });
                 await runGroupTurn(
                     ctx,
                     { isAnonymous: isAnonymous === true, messageId, organizationId, origin, streamId, streamingConfig, threadId, userId, userPrompt },
@@ -175,7 +197,7 @@ export const runStreamingAgent = internalAction
 
             runContextPromise.catch(() => undefined);
 
-            const skillCommand = findSkillCommand(userPrompt, message?.message?.content, prompt);
+            const skillCommand = skill ?? findSkillCommand(userPrompt, message?.message?.content, prompt);
             const skillRun = await ctx.runQuery(internal.skills.executor.resolveSkillsForRun, {
                 organizationId,
                 rawArgs: skillCommand?.rawArgs,
@@ -415,8 +437,9 @@ export const runStreamingAgent = internalAction
 
             // Record the approval snapshot (if the run paused) and flush. The
             // snapshot is what the continuation rebuilds this exact run from.
-            // A locked chat's content is never mined into memory.
-            const extractMemory = runContext.memoryEnabled && !isThreadLocked(thread);
+            // A locked chat's content is never mined into memory, and neither is a goal round's instruction: it is the
+            // goal plus a reviewer's note drawn from tool output, not something the user said.
+            const extractMemory = runContext.memoryEnabled && !isThreadLocked(thread) && sseMessages?.[0]?.agentName !== GOAL_CONTINUATION_AGENT;
 
             let finished: Awaited<ReturnType<typeof finishRun>>;
 
@@ -433,6 +456,7 @@ export const runStreamingAgent = internalAction
                         // A run that pauses extracts at the pause; its continuation extracts only the steers it takes.
                         memory: memoryToCarry({ botId: runContext.botId, extractMemory, prompt }),
                         model,
+                        promptMessageId: messageId,
                         reasoningEffort: threadReasoningEffort,
                         researchDepth: effectiveResearchDepth,
                         searchMode: effectiveSearchMode,
@@ -459,6 +483,15 @@ export const runStreamingAgent = internalAction
                 firstTokenTime,
                 prompt,
             });
+
+            // A run that belongs to a goal is reviewed before the chat settles: the goal keeps the thread running
+            // and holds the follow-ups back until it ends. A run paused on an approval is not finished yet.
+            if (finished.paused) {
+                await noteGoalPaused(ctx, threadId);
+            } else if ((await handOffToGoalReview(ctx, threadId, { messageId })) || (await otherGoalHoldsThread(ctx, threadId, { messageId }))) {
+                // Its goal reviews it next; or its goal was replaced while it ran and the new goal owns the thread now.
+                return;
+            }
 
             void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, {
                 threadId,
@@ -559,6 +592,16 @@ export const continueAfterToolApproval = internalAction
                 { answer, approvalId, approved, config, denyReason, streamId, threadId, userId },
                 { admittedRun: true, steerable: true },
             );
+
+            // The run a goal was waiting on ended here, once nothing more is pending (see `runStreamingAgent`).
+            if (resumed.paused) {
+                await noteGoalPaused(ctx, threadId);
+            } else if (
+                (!resumed.stopped && (await handOffToGoalReview(ctx, threadId, { streamId }))) ||
+                (await otherGoalHoldsThread(ctx, threadId, { streamId }))
+            ) {
+                return;
+            }
 
             await setThreadStatus(ctx, threadId, "active", { awaitingInput: resumed.awaitingInput, replied: !resumed.paused && !resumed.stopped });
         } catch (error) {

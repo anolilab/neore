@@ -21,6 +21,9 @@ import { getUserTier } from "../lib/rate-limiter";
 import { SERVICE_REQUEST_WINDOW_MS } from "../lib/sign-request";
 import { threadShardFor } from "../lib/thread-shard";
 import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
+import { parseSkillCommand } from "../skills/slash-command";
+import { clampGoalEffort, GOAL_TEXT_MAX } from "./goals/shared";
+import { vGoalRunConfig } from "./goals/validators";
 import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
@@ -355,6 +358,8 @@ export interface ChatStartBody {
     duration?: number;
     enabledFeatures?: string[];
     fileIds?: string[];
+    /** Run until a reviewer confirms this goal is met (`chat/goals/`). Text turns in the caller's own chat only. */
+    goal?: { maxRounds?: number; text: string };
     imageSize?: string;
     language?: string;
     mcpServerNames?: string[];
@@ -480,6 +485,19 @@ const runChatStartOnShard = async (
         contentType = "video";
     }
 
+    // The gateway forwards the body unread, so the goal's shape and size are checked here.
+    const goalText = typeof body.goal?.text === "string" ? body.goal.text.trim() : "";
+
+    if (body.goal !== undefined) {
+        if (contentType !== "text" || isAnonymous || body.regenerate) {
+            return Response.json({ error: "A goal needs a signed-in account and a new text message." }, { status: 400 });
+        }
+
+        if (goalText.length === 0 || goalText.length > GOAL_TEXT_MAX) {
+            return Response.json({ error: `A goal must be between 1 and ${GOAL_TEXT_MAX} characters.` }, { status: 400 });
+        }
+    }
+
     // Scopes organization-shared skills. `user.activeOrganization` is always
     // null here (no session read from an HTTP action), so resolve it from the
     // session row, which also re-checks membership. It depends on nothing
@@ -596,6 +614,15 @@ const runChatStartOnShard = async (
         return workerThreadResponse();
     }
 
+    // A goal spends the owner's budget over several rounds: refuse it in a shared thread now, before the turn is saved and charged.
+    if (body.goal !== undefined && validThreadId) {
+        const goalThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> });
+
+        if (goalThread?.userId !== userId) {
+            return Response.json({ error: "A goal can only be set in your own chat." }, { status: 403 });
+        }
+    }
+
     // A coding agent's thread runs on its paired device, not on a cloud model. This is the one turn-start path
     // every caller shares (the app, the public API, the MCP server), so it is also the refusal they hit.
     if (access?.hostRun) {
@@ -678,10 +705,35 @@ const runChatStartOnShard = async (
         researchDepth: body.researchDepth,
         searchMode: body.searchMode,
         seed: body.seed,
-        shouldAutoContinue: body.shouldAutoContinue === true,
+        // A goal runs Deep Work.
+        shouldAutoContinue: body.shouldAutoContinue === true || body.goal !== undefined,
         statelessMode: body.statelessMode,
         style: body.style,
     };
+
+    // The config every round of a goal runs with, checked against what `startGoal` accepts BEFORE the turn is charged
+    // and saved: an ordinary send tolerates any `researchDepth` and longer lists, a goal does not.
+    const goalSkill = body.goal === undefined || !body.prompt ? null : parseSkillCommand(body.prompt);
+    const goalConfig =
+        body.goal === undefined
+            ? undefined
+            : vGoalRunConfig.safeParse({
+                  ...(streamingConfig.customSystemPrompt !== undefined && { customSystemPrompt: streamingConfig.customSystemPrompt }),
+                  ...(streamingConfig.enabledFeatures !== undefined && { enabledFeatures: streamingConfig.enabledFeatures }),
+                  ...(streamingConfig.mcpServerNames !== undefined && { mcpServerNames: streamingConfig.mcpServerNames }),
+                  model: streamingConfig.model,
+                  ...(streamingConfig.reasoningEffort !== undefined && { reasoningEffort: clampGoalEffort(streamingConfig.reasoningEffort) }),
+                  ...(streamingConfig.researchDepth !== undefined && { researchDepth: streamingConfig.researchDepth }),
+                  ...(streamingConfig.searchMode !== undefined && { searchMode: streamingConfig.searchMode }),
+                  ...(streamingConfig.statelessMode !== undefined && { statelessMode: streamingConfig.statelessMode }),
+                  // Every round runs as this one does: an API key's tool limits and the invoked skill carry through.
+                  ...(origin && { origin }),
+                  ...(goalSkill && { skill: goalSkill }),
+              });
+
+    if (goalConfig && !goalConfig.ok) {
+        return Response.json({ error: "These chat settings cannot be used with a goal." }, { status: 400 });
+    }
 
     // Rate limiting. Media prompts are charged where the paid generation actually
     // runs — `/chat/media`, which the client calls next with this prompt's id —
@@ -819,7 +871,30 @@ const runChatStartOnShard = async (
     let streamToken: string | undefined;
 
     if (contentType === "text") {
+        const activeOrganizationId = await activeOrganizationPromise;
+        let goalId: Id<"threadGoals"> | undefined;
+
+        if (body.goal !== undefined && goalConfig?.ok) {
+            const started = await context.runMutation(internal.chat.goals.internal.startGoal, {
+                config: goalConfig.value,
+                ...(typeof body.goal.maxRounds === "number" && { maxRounds: body.goal.maxRounds }),
+                ...(activeOrganizationId && { organizationId: activeOrganizationId }),
+                promptMessageId: messageId,
+                // The trimmed text the length check above passed, so a padded goal cannot fail validation after the charge.
+                text: goalText,
+                threadId: threadId as Id<"threads">,
+                userId,
+            });
+
+            if (!started.ok) {
+                return Response.json({ error: started.error }, { status: 400 });
+            }
+
+            goalId = started.goalId;
+        }
+
         streamId = await context.runMutation(internal.chat.streaming.createStreamWithMessage, {
+            ...(goalId && { goalId }),
             messageId,
             streamingConfig,
             threadId,
@@ -827,8 +902,6 @@ const runChatStartOnShard = async (
         });
 
         streamToken = await createStreamToken(streamId!, userId, threadId, signingSecret);
-
-        const activeOrganizationId = await activeOrganizationPromise;
 
         // On the jobs queue, not the scheduler: the SchedulerDO runs jobs one at a
         // time, so a scheduled run waited behind every other user's run and

@@ -4,6 +4,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { HistoryState, useNavigate } from "@tanstack/react-router";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
+import { goalForMessage, useGoalComposer } from "@/features/chat/goal/goal-store";
 import type useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
@@ -137,6 +138,9 @@ export const runSendMessage = async (env: SendMessageEnv, text: string, attachme
     const isCreatingNewThread = !threadId;
 
     if (localTarget) {
+        // A local turn never carries a goal: clear one that is armed, so it cannot ride the next gateway send.
+        useGoalComposer.getState().setEnabled(false);
+
         const restoreComposer = (message: string | undefined) => {
             setOptimisticMessages(withoutMessage(optimisticId));
             useChatUIStore.getState().setComposerText(text);
@@ -243,6 +247,13 @@ export const runSendMessage = async (env: SendMessageEnv, text: string, attachme
             searchMode,
             threadId: threadId || undefined, // undefined triggers thread creation
         };
+
+        // "Run until done": this message is a goal (text turns only).
+        const goal = currentMode === "text" ? goalForMessage(text) : undefined;
+
+        if (goal) {
+            requestBody.goal = goal;
+        }
 
         // Add image generation settings
         if (imageSettings) {
@@ -361,6 +372,9 @@ export const runSendMessage = async (env: SendMessageEnv, text: string, attachme
             }
 
             const composerMode = useModelStore.getState().getComposerMode(threadId || undefined);
+
+            // A goal is spent by the message that carried it; one armed in text mode does not wait out an image or video send.
+            useGoalComposer.getState().setEnabled(false);
 
             trackEvent("stream_started", { model });
             trackEvent("message_sent", {

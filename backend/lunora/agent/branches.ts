@@ -10,6 +10,7 @@ import { agentSwitchOf } from "./agent-switch-logic";
 import { childrenOf, contextPathIds, descendFrom, getThreadRow, loadActivePath, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
 import type { MessageBranch } from "./branch-tree";
 import { BRANCH_ROOT, forkEnd, messageRowsOf } from "./branch-tree";
+import { endActiveGoals } from "../chat/goals/rows";
 import { addMessagesHandler, getMaxMessage } from "./messages";
 import { requireOwnedThread } from "./thread-read-access";
 import { isLockedWithoutProof } from "./thread-passcode";
@@ -317,6 +318,10 @@ export const saveEditedSiblingHandler = async (
     }
 
     const threadId = original.threadId as Id<"threads">;
+
+    // An edit rewrites the prompt a goal was working from: the goal does not carry over to the new branch.
+    await endActiveGoals(ctx, threadId, "superseded");
+
     const parent = await parentOf(ctx, threadId, original);
     const { messages } = await addMessagesHandler(ctx, {
         fromUser: true,

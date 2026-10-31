@@ -49,6 +49,7 @@ import type {
 } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
+import ComposerGoal from "@/features/chat/goal/composer-goal";
 import HostComposer from "@/features/chat/host/host-composer";
 import PromptImprovementPanel from "@/features/chat/prompt-improvement/components/prompt-improvement-panel";
 import ConnectionBanner from "@/features/connection/components/connection-banner";
@@ -743,6 +744,8 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
                                     </m.div>
                                 )}
                             </AnimatePresence>
+                            {/* Run until done - a goal needs an account and a text message */}
+                            {composerMode === "text" && !isAnonymous && <ComposerGoal disabled={isSSEStreaming} />}
                             {/* MCP server selector - only for text mode */}
                             <AnimatePresence mode="popLayout">
                                 {composerMode === "text" && (

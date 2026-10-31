@@ -8,6 +8,7 @@ import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
+import { deleteGoalsForThread, endActiveGoals } from "../chat/goals/rows";
 
 /**
  * Thread operations.
@@ -468,6 +469,9 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         if (host) {
             await endHostThread(context, host, context.now);
         }
+
+        // A goal's review queued between pages would read a half-deleted transcript, charge and open another round.
+        await endActiveGoals(context, args.threadId, "user");
     }
 
     const messages = await context.db
@@ -486,6 +490,9 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
     if (messages.isDone) {
         // Approval snapshots hold the run's system prompt; they go with the thread.
         await deleteToolApprovalRunsForThread(context, args.threadId);
+
+        // A goal is about this thread; a queued review or round must find it ended, not point at a deleted chat.
+        await deleteGoalsForThread(context, args.threadId);
 
         // One batch of links per call. While links remain this page reports "not done" and the
         // chain re-runs it, so the thread row (deleted last) and its links never outlive a partial delete.
@@ -719,8 +726,9 @@ export const softDeleteThread = internalMutation
             deletedAt: ctx.now,
             updatedAt: ctx.now,
         });
-        // A coding agent's turn does not outlive the thread it writes into.
+        // A coding agent's turn does not outlive the thread it writes into, nor does a goal.
         await endHostThread(ctx, oldThread, ctx.now);
+        await endActiveGoals(ctx, args.threadId, "user");
         const newThread = (await ctx.db.get(args.threadId))!;
 
         // Remove from aggregates when soft deleted

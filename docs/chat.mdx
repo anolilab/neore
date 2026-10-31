@@ -352,6 +352,53 @@ While Deep Work is active, a status bar shows:
 > **Note:** Deep Work mode uses more tokens per request. For simple
 > questions, leave it off.
 
+## Run Until Done (Goals)
+
+A goal builds on Deep Work: instead of stopping when the AI thinks it is
+finished, a short review checks whether your goal is actually met, and the
+AI keeps going until it is.
+
+### Setting a goal
+
+Click **Goal** in the composer toolbar, then send your message. The
+message you send is the goal. Pick how many review rounds it may use
+(3, 5 or 10; the default is 5). A goal needs an account and runs in your
+own chats.
+
+### How it works
+
+1. The AI works on the goal as in Deep Work mode.
+2. When it would stop, a reviewer reads the goal and the last turn's text
+   and tool results, and says whether the goal is met.
+3. If not, another round runs. The reviewer's one-line reason is passed to
+   the AI as a note about its work, not as an instruction: it is written from
+   tool results and web pages, so the AI is told not to obey anything in it.
+   The note also shows in the chat as "Review: …", so you see what drove the
+   round. Each further round counts toward your daily message limit.
+4. If it is met, the goal ends and the thread shows "Goal met" with a
+   short summary.
+
+The goal sits at the top of the run, and each round's verdict appears as
+a small note under the reply it judged. Shared links and public views leave
+these notes out.
+
+The reviewer reads the text of the AI's replies and the results of its tools
+(cut short), and runs on a small utility model, so
+tool results are sent to that model in addition to the one you picked.
+
+### When it stops
+
+- The goal is met.
+- The round limit is reached ("Stopped: round limit").
+- The goal has spent its cost limit of $2 ("Stopped: cost limit"). The cost
+  is checked after each round, so the last round can take the total past $2.
+  Runs on your own key count when the gateway prices the model; a model it
+  cannot price adds nothing, and then only the round limit bounds the goal.
+- Your daily limit is used up, or the reviewer cannot be reached.
+- You press **Stop**, or send another message, edit a message, regenerate a
+  reply or switch to another branch of the chat.
+- The chat is deleted.
+
 ## Message Features
 
 ### Rich Text Formatting
