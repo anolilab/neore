@@ -19,6 +19,7 @@
  * | `worker-stop`      | `<threadId>:<clientId>`  | {@link WORKER_DISPATCH_CLAIM_TTL_MS} | `sub-agents/functions.ts` |
  * | `public-api-idempotency` | `<sha256 of api key id + Idempotency-Key>` | 24 h        | `public-api/router.ts` (POSTs with an `Idempotency-Key`) |
  * | `aside-add`        | `<userId>:<threadId>:<entryId>` | {@link ASIDE_ADD_CLAIM_TTL_MS} | `chat/aside.ts` ("Add to thread", one click, retried or doubled) |
+ * | `thread-summary`    | `<threadId>:<last covered row id>` | 30 min                         | `agent/thread-summaries.ts` |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
  * | `video-reservation` | `<requestId>`            | 24 h                          | `auth/billing.ts`            |

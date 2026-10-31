@@ -8,12 +8,14 @@ import { v } from "lunorash/server";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { threadSummaryTaint } from "../agent/thread-summary-taint";
 import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVICE_CALL_DEADLINE_MS, DEVICE_CALL_RETENTION_MS, MAX_DEVICE_INPUT_BYTES, MAX_OPEN_CALLS_PER_DEVICE } from "./lib/constants";
 import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
+import { mergeTaint } from "./lib/taint";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDeviceTaintSource } from "./validators";
 
@@ -144,6 +146,8 @@ export const createDeviceCall = internalMutation
             return { error: "rate_limited" as const };
         }
 
+        // The model may have read untrusted content that only a summary of the thread's older turns still holds.
+        const taintedBy = mergeTaint(args.taintedBy, await threadSummaryTaint(ctx, threadId));
         const deadline = now + DEVICE_CALL_DEADLINE_MS;
         const callId = await ctx.db.insert("deviceCalls", {
             createdAt: now,
@@ -154,7 +158,7 @@ export const createDeviceCall = internalMutation
             input: args.input,
             signature: "",
             status: "pending",
-            taintedBy: args.taintedBy,
+            taintedBy,
             threadId,
             toolName,
             userId,
@@ -168,7 +172,7 @@ export const createDeviceCall = internalMutation
             issuedAt: now,
             kind: "call",
             nonce: crypto.randomUUID(),
-            taintedBy: args.taintedBy,
+            taintedBy,
             threadId,
             threadTitle: (thread.title ?? "").slice(0, 200),
             tool: toolName,
