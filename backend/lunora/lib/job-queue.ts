@@ -59,7 +59,8 @@ const jobsQueue = (): QueueProducer =>
  * shard that holds its rows. Code outside a shard (an HTTP action) must name
  * the owner's shard, or the job runs on `__root__`.
  *
- * `once` routes an ACTION through `runJobOnce` under a fresh `jobId`, for a
+ * `once` routes an ACTION through `runJobOnce` under a fresh `jobId` (or the
+ * caller's own, so the same send twice is one run), for a
  * target that has no claim of its own (see the module comment); `userId` tags
  * the claim so account deletion erases it, and `onLapse` is what runs (with
  * `claimKey` added) if a delivery dies mid-job (`lib/job-once.ts`).
@@ -69,7 +70,7 @@ export const enqueueJob = async <F extends FunctionReference>(
     args: ArgsOf<F>,
     options: {
         delayMs?: number;
-        once?: { onLapse?: { args: Record<string, unknown>; ref: { __lunoraRef: string } }; userId?: string };
+        once?: { jobId?: string; onLapse?: { args: Record<string, unknown>; ref: { __lunoraRef: string } }; userId?: string };
         shardKey?: string;
     } = {},
 ): Promise<void> => {
@@ -79,7 +80,7 @@ export const enqueueJob = async <F extends FunctionReference>(
         ? {
               args: {
                   args,
-                  jobId: crypto.randomUUID(),
+                  jobId: options.once.jobId ?? crypto.randomUUID(),
                   onLapse: options.once.onLapse && { args: JSON.stringify(options.once.onLapse.args), target: options.once.onLapse.ref.__lunoraRef },
                   target: ref.__lunoraRef,
                   userId: options.once.userId,

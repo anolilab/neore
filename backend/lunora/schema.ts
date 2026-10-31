@@ -48,7 +48,7 @@ import { vDraftComment, vReviewVerdict } from "./source-control/validators";
 import { vSkillConfig } from "./skills/validators";
 import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
 import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./tasks/validators";
-import { vWebhookSignatureScheme } from "./triggers/validators";
+import { vEventSource, vEventState, vWebhookSignatureScheme } from "./triggers/validators";
 
 /** Hoisted so `streamDeltasFields` is readable as a value, not just a type. */
 export const streamDeltasFields = {
@@ -2931,6 +2931,9 @@ export const schema = defineSchema({
     triggerExecutions: defineTable({
         completedAt: v.optional(v.number()),
         error: v.optional(v.string()),
+        // The firing of an event trigger that started this run (its `eventState.firedAt`); absent on every other run, a manual one included.
+        // A moment in time is switched off only by the run of its own firing (`switchOffFiredMoment`).
+        firing: v.optional(v.number()),
         // Set on the run whose failure paused its trigger, so a redelivered settlement re-sends the pause notice rather than the plain one.
         pausedTrigger: v.optional(v.boolean()),
         payload: v.optional(v.string()),
@@ -2959,6 +2962,9 @@ export const schema = defineSchema({
         eventConnectionId: v.optional(v.string()),
         eventFilter: v.optional(v.string()),
         eventProvider: v.optional(v.string()),
+        // Event triggers: the condition that is watched, and what the last check left behind (`triggers/events.ts`).
+        eventSource: v.optional(vEventSource),
+        eventState: v.optional(vEventState),
         eventType: v.optional(v.string()),
         // Consecutive runs that failed for a reason the owner can fix; absent = 0. Enough of them pause the trigger (`triggers/failure-streak.ts`).
         failureStreak: v.optional(v.number()),
@@ -3006,7 +3012,10 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_userId_organizationId", ["userId", "organizationId"])
         .index("by_type_enabled", ["type", "enabled"])
-        .index("by_enabled_nextTriggerAt", ["enabled", "nextTriggerAt"]),
+        .index("by_enabled_nextTriggerAt", ["enabled", "nextTriggerAt"])
+        // The active-watcher cap counts one user's switched-on event triggers; the dispatcher reads the due ones in order. Both stop at a bound.
+        .index("by_userId_type_enabled", ["userId", "type", "enabled"])
+        .index("by_type_enabled_nextTriggerAt", ["type", "enabled", "nextTriggerAt"]),
 
     twoFactor: defineTable({
         backupCodes: v.string(),

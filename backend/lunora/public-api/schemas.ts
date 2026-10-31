@@ -164,7 +164,7 @@ export const zTriggerSchema = z.object({
     systemPrompt: z.string().nullable(),
     timezone: z.string().nullable(),
     triggerCount: z.number(),
-    type: z.string().meta({ description: "schedule | webhook" }),
+    type: z.string().meta({ description: "schedule | webhook | event. Create and update here handle schedule and webhook triggers." }),
     updatedAt: z.number(),
     webhookSignatureScheme: z.string().nullable().meta({ description: "timestamped | native | gitlab-token, for a webhook trigger." }),
 });

@@ -625,13 +625,13 @@ for a schema table that is neither policed nor listed:
 | `tasks_functions.runTask` | mutation | authMutation + RL | tasks | owner helper | ok |
 | `tasks_functions.updateGoal` | mutation | authMutation + RL | goals | owner helper | ok |
 | `tasks_functions.updateTask` | mutation | authMutation + RL | goals, skills, tasks | owner helper | ok |
-| `triggers_functions.createTrigger` | mutation | authMutation + RL | triggers | caller-scoped (ctx.user); botId must be a bot the caller owns | ok |
+| `triggers_functions.createTrigger` | mutation | authMutation + RL | triggers | caller-scoped (ctx.user); botId must be a bot the caller owns; an event page source must pass the SSRF URL check and a thread source must be a thread the caller can read (owner or grant) | ok |
 | `triggers_functions.deleteTrigger` | mutation | authMutation + RL | triggers | row.userId == caller | ok |
 | `triggers_functions.getTriggerExecutions` | query | authQuery | triggers | row.userId == caller | ok |
 | `triggers_functions.getTriggers` | query | authQuery | — | caller-scoped (ctx.user) | ok |
-| `triggers_functions.setTriggerEnabled` | mutation | authMutation + RL | triggers | row.userId == caller | ok |
+| `triggers_functions.setTriggerEnabled` | mutation | authMutation + RL | triggers | row.userId == caller; at most 10 event triggers switched on per caller | ok |
 | `triggers_functions.testRunTrigger` | action | authAction + RL | triggers | row.userId == caller | ok |
-| `triggers_functions.updateTrigger` | mutation | authMutation + RL | triggers | row.userId == caller; a new botId must be a bot the caller owns | ok |
+| `triggers_functions.updateTrigger` | mutation | authMutation + RL | triggers | row.userId == caller; a new botId must be a bot the caller owns; a new event source is checked as on create | ok |
 | `usage_activity.getActivityHeatmap` | query | authQuery | usageDaily | caller-scoped (ctx.user) | ok — new; at most 378 rows via `(userId, skillKey, date)` |
 | `usage_activity.getSkillBreakdown` | query | authQuery | usageDaily | caller-scoped (ctx.user) | ok — new; at most 4000 rows via `(userId, date)` |
 | `usage_backfill.getUsageBackfillStatus` | query | authQuery | usageBackfill | caller-scoped (ctx.user) | ok — new; one row via `by_userId` |
