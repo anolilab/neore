@@ -327,6 +327,18 @@ describe("startHostSession", () => {
         expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
     });
 
+    it("hands a retry its thread after the agent opened, or the session ended", async () => {
+        const device = await pairedDevice(ownerId);
+        const first = (await start("tap-1", {}, device.deviceId)) as { threadId: string };
+        const [session] = await rows("acpSessions");
+
+        for (const status of ["idle", "ended"]) {
+            await run(async (ctx) => await ctx.db.patch(session?._id as never, { status }));
+
+            expect(await start("tap-1", {}, device.deviceId)).toEqual({ started: false, threadId: first.threadId });
+        }
+    });
+
     it("refuses a pair the computer did not offer, an offline computer and another user's device", async () => {
         const device = await pairedDevice(ownerId);
 

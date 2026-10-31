@@ -14,6 +14,7 @@ import type { QueryCtx } from "../_generated/server";
 import { insertThread } from "../agent/table-writes";
 import { stopHostTurn } from "./lib/finish";
 import { claimOnce } from "../lib/claim-once";
+import { sha256Hex } from "../lib/crypto";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { createAcpCall } from "../devices/lib/acp-call";
@@ -26,8 +27,6 @@ import { vPendingPermission } from "./validators";
 
 /** A double tap, or a retry after a lost answer, within this is the same start. */
 const START_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
-/** A retry looks for the session its first try made among those started this recently. */
-const RECENT_START_MS = 5 * 60_000;
 
 type Pending = Infer<typeof vPendingPermission>;
 
@@ -113,16 +112,12 @@ export const startHostSession = authMutation
             throw new LunoraError("BAD_REQUEST", "That computer is not online.");
         }
 
+        // The session id comes from the client id, so a retry finds the first try's session whatever it became since.
+        const hostSessionId = `web-${await sha256Hex(`${userId}:${args.clientId}`)}`;
+
         if (!(await claimOnce(ctx, "host-start", `${userId}:${args.clientId}`, START_CLAIM_TTL_MS, userId))) {
             // The first try's answer may have been lost: hand back the session it made.
-            const { page } = await ctx.db.acpSessions.findMany({ limit: 10, where: { status: "starting", userId } });
-            const first = page.find(
-                (session) =>
-                    session.deviceId === device._id &&
-                    session.agentKey === offer.agentKey &&
-                    session.folderId === offer.folderId &&
-                    ctx.now - session.createdAt <= RECENT_START_MS,
-            );
+            const first = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
 
             return { started: false, ...(first && { threadId: first.threadId as string }) };
         }
@@ -138,7 +133,6 @@ export const startHostSession = authMutation
             updatedAt: ctx.now,
             userId,
         });
-        const hostSessionId = crypto.randomUUID();
 
         await ctx.db.insert("acpSessions", {
             agentKey: offer.agentKey,
