@@ -54,7 +54,10 @@ describe(failRun, () => {
 
             await failRun(ctx as never, ARGS);
 
-            expect(calls.find((call) => call.ref === internal.chat.request_secret.discardSecretsOfThread)?.args).toStrictEqual({ threadId: "thread-1" });
+            expect(calls.find((call) => call.ref === internal.chat.request_secret.discardSecretsOfThread)?.args).toStrictEqual({
+                streamId: "stream-1",
+                threadId: "thread-1",
+            });
         }
     });
 

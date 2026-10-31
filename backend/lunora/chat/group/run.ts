@@ -162,6 +162,8 @@ interface TurnContext {
     /** Captured from the first speaker's context — the prompt with its attachments. */
     promptMessages: ModelMessage[] | undefined;
     reasoningEffort: { message?: number; thread?: number };
+    /** The reply the turn belongs to (`ToolRunConfig.replyKey`): its first stream, kept through every pause. */
+    replyKey: string;
     researchDepth: ResearchDepth;
     searchMode: string;
     shouldAutoContinue: boolean;
@@ -418,6 +420,7 @@ const runSpeaker = async (
             mcpServerNames: toolResult.mcpServerNames,
             model,
             reasoningEffort,
+            replyKey: turn.replyKey,
             researchDepth: turn.researchDepth,
             searchMode,
             shouldAutoContinue: turn.shouldAutoContinue,
@@ -574,7 +577,7 @@ const runQueue = async (
 
     await setThreadStatus(ctx, turn.threadId, "active");
     // The turn is over for good (a pause or a stop returned before this): its saved references go with it.
-    await discardRunSecrets(ctx, turn.threadId);
+    await discardRunSecrets(ctx, { streamId: turn.streamId, threadId: turn.threadId });
 
     void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId: turn.threadId, userId: turn.userId });
 };
@@ -594,6 +597,7 @@ const loadTurnContext = async (
         promptMessageId: string;
         /** The user's message, for memory and knowledge-base retrieval — absent on a resumed turn. */
         promptText?: string;
+        replyKey: string;
         researchDepth: ResearchDepth;
         searchMode: string;
         shouldAutoContinue: boolean;
@@ -632,6 +636,7 @@ const loadTurnContext = async (
         promptMessageId: args.promptMessageId,
         promptMessages: undefined,
         reasoningEffort: { message: args.messageReasoningEffort, thread: runContext.threadSettings?.reasoningEffort },
+        replyKey: args.replyKey,
         researchDepth: runContext.researchDepth,
         searchMode: args.searchMode,
         shouldAutoContinue: args.shouldAutoContinue,
@@ -672,6 +677,7 @@ export const runGroupTurn = async (ctx: ActionCtx, input: GroupTurnInput, config
         origin: input.origin ?? "lead",
         promptMessageId: messageId,
         promptText,
+        replyKey: input.streamId,
         researchDepth: toResearchDepth(streamingConfig.researchDepth),
         searchMode: streamingConfig.searchMode || "chat",
         shouldAutoContinue: streamingConfig.shouldAutoContinue === true,
@@ -813,6 +819,7 @@ export const continueGroupAfterToolApproval = async (
         // The approval snapshot kept what started the turn: a person answering it does not make it the lead's.
         origin: config.dispatchOrigin ?? "lead",
         promptMessageId: resumed.lastMessageId ?? approvalId,
+        replyKey: config.replyKey ?? streamId,
         researchDepth: config.researchDepth,
         searchMode: config.searchMode,
         shouldAutoContinue: config.shouldAutoContinue,

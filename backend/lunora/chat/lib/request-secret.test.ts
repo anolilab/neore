@@ -27,8 +27,10 @@ vi.mock("../../agent/client", () => {
 const { default: schema } = await import("../../schema");
 const { claimSecretAnswer, secretResumeArgs } = await import("./request-secret-claim");
 const { consumeAsMcpHeader, consumeAsProviderKey } = await import("./secret-consumers");
-const { discardThreadSecrets, invalidSecretUse, storeRequestedSecret, sweepExpiredSecrets, takeRequestedSecret } = await import("./secret-requests");
-const { mcpServersWithSecretHeaders, pruneMcpSecretHeaders } = await import("../../auth/lib/mcp-secret-headers");
+const { deleteThreadSecrets, discardThreadSecrets, invalidSecretUse, replyKeyOfStream, storeRequestedSecret, sweepExpiredSecrets, takeRequestedSecret } =
+    await import("./secret-requests");
+const { headersForConnectionTest, mcpServersWithSecretHeaders, pruneMcpSecretHeaders } = await import("../../auth/lib/mcp-secret-headers");
+const agentThreads = await import("../../agent/threads");
 const { redactPreferences } = await import("../../auth/lib/byok-keys");
 const { claimAskUserAnswer } = await import("./ask-user-claim");
 const { collectApprovalRequestIds } = await import("./tool-approval-claim");
@@ -59,9 +61,11 @@ const CONFIG = {
     instructions: "system prompt",
     mcpServerNames: [],
     model: "test-model",
+    replyKey: "stream-A",
     researchDepth: "balanced" as const,
     searchMode: "chat",
     shouldAutoContinue: true,
+    startedBy: OWNER,
     toolNames: ["requestSecret", "askUser"],
 };
 
@@ -85,10 +89,18 @@ const insertMessage = async (order: number, message: unknown) =>
         async (ctx: any) => await ctx.db.insert("messages", { message, order, status: "success", stepOrder: 0, threadId, tool: true, userId: OWNER }),
     );
 
-const insertRun = async (approvalId: string) =>
+const insertRun = async (approvalId: string, config: Record<string, unknown> = CONFIG, streamId?: string) =>
     await harness.run(
         async (ctx: any) =>
-            await ctx.db.insert("toolApprovalRuns", { approvalId, config: CONFIG, createdAt: Date.now(), status: "pending", threadId, userId: OWNER }),
+            await ctx.db.insert("toolApprovalRuns", {
+                approvalId,
+                config,
+                createdAt: Date.now(),
+                status: "pending",
+                ...(streamId !== undefined && { streamId }),
+                threadId,
+                userId: OWNER,
+            }),
     );
 
 const save = async (value: string | null, options: { approvalId?: string; callerId?: string } = {}) =>
@@ -138,10 +150,19 @@ const takeHeader = async (ref: string, options: { callerId?: string; now?: numbe
 
 const preferences = async () => await harness.run(async (ctx: any) => await ctx.db.query("aiUserPreferences").first());
 
-const storeSecret = async (use: typeof PROVIDER_USE | typeof STORED_HEADER_USE = PROVIDER_USE, now = Date.now()) =>
+const storeSecret = async (use: typeof PROVIDER_USE | typeof STORED_HEADER_USE = PROVIDER_USE, now = Date.now(), replyKey?: string) =>
     await harness.run(
         async (ctx: any) =>
-            await storeRequestedSecret(ctx, { approvalId: "sec-x", label: "L", now, threadId: threadId as never, use, userId: OWNER, value: SECRET }),
+            await storeRequestedSecret(ctx, {
+                approvalId: "sec-x",
+                label: "L",
+                now,
+                ...(replyKey !== undefined && { replyKey }),
+                threadId: threadId as never,
+                use,
+                userId: OWNER,
+                value: SECRET,
+            }),
     );
 
 /** Every row of every table the feature can touch, as text. */
@@ -170,6 +191,7 @@ const BAD_VALUE = /Provide a value/iu;
 const NO_SERVER = /no saved MCP server/iu;
 const AMBIGUOUS_SERVER = /more than one/iu;
 const BAD_HEADER_VALUE = /line break|control/iu;
+const COLLABORATOR_TURN = /only a reply you started/iu;
 
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
@@ -250,6 +272,37 @@ describe("claimSecretAnswer", () => {
         expect(row.encryptedValue).not.toContain(SECRET);
         expect(await decryptKey(row.encryptedValue, "provider-keys")).toBe(SECRET);
         expect(row.expiresAt - row.createdAt).toBe(SECRET_TTL_MS);
+    });
+
+    it("records which reply the snapshot belongs to on the stored reference", async () => {
+        await save(SECRET);
+
+        expect(await secretRows()).toMatchObject([{ replyKey: "stream-A" }]);
+    });
+
+    it("refuses a value for a turn a collaborator started, rolling the claim back and storing nothing", async () => {
+        await insertMessage(2, { content: "and again", role: "user" });
+        await insertMessage(3, request("sec-2", "requestSecret", SECRET_INPUT));
+        await insertRun("sec-2", { ...CONFIG, startedBy: STRANGER });
+
+        await expect(save(SECRET, { approvalId: "sec-2" })).rejects.toThrow(COLLABORATOR_TURN);
+        expect(await secretRows()).toHaveLength(0);
+        expect(await statuses()).toStrictEqual(["pending", "pending"]);
+        // Declining is still possible.
+        expect(await save(null, { approvalId: "sec-2" })).toMatchObject({ kind: "claimed" });
+    });
+
+    it("refuses a value for a snapshot that names nobody as the starter", async () => {
+        const legacy: Record<string, unknown> = { ...CONFIG };
+
+        delete legacy.startedBy;
+
+        await insertMessage(2, { content: "and again", role: "user" });
+        await insertMessage(3, request("sec-2", "requestSecret", SECRET_INPUT));
+        await insertRun("sec-2", legacy);
+
+        await expect(save(SECRET, { approvalId: "sec-2" })).rejects.toThrow(COLLABORATOR_TURN);
+        expect(await secretRows()).toHaveLength(0);
     });
 
     it("trims the value", async () => {
@@ -689,6 +742,33 @@ describe("the turn that spends a reference", () => {
     });
 });
 
+describe("the audit history of the stored header secrets", () => {
+    it("never holds the ciphertext of a saved header, on a write or a delete", async () => {
+        const id = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    mcpSecretHeaders: [{ encryptedValue: "v1:CIPHERTEXT-ONE", header: "Authorization", server: "Files", url: FILES_URL }],
+                    mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: FILES_URL }],
+                    userId: OWNER,
+                }),
+        );
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.patch(id, {
+                    mcpSecretHeaders: [{ encryptedValue: "v1:CIPHERTEXT-TWO", header: "Authorization", server: "Files", url: FILES_URL }],
+                }),
+        );
+        await harness.run(async (ctx: any) => await ctx.db.delete(id));
+
+        const history = JSON.stringify(await harness.run(async (ctx: any) => await ctx.db.query("documentHistory").collect()));
+
+        expect(history).toContain("Files");
+        expect(history).not.toContain("CIPHERTEXT-ONE");
+        expect(history).not.toContain("CIPHERTEXT-TWO");
+    });
+});
+
 describe("keeping the stored header secrets in step with the server list", () => {
     const secret = (server: string, url: string, header = "Authorization") => {
         return { encryptedValue: "v1:x", header, server, url };
@@ -713,6 +793,36 @@ describe("keeping the stored header secrets in step with the server list", () =>
         );
 
         expect(kept).toStrictEqual([secret("Files", FILES_URL)]);
+    });
+
+    it("looks at every server with that name and address, not just the first", () => {
+        const kept = pruneMcpSecretHeaders(
+            [secret("Files", FILES_URL)],
+            [entry("Files", FILES_URL), entry("Files", FILES_URL, [{ key: "Authorization", value: "typed-by-hand" }])],
+        );
+
+        expect(kept).toStrictEqual([]);
+    });
+});
+
+describe("the headers of a connection test", () => {
+    it("lets a header typed in the form win over a saved secret of the same name, as saving the form would", () => {
+        const headers = headersForConnectionTest(
+            [{ key: "authorization", value: "typed-new-token" }],
+            [
+                { key: "Authorization", value: "saved-old-token" },
+                { key: "X-Team", value: "saved-team" },
+            ],
+        );
+
+        expect(headers).toStrictEqual([
+            { key: "authorization", value: "typed-new-token" },
+            { key: "X-Team", value: "saved-team" },
+        ]);
+    });
+
+    it("sends the saved secrets when the form holds nothing", () => {
+        expect(headersForConnectionTest(undefined, [{ key: "Authorization", value: "saved" }])).toStrictEqual([{ key: "Authorization", value: "saved" }]);
     });
 });
 
@@ -865,7 +975,7 @@ describe("answering for an MCP server", () => {
         await insertMessage(3, request("sec-2", "requestSecret", { label: "Files token", use: HEADER_USE }));
         await insertRun("sec-2");
 
-        for (const value of ["tok\r\nX-Evil: 1", "tok\nen", "to\0ken", "a\rb"]) {
+        for (const value of ["tok\r\nX-Evil: 1", "tok\nen", "to\0ken", "a\rb", "tok\u{100}en", "tok\u{1F600}en"]) {
             await expect(save(value, { approvalId: "sec-2" })).rejects.toThrow(BAD_HEADER_VALUE);
         }
 
@@ -875,10 +985,10 @@ describe("answering for an MCP server", () => {
 });
 
 describe("when a run ends", () => {
-    it("drops the ciphertext of the thread's saved references and keeps their rows", async () => {
-        const ref = await storeSecret();
+    it("drops the ciphertext of that reply's saved references and keeps their rows", async () => {
+        const ref = await storeSecret(PROVIDER_USE, Date.now(), "stream-A");
 
-        expect(await harness.run(async (ctx: any) => await discardThreadSecrets(ctx, { threadId: threadId as never }))).toBe(1);
+        expect(await harness.run(async (ctx: any) => await discardThreadSecrets(ctx, { replyKey: "stream-A", threadId: threadId as never }))).toBe(1);
 
         const [row] = await secretRows();
 
@@ -887,11 +997,58 @@ describe("when a run ends", () => {
         expect(await takeProvider(ref)).toMatchObject({ status: "used" });
     });
 
+    it("leaves another reply's references on the same thread alone", async () => {
+        const first = await storeSecret(PROVIDER_USE, Date.now(), "stream-A");
+        const second = await storeSecret(PROVIDER_USE, Date.now(), "stream-B");
+
+        expect(await harness.run(async (ctx: any) => await discardThreadSecrets(ctx, { replyKey: "stream-A", threadId: threadId as never }))).toBe(1);
+
+        expect(await takeProvider(first)).toMatchObject({ status: "used" });
+        expect(await takeProvider(second)).toMatchObject({ status: "saved" });
+    });
+
     it("leaves other threads' references alone, and a second pass finds nothing", async () => {
-        await storeSecret();
+        await storeSecret(PROVIDER_USE, Date.now(), "stream-A");
 
         const other = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "O", userId: OWNER }));
         const otherRef = await harness.run(
+            async (ctx: any) =>
+                await storeRequestedSecret(ctx, {
+                    approvalId: "sec-o",
+                    label: "L",
+                    now: Date.now(),
+                    replyKey: "stream-A",
+                    threadId: other,
+                    use: PROVIDER_USE,
+                    userId: OWNER,
+                    value: SECRET,
+                }),
+        );
+
+        await harness.run(async (ctx: any) => await discardThreadSecrets(ctx, { replyKey: "stream-A", threadId: threadId as never }));
+
+        expect(await harness.run(async (ctx: any) => await discardThreadSecrets(ctx, { replyKey: "stream-A", threadId: threadId as never }))).toBe(0);
+        expect(await takeProvider(otherRef, { thread: other })).toMatchObject({ status: "saved" });
+    });
+
+    it("names a continuation's reply by the key its snapshot carries, and a first run's by its own stream", async () => {
+        await insertRun("sec-c", { ...CONFIG, replyKey: "stream-A" }, "stream-C1");
+
+        const keyOf = async (streamId: string) => await harness.run(async (ctx: any) => await replyKeyOfStream(ctx, { streamId, threadId: threadId as never }));
+
+        expect(await keyOf("stream-C1")).toBe("stream-A");
+        expect(await keyOf("stream-A")).toBe("stream-A");
+        expect(await keyOf("stream-unrelated")).toBe("stream-unrelated");
+    });
+});
+
+describe("when a thread is deleted", () => {
+    it("removes its saved references, ciphertext and rows, and no other thread's", async () => {
+        await storeSecret();
+
+        const other = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "O", userId: OWNER }));
+
+        await harness.run(
             async (ctx: any) =>
                 await storeRequestedSecret(ctx, {
                     approvalId: "sec-o",
@@ -904,10 +1061,15 @@ describe("when a run ends", () => {
                 }),
         );
 
-        await harness.run(async (ctx: any) => await discardThreadSecrets(ctx, { threadId: threadId as never }));
+        expect(await harness.run(async (ctx: any) => await deleteThreadSecrets(ctx, { threadId: threadId as never }))).toBe(1);
+        expect(await secretRows()).toMatchObject([{ threadId: other }]);
+    });
 
-        expect(await harness.run(async (ctx: any) => await discardThreadSecrets(ctx, { threadId: threadId as never }))).toBe(0);
-        expect(await takeProvider(otherRef, { thread: other })).toMatchObject({ status: "saved" });
+    it("goes through the one routine every thread deletion path ends in", async () => {
+        await storeSecret();
+        await harness.run(async (ctx: any) => await ctx.runMutation(agentThreads.deleteAllForThreadIdAsync, { threadId }));
+
+        expect(await secretRows()).toHaveLength(0);
     });
 });
 

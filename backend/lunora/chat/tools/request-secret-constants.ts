@@ -44,8 +44,8 @@ export const isForbiddenSecretHeader = (name: string): boolean => {
     return FORBIDDEN_HEADERS.has(lower) || lower.startsWith("proxy-");
 };
 
-/** A header value that could end the header and start another (CR, LF) or that no server accepts (NUL). */
-export const SECRET_HEADER_VALUE_FORBIDDEN_RE = /[\0\n\r]/u;
+/** A header value that could end the header and start another (CR, LF), that no server accepts (NUL), or that is not a ByteString (above U+00FF, which the `Headers` constructor throws on). */
+export const SECRET_HEADER_VALUE_FORBIDDEN_RE = /[\0\n\r\u{100}-\u{10FFFF}]/u;
 
 /** What the model is told when the user declines to give the secret. */
 export const SECRET_DECLINED_REASON =

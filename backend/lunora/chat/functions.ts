@@ -60,6 +60,7 @@ import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } fr
 import { paginatedOf } from "../lib/output-validators";
 import { getAuthUserIdentity } from "../auth";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
+import { headersForConnectionTest } from "../auth/lib/mcp-secret-headers";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
 import { patchBrowserSession } from "../browser/session-writes";
 import { authAction, authMutation, authQuery, liteAuthQuery, optionalAuthQuery, publicQuery, rateLimit } from "../lib/crpc";
@@ -6213,8 +6214,7 @@ export const testMCPServerConnection = authAction
         const secretHeaders = await context
             .runQuery(internal.auth.functions.getMcpSecretHeadersQuery, { name, url, userId: context.user.userId })
             .catch(() => []);
-        const sent = (headers ?? []).filter((header) => secretHeaders.every((secret) => secret.key.toLowerCase() !== header.key.toLowerCase()));
-        const allHeaders = [...sent, ...secretHeaders];
+        const allHeaders = headersForConnectionTest(headers, secretHeaders);
         const config: import("./lib/mcp-tools").MCPServerConfig = { enabled: true, ...(allHeaders.length > 0 && { headers: allHeaders }), name, protocol, url };
         // A saved server the user signed in to is tested WITH its token (same name
         // and url only), never pruning: this is one server, not the whole list.

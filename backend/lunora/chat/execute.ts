@@ -435,6 +435,8 @@ export const runStreamingAgent = internalAction
                         memory: memoryToCarry({ botId: runContext.botId, extractMemory, prompt }),
                         model,
                         reasoningEffort: threadReasoningEffort,
+                        // The reply is named by its first stream; every continuation inherits it.
+                        replyKey: streamId,
                         researchDepth: effectiveResearchDepth,
                         searchMode: effectiveSearchMode,
                         shouldAutoContinue: isAutoContinue,

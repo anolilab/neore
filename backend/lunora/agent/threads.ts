@@ -7,6 +7,7 @@ import { internalAction, internalMutation, internalQuery, type MutationCtx as Mu
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
+import { deleteThreadSecrets } from "../chat/lib/secret-requests";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
 
 /**
@@ -461,6 +462,9 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
     if (messages.isDone) {
         // Approval snapshots hold the run's system prompt; they go with the thread.
         await deleteToolApprovalRunsForThread(context, args.threadId);
+
+        // So do the values `requestSecret` saved for its replies: nobody can spend them once the thread is gone.
+        await deleteThreadSecrets(context, { threadId: args.threadId });
 
         // One batch of links per call. While links remain this page reports "not done" and the
         // chain re-runs it, so the thread row (deleted last) and its links never outlive a partial delete.

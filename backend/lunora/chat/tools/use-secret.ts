@@ -31,7 +31,8 @@ const refusal = (message: string): UseSecretOutput => {
 
 export const saveSecretAsProviderKeyTool = createTool<UseSecretInput, UseSecretOutput, ToolContext>({
     description: `Save a secret the user gave you with requestSecret (use.kind "provider_key") as their own API key for the provider they approved.
-Takes the reference only; the value stays on the server. A reference works once, in the reply that received it.`,
+Takes the reference only; the value stays on the server. A reference works once, in the reply that received it.
+The change applies from the user's next message: this reply keeps the key and the server connections it already has.`,
     execute: async (context, input) => {
         if (!context.userId || !context.threadId) {
             return refusal("Sign in to use a requested secret.");
@@ -52,7 +53,8 @@ Takes the reference only; the value stays on the server. A reference works once,
 
 export const setMcpServerSecretTool = createTool<UseSecretInput, UseSecretOutput, ToolContext>({
     description: `Set a secret the user gave you with requestSecret (use.kind "mcp_header") as a header on the saved MCP server they approved.
-Takes the reference only; the value stays on the server. A reference works once, in the reply that received it.`,
+Takes the reference only; the value stays on the server. A reference works once, in the reply that received it.
+The change applies from the user's next message: this reply keeps the key and the server connections it already has.`,
     execute: async (context, input) => {
         if (!context.userId || !context.threadId) {
             return refusal("Sign in to use a requested secret.");

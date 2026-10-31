@@ -105,6 +105,15 @@ export const claimSecretAnswer = async (
         throw new LunoraError("BAD_REQUEST", "This secret request has no valid destination");
     }
 
+    // A continuation runs as the owner, but a consumer spends a reference only in a turn the owner started (`takeRequestedSecret`):
+    // a value stored for a collaborator's turn could never be used.
+    if (claim.config.startedBy !== claim.ownerId) {
+        throw new LunoraError(
+            "BAD_REQUEST",
+            "Only a reply you started can use a secret, and someone else started this one. Decline it, or ask again in your own message",
+        );
+    }
+
     const value = reply.value.trim();
 
     if (value.length === 0 || value.length > secretValueMax(asked)) {
@@ -112,13 +121,22 @@ export const claimSecretAnswer = async (
     }
 
     if (asked.kind === "mcp_header" && SECRET_HEADER_VALUE_FORBIDDEN_RE.test(value)) {
-        throw new LunoraError("BAD_REQUEST", "A header value cannot contain a line break or a control character");
+        throw new LunoraError("BAD_REQUEST", "A header value cannot contain a line break, a control character or a character above U+00FF");
     }
 
     const use = await withServerUrl(ctx, claim.ownerId, asked);
 
     const label = typeof input.label === "string" ? input.label.slice(0, SECRET_LABEL_MAX) : "Secret";
-    const ref = await storeRequestedSecret(ctx, { approvalId, label, now, threadId, use, userId: claim.ownerId, value });
+    const ref = await storeRequestedSecret(ctx, {
+        approvalId,
+        label,
+        now,
+        ...(claim.config.replyKey !== undefined && { replyKey: claim.config.replyKey }),
+        threadId,
+        use,
+        userId: claim.ownerId,
+        value,
+    });
 
     return { ...claim, ref, use };
 };

@@ -5593,6 +5593,19 @@
             }
           ]
         },
+        "projectIds": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "id",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "ref": "projects"
+          }
+        },
         "revokedAt": {
           "kind": "number",
           "nullable": false,
@@ -16824,6 +16837,12 @@
           "optional": false,
           "unique": false
         },
+        "replyKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "status": {
           "kind": "union",
           "nullable": false,
@@ -21221,6 +21240,13 @@
               "optional": true,
               "unique": false
             },
+            "replyKey": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
             "researchDepth": {
               "kind": "union",
               "nullable": false,
@@ -21266,7 +21292,8 @@
               "kind": "string",
               "nullable": false,
               "optional": true,
-              "unique": false
+              "unique": false,
+              "refined": true
             },
             "toolNames": {
               "kind": "array",

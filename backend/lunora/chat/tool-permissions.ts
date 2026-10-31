@@ -80,7 +80,7 @@ export const getToolPermissionsQuery = internalQuery
 
 /** The user's time-boxed allows, lapsed ones included — the resolver judges them against the clock. */
 export const getToolPermissionGrantsQuery = internalQuery
-    .input({ userId: v.string() })
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(vToolPermissionGrants)
     .query(async ({ args: { userId }, ctx }) => {
         const prefs = await ctx.db
@@ -343,7 +343,7 @@ export const recordPendingToolApprovals = internalMutation
         askUserApprovalIds: v.optional(v.array(v.string())),
         config: vToolRunConfig,
         // The subset that are `requestSecret` cards: answered with a value, not approved, so they notify as their own thing.
-        secretApprovalIds: v.optional(v.array(v.string())),
+        secretApprovalIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
         threadId: v.string(),
         userId: v.string(),
     })

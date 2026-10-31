@@ -86,17 +86,18 @@ const CONFIG = {
     instructions: "system prompt",
     mcpServerNames: [],
     model: "test-model",
+    replyKey: "stream-A",
     researchDepth: "balanced" as const,
     searchMode: "chat",
     shouldAutoContinue: true,
-    startedBy: COLLABORATOR,
+    startedBy: OWNER,
     toolNames: ["requestSecret"],
 };
 
 let harness: ReturnType<typeof lunoraTest>;
 let threadId: string;
 
-const insertRequest = async (approvalId: string, input: unknown, order = 1) => {
+const insertRequest = async (approvalId: string, input: unknown, order = 1, config: Record<string, unknown> = CONFIG) => {
     await harness.run(async (ctx: any) => {
         await ctx.db.insert("messages", {
             message: {
@@ -113,7 +114,7 @@ const insertRequest = async (approvalId: string, input: unknown, order = 1) => {
             tool: true,
             userId: OWNER,
         });
-        await ctx.db.insert("toolApprovalRuns", { approvalId, config: CONFIG, createdAt: Date.now(), status: "pending", threadId, userId: OWNER });
+        await ctx.db.insert("toolApprovalRuns", { approvalId, config, createdAt: Date.now(), status: "pending", threadId, userId: OWNER });
     });
 };
 
@@ -164,10 +165,36 @@ describe("answerSecretRequest", () => {
         expect(JSON.stringify(await rows("persistentChunks"))).not.toContain(SECRET);
     });
 
-    it("keeps who started the turn in the snapshot the continuation resumes from", async () => {
+    it("keeps who started the turn, and the reply it belongs to, in the snapshot the continuation resumes from", async () => {
         await answer(OWNER, SECRET);
 
+        expect((queued[0]!.args as { config: { replyKey?: string; startedBy?: string } }).config).toMatchObject({ replyKey: "stream-A", startedBy: OWNER });
+        expect(await rows("requestedSecrets")).toMatchObject([{ replyKey: "stream-A" }]);
+    });
+
+    it("refuses the owner's value for a turn a collaborator started, since no consumer could spend it, but lets them decline", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.insert("threadAccess", { ownerId: OWNER, permission: "write", threadId, userId: COLLABORATOR }));
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("messages", {
+                    message: { content: "from the collaborator", role: "user" },
+                    order: 2,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId,
+                    userId: COLLABORATOR,
+                }),
+        );
+        await insertRequest("sec-3", { label: "OpenAI API key", use: { kind: "provider_key", provider: "openai" } }, 3, { ...CONFIG, startedBy: COLLABORATOR });
+
+        await expect(answer(OWNER, SECRET, "sec-3")).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        expect(await rows("requestedSecrets")).toHaveLength(0);
+        expect(queued).toHaveLength(0);
+
+        await answer(OWNER, null, "sec-3");
+
         expect((queued[0]!.args as { config: { startedBy?: string } }).config.startedBy).toBe(COLLABORATOR);
+        expect(queued[0]!.args).toMatchObject({ approved: false });
     });
 
     it("declining queues a denial and stores nothing", async () => {

@@ -65,7 +65,17 @@ export const invalidSecretUse = (use: SecretUse): string | undefined => {
 /** Store `value` for `row.userId`'s thread and return the reference that stands for it. The caller stamps `userId` from the claimed run, never from a client. */
 export const storeRequestedSecret = async (
     ctx: Database,
-    row: { approvalId: string; label: string; now: number; threadId: Id<"threads">; use: SecretUse; userId: string; value: string },
+    row: {
+        approvalId: string;
+        label: string;
+        now: number;
+        /** The reply that asked; its end drops the value ({@link discardThreadSecrets}). */
+        replyKey?: string;
+        threadId: Id<"threads">;
+        use: SecretUse;
+        userId: string;
+        value: string;
+    },
 ): Promise<string> => {
     const ref = newSecretRef();
 
@@ -76,6 +86,7 @@ export const storeRequestedSecret = async (
         expiresAt: secretExpiresAt(row.now),
         label: row.label,
         ref,
+        ...(row.replyKey !== undefined && { replyKey: row.replyKey }),
         status: "saved",
         threadId: row.threadId,
         use: row.use,
@@ -152,27 +163,55 @@ export const takeRequestedSecret = async (
 };
 
 /**
- * Drop the ciphertext of every reference still saved for `threadId`, keeping the rows (a later spend reads `used`).
- * Called when a reply ends for good — finished, failed or stopped, never at a pause — so a value does not wait out
- * its 24 hours once the reply that received it is over. Returns how many it dropped.
+ * The reply a stream belongs to: the key its approval snapshot carries when the stream is a continuation, or the
+ * stream's own id when it is the reply's first run (whose snapshot is stamped with that id).
+ */
+export const replyKeyOfStream = async (ctx: Database, args: { streamId: string; threadId: Id<"threads"> }): Promise<string> => {
+    const runs = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
+        .collect();
+
+    return runs.find((run) => run.streamId === args.streamId)?.config.replyKey ?? args.streamId;
+};
+
+/**
+ * Drop the ciphertext of the references of one reply (`replyKey`) that are still saved on `threadId`, keeping the rows
+ * (a later spend reads `used`). Called when that reply ends for good — finished, failed or stopped, never at a pause —
+ * so a value does not wait out its 24 hours once the reply that received it is over, and another reply on the thread
+ * keeps its own. Returns how many it dropped.
  *
  * What remains: the row itself (status, label, destination, ref, approvalId, expiresAt) until the sweep; and the
  * ciphertext of a reply that never reached an end — a worker killed mid-continuation, or a stream the timeout reaper
  * closed, which does not call this — until its `expiresAt` passes and the housekeeping sweep (every 10 minutes on a
  * shard that was active, else daily for 30 days) deletes the row. A decline stores nothing at all.
  */
-export const discardThreadSecrets = async (ctx: Database, args: { threadId: Id<"threads"> }): Promise<number> => {
+export const discardThreadSecrets = async (ctx: Database, args: { replyKey: string; threadId: Id<"threads"> }): Promise<number> => {
     const rows = await ctx.db
         .query("requestedSecrets")
         .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
         .collect();
-    const live = rows.filter((row) => row.encryptedValue !== undefined);
+    const live = rows.filter((row) => row.encryptedValue !== undefined && row.replyKey === args.replyKey);
 
     for (const row of live) {
         await patchRow(ctx.db, row, { encryptedValue: undefined });
     }
 
     return live.length;
+};
+
+/** Delete every row of `threadId`, ciphertext included — the thread is gone, and so is whatever a reply of it was holding. Returns how many. */
+export const deleteThreadSecrets = async (ctx: Database, args: { threadId: Id<"threads"> }): Promise<number> => {
+    const rows = await ctx.db
+        .query("requestedSecrets")
+        .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
+        .collect();
+
+    for (const row of rows) {
+        await ctx.db.delete(row._id);
+    }
+
+    return rows.length;
 };
 
 /** Delete the rows on this shard whose reference lapsed, whatever their status. Returns how many. */

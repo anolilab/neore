@@ -16,7 +16,7 @@
  * spent for the user and thread that asked, and by nobody else.
  *
  * A reference is spent during the reply that received it: the ciphertext is dropped when a reply ends for good
- * (`discardSecretsOfThread`; see `discardThreadSecrets` for what a missed end leaves until the sweep).
+ * (`discardSecretsOfThread`, by the reply's key; see `discardThreadSecrets` for what a missed end leaves until the sweep).
  *
  * The value is an argument of exactly one client procedure — this one — and is
  * never passed to a log call, an event or a job.
@@ -27,9 +27,10 @@ import { v } from "lunorash/server";
 import { internalMutation } from "../_generated/server";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { rateLimitGuard } from "../lib/rate-limiter";
+import { noteShardActivity } from "../lib/shard-housekeeping";
 import { claimSecretAnswer, secretResumeArgs } from "./lib/request-secret-claim";
 import { consumeAsMcpHeader, consumeAsProviderKey } from "./lib/secret-consumers";
-import { discardThreadSecrets, sweepExpiredSecrets } from "./lib/secret-requests";
+import { discardThreadSecrets, replyKeyOfStream, sweepExpiredSecrets } from "./lib/secret-requests";
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
 import { SECRET_HEADER_VALUE_MAX, SECRET_REF_MAX } from "./tools/request-secret-constants";
 
@@ -77,6 +78,9 @@ export const answerSecretRequest = authMutation
             return { alreadyResolved: true, streamId: claim.streamId };
         }
 
+        // The value now waits for its 24 hours on this shard, so housekeeping must visit it even if its last HTTP request was long ago.
+        await noteShardActivity(ctx, claim.ownerId);
+
         // A provider key counts against the same budget as saving one in Settings. A throw rolls the claim back.
         if (claim.use?.kind === "provider_key") {
             await rateLimitGuard({ ...ctx, rateLimitKey: "byok/save", user: ctx.user });
@@ -110,15 +114,15 @@ export const consumeSecretAsMcpHeader = internalMutation
     .mutation(async ({ args, ctx }) => await consumeAsMcpHeader(ctx, { ...args, now: ctx.now }));
 
 /**
- * A reply ended for good (finished, failed or stopped — never at a pause): drop the ciphertext of the thread's saved
- * references. The rows stay, so a late spend reads `used`. Best effort from the caller; whatever it misses waits for
- * the sweep below, which runs per shard when the shard was active.
+ * The reply `streamId` belongs to ended for good (finished, failed or stopped — never at a pause): drop the ciphertext
+ * of ITS saved references, not another reply's on the same thread. The rows stay, so a late spend reads `used`. Best
+ * effort from the caller; whatever it misses waits for the sweep below, which runs per shard when the shard was active.
  */
 export const discardSecretsOfThread = internalMutation
-    .input({ threadId: v.id("threads") })
+    .input({ streamId: v.string().max(MAX_LENGTH.id), threadId: v.id("threads") })
     .output(v.null())
-    .mutation(async ({ args: { threadId }, ctx }) => {
-        await discardThreadSecrets(ctx, { threadId });
+    .mutation(async ({ args: { streamId, threadId }, ctx }) => {
+        await discardThreadSecrets(ctx, { replyKey: await replyKeyOfStream(ctx, { streamId, threadId }), threadId });
 
         return null;
     });

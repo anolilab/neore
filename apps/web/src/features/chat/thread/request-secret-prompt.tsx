@@ -30,12 +30,13 @@ import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
-/** Mirrors `SECRET_HEADER_VALUE_MAX` on the server; a provider key is capped lower there. */
-const VALUE_MAX = 10_000;
+/** Mirror `SECRET_HEADER_VALUE_MAX` and `SECRET_PROVIDER_KEY_MAX` on the server (`chat/tools/request-secret-constants.ts`). */
+const HEADER_VALUE_MAX = 10_000;
+const PROVIDER_KEY_MAX = 500;
 
 type SecretUse = { header: string; kind: "mcp_header"; server: string } | { kind: "provider_key"; provider: string };
 
-type Server = { kind: "ambiguous" } | { host: string; kind: "found" } | { kind: "loading" } | { kind: "missing" };
+type Server = { address: string; kind: "found" } | { kind: "ambiguous" } | { kind: "loading" } | { kind: "missing" };
 
 interface RequestSecretInput {
     label?: string;
@@ -54,9 +55,12 @@ const PROVIDER_NAMES: Record<string, string> = {
     xai: "xAI",
 };
 
-const hostOf = (url: string): string => {
+/** Where the header will be sent, without a query or fragment (a saved URL can carry a token there). */
+const addressOf = (url: string): string => {
     try {
-        return new URL(url).host;
+        const { host, pathname, protocol } = new URL(url);
+
+        return `${protocol}//${host}${pathname}`;
     } catch {
         return url;
     }
@@ -74,7 +78,7 @@ const resolveServer = (servers: ReadonlyArray<{ name: string; url: string }> | u
         return { kind: "ambiguous" };
     }
 
-    return matches[0] ? { host: hostOf(matches[0].url), kind: "found" } : { kind: "missing" };
+    return matches[0] ? { address: addressOf(matches[0].url), kind: "found" } : { kind: "missing" };
 };
 
 const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
@@ -86,6 +90,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const headingId = useId();
     const valueId = useId();
     const destinationId = useId();
+    const tooLongId = useId();
     const [draft, setDraft] = useState("");
     const [submitted, setSubmitted] = useState<Submitted | null>(null);
     // Focus lands here after a send: the form (and the focused control) goes away.
@@ -101,10 +106,15 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const isWaiting = part.state === "approval-requested" && submitted === null;
     // Only the owner's servers are the destination, and only the owner's card needs them: for anyone else (a
     // collaborator, a public view) the query never runs. For the owner it is the one the composer and Settings read.
-    const { data: preferences } = useQuery(
+    const { data: preferences, isSuccess: preferencesLoaded } = useQuery(
         crpc.auth.functions.getAIUserPreferences.queryOptions(isOwner && isWaiting && input.use?.kind === "mcp_header" ? {} : skipToken),
     );
-    const server = input.use?.kind === "mcp_header" && isOwner ? resolveServer(preferences?.mcpServers, input.use.server) : undefined;
+    // A user who never saved a server has no `mcpServers` (or no row at all): once the read has answered, that is an empty list, not "still loading".
+    const savedServers = preferences?.mcpServers ?? (preferencesLoaded ? [] : undefined);
+    const server = input.use?.kind === "mcp_header" && isOwner ? resolveServer(savedServers, input.use.server) : undefined;
+    const valueMax = input.use?.kind === "provider_key" ? PROVIDER_KEY_MAX : HEADER_VALUE_MAX;
+    // Checked before anything is sent: the card clears the draft once it goes, and the server would refuse it after that.
+    const tooLong = draft.trim().length > valueMax;
     // A header goes to one saved server, found by name when the answer arrives: without exactly one the server refuses it.
     const destinationReady = server === undefined || server.kind === "found";
     const canAnswer = isOwner && isWaiting && !!approvalId && !!threadId && !isPending;
@@ -114,7 +124,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     if (input.use?.kind === "provider_key") {
         const provider = PROVIDER_NAMES[input.use.provider] ?? input.use.provider;
 
-        destination = t`Saved as your ${provider} API key`;
+        destination = t`Will be saved as your ${provider} API key`;
     } else if (input.use?.kind === "mcp_header") {
         const { header, server: serverName } = input.use;
 
@@ -125,9 +135,9 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                 break;
             }
             case "found": {
-                const { host } = server;
+                const { address } = server;
 
-                destination = t`Set as the ${header} header on your ${serverName} MCP server (${host})`;
+                destination = t`Set as the ${header} header on your ${serverName} MCP server (${address})`;
 
                 break;
             }
@@ -149,6 +159,10 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
 
         const value = reply === "save" ? draft.trim() : null;
 
+        if (value !== null && value.length > valueMax) {
+            return;
+        }
+
         // Cleared before the call returns: the value lives in this component for no longer than the keystrokes.
         setDraft("");
         setSubmitted(reply);
@@ -169,7 +183,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        if (draft.trim().length > 0 && canAnswer && destinationReady) {
+        if (draft.trim().length > 0 && !tooLong && canAnswer && destinationReady) {
             send("save");
         }
     };
@@ -215,11 +229,12 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         {label || t`Secret`}
                     </label>
                     <Input
-                        aria-describedby={destination ? destinationId : undefined}
+                        aria-describedby={[destination ? destinationId : "", tooLong ? tooLongId : ""].filter(Boolean).join(" ") || undefined}
+                        aria-invalid={tooLong || undefined}
                         autoComplete="new-password"
                         autoCorrect="off"
                         id={valueId}
-                        maxLength={VALUE_MAX}
+                        maxLength={HEADER_VALUE_MAX}
                         name="requested-secret"
                         onChange={(event) => setDraft(event.target.value)}
                         placeholder={t`Paste it here — it is not shown in the chat`}
@@ -228,8 +243,13 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         type="password"
                         value={draft}
                     />
+                    {tooLong && (
+                        <p className="text-destructive text-xs" id={tooLongId} role="alert">
+                            {t`This is too long: up to ${valueMax} characters.`}
+                        </p>
+                    )}
                     <div className="flex flex-wrap gap-2">
-                        <Button disabled={draft.trim().length === 0 || !destinationReady} size="sm" type="submit">
+                        <Button disabled={draft.trim().length === 0 || tooLong || !destinationReady} size="sm" type="submit">
                             <KeyRound aria-hidden="true" />
                             {t`Save`}
                         </Button>

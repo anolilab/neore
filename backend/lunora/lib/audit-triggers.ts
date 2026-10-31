@@ -35,6 +35,7 @@ const REDACTED_FIELDS = new Set([
     "hashedPassword",
     "inviteToken",
     "kvTokenKey",
+    "mcpSecretHeaders",
     "oauthClient",
     "publicAccessToken",
     "totpSecret",

@@ -33,10 +33,25 @@ export const sameHeaderName = (a: string, b: string): boolean => a.toLowerCase()
  */
 export const pruneMcpSecretHeaders = (secrets: McpSecretHeader[], servers: McpServerHeaders[]): McpSecretHeader[] =>
     secrets.filter((secret) => {
-        const server = servers.find((candidate) => candidate.name === secret.server && candidate.url === secret.url);
+        // Every server at that name and address counts: a secret applies to each of them, so a header typed on any one drops it.
+        const matches = servers.filter((candidate) => candidate.name === secret.server && candidate.url === secret.url);
 
-        return server !== undefined && (server.headers ?? []).every((header) => !sameHeaderName(header.key, secret.header));
+        return matches.length > 0 && matches.every((server) => (server.headers ?? []).every((header) => !sameHeaderName(header.key, secret.header)));
     });
+
+/**
+ * The headers of a connection test: those typed in the form, plus each saved secret the form does not set by name.
+ * Saving the form drops such a secret ({@link pruneMcpSecretHeaders}), so a typed header wins here too and the test
+ * checks the value that would be kept.
+ */
+export const headersForConnectionTest = (
+    typed: { key: string; value: string }[] | undefined,
+    secrets: { key: string; value: string }[],
+): { key: string; value: string }[] => {
+    const own = typed ?? [];
+
+    return [...own, ...secrets.filter((secret) => own.every((header) => !sameHeaderName(header.key, secret.key)))];
+};
 
 /**
  * `servers` with each saved secret added as a plain header on the server it was approved for.

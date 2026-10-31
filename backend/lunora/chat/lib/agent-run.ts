@@ -245,12 +245,12 @@ export const setRunStartedBy = (ctx: object, startedBy: string | undefined): voi
 };
 
 /**
- * A reply ended for good — drop the ciphertext of the thread's saved secret references (`requestSecret`). Best
+ * A reply ended for good — drop the ciphertext of that reply's saved secret references (`requestSecret`). Best
  * effort: it must never fail or delay the end of a run, and what it misses waits for the housekeeping sweep.
  */
-export const discardRunSecrets = async (ctx: Pick<ActionCtx, "runMutation">, threadId: string): Promise<void> => {
+export const discardRunSecrets = async (ctx: Pick<ActionCtx, "runMutation">, run: { streamId: string; threadId: string }): Promise<void> => {
     try {
-        await ctx.runMutation(internal.chat.request_secret.discardSecretsOfThread, { threadId: threadId as Id<"threads"> });
+        await ctx.runMutation(internal.chat.request_secret.discardSecretsOfThread, { streamId: run.streamId, threadId: run.threadId as Id<"threads"> });
     } catch {
         // Swept later.
     }
@@ -841,7 +841,7 @@ export const finishRun = async (
     // A pause keeps the references (a consumer set to ask resumes the run); only a final end drops them. A group turn that
     // goes on with the next speaker (`keepOpenUnlessPaused`) is not over either.
     if (!paused && keepOpenUnlessPaused !== true) {
-        await discardRunSecrets(ctx, threadId);
+        await discardRunSecrets(ctx, { streamId, threadId });
     }
 
     return { paused };
@@ -904,7 +904,7 @@ export const endStoppedRun = async (
     args.stop.abort();
     // Errors are reported on the result, not thrown; the abort ends the stream, so this returns once the save is done.
     await args.result.consumeStream();
-    await discardRunSecrets(ctx, args.threadId);
+    await discardRunSecrets(ctx, { streamId: args.streamId, threadId: args.threadId });
 
     return stopped.messageId === undefined ? [] : [stopped.messageId];
 };
@@ -1224,5 +1224,5 @@ export const failRun = async (
         // Ignore cleanup errors
     }
 
-    await discardRunSecrets(ctx, threadId);
+    await discardRunSecrets(ctx, { streamId, threadId });
 };

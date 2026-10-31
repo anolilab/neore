@@ -10,8 +10,9 @@ import RequestSecretPrompt from "./request-secret-prompt";
 
 const SECRET = "sk-live-0123456789-supersecret";
 
-const { answer, readPreferences, servers, thread } = vi.hoisted(() => {
+const { answer, preferencesRow, readPreferences, servers, thread } = vi.hoisted(() => {
     return {
+        preferencesRow: { current: undefined as { mcpServers?: { name: string; url: string }[] } | null | undefined },
         readPreferences: vi.fn(),
         thread: { current: { userId: "owner" } },
         answer: vi.fn(async (_variables: unknown) => {
@@ -72,7 +73,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                                             : async () => {
                                                   readPreferences();
 
-                                                  return { mcpServers: servers.current };
+                                                  return preferencesRow.current === undefined ? { mcpServers: servers.current } : preferencesRow.current;
                                               },
                                     queryKey: ["getAIUserPreferences"],
                                 };
@@ -99,7 +100,10 @@ vi.mock("@/lib/toast", () => {
 
 const SAVE = /^Save$/u;
 const DECLINE = /Decline/u;
-const FILES_HOST = /files\.example\.com/u;
+const FILES_ADDRESS = /https:\/\/files\.example\.com\/mcp/u;
+const FILES_ADDRESS_HTTP = /http:\/\/files\.example\.com\/mcp/u;
+const HIDDEN_QUERY = /hidden/u;
+const TOO_LONG = /up to 500 characters/u;
 const NO_SERVER = /no saved MCP server named Files/u;
 
 const header = { header: "Authorization", kind: "mcp_header", server: "Files" } as const;
@@ -123,7 +127,9 @@ const mountCard = (use: unknown, children?: ReactNode) => {
 describe("the secret request card", () => {
     beforeEach(() => {
         thread.current = { userId: "owner" };
+        preferencesRow.current = undefined;
         readPreferences.mockClear();
+        answer.mockClear();
     });
 
     it("keeps the value out of the mutation cache once the answer is sent", async () => {
@@ -151,12 +157,61 @@ describe("the secret request card", () => {
         );
     });
 
-    it("names the host of the server a header will be set on", async () => {
+    it("names the address of the server a header will be set on, scheme and path included, and nothing from the query", async () => {
+        // eslint-disable-next-line unicorn/prefer-https -- the card has to show the scheme of a server saved over plain http
+        servers.current = [{ name: "Files", url: "http://files.example.com/mcp?token=hidden" }];
+        mountCard(header);
+
+        expect(await screen.findByText(FILES_ADDRESS_HTTP)).toBeTruthy();
+        expect(screen.queryByText(HIDDEN_QUERY)).toBeNull();
+        expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("shows the address of an https server and enables Save once a value is typed", async () => {
         servers.current = [{ name: "Files", url: "https://files.example.com/mcp" }];
         mountCard(header);
 
-        expect(await screen.findByText(FILES_HOST)).toBeTruthy();
+        expect(await screen.findByText(FILES_ADDRESS)).toBeTruthy();
+
+        fireEvent.change(screen.getByPlaceholderText("Paste it here — it is not shown in the chat"), { target: { value: SECRET } });
+
+        expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("tells a user whose preferences hold no servers at all that there is none, rather than staying silent", async () => {
+        preferencesRow.current = null;
+        mountCard(header);
+
+        expect(await screen.findByText(NO_SERVER)).toBeTruthy();
         expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("refuses a provider key longer than the server takes before sending, keeping what was typed", async () => {
+        mountCard({ kind: "provider_key", provider: "openai" });
+
+        const field = screen.getByPlaceholderText("Paste it here — it is not shown in the chat") as HTMLInputElement;
+
+        fireEvent.change(field, { target: { value: "k".repeat(501) } });
+
+        expect(screen.getByText(TOO_LONG)).toBeTruthy();
+        expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
+        expect(field.value).toHaveLength(501);
+
+        fireEvent.submit(field);
+
+        expect(answer).not.toHaveBeenCalled();
+        expect(field.value).toHaveLength(501);
+    });
+
+    it("lets a header value run past a provider key's limit", async () => {
+        servers.current = [{ name: "Files", url: "https://files.example.com/mcp" }];
+        mountCard(header);
+
+        await screen.findByText(FILES_ADDRESS);
+        fireEvent.change(screen.getByPlaceholderText("Paste it here — it is not shown in the chat"), { target: { value: "t".repeat(2000) } });
+
+        expect(screen.queryByText(TOO_LONG)).toBeNull();
+        expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(false);
     });
 
     it("cannot be saved when no saved server has that name, but can still be declined", async () => {

@@ -214,7 +214,7 @@ describe(finishRun, () => {
         expect(ctx.runMutation).toHaveBeenCalledWith(internal.chat.streaming.persistent.library.addChunk, expect.objectContaining({ final: true }));
     });
 
-    it("a final end drops the thread's saved secret references, and a failing drop does not fail the run", async () => {
+    it("a final end drops that reply's saved secret references, and a failing drop does not fail the run", async () => {
         const ctx = {
             runMutation: vi.fn(async (ref: unknown) => {
                 if (ref === internal.chat.request_secret.discardSecretsOfThread) {
@@ -226,7 +226,7 @@ describe(finishRun, () => {
         };
 
         await expect(finishRun(ctx as never, { ...runArgs, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({ paused: false });
-        expect(ctx.runMutation).toHaveBeenCalledWith(internal.chat.request_secret.discardSecretsOfThread, { threadId: "thread-1" });
+        expect(ctx.runMutation).toHaveBeenCalledWith(internal.chat.request_secret.discardSecretsOfThread, { streamId: "stream-1", threadId: "thread-1" });
     });
 
     it("a pause keeps them (a consumer set to ask resumes the run), and so does a group turn that goes on to its next speaker", async () => {
@@ -244,12 +244,15 @@ describe(finishRun, () => {
         expect(ctx.runMutation).not.toHaveBeenCalledWith(internal.chat.request_secret.discardSecretsOfThread, expect.anything());
     });
 
-    it("a stop that ends the reply drops them too, with the thread it names", async () => {
+    it("a stop that ends the reply drops them too, with the thread and stream it names", async () => {
         const { ctx, mutations } = stoppedCtx(true);
 
         await endStoppedRun(ctx as never, streamWriteRefused({ reasoning: "", text: "Hello." }, conflict()), { ...STOP_ARGS, stop: new AbortController() });
 
-        expect(mutations.find((call) => call.ref === internal.chat.request_secret.discardSecretsOfThread)?.args).toStrictEqual({ threadId: "thread-1" });
+        expect(mutations.find((call) => call.ref === internal.chat.request_secret.discardSecretsOfThread)?.args).toStrictEqual({
+            streamId: "stream-1",
+            threadId: "thread-1",
+        });
     });
 });
 

@@ -10,6 +10,7 @@
 import type { Infer } from "lunorash/server";
 import { v } from "lunorash/server";
 
+import { MAX_LENGTH } from "../../lib/validators";
 import { vGroupRunSnapshot } from "../group/validators";
 
 export const vToolRunConfig = v.object({
@@ -34,6 +35,12 @@ export const vToolRunConfig = v.object({
     memory: v.optional(v.object({ botId: v.optional(v.string()) })),
     model: v.string(),
     reasoningEffort: v.optional(v.number()),
+    /**
+     * Names the reply this snapshot belongs to (the stream its first run wrote to), carried unchanged through every
+     * pause and continuation. A `requestSecret` reference is stamped with it, so a reply that ends drops only its own
+     * references and not those of another reply on the same thread. Absent on a snapshot that predates it.
+     */
+    replyKey: v.optional(v.string().max(MAX_LENGTH.id)),
     researchDepth: v.union(v.literal("speed"), v.literal("balanced"), v.literal("thorough")),
     searchMode: v.string(),
     shouldAutoContinue: v.boolean(),
@@ -42,7 +49,7 @@ export const vToolRunConfig = v.object({
      * turn). The continuation runs as the owner, so this is what `setMcpServerSecret` checks before it spends
      * the owner's secret. Absent on a snapshot written before it existed, which reads as nobody.
      */
-    startedBy: v.optional(v.string()),
+    startedBy: v.optional(v.string().max(MAX_LENGTH.id)),
     toolNames: v.array(v.string()),
     /**
      * Runtime tool name -> stable permission key, taken from the tools as they
