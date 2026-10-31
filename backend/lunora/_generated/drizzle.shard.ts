@@ -51,6 +51,7 @@ export const aiUserPreferences = sqliteTable("aiUserPreferences", {
     searchProvider: text("searchProvider"),
     selectedModel: text("selectedModel"),
     showTimestamps: integer("showTimestamps", { mode: "boolean" }),
+    toolPermissionGrants: text("toolPermissionGrants", { mode: "json" }).$type<Record<string, number>>(),
     toolPermissions: text("toolPermissions", { mode: "json" }).$type<Record<string, "auto" | "ask" | "off">>(),
     userId: text("userId").notNull(),
 }, (t) => ({

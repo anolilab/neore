@@ -440,7 +440,7 @@ msgstr "{0} 件失敗"
 
 #. placeholder {0}: modeLabels[mode]
 #. placeholder {1}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:88
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:93
 msgid "{0} for {1}"
 msgstr "{1} の{0}"
 
@@ -1076,6 +1076,10 @@ msgstr "{selectedCount, plural, other {# 件のスレッドを選択中}}"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{MAX_PARALLEL} 個中 {selectedCount} 個を選択中"
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:204
+msgid "{server} · until {until}"
+msgstr ""
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:77
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
@@ -2738,13 +2742,29 @@ msgstr "すべての種類"
 msgid "All Users"
 msgstr "すべてのユーザー"
 
-#: src/features/chat/thread/tool-approval.tsx:95
+#: src/features/chat/thread/tool-approval.tsx:100
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "{server} の「{tool}」を許可しますか？"
 
-#: src/features/chat/thread/tool-approval.tsx:95
+#: src/features/chat/thread/tool-approval.tsx:100
 msgid "Allow \"{tool}\"?"
 msgstr "「{tool}」を許可しますか？"
+
+#: src/features/chat/thread/tool-approval.tsx:133
+msgid "Allow {tool} for 1 hour"
+msgstr ""
+
+#: src/features/chat/thread/tool-approval.tsx:137
+msgid "Allow {tool} for today"
+msgstr ""
+
+#: src/features/chat/thread/tool-approval.tsx:135
+msgid "Allow for 1 hour"
+msgstr ""
+
+#: src/features/chat/thread/tool-approval.tsx:139
+msgid "Allow for today"
+msgstr ""
 
 #. placeholder {0}: osLabels[key]
 #: src/features/local-models/components/local-setup-guide.tsx:115
@@ -2755,6 +2775,11 @@ msgstr "このサイトを許可（{0}）"
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "許可された AI モデル"
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:192
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:193
+msgid "Allowed for a limited time"
+msgstr ""
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:224
 msgid "Allowed Providers"
@@ -2780,11 +2805,11 @@ msgstr "アカウントをお持ちですか？"
 msgid "Also viewing"
 msgstr "他の閲覧者"
 
-#: src/features/chat/thread/tool-approval.tsx:124
+#: src/features/chat/thread/tool-approval.tsx:129
 msgid "Always allow"
 msgstr "常に許可"
 
-#: src/features/chat/thread/tool-approval.tsx:122
+#: src/features/chat/thread/tool-approval.tsx:127
 msgid "Always allow {tool}"
 msgstr "{tool} を常に許可"
 
@@ -3166,16 +3191,16 @@ msgstr "適用しています..."
 msgid "approval"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:116
+#: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/tasks/components/task-detail-dialog.tsx:102
 msgid "Approve"
 msgstr "承認"
 
-#: src/features/chat/thread/tool-approval.tsx:114
+#: src/features/chat/thread/tool-approval.tsx:119
 msgid "Approve {tool} once"
 msgstr "{tool} を今回のみ承認"
 
-#: src/features/chat/thread/tool-approval.tsx:74
+#: src/features/chat/thread/tool-approval.tsx:79
 msgid "Approved — running tool"
 msgstr "承認済み — ツールを実行中"
 
@@ -3376,7 +3401,7 @@ msgstr "昇順"
 msgid "ask"
 msgstr ""
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:56
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:59
 msgid "Ask"
 msgstr "確認"
 
@@ -3535,7 +3560,7 @@ msgstr ""
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:56
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:59
 msgid "Auto"
 msgstr "自動"
 
@@ -3587,7 +3612,7 @@ msgstr "返信を自動で読み上げ"
 msgid "Auto-save"
 msgstr "自動保存"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:213
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:305
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "自動：確認なしで実行します。確認：承認/拒否を待って一時停止します。オフ：アシスタントはこのツールを認識しません。自動化（トリガー、メッセンジャーボット、ワークフロー）では確認ができないため、「確認」のツールは使用できません。MCP ツールは、サーバーが読み取り専用と指定しない限り、既定で「確認」になります。"
 
@@ -4460,8 +4485,8 @@ msgstr "組み込みのキャンバスエディター"
 msgid "Built-in reasoning before generating"
 msgstr "生成前の組み込み推論"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:218
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:219
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:312
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:313
 #: src/features/settings/lib/settings-keywords.ts:101
 msgid "Built-in tools"
 msgstr "組み込みツール"
@@ -5263,7 +5288,7 @@ msgstr "検索モードを選択"
 msgid "Choose the camera system for your shot"
 msgstr "撮影に使うカメラシステムを選択します"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:207
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:299
 msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 msgstr "アシスタントが自動で使えるツール、承認が必要なツール、無効にするツールを選択します。"
 
@@ -6451,7 +6476,7 @@ msgstr "{0} に接続済み"
 msgid "Connected. You can close this window."
 msgstr "接続しました。このウィンドウは閉じてかまいません。"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:232
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:334
 msgid "Connecting to your MCP servers..."
 msgstr "MCP サーバーに接続しています..."
 
@@ -7155,7 +7180,7 @@ msgstr "スキル別の内訳を読み込めませんでした。"
 msgid "Could not load this"
 msgstr ""
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:131
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:137
 msgid "Could not load tools: {error}"
 msgstr "ツールを読み込めませんでした：{error}"
 
@@ -7260,7 +7285,7 @@ msgid "Could not send the message."
 msgstr ""
 
 #: src/features/chat/thread/ask-user-prompt.tsx:83
-#: src/features/chat/thread/tool-approval.tsx:63
+#: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "回答を送信できませんでした。もう一度お試しください。"
 
@@ -7831,7 +7856,7 @@ msgid "Custom rate limits"
 msgstr "カスタムのレート制限"
 
 #. placeholder {0}: modeLabels[tool.defaultMode]
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:70
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:73
 msgid "Custom setting (default: {0})"
 msgstr "カスタム設定（既定：{0}）"
 
@@ -8157,7 +8182,7 @@ msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "DeepSeek の思考機能付き実験的な高度チャット LLM"
 
 #: src/features/appearance/components/appearance-controls.tsx:164
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:70
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:73
 msgid "Default"
 msgstr "既定"
 
@@ -8620,7 +8645,7 @@ msgstr "最大限の AI 性能と洗練された推論が最も重要となる�
 msgid "Denied"
 msgstr "拒否"
 
-#: src/features/chat/thread/tool-approval.tsx:72
+#: src/features/chat/thread/tool-approval.tsx:77
 msgid "Denied — continuing without it"
 msgstr "拒否されました — ツールなしで続行します"
 
@@ -8640,11 +8665,11 @@ msgstr ""
 msgid "Density updated"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:120
+#: src/features/chat/thread/tool-approval.tsx:125
 msgid "Deny"
 msgstr "拒否"
 
-#: src/features/chat/thread/tool-approval.tsx:118
+#: src/features/chat/thread/tool-approval.tsx:123
 msgid "Deny {tool}"
 msgstr "{tool} を拒否"
 
@@ -8818,7 +8843,7 @@ msgstr "テキストとレイアウトの精度が最も重要な、ロゴ、ア
 msgid "Desktop"
 msgstr "デスクトップ"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:66
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:69
 msgid "destructive"
 msgstr "破壊的"
 
@@ -11698,6 +11723,10 @@ msgstr "セッションを取り消せませんでした"
 msgid "Failed to revoke sessions"
 msgstr "セッションを取り消せませんでした"
 
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:266
+msgid "Failed to revoke the allow"
+msgstr ""
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:479
 msgid "Failed to save {providerId} API key"
 msgstr "{providerId} の API キーを保存できませんでした"
@@ -11930,7 +11959,7 @@ msgstr "ケースの更新に失敗しました"
 msgid "Failed to update thread visibility"
 msgstr "スレッドの公開範囲を更新できませんでした"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:174
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:254
 msgid "Failed to update tool permission"
 msgstr "ツールの権限を更新できませんでした"
 
@@ -16753,7 +16782,7 @@ msgstr "概要を読み込み中…"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
 #: src/features/settings/components/chat/default-models-settings.tsx:185
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:165
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:245
 #: src/features/settings/components/chat/trigger-settings.tsx:903
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
@@ -17355,7 +17384,7 @@ msgstr "MCP"
 msgid "MCP Registry"
 msgstr "MCP レジストリ"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:238
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:340
 msgid "MCP server"
 msgstr "MCP サーバー"
 
@@ -17396,8 +17425,8 @@ msgstr "MCP サーバー"
 msgid "MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting."
 msgstr "MCP サーバーは、AI が会話中に使える追加のツールを提供します。接続したサーバーのツールは、チャット時に自動的に利用可能になります。"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:227
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:228
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:329
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:330
 #: src/features/settings/lib/settings-keywords.ts:102
 msgid "MCP tools"
 msgstr "MCP ツール"
@@ -19215,7 +19244,7 @@ msgstr "ペアリングされたデバイスはありません。"
 msgid "No diff data available for this version"
 msgstr "このバージョンの差分データはありません"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:235
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:337
 msgid "No enabled MCP servers."
 msgstr "有効な MCP サーバーはありません。"
 
@@ -19605,7 +19634,7 @@ msgstr "ティアデータはまだありません。ティア情報はゲート
 msgid "No tools shared yet"
 msgstr "共有されているツールはまだありません"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:134
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:140
 msgid "No tools."
 msgstr "ツールはありません。"
 
@@ -19752,7 +19781,7 @@ msgstr "承認されませんでした"
 msgid "Not attached:"
 msgstr "添付されなかったファイル："
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:67
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:70
 msgid "not configured"
 msgstr "未設定"
 
@@ -19947,7 +19976,7 @@ msgstr ""
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:56
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:59
 msgid "Off"
 msgstr "オフ"
 
@@ -23058,7 +23087,7 @@ msgstr "ドキュメントを読む"
 msgid "Read what needs you: the description, commits, files, diff and checks of each change."
 msgstr ""
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:65
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:68
 msgid "read-only"
 msgstr "読み取り専用"
 
@@ -24083,12 +24112,12 @@ msgstr "確認メールを再送信"
 #: ../../packages/ui/src/components/image-editor.tsx:311
 #: src/features/canvas/canvas-panel.tsx:239
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:101
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:106
 msgid "Reset"
 msgstr "リセット"
 
 #. placeholder {0}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:95
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:100
 msgid "Reset {0} to default"
 msgstr "{0} を既定に戻す"
 
@@ -24353,6 +24382,7 @@ msgstr "レビュアーのメモ"
 
 #: src/features/auth/components/settings/account/account-cell.tsx:140
 #: src/features/pages/components/page-share-dialog.tsx:209
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:213
 msgid "Revoke"
 msgstr "取り消す"
 
@@ -24363,6 +24393,10 @@ msgstr "すべてのセッションを取り消す"
 #: src/features/auth/components/settings/security/session-cell.tsx:103
 msgid "Revoke Session"
 msgstr "セッションを取り消す"
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:207
+msgid "Revoke the allow for {tool}"
+msgstr ""
 
 #. placeholder {0}: result.revokedCount
 #: src/features/admin/components/user-sessions-dialog.tsx:55
@@ -25969,7 +26003,7 @@ msgstr "タイムスタンプを表示"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "最大 {rowLimit} 行を表示 ({byteCount} バイト)"
 
-#: src/features/chat/thread/tool-approval.tsx:105
+#: src/features/chat/thread/tool-approval.tsx:110
 msgid "Show what it will send"
 msgstr "送信内容を表示"
 
@@ -28948,6 +28982,14 @@ msgstr "これらのメモリはメッセージに一致したため、この返
 msgid "These providers will never be used for your requests."
 msgstr "これらのプロバイダーがリクエストに使われることはありません。"
 
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:194
+msgid "These tools run without asking until the time shown. Revoke one to be asked again from your next message."
+msgstr ""
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:174
+#~ msgid "These tools run without asking until the time shown. Revoke one to be asked again right away."
+#~ msgstr ""
+
 #: src/features/chat/thread/composer-draw-dialog.tsx:35
 msgid "Thick"
 msgstr "太い"
@@ -29732,7 +29774,7 @@ msgstr "ツール呼び出し"
 msgid "Tool Calling"
 msgstr "ツール呼び出し"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:206
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:298
 #: src/features/settings/lib/settings-navigation.ts:95
 msgid "Tool Permissions"
 msgstr "ツールの権限"
@@ -30522,6 +30564,10 @@ msgstr "未対応の形式"
 #: src/features/pages/components/page-share-dialog.tsx:206
 msgid "until {0}"
 msgstr "{0} まで"
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:204
+msgid "Until {until}"
+msgstr ""
 
 #: src/features/pages/components/page-tree-item.tsx:53
 #: src/features/pages/components/page-view.tsx:390
@@ -31885,7 +31931,7 @@ msgstr ""
 msgid "Waiting for the owner to answer"
 msgstr "オーナーの回答を待っています"
 
-#: src/features/chat/thread/tool-approval.tsx:69
+#: src/features/chat/thread/tool-approval.tsx:74
 msgid "Waiting for the owner to approve"
 msgstr "オーナーの承認を待っています"
 
@@ -31905,7 +31951,7 @@ msgstr "あなたの回答を待っています"
 msgid "Waiting for your answer in {0}"
 msgstr "{0} であなたの回答を待っています"
 
-#: src/features/chat/thread/tool-approval.tsx:69
+#: src/features/chat/thread/tool-approval.tsx:74
 msgid "Waiting for your approval"
 msgstr "あなたの承認を待っています"
 

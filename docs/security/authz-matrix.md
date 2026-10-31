@@ -365,6 +365,7 @@ for a schema table that is neither policed nor listed:
 | `chat_tool_permissions.getToolPermissionSettings` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_tool_permissions.listMcpToolPermissions` | action | authAction + RL | aiUserPreferences | caller-scoped (ctx.user) | **fixed** (medium) — SSRF guard on saved server URLs |
 | `chat_tool_permissions.respondToToolApproval` | mutation | authMutation + RL | threads | thread access (owner/grant) | ok |
+| `chat_tool_permissions.revokeToolPermissionGrant` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_tool_permissions.setToolPermission` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_translate.translateMessage` | action | authAction + RL | actionCache | caller-scoped (ctx.user); cache key includes the caller id, text comes from the caller; guests refused; a cache miss is charged to the daily text quota, output budget scaled to the text | ok |
 | `coding_agents_execute.createPullRequest` | action | authAction + RL | codingAgentRuns | caller-scoped (ctx.user) | ok |

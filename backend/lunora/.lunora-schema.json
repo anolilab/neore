@@ -3103,6 +3103,24 @@
           "optional": true,
           "unique": false
         },
+        "toolPermissionGrants": {
+          "kind": "record",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "key": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          },
+          "of": {
+            "kind": "number",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
         "toolPermissions": {
           "kind": "record",
           "nullable": false,
