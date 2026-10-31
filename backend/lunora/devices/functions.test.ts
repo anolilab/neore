@@ -299,6 +299,21 @@ describe("a device's project scope in the GDPR export", () => {
 
         expect(exported.devices.map((device) => device.projectIds)).toEqual([[project]]);
     });
+
+    it("lists the coding-agent folders the user approved", async () => {
+        const { deviceId } = await register(ownerId);
+        const offer = { agentKey: "claude", agentLabel: "Claude Code", folderId: "folder-1", folderLabel: "neore" };
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch(deviceId, { acpOffers: [offer] });
+        });
+
+        const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(gdpr.collectDevicesForExport, { userId: ownerId }))) as {
+            devices: { acpOffers?: unknown[] }[];
+        };
+
+        expect(exported.devices.map((device) => device.acpOffers)).toEqual([[offer]]);
+    });
 });
 
 describe("a device's project scope", () => {
@@ -556,6 +571,25 @@ describe("the relay", () => {
         await expect(claim("window-b")).resolves.toEqual({ claimed: false });
         await expect(claim()).resolves.toEqual({ claimed: false });
         expect(await readCall(callId)).toMatchObject({ claimId: "window-a", status: "claimed" });
+    });
+
+    it("takes a result only from the window that holds the claim", async () => {
+        const { deviceId, secret } = await pairedDevice(ownerId);
+        const threadId = await insertThread(ownerId);
+        const { callId } = (await createCall({ deviceId, threadId, userId: ownerId })) as { callId: string };
+        const complete = async (claimId?: string) =>
+            await as(ownerId).mutation(
+                functions.completeDeviceCall as never,
+                { ...(await signedResult(deviceId, secret, callId)), ...(claimId !== undefined && { claimId }) } as never,
+            );
+
+        await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId, claimId: "window-a" } as never);
+
+        // A window whose lease lapsed reports late: its result is not the claimant's, so the call stays open.
+        await expect(complete("window-b")).resolves.toEqual({ accepted: false });
+        expect(await readCall(callId)).toMatchObject({ claimId: "window-a", status: "claimed" });
+        await expect(complete("window-a")).resolves.toEqual({ accepted: true });
+        expect(await readCall(callId)).toMatchObject({ status: "completed" });
     });
 
     it("caps what a device returns, whatever it claims", async () => {

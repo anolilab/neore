@@ -460,10 +460,20 @@ export const claimDeviceCall = authMutation
 /**
  * Records a device's SIGNED result. A terminal call is never rewritten, so a
  * replayed result for a finished call is ignored (`accepted: false`).
+ *
+ * A call claimed under a `claimId` takes its result only from that window: a coding-agent command whose lease
+ * lapsed is claimed again, and the first window's late result must not finish it under the second.
  */
 export const completeDeviceCall = authMutation
     .use(rateLimit("devices/relay"))
-    .input({ callId: v.id("deviceCalls"), deviceId: v.id("devices"), payload: vResultPayload, signature: vSignature, viaDeviceId: vViaDeviceId })
+    .input({
+        callId: v.id("deviceCalls"),
+        claimId: v.optional(v.string().max(MAX_LENGTH.id)),
+        deviceId: v.id("devices"),
+        payload: vResultPayload,
+        signature: vSignature,
+        viaDeviceId: vViaDeviceId,
+    })
     .output(v.object({ accepted: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
@@ -482,7 +492,7 @@ export const completeDeviceCall = authMutation
 
         const call = await ctx.db.deviceCalls.findFirst({ where: { _id: args.callId, deviceId: device._id, userId } });
 
-        if (call?.status !== "claimed") {
+        if (call?.status !== "claimed" || (call.claimId !== undefined && args.claimId !== call.claimId)) {
             return { accepted: false };
         }
 

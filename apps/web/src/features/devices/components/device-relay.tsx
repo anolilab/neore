@@ -213,7 +213,7 @@ const DeviceRelay: FC = () => {
                 return result.claimed;
             },
             complete: async (call, result) => {
-                await mutations.current.complete({ ...addressed(call), ...result });
+                await mutations.current.complete({ ...addressed(call), ...result, claimId: windowId });
             },
             execute: ({ envelope, signature }) => executeOnNativeDevice({ envelope, signature }),
             release: async (call, reason) => {
