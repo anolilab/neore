@@ -38,6 +38,7 @@ export interface DeviceWindowApi {
     acpView: () => Promise<AcpView>;
     auditTail: () => Promise<string[]>;
     confirm: (message: string) => Promise<boolean>;
+    hostAcpUpdate: (deviceId: string, update: AcpUpdate) => Promise<Pick<AcpView, "agents" | "consents">>;
     hostConnect: (deviceId: string) => Promise<HostProbe>;
     hostDisconnect: (deviceId: string) => Promise<void>;
     /** Asks for a file to save to, then downloads the server folder into it as a tar. `null` when cancelled. */

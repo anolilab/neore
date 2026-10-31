@@ -206,6 +206,9 @@ const invoke = (channel: string, event: IpcEvent, ...args: unknown[]): unknown =
 
 const makeCore = () => {
     return {
+        acpHostSpawnPlan: vi.fn((_deviceId: string, _agentKey: string, folder: string): string =>
+            JSON.stringify({ args: ["--acp"], command: "/opt/agent", cwd: folder, env: {}, scratch: false, secretNames: [] }),
+        ),
         acpInstall: vi.fn((_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
         acpInstallPrune: vi.fn(),
         acpInstallStage: vi.fn(() => mkdtempSync(path.join(fake.userData, "stage-"))),
@@ -235,6 +238,12 @@ const makeCore = () => {
         auditTail: vi.fn(() => ["{}"]),
         denyPrompts: vi.fn(),
         execute: vi.fn(async () => JSON.stringify({ payload: "{}", signature: "s" })),
+        hostAcpUpdate: vi.fn((_deviceId: string, _update: string) => JSON.stringify({ agents: [], consents: [] })),
+        hostAgentStart: vi.fn((_deviceId: string, _handle: number, _agentKey: string, _folder: string): string => {
+            throw new Error("this computer is not connected to build-box");
+        }),
+        hostAgentStop: vi.fn(),
+        hostAgentWrite: vi.fn(),
         hostConnect: vi.fn(async () => JSON.stringify({ platform: "linux" })),
         hostDisconnect: vi.fn(),
         hostDownload: vi.fn(async (_deviceId: string, _path: string, _destination: string) =>
@@ -498,6 +507,83 @@ describe("servers over SSH", () => {
         await invoke(DEVICE_CHANNEL.hostConnect, siteEvent(), "host-1");
 
         expect(core.hostConnect).toHaveBeenLastCalledWith("host-1", false);
+    });
+});
+
+describe("coding agents on a server", () => {
+    const START = {
+        agentKey: "claude",
+        agentLabel: "Claude on build-box",
+        folderId: "f1",
+        folderLabel: "app",
+        folderPath: "/srv/app",
+        kind: "start",
+        sessionId: "s9",
+        threadId: "t9",
+    };
+    const prepared = (extra: Record<string, unknown>): string =>
+        JSON.stringify({ callId: "c9", command: START, expiresAt: Date.now() + 60_000, refusal: null, ...extra });
+    const SERVER_VIEW = {
+        hosts: [{ acpAgents: [{ args: [], command: "/opt/agent", envNames: [], install: null, key: "claude", label: "Claude" }], acpConsents: [{ agentKey: "claude", folderId: "f1", folderLabel: "app", folderPath: "/srv/app" }], deviceId: "srv-1", name: "build-box" }],
+        paired: true,
+        roots: [],
+    };
+
+    it("starts a command for a server through that server's host and never as a process of this computer", async () => {
+        core.settingsGet.mockReturnValue(JSON.stringify(SERVER_VIEW));
+        core.acpPrepare.mockReturnValue(prepared({ deviceId: "srv-1", server: "build-box" }));
+
+        await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+
+        // Planned by the core for the server (not for this computer), and handed to the server's host.
+        await vi.waitFor(() => expect(core.hostAgentStart).toHaveBeenCalledWith("srv-1", 1, "claude", "/srv/app"));
+        expect(core.acpHostSpawnPlan).toHaveBeenCalledWith("srv-1", "claude", "/srv/app");
+        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+        expect(spawnAgent).not.toHaveBeenCalled();
+        expect(core.acpSign).toHaveBeenLastCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "accepted");
+    });
+
+    it("starts a command for this computer as a process of its own and asks the core for nothing about a server", async () => {
+        core.acpPrepare.mockReturnValue(prepared({ deviceId: "desk-1", server: null }));
+        core.acpSpawnPlan.mockImplementation(() => {
+            throw new Error("that folder is not allowed");
+        });
+
+        await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+
+        await vi.waitFor(() => expect(core.acpSpawnPlan).toHaveBeenCalledWith("claude", "/srv/app"));
+        expect(core.acpHostSpawnPlan).not.toHaveBeenCalled();
+        expect(core.hostAgentStart).not.toHaveBeenCalled();
+    });
+
+    it("refuses a command for a server that is no longer paired before anything is planned", async () => {
+        core.settingsGet.mockReturnValue(JSON.stringify({ hosts: [], paired: true, roots: [] }));
+        core.acpPrepare.mockReturnValue(prepared({ deviceId: "srv-gone", server: "gone" }));
+
+        await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+
+        expect(core.acpSign).toHaveBeenLastCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "that server is not paired with this computer");
+        expect(core.acpHostSpawnPlan).not.toHaveBeenCalled();
+        expect(core.hostAgentStart).not.toHaveBeenCalled();
+    });
+
+    it("lets only the device window approve agents and folders for a server, for a valid device id", async () => {
+        const update = { agentKey: "claude", folder: "/srv/app", op: "grant" };
+
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+        expect(() => invoke(LOCAL_CHANNEL.hostAcpUpdate, siteEvent(), "srv-1", update)).toThrow("device: not the device window");
+        await expect(invoke(LOCAL_CHANNEL.hostAcpUpdate, localEvent(), 7, update)).rejects.toThrow("device: deviceId is invalid");
+        expect(core.hostAcpUpdate).not.toHaveBeenCalled();
+
+        await invoke(LOCAL_CHANNEL.hostAcpUpdate, localEvent(), "srv-1", update);
+
+        expect(core.hostAcpUpdate).toHaveBeenCalledWith("srv-1", JSON.stringify(update));
+    });
+
+    it("is not on the relay: the site can start no agent on a server by itself", () => {
+        for (const channel of Object.keys(DEVICE_CHANNEL)) {
+            expect(channel.toLowerCase()).not.toContain("agent");
+        }
     });
 });
 

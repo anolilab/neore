@@ -43,6 +43,8 @@ const removeQuietly = async (folder: string): Promise<void> => {
 export interface ManagerOptions {
     appVersion: string;
     cancelGraceMs?: number;
+    /** The agents run on another machine (a server): their folder is not one of this computer's, so none of its files are read for them. */
+    folderIsRemote?: boolean;
     gate?: PermissionGate;
     /** The label of the folder the user approved for this agent (never its path), for the backend's thread. Undefined: keep the session on this computer. */
     hostInfo?: (agentKey: string, folder: string) => Pick<HostSessionInfo, "folderId" | "folderLabel"> | undefined;
@@ -97,7 +99,7 @@ export class AcpManager {
         let child: AgentProcess;
 
         try {
-            child = this.spawn(plan);
+            child = this.spawn(plan, agentKey);
         } catch (error) {
             // The folder exists before anything starts; a start that fails must not leave it behind.
             if (plan.scratch) {
@@ -168,7 +170,7 @@ export class AcpManager {
 
         // The core decides: it refuses an unregistered agent and (with consent) a folder the user has not approved.
         const plan = this.options.plan(agentKey, folder);
-        const child = this.spawn(plan);
+        const child = this.spawn(plan, agentKey);
         const folderInfo = this.options.hostInfo?.(agentKey, plan.cwd);
         const session = new AgentSession({
             agentKey,
@@ -176,6 +178,7 @@ export class AcpManager {
             appVersion: this.options.appVersion,
             cancelGraceMs: this.options.cancelGraceMs,
             folder: plan.cwd,
+            folderIsRemote: this.options.folderIsRemote,
             gate: this.options.gate ?? declineGate,
             log: this.options.log,
             onChange: () => this.changed(),
@@ -296,8 +299,8 @@ export class AcpManager {
         }, CHANGE_INTERVAL_MS);
     }
 
-    private spawn(plan: SpawnPlan): AgentProcess {
-        const child = this.options.spawn(plan);
+    private spawn(plan: SpawnPlan, agentKey: string): AgentProcess {
+        const child = this.options.spawn(plan, agentKey);
 
         this.processes.add(child);
         this.forgetWhenExited(child);

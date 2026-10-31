@@ -108,7 +108,12 @@ export interface Download {
 
 /** A server as the local window lists it (`HostView`). */
 export interface HostView {
+    /** The coding agents registered for this server (their commands are paths on it) and the folders each is approved for. */
+    acpAgents: { args: string[]; command: string; envNames: string[]; install: null; key: string; label: string }[];
+    acpConsents: { agentKey: string; folderId: string; folderLabel: string; folderPath: string }[];
     address: string;
+    /** Whether the host software on the server runs coding agents; null while not connected. */
+    agentsSupported: boolean | null;
     allowShellNetwork: boolean;
     connected: boolean;
     deviceId: string;
@@ -200,10 +205,14 @@ export type CoreEvent
         | { callId: string; deviceId: string; payload: string; signature: string; type: "progress" }
         | { prompt: Prompt; type: "prompt" }
         | { type: "acpPermissionsChanged" }
+        | { code: number | null; error: string | null; handle: number; signal: number | null; type: "hostAgentEnded" }
+        | { data: string; handle: number; stream: "stderr" | "stdout"; type: "hostAgent" }
         | { type: "changed" };
 
 /** The surface of the native `DeviceCore` class. */
 export interface DeviceCore {
+    /** What to start for an approved agent on a server (JSON): only the user's variables, the server builds the rest. */
+    acpHostSpawnPlan: (deviceId: string, agentKey: string, folder: string) => string;
     acpInstall: (request: string) => string;
     acpInstallPrune: (agentKey: string) => void;
     acpInstallStage: () => string;
@@ -226,6 +235,10 @@ export interface DeviceCore {
     auditTail: () => string[];
     denyPrompts: () => void;
     execute: (envelope: string, signature: string) => Promise<string>;
+    hostAcpUpdate: (deviceId: string, update: string) => string;
+    hostAgentStart: (deviceId: string, handle: number, agentKey: string, folder: string) => string;
+    hostAgentStop: (handle: number) => void;
+    hostAgentWrite: (handle: number, bytes: Buffer) => void;
     hostConnect: (deviceId: string, retry: boolean) => Promise<string>;
     hostDisconnect: (deviceId: string) => void;
     hostDownload: (deviceId: string, path: string, destination: string) => Promise<string>;
