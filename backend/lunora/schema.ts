@@ -2415,6 +2415,9 @@ export const schema = defineSchema({
         // Who sent this dispatch (`sub-agents/logic.ts:DISPATCH_SOURCES`); unset on rows from before it was recorded.
         dispatchedBy: v.optional(vDispatchSource),
         error: v.optional(v.string()),
+        // How many times a host run's message met a busy computer and was put back in line to try again
+        // (`sub-agents/host-runs.ts:HOST_START_MAX_ATTEMPTS`); unset until the first.
+        hostStartAttempts: v.optional(v.number()),
         // A host run's turn (`persistentStreams.hostTurnId`): the host's `turn_end` finishes the run that sent it,
         // and a turn nobody dispatched (one typed in the desktop window) finishes none.
         hostTurnId: v.optional(v.string()),

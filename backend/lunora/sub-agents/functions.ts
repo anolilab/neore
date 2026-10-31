@@ -57,11 +57,12 @@ import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/acco
 import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
 import { MAX_LENGTH } from "../lib/validators";
-import { hostRunActivity, sendHostRunTurn } from "./host-runs";
+import { HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
 
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import {
     buildResultMessage,
+    resultContent,
     DISPATCH_SOURCES,
     type DispatchSource,
     dispatchSourceProblem,
@@ -394,7 +395,9 @@ const isHostInLeadScope = async (ctx: MutationCtx, run: Pick<RunDoc, "parentThre
 /**
  * Starts a host run in the caller's transaction: claims it (no charge: the agent bills its own account) and sends its
  * message as the `acp_send` call. A host that cannot be reached fails the run at once, through {@link finishRun}, so the
- * lead hears a failure like any other and the queue moves on. Nothing waits on a job that could be lost.
+ * lead hears a failure like any other and the queue moves on. A computer that is only busy (its open-call budget is spent,
+ * or a turn holds the session) is not a failure: the run goes back to the head of the line and
+ * {@link retryHostRunStart} tries it again, so the messages behind it wait too instead of meeting the same refusal.
  */
 const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<void> => {
     const claimed = await claimQueuedRun(ctx, runId);
@@ -419,10 +422,50 @@ const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promis
 
     const sent = await sendHostRunTurn(ctx, claimed, Date.now());
 
-    if ("error" in sent) {
-        await finishRun(ctx, runId, { error: sent.error, kind: "failed" });
+    if (!("error" in sent)) {
+        return;
     }
+
+    const attempts = (claimed.hostStartAttempts ?? 0) + 1;
+
+    if (!sent.retry || attempts >= HOST_START_MAX_ATTEMPTS) {
+        await finishRun(ctx, runId, { error: sent.error, kind: "failed" });
+
+        return;
+    }
+
+    await putHostRunBack(ctx, claimed, attempts);
 };
+
+/**
+ * Undoes a host run's claim after a busy answer and schedules the next try. The run keeps its place at the head of the
+ * line, so a later message is never started ahead of it (`claimQueuedRun` starts the head only). A retry that finds
+ * the run started, cancelled or ended is a no-op: the claim decides, so a duplicate retry is harmless.
+ */
+const putHostRunBack = async (ctx: MutationCtx, run: RunDoc, attempts: number): Promise<void> => {
+    const now = Date.now();
+
+    await patchById(ctx.db, run._id, { hostStartAttempts: attempts, startedAt: undefined, status: "queued", updatedAt: now });
+
+    const worker = run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
+
+    // The claim marked the thread running; a reply the person started there meanwhile keeps it so.
+    if (worker?.status === "running" && !(await isThreadStreaming(ctx, worker._id))) {
+        await patchThread(ctx.db, worker._id, { status: "active", updatedAt: now });
+    }
+
+    await ctx.scheduler.runAfter(hostStartRetryDelayMs(attempts), internal.sub_agents.functions.retryHostRunStart, { runId: run._id });
+};
+
+/** Tries again to start a host run that met a busy computer (a no-op unless it is still the queued head of its line). */
+export const retryHostRunStart = internalMutation
+    .input({ runId: v.id("subAgentRuns") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await startHostRun(ctx, args.runId);
+
+        return null;
+    });
 
 /** Lifetime runs of a lead read to count its distinct children; the depth cap keeps real counts tiny. */
 const SUB_AGENT_LIFETIME_SCAN = 200;
@@ -622,7 +665,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
     // Only the task text reaches a coding agent on a computer: a tool list or skill the caller asks for would read as a
     // limit that nothing applies there. (The lead's own tool names, which a cloud worker inherits, are not one: a host
     // worker never stores them, below.)
-    if (runnerKind === "host" && (common.allowlist?.length || skillSlug !== undefined)) {
+    if (runnerKind === "host" && (common.allowlist !== undefined || skillSlug !== undefined)) {
         return await refuse(other(HOST_NO_TOOLS_OR_SKILL));
     }
 
@@ -1076,7 +1119,7 @@ const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promis
 
     await addMessagesHandler(ctx, {
         agentName: SUB_AGENT_NAME,
-        messages: [{ message: { content: text, role: "assistant" }, status: "success" }],
+        messages: [{ message: { content: resultContent(text, run.runner?.kind === "host"), role: "assistant" }, status: "success" }],
         overrideOrder: (last?.order ?? -1) + 1,
         ...(leaf && { parentMessageId: leaf._id }),
         threadId: thread._id,

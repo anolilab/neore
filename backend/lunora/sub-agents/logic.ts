@@ -7,6 +7,8 @@ import type { FollowUpControl } from "@neore/ai/capabilities";
 import { CLOUD_HEADLESS_CAPABILITIES, followUpControl } from "@neore/ai/capabilities";
 import type { StopCondition, ToolSet } from "ai";
 
+import { HOST_TEXT_MARK } from "../acp/lib/reply";
+
 /**
  * How deep delegation may nest. A user's own thread is depth 0; its sub-agent
  * runs at 1, and that sub-agent's own sub-agent at 2 — the last level allowed.
@@ -430,3 +432,10 @@ export const buildResultMessage = (input: {
 
     return `${heading}\n\n${body}${link}${sentBy}`;
 };
+
+/**
+ * The content of the message a run's result is posted as. A run on a computer is the agent's own text, untrusted, so it
+ * carries the same mark as the reply in the worker's thread (`acp/lib/reply.ts`) and the lead's view loads none of its
+ * Markdown images.
+ */
+export const resultContent = (text: string, hostRun: boolean) => (hostRun ? [{ providerMetadata: HOST_TEXT_MARK, text, type: "text" as const }] : text);

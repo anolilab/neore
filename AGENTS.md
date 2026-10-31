@@ -513,21 +513,11 @@ written here is what is not.
   (never over `off`, never to other tools, withheld at the depth cap).
   Triggers, tasks and messenger replies inherit nothing, so they lose it.
   **A worker can run on a paired computer** (`runner: { kind: "host", deviceId }`,
-  `sub-agents/host-runs.ts`): its child thread is `threads.runner = "host"` with an
-  `acpSessions` row, and a run is the existing signed `acp_send`
-  (`acp/lib/send-turn.ts`, shared with `/hosts/send`), started in the same
-  transaction as the claim — no jobs-queue hop to lose. It is never charged
-  (`claimQueuedRun` skips `chargeRound`) but spends `subAgents/run`. The host's
-  `turn_end` finishes the run through `acp/lib/finish.ts#endHostTurn` →
-  `settleWorkerRun`, matching on `subAgentRuns.hostTurnId` (a turn typed in the
-  desktop window finishes nothing); `functions.ts` and `finish.ts` load each
-  other lazily, never statically. Ending a run from this side (stop, reaper)
-  cancels the live turn (`stopHostTurnOf`). A host dispatch needs a person: the
-  tools' `needsApproval` is a function that asks whatever the mode or a timed
-  allow says, a headless run (`ToolCtx.headless`) is not asked and the mutation
-  refuses it, and every source but `lead`/`user` is refused at admission. A host
-  run's activity is its newest stream chunk, and a pending permission pauses both
-  the quiet notice and the reaper.
+  `sub-agents/host-runs.ts`; plans/agent-orchestrator.md S5): a run is the existing signed
+  `acp_send`, started in the claim's transaction, never charged. A busy computer is not a
+  failure: the run goes back to the head of its line and `retryHostRunStart` tries again
+  (`HOST_START_MAX_ATTEMPTS`), so the messages behind it do not meet the same refusal.
+  `functions.ts` and `acp/lib/finish.ts` load each other lazily, never statically.
 
 - **Idle-thread summaries** (`backend/lunora/agent/thread-summaries.ts`, rules in
   `thread-summary-logic.ts`) — the agent reads only the last 100 rows of the

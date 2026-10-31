@@ -145,20 +145,20 @@ const saveHostReply = async (
 
     // The thread was deleted while the turn ran: a reply saved now would outlive its cleanup.
     if (!thread || thread.deleted) {
-        return hostResultText(transcript);
+        return hostResultText(transcript, false);
     }
 
     // The prompt the reply answers is gone (a deleted message): saving would assert, and the reaper would
     // fail the whole shard tick on it.
     if (stream.messageId && !(await ctx.db.get(stream.messageId as Id<"messages">))) {
-        return hostResultText(transcript);
+        return hostResultText(transcript, false);
     }
 
     const session = await sessionOfThread(ctx, threadId);
     const reply = buildHostReply({ agentKey: session?.agentKey ?? "host", changes, error, reason, transcript });
 
     if (!reply) {
-        return hostResultText(transcript);
+        return hostResultText(transcript, false);
     }
 
     const promptMessageId = stream.messageId as Id<"messages">;
@@ -170,7 +170,7 @@ const saveHostReply = async (
 
     await addMessagesHandler(ctx, { failPendingSteps: regenerate, messages: [reply], promptMessageId, threadId, userId: stream.userId });
 
-    return hostResultText(transcript);
+    return hostResultText(transcript, true);
 };
 
 const STATUS_OF: Record<HostReplyReason, "done" | "error" | "timeout"> = {

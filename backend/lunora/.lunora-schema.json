@@ -21839,6 +21839,12 @@
           "optional": true,
           "unique": false
         },
+        "hostStartAttempts": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "hostTurnId": {
           "kind": "string",
           "nullable": false,

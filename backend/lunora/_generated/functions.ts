@@ -1402,6 +1402,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "sub_agents_functions:messageWorker": lunora_sub_agents_functions_186.messageWorker as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:postResult": lunora_sub_agents_functions_186.postResult as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:reapRun": lunora_sub_agents_functions_186.reapRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:retryHostRunStart": lunora_sub_agents_functions_186.retryHostRunStart as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:setWorkerPolicy": lunora_sub_agents_functions_186.setWorkerPolicy as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:shouldRunStop": lunora_sub_agents_functions_186.shouldRunStop as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:stopWorker": lunora_sub_agents_functions_186.stopWorker as unknown as RegisteredLunoraFunction,
@@ -7586,6 +7587,12 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
+installCompiledValidatorMap(lunora_sub_agents_functions_186.retryHostRunStart.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["runId"] !== "string") return DEFER;
+return { "runId": source["runId"] };
+});
 installCompiledValidatorMap(lunora_sub_agents_functions_186.shouldRunStop.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -9662,6 +9669,7 @@ export interface Caller {
             messageWorker: (args: { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: (args: { attempt: number; failures?: number; runId: Id<"subAgentRuns"> }) => Promise<null>;
             reapRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<null>;
+            retryHostRunStart: (args: { runId: Id<"subAgentRuns"> }) => Promise<null>;
             setWorkerPolicy: (args: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; leadThreadId: Id<"threads">; maxDispatchesPerHour?: number; unlockProof?: string }) => Promise<null>;
             shouldRunStop: (args: { runId: Id<"subAgentRuns"> }) => Promise<boolean>;
             stopWorker: (args: { clientId: string; runId?: Id<"subAgentRuns">; scope: "current" | "all_queued"; workerId: Id<"threads"> }) => Promise<{ cancelled: number }>;
@@ -11466,6 +11474,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             messageWorker: (args) => callRegistered(context, "sub_agents_functions:messageWorker", args),
             postResult: (args) => callRegistered(context, "sub_agents_functions:postResult", args),
             reapRun: (args) => callRegistered(context, "sub_agents_functions:reapRun", args),
+            retryHostRunStart: (args) => callRegistered(context, "sub_agents_functions:retryHostRunStart", args),
             setWorkerPolicy: (args) => callRegistered(context, "sub_agents_functions:setWorkerPolicy", args),
             shouldRunStop: (args) => callRegistered(context, "sub_agents_functions:shouldRunStop", args),
             stopWorker: (args) => callRegistered(context, "sub_agents_functions:stopWorker", args),

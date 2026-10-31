@@ -22,16 +22,30 @@ const REFUSALS = {
     offline: "The host did not answer: that computer is offline.",
 } as const;
 
+/** How often a message that met a busy computer is tried again before it fails. */
+export const HOST_START_MAX_ATTEMPTS = 8;
+
+const HOST_START_RETRY_BASE_MS = 5000;
+const HOST_START_RETRY_CAP_MS = 120_000;
+
+/** The wait before the next try after `attempts` busy answers: 5 s, doubling, at most 2 min. */
+export const hostStartRetryDelayMs = (attempts: number): number => Math.min(HOST_START_RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1), HOST_START_RETRY_CAP_MS);
+
+/** Why a host run's message was not sent: `retry` means the computer is only busy right now, so the run waits; otherwise it is final. */
+export type HostSendRefusal = { error: string; retry: boolean };
+
 /**
  * Sends a claimed run's message to the worker's agent: the same signed `acp_send` as a message from the web
  * (`queueHostTurn`), under a turn id the run keeps, so that turn's end finishes this run and no other. Answers why
- * nothing was sent, for the caller to fail the run with; the turn is not retried or held back for a host that is not answering.
+ * nothing was sent: a refusal that is `retry` is a busy computer (its open-call budget is spent, or a turn holds the
+ * session) and the caller holds the run for another try; any other fails the run, the turn is not held back for a
+ * host that is not answering.
  */
-export const sendHostRunTurn = async (ctx: MutationCtx, run: RunDoc, now: number): Promise<{ error: string } | { turnId: string }> => {
+export const sendHostRunTurn = async (ctx: MutationCtx, run: RunDoc, now: number): Promise<HostSendRefusal | { turnId: string }> => {
     const session = run.childThreadId === undefined ? null : await sessionOfThread(ctx, run.childThreadId as Id<"threads">);
 
     if (!session || session.status === "ended") {
-        return { error: "The agent's session has ended. Start a new worker to continue." };
+        return { error: "The agent's session has ended. Start a new worker to continue.", retry: false };
     }
 
     // The session runs one turn at a time. A turn the person started in the desktop window holds it.
@@ -40,13 +54,13 @@ export const sendHostRunTurn = async (ctx: MutationCtx, run: RunDoc, now: number
     });
 
     if (busy) {
-        return { error: "The agent is busy with another turn on that computer." };
+        return { error: "The agent is busy with another turn on that computer.", retry: true };
     }
 
     const queued = await queueHostTurn(ctx, { session, text: promptOf(run), threadId: session.threadId, userId: run.userId }, now);
 
     if ("error" in queued) {
-        return { error: REFUSALS[queued.error] };
+        return { error: REFUSALS[queued.error], retry: queued.error === "busy" };
     }
 
     await ctx.db.patch(run._id, { hostTurnId: queued.turnId, updatedAt: now });

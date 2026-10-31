@@ -14,7 +14,7 @@ export const HOST_PROVIDER = "acp-host";
  * Marks the text of a host reply for the reader (`packages/chat-ui/src/utils/host-run-text.ts`): it is a coding
  * agent's own text, so its Markdown images are not loaded.
  */
-const HOST_TEXT_MARK = { neore: { runner: "host" } } as const;
+export const HOST_TEXT_MARK = { neore: { runner: "host" } } as const;
 
 const MAX_ERROR_CHARS = 1000;
 
@@ -59,22 +59,27 @@ const MAX_CHILD_TOOLS = 50;
 const MAX_CHILDREN_TOTAL_CHARS = 128_000;
 const MAX_CHILDREN_TOTAL_TOOLS = 200;
 
+/** A file name as inline code: the name is the agent's text, and must not become Markdown, a link or an image. */
+const asCode = (name: string): string => `\`${name.replaceAll(/[`\r\n]/gu, " ").trim()}\``;
+
 export const emptyTranscript = (): HostTranscript => {
     return { children: [], media: [], reasoning: "", text: "" };
 };
 
 /**
  * What a worker's lead is told the agent returned: its words, or, for a reply of files only, which files, so a
- * file-only result never reads as an empty one.
+ * file-only result never reads as an empty one. `saved` is whether the reply was saved in the worker's thread: only then
+ * are the files "in its thread".
  */
-export const hostResultText = (transcript: HostTranscript): string => {
+export const hostResultText = (transcript: HostTranscript, saved: boolean): string => {
     if (transcript.text.trim() !== "" || transcript.media.length === 0) {
         return transcript.text;
     }
 
-    const names = transcript.media.map((media) => media.name).join(", ");
+    const names = transcript.media.map((media) => asCode(media.name)).join(", ");
+    const returned = `The agent returned ${transcript.media.length === 1 ? "a file" : `${String(transcript.media.length)} files`} and no text: ${names}.`;
 
-    return `The agent returned ${transcript.media.length === 1 ? "a file" : `${String(transcript.media.length)} files`} and no text: ${names}. They are in its thread.`;
+    return saved ? `${returned} They are in its thread.` : `${returned} The reply was not saved.`;
 };
 
 /** Keeps a stored `media` event for the reply. Past the per-turn count it is dropped, not the turn. */
@@ -169,9 +174,6 @@ const withoutAttachedImages = (text: string, references: ReadonlySet<string>): s
 
 const formatSize = (bytes: number): string =>
     bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MiB` : `${Math.max(1, Math.round(bytes / 1024))} KiB`;
-
-/** A file name as inline code: the name is the agent's text, and must not become Markdown, a link or an image. */
-const asCode = (name: string): string => `\`${name.replaceAll(/[`\r\n]/gu, " ").trim()}\``;
 
 /** Whether an attached file is shown in the message. Any other (a document, or an image over the inline cap) is a download card. */
 const isInline = (file: HostMedia): boolean =>

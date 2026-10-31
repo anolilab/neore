@@ -298,7 +298,21 @@ describe("isForwardHostState", () => {
 
 describe("hostResultText", () => {
     it("is the agent's words when it wrote any", () => {
-        expect(hostResultText(transcript("Done.", "", [{ name: "report.pdf", size: 10 }]))).toBe("Done.");
+        expect(hostResultText(transcript("Done.", "", [{ name: "report.pdf", size: 10 }]), true)).toBe("Done.");
+    });
+
+    it("writes each file name as inline code, so a name the agent chose is never Markdown", () => {
+        const text = hostResultText(transcript("", "", [{ name: "![x](https://example.test/p.png)", size: 10 }]), true);
+
+        expect(text).toContain("`![x](https://example.test/p.png)`");
+    });
+
+    it("points to the thread only when the reply was saved there", () => {
+        const files = transcript("", "", [{ name: "report.pdf", size: 10 }]);
+
+        expect(hostResultText(files, true)).toContain("in its thread");
+        expect(hostResultText(files, false)).not.toContain("in its thread");
+        expect(hostResultText(files, false)).toContain("`report.pdf`");
     });
 
     it("names the files of a reply that has only files, so the lead does not read it as empty", () => {
@@ -307,6 +321,7 @@ describe("hostResultText", () => {
                 { name: "report.pdf", size: 10 },
                 { name: "chart.png", size: 5 },
             ]),
+            true,
         );
 
         expect(text).toContain("report.pdf");

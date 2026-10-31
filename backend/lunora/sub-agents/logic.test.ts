@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     applyToolAllowlist,
     buildResultMessage,
+    resultContent,
     canNest,
     dispatchSourceProblem,
     originOfRun,
@@ -116,6 +117,18 @@ describe(buildResultMessage, () => {
         expect(text).toContain("**Sub-agent failed:** Do it");
         expect(text).toContain("Quota exhausted");
         expect(text).not.toContain("/chat/");
+    });
+});
+
+describe(resultContent, () => {
+    it("is plain text for a cloud run", () => {
+        expect(resultContent("**Sub-agent finished:** x", false)).toBe("**Sub-agent finished:** x");
+    });
+
+    it("marks the text of a run on a computer as the agent's own", () => {
+        expect(resultContent("**Sub-agent finished:** x", true)).toEqual([
+            { providerMetadata: { neore: { runner: "host" } }, text: "**Sub-agent finished:** x", type: "text" },
+        ]);
     });
 });
 

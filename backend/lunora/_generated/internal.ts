@@ -1037,6 +1037,7 @@ export interface InternalApiTypes {
             messageWorker: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: FunctionReference<"mutation", { attempt: number; failures?: number; runId: Id<"subAgentRuns"> }, null>;
             reapRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
+            retryHostRunStart: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
             shouldRunStop: FunctionReference<"query", { runId: Id<"subAgentRuns"> }, boolean>;
         };
     };
@@ -2166,6 +2167,7 @@ export const internal: InternalApiTypes = {
             messageWorker: { __lunoraRef: "sub_agents_functions:messageWorker" },
             postResult: { __lunoraRef: "sub_agents_functions:postResult" },
             reapRun: { __lunoraRef: "sub_agents_functions:reapRun" },
+            retryHostRunStart: { __lunoraRef: "sub_agents_functions:retryHostRunStart" },
             shouldRunStop: { __lunoraRef: "sub_agents_functions:shouldRunStop" },
         },
     },

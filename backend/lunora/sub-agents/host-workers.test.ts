@@ -60,6 +60,8 @@ const remote = await import("../acp/remote");
 const send = await import("../acp/send");
 const functions = await import("./functions");
 const { SUB_AGENT_STALE_MS } = await import("./logic");
+const { HOST_START_MAX_ATTEMPTS } = await import("./host-runs");
+const { MAX_OPEN_ACP_CALLS_PER_DEVICE } = await import("../devices/lib/constants");
 
 type Row = Record<string, any>;
 
@@ -269,6 +271,8 @@ describe("creating a worker on a computer", () => {
             message: expect.stringMatching(HOST_NO_TOOLS_OR_SKILL),
         });
         await expect(createHostWorker(device, { skill: "summarise" })).rejects.toMatchObject({ message: expect.stringMatching(HOST_NO_TOOLS_OR_SKILL) });
+        // A list that is present but empty is a limit too ("no tools"), which nothing on a computer would apply.
+        await expect(createHostWorker(device, { toolAllowlist: [] })).rejects.toMatchObject({ message: expect.stringMatching(HOST_NO_TOOLS_OR_SKILL) });
         expect(await table("subAgentRuns")).toHaveLength(0);
         expect(await table("deviceCalls")).toHaveLength(0);
     });
@@ -416,6 +420,23 @@ describe("the charge", () => {
 });
 
 describe("the end of a host turn", () => {
+    it("marks the result it posts to the lead as the agent's own text, so the lead's view loads none of its Markdown images", async () => {
+        const device = await pairedDevice();
+        const receipt = await dispatchWithLead(device);
+
+        await sessionOpen(device, receipt.workerId);
+        await finishTurn(device, receipt.workerId, "![x](https://example.test/p.png)");
+
+        const posted = (await table("messages", { threadId: leadId })).find((row) => JSON.stringify(row.message.content).includes("Sub-agent finished"))!;
+        const parts = posted.message.content as Row[];
+
+        expect(Array.isArray(parts)).toBe(true);
+        expect(parts.filter((part) => part.type === "text")).toSatisfy(
+            (texts: Row[]) => texts.length > 0 && texts.every((part) => part.providerMetadata?.neore?.runner === "host"),
+        );
+        expect(JSON.stringify(parts)).toContain("example.test/p.png");
+    });
+
     it("finishes the run with the agent's text and posts it to the lead", async () => {
         const device = await pairedDevice();
         const receipt = await dispatchWithLead(device);
@@ -776,6 +797,164 @@ describe("a session that closes with runs behind its turn", () => {
         expect(await sendCalls()).toHaveLength(1);
         expect((await table("persistentStreams", { threadId: receipt.workerId })).filter((stream) => stream.hostState !== "ended")).toHaveLength(0);
         expect((await sessionOf(receipt.workerId)).status).toBe("ended");
+    });
+});
+
+/** Fills the computer's open `acp_*` call budget (`MAX_OPEN_ACP_CALLS_PER_DEVICE`) with calls nobody has answered yet. */
+const fillOpenCalls = async (device: Device): Promise<string[]> =>
+    await run(async (context) => {
+        const ids: string[] = [];
+
+        for (let index = 0; index < MAX_OPEN_ACP_CALLS_PER_DEVICE; index += 1) {
+            ids.push(
+                await context.db.insert("deviceCalls", {
+                    createdAt: Date.now(),
+                    deadline: Date.now() + 600_000,
+                    deviceId: device.deviceId,
+                    deviceName: "Laptop",
+                    envelope: "",
+                    input: "{}",
+                    signature: "",
+                    status: "claimed",
+                    taintedBy: [],
+                    threadId: leadId,
+                    toolName: "acp_send",
+                    userId: OWNER,
+                }),
+            );
+        }
+
+        return ids;
+    });
+
+const freeOpenCalls = async (ids: string[]) =>
+    await run(async (context) => {
+        for (const id of ids) {
+            await context.db.patch(id, { status: "completed" });
+        }
+    });
+
+const retryStart = async (runId: string) => await run(async (context) => await context.runMutation(functions.retryHostRunStart, { runId }));
+
+const BUSY = /computer is busy/iu;
+
+/** The `acp_send` calls that were signed for a run (the filler rows have no envelope). */
+const sentCalls = async (): Promise<Row[]> => (await sendCalls()).filter((call) => call.envelope !== "");
+
+describe("a queued message that meets a busy computer", () => {
+    /** A worker with a message queued behind its running turn, and the computer's call budget spent when that turn ends. */
+    const queuedBehindBusyComputer = async (extra: Row = {}) => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+
+        await sessionOpen(device, receipt.workerId);
+
+        const queued = await dispatchFromLead(receipt.workerId, "call-2", extra);
+
+        expect(queued).toMatchObject({ state: "queued" });
+
+        const filler = await fillOpenCalls(device);
+
+        await finishTurn(device, receipt.workerId);
+
+        return { device, filler, receipt, runId: (queued as { runId: string }).runId };
+    };
+
+    it("stays queued and tells the lead nothing, instead of failing", async () => {
+        const { runId } = await queuedBehindBusyComputer();
+        const waiting = await runRow(runId);
+
+        expect(waiting).toMatchObject({ hostStartAttempts: 1, status: "queued" });
+        expect(waiting.startedAt).toBeUndefined();
+        expect(waiting.error).toBeUndefined();
+        expect((await leadMessages()).join(",")).not.toMatch(BUSY);
+        expect(await sentCalls()).toHaveLength(1);
+    });
+
+    it("starts when the computer has room again, once", async () => {
+        const { filler, runId } = await queuedBehindBusyComputer();
+
+        await freeOpenCalls(filler);
+        await retryStart(runId);
+
+        expect(await runRow(runId)).toMatchObject({ status: "running" });
+        expect(await sentCalls()).toHaveLength(2);
+
+        await retryStart(runId);
+
+        expect(await sentCalls()).toHaveLength(2);
+    });
+
+    it("keeps the messages behind it queued, not started ahead of it", async () => {
+        const { filler, receipt, runId } = await queuedBehindBusyComputer();
+        const third = await dispatchFromUser(receipt.workerId, "third");
+
+        expect(third.state).toBe("queued");
+        await retryStart(runId);
+        await retryStart(third.runId);
+
+        expect(await runRow(runId)).toMatchObject({ hostStartAttempts: 2, status: "queued" });
+        expect(await runRow(third.runId)).toMatchObject({ status: "queued" });
+        expect(await sentCalls()).toHaveLength(1);
+
+        await freeOpenCalls(filler);
+        await retryStart(runId);
+
+        expect(await runRow(runId)).toMatchObject({ status: "running" });
+        expect(await runRow(third.runId)).toMatchObject({ status: "queued" });
+    });
+
+    it("fails once, with the busy message, after the last attempt", async () => {
+        const { runId } = await queuedBehindBusyComputer();
+
+        for (let attempt = 1; attempt < HOST_START_MAX_ATTEMPTS; attempt += 1) {
+            expect(await runRow(runId)).toMatchObject({ status: "queued" });
+            await retryStart(runId);
+        }
+
+        expect(await runRow(runId)).toMatchObject({ error: expect.stringMatching(BUSY), status: "failed" });
+
+        await retryStart(runId);
+
+        expect((await leadMessages()).filter((message) => BUSY.test(message))).toHaveLength(1);
+        expect(await sentCalls()).toHaveLength(1);
+    });
+
+    it("fails at once when the refusal is final: the agent's session has ended", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+
+        await sessionOpen(device, receipt.workerId);
+
+        const queued = (await dispatchFromLead(receipt.workerId, "call-2")) as { runId: string };
+
+        await fillOpenCalls(device);
+        await closeSession(device, receipt.workerId);
+
+        const failed = await runRow(queued.runId);
+
+        expect(failed).toMatchObject({ error: expect.stringMatching(SESSION_ENDED), status: "failed" });
+        expect(failed.hostStartAttempts).toBeUndefined();
+        expect((await leadMessages()).filter((message) => SESSION_ENDED.test(message))).toHaveLength(1);
+    });
+});
+
+describe("two workers started on one computer back to back", () => {
+    it("holds the second's first message until the computer has room, instead of failing it", async () => {
+        const device = await pairedDevice();
+        const first = await createHostWorker(device);
+        const second = await createHostWorker(device, { clientId: "make-2", name: "Second", task: "Second job" });
+
+        expect(first.state).toBe("running");
+        expect(second.state).toBe("queued");
+        expect(await runRow(second.runId)).toMatchObject({ hostStartAttempts: 1, status: "queued" });
+        expect((await leadMessages()).join(",")).not.toMatch(BUSY);
+
+        await freeOpenCalls((await table("deviceCalls")).map((call) => call._id as string));
+        await retryStart(second.runId);
+
+        expect(await runRow(second.runId)).toMatchObject({ status: "running" });
+        expect(await sentCalls()).toHaveLength(2);
     });
 });
 
