@@ -360,7 +360,8 @@ const runSpeaker = async (
                 prompt: "",
                 savedMessages: result.savedMessages,
                 skill: { id: speaker.skillId, name: speaker.name },
-                summarizeThread: turn.prefs.threadSummariesEnabled,
+                // A group run builds its own context and never reads a stored summary, so it schedules none.
+                summarizeThread: false,
                 threadId: turn.threadId,
                 ...(turn.prefs.timezone && { timeZone: turn.prefs.timezone }),
                 timingStart,

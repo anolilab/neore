@@ -257,7 +257,10 @@ export const prepareThreadSummary = internalMutation
         const slice = after.slice(0, plan.take);
         const { consumed, text } = renderTranscript(
             slice.map((row) => {
-                return { role: (row.message as { role?: string } | undefined)?.role ?? "assistant", text: row.tool ? undefined : row.text };
+                const role = (row.message as { role?: string } | undefined)?.role ?? "assistant";
+
+                // A tool result has no words of its own; an assistant row that also called a tool keeps its text.
+                return { role, text: role === "tool" ? undefined : row.text };
             }),
         );
         const covered = slice[consumed - 1];

@@ -2544,6 +2544,7 @@ export const schema = defineSchema({
         /** The thread's owner, whose shard this row lives on and whose account erases it. */
         userId: v.string(),
     })
+        .shardBy("userId")
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
 

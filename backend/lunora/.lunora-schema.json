@@ -19545,7 +19545,7 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "shardBy:userId"
     },
     "threadInvites": {
       "commitOrdered": false,

@@ -691,7 +691,7 @@ class AppBuilder<Env extends object> {
             ["teamSettings", { mode: { kind: "global" } }],
             ["temporaryThreads", { mode: { field: "userId", kind: "shardBy" } }],
             ["threadAccess", { mode: { kind: "global" } }],
-            ["threadContextSummaries", { mode: { kind: "root" } }],
+            ["threadContextSummaries", { mode: { field: "userId", kind: "shardBy" } }],
             ["threadInvites", { mode: { kind: "global" } }],
             ["threadKnowledge", { mode: { kind: "root" } }],
             ["threadPasscodes", { mode: { field: "userId", kind: "shardBy" } }],

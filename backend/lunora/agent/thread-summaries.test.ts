@@ -326,6 +326,20 @@ describe("a branch", () => {
     });
 });
 
+describe("rows that called a tool", () => {
+    it("keep the assistant's own text in the transcript", async () => {
+        expect.assertions(1);
+
+        await seedThread(ROWS);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch(rowIds[3], { text: "I will look this up.", tool: true });
+        });
+        await runJob(rowIds.at(-1)!);
+
+        expect(generateText.mock.calls[0]?.[0].prompt).toContain("I will look this up.");
+    });
+});
+
 describe("the debounce and redelivery", () => {
     it("runs one job for two replies: the earlier job finds a newer row", async () => {
         expect.assertions(3);
