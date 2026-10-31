@@ -1,14 +1,19 @@
 /**
  * Coding-agent sessions, as the web app reads them. Both are the caller's own; a host thread is never shared.
- * Starting, cancelling and answering are the remote-control slice (plans/acp-agent-host.md §8, S4).
+ * Starting, cancelling and answering are in `remote.ts`.
  */
+import { CLOUD_INTERACTIVE_CAPABILITIES, LOCAL_BROWSER_CAPABILITIES, unknownCapabilityReport } from "@neore/ai/capabilities";
 import type { Infer } from "lunorash/server";
 import { v } from "lunorash/server";
 
+import { internalMutation } from "../_generated/server";
+import { resolveThreadReadAccess } from "../agent/thread-read-access";
+import { isLocalBrowserModel, loadCustomProviders } from "../chat/lib/local-turn";
 import { authQuery } from "../lib/crpc";
 import { vCapabilityReport } from "../lib/capability-report";
 import { MAX_LENGTH } from "../lib/validators";
-import { vAcpSessionStatus } from "./validators";
+import { isHostRunThread } from "./lib/host-thread";
+import { vAcpSessionStatus, vHostEndReason } from "./validators";
 
 const MAX_LISTED_SESSIONS = 50;
 
@@ -20,6 +25,25 @@ const vHostSessionView = v.object({
     createdAt: v.number(),
     deviceId: v.string(),
     folderLabel: v.string(),
+    lastEventAt: v.optional(v.number()),
+    status: vAcpSessionStatus,
+    threadId: v.string(),
+});
+
+/**
+ * One session with how its last turn ended, so Continue is offered after a restart or a timeout
+ * (plans/acp-agent-host.md §4.5). Read off the last STREAM, not the reply row: a restart that comes after the
+ * reaper moves the reason from `timeout` to `interrupted` and writes no second reply.
+ */
+const vHostSessionDetail = v.object({
+    _id: v.string(),
+    agentKey: v.string(),
+    agentLabel: v.string(),
+    capabilities: v.optional(vCapabilityReport),
+    createdAt: v.number(),
+    deviceId: v.string(),
+    folderLabel: v.string(),
+    lastEndReason: v.optional(vHostEndReason),
     lastEventAt: v.optional(v.number()),
     status: vAcpSessionStatus,
     threadId: v.string(),
@@ -51,6 +75,21 @@ const toView = (row: {
     };
 };
 
+/** The thread is gone for good: so is the session that ran or imported into it, or its agent session could never be imported again. */
+export const deleteSessionsOfThread = internalMutation
+    .input({ threadId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const threadId = ctx.db.normalizeId("threads", args.threadId);
+        const { page } = threadId ? await ctx.db.acpSessions.findMany({ where: { threadId } }) : { page: [] };
+
+        for (const session of page) {
+            await ctx.db.delete(session._id);
+        }
+
+        return null;
+    });
+
 /** The caller's coding-agent sessions, newest first. */
 export const listHostSessions = authQuery
     .input({})
@@ -68,10 +107,54 @@ export const listHostSessions = authQuery
 /** The session a host thread runs in, or null for a thread that is not one, or is not the caller's. */
 export const getHostSession = authQuery
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
-    .output(v.union(v.null(), vHostSessionView))
+    .output(v.union(v.null(), vHostSessionDetail))
     .query(async ({ args, ctx }) => {
         const threadId = ctx.db.normalizeId("threads", args.threadId);
         const row = threadId ? await ctx.db.acpSessions.findFirst({ where: { threadId, userId: ctx.user.userId } }) : null;
 
-        return row ? toView(row) : null;
+        if (!row || !threadId) {
+            return null;
+        }
+
+        const last = await ctx.db.persistentStreams.findFirst({ orderBy: [{ _creationTime: "desc" }], where: { producer: "host", threadId } });
+
+        return { ...toView(row), ...(last?.hostEndReason !== undefined && { lastEndReason: last.hostEndReason }) };
+    });
+
+/**
+ * What the runner of a thread can do (plans/provider-capabilities.md §6): the report its host sent for a host
+ * thread (all unknown while it has sent none), the local-browser declaration for a thread on one of the owner's
+ * `local-browser` endpoints, the cloud declaration for any other. Null for a thread the caller cannot read, so a
+ * stranger learns nothing, not even that the id exists.
+ *
+ * A local-browser thread is told by its model's endpoint TYPE (`custom:<endpoint>/<model>` against the owner's
+ * endpoints), never by a model name. Only the owner's endpoints are readable here, so a grantee reads the cloud
+ * declaration for it; the composer that runs a local model picks `LOCAL_BROWSER_CAPABILITIES` itself.
+ */
+export const getThreadCapabilities = authQuery
+    .input({ threadId: v.string().max(MAX_LENGTH.id) })
+    .output(v.union(v.null(), vCapabilityReport))
+    .query(async ({ args, ctx }) => {
+        const threadId = ctx.db.normalizeId("threads", args.threadId);
+        const access = threadId ? await resolveThreadReadAccess(ctx, threadId, ctx.user.userId) : null;
+
+        if (access?.kind !== "full") {
+            return null;
+        }
+
+        if (!isHostRunThread(access.thread)) {
+            const onLocalEndpoint =
+                access.thread.userId === ctx.user.userId && isLocalBrowserModel(access.thread.model, await loadCustomProviders(ctx, ctx.user.userId));
+
+            return onLocalEndpoint ? LOCAL_BROWSER_CAPABILITIES : CLOUD_INTERACTIVE_CAPABILITIES;
+        }
+
+        // A host thread is its owner's alone: a live grant reads the thread, not the computer's report.
+        if (access.thread.userId !== ctx.user.userId) {
+            return null;
+        }
+
+        const session = await ctx.db.acpSessions.findFirst({ where: { threadId: access.thread._id, userId: ctx.user.userId } });
+
+        return session?.capabilities ?? unknownCapabilityReport(0);
     });

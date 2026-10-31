@@ -8,6 +8,7 @@ import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
+import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Heading } from "@neore/ui/components/heading";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
@@ -88,6 +89,7 @@ const ModelsSettings: FC = () => {
     const [searchQuery, setSearchQuery] = useState("");
     const [activeFilters, setActiveFilters] = useState<Set<ModelFilterCapability>>(new Set());
     const [showFilters, setShowFilters] = useState(false);
+    const [confirmResetOpen, setConfirmResetOpen] = useState(false);
     const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
     const [selectedMode, setSelectedMode] = useState<string | null>(null);
     const [selectedState, setSelectedState] = useState<string | null>(null);
@@ -374,7 +376,7 @@ const ModelsSettings: FC = () => {
                             <Button onClick={disableAll} size="sm" variant="outline">
                                 {t`Disable All`}
                             </Button>
-                            <Button onClick={resetToDefaults} size="sm" variant="outline">
+                            <Button onClick={() => setConfirmResetOpen(true)} size="sm" variant="outline">
                                 <RotateCcw aria-hidden="true" className="mr-2 size-4" />
                                 {t`Reset to Defaults`}
                             </Button>
@@ -611,6 +613,17 @@ const ModelsSettings: FC = () => {
                     )}
                 </CardContent>
             </Card>
+            <ConfirmDialog
+                confirmLabel={t`Reset`}
+                description={t`Every model returns to its default on or off setting.`}
+                onConfirm={() => {
+                    setConfirmResetOpen(false);
+                    void resetToDefaults();
+                }}
+                onOpenChange={setConfirmResetOpen}
+                open={confirmResetOpen}
+                title={t`Reset models to defaults?`}
+            />
         </div>
     );
 };

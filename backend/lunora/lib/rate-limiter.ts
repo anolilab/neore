@@ -132,10 +132,15 @@ export const RATE_LIMIT_CONFIGS = {
     "chat-import/start:free": Ratelimit.fixedWindow(5, HOUR),
     "chat-import/start:premium": Ratelimit.fixedWindow(20, HOUR),
 
+    // The summary call of an agent switch (`chat/agent-switch.ts`): a ~48k-token utility-model call made before
+    // anything is charged, so it has a tight budget of its own and cannot be spent through `chat/update`.
+    "chat/agentSwitchSummary:free": Ratelimit.fixedWindow(5, MINUTE),
+    "chat/agentSwitchSummary:premium": Ratelimit.fixedWindow(15, MINUTE),
     // Chat attachments taken into chat files (`file.ts#finalizeChatUpload`):
     // each is up to 25 MB hashed and re-stored. A burst covers dropping a
     // handful of files at once.
     "chat/attachmentUpload:free": Ratelimit.tokenBucket(20, MINUTE, 30),
+
     "chat/attachmentUpload:premium": Ratelimit.tokenBucket(60, MINUTE, 90),
     // Composer ghost text (`chat/autocomplete.ts`): one tiny utility-model call
     // per pause in typing — frequent by design, so generous, but bounded. Its
@@ -145,13 +150,12 @@ export const RATE_LIMIT_CONFIGS = {
     "chat/autocomplete:premium": Ratelimit.tokenBucket(60, MINUTE, 80),
     // Chat CRUD limits
     "chat/create:free": Ratelimit.fixedWindow(20, MINUTE),
-
     "chat/create:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Daily content limits per user tier - AUDIO
     "chat/dailyAudio:anonymous": Ratelimit.fixedWindow(1, DAY),
+
     "chat/dailyAudio:free": Ratelimit.fixedWindow(5, DAY),
     "chat/dailyAudio:premium": Ratelimit.fixedWindow(100, DAY),
-
     // Daily content limits per user tier - IMAGE
     "chat/dailyImage:anonymous": Ratelimit.fixedWindow(1, DAY),
     "chat/dailyImage:free": Ratelimit.fixedWindow(5, DAY),
@@ -172,12 +176,13 @@ export const RATE_LIMIT_CONFIGS = {
     // Daily content limits per user tier - TEXT
     "chat/dailyText:anonymous": Ratelimit.fixedWindow(10, DAY),
     "chat/dailyText:free": Ratelimit.fixedWindow(20, DAY),
+
     "chat/dailyText:premium": Ratelimit.fixedWindow(1000, DAY),
+
     // Daily content limits per user tier - VIDEO
     // Note: "chat/dailyVideo:anonymous" is intentionally omitted (limit=0 means always blocked)
     // The calling code already handles capacity===0 by returning early.
     "chat/dailyVideo:free": Ratelimit.fixedWindow(5, DAY),
-
     "chat/dailyVideo:premium": Ratelimit.fixedWindow(100, DAY),
 
     "chat/delete:free": Ratelimit.fixedWindow(10, MINUTE),
@@ -194,6 +199,10 @@ export const RATE_LIMIT_CONFIGS = {
     // for several at once, hence the burst.
     "chat/linkPreview:free": Ratelimit.tokenBucket(30, MINUTE, 60),
     "chat/linkPreview:premium": Ratelimit.tokenBucket(90, MINUTE, 150),
+    // Marking a thread's latest reply as seen (`chat/thread-state.ts`): one call per thread switch, a no-op
+    // most of the time, so a fast switcher must not spend the `chat/update` budget that renames share.
+    "chat/markViewed:free": Ratelimit.tokenBucket(60, MINUTE, 120),
+    "chat/markViewed:premium": Ratelimit.tokenBucket(120, MINUTE, 240),
     // Chat/AI limits (tiered)
     "chat/message:free": Ratelimit.tokenBucket(30, MINUTE, 50),
 
@@ -265,10 +274,20 @@ export const RATE_LIMIT_CONFIGS = {
     // GDPR limits
     "gdpr/request:free": Ratelimit.fixedWindow(3, HOUR),
     "gdpr/request:premium": Ratelimit.fixedWindow(5, HOUR),
+    // Remote control of a coding agent (`acp/remote.ts`, `acp/send.ts`): each one queues a signed command for a
+    // computer that holds three open ones, so a person gets a burst, not a stream.
+    "hosts/answer:free": Ratelimit.fixedWindow(60, MINUTE),
+    "hosts/answer:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Host turn output (`acp/http.ts`), per verified device: a turn posts at most four batches a second,
     // and a device runs a handful of sessions.
     "hosts/ingest:free": Ratelimit.fixedWindow(3000, MINUTE),
     "hosts/ingest:premium": Ratelimit.fixedWindow(3000, MINUTE),
+    "hosts/send:free": Ratelimit.fixedWindow(30, MINUTE),
+    "hosts/send:premium": Ratelimit.fixedWindow(30, MINUTE),
+    "hosts/start:free": Ratelimit.fixedWindow(10, MINUTE),
+    "hosts/start:premium": Ratelimit.fixedWindow(10, MINUTE),
+    // A paired computer's uploads (`acp/upload-http.ts`), apart from the person's own, so an agent cannot spend their budget.
+    "hosts/uploads/create": Ratelimit.tokenBucket(30, MINUTE, 30),
     // Adding a file to the knowledge base schedules its ingestion.
     "knowledge/add:free": Ratelimit.fixedWindow(20, MINUTE),
     "knowledge/add:premium": Ratelimit.fixedWindow(60, MINUTE),
@@ -479,8 +498,15 @@ export const RATE_LIMIT_CONFIGS = {
     "skills/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Develop mode (`source-control/`): every read is an outbound call to the Git host with
     // the user's own token, and opening one pull request fans out to a few (files page by page).
+    // Edits to a review draft: no host call, but a person typing saves often.
+    "sourceControl/draft:free": Ratelimit.fixedWindow(240, MINUTE),
+    "sourceControl/draft:premium": Ratelimit.fixedWindow(600, MINUTE),
     "sourceControl/read:free": Ratelimit.fixedWindow(240, MINUTE),
     "sourceControl/read:premium": Ratelimit.fixedWindow(600, MINUTE),
+    // A write to the Git host (a reply, a resolve, a viewed mark, a submitted review) is a user action
+    // that the host rate-limits too; GitHub's content-creation limit is the tighter one.
+    "sourceControl/write:free": Ratelimit.fixedWindow(60, MINUTE),
+    "sourceControl/write:premium": Ratelimit.fixedWindow(120, MINUTE),
     // Sub-agent starts (`sub-agents/functions.ts`), on top of the task quotas
     // each start is charged (`tasks/account.ts:chargeRound`) and the fan-out cap.
     "subAgents/run:free": Ratelimit.fixedWindow(10, HOUR),

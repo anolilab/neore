@@ -52,7 +52,8 @@ const ComposerFollowupSuggestions: FC = () => {
     const previousThreadIdRef = useRef<string | undefined>(undefined);
     const isFetchingRef = useRef(false);
 
-    const lastMessage = messages.length > 0 ? messages.at(-1) : null;
+    // A switch divider is a system row below the reply the suggestions are for; the server's cache skips it too.
+    const lastMessage = messages.findLast((message) => message.role !== "system") ?? null;
     const lastMessageRole = useMemo(() => lastMessage?.role, [lastMessage]);
 
     const hasUserMessage = useMemo(() => messages.some((message) => message.role === "user"), [messages]);

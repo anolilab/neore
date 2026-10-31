@@ -83,6 +83,22 @@ describe(failRun, () => {
         expect(calls.find((call) => call.ref === internal.agent.threads.updateThread)?.args).toMatchObject({ patch: { status: "active" } });
     });
 
+    it("settles the stop of a stopped run, which will never save the text it owed", async () => {
+        const { calls, ctx } = fakeCtx(["done"]);
+
+        await failRun(ctx as never, ARGS);
+
+        expect(calls.find((call) => call.ref === internal.chat.streaming.persistent.library.settleStoppedRun)?.args).toStrictEqual({ streamId: "stream-1" });
+    });
+
+    it("leaves a live stream's stop alone", async () => {
+        const { calls, ctx } = fakeCtx(["streaming"]);
+
+        await failRun(ctx as never, ARGS);
+
+        expect(calls.some((call) => call.ref === internal.chat.streaming.persistent.library.settleStoppedRun)).toBe(false);
+    });
+
     it("writes the error line and the requested thread status for a live stream", async () => {
         const { calls, ctx } = fakeCtx(["streaming"]);
 

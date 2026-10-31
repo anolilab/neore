@@ -15,6 +15,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import type { FollowUpControl } from "@neore/ai/capabilities";
 import { buttonVariants } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import { Separator } from "@neore/ui/components/separator";
@@ -25,6 +26,7 @@ import type { ReactNode } from "react";
 import { lazy, Suspense, useImperativeHandle, useRef } from "react";
 
 import type { PromptHistoryDirection } from "@/features/chat/core/utils/prompt-history";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { PromptVariable } from "@/features/prompts/lib/prompt-variables";
 
 import type { ChatReference } from "./chat-reference";
@@ -34,6 +36,7 @@ import { ComposerTiptapEditor } from "./composer-tiptap/composer-tiptap-editor";
 import type { BannedWordMatch } from "./composer-tiptap/extensions/banned-word-decoration";
 import type { VaultFileRef } from "./composer-tiptap/file-mention-popup";
 import type { GhostRequest } from "./composer-tiptap/ghost-completion-controller";
+import { sendShortcutLabel } from "./composer-tiptap/send-behavior";
 
 const ComposerVoiceInput = lazy(() => import("./composer-voice-input"));
 
@@ -62,6 +65,12 @@ interface ComposerInputAreaProps {
     customVariables?: PromptVariable[];
     /** Whether input is disabled */
     disabled?: boolean;
+
+    /**
+     * How the runner takes a message sent while it works (`followUpControl`). Only a steer
+     * shows the button; omitted, it reads as "none", so a runner that did not say hides it.
+     */
+    followUp?: FollowUpControl;
     /** Whether a recalled prompt is showing, see `ComposerTiptapEditor` */
     isHistoryRecalled?: () => boolean;
     /** Whether streaming is active (shows stop button) */
@@ -122,6 +131,7 @@ const ComposerInputArea = ({
     compact = false,
     customVariables,
     disabled = false,
+    followUp = "none",
     isStreaming = false,
     isUploading = false,
     maxRows = 5,
@@ -145,6 +155,8 @@ const ComposerInputArea = ({
     value,
 }: ComposerInputAreaProps & { ref?: React.RefObject<ComposerInputAreaRef | null> }) => {
     const { t } = useLingui();
+    const sendShortcut = useUIStateStore((state) => sendShortcutLabel(state.preferences.sendBehavior));
+    const sendTooltip = sendShortcut ? t`Send message (${sendShortcut})` : t`Send message`;
     const tiptapRef = useRef<ComposerTiptapEditorRef>(null);
 
     useImperativeHandle(ref, () => {
@@ -186,7 +198,7 @@ const ComposerInputArea = ({
                                                         disabled={disabled}
                                                         type="button"
                                                     >
-                                                        <PlusIcon className="text-foreground size-4 dark:text-white" />
+                                                        <PlusIcon aria-hidden="true" className="text-foreground size-4 dark:text-white" />
                                                     </button>
                                                 }
                                             />
@@ -218,6 +230,7 @@ const ComposerInputArea = ({
                                 <TooltipTrigger
                                     render={
                                         <button
+                                            aria-label={t`Add attachment`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "ghost" }),
                                                 "my-2 size-[34px]",
@@ -227,7 +240,7 @@ const ComposerInputArea = ({
                                             onClick={onAddAttachment}
                                             type="button"
                                         >
-                                            <PlusIcon className="text-foreground size-4 dark:text-white" />
+                                            <PlusIcon aria-hidden="true" className="text-foreground size-4 dark:text-white" />
                                         </button>
                                     }
                                 />
@@ -283,12 +296,12 @@ const ComposerInputArea = ({
                     survive when transcribed text makes the input non-empty. */}
                 {isStreaming ? (
                     <>
-                        {onSteer && !isEmpty && !isUploading && (
+                        {onSteer && (followUp === "steer" || followUp === "steer-restart") && !isEmpty && !isUploading && (
                             <Tooltip>
                                 <TooltipTrigger
                                     render={
                                         <button
-                                            aria-label={t`Steer the reply`}
+                                            aria-label={followUp === "steer-restart" ? t`Interrupt and restart` : t`Steer the reply`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "outline" }),
                                                 "my-2 size-[34px]",
@@ -302,7 +315,11 @@ const ComposerInputArea = ({
                                         </button>
                                     }
                                 />
-                                <TooltipContent side="bottom">{t`Steer — the current reply reads this at its next step`}</TooltipContent>
+                                <TooltipContent side="bottom">
+                                    {followUp === "steer-restart"
+                                        ? t`Interrupt and restart — stops the current reply and sends this`
+                                        : t`Steer — the current reply reads this at its next step`}
+                                </TooltipContent>
                             </Tooltip>
                         )}
                         {canQueueWhileStreaming && (!isEmpty || isUploading) && (
@@ -377,7 +394,7 @@ const ComposerInputArea = ({
                                         </button>
                                     }
                                 />
-                                <TooltipContent side="bottom">{isUploading ? t`Waiting for uploads to complete…` : t`Send message`}</TooltipContent>
+                                <TooltipContent side="bottom">{isUploading ? t`Waiting for uploads to complete…` : sendTooltip}</TooltipContent>
                             </Tooltip>
                         )}
                     </>

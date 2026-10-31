@@ -5,6 +5,10 @@ import type { GrantUser } from "./grant";
 export type AuthStatus = "loading" | "signed-in" | "signed-out";
 
 export interface AuthValue {
+    /** Whether a JWT is held. A cold start with no network is signed in (the stored user is known) but holds none, so it reads nothing from the server. */
+    hasToken: boolean;
+    /** Mints a new JWT now instead of at the next retry. Resolves when that attempt has ended, whether or not it got one. */
+    retryToken: () => Promise<void>;
     signIn: () => Promise<void>;
     signOut: () => Promise<void>;
     status: AuthStatus;

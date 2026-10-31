@@ -21,6 +21,7 @@ import { LunoraError } from "lunorash/server";
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { onUserShard } from "../../lib/workflow-shard";
+import { collectAllReviewDrafts } from "../../source-control/export-pages";
 
 export interface ExportParams {
     requestId: Id<"gdprRequests">;
@@ -74,6 +75,13 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         const tasks = await context.step.do("collect-tasks", async () => await context.run(internal.tasks.gdpr.collectTasksForExport, { userId }));
         const memories = await context.step.do("collect-memories", async () => await context.run(internal.memory.gdpr.collectMemoriesForExport, { userId }));
         const evals = await context.step.do("collect-evals", async () => await context.run(internal.evals.gdpr.collectEvalsForExport, { userId }));
+        // A page per step, so no checkpoint outgrows the log's size limit however many drafts there are. The first
+        // step keeps the old name: an in-flight run's recorded result has no cursor and reads as the only page.
+        const reviewDrafts = await collectAllReviewDrafts(async (cursor, page) => {
+            const name = page === 0 ? "collect-review-drafts" : `collect-review-drafts-${String(page)}`;
+
+            return await context.step.do(name, async () => await context.run(internal.source_control.gdpr.collectReviewDraftsForExport, { cursor, userId }));
+        });
         const bots = await context.step.do("collect-bots", async () => await context.run(internal.bots.gdpr.collectBotsForExport, { userId }));
         const codingAgentRuns = await context.step.do(
             "collect-coding-agent-runs",
@@ -131,6 +139,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                         profile,
                         prompts,
                         requestId,
+                        reviewDrafts,
                         settings,
                         tasks,
                         threadTags,

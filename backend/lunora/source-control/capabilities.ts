@@ -8,11 +8,22 @@ import type { Capability } from "@neore/ai/capabilities";
 import { capabilityIn, isAvailable } from "@neore/ai/capabilities";
 
 export type HostCapabilityGroups = {
+    checks?: {
+        /** Which checks the base branch's rules require, so an optional failure is not red. */
+        requiredState?: Capability;
+        /** Re-run one check or job on its own, not the whole workflow. */
+        rerun?: Capability;
+    };
     inbox?: {
         drafts?: Capability;
         mine?: Capability;
         needsMyReview?: Capability;
         readyToMerge?: Capability;
+    };
+    merge?: {
+        /** Merge once the host's rules are met. */
+        auto?: Capability;
+        now?: Capability;
     };
     pullRequest?: {
         checks?: Capability;
@@ -20,6 +31,17 @@ export type HostCapabilityGroups = {
         description?: Capability;
         diff?: Capability;
         files?: Capability;
+    };
+    review?: {
+        batchedSubmit?: Capability;
+        lineComments?: Capability;
+        replies?: Capability;
+        resolveThreads?: Capability;
+        verdictApprove?: Capability;
+        verdictComment?: Capability;
+        verdictRequestChanges?: Capability;
+        /** Viewed marks the host keeps, so they follow the user to the host's own page. */
+        viewedMarks?: Capability;
     };
 };
 

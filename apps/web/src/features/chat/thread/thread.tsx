@@ -14,13 +14,14 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import cn from "@neore/ui/utils/cn";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { ArrowDownIcon, CornerLeftUpIcon } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import AskAsideShortcutListener from "@/features/chat/aside/ask-aside-shortcut-listener";
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
@@ -29,6 +30,7 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import ForwardSelectionBar from "@/features/chat/forward/forward-selection-bar";
+import { hasUnseenReply } from "@/features/chat/thread-list/lib/thread-state-rules";
 import WorkerComposer from "@/features/sub-agents/components/worker-composer";
 import WorkerList from "@/features/sub-agents/components/worker-list";
 import WorkerRunLog from "@/features/sub-agents/components/worker-run-log";
@@ -44,6 +46,7 @@ import Composer from "./composer";
 import ComposerEffortShortcuts from "./composer-effort-shortcuts";
 import CopyLastCodeBlockListener from "./copy-last-code-block";
 import EditComposer from "./edit-composer";
+import ThreadFindBar from "./find/thread-find-bar";
 import MediaGalleryView from "./media-gallery-view";
 import MessageList, { scrollToMessage } from "./message-list";
 import { lastPromptId } from "./minimap-items";
@@ -120,6 +123,17 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
 
     const crpc = useCRPC();
     const afterFirstPaint = useAfterFirstPaint();
+
+    // Owner-only fields, absent on a thread shared with the caller. Opening a thread, or a reply finishing in it, marks it seen once.
+    const { mutate: markThreadViewed } = useMutation(crpc.chat.thread_state.markThreadViewed.mutationOptions());
+    const hasUnseen = !isNewThread && !isStreaming && hasUnseenReply(thread ?? {});
+    const lastReplyAt = thread?.lastReplyAt;
+
+    useEffect(() => {
+        if (hasUnseen && threadId) {
+            markThreadViewed({ threadId: threadId as Id<"threads"> });
+        }
+    }, [hasUnseen, lastReplyAt, markThreadViewed, threadId]);
     // A comparison parent needs its children at once; any other thread reads them after first paint,
     // to learn whether it has workers to list.
     const { data: childThreads } = useQuery(
@@ -262,7 +276,13 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
             <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
             <ComposerEffortShortcuts />
             <CopyLastCodeBlockListener />
-            <div className={cn("h-[calc(100%-40px)]", className)} style={{ "--thread-max-width": maxWidth } as React.CSSProperties}>
+            <AskAsideShortcutListener />
+            <div
+                className={cn("relative h-[calc(100%-40px)]", className)}
+                data-find-in-thread-host={composerMode === "text" && !isNewThread ? "" : undefined}
+                style={{ "--thread-max-width": maxWidth } as React.CSSProperties}
+            >
+                {composerMode === "text" && !isNewThread && <ThreadFindBar key={threadId} />}
                 <ThreadViewport className="flex h-full flex-col items-center bg-inherit px-4 pt-2" ref={viewportRef}>
                     {!isNewThread && <SubAgentParentBreadcrumb className="w-full max-w-(--thread-max-width)" threadId={threadId} />}
                     <div

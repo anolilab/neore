@@ -61,7 +61,10 @@ vi.mock("@/lib/lunora/crpc", () => {
         useCRPC: () => {
             return {
                 agent: { thread_lock: { lockThread: entry } },
-                chat: { functions: { abortThreadStream: entry, convertTemporaryToPermanent: entry, getThread: entry } },
+                chat: {
+                    functions: { abortThreadStream: entry, convertTemporaryToPermanent: entry, getThread: entry },
+                    thread_state: { snoozeThread: entry, unsnoozeThread: entry },
+                },
             };
         },
         useLunora: () => {
@@ -79,7 +82,7 @@ vi.mock("@neore/client-runtime", async (importOriginal) => {
 });
 
 vi.mock("@/lib/toast", () => {
-    return { showError: () => {} };
+    return { showError: () => {}, showSuccess: () => {} };
 });
 
 vi.mock("@/hooks/use-has-opened", () => {
@@ -133,6 +136,8 @@ vi.mock("./stores/thread-list-ui-store", () => {
 });
 
 const { default: ThreadNode } = await import("./thread-node");
+
+const SNOOZE_BUTTON = /^Snooze thread/u;
 
 const child = { branchPoint: 0, branchType: "branch", children: [], createdAt: 0, depth: 1, status: "idle", threadId: "c1", title: "Child" };
 
@@ -188,9 +193,36 @@ describe("ThreadNode", () => {
         expect(screen.getByRole("button", { name: `${action}: Quarterly plan` })).toBeTruthy();
     });
 
+    it("offers a snooze on a root thread that has a reply, and none on a child", () => {
+        const replied = { ...baseProps.node, lastReplyAt: 1 };
+        const { rerender } = render(<ThreadNode {...baseProps} node={replied} />);
+
+        expect(screen.getByRole("button", { name: "Snooze thread: Quarterly plan" })).toBeTruthy();
+
+        rerender(<ThreadNode {...baseProps} node={{ ...child, lastReplyAt: 1 }} />);
+
+        expect(screen.queryByRole("button", { name: SNOOZE_BUTTON })).toBeNull();
+    });
+
     it("flips the expand label and state when the branches are open", () => {
         render(<ThreadNode {...baseProps} expandedThreads={new Set(["t1"])} />);
 
         expect(screen.getByRole("button", { expanded: true, name: "Collapse branches: Quarterly plan" })).toBeTruthy();
+    });
+
+    it("announces a thread that starts waiting for the user, and clears when it stops", () => {
+        const { rerender } = render(<ThreadNode {...baseProps} />);
+        const region = screen.getByRole("status");
+
+        expect(region.textContent).toBe("");
+
+        rerender(<ThreadNode {...baseProps} node={{ ...baseProps.node, awaitingInput: "approval" }} />);
+
+        expect(screen.getByRole("status")).toBe(region);
+        expect(region.textContent).toBe("Waiting for your approval");
+
+        rerender(<ThreadNode {...baseProps} node={{ ...baseProps.node, awaitingInput: "question" }} />);
+
+        expect(region.textContent).toBe("Waiting for your answer");
     });
 });

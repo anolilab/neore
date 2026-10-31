@@ -2,9 +2,9 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/dialog";
 import { useAppForm } from "@neore/ui/components/form";
 import { Input } from "@neore/ui/components/input";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import cn from "@neore/ui/utils/cn";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";

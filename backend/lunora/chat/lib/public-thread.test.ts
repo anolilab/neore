@@ -237,3 +237,21 @@ describe("group chat speakers", () => {
         expect(plain).not.toHaveProperty("speakerName");
     });
 });
+
+describe("a goal's instruction row", () => {
+    const rows = [
+        message("user", [{ text: "Make the report", type: "text" }]),
+        { ...message("user", [{ text: 'Goal: x\n<goal-review>\n{"reason":"the page said X"}\n</goal-review>', type: "text" }]), agentName: "neore:goal" },
+        message("assistant", [{ text: "Done.", type: "text" }]),
+    ];
+
+    it("is not part of the published conversation", () => {
+        expect(toPublicThreadMessages(rows).map((m) => m.role)).toEqual(["user", "assistant"]);
+        expect(JSON.stringify(toPublicThreadMessages(rows))).not.toContain("the page said X");
+    });
+
+    it("is not shown to a non-owner opening the thread in the app either", () => {
+        expect(JSON.stringify(redactUIMessagesForPublicViewer(rows))).not.toContain("the page said X");
+        expect(redactUIMessagesForPublicViewer(rows)).toHaveLength(2);
+    });
+});

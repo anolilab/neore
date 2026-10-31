@@ -9,11 +9,13 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use device_core::frame::{read_frame, write_frame};
+use device_core::frame::{read_frame, stream_chunk_of, write_frame, CHUNK_TAG};
 use device_core::host::{run_request, RunParams};
 use serde_json::{json, Value};
 use vectors::{Observed, Sandbox};
@@ -69,12 +71,20 @@ fn host_command() -> Command {
 struct Host {
     child: Child,
     frames: Receiver<Value>,
+    /// While set, the reader stops taking frames off stdout, so the pipe fills and the host stalls on its writes.
+    held: Arc<AtomicBool>,
     stdin: Option<ChildStdin>,
 }
 
 impl Host {
     fn start() -> Host {
+        Self::start_with(&[])
+    }
+
+    /// A host that also has `extra` in its environment, as a forwarded agent socket would be.
+    fn start_with(extra: &[(&str, &str)]) -> Host {
         let mut child = host_command()
+            .envs(extra.iter().copied())
             .arg("--stdio")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -84,23 +94,44 @@ impl Host {
         let mut stdout = child.stdout.take().unwrap();
         let stdin = child.stdin.take();
         let (sender, frames) = channel();
+        let held = Arc::new(AtomicBool::new(false));
+        let reader_held = Arc::clone(&held);
 
-        thread::spawn(move || {
-            while let Ok(Some(bytes)) = read_frame(&mut stdout) {
-                if sender
-                    .send(serde_json::from_slice(&bytes).unwrap())
-                    .is_err()
-                {
-                    break;
-                }
+        thread::spawn(move || loop {
+            while reader_held.load(Ordering::SeqCst) {
+                thread::sleep(Duration::from_millis(10));
+            }
+
+            let Ok(Some(bytes)) = read_frame(&mut stdout) else {
+                break;
+            };
+            // A chunk is raw bytes; the tests see it as `{ kind: "chunk", id, stream, bytes: [..] }`.
+            let frame = stream_chunk_of(&bytes).map_or_else(
+                || serde_json::from_slice(&bytes).unwrap(),
+                |(tag, id, data)| {
+                    json!({
+                        "kind": "chunk", "id": id, "bytes": data,
+                        "stream": if tag == CHUNK_TAG { "stdout" } else { "stderr" },
+                    })
+                },
+            );
+
+            if sender.send(frame).is_err() {
+                break;
             }
         });
 
         Host {
             child,
             frames,
+            held,
             stdin,
         }
+    }
+
+    /// Stops (or resumes) reading the host's stdout.
+    fn hold(&self, held: bool) {
+        self.held.store(held, Ordering::SeqCst);
     }
 
     fn next(&self) -> Value {
@@ -179,7 +210,8 @@ fn the_host_says_what_it_can_sandbox_before_anything_else() {
     .is_ok();
 
     assert_eq!(hello["kind"], "hello");
-    assert_eq!(hello["protocol"], 2);
+    assert_eq!(hello["protocol"], 3);
+    assert_eq!(hello["agents"], cfg!(unix));
     assert_eq!(hello["platform"], device_core::actions::platform());
     assert_eq!(hello["sandbox"]["available"], confines);
 }
@@ -497,4 +529,515 @@ fn the_host_sees_only_the_clean_environment() {
             );
         }
     }
+}
+
+/// A folder of `names`, each holding its own name, to list and archive.
+fn folder_of(label: &str, names: &[&str]) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("neore-host-files-{label}-{}", std::process::id()));
+
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("root")).unwrap();
+
+    for name in names {
+        std::fs::write(dir.join("root").join(name), name).unwrap();
+    }
+
+    std::fs::canonicalize(dir.join("root")).unwrap()
+}
+
+fn files(root: &Path, path: &str) -> Value {
+    json!({ "roots": [root], "path": path })
+}
+
+#[test]
+fn a_folder_is_listed_a_page_at_a_time_inside_the_shared_folders() {
+    let root = folder_of("list", &["e", "b", "d", "a", "c"]);
+    let mut host = Host::start();
+
+    host.next();
+
+    let mut seen = Vec::new();
+    let mut after = Value::Null;
+
+    for id in 1..=5 {
+        let mut params = files(&root, "");
+
+        params["after"] = after.clone();
+        params["limit"] = json!(2);
+        host.request(id, "list", params);
+
+        let response = host.next();
+
+        assert_eq!(response["ok"], true, "{response}");
+
+        let page = &response["result"];
+
+        seen.extend(
+            page["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["name"].as_str().unwrap().to_owned()),
+        );
+
+        if page["next"].is_null() {
+            break;
+        }
+
+        after = page["next"].clone();
+    }
+
+    assert_eq!(seen, ["a", "b", "c", "d", "e"]);
+
+    host.request(9, "list", files(&root, ".."));
+    host.request(10, "list", files(&root, "/"));
+
+    for _ in 0..2 {
+        let response = host.next();
+
+        assert_eq!(response["ok"], false, "{response}");
+        assert!(response["error"]
+            .as_str()
+            .unwrap()
+            .contains("outside the shared folders"));
+    }
+}
+
+#[cfg(unix)]
+mod tar {
+    use super::*;
+
+    /// Sends `tar` and collects its chunks and response.
+    fn download(host: &mut Host, id: u64, params: Value) -> (Vec<u8>, Value) {
+        host.request(id, "tar", params);
+
+        let mut archive = Vec::new();
+
+        loop {
+            let frame = host.next();
+
+            match frame["kind"].as_str() {
+                Some("chunk") => {
+                    assert_eq!(frame["id"], id);
+                    archive.extend(
+                        frame["bytes"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|byte| byte.as_u64().unwrap() as u8),
+                    );
+                }
+                _ => return (archive, frame),
+            }
+        }
+    }
+
+    #[test]
+    fn a_folder_streams_as_chunks_then_a_response_that_says_what_it_holds() {
+        let root = folder_of("tar", &["one", "two"]);
+        let mut host = Host::start();
+
+        host.next();
+
+        let (archive, response) = download(&mut host, 3, files(&root, ""));
+        let tar = root.parent().unwrap().join("out.tar");
+
+        std::fs::write(&tar, &archive).unwrap();
+
+        let listed = Command::new("tar").arg("-tf").arg(&tar).output().unwrap();
+        let mut names: Vec<_> = String::from_utf8_lossy(&listed.stdout)
+            .lines()
+            .map(str::to_owned)
+            .collect();
+
+        names.sort();
+
+        assert_eq!(response["ok"], true, "{response}");
+        assert_eq!(response["id"], 3);
+        assert_eq!(
+            response["result"],
+            json!({ "bytes": 6, "files": 2, "folders": 1, "skipped": 0, "unreadable": 0 })
+        );
+        assert_eq!(names.len(), 3, "{names:?}");
+        assert!(names[0].ends_with("root/") && names[1].ends_with("/one"));
+
+        // A folder outside the shared ones is refused before a byte is sent.
+        let (archive, response) = download(&mut host, 4, files(&root, ".."));
+
+        assert!(archive.is_empty());
+        assert_eq!(response["ok"], false);
+    }
+
+    /// The host stalls on a stdout nobody reads (the test stops reading it); a `cancel` is read all the same and
+    /// ends the archive.
+    #[test]
+    fn a_cancel_stops_an_archive_that_is_still_being_written() {
+        let root = folder_of("cancel", &[]);
+
+        std::fs::write(root.join("big"), vec![7u8; 24 * 1024 * 1024]).unwrap();
+
+        let mut host = Host::start();
+
+        host.next();
+        host.hold(true);
+        host.request(5, "tar", files(&root, ""));
+        thread::sleep(Duration::from_millis(500));
+        host.request(6, "cancel", json!({ "target": 5 }));
+        host.hold(false);
+
+        let (mut archive, mut answers) = (0usize, Vec::new());
+
+        while answers.len() < 2 {
+            let frame = host.next();
+
+            if frame["kind"] == "chunk" {
+                archive += frame["bytes"].as_array().unwrap().len();
+            } else {
+                answers.push(frame);
+            }
+        }
+
+        let tar = answers.iter().find(|frame| frame["id"] == 5).unwrap();
+
+        assert!(answers
+            .iter()
+            .any(|frame| frame["id"] == 6 && frame["ok"] == true));
+        assert_eq!(tar["ok"], false, "{tar}");
+        assert_eq!(tar["error"], "the download was stopped");
+        assert!(archive < 24 * 1024 * 1024, "{archive} bytes were sent");
+    }
+}
+
+// ─── Coding agents (S7) ──────────────────────────────────────────────────
+
+/// Sends bytes to the agent started by request `id`, as a chunk frame; no bytes close its stdin.
+#[cfg(unix)]
+fn agent_input(host: &mut Host, id: u64, bytes: &[u8]) {
+    let mut frame = vec![CHUNK_TAG];
+
+    frame.extend_from_slice(&id.to_be_bytes());
+    frame.extend_from_slice(bytes);
+    write_frame(host.stdin.as_mut().unwrap(), &frame).unwrap();
+}
+
+#[cfg(unix)]
+fn agent_params(root: &Path, script: &str, env: &Value) -> Value {
+    json!({
+        "args": ["-c", script], "command": "/bin/sh", "cwd": root, "env": env,
+        "roots": [root],
+    })
+}
+
+/// What an agent printed, by stream, and the response that ended it. Reads until the response of request `id`.
+#[cfg(unix)]
+fn agent_run(host: &Host, id: u64) -> (String, String, Value) {
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+
+    loop {
+        let frame = host.next();
+
+        match frame["kind"].as_str() {
+            Some("chunk") if frame["id"] == id => {
+                let bytes: Vec<u8> = frame["bytes"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|byte| byte.as_u64().unwrap() as u8)
+                    .collect();
+
+                if frame["stream"] == "stdout" {
+                    out.extend(bytes);
+                } else {
+                    err.extend(bytes);
+                }
+            }
+            Some("response") if frame["id"] == id => {
+                return (
+                    String::from_utf8(out).unwrap(),
+                    String::from_utf8(err).unwrap(),
+                    frame,
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+#[cfg(unix)]
+fn alive(pid: i64) -> bool {
+    // SAFETY: signal 0 only asks whether the process exists.
+    unsafe { libc::kill(pid as libc::pid_t, 0) == 0 }
+}
+
+#[cfg(unix)]
+fn wait_gone(what: &str, pid: i64) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
+
+    while alive(pid) {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "{what} ({pid}) is still running"
+        );
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[cfg(unix)]
+fn wait_for_file(file: &Path) -> String {
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
+
+    loop {
+        if let Ok(text) = std::fs::read_to_string(file) {
+            if text.ends_with('\n') {
+                return text.trim().to_owned();
+            }
+        }
+
+        assert!(
+            std::time::Instant::now() < deadline,
+            "{} never appeared",
+            file.display()
+        );
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
+#[cfg(unix)]
+fn agent_folder(label: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("neore-host-agent-{label}-{}", std::process::id()));
+
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    dir.canonicalize().unwrap()
+}
+
+#[cfg(unix)]
+#[test]
+fn an_agent_streams_both_outputs_takes_input_and_ends_with_its_status() {
+    let root = agent_folder("stream");
+    let mut host = Host::start();
+
+    host.next();
+    host.request(
+        1,
+        "agent",
+        agent_params(
+            &root,
+            "echo ready; echo oops >&2; read line; echo got:$line; exit 3",
+            &json!({}),
+        ),
+    );
+    // The agent waits for a line; the desktop's bytes for request 1 are its stdin.
+    agent_input(&mut host, 1, b"hello\n");
+
+    let (out, err, response) = agent_run(&host, 1);
+
+    assert_eq!(out, "ready\ngot:hello\n");
+    assert_eq!(err, "oops\n");
+    assert_eq!(response["ok"], true, "{response}");
+    assert_eq!(response["result"]["code"], 3);
+}
+
+#[cfg(unix)]
+#[test]
+fn an_agent_gets_the_hosts_own_environment_and_the_persons_variables_and_no_agent_socket() {
+    let root = agent_folder("env");
+    let mut host = Host::start();
+
+    host.next();
+    host.request(
+        1,
+        "agent",
+        agent_params(
+            &root,
+            "env",
+            &json!({ "EXTRA": "from-the-person", "PATH": "/usr/bin:/bin:/opt/x" }),
+        ),
+    );
+
+    let (out, _, response) = agent_run(&host, 1);
+    let names: BTreeSet<&str> = out
+        .lines()
+        .filter_map(|line| line.split('=').next())
+        .collect();
+
+    assert_eq!(response["result"]["code"], 0, "{response}");
+    assert!(out.contains("EXTRA=from-the-person"));
+    assert!(out.contains("PATH=/usr/bin:/bin:/opt/x"));
+    assert!(out.contains("HOME="));
+    assert!(!names.contains("SSH_AUTH_SOCK"));
+    // Nothing of cargo's environment, which the host was started from, reaches the agent.
+    assert!(!names.contains("CARGO_MANIFEST_DIR"));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_forwarded_agent_socket_reaches_the_agent_only_when_the_host_has_one() {
+    let root = agent_folder("socket");
+    let mut host = Host::start_with(&[("SSH_AUTH_SOCK", "/run/forwarded.sock")]);
+
+    host.next();
+    host.request(1, "agent", agent_params(&root, "env", &json!({})));
+
+    let (out, _, _) = agent_run(&host, 1);
+
+    assert!(out.contains("SSH_AUTH_SOCK=/run/forwarded.sock"));
+}
+
+#[cfg(unix)]
+#[test]
+fn an_agent_does_not_start_outside_the_shared_folders_or_with_a_reserved_variable() {
+    let root = agent_folder("refuse");
+    let mut host = Host::start();
+
+    host.next();
+    host.request(1, "agent", agent_params(Path::new("/"), "true", &json!({})));
+    host.request(
+        2,
+        "agent",
+        agent_params(&root, "true", &json!({ "NODE_OPTIONS": "--require x" })),
+    );
+    host.request(3, "agent", agent_params(&root, "true", &json!({})));
+
+    let responses: Vec<Value> = (0..3).map(|_| host.next()).collect();
+    let by_id = |id: u64| responses.iter().find(|r| r["id"] == id).unwrap();
+
+    assert_eq!(by_id(1)["ok"], false, "{}", by_id(1));
+    assert_eq!(by_id(2)["ok"], false, "{}", by_id(2));
+    assert_eq!(by_id(3)["ok"], true, "{}", by_id(3));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_cancel_stops_the_agent_and_its_group() {
+    let root = agent_folder("cancel");
+    let pidfile = root.join("child.pid");
+    let mut host = Host::start();
+
+    host.next();
+    host.request(
+        1,
+        "agent",
+        agent_params(
+            &root,
+            &format!(
+                "sleep 300 & echo $! > {}; exec sleep 300",
+                pidfile.display()
+            ),
+            &json!({}),
+        ),
+    );
+
+    let child: i64 = wait_for_file(&pidfile).parse().unwrap();
+
+    host.request(2, "cancel", json!({ "target": 1 }));
+
+    let (_, _, response) = agent_run(&host, 1);
+
+    assert_eq!(response["result"]["signal"], libc::SIGTERM);
+    // The shell's background child was in the agent's group and goes with it.
+    wait_gone("the agent's child", child);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_desktop_that_goes_away_takes_the_whole_agent_tree_with_it() {
+    let root = agent_folder("eof");
+    let (pidfile, leaderfile) = (root.join("child.pid"), root.join("leader.pid"));
+    let mut host = Host::start();
+
+    host.next();
+    host.request(
+        1,
+        "agent",
+        agent_params(
+            &root,
+            &format!(
+                "sleep 300 & echo $! > {}; echo $$ > {}; exec sleep 300",
+                pidfile.display(),
+                leaderfile.display()
+            ),
+            &json!({}),
+        ),
+    );
+
+    let child: i64 = wait_for_file(&pidfile).parse().unwrap();
+    let leader: i64 = wait_for_file(&leaderfile).parse().unwrap();
+
+    // The desktop quit: ssh ends and the host's stdin with it.
+    host.close_stdin();
+
+    assert_eq!(host.exit_code(), Some(0));
+    wait_gone("the agent", leader);
+    wait_gone("the agent's child", child);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_host_told_to_stop_takes_the_whole_agent_tree_with_it() {
+    let root = agent_folder("term");
+    let pidfile = root.join("child.pid");
+    let mut host = Host::start();
+
+    host.next();
+    host.request(
+        1,
+        "agent",
+        agent_params(
+            &root,
+            &format!(
+                "sleep 300 & echo $! > {}; exec sleep 300",
+                pidfile.display()
+            ),
+            &json!({}),
+        ),
+    );
+
+    let child: i64 = wait_for_file(&pidfile).parse().unwrap();
+
+    // SAFETY: SIGTERM to the host this test started.
+    unsafe {
+        libc::kill(host.child.id() as libc::pid_t, libc::SIGTERM);
+    }
+
+    host.exit_code();
+    wait_gone("the agent's child", child);
+}
+
+#[cfg(unix)]
+#[test]
+fn agents_have_slots_of_their_own_and_do_not_use_up_the_requests() {
+    let root = agent_folder("slots");
+    let mut host = Host::start();
+
+    host.next();
+
+    for id in 1..=8 {
+        host.request(
+            id,
+            "agent",
+            agent_params(&root, "exec sleep 300", &json!({})),
+        );
+    }
+
+    // A ninth is refused; the file and command requests still have all their slots.
+    host.request(
+        9,
+        "agent",
+        agent_params(&root, "exec sleep 300", &json!({})),
+    );
+
+    let refusal = host.next();
+
+    assert_eq!(refusal["id"], 9);
+    assert_eq!(refusal["ok"], false);
+    assert_eq!(refusal["error"], "too many coding agents on this server");
+
+    host.run(10, params(&root, "fs_list", &json!({})));
+
+    let listing = host.next();
+
+    assert_eq!(listing["id"], 10);
+    assert_eq!(listing["ok"], true, "{listing}");
 }

@@ -10,6 +10,7 @@
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
+import { patchThread } from "../../agent/table-writes";
 import { enqueueJob } from "../../lib/job-queue";
 import { persistentTextStreaming } from "../streaming";
 import type { ToolRunConfig } from "./tool-run-config";
@@ -56,10 +57,8 @@ export const resumeClaimedRun = async (ctx: MutationCtx, args: ResumeClaimedRunA
         userId: ownerId,
     });
 
-    await ctx.scheduler.runAfter(0, internal.agent.threads.updateThread, {
-        patch: { status: "running", updatedAt: Date.now() },
-        threadId,
-    });
+    // In this transaction, not scheduled: a late write would wipe the `awaitingInput` of a continuation that paused again.
+    await patchThread(ctx.db, threadId, { status: "running", updatedAt: ctx.now });
 
     return streamId;
 };

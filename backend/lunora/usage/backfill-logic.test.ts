@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { agentSwitchRowContent } from "../agent/agent-switch-logic";
 import { GATEWAY_COST_METADATA_KEY } from "../agent/message-cost";
 import { DEFAULT_SKILL_KEY } from "./activity-logic";
 import type { BackfillRow } from "./backfill-logic";
@@ -17,6 +18,20 @@ const row = (order: number, role: string, overrides: Partial<BackfillRow> = {}):
 const ids = (groups: ReturnType<typeof groupReplies>): string[][] => groups.map((group) => group.rows.map((r) => r._id));
 
 describe("groupReplies", () => {
+    it("leaves an agent switch divider out: it is no reply, and ends the run before it", () => {
+        const part = { from: { kind: "model" as const, model: "a" }, mode: "full" as const, startMessageId: "m", to: { kind: "model" as const, model: "b" } };
+        const divider = row(1, "system", { _id: "divider", providerMetadata: agentSwitchRowContent(part).providerMetadata });
+        const rows = [
+            row(0, "user", { _id: "p0" }),
+            row(0, "assistant", { _id: "a" }),
+            divider,
+            row(2, "user", { _id: "p2" }),
+            row(2, "assistant", { _id: "b" }),
+        ];
+
+        expect(ids(groupReplies(rows))).toStrictEqual([["a"], ["b"]]);
+    });
+
     it("cuts one reply per run: after a prompt, at a new order, at a sibling, at a new speaker", () => {
         const prompt = row(0, "user", { _id: "p0" });
         const rows = [
@@ -43,6 +58,12 @@ describe("groupReplies", () => {
         ];
 
         expect(ids(groupReplies(rows))).toStrictEqual([["a", "a-tool"], ["b"]]);
+    });
+
+    it("leaves out a side question's row: it was recorded live, and carries no usage of its own", () => {
+        const rows = [row(0, "user", { _id: "p0" }), row(0, "assistant", { _id: "a" }), row(1, "assistant", { _id: "aside", agentName: "Side question" })];
+
+        expect(ids(groupReplies(rows))).toStrictEqual([["a"]]);
     });
 
     it("names the prompt's author only for replies in the prompt's order", () => {

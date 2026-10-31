@@ -14,6 +14,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { followUpControl } from "@neore/ai/capabilities";
 import type { Id } from "@neore/backend/dataModel";
 import { isThreadLockedError } from "@neore/client-runtime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
@@ -36,6 +37,7 @@ import {
 } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import { useChatActions, useChatIsStreaming, useChatLunora, useChatThread } from "@/features/chat/core/context/chat-context";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
+import useRunnerCapabilities from "@/features/chat/core/hooks/use-runner-capabilities";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import { selectAttachedReferences, selectRemoveAttachedReference, useChatUIStore, useComposerState } from "@/features/chat/core/stores/chat-ui-store";
 import { MIN_COMPARISON_MODELS, useModelStore } from "@/features/chat/core/stores/model-store";
@@ -47,6 +49,8 @@ import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/cha
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
+import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
@@ -60,6 +64,7 @@ import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import useComposerAutocomplete from "./composer-tiptap/use-composer-autocomplete";
+import interruptAndSend from "./interrupt-and-send";
 import { readChatMessages } from "./read-chat-messages";
 import ReplyCompleteAnnouncement from "./reply-complete-announcement";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
@@ -84,6 +89,10 @@ const fetchVaultFile = async (url: string, fileName: string, fileType: string): 
     return new File([await response.blob()], fileName, { type: fileType });
 };
 
+/** Messages already toasted (no second announcement), and those a retry cannot fix (too large, unsupported, content mismatch). */
+const toastedMessages = new Set<string>();
+const permanentMessages = new Set<string>();
+
 /**
  * Also outside the component: a conditional inside a `catch` makes the React Compiler skip it.
  * An upload failure the adapter recognised (too large, unsupported, expired,
@@ -93,6 +102,12 @@ const fetchVaultFile = async (url: string, fileName: string, fileType: string): 
 const errorMessage = (error: unknown, fallback: string, describe?: (error: AttachmentTooLargeError | AttachmentUploadError) => string): string => {
     if ((error instanceof AttachmentTooLargeError || error instanceof AttachmentUploadError) && describe) {
         const message = describe(error);
+
+        toastedMessages.add(message);
+
+        if (error instanceof AttachmentTooLargeError || error.reason === "unsupported" || error.reason === "content-mismatch") {
+            permanentMessages.add(message);
+        }
 
         showError(message);
 
@@ -211,13 +226,16 @@ const AttachmentPreviewInner: FC<{
     attachment: PendingAttachment;
     onEdit?: () => void;
     onRemove: () => void;
-}> = ({ attachment, onEdit, onRemove }) => {
+    onRetry?: () => void;
+}> = ({ attachment, onEdit, onRemove, onRetry }) => {
     const { t } = useLingui();
     const isImage = attachment.type === "image";
     const canEdit = attachment.file && isEditable(attachment.file);
     const isText = canEdit;
     const isUploading = attachment.status === "uploading";
     const isError = attachment.status === "error";
+    // An empty file is a placeholder whose fetch failed, and some failures repeat identically.
+    const canRetry = attachment.file.size > 0 && !permanentMessages.has(attachment.error ?? "");
     // Documents only: an image goes to the model as itself.
     const extraction = useAttachmentExtraction(attachment.fileId, !isImage && attachment.status === "complete");
     const isReading = extraction === "pending" || extraction === "processing";
@@ -281,6 +299,7 @@ const AttachmentPreviewInner: FC<{
                                 <TooltipTrigger
                                     render={
                                         <button
+                                            aria-label={t`Edit content`}
                                             className="shrink-0 rounded-md p-1.5 text-blue-600 hover:bg-blue-200 dark:text-blue-400 dark:hover:bg-blue-900/50"
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -288,7 +307,7 @@ const AttachmentPreviewInner: FC<{
                                             }}
                                             type="button"
                                         >
-                                            <EditIcon className="size-3.5" />
+                                            <EditIcon aria-hidden="true" className="size-3.5" />
                                         </button>
                                     }
                                 />
@@ -299,6 +318,7 @@ const AttachmentPreviewInner: FC<{
                             <TooltipTrigger
                                 render={
                                     <button
+                                        aria-label={t`Remove`}
                                         className="shrink-0 rounded-full p-1 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30"
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -306,7 +326,7 @@ const AttachmentPreviewInner: FC<{
                                         }}
                                         type="button"
                                     >
-                                        <XIcon className="size-3.5" />
+                                        <XIcon aria-hidden="true" className="size-3.5" />
                                     </button>
                                 }
                             />
@@ -364,16 +384,32 @@ const AttachmentPreviewInner: FC<{
                         <TooltipTrigger
                             render={
                                 <button
+                                    aria-label={t`Remove`}
                                     className="absolute -top-1 -right-1 rounded-full bg-white p-0.5 shadow-sm hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
                                     onClick={onRemove}
                                     type="button"
                                 >
-                                    <XIcon className="size-3" />
+                                    <XIcon aria-hidden="true" className="size-3" />
                                 </button>
                             }
                         />
                         <TooltipContent>{t`Remove`}</TooltipContent>
                     </Tooltip>
+                </div>
+            )}
+            {isError && (
+                <div className="mt-1 flex max-w-md items-center gap-1.5 text-xs text-red-700 dark:text-red-300">
+                    <span>{t`Upload failed`}</span>
+                    {onRetry && canRetry && (
+                        <button
+                            aria-label={t`Retry upload of ${attachmentName}`}
+                            className="rounded-sm font-medium underline underline-offset-2 hover:no-underline focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
+                            onClick={onRetry}
+                            type="button"
+                        >
+                            {t`Retry upload`}
+                        </button>
+                    )}
                 </div>
             )}
         </div>
@@ -392,13 +428,15 @@ AttachmentPreview.displayName = "AttachmentPreview";
 const AttachmentItem = memo<{
     attachment: PendingAttachment;
     removeAttachment: (id: string) => void;
+    retryAttachment: (attachment: PendingAttachment) => void;
     setEditingAttachmentId: (id: string) => void;
-}>(({ attachment, removeAttachment, setEditingAttachmentId }) => {
+}>(({ attachment, removeAttachment, retryAttachment, setEditingAttachmentId }) => {
     const handleRemove = useCallback(() => removeAttachment(attachment.id), [removeAttachment, attachment.id]);
     const handleEdit = useCallback(() => setEditingAttachmentId(attachment.id), [setEditingAttachmentId, attachment.id]);
+    const handleRetry = useCallback(() => retryAttachment(attachment), [retryAttachment, attachment]);
     const canEdit = attachment.file && isEditable(attachment.file);
 
-    return <AttachmentPreview attachment={attachment} onEdit={canEdit ? handleEdit : undefined} onRemove={handleRemove} />;
+    return <AttachmentPreview attachment={attachment} onEdit={canEdit ? handleEdit : undefined} onRemove={handleRemove} onRetry={handleRetry} />;
 });
 
 AttachmentItem.displayName = "AttachmentItem";
@@ -424,6 +462,8 @@ const ComposerInput = ({
     const mentionFileInputRef = useRef<HTMLInputElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [editingAttachmentId, setEditingAttachmentId] = useState<string | null>(null);
+    const announcedFailures = useRef(new Set<string>());
+    const [failureAnnouncement, setFailureAnnouncement] = useState("");
 
     // Context
     const { cancelStream, jwtToken, sendMessage } = useChatActions();
@@ -446,6 +486,16 @@ const ComposerInput = ({
 
     // Composer state from store
     const { addAttachment, attachments, clear, removeAttachment, setText, text, updateAttachment } = useComposerState();
+
+    // The editor's key handler reads the send preference from the UI-state store at key time; the account
+    // setting (server-backed) is mirrored there so a new device honours it too.
+    const { sendBehavior } = useUserPreferences();
+
+    useEffect(() => {
+        if (useUIStateStore.getState().preferences.sendBehavior !== sendBehavior) {
+            useUIStateStore.getState().setUserPreferences({ sendBehavior });
+        }
+    }, [sendBehavior]);
 
     // Prompt history and queue-while-streaming: only for a plain thread composer.
     // The comparison parent fans out through `onSubmitOverride`, and the compact
@@ -743,18 +793,25 @@ const ComposerInput = ({
     // reply has no step boundary) is sent after it, like a queued message. A
     // refused steer (a group chat, a reply that just ended) is simply queued.
     const { mutateAsync: steerRun } = useMutation(crpc.chat.steering.steerRun.mutationOptions());
+    const followUp = followUpControl(useRunnerCapabilities());
     const canSteer = isThreadComposer && !isComparisonValid && Boolean(sseStreamState) && attachments.length === 0 && attachedReferences.length === 0;
 
     const handleSteer = useCallback(() => {
         const streamId = sseStreamState;
         const steerText = text;
 
-        if (!canSteer || !threadId || !streamId || !steerText.trim() || disabled) {
+        if (!canSteer || (followUp !== "steer" && followUp !== "steer-restart") || !threadId || !streamId || !steerText.trim() || disabled) {
             return;
         }
 
         promptHistory.reset();
         clear();
+
+        if (followUp === "steer-restart") {
+            interruptAndSend(threadId, steerText, cancelStream);
+
+            return;
+        }
 
         const { enqueue, settleSteer } = usePromptQueueStore.getState();
 
@@ -774,14 +831,18 @@ const ComposerInput = ({
             .then(() => settleSteer(threadId, steerId, "accepted"))
             .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"))
             .finally(() => clearTimeout(unanswered));
-    }, [canSteer, clear, disabled, promptHistory, sseStreamState, steerRun, text, threadId]);
+    }, [canSteer, cancelStream, clear, disabled, followUp, promptHistory, sseStreamState, steerRun, text, threadId]);
 
     // Handle submit — fully synchronous, fire-and-forget network call.
     // Optimistic state (user message + Thinking...) is shown immediately inside
     // sendMessage before the first await. The network request runs in the background.
     // Content safety (banned words) is validated server-side in the /chat/stream endpoint.
     const handleSubmit = useCallback(() => {
-        if (!text.trim() && attachments.length === 0) {
+        // Read the draft from the store, not the render: a key pressed right after typing runs the handler of
+        // the previous render, which still sees the old (possibly empty) draft.
+        const { composerAttachments: draftAttachments, composerText: draftText } = useChatUIStore.getState();
+
+        if (!draftText.trim() && draftAttachments.length === 0) {
             return;
         }
 
@@ -791,7 +852,7 @@ const ComposerInput = ({
             return;
         }
 
-        const pendingAttachments = attachments.filter((a) => a.status !== "complete");
+        const pendingAttachments = draftAttachments.filter((a) => a.status !== "complete");
 
         if (pendingAttachments.length > 0) {
             return;
@@ -811,7 +872,9 @@ const ComposerInput = ({
                 return;
             }
 
-            usePromptQueueStore.getState().enqueue(threadId, { attachments, references: useChatUIStore.getState().attachedReferences, text });
+            usePromptQueueStore
+                .getState()
+                .enqueue(threadId, { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText });
             clear();
 
             return;
@@ -822,14 +885,14 @@ const ComposerInput = ({
 
         if (onSubmitOverride) {
             // Comparison parent: fan-out to all child threads
-            void onSubmitOverride(text, attachments).then(() => {
+            void onSubmitOverride(draftText, draftAttachments).then(() => {
                 clear();
                 useChatUIStore.getState().setIsSubmitting(false);
 
                 return undefined;
             });
         } else if (isComparisonValid) {
-            void sendComparisonMessage(text, selectedModelsForComparison, attachments).then(() => {
+            void sendComparisonMessage(draftText, selectedModelsForComparison, draftAttachments).then(() => {
                 useChatUIStore.getState().setIsSubmitting(false);
 
                 return undefined;
@@ -837,13 +900,11 @@ const ComposerInput = ({
         } else {
             // Fire-and-forget: sendMessage updates optimistic state synchronously
             // (clears composer, shows Thinking...) then runs the fetch in the background
-            void sendMessage(text, attachments);
+            void sendMessage(draftText, draftAttachments);
         }
 
         onSubmitProp?.();
     }, [
-        text,
-        attachments,
         disabled,
         sendMessage,
         onSubmitProp,
@@ -1050,6 +1111,36 @@ const ComposerInput = ({
         [attachmentAdapter, updateAttachment, describeUploadError],
     );
 
+    // Announce a newly failed upload once, unless its toast already did.
+    useEffect(() => {
+        const seen = announcedFailures.current;
+        const failed = attachments.filter((a) => a.status === "error");
+
+        for (const id of seen) {
+            if (failed.every((a) => a.id !== id)) {
+                seen.delete(id);
+            }
+        }
+
+        const fresh = failed.find((a) => !seen.has(a.id));
+
+        for (const a of failed) {
+            seen.add(a.id);
+        }
+
+        if (fresh && !toastedMessages.has(fresh.error ?? "")) {
+            setFailureAnnouncement(t`Upload failed: ${fresh.name}`);
+        }
+    }, [attachments, t]);
+
+    // Re-run a failed upload from the file the attachment kept.
+    const retryAttachment = useCallback(
+        (attachment: PendingAttachment) => {
+            void uploadGeneratedFile(attachment.id, attachment.file, t`Upload failed`);
+        },
+        [uploadGeneratedFile, t],
+    );
+
     const attachGeneratedFile = useCallback(
         async (file: File, failureLabel: string): Promise<boolean> => await uploadGeneratedFile(addAttachment(file), file, failureLabel),
         [addAttachment, uploadGeneratedFile],
@@ -1169,6 +1260,9 @@ const ComposerInput = ({
                 />
             )}
 
+            <span className="sr-only" role="status">
+                {failureAnnouncement}
+            </span>
             {isThreadComposer && <PromptHistorySource onEntries={promptHistory.setEntries} />}
             {isThreadComposer && <ComposerPromptQueue />}
             {isThreadComposer && <AutoReadReplies />}
@@ -1231,6 +1325,7 @@ const ComposerInput = ({
                                             attachment={attachment}
                                             key={attachment.id}
                                             removeAttachment={removeAttachment}
+                                            retryAttachment={retryAttachment}
                                             setEditingAttachmentId={setEditingAttachmentId}
                                         />
                                     ))}
@@ -1242,6 +1337,7 @@ const ComposerInput = ({
                 canQueueWhileStreaming={isThreadComposer && !isComparisonValid}
                 currentThreadId={threadId}
                 disabled={disabled || isComparisonLoading}
+                followUp={followUp}
                 isHistoryRecalled={isThreadComposer ? promptHistory.isRecalled : undefined}
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}

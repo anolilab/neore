@@ -27,6 +27,14 @@ describe(roundQuotaKeys, () => {
         expect(roundQuotaKeys({ isAdmin: true, isAnonymous: false, tier: "free" })).toStrictEqual([]);
     });
 
+    it("charges a chat round (an agent-switch summary) against the chat limit alone", () => {
+        for (const tier of ["free", "premium"] as const) {
+            expect(roundQuotaKeys({ isAdmin: false, isAnonymous: false, tier }, "chat")).toStrictEqual([`chat/dailyText:${tier}`]);
+        }
+
+        expect(roundQuotaKeys({ isAdmin: true, isAnonymous: false, tier: "free" }, "chat")).toStrictEqual([]);
+    });
+
     it("keeps the tasks ceiling at or under the chat allowance it shares", () => {
         for (const tier of ["free", "premium"] as const) {
             expect(RATE_LIMIT_CONFIGS[getRateLimitKey("tasks/dailyRuns", tier)].rate).toBeLessThanOrEqual(RATE_LIMIT_CONFIGS[`chat/dailyText:${tier}`].rate);

@@ -1,6 +1,12 @@
 //! The frames `neore-host` and the desktop exchange over the host's stdin and stdout: a big-endian `u32`
 //! length, then that many bytes of JSON. stdout carries frames and nothing else; the host's log is stderr.
 //!
+//! A frame is JSON (it starts with `{`) except a **chunk**: the tag byte [`CHUNK_TAG`], the request id as a
+//! big-endian `u64`, then raw bytes. Chunks carry the body of a streaming answer (a folder as tar) without
+//! escaping it; the request still ends with an ordinary JSON response. A coding agent's request (`agent_host.rs`)
+//! streams in both directions: its stdout is [`CHUNK_TAG`] chunks and its stderr [`STDERR_TAG`] chunks to the
+//! desktop, and the desktop's chunks for that id are its stdin (an empty one closes it).
+//!
 //! A length-prefixed stream cannot resynchronise, so a bad length or a stream that ends inside a frame is
 //! an error for the caller to end the connection on.
 
@@ -9,6 +15,33 @@ use std::io::{self, Read, Write};
 /// The largest frame either side accepts, checked before anything is allocated. An `fs_write` of the
 /// 1 MiB file cap, escaped as JSON, fits with room to spare.
 pub const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
+
+/// The first byte of a chunk frame. JSON never starts with it.
+pub const CHUNK_TAG: u8 = 1;
+/// The first byte of a chunk frame that carries a coding agent's stderr. JSON never starts with it either.
+pub const STDERR_TAG: u8 = 2;
+/// Tag and request id, before a chunk's bytes.
+pub const CHUNK_HEADER_BYTES: usize = 9;
+
+/// The request id and bytes of a chunk frame, or `None` for any other frame.
+pub fn chunk_of(frame: &[u8]) -> Option<(u64, &[u8])> {
+    let (header, bytes) = frame.split_at_checked(CHUNK_HEADER_BYTES)?;
+
+    (header[0] == CHUNK_TAG).then(|| (u64::from_be_bytes(header[1..].try_into().unwrap()), bytes))
+}
+
+/// The tag, request id and bytes of a chunk frame of either stream, or `None` for any other frame.
+pub fn stream_chunk_of(frame: &[u8]) -> Option<(u8, u64, &[u8])> {
+    let (header, bytes) = frame.split_at_checked(CHUNK_HEADER_BYTES)?;
+
+    matches!(header[0], CHUNK_TAG | STDERR_TAG).then(|| {
+        (
+            header[0],
+            u64::from_be_bytes(header[1..].try_into().unwrap()),
+            bytes,
+        )
+    })
+}
 
 /// Reads one frame. `Ok(None)` is the stream ending cleanly between frames.
 pub fn read_frame(reader: &mut impl Read) -> io::Result<Option<Vec<u8>>> {
@@ -74,6 +107,18 @@ mod tests {
         assert_eq!(read_frame(&mut reader).unwrap().unwrap(), b"{\"a\":1}");
         assert_eq!(read_frame(&mut reader).unwrap().unwrap(), b"");
         assert!(read_frame(&mut reader).unwrap().is_none());
+    }
+
+    #[test]
+    fn a_chunk_carries_its_request_id_and_raw_bytes() {
+        let mut frame = vec![CHUNK_TAG];
+
+        frame.extend_from_slice(&7u64.to_be_bytes());
+        frame.extend_from_slice(&[0, 255, b'{']);
+
+        assert_eq!(chunk_of(&frame), Some((7, &[0, 255, b'{'][..])));
+        assert_eq!(chunk_of(b"{\"kind\":\"response\"}"), None);
+        assert_eq!(chunk_of(&frame[..5]), None);
     }
 
     #[test]

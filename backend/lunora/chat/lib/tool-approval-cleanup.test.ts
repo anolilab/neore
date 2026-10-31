@@ -49,6 +49,36 @@ afterEach(() => {
     harness.close();
 });
 
+describe("a thread waiting on an expired request", () => {
+    const waiting = async () =>
+        await harness.run(async (ctx: any) => await ctx.db.insert("threads", { awaitingInput: "approval", status: "active", title: "W", userId: "u1" }));
+    const awaitingOf = async (threadId: string) =>
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.get(threadId);
+
+            return row.awaitingInput;
+        });
+
+    it("stops waiting once its last pending request is purged", async () => {
+        const threadId = await waiting();
+
+        await insertRun({ approvalId: "old", createdAt: NOW - PENDING_APPROVAL_TTL_MS - 1, status: "pending", threadId });
+        await harness.run(async (ctx: any) => await purgeExpiredToolApprovalRuns(ctx, NOW));
+
+        expect(await awaitingOf(threadId)).toBeUndefined();
+    });
+
+    it("keeps waiting while a newer request on it is open", async () => {
+        const threadId = await waiting();
+
+        await insertRun({ approvalId: "old", createdAt: NOW - PENDING_APPROVAL_TTL_MS - 1, status: "pending", threadId });
+        await insertRun({ approvalId: "new", createdAt: NOW, status: "pending", threadId });
+        await harness.run(async (ctx: any) => await purgeExpiredToolApprovalRuns(ctx, NOW));
+
+        expect(await awaitingOf(threadId)).toBe("approval");
+    });
+});
+
 describe("thread deletion", () => {
     it("deletes the thread's approval snapshots and leaves other threads' alone", async () => {
         const [doomed, kept] = await harness.run(async (ctx: any) => [

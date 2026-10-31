@@ -42,8 +42,16 @@ export interface PermissionView {
     toolKind: string;
 }
 
+/** What a registry install pinned; set only on an agent that came from one. */
+export interface AcpInstall {
+    publisher: string;
+    sha256: string;
+    source: string;
+    version: string;
+}
+
 export interface AcpView {
-    agents: { args: string[]; command: string; envNames: string[]; key: string; label: string }[];
+    agents: { args: string[]; command: string; envNames: string[]; install: AcpInstall | null; key: string; label: string }[];
     consents: AcpConsent[];
     envNames: string[];
 }
@@ -105,3 +113,16 @@ export interface ProbeResult {
 
 /** What the agent can do, as it reported it. Kept raw: the capability mapping reads it later. */
 export type AgentCapabilities = Record<string, unknown>;
+
+/** A session an agent keeps, as the window lists it for import. `updatedAt` is the agent's ISO 8601 timestamp, or "". */
+export interface NativeSessionView {
+    sessionId: string;
+    title: string;
+    updatedAt: string;
+}
+
+export type ImportSummary
+    /** The thread was already in Neore (imported before, or run there): nothing was sent. */
+    = | { status: "already" }
+    /** `droppedTurns` were past the cap and not kept; `shortenedTurns` had a message cut to the size Neore stores. */
+        | { droppedTurns: number; shortenedTurns: number; status: "imported"; turns: number };

@@ -40,6 +40,8 @@ const SYSTEM_DB_IMPORTERS = [
     "pages/functions.ts",
     // Existence, uniqueness and storage-ownership decisions about another user.
     "agent/display-media.ts",
+    // Whether the thread OWNER has a tool approval open, which a collaborator's scope cannot see: a refusal, never rows.
+    "chat/agent-switch.ts",
     // Decisions only: a lock check drops rows the caller already passed RLS for; the proof check reads a passcode row to verify it.
     "agent/messages.ts",
     "agent/thread-passcode.ts",

@@ -9,16 +9,15 @@ import { internalMutation, type MutationCtx, type QueryCtx } from "../_generated
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
-import { pick } from "../lib/collections";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { assert } from "../lib/error-helpers";
-import { paginationOptionsValidator, partial, MAX_LENGTH } from "../lib/validators";
+import { paginationOptionsValidator, MAX_LENGTH } from "../lib/validators";
 import {
     type ProjectDoc as ProjectDocument,
     vPaginationResult,
     vProjectCreateFields,
+    vProjectPatchFields,
     vProjectDoc as vProjectDocument,
-    vProjectDocFields as vProjectDocumentFields,
     vThreadDoc as vThreadDocument,
 } from "./validators";
 import { admitOrganization } from "../lib/rls/scope";
@@ -242,7 +241,7 @@ export type ProjectFieldsSupportingPatch = (typeof projectFieldsSupportingPatch)
 
 export const updateProject = internalMutation
     .input({
-        patch: v.object(partial(pick(vProjectDocumentFields, [...projectFieldsSupportingPatch]))),
+        patch: v.object({ ...vProjectPatchFields }),
         projectId: v.id("projects"),
     })
     .output(v.from(vProjectDocument))

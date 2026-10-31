@@ -92,6 +92,18 @@ export const readHostPairing = (value: unknown): { deviceId: string; secret: str
 
 export const readDeviceId = (value: unknown): string => text(value, "deviceId", 64);
 
+/** A path on a server: empty is its first shared folder. The server decides whether it is inside the shared folders. */
+export const readServerPath = (value: unknown): string => {
+    if (value === "") {
+        return "";
+    }
+
+    return text(value, "path", 4096);
+};
+
+/** The last name of the page before. */
+export const readAfter = (value: unknown): string | undefined => optionalText(value, "after", 4096);
+
 /** The device a manifest is for: this computer's when absent. */
 export const readOptionalDeviceId = (value: unknown): string | undefined => value === undefined ? undefined : text(value, "deviceId", 64);
 
@@ -166,6 +178,28 @@ export const readAcpUpdate = (value: unknown): string => {
 export const readAgentKey = (value: unknown): string => text(value, "agent", 40);
 
 export const readSessionId = (value: unknown): string => text(value, "session", 64);
+
+/** The agent's own id for a saved session; it comes from the agent's list and goes back to the same agent. */
+export const readNativeSessionId = (value: unknown): string => text(value, "saved session", 256);
+
+export const readSessionTitle = (value: unknown): string | undefined => value === undefined || value === "" ? undefined : text(value, "title", 200);
+
+export const readSearchQuery = (value: unknown): string => value === "" ? "" : text(value, "search", 100);
+
+export const readAgentVersion = (value: unknown): string => text(value, "version", 40);
+
+const SHA256_HEX = /^[0-9a-f]{64}$/u;
+
+/** A hook id from the approved file, and the sha-256 hex of the file the person was shown. */
+export const readHookId = (value: unknown): string => text(value, "hook", 40);
+
+export const readHooksHash = (value: unknown): string => {
+    if (typeof value !== "string" || !SHA256_HEX.test(value)) {
+        throw new Error("device: hooks file hash is invalid");
+    }
+
+    return value;
+};
 
 export const readFolder = (value: unknown): string => text(value, "folder", MAX_PATH_CHARS);
 

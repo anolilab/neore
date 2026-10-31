@@ -30,13 +30,15 @@ interface SiteBridge {
 
 const appDirectory = fileURLToPath(new URL("..", import.meta.url));
 const FAKE_HELPER = path.join(appDirectory, "e2e", "fixtures", "fake-whisper-cli.mjs");
+/** Windows cannot run a script by its shebang, so the stand-in helper is a script given to the test runner's own node. */
+const NODE = process.execPath;
 // The shell spec owns the base ports; this one runs beside it, never at the same time (one worker), on its own pair.
 const SITE_PORT = Number(process.env.NEORE_E2E_PORT ?? 4399) + 20;
 const SITE = `http://127.0.0.1:${SITE_PORT}`;
 const FAKE_TRANSCRIPT = /^Hello from the fake recogniser, \d+ samples\. Second segment\.$/u;
 const DICTATION_PAGE = /\/dictation-window\/dictation\.html$/u;
-/** A real recogniser, when one is built: `NEORE_WHISPER_CLI` and `NEORE_WHISPER_MODEL`, and `NEORE_WHISPER_CLIP` (16 kHz mono WAV of speech). */
-const REAL = { cli: process.env.NEORE_WHISPER_CLI, clip: process.env.NEORE_WHISPER_CLIP, model: process.env.NEORE_WHISPER_MODEL };
+/** A real recogniser, when one is built: `NEORE_WHISPER_CLI` and `NEORE_WHISPER_MODEL`, and `NEORE_WHISPER_CLIP` (16 kHz mono WAV of speech that says `NEORE_WHISPER_EXPECT`, "test" by default). */
+const REAL = { cli: process.env.NEORE_WHISPER_CLI, clip: process.env.NEORE_WHISPER_CLIP, expect: process.env.NEORE_WHISPER_EXPECT ?? "test", model: process.env.NEORE_WHISPER_MODEL };
 
 const USE_MICROPHONE = process.env.NEORE_E2E_MICROPHONE === "1";
 
@@ -117,8 +119,8 @@ const useFakeRecogniser = async (app: ElectronApplication, behaviour = "recognis
 
     await writeFile(modelPath, behaviour);
     await app.evaluate((_electron, engine) => (globalThis as unknown as { neoreShell: { dictation: Probe } }).neoreShell.dictation.useTestEngine(engine), {
-        args: [],
-        command: FAKE_HELPER,
+        args: [FAKE_HELPER],
+        command: NODE,
         modelPath,
     });
 };
@@ -133,7 +135,7 @@ const audioBytes = (app: ElectronApplication): Promise<number> =>
     app.evaluate(() => (globalThis as unknown as { neoreShell: { dictation: Probe } }).neoreShell.dictation.audioBytes);
 
 const findPage = async (app: ElectronApplication, isMatch: (url: string) => boolean): Promise<Page> => {
-    await expect.poll(() => app.windows().filter((page) => isMatch(page.url())).length).toBeGreaterThan(0);
+    await expect.poll(() => app.windows().filter((page) => isMatch(page.url())).length, { timeout: 20_000 }).toBeGreaterThan(0);
 
     return app.windows().find((page) => isMatch(page.url())) as Page;
 };
@@ -150,7 +152,21 @@ const pcmOf = (wav: Buffer): Buffer => wav.subarray(wav.indexOf("data") + 8);
  */
 const dictate = async (app: ElectronApplication, pcm: Buffer = pcmOf(toneWav())): Promise<void> => {
     await call(app, "begin");
-    await expect.poll(() => call<string>(app, "state"), { timeout: 15_000 }).toBe("recording");
+    // A dictation that ends before it records says why (its outcome), instead of only "idle".
+    await expect
+        .poll(
+            async () => {
+                const state = await call<string>(app, "state");
+
+                if (state === "idle") {
+                    throw new Error(`the dictation ended before it recorded: ${await call<string | undefined>(app, "outcome")}`);
+                }
+
+                return state;
+            },
+            { timeout: 15_000 },
+        )
+        .toBe("recording");
 
     if (!USE_MICROPHONE) {
         const page = await findPage(app, (url) => DICTATION_PAGE.test(url));
@@ -280,10 +296,12 @@ test("with the network blocked, a dictation completes and inserts its text as a 
         expect(draft).toMatch(FAKE_TRANSCRIPT);
         // The window closed on release, and nothing recorded stayed on disk.
         await expect.poll(() => app.windows().filter((window) => DICTATION_PAGE.test(window.url())).length).toBe(0);
-        expect(await audioFiles([userData, temp])).toStrictEqual([]);
     } finally {
         await app.close();
     }
+
+    // After the app has quit: while it runs, Windows keeps some of its own files (the cookie store) open and unreadable.
+    expect(await audioFiles([userData, temp])).toStrictEqual([]);
 });
 
 test("killing the helper shows an error and does not take the app down", async () => {
@@ -459,7 +477,7 @@ test("the settings window turns dictation on, deletes a model file, and is out o
     }
 });
 
-// Registered only when a real recogniser is given (NEORE_WHISPER_CLI, NEORE_WHISPER_MODEL and NEORE_WHISPER_CLIP): CI has no built whisper-cli, model or spoken clip.
+// Registered only when a real recogniser is given (NEORE_WHISPER_CLI, NEORE_WHISPER_MODEL and NEORE_WHISPER_CLIP): `.github/workflows/dictation-desktop.yml` builds one, with a model and whisper.cpp's own spoken clip, on every supported OS.
 if (REAL.cli !== undefined && REAL.model !== undefined && REAL.clip !== undefined) {
     test("recognises a spoken clip on the device", async () => {
         const { app } = await launch(REAL.clip);
@@ -478,7 +496,7 @@ if (REAL.cli !== undefined && REAL.model !== undefined && REAL.clip !== undefine
 
             const draft = await site.evaluate(() => (globalThis as { neoreNative?: SiteBridge }).neoreNative?.takePendingDraft());
 
-            expect(draft?.toLowerCase()).toContain("test");
+            expect(draft?.toLowerCase()).toContain(REAL.expect);
         } finally {
             await app.close();
         }

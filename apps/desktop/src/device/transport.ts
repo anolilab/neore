@@ -6,7 +6,7 @@
  * values cross the addon as JSON strings and are parsed here, so a transport hands back typed values.
  */
 import { loadDeviceCore } from "./addon";
-import type { CoreEvent, DeviceCore as DeviceCoreHandle, DeviceStatus, HostProbe, HostSpec, HostUpgrade, Prompt, SettingsView, Signed } from "./types";
+import type { CoreEvent, DeviceCore as DeviceCoreHandle, DeviceStatus, Download, FileRead, FilesPage, HostProbe, HostSpec, HostUpgrade, Prompt, SettingsView, Signed } from "./types";
 
 export interface HostTransport {
     auditTail: () => string[];
@@ -18,6 +18,12 @@ export interface HostTransport {
     /** `retry` is the local window's Retry: it starts the reconnect attempts over. A page's connect counts as one more attempt. */
     hostConnect: (deviceId: string, retry: boolean) => Promise<HostProbe>;
     hostDisconnect: (deviceId: string) => void;
+    /** Downloads a folder of a connected server as one tar archive into `destination`, a file the person chose. Symlinks are left out. */
+    hostDownload: (deviceId: string, path: string, destination: string) => Promise<Download>;
+    /** A file of a connected server as text. */
+    hostFileRead: (deviceId: string, path: string) => Promise<FileRead>;
+    /** One page of a folder on a connected server, in name order; `after` is the previous page's `next`. */
+    hostFilesList: (deviceId: string, path: string, after?: string) => Promise<FilesPage>;
     /** Drops the pinned host key, so the next connection asks to trust whatever the server presents. */
     hostForgetKey: (deviceId: string) => void;
     /** Stores a probed server as a device of its own, after a local confirmation. */
@@ -62,6 +68,9 @@ export const createLocalTransport = (dataDirectory: string, onEvent: (event: Cor
         execute: async (envelope, signature) => JSON.parse(await core.execute(envelope, signature)) as Signed,
         hostConnect: async (deviceId, retry) => JSON.parse(await core.hostConnect(deviceId, retry)) as HostProbe,
         hostDisconnect: (deviceId) => core.hostDisconnect(deviceId),
+        hostDownload: async (deviceId, path, destination) => JSON.parse(await core.hostDownload(deviceId, path, destination)) as Download,
+        hostFileRead: async (deviceId, path) => JSON.parse(await core.hostFileRead(deviceId, path)) as FileRead,
+        hostFilesList: async (deviceId, path, after) => JSON.parse(await core.hostFilesList(deviceId, path, after)) as FilesPage,
         hostForgetKey: (deviceId) => core.hostForgetKey(deviceId),
         hostPair: (spec, deviceId, secret) => core.hostPair(JSON.stringify(spec), deviceId, secret),
         hostProbe: async (spec) => JSON.parse(await core.hostProbe(JSON.stringify(spec))) as HostProbe,

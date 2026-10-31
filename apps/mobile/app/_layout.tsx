@@ -6,6 +6,7 @@ import { Text, View } from "react-native";
 import { AuthProvider } from "@/auth/auth-context";
 import { useAuth } from "@/auth/auth-state";
 import { loadConfig } from "@/lib/config";
+import { OfflineProvider } from "@/offline/offline-provider";
 
 /** Sends a signed-out user to the sign-in screen and a signed-in one away from it. */
 const SignInGate = () => {
@@ -29,6 +30,8 @@ const SignInGate = () => {
             <Stack.Screen name="index" options={{ title: "Chats" }} />
             <Stack.Screen name="sign-in" options={{ title: "Sign in" }} />
             <Stack.Screen name="chat/[threadId]" options={{ title: "Chat" }} />
+            <Stack.Screen name="projects/index" options={{ title: "Projects" }} />
+            <Stack.Screen name="projects/[projectId]" options={{ title: "Project" }} />
         </Stack>
     );
 };
@@ -54,7 +57,9 @@ const RootLayout = () => {
         <AuthProvider>
             {/* eslint-disable-next-line react/style-prop-object -- expo-status-bar takes "auto" as a string, not a style object */}
             <StatusBar style="auto" />
-            <SignInGate />
+            <OfflineProvider>
+                <SignInGate />
+            </OfflineProvider>
         </AuthProvider>
     );
 };

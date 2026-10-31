@@ -14,7 +14,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@neore/ui/components/ai-elements/reasoning";
 import { Source, Sources, SourcesContent, SourcesTrigger } from "@neore/ui/components/ai-elements/sources";
 import AnimatedTiles from "@neore/ui/components/animated-tiles";
-import { chatMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
+import { chatMarkdownComponents, hostMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
 import type { FileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { getFileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
@@ -30,10 +30,14 @@ import { resolveAutoApproval } from "../utils/auto-approval";
 import { createCitationMarker, safeHttpUrl } from "../utils/citation-marker";
 import cn from "../utils/cn";
 import { resolveDeviceToolName } from "../utils/device-tool-name";
+import { isHostRunText } from "../utils/host-run-text";
 import { mcpToolMetaKey, resolveMcpToolName } from "../utils/mcp-tool-name";
 import { getPageContextInfo } from "../utils/page-context";
 import { SANDBOX_FILE_TOOL_TYPES, sandboxOutputsOf } from "../utils/sandbox-files";
 import PageContextChip from "./page-context-chip";
+import ToolGroup from "./tool-group";
+import type { ToolGroupSegment } from "./turn-summary";
+import { segmentTurn } from "./turn-summary";
 
 // Lazy-loaded file renderers (code-split per file type). The type predicates live in
 // `file-type-utilities`, a small module with no heavy dependencies, so importing it statically is free.
@@ -80,11 +84,11 @@ interface MessageContentProps {
         Image?: FC<{ part: ImagePart }>;
         McpApp?: FC<{ part: ToolPart; resourceUri: string; serverName: string; toolName: string }>;
         PresentationArtifact?: FC<{ presentationId: string; slideCount: number; styleName?: string; title: string }>;
-        Reasoning?: FC<{ isStreaming?: boolean; text: string }>;
+        Reasoning?: FC<{ isStreaming?: boolean; literalImages?: boolean; text: string }>;
         /** Files a code-execution or shell run saved to its output directory (`utils/sandbox-files.ts`). */
         SandboxFiles?: FC<SandboxOutputs>;
         SourceGroup?: FC<{ sources: (SourceDocumentPart | SourceUrlPart)[] }>;
-        Text?: FC<{ isAnimating: boolean; text: string }>;
+        Text?: FC<{ isAnimating: boolean; literalImages?: boolean; text: string }>;
         /** Rendered for a tool call awaiting the user's approval (`state: "approval-requested"`). */
         ToolApproval?: FC<{ part: ToolPart }>;
         /** Rendered above any tool call the user's quick check approved (`utils/auto-approval.ts`), in every state after the call. */
@@ -109,7 +113,7 @@ interface MessageContentProps {
  * Default Text renderer using Streamdown. Math and mermaid load on demand
  * (`useStreamdownPlugins`), so they stay off the startup path.
  */
-const DefaultText: FC<{ isAnimating: boolean; text: string }> = memo(({ isAnimating, text }) => {
+const DefaultText: FC<{ isAnimating: boolean; literalImages?: boolean; text: string }> = memo(({ isAnimating, literalImages, text }) => {
     const plugins = useStreamdownPlugins(text);
     // The user's code / diagram themes and code-block display (Appearance settings), provided by the app.
     const { codeLineNumbers, mermaid, shikiTheme } = useStreamdownAppearance();
@@ -119,7 +123,7 @@ const DefaultText: FC<{ isAnimating: boolean; text: string }> = memo(({ isAnimat
         <Streamdown
             className="streamdown-animate"
             codeBlockMaxHeight="none"
-            components={chatMarkdownComponents}
+            components={literalImages ? hostMarkdownComponents : chatMarkdownComponents}
             isAnimating={isAnimating}
             lineNumbers={codeLineNumbers}
             mermaid={mermaid}
@@ -136,10 +140,10 @@ DefaultText.displayName = "DefaultText";
 /**
  * Default Reasoning renderer with collapsible
  */
-const DefaultReasoning: FC<{ isStreaming?: boolean; text: string }> = memo(({ isStreaming, text }) => (
+const DefaultReasoning: FC<{ isStreaming?: boolean; literalImages?: boolean; text: string }> = memo(({ isStreaming, literalImages, text }) => (
     <Reasoning isStreaming={isStreaming ?? false}>
         <ReasoningTrigger />
-        <ReasoningContent>{text}</ReasoningContent>
+        <ReasoningContent {...(literalImages && { components: hostMarkdownComponents })}>{text}</ReasoningContent>
     </Reasoning>
 ));
 
@@ -618,6 +622,9 @@ CodeExecutionResultView.displayName = "CodeExecutionResultView";
 /** Tool types whose output renders as a document artifact card. */
 const DOCUMENT_ARTIFACT_TOOLS = new Set(["tool-createDocument", "tool-deepResearch", "tool-updateDocument"]);
 
+/** Tools that render their own card or ask the person something; never folded into a summary. */
+const UNFOLDABLE_TOOLS = new Set(["tool-askUser", "tool-browser", "tool-codeExecution", "tool-createPresentation", "tool-updateSlide"]);
+
 const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
     const { t } = useLingui();
     const isLoading = part.state === "input-streaming" || part.state === "input-available";
@@ -757,6 +764,43 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
     const ResolvedToolCall = useMemo(() => ToolCall ?? makeDefaultToolCall(McpApp, toolMeta), [McpApp, ToolCall, toolMeta]);
 
     const isAnimating = isStreaming || message.status === "streaming";
+    const isFinished = !isAnimating && message.status !== "pending";
+
+    // Finished runs of plain tool calls fold into one summary line. Calls with their own view
+    // (artifacts, widgets, device, questions) keep it, so they stay out of the fold.
+    const toolGroups = useMemo(() => {
+        const groups = new Map<number, ToolGroupSegment>();
+
+        if (!isFinished) {
+            return groups;
+        }
+
+        const canFold = (part: ToolPart): boolean => {
+            const name = part.type.replace("tool-", "");
+            const mcpInfo = resolveMcpToolName(part);
+            // Same lookup as DefaultToolCall: an MCP App call keeps its live view under the header.
+            const hasMcpApp =
+                !!McpApp && !!toolMeta && !!mcpInfo && !!(toolMeta.get(mcpToolMetaKey(mcpInfo.serverName, mcpInfo.toolName)) ?? toolMeta.get(name));
+
+            return (
+                !hasMcpApp &&
+                !SANDBOX_FILE_TOOL_TYPES.has(part.type) &&
+                !UNFOLDABLE_TOOLS.has(part.type) &&
+                !DOCUMENT_ARTIFACT_TOOLS.has(part.type) &&
+                !Object.hasOwn(toolViews ?? {}, name) &&
+                !Object.hasOwn(toolWidgets ?? {}, name) &&
+                !(DeviceToolCall && resolveDeviceToolName(part))
+            );
+        };
+
+        for (const segment of segmentTurn(message.parts, canFold)) {
+            if (segment.kind === "group") {
+                groups.set(segment.start, segment);
+            }
+        }
+
+        return groups;
+    }, [DeviceToolCall, isFinished, McpApp, message.parts, toolMeta, toolViews, toolWidgets]);
 
     // Extract generation prompt from metadata (set by generateImage/generateVideo/generateSpeech)
     const generationPrompt = (message.metadata as { prompt?: string } | undefined)?.prompt;
@@ -767,9 +811,16 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
     // Render parts
     const renderedParts: ReactNode[] = [];
 
+    let openGroup: { end: number; group: ToolGroupSegment; mark: number } | undefined;
+
     for (let i = 0; i < message.parts.length; i += 1) {
         const part = message.parts[i] as MessagePart;
         const key = `${message.id}-part-${i}`;
+        const groupHere = toolGroups.get(i);
+
+        if (groupHere) {
+            openGroup = { end: groupHere.end, group: groupHere, mark: renderedParts.length };
+        }
 
         switch (part.type as string) {
             case "file": {
@@ -806,7 +857,14 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                     // answer (or a tool call) starts, the panel should collapse.
                     const isReasoningStreaming = isAnimating && i === message.parts.length - 1;
 
-                    renderedParts.push(<ReasoningRenderer isStreaming={isReasoningStreaming} key={key} text={reasoningPart.text} />);
+                    renderedParts.push(
+                        <ReasoningRenderer
+                            isStreaming={isReasoningStreaming}
+                            key={key}
+                            literalImages={isHostRunText(reasoningPart) || message.parts.some((other) => isHostRunText(other))}
+                            text={reasoningPart.text}
+                        />,
+                    );
                 }
 
                 break;
@@ -854,8 +912,8 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                         }
                         default: {
                             renderedParts.push(
-                                <div data-markdown-part={isAnimating ? undefined : textPart.text} key={key}>
-                                    <Text isAnimating={isAnimating} text={textPart.text} />
+                                <div data-find-text="" data-markdown-part={isAnimating ? undefined : textPart.text} key={key}>
+                                    <Text isAnimating={isAnimating} literalImages={isHostRunText(textPart)} text={textPart.text} />
                                 </div>,
                             );
                         }
@@ -1030,6 +1088,15 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                 }
                 // Unknown parts are silently skipped
             }
+        }
+
+        if (openGroup && i === openGroup.end) {
+            renderedParts.push(
+                <ToolGroup group={openGroup.group} key={`${key}-group`}>
+                    {renderedParts.splice(openGroup.mark)}
+                </ToolGroup>,
+            );
+            openGroup = undefined;
         }
     }
 

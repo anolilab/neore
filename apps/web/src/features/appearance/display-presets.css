@@ -20,18 +20,21 @@
     --density-message-gap: 1.5rem;
     --density-bubble-py: 0.625rem;
     --density-row-py: 0.5rem;
+    --assistant-body-leading: 1.65;
 }
 
 [data-density="compact"] {
     --density-message-gap: 0.75rem;
     --density-bubble-py: 0.375rem;
     --density-row-py: 0.25rem;
+    --assistant-body-leading: 1.55;
 }
 
 [data-density="spacious"] {
     --density-message-gap: 2.25rem;
     --density-bubble-py: 0.875rem;
     --density-row-py: 0.75rem;
+    --assistant-body-leading: 1.75;
 }
 
 /*

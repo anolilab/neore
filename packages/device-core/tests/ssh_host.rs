@@ -22,8 +22,8 @@ use std::time::{Duration, Instant};
 
 use device_core::install::{self, target_for_uname, Bundle, Installed, Remote, Root};
 use device_core::ssh::{
-    control_args, forget_keys, pinned_keys, terminal_args, HostConnection, HostKey, HostLink,
-    Interact, SshError, SshPaths, Target, HOST_VERSION,
+    control_args, forget_keys, pinned_keys, terminal_args, AgentExit, AgentSink, HostConnection,
+    HostKey, HostLink, Interact, SshError, SshPaths, Target, HOST_VERSION,
 };
 use device_core::store::{self, test_keychain, Host, Pairing, Settings};
 use device_core::{DeviceState, Event};
@@ -1356,6 +1356,8 @@ impl Desktop {
             &data_dir.join("device.json"),
             &Settings {
                 hosts: vec![Host {
+                    acp_agents: Vec::new(),
+                    acp_consents: Vec::new(),
                     address: target.address.clone(),
                     allow_shell_network: false,
                     allow_unsandboxed_shell: false,
@@ -1830,4 +1832,359 @@ fn a_host_that_refuses_its_command_line_needs_a_reinstall_and_is_not_retried() {
     assert!(!error.retryable());
     assert!(error.to_string().contains("Reinstall"));
     end_master(&target, &paths);
+}
+
+const BIG_FOLDER_FILES: usize = 10_000;
+
+/// A folder of `BIG_FOLDER_FILES` small files, a link out of it and a file outside that the link points at.
+/// Returns the folder and the bytes its files hold.
+fn big_folder(label: &str) -> (PathBuf, u64) {
+    let dir = std::env::temp_dir().join(format!("neore-big-{label}-{}", std::process::id()));
+
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("big")).unwrap();
+    fs::write(dir.join("secret.txt"), "outside-the-shared-folder").unwrap();
+    std::os::unix::fs::symlink(dir.join("secret.txt"), dir.join("big/escape.txt")).unwrap();
+
+    let mut bytes = 0;
+
+    for index in 0..BIG_FOLDER_FILES {
+        let content = format!("file {index}\n").repeat(40);
+
+        bytes += content.len() as u64;
+        fs::write(dir.join(format!("big/file-{index:05}.txt")), content).unwrap();
+    }
+
+    (fs::canonicalize(dir.join("big")).unwrap(), bytes)
+}
+
+/// How long a 10,000-file folder may take to list and to download, each, over a real ssh session.
+///
+/// MEASURED over six runs of this test (debug build, a sshd on 127.0.0.1, Apple silicon macOS 26, 2026-10-28):
+/// listing the 10,001 entries in six pages took 0.46 to 0.78 s, the download of the 10.2 MB tar 0.69 to 1.29 s (the
+/// listing took 0.28 to 0.42 s over three runs once a page kept only its own names).
+/// TODO(S6): add the first green CI run's Ubuntu and macOS numbers (the job summary has them) and re-pin if they
+/// leave less than three times headroom.
+/// The budgets are about six times the worst run: CI runners are slower and noisier than a laptop, and what this
+/// guards is a regression to something that costs a round trip per file (minutes), not a few percent.
+const LIST_BUDGET: Duration = Duration::from_secs(5);
+const DOWNLOAD_BUDGET: Duration = Duration::from_secs(8);
+
+#[test]
+fn a_ten_thousand_file_folder_lists_and_downloads_within_the_budget() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "files");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let connection = connect(&server, &target, &paths, &trusting()).unwrap();
+    let (folder, bytes) = big_folder("ssh");
+    let params = json!({ "roots": [folder], "path": "" });
+
+    let started = Instant::now();
+    let mut names = Vec::new();
+    let mut after = serde_json::Value::Null;
+    let mut pages = 0;
+
+    loop {
+        let mut page_params = params.clone();
+
+        page_params["after"] = after.clone();
+
+        let page = connection
+            .list_files(&page_params, Duration::from_secs(30))
+            .unwrap();
+
+        pages += 1;
+        names.extend(
+            page["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["name"].as_str().unwrap().to_owned()),
+        );
+
+        if page["next"].is_null() {
+            break;
+        }
+
+        after = page["next"].clone();
+    }
+
+    let listed = started.elapsed();
+
+    // The 10,000 files and the link, once each and in order.
+    assert_eq!(names.len(), BIG_FOLDER_FILES + 1);
+    assert!(names.windows(2).all(|pair| pair[0] < pair[1]));
+    assert_eq!(pages, 6);
+
+    let archive_path = server.dir.join("big.tar");
+    let mut archive = fs::File::create(&archive_path).unwrap();
+    let started = Instant::now();
+    let summary = connection
+        .download(&params, &mut archive, Duration::from_secs(30))
+        .unwrap();
+    let downloaded = started.elapsed();
+
+    // The numbers the budgets were set from; a passing test prints nothing, so CI gets them in the job summary.
+    let line = format!(
+        "ten-thousand-file folder: listed {} entries in {pages} pages in {listed:?}, downloaded {} bytes in {downloaded:?} (budgets {LIST_BUDGET:?} and {DOWNLOAD_BUDGET:?})",
+        names.len(),
+        fs::metadata(&archive_path).unwrap().len()
+    );
+
+    eprintln!("{line}");
+
+    if let Some(summary) = std::env::var_os("GITHUB_STEP_SUMMARY") {
+        let mut summary = fs::OpenOptions::new().append(true).open(summary).unwrap();
+
+        writeln!(summary, "{line}\n").unwrap();
+    }
+
+    assert!(listed < LIST_BUDGET, "listing took {listed:?}");
+    assert!(
+        downloaded < DOWNLOAD_BUDGET,
+        "the download took {downloaded:?}"
+    );
+
+    // What came down is a complete archive of the folder without the link, and nothing of what the link names.
+    assert_eq!(
+        summary,
+        json!({ "bytes": bytes, "files": BIG_FOLDER_FILES, "folders": 1, "skipped": 1, "unreadable": 0 })
+    );
+
+    let entries = Command::new("tar")
+        .arg("-tf")
+        .arg(&archive_path)
+        .output()
+        .unwrap();
+
+    assert!(entries.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&entries.stdout).lines().count(),
+        BIG_FOLDER_FILES + 1
+    );
+    assert!(!fs::read(&archive_path)
+        .unwrap()
+        .windows(25)
+        .any(|window| window == b"outside-the-shared-folder"));
+
+    // A folder the person did not share is refused by the server, not trusted to the caller.
+    let outside = json!({ "roots": [folder], "path": ".." });
+
+    assert!(connection
+        .download(&outside, &mut std::io::sink(), Duration::from_secs(30))
+        .unwrap_err()
+        .contains("outside the shared folders"));
+
+    finish(&connection, &target, &paths);
+}
+
+/// A writer that takes its time, like a slow disk.
+struct Slow(Duration);
+
+impl std::io::Write for Slow {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        thread::sleep(self.0);
+
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn another_request_is_answered_while_a_download_waits_on_a_slow_disk() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "slow");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let connection = Arc::new(connect(&server, &target, &paths, &trusting()).unwrap());
+    let dir = std::env::temp_dir().join(format!("neore-slow-{}", std::process::id()));
+
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("big")).unwrap();
+    fs::write(dir.join("big/blob"), vec![7u8; 16 * 1024 * 1024]).unwrap();
+
+    let folder = fs::canonicalize(dir.join("big")).unwrap();
+    let params = json!({ "roots": [folder], "path": "" });
+    let download = {
+        let (connection, params) = (Arc::clone(&connection), params.clone());
+
+        thread::spawn(move || {
+            let started = Instant::now();
+            let result = connection.download(
+                &params,
+                &mut Slow(Duration::from_millis(100)),
+                Duration::from_secs(30),
+            );
+
+            (result, started.elapsed())
+        })
+    };
+
+    // The disk takes about six seconds for the 16 MiB; the connection must not wait for it.
+    thread::sleep(Duration::from_secs(1));
+
+    let started = Instant::now();
+    let page = connection
+        .list_files(&params, Duration::from_secs(30))
+        .unwrap();
+    let answered = started.elapsed();
+
+    assert_eq!(page["entries"].as_array().unwrap().len(), 1);
+    assert!(
+        answered < Duration::from_secs(2),
+        "the page took {answered:?}"
+    );
+
+    let (result, took) = download.join().unwrap();
+
+    assert!(result.is_ok(), "{result:?}");
+    assert!(
+        took > Duration::from_secs(3),
+        "the disk was not slow: {took:?}"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+    finish(&connection, &target, &paths);
+}
+
+// ─── Coding agents on the server (S7) ────────────────────────────────────
+
+/// Collects what an agent printed and how it ended.
+#[derive(Default)]
+struct Collected {
+    ended: Mutex<Option<Result<AgentExit, String>>>,
+    err: Mutex<Vec<u8>>,
+    out: Mutex<Vec<u8>>,
+}
+
+impl AgentSink for Collected {
+    fn output(&self, stderr: bool, bytes: &[u8]) {
+        if stderr { &self.err } else { &self.out }
+            .lock()
+            .unwrap()
+            .extend_from_slice(bytes);
+    }
+
+    fn ended(&self, result: Result<AgentExit, String>) {
+        *self.ended.lock().unwrap() = Some(result);
+    }
+}
+
+impl Collected {
+    fn stdout(&self) -> String {
+        String::from_utf8_lossy(&self.out.lock().unwrap()).into_owned()
+    }
+}
+
+fn eventually(what: &str, condition: impl Fn() -> bool) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+
+    while !condition() {
+        assert!(Instant::now() < deadline, "{what}");
+        thread::sleep(Duration::from_millis(30));
+    }
+}
+
+fn process_alive(pid: i64) -> bool {
+    // SAFETY: signal 0 only asks whether the process exists.
+    unsafe { libc::kill(pid as libc::pid_t, 0) == 0 }
+}
+
+fn agent_request(root: &Path, script: &str) -> serde_json::Value {
+    json!({
+        "args": ["-c", script], "command": "/bin/sh", "cwd": root, "env": {},
+        "roots": [root],
+    })
+}
+
+#[test]
+fn a_coding_agent_runs_on_the_server_without_the_clients_agent_socket_and_dies_with_the_connection()
+{
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "codag");
+    let (target, paths) = (server.target("client"), server.paths("c"));
+    let interact = trusting();
+    let connection = connect(&server, &target, &paths, &interact).unwrap();
+    let root = vectors::fixture("ssh-agent");
+
+    assert!(
+        connection.hello().agents,
+        "the host should announce coding agents"
+    );
+
+    // The environment the agent starts with is the host's own: forwarding is off, so no agent socket is in it.
+    let printed = Arc::new(Collected::default());
+
+    connection
+        .agent_start(
+            &agent_request(&root, "env"),
+            Arc::clone(&printed) as Arc<dyn AgentSink>,
+        )
+        .unwrap();
+    eventually("the agent never ended", || {
+        printed.ended.lock().unwrap().is_some()
+    });
+
+    let environment = printed.stdout();
+
+    assert!(environment.contains("HOME="), "{environment}");
+    assert!(!environment.contains("SSH_AUTH_SOCK"), "{environment}");
+    assert!(!environment.contains("SSH_CONNECTION"), "{environment}");
+
+    // A round trip over the connection, then the connection goes away with the agent and a child it started.
+    let pidfile = root.join("agent-child.pid");
+    let _ = fs::remove_file(&pidfile);
+
+    let live = Arc::new(Collected::default());
+    let handle = connection
+        .agent_start(
+            &agent_request(
+                &root,
+                &format!(
+                    "sleep 300 & echo $! > {}; echo $$; read line; echo got:$line; exec sleep 300",
+                    pidfile.display()
+                ),
+            ),
+            Arc::clone(&live) as Arc<dyn AgentSink>,
+        )
+        .unwrap();
+
+    eventually("the agent never said its pid", || {
+        live.stdout().contains('\n')
+    });
+    connection.agent_write(handle, b"hello\n").unwrap();
+    eventually("the agent never answered", || {
+        live.stdout().contains("got:hello")
+    });
+
+    let leader: i64 = live.stdout().lines().next().unwrap().parse().unwrap();
+    let child: i64 = fs::read_to_string(&pidfile)
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+
+    assert!(process_alive(leader) && process_alive(child));
+
+    // The desktop quit: its ssh session is gone (that is what quitting does; the master may live on for its
+    // ControlPersist), and the host with it. Only the session is closed here, so a master left up cannot be what
+    // ended the agent.
+    connection.close();
+    eventually("the agent outlived the connection", || {
+        !process_alive(leader)
+    });
+    eventually("the agent's child outlived the connection", || {
+        !process_alive(child)
+    });
+    assert!(
+        live.ended.lock().unwrap().is_some(),
+        "the sink should be told the connection ended"
+    );
+    assert!(
+        master_is_running(&target, &paths),
+        "the master should still be up, so it is not what ended the agent"
+    );
+    finish(&connection, &target, &paths);
 }

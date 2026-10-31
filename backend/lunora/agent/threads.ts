@@ -8,24 +8,26 @@ import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
+import { deleteGoalsForThread, endActiveGoals, hasLiveStream } from "../chat/goals/rows";
 
 /**
  * Thread operations.
  * Migrated from `@neore/backend-agent` component.
  */
-import { omit, pick } from "../lib/collections";
+import { omit } from "../lib/collections";
 import { assert } from "../lib/error-helpers";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
-import { paginationOptionsValidator, partial, MAX_LENGTH } from "../lib/validators";
+import { paginationOptionsValidator, MAX_LENGTH } from "../lib/validators";
 import { endHostThread, restoreHostThread } from "../acp/lib/thread-removed";
 import { deleteMessage } from "./messages";
 import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
 import { isThreadLocked, toLockedThreadStub } from "../lib/thread-lock";
 import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread, resolveThreadReadAccess, type ThreadPermission } from "./thread-read-access";
-import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadDocFields, vThreadStatus } from "./validators";
+import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadPatchFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
+import { clearAwaitingInput, patchesWithoutAwaitingInput } from "./table-writes";
 import { deleteThreadSummaries } from "./thread-summaries";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
@@ -42,6 +44,18 @@ export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
     }
 
     return result as unknown as ThreadDoc;
+};
+
+/**
+ * Unread, snooze and "needs you" belong to the thread's OWNER; the row is shared with grantees, who must not see
+ * (or act on) them. Reads that can reach a grantee return the row through here.
+ */
+const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozedUntil"] as const;
+
+export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
+    const isOwner = thread.userId !== undefined && thread.userId === viewerId;
+
+    return publicThread(isOwner ? thread : (omit(thread, [...OWNER_STATE_KEYS]) as Doc<"threads">));
 };
 
 /**
@@ -90,7 +104,7 @@ export const getThread = query
             return toLockedThreadStub(publicThread(access.thread)) as unknown as ThreadDoc;
         }
 
-        return access.kind === "full" ? publicThread(access.thread) : redactThreadForPublicViewer(publicThread(access.thread));
+        return access.kind === "full" ? threadForViewer(access.thread, identity?.userId) : redactThreadForPublicViewer(publicThread(access.thread));
     });
 
 const listThreadsByUserIdArgs = {
@@ -215,6 +229,8 @@ export const threadFieldsSupportingPatch = [
     "title" as const,
     "summary" as const,
     "status" as const,
+    "awaitingInput" as const,
+    "lastReplyAt" as const,
     "userId" as const,
     "model" as const,
     "tags" as const,
@@ -245,7 +261,7 @@ export type ThreadFieldsSupportingPatch = (typeof threadFieldsSupportingPatch)[n
 
 export const updateThread = internalMutation
     .input({
-        patch: v.object(partial(pick(vThreadDocFields, [...threadFieldsSupportingPatch]))),
+        patch: v.object({ ...vThreadPatchFields }),
         threadId: v.id("threads"),
     })
     .output(v.from(vThreadDocument))
@@ -253,12 +269,34 @@ export const updateThread = internalMutation
         const oldThread = await ctx.db.get(args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
-        await ctx.db.patch(args.threadId, withoutUndefined(args.patch));
+
+        // Back to `running` ends a pause: awaitingInput goes in the same write (see `patchThread`).
+        if (patchesWithoutAwaitingInput(oldThread, args.patch)) {
+            await patchRow(ctx.db, oldThread, { ...withoutUndefined(args.patch), awaitingInput: undefined });
+        } else {
+            await ctx.db.patch(args.threadId, withoutUndefined(args.patch));
+        }
+
         const newThread = (await ctx.db.get(args.threadId))!;
 
         // Update aggregates
         // Handle thread orders aggregate
         return publicThread(newThread);
+    });
+
+/**
+ * A continuation the user stopped answers no request any more: the pause it was resumed from ends with it. A newer
+ * run on the thread owns `awaitingInput` now (it may have paused again), so it is left alone then.
+ */
+export const endStoppedPause = internalMutation
+    .input({ threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        if (!(await hasLiveStream(ctx, args.threadId))) {
+            await clearAwaitingInput(ctx.db, args.threadId);
+        }
+
+        return null;
     });
 
 export const searchThreadTitles = query
@@ -446,6 +484,9 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         if (host) {
             await endHostThread(context, host, context.now);
         }
+
+        // A goal's review queued between pages would read a half-deleted transcript, charge and open another round.
+        await endActiveGoals(context, args.threadId, "user");
     }
 
     const messages = await context.db
@@ -464,6 +505,9 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
     if (messages.isDone) {
         // Approval snapshots hold the run's system prompt; they go with the thread.
         await deleteToolApprovalRunsForThread(context, args.threadId);
+
+        // A goal is about this thread; a queued review or round must find it ended, not point at a deleted chat.
+        await deleteGoalsForThread(context, args.threadId);
 
         // One batch of links per call. While links remain this page reports "not done" and the
         // chain re-runs it, so the thread row (deleted last) and its links never outlive a partial delete.
@@ -697,8 +741,9 @@ export const softDeleteThread = internalMutation
             deletedAt: ctx.now,
             updatedAt: ctx.now,
         });
-        // A coding agent's turn does not outlive the thread it writes into.
+        // A coding agent's turn does not outlive the thread it writes into, nor does a goal.
         await endHostThread(ctx, oldThread, ctx.now);
+        await endActiveGoals(ctx, args.threadId, "user");
         const newThread = (await ctx.db.get(args.threadId))!;
 
         // Remove from aggregates when soft deleted
@@ -1065,7 +1110,7 @@ export const getThreadWithAccess = internalQuery
             return null;
         }
 
-        return publicThread(access.thread);
+        return threadForViewer(access.thread, args.userId);
     });
 
 export const checkThreadAccessBatch = internalQuery
@@ -1093,7 +1138,7 @@ export const checkThreadAccessBatchHandler = async (
         return { hasAccess: false as const, permission: null, thread: null };
     }
 
-    return { hasAccess: true as const, permission: access.permission, thread: publicThread(access.thread) };
+    return { hasAccess: true as const, permission: access.permission, thread: threadForViewer(access.thread, args.userId) };
 };
 
 export const searchThreadsByTitleAndSummary = query

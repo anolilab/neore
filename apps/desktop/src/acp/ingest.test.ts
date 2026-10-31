@@ -9,7 +9,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { HostEvent } from "./ingest";
+import type { HostEvent, PosterOptions } from "./ingest";
 import { HostPoster, KEEPALIVE_MS, POST_INTERVAL_MS } from "./ingest";
 
 interface Post {
@@ -105,14 +105,20 @@ let logs: string[];
 
 const hosts: HostPoster[] = [];
 
-const poster = (fetchImpl: typeof fetch = backend.fetch as typeof fetch) => {
+const cancelled: string[][] = [];
+
+const poster = (media?: PosterOptions["media"], fetcher: typeof fetch = backend.fetch as typeof fetch) => {
     const host = new HostPoster({
+        cancelTurn: (sessionId, turnId) => {
+            cancelled.push([sessionId, turnId]);
+        },
         deviceId: () => paired,
         endpoint: new URL("https://backend.test/hosts/ingest"),
-        fetch: fetchImpl,
+        fetch: fetcher,
         log: (message) => {
             logs.push(message);
         },
+        ...media && { media },
         now: () => clock,
         random: () => 0.5,
         sign: (payload) => `sig:${String(payload.length)}`,
@@ -155,6 +161,7 @@ beforeEach(async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     scratch = await mkdtemp(path.join(tmpdir(), "neore-acp-ingest-"));
     backend = new FakeBackend();
+    cancelled.length = 0;
     paired = "dev1";
     clock = 1_000_000;
     logs = [];
@@ -175,6 +182,159 @@ afterEach(async () => {
     await rm(scratch, { force: true, recursive: true });
 });
 
+describe("a turn's files", () => {
+    const UPLOAD_ID = "abcdefghijklmnopqrstu";
+    const PNG = { bytes: new Uint8Array([0x89, 0x50, 0x4E, 0x47, 1]), kind: "image", mime: "image/png", name: "chart.png", size: 5, status: "read" };
+
+    /** The backend for a poster that also uploads: ingest posts go to the stand-in, upload requests are accepted. */
+    const withUploads = () => {
+        const uploads: string[] = [];
+        const fetcher = async (url: URL | string, init?: RequestInit): Promise<Response> => {
+            if (String(url).includes("/hosts/uploads")) {
+                uploads.push(String(init?.method));
+
+                return init?.method === "POST"
+                    ? new Response(null, { headers: { Location: `/hosts/uploads/${UPLOAD_ID}` }, status: 201 })
+                    : new Response(null, { status: 204 });
+            }
+
+            return await backend.fetch(url, init);
+        };
+
+        return { fetcher: fetcher as typeof fetch, uploads };
+    };
+
+    const media = (read: (reference: string) => Promise<unknown>): NonNullable<PosterOptions["media"]> => {
+        return {
+            endpoint: new URL("https://backend.test/hosts/uploads"),
+            read: async (_agent, _folder, reference) => (await read(reference)) as never,
+            sign: () => "sig",
+        };
+    };
+
+    it("posts a file's event before the end of the turn, and the end last", async () => {
+        const { fetcher, uploads } = withUploads();
+        const read = vi.fn(async () => PNG);
+        const host = poster(media(read), fetcher);
+
+        await open(host);
+        host.turnStarted("s1", "t1", "draw");
+        host.text("s1", "t1", "Here: ![c](out/chart.png)");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+        await settle(POST_INTERVAL_MS);
+
+        expect(read).toHaveBeenCalledExactlyOnceWith("out/chart.png");
+        expect(uploads).toEqual(["POST", "PATCH"]);
+
+        const kinds = (backend.chunks.get("t1") ?? []).map((event) => event.kind);
+
+        expect(kinds.slice(-2)).toEqual(["media", "turn_end"]);
+        expect(backend.chunks.get("t1")?.at(-2)).toEqual({
+            contentType: "image/png",
+            kind: "media",
+            name: "chart.png",
+            reference: "out/chart.png",
+            size: 5,
+            uploadId: UPLOAD_ID,
+        });
+    });
+
+    it("sends the files one to a post, each with its own seq", async () => {
+        const { fetcher } = withUploads();
+        const host = poster(
+            media(async () => PNG),
+            fetcher,
+        );
+
+        await open(host);
+        host.turnStarted("s1", "t1", "draw");
+        host.text("s1", "t1", "![a](a.png) ![b](b.png)");
+        host.turnEnded("s1", "t1", "end_turn");
+
+        for (let step = 0; step < 4; step += 1) {
+            // eslint-disable-next-line no-await-in-loop -- each tick must run before the next is armed
+            await settle(POST_INTERVAL_MS);
+        }
+
+        const withFiles = backend.posts.filter(({ post }) => post.turnId === "t1" && post.events.some((event) => event.kind === "media"));
+
+        expect(withFiles).toHaveLength(2);
+        expect(withFiles.map(({ post }) => post.events.filter((event) => event.kind === "media").length)).toEqual([1, 1]);
+        expect(new Set(withFiles.map(({ post }) => post.firstSeq)).size).toBe(2);
+        expect((backend.chunks.get("t1") ?? []).filter((event) => event.kind === "media")).toHaveLength(2);
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished" });
+    });
+
+    it("ends a turn with no image reference at once, without reading anything", async () => {
+        const { fetcher, uploads } = withUploads();
+        const read = vi.fn(async () => PNG);
+        const host = poster(media(read), fetcher);
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "See [the file](notes.md)");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+
+        expect(read).not.toHaveBeenCalled();
+        expect(uploads).toEqual([]);
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished" });
+    });
+
+    it("posts nothing for a reference the core refuses, and still ends the turn", async () => {
+        const { fetcher, uploads } = withUploads();
+        const host = poster(
+            media(async () => { return { kind: "", mime: "", name: "", size: 0, status: "refused" }; }),
+            fetcher,
+        );
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "![a](../secret.png)");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+        await settle(POST_INTERVAL_MS);
+
+        expect(uploads).toEqual([]);
+        expect((backend.chunks.get("t1") ?? []).map((event) => event.kind)).toEqual(["turn_start", "text", "turn_end"]);
+    });
+
+    it("reads nothing for a turn that failed", async () => {
+        const { fetcher } = withUploads();
+        const read = vi.fn(async () => PNG);
+        const host = poster(media(read), fetcher);
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "![a](a.png)");
+        host.turnEnded("s1", "t1", "failed", "boom");
+        await settle(POST_INTERVAL_MS);
+
+        expect(read).not.toHaveBeenCalled();
+        expect(backend.chunks.get("t1")?.at(-1)).toMatchObject({ kind: "turn_end", reason: "failed" });
+    });
+
+    it("ends the turn even when reading throws", async () => {
+        const { fetcher } = withUploads();
+        const host = poster(
+            media(async () => {
+                throw new Error("boom");
+            }),
+            fetcher,
+        );
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.text("s1", "t1", "![a](a.png)");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished" });
+    });
+});
+
 describe("opening a session", () => {
     it("posts session_open signed for the device, and keeps a turn waiting for the thread it names", async () => {
         const host = poster();
@@ -186,6 +346,25 @@ describe("opening a session", () => {
         expect(first?.post).toMatchObject({ deviceId: "dev1", events: [{ ...INFO, kind: "session_open" }], kind: "turn", sessionId: "s1", v: 1 });
         expect(first?.post.threadId).toBeUndefined();
         expect(first?.signature).toMatch(SIGNED);
+    });
+
+    it("carries the agent's own session id and what it advertised, cut to what the backend takes", async () => {
+        const host = poster();
+        const capabilities = { groups: { sessions: { load: { degradation: "none", supported: true } } }, reportedAt: 5, version: 1 } as const;
+
+        host.sessionOpened("s1", { ...INFO, capabilities, nativeSessionId: "n".repeat(300) });
+        await settle();
+
+        expect(backend.posts[0]?.post.events[0]).toMatchObject({ capabilities, kind: "session_open", nativeSessionId: "n".repeat(256) });
+    });
+
+    it("leaves out an id the agent did not give", async () => {
+        const host = poster();
+
+        host.sessionOpened("s1", { ...INFO, nativeSessionId: "" });
+        await settle();
+
+        expect(backend.posts[0]?.post.events[0]).not.toHaveProperty("nativeSessionId");
     });
 
     it("posts nothing while the computer is not paired", async () => {
@@ -257,6 +436,224 @@ describe("a session that never gets a thread", () => {
         expect(backend.posts.filter(({ post }) => post.close !== true)).toHaveLength(1);
         expect(backend.posts.filter(({ post }) => post.close === true)).toHaveLength(1);
         expect(host.busy).toBe(false);
+    });
+});
+
+describe("a session and turns the backend started", () => {
+    it("knows the thread already, so a prompt it received is posted at once, before the open is answered", async () => {
+        const host = poster();
+
+        backend.respond = (post) => post.threadId === undefined ? Response.json({ error: "slow" }, { status: 503 }) : undefined;
+        host.sessionOpened("s1", INFO, "thread-1");
+        host.turnReceived("s1", "t1", "fix it");
+        await settle(POST_INTERVAL_MS);
+
+        const turn = backend.posts.find(({ post }) => post.turnId === "t1");
+
+        expect(turn?.post).toMatchObject({ events: [{ kind: "turn_start", text: "fix it" }], firstSeq: 0, threadId: "thread-1", turnId: "t1" });
+    });
+
+    it("posts the prompt once when the turn then starts: received and started are one turn, not two", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnReceived("s1", "t1", "fix it");
+        host.turnStarted("s1", "t1", "fix it");
+        host.text("s1", "t1", "done");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")).toEqual([
+            { kind: "turn_start", text: "fix it" },
+            { kind: "text", text: "done" },
+        ]);
+    });
+
+    it("ends a prompt that was queued and then withdrawn, so its stream does not wait for the reaper", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnReceived("s1", "t1", "later");
+        host.turnEnded("s1", "t1", "cancelled");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")).toEqual([
+            { kind: "turn_start", text: "later" },
+            { kind: "turn_end", reason: "cancelled" },
+        ]);
+    });
+});
+
+describe("a message held for a session that is not open yet", () => {
+    it("posts its turn with the thread the command named, before any session link exists, and then runs under that one turn", async () => {
+        const host = poster();
+
+        host.turnHeld("s1", "t1", "fix it", "thread-7");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.posts.find(({ post }) => post.turnId === "t1")?.post).toMatchObject({
+            events: [{ kind: "turn_start", text: "fix it" }],
+            firstSeq: 0,
+            threadId: "thread-7",
+        });
+
+        // The session opens and the held message runs: the same turn goes on, with no second `turn_start`.
+        await open(host);
+        host.turnReceived("s1", "t1", "fix it");
+        host.turnStarted("s1", "t1", "fix it");
+        host.text("s1", "t1", "done");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")).toEqual([
+            { kind: "turn_start", text: "fix it" },
+            { kind: "text", text: "done" },
+        ]);
+    });
+
+    it("keeps posting while it waits, so the backend's reaper does not time it out", async () => {
+        const host = poster();
+
+        host.turnHeld("s1", "t1", "fix it", "thread-7");
+        await settle(POST_INTERVAL_MS);
+
+        const before = backend.posts.length;
+
+        await settle(KEEPALIVE_MS + 1000);
+        expect(backend.posts.length).toBeGreaterThan(before);
+    });
+
+    it("ends with an error when it is never sent", async () => {
+        const host = poster();
+
+        host.turnHeld("s1", "t1", "fix it", "thread-7");
+        host.turnEnded("s1", "t1", "failed", "the agent did not start");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")).toEqual([
+            { kind: "turn_start", text: "fix it" },
+            { error: "the agent did not start", kind: "turn_end", reason: "failed" },
+        ]);
+    });
+
+    it("is not posted for a computer that is not paired", async () => {
+        paired = undefined;
+
+        const host = poster();
+
+        host.turnHeld("s1", "t1", "fix it", "thread-7");
+        await settle(1000);
+        expect(backend.posts).toEqual([]);
+    });
+
+    it("ends a held message that expired while the app was down, at the seq the backend names", async () => {
+        backend.chunks.set("t1", [{ kind: "turn_start", text: "fix it" }]);
+
+        const host = poster();
+
+        host.endLapsedTurn("s1", "t1", "thread-7", { error: "the agent did not open its session in time", reason: "failed" });
+        await settle(POST_INTERVAL_MS * 2);
+
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ error: "the agent did not open its session in time", kind: "turn_end", reason: "failed" });
+    });
+});
+
+describe("an agent's own children", () => {
+    it("are posted under the call that spawned them, long text in pieces, and the completion cut to what one post takes", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "delegate");
+        host.child("s1", "t1", "task1", { kind: "text", text: "a".repeat(40_000) });
+        host.child("s1", "t1", "task1", { id: "c1", kind: "tool", status: "completed", title: "Read", toolKind: "read" });
+        host.child("s1", "t1", "task1", { kind: "end", status: "completed", text: "x".repeat(100_000) });
+        await settle(POST_INTERVAL_MS * 4);
+
+        const events = backend.chunks.get("t1") ?? [];
+        const children = events.filter((event) => event.kind.startsWith("child_"));
+
+        expect(children.map((event) => event.kind)).toEqual(["child_text", "child_text", "child_text", "child_tool", "child_end"]);
+        expect(children.every((event) => "spawnId" in event && event.spawnId === "task1")).toBe(true);
+        expect(children.filter((event) => event.kind === "child_text").map((event) => (event as { text: string }).text.length)).toEqual([16_000, 16_000, 8000]);
+        expect((children.at(-1) as { text: string }).text).toHaveLength(30_000);
+    });
+
+    it("are not posted for a turn that is not running", async () => {
+        const host = poster();
+
+        await open(host);
+        host.child("s1", "nothing", "task1", { kind: "text", text: "late" });
+        await settle(POST_INTERVAL_MS * 2);
+        expect(backend.chunks.has("nothing")).toBe(false);
+    });
+});
+
+describe("a turn the backend ended first", () => {
+    it("stops the agent on this computer, which makes good a cancel that never arrived", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "hello");
+        await settle(POST_INTERVAL_MS);
+        // Stop, the reaper or a revoke ended it on the backend; the cancel call to this computer was lost.
+        backend.ended.add("t1");
+        host.text("s1", "t1", "still going");
+        await settle(POST_INTERVAL_MS);
+
+        expect(cancelled).toEqual([["s1", "t1"]]);
+        expect(host.busy).toBe(false);
+    });
+
+    it("leaves a turn alone that this computer ended itself", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "hello");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+
+        expect(cancelled).toEqual([]);
+    });
+});
+
+describe("a turn that changed files", () => {
+    it("ends with its summary on the turn_end event, and the whole post stays under the backend's body cap", async () => {
+        const host = poster();
+        const summary = { files: [{ added: 2, path: "src/a.ts", removed: 1 }], patch: "--- a/src/a.ts\n+++ b/src/a.ts\n" };
+
+        await open(host);
+        host.turnStarted("s1", "t1", "edit it");
+        host.turnEnded("s1", "t1", "end_turn", undefined, summary);
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished", summary });
+        expect(Math.max(...backend.bodyBytes)).toBeLessThan(256 * 1024);
+    });
+
+    it("sends the end of the turn again without its summary when the backend refuses the post, so the reply is still saved", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "edit it");
+        backend.respond = (post) =>
+            post.events.some((event) => event.kind === "turn_end" && event.summary !== undefined)
+                ? Response.json({ error: "bad" }, { status: 400 })
+                : undefined;
+        host.turnEnded("s1", "t1", "end_turn", undefined, { files: [{ added: 1, path: "a.ts", removed: 0 }], patch: "+x\n" });
+        await settle(POST_INTERVAL_MS);
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished" });
+        expect(backend.ended.has("t1")).toBe(true);
+    });
+
+    it("sends a turn with nothing changed exactly as before", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "hi");
+        host.turnEnded("s1", "t1", "end_turn");
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")?.at(-1)).toEqual({ kind: "turn_end", reason: "finished" });
     });
 });
 
@@ -555,7 +952,7 @@ describe("the signed post", () => {
             return await original(url, init);
         };
 
-        const retrying = poster(flaky as typeof fetch);
+        const retrying = poster(undefined, flaky as typeof fetch);
 
         await open(retrying);
         retrying.turnStarted("s1", "t2", "go");
@@ -728,7 +1125,7 @@ describe("a session that ends locally", () => {
         const gate = new Promise<void>((resolve) => {
             release = resolve;
         });
-        const host = poster(async (url, init) => {
+        const host = poster(undefined, async (url, init) => {
             const { payload } = JSON.parse(String(init?.body)) as { payload: string };
             const post = JSON.parse(payload) as Post;
 
@@ -781,7 +1178,10 @@ describe("a session that ends locally", () => {
 describe("a restart", () => {
     it("ends a turn the previous run left behind as interrupted, at the seq the backend names", async () => {
         await writeFile(path.join(scratch, "acp-host-turns.json"), JSON.stringify({ turns: [{ sessionId: "old", threadId: "thread-9", turnId: "t-old" }] }));
-        backend.chunks.set("t-old", [{ kind: "turn_start", text: "x" }, { kind: "text", text: "half" }]);
+        backend.chunks.set("t-old", [
+            { kind: "turn_start", text: "x" },
+            { kind: "text", text: "half" },
+        ]);
 
         const host = poster();
 
@@ -816,6 +1216,33 @@ describe("a restart", () => {
         await settle(60_000);
 
         expect(backend.chunks.get("t-old")?.at(-1)).toEqual({ kind: "turn_end", reason: "interrupted" });
+    });
+
+    it("still ends a turn the last run left when a replayed message rewrites the file first", async () => {
+        await writeFile(path.join(scratch, "acp-host-turns.json"), JSON.stringify({ turns: [{ sessionId: "old", threadId: "thread-9", turnId: "t-old" }] }));
+        backend.chunks.set("t-old", [{ kind: "turn_start", text: "x" }]);
+
+        const host = poster();
+        const leftovers = await host.readLeftovers();
+
+        // The replay of a held message opens a channel, which rewrites the file of running turns.
+        host.turnHeld("s2", "t-held", "go", "thread-2");
+        await host.persisted();
+
+        // The file keeps the turn that is still to be ended, beside the new one.
+        expect(await runningTurns()).toEqual({
+            turns: [
+                { sessionId: "s2", threadId: "thread-2", turnId: "t-held" },
+                { sessionId: "old", threadId: "thread-9", turnId: "t-old" },
+            ],
+        });
+
+        await host.recover(leftovers);
+        await settle(POST_INTERVAL_MS * 2);
+
+        expect(backend.chunks.get("t-old")?.at(-1)).toEqual({ kind: "turn_end", reason: "interrupted" });
+        // The held message's own turn is not ended: it has a channel, and runs when its session opens.
+        expect(backend.chunks.get("t-held")?.some((event) => event.kind === "turn_end")).toBe(false);
     });
 
     it("records a running turn on disk once its thread is known", async () => {

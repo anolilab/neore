@@ -452,11 +452,22 @@ pub fn reap(_dir: &Path, _ids: &[String], _own: Option<&str>) -> Reaped {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn a_ps_line_keeps_a_program_path_with_spaces_whole() {
+        let args = split_ps_args("/Users/me/Application Support/neore-host --stdio --launch abc");
+
+        assert_eq!(args[0], "/Users/me/Application Support/neore-host");
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--launch" && pair[1] == "abc"));
+    }
+
     #[cfg(unix)]
     #[test]
     fn ps_output_keeps_a_program_path_with_spaces() {
-        use super::split_ps_args;
-
         assert_eq!(
             split_ps_args("/Users/Jane Doe/.neore/host/1/neore-host --stdio --launch abc\n"),
             [
@@ -468,7 +479,6 @@ mod tests {
         );
         assert_eq!(split_ps_args("sleep 5"), ["sleep", "5"]);
     }
-    use super::*;
 
     fn dir(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("neore-launch-{name}-{}", std::process::id()));

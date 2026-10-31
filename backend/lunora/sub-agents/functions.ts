@@ -36,6 +36,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { resolveLeafRow } from "../agent/branch-rows";
 import { addMessagesHandler, getMaxMessage } from "../agent/messages";
+import { isThreadStreaming } from "../agent/thread-streaming";
 import { insertThread, insertThreadRelationship, patchThread } from "../agent/table-writes";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { claimOnce, releaseClaim, WORKER_DISPATCH_CLAIM_TTL_MS, WORKER_DISPATCH_SCOPE, WORKER_STOP_SCOPE } from "../lib/claim-once";
@@ -910,20 +911,6 @@ const resumeLineAfterStoppedRun = async (ctx: MutationCtx, runId: Id<"subAgentRu
 };
 
 export type SubAgentOutcome = { error: string; kind: "failed" } | { kind: "cancelled" } | { kind: "succeeded"; result: string };
-
-/** Streams of one thread checked for activity — its latest few, never its history. */
-const RECENT_STREAMS_CHECKED = 5;
-
-/** Whether the parent thread has a run still writing to it (`persistentStreams`, pending or streaming). */
-const isThreadStreaming = async (ctx: Pick<MutationCtx, "db">, threadId: string): Promise<boolean> => {
-    const streams = await ctx.db
-        .query("persistentStreams")
-        .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
-        .order("desc")
-        .take(RECENT_STREAMS_CHECKED);
-
-    return streams.some((stream) => stream.status === "pending" || stream.status === "streaming");
-};
 
 /**
  * Posts an ended run's result to the parent thread, once, if the lead asked for it
