@@ -19,6 +19,7 @@ import { buildDeviceTools } from "./device-tools";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import type { MCPServerConfig } from "./mcp-tools";
 import { getMCPTools } from "./mcp-tools";
+import type { ToolProgressSink } from "./mcp-progress";
 import type { SearchMode } from "./tool-builder";
 import { ToolName } from "../tools";
 import { admittedKnowledgeSearchTool } from "../tools/knowledge-search";
@@ -53,6 +54,8 @@ export interface BuildAgentToolsOptions {
     headless?: boolean;
     /** Headless only: built-ins whose `ask` the run inherited an approval for (`ToolPermissionOptions.headlessApproved`). */
     headlessApproved?: ReadonlyArray<string>;
+    /** Interactive runs: where a long MCP call's progress is shown. Omitted, none is relayed. */
+    mcpProgress?: ToolProgressSink;
     /** Restrict MCP servers to these names; empty/undefined means every enabled server. */
     mcpServerNames?: string[];
     model: LanguageModel | string;
@@ -98,6 +101,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         deviceThreadId,
         headless,
         headlessApproved,
+        mcpProgress,
         mcpServerNames,
         model,
         origin,
@@ -154,7 +158,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
     const noDevices: DeviceToolsResult = { descriptors: new Map(), tools: {} };
     const [mcpResult, deviceResult] = await Promise.all([
-        getMCPTools(selectedServers),
+        // An outside agent's (public API) event mapping drops progress chunks, so its runs write none.
+        getMCPTools(selectedServers, { progress: origin === "outside_agent" ? undefined : mcpProgress }),
         // A device problem must never take the run down with it.
         deviceThreadId === undefined || headless || origin === "outside_agent"
             ? noDevices
