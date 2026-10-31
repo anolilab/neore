@@ -378,13 +378,14 @@ export interface ApiTypes {
             getDeviceCallByToolCall: FunctionReference<"query", { toolCallId: string }, null | { _id: string; deviceName: string; phase?: "prompting" | "running"; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; toolName: string }>;
             heartbeatDevice: FunctionReference<"mutation", { deviceId: Id<"devices">; viaDeviceId?: Id<"devices"> }, { paired: boolean }>;
             listDeviceCalls: FunctionReference<"query", { deviceId?: Id<"devices">; limit?: number }, Array<{ _id: string; completedAt?: number; createdAt: number; decision?: string; deviceId: string; deviceName: string; error?: string; exitCode?: number; input: string; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: string; toolName: string; truncated?: boolean }>>;
-            listDevices: FunctionReference<"query", {}, Array<{ _id: string; createdAt: number; lastSeenAt?: number; name: string; platform: "macos" | "windows" | "linux"; toolNames: Array<string>; transport?: "ssh"; viaDeviceId?: string }>>;
+            listDevices: FunctionReference<"query", {}, Array<{ _id: string; createdAt: number; lastSeenAt?: number; name: string; platform: "macos" | "windows" | "linux"; projectIds?: Array<string>; toolNames: Array<string>; transport?: "ssh"; viaDeviceId?: string }>>;
             listPendingDeviceCalls: FunctionReference<"query", { deviceId: Id<"devices">; hostDeviceIds?: Array<Id<"devices">> }, Array<{ callId: string; deviceId: string; envelope: string; signature: string }>>;
             registerDevice: FunctionReference<"mutation", { name: string; platform: "macos" | "windows" | "linux"; viaDeviceId?: Id<"devices"> }, { deviceId: string; secret: string }>;
             releaseDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; deviceId: Id<"devices">; reason: string; viaDeviceId?: Id<"devices"> }, null>;
             renameDevice: FunctionReference<"mutation", { deviceId: Id<"devices">; name: string }, null>;
             reportDeviceCallProgress: FunctionReference<"mutation", { callId: Id<"deviceCalls">; deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }, { accepted: boolean }>;
             revokeDevice: FunctionReference<"mutation", { deviceId: Id<"devices"> }, null>;
+            setDeviceProjectScope: FunctionReference<"mutation", { deviceId: Id<"devices">; scope: { kind: "any" } | { kind: "projects"; projectIds: Array<Id<"projects">> } }, null>;
             updateDeviceManifest: FunctionReference<"mutation", { deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }, { toolCount: number }>;
         };
     };
@@ -1164,6 +1165,7 @@ export const api: ApiTypes = {
             renameDevice: { __lunoraRef: "devices_functions:renameDevice" },
             reportDeviceCallProgress: { __lunoraRef: "devices_functions:reportDeviceCallProgress" },
             revokeDevice: { __lunoraRef: "devices_functions:revokeDevice" },
+            setDeviceProjectScope: { __lunoraRef: "devices_functions:setDeviceProjectScope" },
             updateDeviceManifest: { __lunoraRef: "devices_functions:updateDeviceManifest" },
         },
     },
