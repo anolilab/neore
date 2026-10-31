@@ -45,6 +45,7 @@ const dependencies = (overrides: Partial<LowRiskApproverDependencies> = {}) => {
         record: (id, record) => {
             records.push([id, record]);
         },
+        stillAllowed: vi.fn(async () => true),
         untrustedContext: async () => false,
         ...overrides,
     };
@@ -281,6 +282,33 @@ describe("createLowRiskApprover", () => {
 
         await expect(createLowRiskApprover(base)(call())).resolves.toBe(false);
         expect(records).toEqual([]);
+    });
+
+    it("asks the person when the setting is switched off or the thread is shared while the classifier runs", async () => {
+        const { base, records } = dependencies({ stillAllowed: async () => false });
+
+        await expect(createLowRiskApprover(base)(call())).resolves.toBe(false);
+        expect(records).toEqual([]);
+
+        const failing = dependencies({
+            stillAllowed: async () => {
+                throw new Error("read failed");
+            },
+        });
+
+        await expect(createLowRiskApprover(failing.base)(call())).resolves.toBe(false);
+        expect(failing.records).toEqual([]);
+    });
+
+    it.each([
+        ["summarised", "[Context from earlier in this conversation]\nAssistant: called webSearch"],
+        ["dropped", "[Earlier conversation was removed to fit the context window]"],
+    ])("asks the person, without asking the model, when older history was %s to fit the window", async (_name, text) => {
+        const { base } = dependencies();
+        const compressed = [{ content: text, role: "user" }, ...CLEAN_MESSAGES];
+
+        await expect(createLowRiskApprover(base)(call({ messages: compressed }))).resolves.toBe(false);
+        expect(base.classify).not.toHaveBeenCalled();
     });
 
     it("asks the person, without asking the model, when the run carries untrusted content", async () => {

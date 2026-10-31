@@ -30,6 +30,7 @@
  * above is a unit test.
  */
 import { computeTaint } from "../../devices/lib/taint";
+import { isCompressedHistory } from "./auto-continue";
 import type { ToolDescriptor, ToolPermissionOptions } from "./tool-permissions";
 
 /** The longest reason kept: it is model text shaped by the call's arguments, shown to the user as plain text. */
@@ -318,6 +319,11 @@ export interface LowRiskApproverDependencies {
     /** Called once per approval, before the call runs. */
     record: (toolCallId: string, record: AutoApprovalRecord) => void;
     /**
+     * Re-reads the setting and the thread's sharing right before an approval: the classifier takes seconds, and a switch
+     * made meanwhile must hold for this call. A rejection counts as `false`.
+     */
+    stillAllowed: () => Promise<boolean>;
+    /**
      * Whether the prompt carries knowledge-base excerpts, memories or project context (`loadRunContext`): text the person
      * did not write in this chat, which reaches the model as instructions. A rejection counts as `true`.
      */
@@ -338,8 +344,12 @@ export const createLowRiskApprover =
         };
 
         try {
-            // Unknown history is untrusted history.
-            if (call.messages === undefined || computeTaint(call.messages as Parameters<typeof computeTaint>[0]).length > 0) {
+            // Unknown history is untrusted history, and so is history compressed to text: its tool results are no longer visible.
+            if (
+                call.messages === undefined ||
+                isCompressedHistory(call.messages as Parameters<typeof isCompressedHistory>[0]) ||
+                computeTaint(call.messages as Parameters<typeof computeTaint>[0]).length > 0
+            ) {
                 return done("tainted");
             }
 
@@ -365,6 +375,10 @@ export const createLowRiskApprover =
             }
 
             if (!verdict.lowRisk) {
+                return done("kept-for-person");
+            }
+
+            if (!(await dependencies.stillAllowed().catch(() => false))) {
                 return done("kept-for-person");
             }
 

@@ -52,6 +52,7 @@ import { defaultToolPermission, toolPermissionKey } from "./lib/tool-permissions
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { ASK_USER_TOOL_NAME } from "./tools/ask-user-constants";
+import { threadSummaryTaint } from "../agent/thread-summary-taint";
 
 const vToolPermissionMode = v.union(v.literal("auto"), v.literal("ask"), v.literal("off"));
 const vToolPermissions = v.record(v.string(), vToolPermissionMode);
@@ -95,7 +96,11 @@ export const getToolPermissionGrantsQuery = internalQuery
 
 type QuickCheckCtx = Pick<QueryCtx, "db">;
 
-/** The user's opt-in is on AND the thread is one only they write to (`isDeviceEligibleThread`). */
+/**
+ * The user's opt-in is on, the thread is one only they write to (`isDeviceEligibleThread`), and none of its context
+ * summaries folded in untrusted content: a summary reaches the model as notes in its system prompt, so a web page or
+ * tool result that scrolled out of the window still shapes the call (`agent/thread-summary-taint.ts`).
+ */
 const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, userId: string): Promise<boolean> => {
     const prefs = await ctx.db
         .query("aiUserPreferences")
@@ -109,7 +114,13 @@ const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, us
     const thread = await ctx.db.get(threadId);
     const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
 
-    return isDeviceEligibleThread(thread, userId, grant !== null);
+    if (!isDeviceEligibleThread(thread, userId, grant !== null)) {
+        return false;
+    }
+
+    const summaryTaint = await threadSummaryTaint(ctx, threadId);
+
+    return summaryTaint.length === 0;
 };
 
 /**

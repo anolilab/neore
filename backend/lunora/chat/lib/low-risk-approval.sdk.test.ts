@@ -46,6 +46,7 @@ const run = async (classify: () => Promise<unknown>, untrusted = false) => {
         record: (id, record) => {
             records[id] = record;
         },
+        stillAllowed: async () => true,
         untrustedContext: async () => untrusted,
     });
     const { tools } = applyToolPermissions(

@@ -262,6 +262,40 @@ describe("getLowRiskApprovalContext", () => {
         expect(await ask(await THREAD_ARGS({ deleted: true }))).toBe(false);
         expect(await ask(await THREAD_ARGS({ userId: "someone-else" }))).toBe(false);
     });
+
+    it("is false once a context summary of the thread folded in untrusted content", async () => {
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        const threadId = await THREAD_ARGS();
+        const summary = async (taintedBy: string[]) =>
+            await harness.run(async (ctx: any) => {
+                const message = await ctx.db.insert("messages", {
+                    message: { content: "hi", role: "user" },
+                    order: 0,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId,
+                    tool: false,
+                    userId: USER,
+                });
+
+                await ctx.db.insert("threadContextSummaries", {
+                    coveredCount: 1,
+                    coveredUpToMessageId: message,
+                    createdAt: 1,
+                    summary: "s",
+                    taintedBy,
+                    threadId,
+                    userId: USER,
+                });
+            });
+
+        await summary([]);
+        expect(await ask(threadId)).toBe(true);
+
+        await summary(["web"]);
+        expect(await ask(threadId)).toBe(false);
+    });
 });
 
 describe("consumeLowRiskCheck", () => {

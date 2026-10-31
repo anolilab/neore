@@ -32,6 +32,19 @@ const SUMMARY_TRUNCATION_LENGTH = 200;
 const ELIDED_TOOL_OUTPUT = "[Tool output removed to fit the context window]";
 /** Stands in for the summary when the summary alone would not fit. */
 const DROPPED_SUMMARY_NOTE = "[Earlier conversation was removed to fit the context window]";
+const SUMMARY_HEADER = "[Context from earlier in this conversation]";
+
+/**
+ * Whether {@link compressContextMessages} rewrote older history into plain text. Tool results and attachments lose
+ * their structure there, so a taint check (`devices/lib/taint.ts`) can no longer see them in what is left.
+ */
+export const isCompressedHistory = (messages: ReadonlyArray<{ content?: unknown; role?: unknown }>): boolean =>
+    messages.some(
+        (message) =>
+            message.role === "user" &&
+            typeof message.content === "string" &&
+            (message.content.startsWith(SUMMARY_HEADER) || message.content === DROPPED_SUMMARY_NOTE),
+    );
 
 // ─── Stream Event Types ─────────────────────────────────────────────────────
 
@@ -415,7 +428,7 @@ export const compressContextMessages = (messages: ModelMessage[], contextLimit: 
         const recentMessages = conversationMessages.slice(cut);
         // Use "user" role for summary to avoid conflicting with the real system prompt
         const summary = {
-            content: `[Context from earlier in this conversation]\n${summarizeOlderMessages(olderMessages, contextLimit)}`,
+            content: `${SUMMARY_HEADER}\n${summarizeOlderMessages(olderMessages, contextLimit)}`,
             role: "user" as const,
         } as unknown as ModelMessage;
 
