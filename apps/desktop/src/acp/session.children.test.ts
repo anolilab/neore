@@ -149,6 +149,17 @@ describe("an agent that reports its children", () => {
         expect(children.filter(({ event }) => event.kind === "end").map(({ event }) => event)).toEqual([{ kind: "end", status: "completed", text: "Two files changed." }]);
     });
 
+    it("ends a card whose spawn call never finished when its turn ends, and ignores the child afterwards", async () => {
+        const { calls, finish, update } = await begin({ report: REPORTS_CHILDREN });
+
+        update(spawn);
+        update(message("child here"), "task1");
+        await finish();
+        update(message("late"), "task1");
+
+        expect(calls).toEqual(["tool:task1:in_progress", "child:text", "child:end"]);
+    });
+
     it("ends an open card as cancelled when the turn is cancelled", async () => {
         const { children, session, update } = await begin({ report: REPORTS_CHILDREN });
 

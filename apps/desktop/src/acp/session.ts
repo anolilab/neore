@@ -416,6 +416,8 @@ export class AgentSession {
         clearTimeout(this.cancelTimer);
         this.cancelTimer = undefined;
         this.current = undefined;
+        // A child whose spawn call never reported its end is over with the turn: it must not take output from a later one.
+        this.children.endAll(reason === "cancelled" || this.cancelRequested ? "cancelled" : "completed");
         this.children.discardUnclaimed();
 
         if (delivered === undefined) {
