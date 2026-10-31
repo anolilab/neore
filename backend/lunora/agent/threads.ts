@@ -444,6 +444,9 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         if (host) {
             await endHostThread(context, host, context.now);
         }
+
+        // A goal's review queued between pages would read a half-deleted transcript, charge and open another round.
+        await endActiveGoals(context, args.threadId, "user");
     }
 
     const messages = await context.db

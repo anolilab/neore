@@ -390,9 +390,10 @@ tool results are sent to that model in addition to the one you picked.
 
 - The goal is met.
 - The round limit is reached ("Stopped: round limit").
-- The goal has spent its cost limit of $2 ("Stopped: cost limit"). A model
-  the gateway cannot price adds nothing to the cost, so only the round limit
-  bounds a run on your own key.
+- The goal has spent its cost limit of $2 ("Stopped: cost limit"). The cost
+  is checked after each round, so the last round can take the total past $2.
+  Runs on your own key count when the gateway prices the model; a model it
+  cannot price adds nothing, and then only the round limit bounds the goal.
 - Your daily limit is used up, or the reviewer cannot be reached.
 - You press **Stop**, or send another message, edit a message, regenerate a
   reply or switch to another branch of the chat.

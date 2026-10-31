@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../../schema";
 import { chargeRound } from "../../tasks/account";
-import { deleteAllForThreadIdAsync, softDeleteThread } from "../../agent/threads";
+import { _deletePageForThreadId, deleteAllForThreadIdAsync, softDeleteThread } from "../../agent/threads";
 import {
     claimGoalRound,
     closeStaleGoalRound,
@@ -601,6 +601,28 @@ describe("a goal whose thread is gone", () => {
         expect(await read(active)).toBeNull();
         expect(await read(ended)).toBeNull();
         expect(await count("threadGoals")).toBe(0);
+    });
+
+    it("ends an active goal on the first page, before the rest of the thread goes", async () => {
+        const goalId = await start();
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("messages", {
+                    message: { content: [{ text: "Working on it.", type: "text" }], role: "assistant" },
+                    order: 0,
+                    status: "success",
+                    stepOrder: 1,
+                    threadId,
+                    tool: false,
+                    userId: OWNER,
+                }),
+        );
+
+        const page = await harness.run(async (ctx: any) => await ctx.runMutation(_deletePageForThreadId, { limit: 1, threadId }));
+
+        expect(page.isDone).toBe(false);
+        expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "user" });
     });
 });
 
