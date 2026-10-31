@@ -8067,7 +8067,7 @@ export interface Caller {
             unlockThread: (args: { passcode: string; threadId: Id<"threads"> }) => Promise<{ expiresAt?: number; ok: boolean; proof?: string; retryAfterMs?: number }>;
         };
         thread_summaries: {
-            eraseUserThreadSummaries: (args: { batch?: number; userId: string }) => Promise<boolean>;
+            eraseUserThreadSummaries: (args: { batch?: number; before: number; userId: string }) => Promise<boolean>;
             finishThreadSummary: (args: { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; previousSummaryId?: Id<"threadContextSummaries">; summary?: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads"> }) => Promise<boolean>;
             getThreadSummaryForContext: (args: { promptMessageId?: Id<"messages">; threadId: Id<"threads"> }) => Promise<string | null>;
             listThreadSummariesForExport: (args: { threadId: Id<"threads"> }) => Promise<Array<{ coveredCount: number; coveredUpToMessageId: string; createdAt: number; summary: string }>>;
@@ -8192,7 +8192,7 @@ export interface Caller {
             getSearchDomainBlocklistQuery: (args: { userId: string }) => Promise<Array<string>>;
             getSessionUserQuery: (args?: {}) => Promise<null | import("../lib/auth-types.js").SessionUser>;
             getUserAuthFlagsQuery: (args: { sessionId?: string; userId: string }) => Promise<{ isAnonymous: boolean; plan: "premium" | null; role: string | null }>;
-            getUserPreferencesQuery: (args: { userId: string }) => Promise<{ aboutMe?: string; backupModel?: string; customInstructions?: string; dictationLanguage?: string; language?: string; location?: string; memoryEnabled: boolean; nickname?: string; profession?: string; threadTitleInstructions?: string; timezone?: string }>;
+            getUserPreferencesQuery: (args: { userId: string }) => Promise<{ aboutMe?: string; backupModel?: string; customInstructions?: string; dictationLanguage?: string; language?: string; location?: string; memoryEnabled: boolean; nickname?: string; profession?: string; threadSummariesEnabled: boolean; threadTitleInstructions?: string; timezone?: string }>;
             getUserRunPlanQuery: (args: { userId: string }) => Promise<{ isAdmin: boolean; plan: "premium" | null }>;
             getUserSettings: (args?: {}) => Promise<import("./dataModel.js").Doc_userSettings | null>;
             hasPassword: (args?: {}) => Promise<boolean>;

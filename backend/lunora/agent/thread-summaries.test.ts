@@ -294,6 +294,38 @@ describe("making a summary", () => {
     });
 });
 
+describe("a branch", () => {
+    it("summarises a reply regenerated on an earlier turn, though another branch holds later rows", async () => {
+        expect.assertions(2);
+
+        await seedThread(ROWS + 10);
+        // Back on turn 64, the reply is regenerated: a sibling of rows[129], which the original path went on past.
+        // The original path's next turn keeps its parent, as `addMessagesHandler` pins it before a sibling lands.
+        await harness.run(async (ctx: any) => await ctx.db.patch(rowIds[130], { parentMessageId: rowIds[129] }));
+        const regenerated = await insertRow(129, { parentMessageId: rowIds[128] });
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: regenerated }));
+        await runJob(regenerated);
+
+        expect(generateText).toHaveBeenCalledTimes(1);
+        expect(await summaries()).toHaveLength(1);
+    });
+
+    it("does nothing for a reply that no longer ends the active path", async () => {
+        expect.assertions(1);
+
+        await seedThread(ROWS + 10);
+        // The original path's next turn keeps its parent, as `addMessagesHandler` pins it before a sibling lands.
+        await harness.run(async (ctx: any) => await ctx.db.patch(rowIds[130], { parentMessageId: rowIds[129] }));
+        const regenerated = await insertRow(129, { parentMessageId: rowIds[128] });
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: regenerated }));
+        await runJob(rowIds.at(-1)!);
+
+        expect(generateText).not.toHaveBeenCalled();
+    });
+});
+
 describe("the debounce and redelivery", () => {
     it("runs one job for two replies: the earlier job finds a newer row", async () => {
         expect.assertions(3);
@@ -513,6 +545,37 @@ describe("what a summary carries over from the rows it folds in", () => {
         expect(head?.taintedBy).toStrictEqual([]);
     });
 
+    it("moves the cover past a first cut with no text, so the next job summarises the rows after it", async () => {
+        expect.assertions(5);
+
+        await seedThread(ROWS);
+        // The first cut (rows 0..49) is all tool results.
+        await harness.run(async (ctx: any) => {
+            for (const id of rowIds.slice(0, 50)) {
+                await ctx.db.patch(id, { message: toolRow.message, tool: true });
+            }
+        });
+        await runJob(rowIds.at(-1)!);
+
+        const [cover] = await summaries();
+
+        expect(generateText).not.toHaveBeenCalled();
+        expect(cover?.coveredUpToMessageId).toBe(rowIds[49]);
+        // An empty cover gives the agent nothing to read.
+        expect(await contextSummary()).toBeNull();
+
+        for (let index = ROWS; index < ROWS + 30; index += 1) {
+            rowIds.push(await insertRow(index));
+        }
+
+        await runJob(rowIds.at(-1)!);
+
+        const [next] = await summaries();
+
+        expect(generateText).toHaveBeenCalledTimes(1);
+        expect(next?.coveredUpToMessageId).toBe(rowIds[79]);
+    });
+
     it("keeps the taint when the folded rows have no text of their own, which re-stores the old summary", async () => {
         expect.assertions(3);
 
@@ -620,6 +683,43 @@ describe("the cost of a thread too long to read from the top", () => {
     });
 });
 
+describe("a run refused after its model call", () => {
+    it("frees its cut, so a job after the user switches summaries back on retries it at once", async () => {
+        expect.assertions(3);
+
+        await seedThread(ROWS);
+        // The user opts out while the model call runs.
+        generateText.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                const settings = await ctx.db
+                    .query("userSettings")
+                    .withIndex("by_userId", (q: any) => q.eq("userId", OWNER))
+                    .first();
+
+                await ctx.db.patch(settings._id, { threadSummariesEnabled: false });
+            });
+
+            return { text: "Made while opting out.", usage: {} };
+        });
+        await runJob(rowIds.at(-1)!);
+
+        expect(await summaries()).toHaveLength(0);
+
+        await harness.run(async (ctx: any) => {
+            const settings = await ctx.db
+                .query("userSettings")
+                .withIndex("by_userId", (q: any) => q.eq("userId", OWNER))
+                .first();
+
+            await ctx.db.patch(settings._id, { threadSummariesEnabled: true });
+        });
+        await runJob(rowIds.at(-1)!);
+
+        expect(generateText).toHaveBeenCalledTimes(2);
+        expect(await summaries()).toHaveLength(1);
+    });
+});
+
 describe("an edit that lands while a summary is being made", () => {
     it("refuses to store a summary prepared before the edit, and lets the next job try again", async () => {
         expect.assertions(4);
@@ -670,16 +770,45 @@ describe("turning the setting off", () => {
                 }),
         );
 
-        const first = await harness.run(async (ctx: any) => await ctx.runMutation(eraseUserThreadSummaries, { batch: 3, userId: OWNER }));
+        const first = await harness.run(async (ctx: any) => await ctx.runMutation(eraseUserThreadSummaries, { batch: 3, before: Date.now(), userId: OWNER }));
 
         expect(first).toBe(true);
         expect(await summaries()).toHaveLength(2);
 
-        const second = await harness.run(async (ctx: any) => await ctx.runMutation(eraseUserThreadSummaries, { batch: 3, userId: OWNER }));
+        const second = await harness.run(async (ctx: any) => await ctx.runMutation(eraseUserThreadSummaries, { batch: 3, before: Date.now(), userId: OWNER }));
 
         expect(second).toBe(false);
         const left = await summaries();
 
         expect(left.map((row) => row.summary)).toStrictEqual(["theirs"]);
+    });
+
+    it("keeps the summaries made after the user switched it back on while the erase was still pending", async () => {
+        expect.assertions(2);
+
+        await seedThread(ROWS);
+        await storeSummary(10, "before the opt-out");
+        const optedOutAt = Date.now();
+
+        // Switched back on, and a new summary made, before the erase job ran.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadContextSummaries", {
+                    coveredCount: 50,
+                    coveredUpToMessageId: rowIds[49],
+                    createdAt: optedOutAt + 60_000,
+                    summary: "after the re-enable",
+                    taintedBy: [],
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const more = await harness.run(async (ctx: any) => await ctx.runMutation(eraseUserThreadSummaries, { before: optedOutAt, userId: OWNER }));
+
+        expect(more).toBe(false);
+        const left = await summaries();
+
+        expect(left.map((row) => row.summary)).toStrictEqual(["after the re-enable"]);
     });
 });

@@ -360,6 +360,7 @@ const runSpeaker = async (
                 prompt: "",
                 savedMessages: result.savedMessages,
                 skill: { id: speaker.skillId, name: speaker.name },
+                summarizeThread: turn.prefs.threadSummariesEnabled,
                 threadId: turn.threadId,
                 ...(turn.prefs.timezone && { timeZone: turn.prefs.timezone }),
                 timingStart,

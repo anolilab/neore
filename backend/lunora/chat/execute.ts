@@ -373,6 +373,7 @@ export const runStreamingAgent = internalAction
                     savedMessages: result.savedMessages,
                     ...(invokedSkill && { skill: { name: `/${invokedSkill.slug}`, ...(invokedSkill.skillId && { id: invokedSkill.skillId }) } }),
                     steeredTexts: steering.steeredTexts(),
+                    summarizeThread: runContext.prefs.threadSummariesEnabled,
                     threadId,
                     ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }),
                     timingStart,

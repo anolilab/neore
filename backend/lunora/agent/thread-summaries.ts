@@ -209,20 +209,19 @@ export const prepareThreadSummary = internalMutation
             return null;
         }
 
-        // Idle since the reply: the reply's last row is still the thread's latest, and nothing is streaming.
-        const latest = (await ctx.db.messages.findFirst({ orderBy: [...STORAGE_ORDER_DESC], where: { threadId: thread._id } })) as Row | null;
+        // Idle since the reply: the reply's last row still ends the ACTIVE path, and nothing is streaming. Another
+        // branch may hold rows of a later order (a regenerate of an earlier turn), so the newest row of the whole
+        // thread is the leaf only before the thread ever branched.
+        const latest = thread.activeLeafMessageId
+            ? null
+            : ((await ctx.db.messages.findFirst({ orderBy: [...STORAGE_ORDER_DESC], where: { threadId: thread._id } })) as Row | null);
+        const leaf = await leafOf(ctx, thread, latest);
 
-        if (!latest || latest._id !== args.afterMessageId) {
+        if (!leaf || leaf._id !== args.afterMessageId) {
             return null;
         }
 
         if (await ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId: thread._id } })) {
-            return null;
-        }
-
-        const leaf = await leafOf(ctx, thread, latest);
-
-        if (!leaf) {
             return null;
         }
 
@@ -289,7 +288,9 @@ export const prepareThreadSummary = internalMutation
 /**
  * Stores the summary and drops the one it extends, keeping the newest few of
  * other branches. With no `summary` the run failed and only its claim goes, so
- * the next reply's job can try the same cut again.
+ * the next reply's job can try the same cut again. An empty `summary` is a cover
+ * with nothing to say yet (the rows had no text): it moves the cut on, and the
+ * agent reads nothing from it.
  */
 export const finishThreadSummary = internalMutation
     .input({
@@ -312,26 +313,32 @@ export const finishThreadSummary = internalMutation
         // The model call took a while: the thread may have been locked, deleted or opted out meanwhile.
         const thread = ownedBy(await ctx.db.get(args.threadId));
 
-        if (!thread || (await blockerOf(ctx, thread)) !== null) {
+        // Refused after the model call: the claim goes too, so a job after a re-enable or an unlock retries at once.
+        const refuse = async (): Promise<false> => {
+            await releaseClaim(ctx, THREAD_SUMMARY_CLAIM_SCOPE, claimKey(args.threadId, args.coveredUpToMessageId));
+
             return false;
+        };
+
+        if (!thread || (await blockerOf(ctx, thread)) !== null) {
+            return await refuse();
         }
 
         // A reply was edited in place since the run was prepared: the rows it read are not the rows there now.
         if ((thread.summaryEpoch ?? 0) !== args.epoch) {
-            await releaseClaim(ctx, THREAD_SUMMARY_CLAIM_SCOPE, claimKey(args.threadId, args.coveredUpToMessageId));
-
-            return false;
+            return await refuse();
         }
 
         const existing = await summariesOf(ctx, args.threadId);
 
-        // Idempotent on the cut; and refuse to store over a summary that moved since the run was prepared.
+        // Idempotent on the cut: a second delivery found it stored, and its claim stays with it.
         if (existing.some((row) => row.coveredUpToMessageId === args.coveredUpToMessageId)) {
             return false;
         }
 
+        // The summary it extends moved since the run was prepared.
         if (args.previousSummaryId && existing.every((row) => row._id !== args.previousSummaryId)) {
-            return false;
+            return await refuse();
         }
 
         await ctx.db.insert("threadContextSummaries", {
@@ -374,17 +381,14 @@ export const runThreadSummary = internalAction
             threadId: args.threadId,
         };
 
-        // Rows with no text of their own: the cover moves on, the summary stays.
+        // Rows with no text of their own: the cover moves on and the summary stays (empty for a first cut, so the next
+        // job starts after these rows instead of picking the same cut again).
         if (job.transcript === "") {
-            if (job.previousSummary) {
-                await ctx.runMutation(internal.agent.thread_summaries.finishThreadSummary, {
-                    ...done,
-                    previousSummaryId: job.previousSummaryId,
-                    summary: job.previousSummary,
-                });
-            } else {
-                await ctx.runMutation(internal.agent.thread_summaries.finishThreadSummary, done);
-            }
+            await ctx.runMutation(internal.agent.thread_summaries.finishThreadSummary, {
+                ...done,
+                ...(job.previousSummaryId && { previousSummaryId: job.previousSummaryId }),
+                summary: job.previousSummary ?? "",
+            });
 
             return null;
         }
@@ -504,18 +508,19 @@ export const dropSummariesFromEdit = async (ctx: MutationCtx, threadId: Id<"thre
 
 /**
  * Erases the summaries of every thread of `userId` (they live on the user's own shard): the user switched the
- * setting off, which is a promise that what it made goes. One batch per call; a full batch schedules the next.
- * Returns whether it did.
+ * setting off, which is a promise that what it made goes. Only rows made up to `before`, the moment of that
+ * opt-out: a user who switches it back on while batches are still pending keeps the summaries made since.
+ * One batch per call; a full batch schedules the next. Returns whether it did.
  */
 export const eraseUserThreadSummaries = internalMutation
-    .input({ batch: v.optional(v.number()), userId: v.string().max(MAX_LENGTH.id) })
+    .input({ batch: v.optional(v.number()), before: v.number(), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const batch = args.batch ?? ERASE_BATCH;
-        const rows = await ctx.db
-            .query("threadContextSummaries")
-            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
-            .take(batch);
+        const { page: rows } = await ctx.db.threadContextSummaries.findMany({
+            limit: batch,
+            where: { createdAt: { lte: args.before }, userId: args.userId },
+        });
 
         for (const row of rows) {
             await ctx.db.delete(row._id);
@@ -528,7 +533,7 @@ export const eraseUserThreadSummaries = internalMutation
                 ctx.scheduler,
                 0,
                 internal.agent.thread_summaries.eraseUserThreadSummaries,
-                { batch: args.batch, userId: args.userId },
+                { batch: args.batch, before: args.before, userId: args.userId },
                 args.userId,
             );
         }

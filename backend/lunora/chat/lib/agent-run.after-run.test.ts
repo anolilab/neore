@@ -16,6 +16,7 @@ const baseArgs = {
     firstTokenTime: 1050,
     prompt: "",
     savedMessages: [reply] as never,
+    summarizeThread: true,
     threadId: "thread-1",
     timingStart: 1000,
     userId: "user-a",
@@ -164,7 +165,7 @@ describe("the idle-thread summary job", () => {
     const summaryJobs = (runAfter: ReturnType<typeof vi.fn>) =>
         runAfter.mock.calls.filter((call: unknown[]) => call[1] === internal.agent.thread_summaries.runThreadSummary);
 
-    const run = async (rows: { _id: string; order: number; stepOrder: number }[]) => {
+    const run = async (rows: { _id: string; order: number; stepOrder: number }[], summarizeThread = true) => {
         const runAfter = vi.fn(async () => "job");
 
         await afterRun({ runMutation: vi.fn(async () => undefined), scheduler: { runAfter } } as never, {
@@ -172,6 +173,7 @@ describe("the idle-thread summary job", () => {
             savedMessages: rows.map((row) => {
                 return { ...row, message: { content: "x", role: "assistant" } };
             }) as never,
+            summarizeThread,
         });
 
         return runAfter;
@@ -196,6 +198,12 @@ describe("the idle-thread summary job", () => {
         expect.assertions(1);
 
         expect(summaryJobs(await run([{ _id: "last-row", order: 3, stepOrder: 1 }]))).toHaveLength(0);
+    });
+
+    it("is not scheduled for a user who has not switched summaries on, so an opted-out reply costs no job", async () => {
+        expect.assertions(1);
+
+        expect(summaryJobs(await run([{ _id: "last-row", order: 40, stepOrder: 1 }], false))).toHaveLength(0);
     });
 
     it("moves with each reply: a second reply schedules its own job for its own last row", async () => {

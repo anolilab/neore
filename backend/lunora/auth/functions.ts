@@ -278,7 +278,7 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
     // Context summaries are opt-in: switching them off erases the ones already made (`agent/thread-summaries.ts`),
     // on the user's own shard, where they live.
     if (tableName === "userSettings" && toStore.threadSummariesEnabled !== undefined && toStore.threadSummariesEnabled !== true) {
-        await runAfterOnShard(context.scheduler, 0, internal.agent.thread_summaries.eraseUserThreadSummaries, { userId }, userId);
+        await runAfterOnShard(context.scheduler, 0, internal.agent.thread_summaries.eraseUserThreadSummaries, { before: now, userId }, userId);
     }
 };
 
@@ -1048,6 +1048,7 @@ export const getUserPreferencesQuery = internalQuery
             memoryEnabled: v.boolean(),
             nickname: v.optional(v.string()),
             profession: v.optional(v.string()),
+            threadSummariesEnabled: v.boolean(),
             threadTitleInstructions: v.optional(v.string()),
             timezone: v.optional(v.string()),
         }),
@@ -1069,6 +1070,7 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: userSettings?.memoryEnabled ?? false, // Opt-in; see memory/functions.ts#isMemoryEnabled
                 nickname: userSettings?.nickname ?? undefined,
                 profession: userSettings?.profession ?? undefined,
+                threadSummariesEnabled: userSettings?.threadSummariesEnabled === true, // Opt-in; see agent/thread-summaries.ts
                 threadTitleInstructions: userSettings?.threadTitleInstructions ?? undefined,
                 timezone: userSettings?.timezone ?? undefined,
             };
@@ -1083,6 +1085,7 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: false,
                 nickname: undefined,
                 profession: undefined,
+                threadSummariesEnabled: false,
                 threadTitleInstructions: undefined,
                 timezone: undefined,
             };

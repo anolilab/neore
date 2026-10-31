@@ -151,7 +151,7 @@ export interface InternalApiTypes {
             inheritThreadPasscode: FunctionReference<"mutation", { sourceThreadId: Id<"threads">; targetThreadId: Id<"threads"> }, null>;
         };
         thread_summaries: {
-            eraseUserThreadSummaries: FunctionReference<"mutation", { batch?: number; userId: string }, boolean>;
+            eraseUserThreadSummaries: FunctionReference<"mutation", { batch?: number; before: number; userId: string }, boolean>;
             finishThreadSummary: FunctionReference<"mutation", { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; previousSummaryId?: Id<"threadContextSummaries">; summary?: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads"> }, boolean>;
             getThreadSummaryForContext: FunctionReference<"query", { promptMessageId?: Id<"messages">; threadId: Id<"threads"> }, string | null>;
             listThreadSummariesForExport: FunctionReference<"query", { threadId: Id<"threads"> }, Array<{ coveredCount: number; coveredUpToMessageId: string; createdAt: number; summary: string }>>;
@@ -232,7 +232,7 @@ export interface InternalApiTypes {
             getMCPServersQuery: FunctionReference<"query", { userId: string }, Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>>;
             getSearchDomainBlocklistQuery: FunctionReference<"query", { userId: string }, Array<string>>;
             getUserAuthFlagsQuery: FunctionReference<"query", { sessionId?: string; userId: string }, { isAnonymous: boolean; plan: "premium" | null; role: string | null }>;
-            getUserPreferencesQuery: FunctionReference<"query", { userId: string }, { aboutMe?: string; backupModel?: string; customInstructions?: string; dictationLanguage?: string; language?: string; location?: string; memoryEnabled: boolean; nickname?: string; profession?: string; threadTitleInstructions?: string; timezone?: string }>;
+            getUserPreferencesQuery: FunctionReference<"query", { userId: string }, { aboutMe?: string; backupModel?: string; customInstructions?: string; dictationLanguage?: string; language?: string; location?: string; memoryEnabled: boolean; nickname?: string; profession?: string; threadSummariesEnabled: boolean; threadTitleInstructions?: string; timezone?: string }>;
             getUserRunPlanQuery: FunctionReference<"query", { userId: string }, { isAdmin: boolean; plan: "premium" | null }>;
             rotateKeys: FunctionReference<"action", {}, unknown>;
         };

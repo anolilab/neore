@@ -46,6 +46,7 @@ describe(afterRun, () => {
             prompt: "Plan my dinner",
             savedMessages: [{ _id: "r1", message: { content: "Here is a plan.", role: "assistant" }, order: 1, stepOrder: 1 }] as never,
             steeredTexts: ["actually, I'm vegetarian"],
+            summarizeThread: false,
             threadId: "thread-1",
             timingStart: Date.now(),
             userId: "user-1",
