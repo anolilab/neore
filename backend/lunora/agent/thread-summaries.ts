@@ -82,6 +82,9 @@ const SUMMARY_EVENT = "chat.thread_summary";
 
 const ERASE_BATCH = 50;
 
+/** The summarising call's deadline; it writes at most `SUMMARY_MAX_OUTPUT_TOKENS`, so a minute is ample. */
+const SUMMARY_CALL_TIMEOUT_MS = 60_000;
+
 const STORAGE_ORDER_DESC = [{ order: "desc" }, { stepOrder: "desc" }, { _creationTime: "desc" }] as const;
 
 const claimKey = (threadId: string, coveredUpToMessageId: string): string => `${threadId}:${coveredUpToMessageId}`;
@@ -400,6 +403,8 @@ export const runThreadSummary = internalAction
 
         try {
             const result = await generateText({
+                // A stalled gateway call must not hold the user's scheduler lane: it fails, and the cut is released.
+                abortSignal: AbortSignal.timeout(SUMMARY_CALL_TIMEOUT_MS),
                 maxOutputTokens: SUMMARY_MAX_OUTPUT_TOKENS,
                 model: await getUtilityModel(gatewayFetch(ctx), { threadId: args.threadId, userId: job.userId }),
                 prompt: buildSummaryPrompt(job.previousSummary, job.transcript),

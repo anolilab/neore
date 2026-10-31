@@ -335,11 +335,12 @@ const AccountSettings: FC = () => {
                             <Label className="text-base font-medium" htmlFor="thread-summaries">
                                 {t`Summarise long chats`}
                             </Label>
-                            <p className="text-muted-foreground text-sm">
+                            <p className="text-muted-foreground text-sm" id="thread-summaries-description">
                                 {t`Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made.`}
                             </p>
                         </div>
                         <Switch
+                            aria-describedby="thread-summaries-description"
                             checked={isThreadSummariesEnabled}
                             id="thread-summaries"
                             onCheckedChange={(checked) => {

@@ -147,6 +147,15 @@ describe("making a summary", () => {
         expect(generateText.mock.calls[0]?.[0].prompt).not.toContain("turn 120");
     });
 
+    it("gives the model call a deadline, so a stalled gateway cannot hold the scheduler lane", async () => {
+        expect.assertions(1);
+
+        await seedThread(ROWS);
+        await runJob(rowIds.at(-1)!);
+
+        expect(generateText.mock.calls[0]?.[0].abortSignal).toBeInstanceOf(AbortSignal);
+    });
+
     it("caps the stored summary", async () => {
         expect.assertions(1);
 
