@@ -28,6 +28,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { readCappedBody } from "./http";
 import { liveHostStream } from "./remote";
 import { isHostRunThread } from "./lib/host-thread";
+import { pendingHandoffOf } from "./lib/pending-handoff";
 import { sessionOfThread, touchSession } from "./lib/sessions";
 
 /** How many of a thread's latest streams a retry looks through for its own; a turn is one stream, and a day holds few. */
@@ -118,9 +119,20 @@ export const sendToHost = internalMutation
         }
 
         const turnId = crypto.randomUUID();
+        // The first prompt after a switch carries what the agent is taking over (plans/harness-switch.md, S3); the saved
+        // message is the user's own words alone. A prompt too long for the call with it is refused, never cut.
+        const handoff = await pendingHandoffOf(ctx, thread);
         const call = await createAcpCall(
             ctx,
-            { deviceId: session.deviceId, input: { sessionId: session.hostSessionId, text: args.text, turnId }, kind: "acp_send", threadId, userId },
+            {
+                deviceId: session.deviceId,
+                input: { sessionId: session.hostSessionId, text: handoff ? `${handoff}\n\n${args.text}` : args.text, turnId },
+                kind: "acp_send",
+                // What the agent took over from another thread is in its context for as long as the session lasts.
+                taintedBy: session.taintedBy,
+                threadId,
+                userId,
+            },
             now,
         );
 

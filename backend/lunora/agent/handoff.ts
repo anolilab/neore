@@ -84,8 +84,15 @@ const PREFACE: Record<HandoffKind, string> = {
 const CLOSING = "END OF RECORD. What follows is the conversation itself, starting with the user's next message.";
 
 /** The handoff text. The same inputs always give the same bytes. */
-export const composeHandoff = (input: { kind: HandoffKind; summary?: string; tail: HandoffTurn[] }): string => {
+export const composeHandoff = (input: { kind: HandoffKind; omittedTurns?: number; summary?: string; tail: HandoffTurn[] }): string => {
     const parts: string[] = [PREFACE[input.kind]];
+
+    if (input.omittedTurns !== undefined) {
+        // Zero stands for "some, not counted".
+        const count = input.omittedTurns === 1 ? "1 earlier turn is" : `${input.omittedTurns} earlier turns are`;
+
+        parts.push(input.omittedTurns === 0 ? "Earlier turns are not included." : `${count} not included.`);
+    }
 
     if (input.summary) {
         parts.push(`SUMMARY OF THE EARLIER TURNS (written by a model, so detail may be missing):\n${quoteTranscript(input.summary.trim())}`);
@@ -145,6 +152,50 @@ export const planHandoff = (newestFirst: ReadonlyArray<HandoffTurn>): HandoffPla
     }
 
     return { older: newestFirst.slice(count).toReversed(), tail: newestFirst.slice(0, count).toReversed() };
+};
+
+const encoder = new TextEncoder();
+
+/** UTF-8 bytes of `text` as a JSON string value, which is what a signed call carries it as. */
+export const jsonBytes = (text: string): number => encoder.encode(JSON.stringify(text)).length - 2;
+
+/**
+ * The handoff for a target that is sent a text and nothing else — a coding agent on a paired computer, a new thread
+ * that takes over from one — with no summary of what does not fit: the newest turns, whole, until `maxBytes` (as
+ * the signed call carries them) is reached, and a line saying how many earlier ones are left out. A turn is never
+ * cut: when the newest alone does not fit this throws, before anything is written.
+ *
+ * `omittedEarlier` says rows older than `newestFirst` exist, which the count cannot know.
+ */
+export const composeTailHandoff = (newestFirst: ReadonlyArray<HandoffTurn>, maxBytes: number, omittedEarlier = false): string => {
+    // The frame, and the longest line that can name the turns left out.
+    const room = maxBytes - jsonBytes(composeHandoff({ kind: "portable", omittedTurns: newestFirst.length + 1, tail: [] }));
+    let used = 0;
+    let count = 0;
+
+    for (const turn of newestFirst) {
+        const size = jsonBytes(`${renderTurn(turn)}\n`);
+
+        if (used + size > room) {
+            break;
+        }
+
+        used += size;
+        count += 1;
+    }
+
+    if (count === 0 && newestFirst.length > 0) {
+        throw tooLarge();
+    }
+
+    const omitted = newestFirst.length - count;
+
+    // Zero stands for "some, not counted": the rows older than the ones read.
+    return composeHandoff({
+        kind: "portable",
+        ...((omitted > 0 || omittedEarlier) && { omittedTurns: omittedEarlier ? 0 : omitted }),
+        tail: newestFirst.slice(0, count).toReversed(),
+    });
 };
 
 /** Throws when `text` weighs more than the budget. After {@link capSummary} only a frame larger than planned can do that. */

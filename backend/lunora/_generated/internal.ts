@@ -28,6 +28,10 @@ export interface InternalApiTypes {
         send: {
             sendToHost: FunctionReference<"mutation", { plan: "free" | "premium"; requestId: string; text: string; threadId: string; unlockProof?: string; userId: string }, { messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "locked" | "not_found" | "offline" | "rate_limited" | "session_ended" | "too_large" | "turn_running" }>;
         };
+        switch: {
+            commitHostSwitch: FunctionReference<"mutation", { clientId: string; target: { kind: "model"; model: string } | { agentKey: string; folderId: string; hostId: Id<"devices">; kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string } | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; hostId: string; kind: "host" }; coldStartCostly: boolean; forkedThreadId?: string; messageId: string | null; switched: boolean }>;
+            isHostSwitchSource: FunctionReference<"query", { threadId: Id<"threads"> }, boolean>;
+        };
         upload: {
             finalizeHostUpload: FunctionReference<"action", { filename: string; uploadId: string; userId: string }, null | { fileId: string; mediaType: string; storageKey: string }>;
             hostStreamNext: FunctionReference<"query", { turnId: string; userId: string }, null | number>;
@@ -320,8 +324,8 @@ export interface InternalApiTypes {
     chat: {
         agent_switch: {
             beginSwitchSummary: FunctionReference<"mutation", { threadId: Id<"threads">; userId: string }, null | number>;
-            commitAgentSwitch: FunctionReference<"mutation", { clientId: string; expectedLeafId: string; handoff?: { mode: "delta" | "portable"; summarized: boolean; text: string }; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string }; coldStartCostly: boolean; messageId: string | null; switched: boolean }>;
-            planAgentSwitch: FunctionReference<"query", { clientId: string; mode?: "full" | "portable"; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string }; allowance?: boolean; leafId?: string; mode?: "full" | "portable" | "delta"; omittedEarlier?: boolean; turns?: Array<{ role: "assistant" | "user"; text: string }> }>;
+            commitAgentSwitch: FunctionReference<"mutation", { clientId: string; expectedLeafId: string; handoff?: { mode: "delta" | "portable"; summarized: boolean; text: string }; target: { kind: "model"; model: string } | { agentKey: string; folderId: string; hostId: Id<"devices">; kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string } | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; hostId: string; kind: "host" }; coldStartCostly: boolean; forkedThreadId?: string; messageId: string | null; switched: boolean }>;
+            planAgentSwitch: FunctionReference<"query", { clientId: string; mode?: "full" | "portable"; target: { kind: "model"; model: string } | { agentKey: string; folderId: string; hostId: Id<"devices">; kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string }; allowance?: boolean; leafId?: string; mode?: "full" | "portable" | "delta"; omittedEarlier?: boolean; turns?: Array<{ role: "assistant" | "user"; text: string }> }>;
         };
         aside: {
             readAsideSnapshot: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { liveReply?: string; rows: Array<{ role: "assistant" | "user"; text: string }>; running: boolean }>;
@@ -1155,6 +1159,10 @@ export const internal: InternalApiTypes = {
         },
         send: {
             sendToHost: { __lunoraRef: "acp_send:sendToHost" },
+        },
+        switch: {
+            commitHostSwitch: { __lunoraRef: "acp_switch:commitHostSwitch" },
+            isHostSwitchSource: { __lunoraRef: "acp_switch:isHostSwitchSource" },
         },
         upload: {
             finalizeHostUpload: { __lunoraRef: "acp_upload:finalizeHostUpload" },

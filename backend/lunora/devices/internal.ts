@@ -10,7 +10,7 @@ import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { ACP_CLEARED } from "../acp/lib/constants";
 import { HOST_DID_NOT_ANSWER, onAcpCallEnded } from "../acp/lib/calls";
-import { threadSummaryTaint } from "../agent/thread-summary-taint";
+import { threadHandoffTaint, threadSummaryTaint } from "../agent/thread-summary-taint";
 import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
@@ -37,7 +37,7 @@ export const isDeviceEligibleThread = (thread: ThreadRow | null, userId: string,
     thread.externalThreadId === undefined &&
     !hasGrants;
 
-const loadEligibleThread = async (ctx: Pick<QueryCtx, "db">, threadId: Doc<"threads">["_id"], userId: string): Promise<Doc<"threads"> | null> => {
+export const loadEligibleThread = async (ctx: Pick<QueryCtx, "db">, threadId: Doc<"threads">["_id"], userId: string): Promise<Doc<"threads"> | null> => {
     const thread = await ctx.db.get(threadId);
     const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
 
@@ -148,8 +148,9 @@ export const createDeviceCall = internalMutation
             return { error: "rate_limited" as const };
         }
 
-        // The model may have read untrusted content that only a summary of the thread's older turns still holds.
-        const taintedBy = mergeTaint(args.taintedBy, await threadSummaryTaint(ctx, threadId));
+        // The model may have read untrusted content that only a summary of the thread's older turns still holds, or
+        // that a coding agent read before this thread took over from it.
+        const taintedBy = mergeTaint(args.taintedBy, await threadSummaryTaint(ctx, threadId), await threadHandoffTaint(ctx, threadId));
         const deadline = now + DEVICE_CALL_DEADLINE_MS;
         const callId = await ctx.db.insert("deviceCalls", {
             createdAt: now,

@@ -7838,7 +7838,7 @@ msgstr "Could not stop the sub-agent."
 msgid "Could not stop the worker."
 msgstr "Could not stop the worker."
 
-#: src/features/chat/model-settings/use-model-combobox.ts:138
+#: src/features/chat/model-settings/use-model-combobox.ts:148
 msgid "Could not switch the model. Please try again."
 msgstr "Could not switch the model. Please try again."
 
@@ -14727,7 +14727,7 @@ msgstr "Hand over a summary"
 msgid "Hand over a summary and the recent messages"
 msgstr "Hand over a summary and the recent messages"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:18
+#: src/features/chat/thread/agent-switch-divider.tsx:19
 msgid "Handed over"
 msgstr "Handed over"
 
@@ -20857,7 +20857,7 @@ msgstr "Old generation cinematic model with higher consistency"
 msgid "Older"
 msgstr "Older"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:18
+#: src/features/chat/thread/agent-switch-divider.tsx:19
 msgid "Older messages were summarised"
 msgstr "Older messages were summarised"
 
@@ -29128,9 +29128,9 @@ msgstr "Switch to an organization to share with it."
 msgid "Switch workspace: currently {triggerLabel}"
 msgstr "Switch workspace: currently {triggerLabel}"
 
-#. placeholder {0}: nameOf(part.from.model)
-#. placeholder {1}: nameOf(part.to.model)
-#: src/features/chat/thread/agent-switch-divider.tsx:14
+#. placeholder {0}: switchAgentName(part.from, nameOf)
+#. placeholder {1}: switchAgentName(part.to, nameOf)
+#: src/features/chat/thread/agent-switch-divider.tsx:15
 msgid "Switched from {0} to {1}"
 msgstr "Switched from {0} to {1}"
 

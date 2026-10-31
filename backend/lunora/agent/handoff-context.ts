@@ -14,7 +14,7 @@
  */
 import type { ModelMessage } from "ai";
 
-import { agentSwitchOf } from "./agent-switch-logic";
+import { agentKeyOf, agentSwitchOf } from "./agent-switch-logic";
 import { docsToModelMessages } from "./mapping";
 
 interface PathRow {
@@ -63,11 +63,13 @@ export const deltaOrphans = (docs: ReadonlyArray<PathRow>): { id: string; model:
             continue;
         }
 
-        if (part.mode === "delta" && !left.has(part.to.model) && !orphans.has(part.to.model)) {
-            orphans.set(part.to.model, doc._id);
+        const target = agentKeyOf(part.to);
+
+        if (part.mode === "delta" && !left.has(target) && !orphans.has(target)) {
+            orphans.set(target, doc._id);
         }
 
-        left.add(part.from.model);
+        left.add(agentKeyOf(part.from));
     }
 
     return [...orphans].map(([model, id]) => {
@@ -99,13 +101,14 @@ export const assembleHandoffContext = <D extends PathRow>(
             continue;
         }
 
-        seenBy.set(part.from.model, [...items]);
+        seenBy.set(agentKeyOf(part.from), [...items]);
 
         if (part.mode === "portable" && part.handoff) {
             items = [{ block: part.handoff }];
         } else if (part.mode === "delta") {
             // A delta without a handoff is a switch back with nothing missed: the agent sees what it saw.
-            const seen = seenBy.get(part.to.model) ?? blocksOf<D>(deltaBases.get(part.to.model) ?? []);
+            const target = agentKeyOf(part.to);
+            const seen = seenBy.get(target) ?? blocksOf<D>(deltaBases.get(target) ?? []);
 
             items = part.handoff ? [...seen, { block: part.handoff }] : [...seen];
         }

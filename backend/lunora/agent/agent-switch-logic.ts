@@ -4,7 +4,7 @@
  * it, and the transcript shows it as a divider. Its payload rides in `providerMetadata`,
  * which already holds opaque per-row facts (`neoreJob`) and is nobody's model input.
  */
-import { type AgentRef, type AgentSwitchPart, vAgentSwitch } from "./agent-switch-validators";
+import { type AgentSwitchPart, type SwitchAgentRef, vAgentSwitch } from "./agent-switch-validators";
 
 import { AGENT_SWITCH_KEY } from "./agent-switch-shape";
 
@@ -31,10 +31,49 @@ export const agentSwitchRowContent = (
     return { message: { content: "", role: "system" }, providerMetadata: { [AGENT_SWITCH_KEY]: checked } };
 };
 
-export const sameAgent = (a: AgentRef, b: AgentRef): boolean => a.kind === b.kind && a.model === b.model;
+/**
+ * The string that tells agents apart where a map or a comparison needs one: a model's id, or the host triple.
+ * A model keeps its bare id, so callers that hold only a model id compare against it directly.
+ */
+export const agentKeyOf = (agent: SwitchAgentRef): string =>
+    agent.kind === "model" ? agent.model : `host:${JSON.stringify([agent.hostId, agent.agentKey, agent.folderId])}`;
+
+export const sameAgent = (a: SwitchAgentRef, b: SwitchAgentRef): boolean => agentKeyOf(a) === agentKeyOf(b);
 
 /** The newest switch among `rows` (newest first, as a path walk returns them), if any. */
 export const lastAgentSwitch = (rows: ReadonlyArray<{ providerMetadata?: unknown }>): AgentSwitchPart | undefined =>
     rows.map((row) => agentSwitchOf(row)).find((part) => part !== undefined);
 
 export { AGENT_SWITCH_KEY } from "./agent-switch-shape";
+
+/**
+ * The part as a client is sent it. The handoff is transcript text for the next model, not for the divider, and a coding agent
+ * is named by its label and folder alone: the computer's id, the agent's key and the folder's id are not for a reader of a
+ * thread (a public copy of it included).
+ */
+export const agentSwitchForWire = (part: AgentSwitchPart): Omit<AgentSwitchPart, "from" | "handoff" | "to"> & { from: unknown; to: unknown } => {
+    const { from, to, ...withHandoff } = part;
+    const rest = Object.fromEntries(Object.entries(withHandoff).filter(([key]) => key !== "handoff")) as Omit<AgentSwitchPart, "from" | "handoff" | "to">;
+    const labelsOf = (agent: SwitchAgentRef) =>
+        agent.kind === "host" ? { agentLabel: agent.agentLabel, folderLabel: agent.folderLabel, kind: agent.kind } : agent;
+
+    return { ...rest, from: labelsOf(from), to: labelsOf(to) };
+};
+
+/**
+ * A stored row as a reader who is not the thread's owner is sent it: a divider's payload is replaced by the display form
+ * (`agentSwitchForWire`), or dropped when it does not parse, so a raw read carries no computer id, agent key, folder id or
+ * handoff. The stored row is untouched.
+ */
+export const withoutSwitchIds = <T extends { providerMetadata?: unknown }>(row: T): T => {
+    const metadata = row.providerMetadata as Record<string, unknown> | undefined;
+
+    if (!metadata || !(AGENT_SWITCH_KEY in metadata)) {
+        return row;
+    }
+
+    const others = Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== AGENT_SWITCH_KEY));
+    const part = agentSwitchOf(row);
+
+    return { ...row, providerMetadata: part ? { ...others, [AGENT_SWITCH_KEY]: agentSwitchForWire(part) } : others };
+};

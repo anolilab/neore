@@ -10,6 +10,7 @@ const hoisted = vi.hoisted(() => {
         preview: vi.fn(async (): Promise<unknown> => {
             return { coldStartCostly: false };
         }),
+        navigate: vi.fn(async () => {}),
         showError: vi.fn(),
         switchAgent: vi.fn(),
         thread: { current: undefined as unknown },
@@ -27,6 +28,14 @@ vi.mock("@lingui/react/macro", () => {
 
 vi.mock("@neore/backend/api", () => {
     return { api: { chat: { agent_switch: { switchThreadAgent: { name: "switch" } }, functions: { updateThread: {} } } } };
+});
+
+vi.mock("@tanstack/react-router", () => {
+    return {
+        useRouter: () => {
+            return { navigate: hoisted.navigate };
+        },
+    };
 });
 
 vi.mock("@tanstack/react-query", () => {
@@ -108,6 +117,38 @@ describe("useModelCombobox: a switch that settles after the user opened another 
         });
 
         expect(useModelStore.getState()).toMatchObject({ selectedModel: B, selectedModelThreadId: "t1" });
+    });
+
+    it("opens the thread a switch made instead of staying on the one it left", async () => {
+        hoisted.navigate.mockClear();
+        hoisted.switchAgent.mockResolvedValue({
+            agent: { kind: "model", model: B },
+            coldStartCostly: false,
+            forkedThreadId: "t9",
+            messageId: null,
+            switched: true,
+        });
+
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        await act(async () => {
+            await result.current.changeModel(B);
+        });
+
+        expect(hoisted.navigate).toHaveBeenCalledWith({ params: { threadId: "t9" }, search: {}, to: "/chat/$threadId" });
+    });
+
+    it("does not navigate for a switch inside the thread", async () => {
+        hoisted.navigate.mockClear();
+        hoisted.switchAgent.mockResolvedValue({ agent: { kind: "model", model: B }, coldStartCostly: false, messageId: "m", switched: true });
+
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        await act(async () => {
+            await result.current.changeModel(B);
+        });
+
+        expect(hoisted.navigate).not.toHaveBeenCalled();
     });
 
     const pickThenNavigate = async (finish: (settle: { reject: (error: Error) => void; resolve: (value: unknown) => void }) => void) => {

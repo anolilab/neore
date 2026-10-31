@@ -43,7 +43,7 @@ describe("lastAgentSwitch", () => {
     it("takes the newest switch of a path that is listed newest first", () => {
         const rows = [{}, agentSwitchRowContent(part("b", "c")), {}, agentSwitchRowContent(part("a", "b"))];
 
-        expect(lastAgentSwitch(rows)?.to.model).toBe("c");
+        expect(lastAgentSwitch(rows)?.to).toEqual({ kind: "model", model: "c" });
         expect(lastAgentSwitch([{}, {}])).toBeUndefined();
     });
 });

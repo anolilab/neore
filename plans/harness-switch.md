@@ -223,6 +223,23 @@ thread ([acp-agent-host.md](acp-agent-host.md) §5.1). Needs ACP S4.
   offer list is refused; no consent is created by a switch (test: the offer list is
   unchanged after the switch).
 
+**S3 as built** (differences from the text above):
+- One mutation, `acp/switch.ts#commitHostSwitch`, routed to by `runAgentSwitch` whenever the target is a host agent or the thread is a
+  host-run one. No summary call, no `chargeRound`: the handoff is the newest turns whole (`composeTailHandoff`) with a line for how many
+  earlier ones are left out, capped at `HOST_HANDOFF_MAX_BYTES` (12 KiB as the signed call carries it; the call holds 32 KiB, prompt
+  included). A host target is always `portable`.
+- The divider's `from`/`to` are `vSwitchAgentRef` (a model, or `{ kind: "host", hostId, agentKey, folderId, agentLabel, folderLabel }`).
+  `threads.activeAgent` stays model-only: a host thread's agent is its newest session.
+- Host to host keeps the thread: the session it ran in is set `ended` and a new one opens in the same thread (`sessionOfThread` is the
+  newest by creation, so only it takes writes; the ended agent's later posts are refused). Cloud to host and host to cloud make one
+  new thread, a first-row `portable` divider holding the handoff, and a `continuation` relationship from the source, which is untouched.
+  A repeated `clientId` answers the same `forkedThreadId`.
+- The host agent gets the handoff in front of its first prompt (`/hosts/send`; `acp/lib/pending-handoff.ts` finds it on the path while no
+  user row follows the divider). The saved message is the user's words alone; a prompt that does not fit beside the handoff is `too_large`.
+- Owner only, the pair must be in the target computer's `acpOffers` and the computer online; a refused `acp_start` throws, which rolls the
+  rest back. Not built: the composer control for a host target, an `acp_*` call that closes the ended session's agent on the computer (it
+  idles until the app quits), and a handoff for a prompt typed into the computer's own window.
+
 **S4 — Native reattach.** Same host agent, `native` mode, when its capability
 report says it can load a saved session, and only when agent, folder and host all match the saved session (otherwise the switch is `portable`). Needs ACP S6 (saved session ids).
 - Acceptance: a switch to the same agent in a different offered folder, or on another host, uses `portable` and never reattaches the old session; the reattach uses the saved native session id; when the load fails,

@@ -5,9 +5,13 @@ import { SESSION_TOUCH_MS } from "./constants";
 type Session = Doc<"acpSessions">;
 type SessionStatus = Session["status"];
 
-/** The session a host thread runs in. A host thread has exactly one (`session_open` makes both). */
+/**
+ * The session a host thread runs in now: its newest. A thread has one when it is made (`session_open`), and a switch
+ * to another host agent in the same thread (plans/harness-switch.md, S3) ends it and opens the next, so a thread's
+ * earlier sessions stay as `ended` rows and only the newest can be written into.
+ */
 export const sessionOfThread = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<Session | null> =>
-    await ctx.db.acpSessions.findFirst({ where: { threadId } });
+    await ctx.db.acpSessions.findFirst({ orderBy: [{ _creationTime: "desc" }], where: { threadId } });
 
 /**
  * Writes the session only when something it shows changed; `lastEventAt` moves at most every {@link SESSION_TOUCH_MS}.

@@ -7839,7 +7839,7 @@ msgstr ""
 msgid "Could not stop the worker."
 msgstr ""
 
-#: src/features/chat/model-settings/use-model-combobox.ts:138
+#: src/features/chat/model-settings/use-model-combobox.ts:148
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
@@ -14728,7 +14728,7 @@ msgstr ""
 msgid "Hand over a summary and the recent messages"
 msgstr ""
 
-#: src/features/chat/thread/agent-switch-divider.tsx:18
+#: src/features/chat/thread/agent-switch-divider.tsx:19
 msgid "Handed over"
 msgstr ""
 
@@ -20858,7 +20858,7 @@ msgstr "Modello cinematografico di vecchia generazione con maggiore coerenza"
 msgid "Older"
 msgstr "Meno recenti"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:18
+#: src/features/chat/thread/agent-switch-divider.tsx:19
 msgid "Older messages were summarised"
 msgstr ""
 
@@ -29129,9 +29129,9 @@ msgstr "Passa a un'organizzazione per condividerla con essa."
 msgid "Switch workspace: currently {triggerLabel}"
 msgstr "Cambia spazio di lavoro: attuale {triggerLabel}"
 
-#. placeholder {0}: nameOf(part.from.model)
-#. placeholder {1}: nameOf(part.to.model)
-#: src/features/chat/thread/agent-switch-divider.tsx:14
+#. placeholder {0}: switchAgentName(part.from, nameOf)
+#. placeholder {1}: switchAgentName(part.to, nameOf)
+#: src/features/chat/thread/agent-switch-divider.tsx:15
 msgid "Switched from {0} to {1}"
 msgstr ""
 
